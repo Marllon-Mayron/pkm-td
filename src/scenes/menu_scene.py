@@ -75,11 +75,11 @@ class MenuScene(BaseScene):
         # Botões - AGORA: "Iniciar Jogo" vai para seleção de fases
         self.buttons = [
             Button(0.3, 0.5, 0.4, 0.08, "Iniciar Jogo",
-                  (0, 100, 0), (0, 150, 0), self.open_phase_select, None),
+                  (100, 100, 0), (150, 150, 0), self.open_phase_select, None),
             Button(0.3, 0.6, 0.4, 0.08, "Configurações",
                   (100, 100, 0), (150, 150, 0), self.open_settings, None),
             Button(0.3, 0.4, 0.4, 0.08, "Editor de Fases",
-                   (100, 50, 150), (150, 100, 200), self.open_editor, None),
+                   (100, 100, 0), (150, 150, 0), self.open_editor, None),
             Button(0.3, 0.7, 0.4, 0.08, "Sair",
                   (100, 0, 0), (150, 0, 0), self.quit_game, None)
         ]
@@ -218,7 +218,7 @@ class MenuScene(BaseScene):
     def open_editor(self):
         """Abre o editor de fases"""
         print("Abrindo editor de fases...")
-        from src.scenes.editor_scene import EditorScene
+        from src.scenes.editor.editor_scene import EditorScene
         self.game.current_scene = EditorScene(self.game)
 
     def quit_game(self):
