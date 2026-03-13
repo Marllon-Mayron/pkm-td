@@ -60,44 +60,44 @@ class Layer:
             print(f"Erro ao carregar tileset: {e}")
             return False
 
-    def render(self, screen, camera, screen_manager, offset_x=0, offset_y=0):
+    def render(self, screen, camera, screen_manager):
+        """Renderiza a layer com cálculos inteiros para evitar gaps"""
         if not self.visible or not self.tileset:
             return
 
         visible_rect = camera.get_visible_rect()
+
         start_x = max(0, int(visible_rect.left // self.tile_size))
         start_y = max(0, int(visible_rect.top // self.tile_size))
         end_x = min(self.width, int(visible_rect.right // self.tile_size) + 1)
         end_y = min(self.height, int(visible_rect.bottom // self.tile_size) + 1)
 
-        # Calcula offset da câmera
-        cam_offset_x = -camera.x * camera.zoom + screen_manager.render_width / 2
-        cam_offset_y = -camera.y * camera.zoom + screen_manager.render_height / 2
+        # PRÉ-CALCULA usando inteiros
+        cam_offset_x = int(-camera.x * camera.zoom * screen_manager.render_scale +
+                           (screen_manager.render_width / 2) * screen_manager.render_scale +
+                           screen_manager.viewport_x)
+        cam_offset_y = int(-camera.y * camera.zoom * screen_manager.render_scale +
+                           (screen_manager.render_height / 2) * screen_manager.render_scale +
+                           screen_manager.viewport_y)
+
+        tile_size_scaled = int(self.tile_size * camera.zoom * screen_manager.render_scale)
 
         for y in range(start_y, end_y):
             for x in range(start_x, end_x):
                 tile_id = self.tiles[y][x]
                 if tile_id > 0 and tile_id - 1 < len(self.tileset):
-                    # Calcula posição no mundo
-                    world_x = x * self.tile_size + offset_x
-                    world_y = y * self.tile_size + offset_y
+                    # Posição na tela com INT para evitar gaps
+                    screen_x = x * tile_size_scaled + cam_offset_x
+                    screen_y = y * tile_size_scaled + cam_offset_y
 
-                    # Calcula posição na superfície de renderização
-                    render_x = world_x * camera.zoom + cam_offset_x
-                    render_y = world_y * camera.zoom + cam_offset_y
-
-                    # IMPORTANTE: Converte para tela usando o ScreenManager
-                    screen_x, screen_y = screen_manager.get_screen_position(render_x, render_y)
-
-                    # Tamanho do tile na tela (considerando zoom E escala da tela)
-                    tile_size_scaled = int(self.tile_size * camera.zoom * screen_manager.render_scale)
-
-                    # Renderiza o tile
                     tile_img = self.tileset[tile_id - 1]
 
-                    # Só escala se necessário
-                    if tile_img.get_width() != tile_size_scaled:
-                        scaled_tile = pygame.transform.scale(tile_img, (tile_size_scaled, tile_size_scaled))
+                    if (tile_img.get_width() != tile_size_scaled or
+                            tile_img.get_height() != tile_size_scaled):
+                        scaled_tile = pygame.transform.scale(
+                            tile_img,
+                            (tile_size_scaled, tile_size_scaled)
+                        )
                         scaled_tile.set_alpha(self.opacity)
                         screen.blit(scaled_tile, (screen_x, screen_y))
                     else:
@@ -156,18 +156,29 @@ class LayerManager:
             if layer.layer_type == LayerType.CEILING:
                 layer.render(screen, camera, screen_manager)
 
+
     def to_dict(self):
         """Converte para dicionário para salvar em JSON"""
+        # Calcula o tamanho máximo entre todas as layers
+        max_width = 0
+        max_height = 0
+
+        for layer in self.layers:
+            max_width = max(max_width, layer.width)
+            max_height = max(max_height, layer.height)
+
         return {
-            "width": self.width,
-            "height": self.height,
+            "width": max_width,  # Salva o tamanho máximo real
+            "height": max_height,
             "tile_size": self.tile_size,
             "layers": [
                 {
                     "name": layer.name,
                     "type": layer.layer_type.value,
                     "tiles": layer.tiles,
-                    "tileset_path": layer.tileset_path
+                    "tileset_path": layer.tileset_path,
+                    "width": layer.width,  # Salva o tamanho individual de cada layer
+                    "height": layer.height
                 }
                 for layer in self.layers
             ]
@@ -175,20 +186,34 @@ class LayerManager:
 
     def from_dict(self, data, base_path=""):
         """Carrega do dicionário"""
-        self.width = data["width"]
-        self.height = data["height"]
-        self.tile_size = data["tile_size"]
+        # Usa o tamanho máximo salvo
+        self.width = data.get("width", 100)  # fallback para 100 se não existir
+        self.height = data.get("height", 100)
+        self.tile_size = data.get("tile_size", 16)
         self.layers = []
 
         for layer_data in data["layers"]:
+            # Verifica se a layer tem tamanho próprio salvo, senão usa o global
+            layer_width = layer_data.get("width", self.width)
+            layer_height = layer_data.get("height", self.height)
+
+            # Obtém os tiles
+            loaded_tiles = layer_data["tiles"]
+
+            # Cria a layer com as dimensões corretas
             layer = Layer(
                 layer_data["name"],
                 LayerType(layer_data["type"]),
-                self.width,
-                self.height,
+                layer_width,
+                layer_height,
                 self.tile_size
             )
-            layer.tiles = layer_data["tiles"]
+
+            # Copia os tiles, garantindo que as dimensões correspondam
+            for y in range(min(len(loaded_tiles), layer_height)):
+                for x in range(min(len(loaded_tiles[y]), layer_width)):
+                    if y < layer_height and x < layer_width:
+                        layer.tiles[y][x] = loaded_tiles[y][x]
 
             if layer_data.get("tileset_path"):
                 tileset_path = os.path.join(base_path, layer_data["tileset_path"])

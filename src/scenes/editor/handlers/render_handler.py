@@ -63,65 +63,102 @@ class EditorRenderHandler:
             print("Nenhum inimigo para renderizar!")
 
     def _render_grid(self, screen):
-        """Renderiza o grid"""
+        """Renderiza o grid alinhado perfeitamente com os tiles"""
+        if not self.editor.show_grid:
+            return
+
+        # Calcula o retângulo visível no mundo
         visible_rect = self.editor.camera.get_visible_rect()
 
-        # Calcula offset da câmera
-        cam_offset_x = -self.editor.camera.x * self.editor.camera.zoom + self.editor.screen_manager.render_width / 2
-        cam_offset_y = -self.editor.camera.y * self.editor.camera.zoom + self.editor.screen_manager.render_height / 2
+        # Converte para coordenadas de grid
+        start_col = int(visible_rect.left // self.editor.grid_size)
+        start_row = int(visible_rect.top // self.editor.grid_size)
+        end_col = int(visible_rect.right // self.editor.grid_size) + 1
+        end_row = int(visible_rect.bottom // self.editor.grid_size) + 1
 
-        # Calcula limites do grid
-        start_x = int(visible_rect.left // self.editor.grid_size) * self.editor.grid_size
-        start_y = int(visible_rect.top // self.editor.grid_size) * self.editor.grid_size
-        end_x = int(visible_rect.right // self.editor.grid_size) * self.editor.grid_size + self.editor.grid_size
-        end_y = int(visible_rect.bottom // self.editor.grid_size) * self.editor.grid_size + self.editor.grid_size
+        # Cria superfície para a grid (mesmo tamanho do viewport)
+        grid_surface = pygame.Surface(
+            (self.editor.screen_manager.viewport_width,
+             self.editor.screen_manager.viewport_height),
+            pygame.SRCALPHA
+        )
 
-        # Cria superfície para a grid
-        grid_surface = pygame.Surface((self.editor.screen_manager.viewport_width,
-                                       self.editor.screen_manager.viewport_height), pygame.SRCALPHA)
+        # Desenha linhas verticais
+        for col in range(start_col, end_col + 1):
+            # Posição mundial da linha
+            world_x = col * self.editor.grid_size
 
-        # Linhas verticais
-        x = start_x
-        while x <= end_x:
-            render_x = x * self.editor.camera.zoom + cam_offset_x
-            render_y1 = visible_rect.top * self.editor.camera.zoom + cam_offset_y
-            render_y2 = visible_rect.bottom * self.editor.camera.zoom + cam_offset_y
+            # Converte para coordenadas de tela
+            screen_x, _ = self._world_to_screen(world_x, 0)
 
-            screen_x, _ = self.editor.screen_manager.get_screen_position(render_x, 0)
-            screen_y1, _ = self.editor.screen_manager.get_screen_position(0, render_y1)
-            screen_y2, _ = self.editor.screen_manager.get_screen_position(0, render_y2)
-
+            # Ajusta para coordenadas locais do viewport
             grid_x = screen_x - self.editor.screen_manager.viewport_x
-            grid_y1 = screen_y1 - self.editor.screen_manager.viewport_y
-            grid_y2 = screen_y2 - self.editor.screen_manager.viewport_y
 
-            color = (150, 80, 80, 150) if x < 0 else (80, 80, 80, 100)
-            pygame.draw.line(grid_surface, color,
-                             (grid_x, grid_y1), (grid_x, grid_y2),
-                             max(1, int(1 * self.editor.screen_manager.render_scale)))
-            x += self.editor.grid_size
+            # Só desenha se estiver dentro do viewport
+            if 0 <= grid_x <= self.editor.screen_manager.viewport_width:
+                # Cor diferente para o eixo 0 (origem)
+                if col == 0:
+                    color = (255, 100, 100, 180)  # Vermelho para eixo Y
+                    width = 2
+                else:
+                    color = (100, 100, 100, 100)  # Cinza para as demais
+                    width = 1
 
-        # Linhas horizontais
-        y = start_y
-        while y <= end_y:
-            render_x1 = visible_rect.left * self.editor.camera.zoom + cam_offset_x
-            render_x2 = visible_rect.right * self.editor.camera.zoom + cam_offset_x
-            render_y = y * self.editor.camera.zoom + cam_offset_y
+                pygame.draw.line(
+                    grid_surface,
+                    color,
+                    (grid_x, 0),
+                    (grid_x, self.editor.screen_manager.viewport_height),
+                    width
+                )
 
-            screen_x1, _ = self.editor.screen_manager.get_screen_position(render_x1, 0)
-            screen_x2, _ = self.editor.screen_manager.get_screen_position(render_x2, 0)
-            screen_y, _ = self.editor.screen_manager.get_screen_position(0, render_y)
+        # Desenha linhas horizontais
+        for row in range(start_row, end_row + 1):
+            # Posição mundial da linha
+            world_y = row * self.editor.grid_size
 
-            grid_x1 = screen_x1 - self.editor.screen_manager.viewport_x
-            grid_x2 = screen_x2 - self.editor.screen_manager.viewport_x
+            # Converte para coordenadas de tela
+            _, screen_y = self._world_to_screen(0, world_y)
+
+            # Ajusta para coordenadas locais do viewport
             grid_y = screen_y - self.editor.screen_manager.viewport_y
 
-            color = (150, 80, 80, 150) if y < 0 else (80, 80, 80, 100)
-            pygame.draw.line(grid_surface, color,
-                             (grid_x1, grid_y), (grid_x2, grid_y),
-                             max(1, int(1 * self.editor.screen_manager.render_scale)))
-            y += self.editor.grid_size
+            # Só desenha se estiver dentro do viewport
+            if 0 <= grid_y <= self.editor.screen_manager.viewport_height:
+                # Cor diferente para o eixo 0 (origem)
+                if row == 0:
+                    color = (100, 255, 100, 180)  # Verde para eixo X
+                    width = 2
+                else:
+                    color = (100, 100, 100, 100)  # Cinza para as demais
+                    width = 1
 
+                pygame.draw.line(
+                    grid_surface,
+                    color,
+                    (0, grid_y),
+                    (self.editor.screen_manager.viewport_width, grid_y),
+                    width
+                )
+
+        # Desenha pontos nas interseções (opcional - para melhor visualização)
+        if self.editor.camera.zoom > 1.5:  # Só mostra pontos quando muito zoom
+            for col in range(start_col, end_col + 1):
+                for row in range(start_row, end_row + 1):
+                    world_x = col * self.editor.grid_size
+                    world_y = row * self.editor.grid_size
+
+                    screen_x, screen_y = self._world_to_screen(world_x, world_y)
+                    grid_x = screen_x - self.editor.screen_manager.viewport_x
+                    grid_y = screen_y - self.editor.screen_manager.viewport_y
+
+                    if (0 <= grid_x <= self.editor.screen_manager.viewport_width and
+                            0 <= grid_y <= self.editor.screen_manager.viewport_height):
+                        # Ponto mais visível nas interseções
+                        color = (200, 200, 0, 200) if col == 0 or row == 0 else (150, 150, 150, 150)
+                        pygame.draw.circle(grid_surface, color, (int(grid_x), int(grid_y)), 2)
+
+        # Aplica a grid na tela
         screen.blit(grid_surface, (self.editor.screen_manager.viewport_x, self.editor.screen_manager.viewport_y))
 
     def _render_map_bounds(self, screen):
@@ -203,12 +240,17 @@ class EditorRenderHandler:
         screen.blit(info_text, (screen_corners[0][0] + 10, screen_corners[0][1] + 30))
 
     def _world_to_screen(self, world_x, world_y):
-        """Converte coordenadas do mundo para tela"""
+        """Converte coordenadas do mundo para coordenadas de tela (pixel perfeito)"""
+        # Calcula posição na superfície de renderização
         render_x = (
                                world_x - self.editor.camera.x) * self.editor.camera.zoom + self.editor.screen_manager.render_width / 2
         render_y = (
                                world_y - self.editor.camera.y) * self.editor.camera.zoom + self.editor.screen_manager.render_height / 2
-        screen_x, screen_y = self.editor.screen_manager.get_screen_position(render_x, render_y)
+
+        # Converte para coordenadas de tela
+        screen_x = render_x * self.editor.screen_manager.render_scale + self.editor.screen_manager.viewport_x
+        screen_y = render_y * self.editor.screen_manager.render_scale + self.editor.screen_manager.viewport_y
+
         return (screen_x, screen_y)
 
     def _render_viewport_border(self, screen):
