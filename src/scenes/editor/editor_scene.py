@@ -126,48 +126,27 @@ class EditorScene(BaseScene):
 
     def _update_preview_objects(self):
         """Atualiza objetos de visualização"""
-        print("=== Atualizando objetos de preview ===")  # Debug
+        print("\n=== Atualizando objetos de preview ===")
 
         path_points = self.path.get_path_points()
-        print(f"Path points: {path_points}")  # Debug
+        print(f"Path points do get_path_points(): {path_points}")
+        print(f"Path.nodes direto: {self.path.nodes}")
 
         # Atualiza inimigos
         if path_points and len(path_points) > 1:
-            print(f"Path tem {len(path_points)} pontos, criando inimigos...")  # Debug
-
-            # Se o path é um loop, remove o último ponto duplicado
-            if self.path.is_loop and path_points[0] == path_points[-1]:
-                path_points = path_points[:-1]
-                print("Path é loop, ajustando pontos...")  # Debug
-
-            # Recria os inimigos
+            print(f"Path tem {len(path_points)} pontos, criando inimigos!")
             self.test_enemies = []
-            for i in range(3):  # 3 inimigos para teste
+            for i in range(2):  # 2 inimigos para teste
                 enemy = TestEnemy(path_points)
-                # Distribui os inimigos ao longo do caminho
-                if i > 0:
-                    # Posiciona os inimigos em diferentes pontos do caminho
-                    total_nodes = len(path_points) - 1
-                    node_offset = i * 0.3  # Avança 30% do caminho por inimigo
-
-                    # Calcula nó e progresso baseado no offset
-                    enemy.current_node = int(node_offset)
-                    enemy.progress = node_offset - enemy.current_node
-
-                    # Atualiza posição inicial baseada no progresso
-                    start = path_points[enemy.current_node]
-                    end = path_points[enemy.current_node + 1]
-                    enemy.position = (
-                        start[0] + (end[0] - start[0]) * enemy.progress,
-                        start[1] + (end[1] - start[1]) * enemy.progress
-                    )
+                # Posiciona um no início e outro no meio
+                if i == 1 and len(path_points) > 2:
+                    enemy.current_point = 1
+                    enemy.progress = 0.0
+                    enemy.position = path_points[1]
                 self.test_enemies.append(enemy)
-
-            print(f"Inimigos criados: {len(self.test_enemies)}")  # Debug
-            for i, enemy in enumerate(self.test_enemies):
-                print(f"Inimigo {i}: ativo={enemy.active}, posição={enemy.position}")  # Debug
+            print(f"Inimigos criados: {len(self.test_enemies)}")
         else:
-            print("Path não tem pontos suficientes, limpando inimigos...")  # Debug
+            print("Path não tem pontos suficientes, limpando inimigos...")
             self.test_enemies = []
 
         # Atualiza torres
@@ -177,7 +156,7 @@ class EditorScene(BaseScene):
             tower_y = spot.y + spot.size // 2
             self.test_towers.append(TestTower(tower_x, tower_y))
 
-        print(f"Torres criadas: {len(self.test_towers)}")  # Debug
+        print(f"Torres criadas: {len(self.test_towers)}")
         print("=== Fim da atualização ===\n")
 
     def _import_tileset(self):

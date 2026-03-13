@@ -4,12 +4,13 @@ import pygame
 class TestEnemy:
     def __init__(self, path_nodes):
         self.path_nodes = path_nodes
-        self.current_node = 0
+        self.current_point = 0
         self.progress = 0.0
-        self.speed = 0.1
+        self.speed = 0.02  # Mais lento para teste
         self.position = path_nodes[0] if path_nodes else (0, 0)
-        self.active = len(path_nodes) > 1  # Precisa de pelo menos 2 nós para ser ativo
-        self.finished = False  # Indica se o inimigo completou o caminho
+        self.active = len(path_nodes) > 1
+        self.finished = False
+        print(f"Inimigo criado com {len(path_nodes)} pontos: {path_nodes}")
 
     def update(self, dt):
         """Atualiza a posição do inimigo"""
@@ -17,35 +18,36 @@ class TestEnemy:
             return
 
         self.progress += self.speed * dt * 60
+        print(f"Progresso: {self.progress:.2f}")  # Debug
 
         if self.progress >= 1.0:
-            self.progress = 1.0
-            self.current_node += 1
+            self.current_point += 1
+            print(f"Avançou para ponto {self.current_point}")
 
-            # Verifica se chegou ao último nó
-            if self.current_node >= len(self.path_nodes) - 1:
+            if self.current_point >= len(self.path_nodes) - 1:
                 self.finished = True
-                print("Inimigo completou o caminho!")  # Debug
+                print("Inimigo completou o caminho!")
                 return
 
             self.progress = 0.0
 
-        start = self.path_nodes[self.current_node]
-        end = self.path_nodes[self.current_node + 1]
+        start = self.path_nodes[self.current_point]
+        end = self.path_nodes[self.current_point + 1]
 
         self.position = (
             start[0] + (end[0] - start[0]) * self.progress,
             start[1] + (end[1] - start[1]) * self.progress
         )
+        print(f"Posição: {self.position}")  # Debug
 
     def reset(self):
-        """Reseta o inimigo para o início do caminho"""
+        """Reseta o inimigo"""
         if self.path_nodes and len(self.path_nodes) > 1:
-            self.current_node = 0
+            self.current_point = 0
             self.progress = 0.0
             self.position = self.path_nodes[0]
             self.finished = False
-            print("Inimigo resetado para o início!")  # Debug
+            print("Inimigo resetado!")
 
     def render(self, screen, camera, screen_manager):
         """Renderiza o inimigo"""
@@ -66,19 +68,9 @@ class TestEnemy:
         eye_size = max(2, int(4 * camera.zoom))
         pygame.draw.circle(screen, (255, 255, 255),
                            (int(screen_x - size / 3), int(screen_y - size / 3)), eye_size)
+        pygame.draw.circle(screen, (0, 0, 0),
+                           (int(screen_x - size / 3), int(screen_y - size / 3)), max(1, eye_size // 2))
         pygame.draw.circle(screen, (255, 255, 255),
                            (int(screen_x + size / 3), int(screen_y - size / 3)), eye_size)
         pygame.draw.circle(screen, (0, 0, 0),
-                           (int(screen_x - size / 3), int(screen_y - size / 3)), max(1, eye_size // 2))
-        pygame.draw.circle(screen, (0, 0, 0),
                            (int(screen_x + size / 3), int(screen_y - size / 3)), max(1, eye_size // 2))
-
-        # Indicador de progresso (opcional)
-        if self.finished:
-            # Desenha um X se o inimigo terminou (útil para debug)
-            pygame.draw.line(screen, (255, 255, 255),
-                             (int(screen_x - size / 2), int(screen_y - size / 2)),
-                             (int(screen_x + size / 2), int(screen_y + size / 2)), 2)
-            pygame.draw.line(screen, (255, 255, 255),
-                             (int(screen_x + size / 2), int(screen_y - size / 2)),
-                             (int(screen_x - size / 2), int(screen_y + size / 2)), 2)

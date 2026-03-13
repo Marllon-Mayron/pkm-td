@@ -9,7 +9,6 @@ class EditorInputHandler:
 
     def handle_event(self, event):
         """Processa eventos do editor"""
-        # Primeiro, processa o diálogo de tamanho do mapa se estiver ativo
         if self.editor.map_size_dialog and self.editor.map_size_dialog.visible:
             result = self.editor.map_size_dialog.handle_event(event)
             if result:
@@ -17,11 +16,9 @@ class EditorInputHandler:
                 self.editor.map_handler.resize_map(new_width, new_height)
             return True
 
-        # Deixa os painéis da UI processarem o evento
         if self._handle_ui_events(event):
             return True
 
-        # Processa outros eventos
         return self._handle_editor_events(event)
 
     def _handle_ui_events(self, event):
@@ -93,7 +90,7 @@ class EditorInputHandler:
         """Processa clique do mouse"""
         mouse_pos = pygame.mouse.get_pos()
 
-        # Verifica botões de modo - CORRIGIDO: usa get_buttons()
+        # Verifica botões de modo
         for rect, text, mode in self.editor.mode_buttons.get_buttons():
             if rect.collidepoint(mouse_pos):
                 if mode == "map_size":
