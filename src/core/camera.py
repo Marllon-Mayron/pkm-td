@@ -9,9 +9,9 @@ class Camera:
         self.world_height = world_height
         self.screen_manager = screen_manager
 
-        # Posição da câmera (centro do mundo)
-        self.x = world_width / 2
-        self.y = world_height / 2
+        # Posição da câmera (centro do mundo) - AGORA PODE SER NEGATIVO
+        self.x = 0  # Começa em 0,0 ao invés do centro
+        self.y = 0
 
         # Zoom
         self.zoom = 1.0
@@ -27,6 +27,12 @@ class Camera:
 
         # Suavização
         self.smooth_factor = 5.0
+
+        # Limites expandidos (agora permitem valores negativos)
+        self.min_x = -1000  # Limite mínimo negativo
+        self.max_x = world_width + 1000  # Limite máximo positivo
+        self.min_y = -1000
+        self.max_y = world_height + 1000
 
     def update(self, dt, mouse_render_pos):
         """Atualiza câmera baseado na posição do mouse em coordenadas de renderização"""
@@ -74,7 +80,7 @@ class Camera:
         self._clamp_position()
 
     def get_visible_rect(self):
-        """Retorna o retângulo visível do mundo"""
+        """Retorna o retângulo visível do mundo (agora pode ser negativo)"""
         half_width = self.screen_manager.render_width / (2 * self.zoom)
         half_height = self.screen_manager.render_height / (2 * self.zoom)
 
@@ -86,14 +92,29 @@ class Camera:
         )
 
     def _clamp_position(self):
-        """Mantém câmera dentro dos limites"""
+        """Mantém câmera dentro dos limites expandidos"""
         half_width = self.screen_manager.render_width / (2 * self.zoom)
         half_height = self.screen_manager.render_height / (2 * self.zoom)
 
-        min_x = half_width
-        max_x = self.world_width - half_width
-        min_y = half_height
-        max_y = self.world_height - half_height
+        # Limites considerando a borda da tela
+        min_x = self.min_x + half_width
+        max_x = self.max_x - half_width
+        min_y = self.min_y + half_height
+        max_y = self.max_y - half_height
+
+        # Garante que min < max
+        if min_x > max_x:
+            min_x = max_x = (min_x + max_x) / 2
+        if min_y > max_y:
+            min_y = max_y = (min_y + max_y) / 2
 
         self.x = max(min_x, min(self.x, max_x))
         self.y = max(min_y, min(self.y, max_y))
+
+    def set_limits(self, min_x, max_x, min_y, max_y):
+        """Define novos limites para a câmera"""
+        self.min_x = min_x
+        self.max_x = max_x
+        self.min_y = min_y
+        self.max_y = max_y
+        self._clamp_position()

@@ -10,6 +10,161 @@ from src.editor.tower_spot_editor import TowerSpotManager
 from src.editor.phase_exporter import PhaseExporter
 from tkinter import filedialog, Tk
 
+
+class MapSizeDialog:
+    def __init__(self, x, y, width, height, current_width, current_height):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.visible = True
+        self.focused = True
+        self.current_width = current_width
+        self.current_height = current_height
+        self.temp_width = str(current_width)
+        self.temp_height = str(current_height)
+        self.active_input = "width"  # "width" or "height"
+
+        # Botões
+        button_width = 80
+        button_height = 30
+        self.confirm_rect = pygame.Rect(
+            x + (width - button_width * 2 - 10) // 2,
+            y + height - 50,
+            button_width,
+            button_height
+        )
+        self.cancel_rect = pygame.Rect(
+            x + (width - button_width * 2 - 10) // 2 + button_width + 10,
+            y + height - 50,
+            button_width,
+            button_height
+        )
+
+        # Input boxes
+        self.width_rect = pygame.Rect(x + 50, y + 80, 100, 30)
+        self.height_rect = pygame.Rect(x + 50, y + 130, 100, 30)
+
+    def handle_event(self, event):
+        if not self.visible:
+            return None
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                return self.confirm()
+            elif event.key == pygame.K_ESCAPE:
+                self.visible = False
+                return None
+            elif event.key == pygame.K_TAB:
+                # Alterna entre width e height
+                self.active_input = "height" if self.active_input == "width" else "width"
+                return None
+            elif event.key == pygame.K_BACKSPACE:
+                if self.active_input == "width":
+                    self.temp_width = self.temp_width[:-1]
+                else:
+                    self.temp_height = self.temp_height[:-1]
+                return None
+            else:
+                # Adiciona números
+                if event.unicode.isdigit():
+                    if self.active_input == "width":
+                        self.temp_width += event.unicode
+                    else:
+                        self.temp_height += event.unicode
+                return None
+
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1:
+                mouse_pos = pygame.mouse.get_pos()
+
+                # Verifica cliques nos inputs
+                if self.width_rect.collidepoint(mouse_pos):
+                    self.active_input = "width"
+                    return None
+                elif self.height_rect.collidepoint(mouse_pos):
+                    self.active_input = "height"
+                    return None
+                elif self.confirm_rect.collidepoint(mouse_pos):
+                    return self.confirm()
+                elif self.cancel_rect.collidepoint(mouse_pos):
+                    self.visible = False
+                    return None
+                elif not self.rect.collidepoint(mouse_pos):
+                    self.visible = False
+                    return None
+
+        return None
+
+    def confirm(self):
+        try:
+            new_width = max(10, min(500, int(self.temp_width) if self.temp_width else 10))
+            new_height = max(10, min(500, int(self.temp_height) if self.temp_height else 10))
+            self.visible = False
+            return (new_width, new_height)
+        except ValueError:
+            return None
+
+    def render(self, screen):
+        if not self.visible:
+            return
+
+        # Fundo semi-transparente
+        overlay = pygame.Surface((screen.get_width(), screen.get_height()))
+        overlay.set_alpha(128)
+        overlay.fill((0, 0, 0))
+        screen.blit(overlay, (0, 0))
+
+        # Caixa de diálogo
+        pygame.draw.rect(screen, (60, 60, 70), self.rect, border_radius=10)
+        pygame.draw.rect(screen, (255, 215, 0), self.rect, 2, border_radius=10)
+
+        # Título
+        font_title = pygame.font.Font(None, 28)
+        title = font_title.render("Configurar Tamanho do Mapa", True, (255, 255, 255))
+        title_x = self.rect.x + (self.rect.width - title.get_width()) // 2
+        screen.blit(title, (title_x, self.rect.y + 20))
+
+        # Labels e inputs
+        font = pygame.font.Font(None, 20)
+
+        # Largura
+        width_label = font.render("Largura (tiles):", True, (200, 200, 200))
+        screen.blit(width_label, (self.rect.x + 20, self.rect.y + 60))
+
+        color = (100, 150, 255) if self.active_input == "width" else (80, 80, 90)
+        pygame.draw.rect(screen, color, self.width_rect, 2)
+        width_surf = font.render(self.temp_width, True, (255, 255, 255))
+        screen.blit(width_surf, (self.width_rect.x + 5, self.width_rect.y + 5))
+
+        # Altura
+        height_label = font.render("Altura (tiles):", True, (200, 200, 200))
+        screen.blit(height_label, (self.rect.x + 20, self.rect.y + 110))
+
+        color = (100, 150, 255) if self.active_input == "height" else (80, 80, 90)
+        pygame.draw.rect(screen, color, self.height_rect, 2)
+        height_surf = font.render(self.temp_height, True, (255, 255, 255))
+        screen.blit(height_surf, (self.height_rect.x + 5, self.height_rect.y + 5))
+
+        # Informação
+        info = font.render("Min: 10, Max: 500 tiles | TAB para alternar", True, (150, 150, 150))
+        info_x = self.rect.x + (self.rect.width - info.get_width()) // 2
+        screen.blit(info, (info_x, self.rect.y + 170))
+
+        # Botões
+        # Confirmar
+        pygame.draw.rect(screen, (0, 150, 0), self.confirm_rect, border_radius=5)
+        pygame.draw.rect(screen, (255, 255, 255), self.confirm_rect, 1, border_radius=5)
+        confirm_text = font.render("Confirmar", True, (255, 255, 255))
+        confirm_x = self.confirm_rect.x + (self.confirm_rect.width - confirm_text.get_width()) // 2
+        confirm_y = self.confirm_rect.y + (self.confirm_rect.height - confirm_text.get_height()) // 2
+        screen.blit(confirm_text, (confirm_x, confirm_y))
+
+        # Cancelar
+        pygame.draw.rect(screen, (150, 0, 0), self.cancel_rect, border_radius=5)
+        pygame.draw.rect(screen, (255, 255, 255), self.cancel_rect, 1, border_radius=5)
+        cancel_text = font.render("Cancelar", True, (255, 255, 255))
+        cancel_x = self.cancel_rect.x + (self.cancel_rect.width - cancel_text.get_width()) // 2
+        cancel_y = self.cancel_rect.y + (self.cancel_rect.height - cancel_text.get_height()) // 2
+        screen.blit(cancel_text, (cancel_x, cancel_y))
+
 class TestEnemy:
     def __init__(self, path_nodes):
         self.path_nodes = path_nodes
@@ -540,6 +695,8 @@ class LayerSelector:
                         (resize_handle.x + 2, resize_handle.bottom - 2),
                         (resize_handle.right - 2, resize_handle.y + 2), 2)
 
+
+
 class EditorScene(BaseScene):
     def __init__(self, game, chapter=None, phase=None):
         super().__init__(game)
@@ -548,9 +705,21 @@ class EditorScene(BaseScene):
         self.world_width = 3000
         self.world_height = 3000
 
+        # Limites expandidos (permitem área negativa)
+        self.min_world_x = -1000
+        self.min_world_y = -1000
+        self.max_world_x = self.world_width + 1000
+        self.max_world_y = self.world_height + 1000
+
         # Inicializa câmera
         self.game.initialize_camera(self.world_width, self.world_height)
         self.camera = self.game.camera
+
+        # Configura limites expandidos na câmera
+        self.camera.set_limits(self.min_world_x, self.max_world_x,
+                               self.min_world_y, self.max_world_y)
+        self.camera.x = 0  # Começa no 0,0
+        self.camera.y = 0
 
         # Gerenciadores
         self.layer_manager = LayerManager()
@@ -587,6 +756,9 @@ class EditorScene(BaseScene):
         # Cria botões de modo
         self.mode_buttons = []
         self._create_mode_buttons()
+
+        self.map_size_dialog = None
+        self.show_map_size_dialog = False
 
         # Fase atual
         self.current_chapter = chapter or 1
@@ -649,6 +821,14 @@ class EditorScene(BaseScene):
             )
             self.mode_buttons.append((rect, text, mode))
 
+        map_config_rect = pygame.Rect(
+            viewport_x + 10,
+            viewport_y + 70 + len(modes) * 40,
+            90,
+            30
+        )
+        self.mode_buttons.append((map_config_rect, "MAP SIZE", "map_size"))
+
     def _update_preview_objects(self):
         """Atualiza objetos de visualização"""
         path_points = self.path.get_path_points()
@@ -689,6 +869,14 @@ class EditorScene(BaseScene):
 
     def handle_event(self, event):
         """Processa eventos do editor"""
+        # Primeiro, processa o diálogo de tamanho do mapa se estiver ativo
+        if self.map_size_dialog and self.map_size_dialog.visible:
+            result = self.map_size_dialog.handle_event(event)
+            if result:
+                new_width, new_height = result
+                self._resize_map(new_width, new_height)
+            return
+
         # Primeiro, deixa os painéis da UI processarem o evento
         ui_handled = False
 
@@ -742,12 +930,13 @@ class EditorScene(BaseScene):
                     self._delete_selected()
                 elif event.key == pygame.K_o:
                     if pygame.key.get_mods() & pygame.KMOD_CTRL:
-                        # Abre diálogo para selecionar fase
                         self._open_phase_loader()
                 elif event.key == pygame.K_l:
                     if pygame.key.get_mods() & pygame.KMOD_CTRL:
-                        # Lista fases disponíveis no console
                         self.list_available_phases()
+                elif event.key == pygame.K_m:
+                    if pygame.key.get_mods() & pygame.KMOD_CTRL:
+                        self._open_map_size_dialog()
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
@@ -755,8 +944,11 @@ class EditorScene(BaseScene):
                 # Verifica botões de modo
                 for rect, text, mode in self.mode_buttons:
                     if rect.collidepoint(mouse_pos):
-                        self.mode = mode
-                        self._update_preview_objects()
+                        if mode == "map_size":
+                            self._open_map_size_dialog()
+                        else:
+                            self.mode = mode
+                            self._update_preview_objects()
                         return
 
                 # Se não clicou em botão e está no viewport, processa ações de edição
@@ -779,45 +971,31 @@ class EditorScene(BaseScene):
 
         if self.mode == "layers":
             # Converte posição do mundo para coordenadas de grid
+            # AGORA PERMITE VALORES NEGATIVOS
             grid_x = int(x // self.grid_size)
             grid_y = int(y // self.grid_size)
 
-            # Verifica se está dentro dos limites
+            # Verifica se está dentro dos limites (agora pode ser negativo)
             current_layer = self.layer_manager.get_current_layer()
             if current_layer:
-                if 0 <= grid_x < current_layer.width and 0 <= grid_y < current_layer.height:
+                # Permite valores negativos e valores além dos limites atuais
+                # Mas ainda verifica se está dentro dos limites máximos
+                if (self.min_world_x // self.grid_size <= grid_x < self.max_world_x // self.grid_size and
+                        self.min_world_y // self.grid_size <= grid_y < self.max_world_y // self.grid_size):
+
+                    # Se estiver fora da área atual da layer, expande a layer
+                    if grid_x < 0 or grid_x >= current_layer.width or grid_y < 0 or grid_y >= current_layer.height:
+                        self._expand_layer_to_include(grid_x, grid_y)
+
                     # Coloca o tile
-                    success = self.layer_manager.set_tile(grid_x, grid_y, self.current_tile)
-                    if success:
-                        print(f"Tile {self.current_tile} colocado em ({grid_x}, {grid_y})")  # Debug
-                    else:
-                        print(f"Falha ao colocar tile em ({grid_x}, {grid_y})")
+                    if 0 <= grid_x < current_layer.width and 0 <= grid_y < current_layer.height:
+                        success = self.layer_manager.set_tile(grid_x, grid_y, self.current_tile)
+                        if success:
+                            print(f"Tile {self.current_tile} colocado em ({grid_x}, {grid_y})")
+                        else:
+                            print(f"Falha ao colocar tile em ({grid_x}, {grid_y})")
                 else:
-                    print(f"Posição ({grid_x}, {grid_y}) fora dos limites da layer")
-
-        elif self.mode == "path":
-            if self.snap_to_grid:
-                x = (x // self.grid_size) * self.grid_size + self.grid_size // 2
-                y = (y // self.grid_size) * self.grid_size + self.grid_size // 2
-
-            node_idx = self.path.get_node_at(x, y)
-            if node_idx >= 0:
-                self.path.selected_node = node_idx
-            else:
-                node_type = "waypoint"
-                if len(self.path.nodes) == 0:
-                    node_type = "start"
-                if pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                    node_type = "end"
-
-                new_idx = self.path.add_node(x, y, node_type)
-                self.path.selected_node = new_idx
-
-                if self.path.selected_node >= 0 and self.path.selected_node != new_idx:
-                    self.path.connect_nodes(self.path.selected_node, new_idx)
-
-        elif self.mode == "towers":
-            self.tower_spots.add_spot(x, y)
+                    print(f"Posição ({grid_x}, {grid_y}) fora dos limites do mundo")
 
     def _handle_right_click(self, world_pos):
         """Processa clique direito"""
@@ -899,10 +1077,10 @@ class EditorScene(BaseScene):
 
         # Borda do viewport
         pygame.draw.rect(screen, (100, 100, 100),
-                        (self.screen_manager.viewport_x,
-                         self.screen_manager.viewport_y,
-                         self.screen_manager.viewport_width,
-                         self.screen_manager.viewport_height), 2)
+                         (self.screen_manager.viewport_x,
+                          self.screen_manager.viewport_y,
+                          self.screen_manager.viewport_width,
+                          self.screen_manager.viewport_height), 2)
 
         # UI Panels
         if self.mode == "layers":
@@ -924,18 +1102,24 @@ class EditorScene(BaseScene):
         # UI Superior
         self._render_ui(screen)
 
+        # Diálogo de tamanho do mapa
+        if self.map_size_dialog and self.map_size_dialog.visible:
+            self.map_size_dialog.render(screen)
+
         # Pause
         if self.paused:
             self._render_pause_overlay(screen)
 
+
     def _render_grid(self, screen):
-        """Renderiza grid"""
+        """Renderiza grid (agora em áreas negativas também)"""
         visible_rect = self.camera.get_visible_rect()
 
         # Calcula offset da câmera
         cam_offset_x = -self.camera.x * self.camera.zoom + self.screen_manager.render_width / 2
         cam_offset_y = -self.camera.y * self.camera.zoom + self.screen_manager.render_height / 2
 
+        # Permite valores negativos no grid
         start_x = int(visible_rect.left // self.grid_size) * self.grid_size
         start_y = int(visible_rect.top // self.grid_size) * self.grid_size
         end_x = int(visible_rect.right // self.grid_size) * self.grid_size + self.grid_size
@@ -962,8 +1146,15 @@ class EditorScene(BaseScene):
             grid_y1 = screen_y1 - self.screen_manager.viewport_y
             grid_y2 = screen_y2 - self.screen_manager.viewport_y
 
-            pygame.draw.line(grid_surface, (80, 80, 80, 100),
-                             (grid_x, grid_y1), (grid_x, grid_y2), max(1, int(1 * self.screen_manager.render_scale)))
+            # Cor diferente para grid em áreas negativas
+            if x < 0:
+                color = (150, 80, 80, 150)  # Vermelho para áreas negativas
+            else:
+                color = (80, 80, 80, 100)  # Cinza para áreas positivas
+
+            pygame.draw.line(grid_surface, color,
+                             (grid_x, grid_y1), (grid_x, grid_y2),
+                             max(1, int(1 * self.screen_manager.render_scale)))
             x += self.grid_size
 
         # Linhas horizontais
@@ -983,8 +1174,15 @@ class EditorScene(BaseScene):
             grid_x2 = screen_x2 - self.screen_manager.viewport_x
             grid_y = screen_y - self.screen_manager.viewport_y
 
-            pygame.draw.line(grid_surface, (80, 80, 80, 100),
-                             (grid_x1, grid_y), (grid_x2, grid_y), max(1, int(1 * self.screen_manager.render_scale)))
+            # Cor diferente para grid em áreas negativas
+            if y < 0:
+                color = (150, 80, 80, 150)  # Vermelho para áreas negativas
+            else:
+                color = (80, 80, 80, 100)  # Cinza para áreas positivas
+
+            pygame.draw.line(grid_surface, color,
+                             (grid_x1, grid_y), (grid_x2, grid_y),
+                             max(1, int(1 * self.screen_manager.render_scale)))
             y += self.grid_size
 
         screen.blit(grid_surface, (self.screen_manager.viewport_x, self.screen_manager.viewport_y))
@@ -1012,15 +1210,21 @@ class EditorScene(BaseScene):
 
         # Painel superior
         pygame.draw.rect(screen, (40, 40, 50),
-                        (viewport_x, viewport_y, self.screen_manager.viewport_width, 60))
+                         (viewport_x, viewport_y, self.screen_manager.viewport_width, 60))
 
         # Título
-        title = self.font.render(f"EDITOR DE FASES - {self.phase_name}", True, (255, 215, 0))
+        current_layer = self.layer_manager.get_current_layer()
+        if current_layer:
+            size_info = f" [{current_layer.width}x{current_layer.height}]"
+        else:
+            size_info = ""
+
+        title = self.font.render(f"EDITOR DE FASES - {self.phase_name}{size_info}", True, (255, 215, 0))
         screen.blit(title, (viewport_x + 10, viewport_y + 10))
 
         # Instruções
         inst = self.font_small.render(
-            "CTRL+S: Salvar | CTRL+O: Carregar | CTRL+I: Importar Tileset | G: Grid | 1-5: Modos | DEL: Remover",
+            "CTRL+S: Salvar | CTRL+O: Carregar | CTRL+I: Importar | CTRL+M: Map Size | G: Grid | 1-5: Modos | DEL: Remover",
             True, (200, 200, 200))
         screen.blit(inst, (viewport_x + 10, viewport_y + 35))
 
@@ -1029,6 +1233,9 @@ class EditorScene(BaseScene):
             if mode == self.mode:
                 color = (100, 150, 200)
                 border = (255, 255, 255)
+            elif mode == "map_size":
+                color = (150, 100, 50)  # Cor diferente para o botão de tamanho
+                border = (200, 150, 100)
             else:
                 color = (60, 60, 80)
                 border = (100, 100, 100)
@@ -1044,11 +1251,58 @@ class EditorScene(BaseScene):
             "layers": "Clique nos tiles à direita | Selecione layers à esquerda",
             "path": "Esquerdo: add nó | Shift+Click: fim | Direito: remove",
             "towers": "Esquerdo: add spot | Direito: remove",
-            "preview": f"Velocidade: {self.preview_speed:.1f}x | +/ - para ajustar"
+            "preview": f"Velocidade: {self.preview_speed:.1f}x | +/ - para ajustar",
+            "map_size": "Configure o tamanho do mapa"
         }
 
-        info = self.font_small.render(mode_info[self.mode], True, (180, 180, 180))
+        info = self.font_small.render(mode_info.get(self.mode, ""), True, (180, 180, 180))
         screen.blit(info, (viewport_x + 10, viewport_y + self.screen_manager.viewport_height - 20))
+
+    def _expand_layer_to_include(self, grid_x, grid_y):
+        """Expande a layer para incluir coordenadas negativas ou além dos limites"""
+        current_layer = self.layer_manager.get_current_layer()
+        if not current_layer:
+            return
+
+        # Calcula novos limites
+        new_min_x = min(0, grid_x)
+        new_min_y = min(0, grid_y)
+        new_max_x = max(current_layer.width - 1, grid_x)
+        new_max_y = max(current_layer.height - 1, grid_y)
+
+        new_width = new_max_x - new_min_x + 1
+        new_height = new_max_y - new_min_y + 1
+
+        # Cria nova matriz com offset
+        new_tiles = [[0 for _ in range(new_width)] for _ in range(new_height)]
+
+        # Copia tiles existentes para a nova posição com offset
+        offset_x = -new_min_x
+        offset_y = -new_min_y
+
+        for y in range(current_layer.height):
+            for x in range(current_layer.width):
+                new_x = x + offset_x
+                new_y = y + offset_y
+                if 0 <= new_x < new_width and 0 <= new_y < new_height:
+                    new_tiles[new_y][new_x] = current_layer.tiles[y][x]
+
+        # Atualiza a layer
+        current_layer.tiles = new_tiles
+        current_layer.width = new_width
+        current_layer.height = new_height
+
+        # Atualiza os limites do mundo
+        self.min_world_x = min(self.min_world_x, new_min_x * self.grid_size)
+        self.min_world_y = min(self.min_world_y, new_min_y * self.grid_size)
+        self.max_world_x = max(self.max_world_x, new_max_x * self.grid_size + self.grid_size)
+        self.max_world_y = max(self.max_world_y, new_max_y * self.grid_size + self.grid_size)
+
+        # Atualiza limites da câmera
+        self.camera.set_limits(self.min_world_x, self.max_world_x,
+                               self.min_world_y, self.max_world_y)
+
+        print(f"Layer expandida: novo tamanho {new_width}x{new_height}, offset ({offset_x}, {offset_y})")
 
     def _render_pause_overlay(self, screen):
         """Overlay de pausa"""
@@ -1149,19 +1403,25 @@ class EditorScene(BaseScene):
             print("\nCarregamento cancelado.")
 
     def _render_map_bounds(self, screen):
-        """Renderiza os limites do mapa"""
+        """Renderiza os limites do mapa (incluindo área negativa)"""
         # Obtém as dimensões da layer atual ou do mapa
         current_layer = self.layer_manager.get_current_layer()
         if not current_layer:
             return
 
-        # Limites do mapa em coordenadas de mundo
-        map_left = 0
-        map_right = current_layer.width * self.grid_size
-        map_top = 0
-        map_bottom = current_layer.height * self.grid_size
+        # Limites do mapa em coordenadas de mundo (agora podem ser negativos)
+        map_left = self.min_world_x
+        map_right = self.max_world_x
+        map_top = self.min_world_y
+        map_bottom = self.max_world_y
 
-        # Converte os cantos do mapa para coordenadas de tela
+        # Área editável atual (onde há tiles)
+        current_left = 0
+        current_right = current_layer.width * self.grid_size
+        current_top = 0
+        current_bottom = current_layer.height * self.grid_size
+
+        # Converte os cantos para coordenadas de tela
         corners = [
             (map_left, map_top),
             (map_right, map_top),
@@ -1174,49 +1434,94 @@ class EditorScene(BaseScene):
             screen_x, screen_y = self._world_to_screen(world_x, world_y)
             screen_corners.append((screen_x, screen_y))
 
-        # Desenha a borda do mapa
-        # Borda externa brilhante
-        pygame.draw.polygon(screen, (255, 215, 0), screen_corners, 3)
+        # Desenha a borda do mapa (limites máximos) - vermelho
+        pygame.draw.polygon(screen, (255, 100, 100), screen_corners, 2)
 
-        # Cantos com marcadores
+        # Desenha a área editável atual - verde
+        current_corners = [
+            (current_left, current_top),
+            (current_right, current_top),
+            (current_right, current_bottom),
+            (current_left, current_bottom)
+        ]
+
+        screen_current_corners = []
+        for world_x, world_y in current_corners:
+            screen_x, screen_y = self._world_to_screen(world_x, world_y)
+            screen_current_corners.append((screen_x, screen_y))
+
+        pygame.draw.polygon(screen, (100, 255, 100), screen_current_corners, 2)
+
+        # Cantos com marcadores (agora mostram valores negativos)
         for screen_x, screen_y in screen_corners:
-            # Círculo nos cantos
-            pygame.draw.circle(screen, (255, 215, 0), (int(screen_x), int(screen_y)), 8)
-            pygame.draw.circle(screen, (255, 255, 255), (int(screen_x), int(screen_y)), 4)
-
-        # Adiciona linhas de grade interna
-        if self.camera.zoom > 0.5:  # Só mostra quando estiver com zoom suficiente
-            # Linhas verticais da borda
-            for x in [map_left, map_right]:
-                screen_x, _ = self._world_to_screen(x, 0)
-                screen_y1, _ = self._world_to_screen(0, map_top)
-                screen_y2, _ = self._world_to_screen(0, map_bottom)
-                pygame.draw.line(screen, (255, 215, 0, 100),
-                                 (screen_x, screen_y1), (screen_x, screen_y2), 1)
-
-            # Linhas horizontais da borda
-            for y in [map_top, map_bottom]:
-                screen_x1, _ = self._world_to_screen(map_left, 0)
-                screen_x2, _ = self._world_to_screen(map_right, 0)
-                screen_y, _ = self._world_to_screen(0, y)
-                pygame.draw.line(screen, (255, 215, 0, 100),
-                                 (screen_x1, screen_y), (screen_x2, screen_y), 1)
+            pygame.draw.circle(screen, (255, 100, 100), (int(screen_x), int(screen_y)), 6)
 
         # Adiciona texto informativo nos cantos
         font = pygame.font.Font(None, 16)
 
         # Canto superior esquerdo
-        text = font.render(f"(0, 0)", True, (255, 255, 255))
+        text = font.render(f"({map_left:.0f}, {map_top:.0f})", True, (255, 100, 100))
         screen.blit(text, (screen_corners[0][0] + 10, screen_corners[0][1] + 10))
 
         # Canto superior direito
-        text = font.render(f"({current_layer.width}, 0)", True, (255, 255, 255))
-        screen.blit(text, (screen_corners[1][0] - 70, screen_corners[1][1] + 10))
+        text = font.render(f"({map_right:.0f}, {map_top:.0f})", True, (255, 100, 100))
+        screen.blit(text, (screen_corners[1][0] - 90, screen_corners[1][1] + 10))
 
         # Canto inferior direito
-        text = font.render(f"({current_layer.width}, {current_layer.height})", True, (255, 255, 255))
-        screen.blit(text, (screen_corners[2][0] - 90, screen_corners[2][1] - 20))
+        text = font.render(f"({map_right:.0f}, {map_bottom:.0f})", True, (255, 100, 100))
+        screen.blit(text, (screen_corners[2][0] - 100, screen_corners[2][1] - 20))
 
         # Canto inferior esquerdo
-        text = font.render(f"(0, {current_layer.height})", True, (255, 255, 255))
+        text = font.render(f"({map_left:.0f}, {map_bottom:.0f})", True, (255, 100, 100))
         screen.blit(text, (screen_corners[3][0] + 10, screen_corners[3][1] - 20))
+
+        # Adiciona informação sobre a área atual
+        info_font = pygame.font.Font(None, 14)
+        info_text = info_font.render(f"Área atual: {current_layer.width}x{current_layer.height} tiles", True,
+                                     (100, 255, 100))
+        screen.blit(info_text, (screen_corners[0][0] + 10, screen_corners[0][1] + 30))
+
+    def _open_map_size_dialog(self):
+        """Abre diálogo para configurar tamanho do mapa"""
+        current_layer = self.layer_manager.get_current_layer()
+        if current_layer:
+            dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
+            dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 250) // 2
+            self.map_size_dialog = MapSizeDialog(
+                dialog_x, dialog_y, 400, 250,
+                current_layer.width, current_layer.height
+            )
+
+    def _resize_map(self, new_width, new_height):
+        """Redimensiona todas as layers do mapa"""
+        print(f"Redimensionando mapa para {new_width}x{new_height} tiles")
+
+        for layer in self.layer_manager.layers:
+            # Cria nova matriz de tiles
+            new_tiles = [[0 for _ in range(new_width)] for _ in range(new_height)]
+
+            # Copia tiles existentes para a nova matriz
+            for y in range(min(layer.height, new_height)):
+                for x in range(min(layer.width, new_width)):
+                    if y < len(layer.tiles) and x < len(layer.tiles[y]):
+                        new_tiles[y][x] = layer.tiles[y][x]
+
+            # Atualiza a layer
+            layer.tiles = new_tiles
+            layer.width = new_width
+            layer.height = new_height
+
+        # Atualiza as dimensões do mundo
+        self.world_width = new_width * self.grid_size
+        self.world_height = new_height * self.grid_size
+
+        # Atualiza a câmera
+        self.game.initialize_camera(self.world_width, self.world_height)
+        self.camera = self.game.camera
+
+        print(f"Mapa redimensionado para {new_width}x{new_height} tiles")
+
+
+
+
+
