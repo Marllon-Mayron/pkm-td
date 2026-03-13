@@ -102,7 +102,7 @@ class TilePalette:
         self.cols = 4
         self.tile_spacing = 4
         self.min_tile_size = 16
-        self.max_tile_size = 64
+        self.max_tile_size = 16
 
         # Para redimensionamento
         self.resizing = False
@@ -740,6 +740,14 @@ class EditorScene(BaseScene):
                         self.preview_speed = max(0.2, self.preview_speed - 0.2)
                 elif event.key == pygame.K_DELETE:
                     self._delete_selected()
+                elif event.key == pygame.K_o:
+                    if pygame.key.get_mods() & pygame.KMOD_CTRL:
+                        # Abre diálogo para selecionar fase
+                        self._open_phase_loader()
+                elif event.key == pygame.K_l:
+                    if pygame.key.get_mods() & pygame.KMOD_CTRL:
+                        # Lista fases disponíveis no console
+                        self.list_available_phases()
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
@@ -1009,8 +1017,9 @@ class EditorScene(BaseScene):
         screen.blit(title, (viewport_x + 10, viewport_y + 10))
 
         # Instruções
-        inst = self.font_small.render("CTRL+S: Salvar | CTRL+I: Importar Tileset | G: Grid | 1-4: Modos | DEL: Remover",
-                                     True, (200, 200, 200))
+        inst = self.font_small.render(
+            "CTRL+S: Salvar | CTRL+O: Carregar | CTRL+I: Importar Tileset | G: Grid | 1-5: Modos | DEL: Remover",
+            True, (200, 200, 200))
         screen.blit(inst, (viewport_x + 10, viewport_y + 35))
 
         # Botões de modo
@@ -1068,3 +1077,71 @@ class EditorScene(BaseScene):
         }
 
         self.exporter.export_phase(phase_data, self.current_chapter, self.current_phase)
+
+    def load_phase(self, chapter, phase_number):
+        """Carrega uma fase existente"""
+        phase_data = self.exporter.load_phase(chapter, phase_number)
+
+        if not phase_data:
+            print(f"Fase {chapter}-{phase_number} não encontrada!")
+            return False
+
+        try:
+            # Carrega o mapa
+            if "map" in phase_data:
+                self.layer_manager.from_dict(phase_data["map"])
+
+            # Carrega o caminho
+            if "path" in phase_data:
+                self.path.from_dict(phase_data["path"])
+
+            # Carrega os spots de torre
+            if "tower_spots" in phase_data:
+                self.tower_spots.from_dict(phase_data["tower_spots"])
+
+            # Atualiza nome da fase
+            self.phase_name = phase_data.get("name", f"Fase {chapter}-{phase_number}")
+            self.current_chapter = chapter
+            self.current_phase = phase_number
+
+            # Atualiza a tile palette com o tileset da layer atual
+            current_layer = self.layer_manager.get_current_layer()
+            if current_layer and current_layer.tileset:
+                self.tile_palette.set_tileset(current_layer.tileset)
+
+            # Atualiza objetos de preview
+            self._update_preview_objects()
+
+            print(f"Fase {chapter}-{phase_number} carregada com sucesso!")
+            return True
+
+        except Exception as e:
+            print(f"Erro ao carregar fase: {e}")
+            return False
+
+    def list_available_phases(self):
+        """Lista todas as fases disponíveis para carregar"""
+        phases = self.exporter.list_phases()
+
+        if not phases:
+            print("Nenhuma fase encontrada!")
+            return
+
+        print("\nFases disponíveis:")
+        for chapter, phase in phases:
+            print(f"  {chapter}-{phase}")
+
+    def _open_phase_loader(self):
+        """Abre diálogo para selecionar fase para carregar"""
+        # Por enquanto, vamos usar um input simples no console
+        print("\n--- CARREGAR FASE ---")
+        self.list_available_phases()
+
+        try:
+            chapter = int(input("Número do capítulo: "))
+            phase = int(input("Número da fase: "))
+            self.load_phase(chapter, phase)
+        except ValueError:
+            print("Entrada inválida!")
+        except KeyboardInterrupt:
+            print("\nCarregamento cancelado.")

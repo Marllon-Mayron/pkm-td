@@ -13,7 +13,7 @@ class Game:
         self.screen_manager = ScreenManager()
         self.running = True
 
-        # Câmera (será inicializada quando necessário)
+        # Câmera
         self.camera = None
 
         # Acumulador para updates fixos
@@ -38,7 +38,7 @@ class Game:
             # Processa eventos
             self.handle_events()
 
-            # Updates fixos (lógica do jogo)
+            # Updates fixos
             dt = self.screen_manager.get_delta_time()
             self.update_accumulator += dt
 
