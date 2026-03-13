@@ -876,7 +876,7 @@ class EditorScene(BaseScene):
         """Renderiza o editor"""
         screen.fill((30, 30, 40))
 
-        # Renderiza mapa - AGORA PASSA O SCREEN_MANAGER
+        # Renderiza mapa
         self.layer_manager.render_all(screen, self.camera, self.screen_manager)
 
         # Elementos de edição
@@ -894,6 +894,8 @@ class EditorScene(BaseScene):
         # Grid
         if self.show_grid:
             self._render_grid(screen)
+
+        self._render_map_bounds(screen)
 
         # Borda do viewport
         pygame.draw.rect(screen, (100, 100, 100),
@@ -1145,3 +1147,76 @@ class EditorScene(BaseScene):
             print("Entrada inválida!")
         except KeyboardInterrupt:
             print("\nCarregamento cancelado.")
+
+    def _render_map_bounds(self, screen):
+        """Renderiza os limites do mapa"""
+        # Obtém as dimensões da layer atual ou do mapa
+        current_layer = self.layer_manager.get_current_layer()
+        if not current_layer:
+            return
+
+        # Limites do mapa em coordenadas de mundo
+        map_left = 0
+        map_right = current_layer.width * self.grid_size
+        map_top = 0
+        map_bottom = current_layer.height * self.grid_size
+
+        # Converte os cantos do mapa para coordenadas de tela
+        corners = [
+            (map_left, map_top),
+            (map_right, map_top),
+            (map_right, map_bottom),
+            (map_left, map_bottom)
+        ]
+
+        screen_corners = []
+        for world_x, world_y in corners:
+            screen_x, screen_y = self._world_to_screen(world_x, world_y)
+            screen_corners.append((screen_x, screen_y))
+
+        # Desenha a borda do mapa
+        # Borda externa brilhante
+        pygame.draw.polygon(screen, (255, 215, 0), screen_corners, 3)
+
+        # Cantos com marcadores
+        for screen_x, screen_y in screen_corners:
+            # Círculo nos cantos
+            pygame.draw.circle(screen, (255, 215, 0), (int(screen_x), int(screen_y)), 8)
+            pygame.draw.circle(screen, (255, 255, 255), (int(screen_x), int(screen_y)), 4)
+
+        # Adiciona linhas de grade interna
+        if self.camera.zoom > 0.5:  # Só mostra quando estiver com zoom suficiente
+            # Linhas verticais da borda
+            for x in [map_left, map_right]:
+                screen_x, _ = self._world_to_screen(x, 0)
+                screen_y1, _ = self._world_to_screen(0, map_top)
+                screen_y2, _ = self._world_to_screen(0, map_bottom)
+                pygame.draw.line(screen, (255, 215, 0, 100),
+                                 (screen_x, screen_y1), (screen_x, screen_y2), 1)
+
+            # Linhas horizontais da borda
+            for y in [map_top, map_bottom]:
+                screen_x1, _ = self._world_to_screen(map_left, 0)
+                screen_x2, _ = self._world_to_screen(map_right, 0)
+                screen_y, _ = self._world_to_screen(0, y)
+                pygame.draw.line(screen, (255, 215, 0, 100),
+                                 (screen_x1, screen_y), (screen_x2, screen_y), 1)
+
+        # Adiciona texto informativo nos cantos
+        font = pygame.font.Font(None, 16)
+
+        # Canto superior esquerdo
+        text = font.render(f"(0, 0)", True, (255, 255, 255))
+        screen.blit(text, (screen_corners[0][0] + 10, screen_corners[0][1] + 10))
+
+        # Canto superior direito
+        text = font.render(f"({current_layer.width}, 0)", True, (255, 255, 255))
+        screen.blit(text, (screen_corners[1][0] - 70, screen_corners[1][1] + 10))
+
+        # Canto inferior direito
+        text = font.render(f"({current_layer.width}, {current_layer.height})", True, (255, 255, 255))
+        screen.blit(text, (screen_corners[2][0] - 90, screen_corners[2][1] - 20))
+
+        # Canto inferior esquerdo
+        text = font.render(f"(0, {current_layer.height})", True, (255, 255, 255))
+        screen.blit(text, (screen_corners[3][0] + 10, screen_corners[3][1] - 20))
