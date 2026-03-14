@@ -86,48 +86,57 @@ class Layer:
         return True
 
     def render(self, screen, camera, screen_manager):
-        """Renderiza a layer com cálculos inteiros para evitar gaps"""
+        """Renderiza a layer com cálculos consistentes"""
         if not self.visible or not self.tileset:
             return
 
-        visible_rect = camera.get_visible_rect()
+        # USA EXATAMENTE OS MESMOS CÁLCULOS QUE A GRID
+        # Calcula offset da câmera (usando round para consistência)
+        cam_offset_x = round((-camera.x * camera.zoom * screen_manager.render_scale +
+                              (screen_manager.render_width / 2) * screen_manager.render_scale +
+                              screen_manager.viewport_x))
+        cam_offset_y = round((-camera.y * camera.zoom * screen_manager.render_scale +
+                              (screen_manager.render_height / 2) * screen_manager.render_scale +
+                              screen_manager.viewport_y))
 
-        start_x = max(0, int(visible_rect.left // self.tile_size))
-        start_y = max(0, int(visible_rect.top // self.tile_size))
-        end_x = min(self.width, int(visible_rect.right // self.tile_size) + 1)
-        end_y = min(self.height, int(visible_rect.bottom // self.tile_size) + 1)
+        # Tamanho do tile escalado (usando round)
+        tile_size_scaled = max(1, round(self.tile_size * camera.zoom * screen_manager.render_scale))
 
-        # PRÉ-CALCULA usando inteiros
-        cam_offset_x = int(-camera.x * camera.zoom * screen_manager.render_scale +
-                           (screen_manager.render_width / 2) * screen_manager.render_scale +
-                           screen_manager.viewport_x)
-        cam_offset_y = int(-camera.y * camera.zoom * screen_manager.render_scale +
-                           (screen_manager.render_height / 2) * screen_manager.render_scale +
-                           screen_manager.viewport_y)
+        # Calcula tiles visíveis baseado no offset (usando divisão inteira)
+        start_x = max(0, (-cam_offset_x) // tile_size_scaled)
+        start_y = max(0, (-cam_offset_y) // tile_size_scaled)
+        end_x = min(self.width, start_x + (screen_manager.viewport_width // tile_size_scaled) + 2)
+        end_y = min(self.height, start_y + (screen_manager.viewport_height // tile_size_scaled) + 2)
 
-        tile_size_scaled = int(self.tile_size * camera.zoom * screen_manager.render_scale)
-
+        # Renderiza tiles
         for y in range(start_y, end_y):
             for x in range(start_x, end_x):
                 tile_id = self.tiles[y][x]
                 if tile_id > 0 and tile_id - 1 < len(self.tileset):
-                    # Posição na tela com INT para evitar gaps
+                    # Posição na tela usando os mesmos valores cacheados
                     screen_x = x * tile_size_scaled + cam_offset_x
                     screen_y = y * tile_size_scaled + cam_offset_y
 
-                    tile_img = self.tileset[tile_id - 1]
+                    # Só renderiza se estiver dentro do viewport (otimização)
+                    if (screen_x + tile_size_scaled > screen_manager.viewport_x and
+                            screen_x < screen_manager.viewport_x + screen_manager.viewport_width and
+                            screen_y + tile_size_scaled > screen_manager.viewport_y and
+                            screen_y < screen_manager.viewport_y + screen_manager.viewport_height):
 
-                    if (tile_img.get_width() != tile_size_scaled or
-                            tile_img.get_height() != tile_size_scaled):
-                        scaled_tile = pygame.transform.scale(
-                            tile_img,
-                            (tile_size_scaled, tile_size_scaled)
-                        )
-                        scaled_tile.set_alpha(self.opacity)
-                        screen.blit(scaled_tile, (screen_x, screen_y))
-                    else:
-                        tile_img.set_alpha(self.opacity)
-                        screen.blit(tile_img, (screen_x, screen_y))
+                        tile_img = self.tileset[tile_id - 1]
+
+                        # Redimensiona se necessário
+                        if (tile_img.get_width() != tile_size_scaled or
+                                tile_img.get_height() != tile_size_scaled):
+                            scaled_tile = pygame.transform.scale(
+                                tile_img,
+                                (tile_size_scaled, tile_size_scaled)
+                            )
+                            scaled_tile.set_alpha(self.opacity)
+                            screen.blit(scaled_tile, (screen_x, screen_y))
+                        else:
+                            tile_img.set_alpha(self.opacity)
+                            screen.blit(tile_img, (screen_x, screen_y))
 
 class LayerManager:
     def __init__(self):

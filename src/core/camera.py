@@ -18,6 +18,9 @@ class Camera:
         self.min_zoom = 0.5
         self.max_zoom = 2.0
         self.zoom_speed = 0.1
+        # Para zoom estabilizado
+        self.use_stabilized_zoom = True  # Ativa zoom estabilizado
+        self.zoom_step = 0.125  # Steps de 1/8 (0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0,
 
         # Velocidade de movimento
         self.pan_speed = 500
@@ -72,11 +75,24 @@ class Camera:
         self._clamp_position()
 
     def handle_zoom(self, zoom_in):
-        """Aplica zoom"""
-        if zoom_in:
-            self.zoom = min(self.max_zoom, self.zoom + self.zoom_speed)
+        """Aplica zoom - agora com opção de estabilização"""
+        if self.use_stabilized_zoom:
+            # Zoom em steps discretos para evitar problemas de arredondamento
+            if zoom_in:
+                self.zoom = min(self.max_zoom, self.zoom + self.zoom_step)
+            else:
+                self.zoom = max(self.min_zoom, self.zoom - self.zoom_step)
+
+            # Arredonda para o step mais próximo para garantir consistência
+            steps = round(self.zoom / self.zoom_step)
+            self.zoom = steps * self.zoom_step
         else:
-            self.zoom = max(self.min_zoom, self.zoom - self.zoom_speed)
+            # Zoom contínuo original
+            if zoom_in:
+                self.zoom = min(self.max_zoom, self.zoom + self.zoom_speed)
+            else:
+                self.zoom = max(self.min_zoom, self.zoom - self.zoom_speed)
+
         self._clamp_position()
 
     def get_visible_rect(self):
