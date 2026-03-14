@@ -208,25 +208,21 @@ class EditorScene(BaseScene):
     def _handle_map_config_result(self, result):
         """Processa o resultado do diálogo de configuração"""
         if result:
-            current_layer = self.layer_manager.get_current_layer()
-            if current_layer:
-                # Redimensiona o layer se necessário
-                if result['width'] != current_layer.width or result['height'] != current_layer.height:
-                    current_layer.resize(result['width'], result['height'])
-                    print(f"Mapa redimensionado para {result['width']}x{result['height']}")
+            # Redimensiona todas as layers se necessário
+            if result['width'] != self.layer_manager.width or result['height'] != self.layer_manager.height:
+                self.layer_manager.resize_all_layers(result['width'], result['height'])
+                print(f"Mapa redimensionado para {result['width']}x{result['height']}")
 
-                # Atualiza capítulo e fase
-                if result['chapter'] != self.current_chapter or result['phase'] != self.current_phase:
-                    self.current_chapter = result['chapter']
-                    self.current_phase = result['phase']
-                    self.phase_name = f"Fase {self.current_chapter}-{self.current_phase}"
-                    print(f"Fase alterada para: {self.phase_name}")
+            # Atualiza capítulo e fase
+            if result['chapter'] != self.current_chapter or result['phase'] != self.current_phase:
+                self.current_chapter = result['chapter']
+                self.current_phase = result['phase']
+                self.phase_name = f"Fase {self.current_chapter}-{self.current_phase}"
+                print(f"Fase alterada para: {self.phase_name}")
 
-                    # Pergunta se quer carregar a fase existente
-                    # (opcional - pode implementar um diálogo de confirmação)
-                    print(f"Dica: Use 'Load Phase' para carregar a fase {self.phase_name} se ela existir")
-
-        # Modifique o método handle_event para processar o resultado do diálogo
+                # Pergunta se quer carregar a fase existente
+                # (opcional - pode implementar um diálogo de confirmação)
+                print(f"Dica: Use 'Load Phase' (Ctrl+O) para carregar a fase {self.phase_name} se ela existir")
 
     def handle_event(self, event):
         """Delega processamento de eventos para o input handler"""

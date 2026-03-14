@@ -148,6 +148,30 @@ class LayerManager:
             if self.current_layer >= len(self.layers):
                 self.current_layer = max(0, len(self.layers) - 1)
 
+    def resize_all_layers(self, new_width, new_height, default_tile=0):
+        """
+        Redimensiona todas as layers para as novas dimensões
+
+        Args:
+            new_width: nova largura em tiles
+            new_height: nova altura em tiles
+            default_tile: tile padrão para preencher novas áreas
+        """
+        if new_width == self.width and new_height == self.height:
+            return True
+
+        print(f"Redimensionando todas as layers de {self.width}x{self.height} para {new_width}x{new_height}")
+
+        for layer in self.layers:
+            layer.resize(new_width, new_height, default_tile)
+
+        # Atualiza as dimensões do gerenciador
+        self.width = new_width
+        self.height = new_height
+
+        print(f"Todas as layers redimensionadas com sucesso")
+        return True
+
     def get_current_layer(self):
         if 0 <= self.current_layer < len(self.layers):
             return self.layers[self.current_layer]
