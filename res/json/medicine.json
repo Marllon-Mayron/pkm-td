@@ -1,0 +1,23 @@
+[{
+    "id": 1,
+    "name": "Potion",
+    "cure": 20,
+    "value": 15,	
+    "desc": "Cura: "
+  },
+  {
+    "id": 2,
+    "name": "Super Potion",
+    "cure": 50,
+    "value": 35,	
+    "desc": "Cura: "
+  },
+  {
+    "id": 3,
+    "name": "Hyper Potion",
+    "cure": 100,
+    "value": 60,	
+    "desc": "Cura: "
+  }
+]
+

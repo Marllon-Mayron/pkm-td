@@ -1,0 +1,606 @@
+{
+   "1": {
+      "lvlMin": 16,
+      "EvolueTo": 2
+   },
+   "2": {
+      "lvlMin": 36,
+      "EvolueTo": 3
+   },
+   "3": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "4": {
+      "lvlMin": 16,
+      "EvolueTo": 5
+   },
+   "5": {
+      "lvlMin": 36,
+      "EvolueTo": 3
+   },
+   "6": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "7": {
+      "lvlMin": 16,
+      "EvolueTo": 8
+   },
+   "8": {
+      "lvlMin": 36,
+      "EvolueTo": 3
+   },
+   "9": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "10": {
+      "lvlMin": 7,
+      "EvolueTo": 11
+   },
+   "11": {
+      "lvlMin": 10,
+      "EvolueTo": 12
+   },
+   "12": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "13": {
+      "lvlMin": 7,
+      "EvolueTo": 14
+   },
+   "14": {
+      "lvlMin": 10,
+      "EvolueTo": 12
+   },
+   "15": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "16": {
+      "lvlMin": 16,
+      "EvolueTo": 17
+   },
+   "17": {
+      "lvlMin": 18,
+      "EvolueTo": 18
+   },
+   "18": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "19": {
+      "lvlMin": 18,
+      "EvolueTo": 20
+   },
+   "20": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "21": {
+      "lvlMin": 22,
+      "EvolueTo": 22
+   },
+   "22": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "23": {
+      "lvlMin": 7,
+      "EvolueTo": 24
+   },
+   "24": {
+      "lvlMin": 22,
+      "EvolueTo": 25
+   },
+   "25": {
+      "lvlMin": 42,
+      "EvolueTo": "none"
+   },
+   "26": {
+      "lvlMin": 20,
+      "EvolueTo": "none"
+   },
+   "27": {
+      "lvlMin": 22,
+      "EvolueTo": 28
+   },
+   "28": {
+      "lvlMin": 42,
+      "EvolueTo": "none"
+   },
+   "29": {
+      "lvlMin": 28,
+      "EvolueTo": 30
+   },
+   "30": {
+      "lvlMin": "MoonStone",
+      "EvolueTo": 31
+   },
+   "31": {
+      "lvlMin": 16,
+      "EvolueTo": 32
+   },
+   "32": {
+      "lvlMin": "MoonStone",
+      "EvolueTo": 33
+   },
+   "33": {
+      "lvlMin": 16,
+      "EvolueTo": 34
+   },
+   "34": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "35": {
+      "lvlMin": "MoonStone",
+      "EvolueTo": 36
+   },
+   "36": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "37": {
+      "lvlMin": 16,
+      "EvolueTo": 38
+   },
+   "38": {
+      "lvlMin": "FireStone",
+      "EvolueTo": 39
+   },
+   "39": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "40": {
+      "lvlMin": "MoonStone",
+      "EvolueTo": 41
+   },
+   "41": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "42": {
+      "lvlMin": 22,
+      "EvolueTo": 43
+   },
+   "43": {
+      "lvlMin": 42,
+      "EvolueTo": "none"
+   },
+   "44": {
+      "lvlMin": 21,
+      "EvolueTo": 45
+   },
+   "45": {
+      "lvlMin": "LeafStone",
+      "EvolueTo": 46
+   },
+   "46": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "47": {
+      "lvlMin": 21,
+      "EvolueTo": 48
+   },
+   "48": {
+      "lvlMin": "LeafStone",
+      "EvolueTo": 49
+   },
+   "49": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "50": {
+      "lvlMin": 20,
+      "EvolueTo": 51
+   },
+   "51": {
+      "lvlMin": 16,
+      "EvolueTo": 52
+   },
+   "52": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "53": {
+      "lvlMin": 20,
+      "EvolueTo": 54
+   },
+   "54": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "55": {
+      "lvlMin": 33,
+      "EvolueTo": 56
+   },
+   "56": {
+      "lvlMin": "WaterStone",
+      "EvolueTo": 57
+   },
+   "57": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "58": {
+      "lvlMin": 33,
+      "EvolueTo": 59
+   },
+   "59": {
+      "lvlMin": "WaterStone",
+      "EvolueTo": 60
+   },
+   "60": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "61": {
+      "lvlMin": "Trade",
+      "EvolueTo": 62
+   },
+   "62": {
+      "lvlMin": 30,
+      "EvolueTo": "none"
+   },
+   "63": {
+      "lvlMin": 28,
+      "EvolueTo": 64
+   },
+   "64": {
+      "lvlMin": 40,
+      "EvolueTo": 65
+   },
+   "65": {
+      "lvlMin": "Trade",
+      "EvolueTo": 66
+   },
+   "66": {
+      "lvlMin": 30,
+      "EvolueTo": 67
+   },
+   "67": {
+      "lvlMin": "Trade",
+      "EvolueTo": 68
+   },
+   "68": {
+      "lvlMin": 28,
+      "EvolueTo": "none"
+   },
+   "69": {
+      "lvlMin": "Trade",
+      "EvolueTo": 70
+   },
+   "70": {
+      "lvlMin": 40,
+      "EvolueTo": 71
+   },
+   "71": {
+      "lvlMin": "Trade",
+      "EvolueTo": 72
+   },
+   "72": {
+      "lvlMin": 40,
+      "EvolueTo": "none"
+   },
+   "73": {
+      "lvlMin": "Trade",
+      "EvolueTo": 74
+   },
+   "74": {
+      "lvlMin": 32,
+      "EvolueTo": "none"
+   },
+   "75": {
+      "lvlMin": 30,
+      "EvolueTo": 76
+   },
+   "76": {
+      "lvlMin": "Trade",
+      "EvolueTo": 77
+   },
+   "77": {
+      "lvlMin": 40,
+      "EvolueTo": "none"
+   },
+   "78": {
+      "lvlMin": 37,
+      "EvolueTo": 79
+   },
+   "79": {
+      "lvlMin": 37,
+      "EvolueTo": "none"
+   },
+   "80": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "81": {
+      "lvlMin": 30,
+      "EvolueTo": 82
+   },
+   "82": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "83": {
+      "lvlMin": 30,
+      "EvolueTo": 84
+   },
+   "84": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "85": {
+      "lvlMin": 31,
+      "EvolueTo": 86
+   },
+   "86": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "87": {
+      "lvlMin": 38,
+      "EvolueTo": 88
+   },
+   "88": {
+      "lvlMin": 38,
+      "EvolueTo": "none"
+   },
+   "89": {
+      "lvlMin": 40,
+      "EvolueTo": 90
+   },
+   "90": {
+      "lvlMin": 40,
+      "EvolueTo": "none"
+   },
+   "91": {
+      "lvlMin": 25,
+      "EvolueTo": 92
+   },
+   "92": {
+      "lvlMin": "Trade",
+      "EvolueTo": 93
+   },
+   "93": {
+      "lvlMin": "Trade",
+      "EvolueTo": "none"
+   },
+   "94": {
+      "lvlMin": "Trade",
+      "EvolueTo": "none"
+   },
+   "95": {
+      "lvlMin": 30,
+      "EvolueTo": 96
+   },
+   "96": {
+      "lvlMin": "Trade",
+      "EvolueTo": "none"
+   },
+   "97": {
+      "lvlMin": 28,
+      "EvolueTo": 98
+   },
+   "98": {
+      "lvlMin": 40,
+      "EvolueTo": 99
+   },
+   "99": {
+      "lvlMin": "Trade",
+      "EvolueTo": 100
+   },
+   "100": {
+      "lvlMin": 25,
+      "EvolueTo": "none"
+   },
+   "101": {
+      "lvlMin": 35,
+      "EvolueTo": 102
+   },
+   "102": {
+      "lvlMin": "LevelUpArea",
+      "EvolueTo": 103
+   },
+   "103": {
+      "lvlMin": "LeafStone",
+      "EvolueTo": 104
+   },
+   "104": {
+      "lvlMin": 28,
+      "EvolueTo": 105
+   },
+   "105": {
+      "lvlMin": "LevelUpArea",
+      "EvolueTo": 106
+   },
+   "106": {
+      "lvlMin": 20,
+      "EvolueTo": "none"
+   },
+   "107": {
+      "lvlMin": 20,
+      "EvolueTo": "none"
+   },
+   "108": {
+      "lvlMin": "LevelUpArea",
+      "EvolueTo": 109
+   },
+   "109": {
+      "lvlMin": 20,
+      "EvolueTo": "none"
+   },
+   "110": {
+      "lvlMin": 20,
+      "EvolueTo": "none"
+   },
+   "111": {
+      "lvlMin": 42,
+      "EvolueTo": 112
+   },
+   "112": {
+      "lvlMin": "Trade",
+      "EvolueTo": "none"
+   },
+   "113": {
+      "lvlMin": 40,
+      "EvolueTo": 114
+   },
+   "114": {
+      "lvlMin": "Trade",
+      "EvolueTo": "none"
+   },
+   "115": {
+      "lvlMin": "LevelUpArea",
+      "EvolueTo": 116
+   },
+   "116": {
+      "lvlMin": 33,
+      "EvolueTo": 117
+   },
+   "117": {
+      "lvlMin": 48,
+      "EvolueTo": "none"
+   },
+   "118": {
+      "lvlMin": 40,
+      "EvolueTo": 119
+   },
+   "119": {
+      "lvlMin": "Trade",
+      "EvolueTo": 120
+   },
+   "120": {
+      "lvlMin": 20,
+      "EvolueTo": 121
+   },
+   "121": {
+      "lvlMin": "WaterStone",
+      "EvolueTo": 122
+   },
+   "122": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "123": {
+      "lvlMin": 30,
+      "EvolueTo": 124
+   },
+   "124": {
+      "lvlMin": "Trade",
+      "EvolueTo": 125
+   },
+   "125": {
+      "lvlMin": "Trade",
+      "EvolueTo": "none"
+   },
+   "126": {
+      "lvlMin": "Trade",
+      "EvolueTo": 127
+   },
+   "127": {
+      "lvlMin": 28,
+      "EvolueTo": "none"
+   },
+   "128": {
+      "lvlMin": 28,
+      "EvolueTo": "none"
+   },
+   "129": {
+      "lvlMin": "LevelUpArea",
+      "EvolueTo": 130
+   },
+   "130": {
+      "lvlMin": "LevelUpArea",
+      "EvolueTo": 131
+   },
+   "131": {
+      "lvlMin": "Trade",
+      "EvolueTo": 132
+   },
+   "132": {
+      "lvlMin": 15,
+      "EvolueTo": 133
+   },
+   "133": {
+      "lvlMin": "LevelUpArea",
+      "EvolueTo": "none"
+   },
+   "134": {
+      "lvlMin": "WaterStone",
+      "EvolueTo": "none"
+   },
+   "135": {
+      "lvlMin": "ThunderStone",
+      "EvolueTo": "none"
+   },
+   "136": {
+      "lvlMin": "FireStone",
+      "EvolueTo": "none"
+   },
+   "137": {
+      "lvlMin": "LevelUpArea",
+      "EvolueTo": 138
+   },
+   "138": {
+      "lvlMin": 40,
+      "EvolueTo": 139
+   },
+   "139": {
+      "lvlMin": "LevelUpArea",
+      "EvolueTo": 140
+   },
+   "140": {
+      "lvlMin": 40,
+      "EvolueTo": "none"
+   },
+   "141": {
+      "lvlMin": 40,
+      "EvolueTo": 142
+   },
+   "142": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "143": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "144": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "145": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "146": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "147": {
+      "lvlMin": 15,
+      "EvolueTo": 148
+   },
+   "148": {
+      "lvlMin": 40,
+      "EvolueTo": 149
+   },
+   "149": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "150": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   },
+   "151": {
+      "lvlMin": "none",
+      "EvolueTo": "none"
+   }
+}

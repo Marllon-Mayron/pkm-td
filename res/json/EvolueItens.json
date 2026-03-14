@@ -1,0 +1,62 @@
+[{
+    "id": 1,
+    "name": "dawn-stone",
+    "value": 80,
+    "desc": "Evoluir pokemons"		
+  },
+  {
+    "id": 2,
+    "name": "dusk-stone",
+    "value": 80,
+    "desc": "Evoluir pokemons"		
+  },
+  {
+    "id": 3,
+    "name": "fire-stone",
+    "value": 80,
+    "desc": "Evoluir pokemons"		
+  },
+  {
+    "id": 4,
+    "name": "ice-stone",
+    "value": 80,
+    "desc": "Evoluir pokemons"		
+  },
+  {
+    "id": 5,
+    "name": "leaf-stone",
+    "value": 80,
+    "desc": "Evoluir pokemons"		
+  },
+  {
+    "id": 6,
+    "name": "moon-stone",
+    "value": 80,
+    "desc": "Evoluir pokemons"		
+  },
+  {
+    "id": 7,
+    "name": "shiny-stone",
+    "value": 80,
+    "desc": "Evoluir pokemons"		
+  },
+  {
+    "id": 8,
+    "name": "sun-stone",
+    "value": 80,
+    "desc": "Evoluir pokemons"		
+  },
+  {
+    "id": 9,
+    "name": "thunder-stone",
+    "value": 80,
+    "desc": "Evoluir pokemons"		
+  },
+  {
+    "id": 10,
+    "name": "water-stone",
+    "value": 80,
+    "desc": "Evoluir pokemons"		
+  }
+]
+

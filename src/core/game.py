@@ -5,6 +5,7 @@ import pygame
 from src.config.settings import settings
 from src.core.screen import ScreenManager
 from src.core.camera import Camera
+from src.entities.player import Player  # Importa a classe Player
 from src.scenes.menu_scene import MenuScene
 
 class Game:
@@ -12,6 +13,11 @@ class Game:
         pygame.init()
         self.screen_manager = ScreenManager()
         self.running = True
+
+        # Cria o jogador
+        self.player = Player(100, 100)  # Posição inicial
+        # Adiciona um Pokémon inicial (Bulbasaur)
+        self.player.add_starter(1)  # ID 1 = Bulbasaur
 
         # Câmera
         self.camera = None
@@ -23,10 +29,18 @@ class Game:
         # Gerenciamento de cenas
         self.current_scene = None
         self.menu_scene = MenuScene(self)
+
+        # Referências para cenas (serão inicializadas quando necessárias)
+        self.phase_select_scene = None
+        self.team_select_scene = None
+        self.game_scene = None
+
+        # Começa com o menu
         self.current_scene = self.menu_scene
 
         print(f"Jogo inicializado - FPS alvo: {settings.target_fps}")
         print(f"Tick rate do jogo: {settings.game_tick_rate} updates/segundo")
+        print(f"Jogador criado com time: {len(self.player.team)} Pokémon")
 
     def initialize_camera(self, world_width, world_height):
         """Inicializa a câmera com o tamanho do mundo"""
@@ -83,7 +97,7 @@ class Game:
         # Limpa a tela
         self.screen_manager.clear()
 
-        # Renderiza a cena atual (agora passa a tela real)
+        # Renderiza a cena atual
         if self.current_scene:
             self.current_scene.render(self.screen_manager.screen)
 

@@ -9,6 +9,7 @@ from src.scenes.base_scene import BaseScene
 from src.config.progress import progress_manager
 from src.config.phase_catalog import phase_catalog
 from src.scenes.game_scene.game_scene import GameScene
+from src.scenes.team_select_scene import TeamSelectScene
 
 
 class PhaseCard:
@@ -661,8 +662,15 @@ class PhaseSelectScene(BaseScene):
 
     def start_phase(self, phase_number):
         """Inicia a fase selecionada"""
-        # Pega informações da fase para possível uso futuro
+        # Pega informações da fase
         phase_info = self.catalog.get_phase_info(self.current_chapter_id, phase_number)
         if phase_info:
             print(f"Iniciando fase: {phase_info['name']}")
-        self.game.current_scene = GameScene(self.game, phase_number)
+
+        # Vai para a tela de seleção de time
+        # Importa aqui para evitar import circular
+        from src.scenes.team_select_scene import TeamSelectScene
+
+        # Cria a cena se não existir ou recria
+        self.game.team_select_scene = TeamSelectScene(self.game)
+        self.game.current_scene = self.game.team_select_scene

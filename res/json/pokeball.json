@@ -1,0 +1,30 @@
+[{
+    "id": 1,
+    "name": "Pokeball",
+    "catch_rate": 30,
+    "value": 20,
+    "desc": "1x de captura"		
+  },
+  {
+    "id": 2,
+    "name": "Greatball",
+    "catch_rate": 45,
+    "value": 40,	
+    "desc": "1.5x de captura"	
+  },
+  {
+    "id": 3,
+    "name": "Ultraball",
+    "catch_rate": 60,
+    "value": 60,
+    "desc": "2x de captura"		
+  },
+  {
+    "id": 4,
+    "name": "Masterball",
+    "catch_rate": 100,
+    "value": 180,
+    "desc": "100% de captura"		
+  }
+]
+
