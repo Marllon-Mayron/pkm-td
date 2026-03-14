@@ -1,0 +1,13 @@
+{
+    "unlocked_phases": [
+        1
+    ],
+    "completed_phases": [],
+    "current_chapter": 1,
+    "stars": {},
+    "settings": {
+        "sound_volume": 0.7,
+        "music_volume": 0.5,
+        "show_fps": false
+    }
+}

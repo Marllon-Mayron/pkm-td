@@ -4,7 +4,8 @@ Cena do menu principal
 import pygame
 import random
 from src.scenes.base_scene import BaseScene
-from src.scenes.phase_select_scene import PhaseSelectScene  # Import adicionado
+from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
+
 
 class Button:
     def __init__(self, x, y, width, height, text, color, hover_color, callback, font):
