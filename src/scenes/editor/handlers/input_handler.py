@@ -107,6 +107,8 @@ class EditorInputHandler:
         if self.editor.mode != "preview" and self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
             world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
             if world_pos:
+                # REMOVIDO: qualquer lógica de redimensionamento por clique
+                # Agora só processa cliques para edição normal
                 if event.button == 1:
                     self.editor._handle_left_click(world_pos)
                 elif event.button == 3:

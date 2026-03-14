@@ -220,10 +220,6 @@ class EditorScene(BaseScene):
                 self.phase_name = f"Fase {self.current_chapter}-{self.current_phase}"
                 print(f"Fase alterada para: {self.phase_name}")
 
-                # Pergunta se quer carregar a fase existente
-                # (opcional - pode implementar um diálogo de confirmação)
-                print(f"Dica: Use 'Load Phase' (Ctrl+O) para carregar a fase {self.phase_name} se ela existir")
-
     def handle_event(self, event):
         """Delega processamento de eventos para o input handler"""
         # Verifica se há um diálogo ativo
