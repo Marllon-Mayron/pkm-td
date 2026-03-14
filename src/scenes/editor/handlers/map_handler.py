@@ -48,9 +48,13 @@ class MapHandler:
                 x = world_pos[0] - 16  # Centraliza no clique
                 y = world_pos[1] - 16
 
-            self.editor.tower_spots.add_spot(x, y)
-            print(f"Spot de torre adicionado em ({x}, {y})")
-            self.editor._update_preview_objects()
+            # Verifica se já existe spot nesta posição
+            existing_spot = self.editor.tower_spots.get_spot_at(x + 8, y + 8)  # +8 para pegar o centro
+            if existing_spot:
+                print(f"Já existe um spot em ({x}, {y})")
+            else:
+                self.editor.tower_spots.add_spot(x, y)
+                self.editor._update_preview_objects()
 
     def handle_right_click(self, world_pos):
         """Processa clique direito no mapa (apagar)"""
@@ -102,6 +106,7 @@ class MapHandler:
                     spot_to_remove = spot
 
             if spot_to_remove:
+                # CORREÇÃO: Agora passa o objeto spot, não o índice
                 self.editor.tower_spots.remove_spot(spot_to_remove)
                 print("Spot de torre removido")
                 self.editor._update_preview_objects()

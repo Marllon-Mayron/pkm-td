@@ -19,6 +19,12 @@ class TowerSpot:
         return (self.x <= px <= self.x + self.size and
                 self.y <= py <= self.y + self.size)
 
+    def __eq__(self, other):
+        """Compara dois spots pela posição"""
+        if isinstance(other, TowerSpot):
+            return self.x == other.x and self.y == other.y and self.size == other.size
+        return False
+
 
 class TowerSpotManager:
     def __init__(self):
@@ -29,22 +35,49 @@ class TowerSpotManager:
         self.grid_size = 16
 
     def add_spot(self, x, y):
+        """Adiciona um spot se não existir outro na mesma posição"""
         # Ajusta para grid se necessário
         if self.snap_to_grid:
             x = (x // self.grid_size) * self.grid_size
             y = (y // self.grid_size) * self.grid_size
 
+        # Verifica se já existe um spot nesta posição
+        for spot in self.spots:
+            if spot.x == x and spot.y == y:
+                print(f"Spot já existe em ({x}, {y})")
+                return -1
+
         spot = TowerSpot(x, y, self.spot_size)
         self.spots.append(spot)
+        print(f"Spot adicionado em ({x}, {y})")
         return len(self.spots) - 1
 
-    def remove_spot(self, index):
+    def remove_spot(self, spot_to_remove):
+        """Remove um spot específico (objeto TowerSpot)"""
+        if spot_to_remove in self.spots:
+            self.spots.remove(spot_to_remove)
+            if self.selected_spot >= len(self.spots):
+                self.selected_spot = len(self.spots) - 1
+            print("Spot removido")
+        else:
+            print("Spot não encontrado para remoção")
+
+    def remove_spot_by_index(self, index):
+        """Remove um spot pelo índice"""
         if 0 <= index < len(self.spots):
             del self.spots[index]
             if self.selected_spot >= len(self.spots):
                 self.selected_spot = len(self.spots) - 1
+            print(f"Spot {index} removido")
 
     def get_spot_at(self, x, y):
+        """Retorna o spot na posição (ou None se não existir)"""
+        for spot in self.spots:
+            if spot.contains_point(x, y):
+                return spot
+        return None
+
+    def get_spot_index_at(self, x, y):
         """Retorna índice do spot na posição"""
         for i, spot in enumerate(self.spots):
             if spot.contains_point(x, y):
