@@ -1,4 +1,4 @@
-# src/scenes/editor/handlers/map_handler.py
+# src/scenes/editor/handlers/map_handler.py (modificado)
 
 import pygame
 
@@ -8,6 +8,10 @@ class MapHandler:
 
     def __init__(self, editor_scene):
         self.editor = editor_scene
+
+    def _save_undo_state(self, action_description):
+        """Método auxiliar para salvar estado antes de ações"""
+        self.editor.undo_manager.save_state(self.editor, action_description)
 
     def handle_left_click(self, world_pos):
         """Processa clique esquerdo no mapa"""
@@ -22,6 +26,9 @@ class MapHandler:
         # Modo layers - desenha tile
         if self.editor.mode == "layers":
             if 0 <= tile_x < current_layer.width and 0 <= tile_y < current_layer.height:
+                # Salva estado ANTES da modificação
+                self._save_undo_state(f"Tile {self.editor.current_tile} em ({tile_x}, {tile_y})")
+
                 self.editor.layer_manager.set_tile(tile_x, tile_y, self.editor.current_tile)
                 print(f"Tile {self.editor.current_tile} colocado em ({tile_x}, {tile_y})")
 
@@ -34,6 +41,9 @@ class MapHandler:
             else:
                 x, y = world_pos
 
+            # Salva estado ANTES da modificação
+            self._save_undo_state(f"Path node em ({x:.0f}, {y:.0f})")
+
             self.editor.path.add_node((x, y))
             print(f"Nó do path adicionado em ({x}, {y})")
             self.editor._update_preview_objects()
@@ -45,14 +55,17 @@ class MapHandler:
                 x = tile_x * self.editor.grid_size
                 y = tile_y * self.editor.grid_size
             else:
-                x = world_pos[0] - 16  # Centraliza no clique
+                x = world_pos[0] - 16
                 y = world_pos[1] - 16
 
             # Verifica se já existe spot nesta posição
-            existing_spot = self.editor.tower_spots.get_spot_at(x + 8, y + 8)  # +8 para pegar o centro
+            existing_spot = self.editor.tower_spots.get_spot_at(x + 8, y + 8)
             if existing_spot:
                 print(f"Já existe um spot em ({x}, {y})")
             else:
+                # Salva estado ANTES da modificação
+                self._save_undo_state(f"Tower spot em ({x:.0f}, {y:.0f})")
+
                 self.editor.tower_spots.add_spot(x, y)
                 self.editor._update_preview_objects()
 
@@ -69,22 +82,33 @@ class MapHandler:
         # Modo layers - apaga tile (coloca 0)
         if self.editor.mode == "layers":
             if 0 <= tile_x < current_layer.width and 0 <= tile_y < current_layer.height:
-                self.editor.layer_manager.set_tile(tile_x, tile_y, 0)
-                print(f"Tile removido em ({tile_x}, {tile_y})")
+                # Verifica se realmente tem um tile para apagar
+                if current_layer.get_tile(tile_x, tile_y) != 0:
+                    # Salva estado ANTES da modificação
+                    self._save_undo_state(f"Remover tile em ({tile_x}, {tile_y})")
 
-        # Modo path - remove nó (se clicar perto)
+                    self.editor.layer_manager.set_tile(tile_x, tile_y, 0)
+                    print(f"Tile removido em ({tile_x}, {tile_y})")
+
+        # Modo path - remove nó
         elif self.editor.mode == "path":
             # Encontra nó mais próximo para remover
             min_dist = float('inf')
             node_to_remove = -1
+            pos_to_remove = None
 
             for i, node in enumerate(self.editor.path.nodes):
                 dist = ((node[0] - world_pos[0]) ** 2 + (node[1] - world_pos[1]) ** 2) ** 0.5
-                if dist < 20 and dist < min_dist:  # 20 pixels de tolerância
+                if dist < 20 and dist < min_dist:
                     min_dist = dist
                     node_to_remove = i
+                    pos_to_remove = node
 
             if node_to_remove >= 0:
+                # Salva estado ANTES da modificação
+                self._save_undo_state(
+                    f"Remover path node {node_to_remove} em ({pos_to_remove[0]:.0f}, {pos_to_remove[1]:.0f})")
+
                 self.editor.path.remove_node(node_to_remove)
                 print(f"Nó {node_to_remove} removido")
                 self.editor._update_preview_objects()
@@ -94,9 +118,9 @@ class MapHandler:
             # Encontra spot mais próximo para remover
             spot_to_remove = None
             min_dist = float('inf')
+            spot_pos = None
 
             for spot in self.editor.tower_spots.spots:
-                # Calcula centro do spot
                 center_x = spot.x + spot.size // 2
                 center_y = spot.y + spot.size // 2
                 dist = ((center_x - world_pos[0]) ** 2 + (center_y - world_pos[1]) ** 2) ** 0.5
@@ -104,9 +128,12 @@ class MapHandler:
                 if dist < spot.size and dist < min_dist:
                     min_dist = dist
                     spot_to_remove = spot
+                    spot_pos = (spot.x, spot.y)
 
             if spot_to_remove:
-                # CORREÇÃO: Agora passa o objeto spot, não o índice
+                # Salva estado ANTES da modificação
+                self._save_undo_state(f"Remover tower spot em ({spot_pos[0]:.0f}, {spot_pos[1]:.0f})")
+
                 self.editor.tower_spots.remove_spot(spot_to_remove)
                 print("Spot de torre removido")
                 self.editor._update_preview_objects()

@@ -287,11 +287,23 @@ class EditorRenderHandler:
         title = self.editor.font.render(f"EDITOR DE FASES - {self.editor.phase_name}{size_info}", True, (255, 215, 0))
         screen.blit(title, (viewport_x + 10, viewport_y + 10))
 
-        # Instruções
+        # Instruções (modificadas para incluir Undo/Redo)
         inst = self.editor.font_small.render(
-            "CTRL+S: Salvar | CTRL+O: Carregar | CTRL+I: Importar | CTRL+M: Map Size | G: Grid | 1-5: Modos | DEL: Remover",
+            "CTRL+S: Salvar | CTRL+O: Carregar | CTRL+I: Importar | CTRL+M: Map Size | "
+            "CTRL+Z: Undo | CTRL+Y: Redo | G: Grid | 1-5: Modos | DEL: Remover",
             True, (200, 200, 200))
         screen.blit(inst, (viewport_x + 10, viewport_y + 35))
+
+        # Indicador de Undo/Redo (opcional)
+        if self.editor.undo_manager.can_undo() or self.editor.undo_manager.can_redo():
+            undo_text = ""
+            if self.editor.undo_manager.can_undo():
+                undo_desc = self.editor.undo_manager.get_undo_description()
+                undo_text = f"Undo: {undo_desc[:20]}..."
+
+            if undo_text:
+                undo_surf = self.editor.font_small.render(undo_text, True, (150, 150, 200))
+                screen.blit(undo_surf, (viewport_x + self.editor.screen_manager.viewport_width - 300, viewport_y + 35))
 
         # Botões de modo
         self.editor.mode_buttons.render(screen, self.editor.mode, self.editor.font_small)

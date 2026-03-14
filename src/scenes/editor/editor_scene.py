@@ -10,6 +10,7 @@ from src.editor.path_editor import Path
 from src.editor.tower_spot_editor import TowerSpotManager
 from src.editor.phase_exporter import PhaseExporter
 from src.scenes.editor.components.layer_selector import LayerSelector
+from src.scenes.editor.components.managers.undo_manager import UndoManager
 from src.scenes.editor.components.map_config_dialog import MapConfigDialog
 from src.scenes.editor.components.mode_buttons import ModeButtons
 from src.scenes.editor.components.tile_palette import TilePalette
@@ -47,6 +48,7 @@ class EditorScene(BaseScene):
         self.path = Path()
         self.tower_spots = TowerSpotManager()
         self.exporter = PhaseExporter()
+        self.undo_manager = UndoManager(max_steps=10)
 
         # Estado do editor
         self.mode = "layers"
@@ -226,6 +228,7 @@ class EditorScene(BaseScene):
             if chapter_changed or phase_changed or name_changed:
                 print(
                     f"Fase alterada para: {self.phase_name} (Capítulo {self.current_chapter}, Fase {self.current_phase})")
+                self.clear_undo_history()
 
     def handle_event(self, event):
         """Delega processamento de eventos para o input handler"""
@@ -338,6 +341,9 @@ class EditorScene(BaseScene):
             # Atualiza objetos de preview
             self._update_preview_objects()
 
+            #Limpa historico salvo
+            self.clear_undo_history()
+
             print(f"Fase {chapter}-{phase_number} carregada com sucesso!")
             return True
 
@@ -370,3 +376,9 @@ class EditorScene(BaseScene):
             print("Entrada inválida!")
         except KeyboardInterrupt:
             print("\nCarregamento cancelado.")
+
+    def clear_undo_history(self):
+        """Limpa o histórico de undo/redo"""
+        self.undo_manager.clear()
+        print("Histórico de undo/redo limpo")
+

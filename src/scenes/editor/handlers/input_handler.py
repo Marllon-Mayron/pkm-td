@@ -94,6 +94,15 @@ class EditorInputHandler:
             self.editor.list_available_phases()
         elif event.key == pygame.K_m and (pygame.key.get_mods() & pygame.KMOD_CTRL):
             self.editor._open_map_config_dialog()
+        elif event.key == pygame.K_z and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+            # Ctrl+Z = Undo
+            if not (pygame.key.get_mods() & pygame.KMOD_SHIFT):  # Não é Ctrl+Shift+Z
+                self.editor.undo_manager.undo(self.editor)
+                return True
+        elif event.key == pygame.K_y and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+            # Ctrl+Y = Redo
+            self.editor.undo_manager.redo(self.editor)
+            return True
         return True
 
     def _handle_mousedown(self, event):
