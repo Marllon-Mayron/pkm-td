@@ -1,3 +1,5 @@
+# src/scenes/editor/handlers/render_handler.py (versão final corrigida)
+
 import pygame
 
 
@@ -49,117 +51,110 @@ class EditorRenderHandler:
 
     def _render_preview(self, screen):
         """Renderiza elementos de preview"""
-        print(
-            f"Renderizando preview: {len(self.editor.test_towers)} torres, {len(self.editor.test_enemies)} inimigos")  # Debug
-
         for tower in self.editor.test_towers:
             tower.render(screen, self.editor.camera, self.editor.screen_manager)
 
-        if self.editor.test_enemies:
-            for i, enemy in enumerate(self.editor.test_enemies):
-                print(f"Renderizando inimigo {i}")  # Debug
-                enemy.render(screen, self.editor.camera, self.editor.screen_manager)
-        else:
-            print("Nenhum inimigo para renderizar!")
+        for enemy in self.editor.test_enemies:
+            enemy.render(screen, self.editor.camera, self.editor.screen_manager)
 
     def _render_grid(self, screen):
         """Renderiza o grid alinhado perfeitamente com os tiles"""
         if not self.editor.show_grid:
             return
 
-        # Calcula o retângulo visível no mundo
-        visible_rect = self.editor.camera.get_visible_rect()
+        # Obtém parâmetros necessários
+        camera = self.editor.camera
+        screen_manager = self.editor.screen_manager
+        grid_size = self.editor.grid_size
 
-        # Converte para coordenadas de grid
-        start_col = int(visible_rect.left // self.editor.grid_size)
-        start_row = int(visible_rect.top // self.editor.grid_size)
-        end_col = int(visible_rect.right // self.editor.grid_size) + 1
-        end_row = int(visible_rect.bottom // self.editor.grid_size) + 1
+        # --- CÁLCULO EXATAMENTE IGUAL AO LAYER_MANAGER.PY ---
+        # PRÉ-CALCULA usando inteiros (igual ao layer_manager)
+        cam_offset_x = int(-camera.x * camera.zoom * screen_manager.render_scale +
+                           (screen_manager.render_width / 2) * screen_manager.render_scale +
+                           screen_manager.viewport_x)
+        cam_offset_y = int(-camera.y * camera.zoom * screen_manager.render_scale +
+                           (screen_manager.render_height / 2) * screen_manager.render_scale +
+                           screen_manager.viewport_y)
 
-        # Cria superfície para a grid (mesmo tamanho do viewport)
+        tile_size_scaled = int(grid_size * camera.zoom * screen_manager.render_scale)
+
+        # Calcula o primeiro tile visível
+        # Em vez de usar visible_rect, calculamos a partir do offset
+        # Isso garante que a grid comece no mesmo lugar que os tiles
+        first_visible_x = -cam_offset_x // tile_size_scaled
+        first_visible_y = -cam_offset_y // tile_size_scaled
+
+        # Quantos tiles cabem na tela (com margem para evitar gaps)
+        tiles_visible_x = (screen_manager.viewport_width // tile_size_scaled) + 2
+        tiles_visible_y = (screen_manager.viewport_height // tile_size_scaled) + 2
+
+        # Cria superfície para a grid
         grid_surface = pygame.Surface(
-            (self.editor.screen_manager.viewport_width,
-             self.editor.screen_manager.viewport_height),
+            (screen_manager.viewport_width, screen_manager.viewport_height),
             pygame.SRCALPHA
         )
 
         # Desenha linhas verticais
-        for col in range(start_col, end_col + 1):
-            # Posição mundial da linha
-            world_x = col * self.editor.grid_size
+        for i in range(tiles_visible_x):
+            tile_x = first_visible_x + i
 
-            # Converte para coordenadas de tela
-            screen_x, _ = self._world_to_screen(world_x, 0)
+            # Posição na tela - MESMA FÓRMULA DO LAYER_MANAGER
+            screen_x = tile_x * tile_size_scaled + cam_offset_x
 
-            # Ajusta para coordenadas locais do viewport
-            grid_x = screen_x - self.editor.screen_manager.viewport_x
+            # Converte para coordenadas locais do viewport
+            grid_x = screen_x - screen_manager.viewport_x
 
-            # Só desenha se estiver dentro do viewport
-            if 0 <= grid_x <= self.editor.screen_manager.viewport_width:
-                # Cor diferente para o eixo 0 (origem)
-                if col == 0:
-                    color = (255, 100, 100, 180)  # Vermelho para eixo Y
+            # Verifica se está dentro do viewport (com pequena margem)
+            if -tile_size_scaled <= grid_x <= screen_manager.viewport_width + tile_size_scaled:
+                # Cor diferente para o eixo Y (x=0)
+                if tile_x == 0:
+                    color = (255, 100, 100, 180)
                     width = 2
                 else:
-                    color = (100, 100, 100, 100)  # Cinza para as demais
+                    color = (100, 100, 100, 100)
                     width = 1
 
+                # Desenha a linha - usa grid_x diretamente, sem arredondar
+                # O Pygame já lida com floats convertendo para ints no momento do desenho
                 pygame.draw.line(
                     grid_surface,
                     color,
                     (grid_x, 0),
-                    (grid_x, self.editor.screen_manager.viewport_height),
+                    (grid_x, screen_manager.viewport_height),
                     width
                 )
 
         # Desenha linhas horizontais
-        for row in range(start_row, end_row + 1):
-            # Posição mundial da linha
-            world_y = row * self.editor.grid_size
+        for i in range(tiles_visible_y):
+            tile_y = first_visible_y + i
 
-            # Converte para coordenadas de tela
-            _, screen_y = self._world_to_screen(0, world_y)
+            # Posição na tela - MESMA FÓRMULA DO LAYER_MANAGER
+            screen_y = tile_y * tile_size_scaled + cam_offset_y
 
-            # Ajusta para coordenadas locais do viewport
-            grid_y = screen_y - self.editor.screen_manager.viewport_y
+            # Converte para coordenadas locais do viewport
+            grid_y = screen_y - screen_manager.viewport_y
 
-            # Só desenha se estiver dentro do viewport
-            if 0 <= grid_y <= self.editor.screen_manager.viewport_height:
-                # Cor diferente para o eixo 0 (origem)
-                if row == 0:
-                    color = (100, 255, 100, 180)  # Verde para eixo X
+            # Verifica se está dentro do viewport (com pequena margem)
+            if -tile_size_scaled <= grid_y <= screen_manager.viewport_height + tile_size_scaled:
+                # Cor diferente para o eixo X (y=0)
+                if tile_y == 0:
+                    color = (100, 255, 100, 180)
                     width = 2
                 else:
-                    color = (100, 100, 100, 100)  # Cinza para as demais
+                    color = (100, 100, 100, 100)
                     width = 1
 
+                # Desenha a linha
                 pygame.draw.line(
                     grid_surface,
                     color,
                     (0, grid_y),
-                    (self.editor.screen_manager.viewport_width, grid_y),
+                    (screen_manager.viewport_width, grid_y),
                     width
                 )
 
-        # Desenha pontos nas interseções (opcional - para melhor visualização)
-        if self.editor.camera.zoom > 1.5:  # Só mostra pontos quando muito zoom
-            for col in range(start_col, end_col + 1):
-                for row in range(start_row, end_row + 1):
-                    world_x = col * self.editor.grid_size
-                    world_y = row * self.editor.grid_size
-
-                    screen_x, screen_y = self._world_to_screen(world_x, world_y)
-                    grid_x = screen_x - self.editor.screen_manager.viewport_x
-                    grid_y = screen_y - self.editor.screen_manager.viewport_y
-
-                    if (0 <= grid_x <= self.editor.screen_manager.viewport_width and
-                            0 <= grid_y <= self.editor.screen_manager.viewport_height):
-                        # Ponto mais visível nas interseções
-                        color = (200, 200, 0, 200) if col == 0 or row == 0 else (150, 150, 150, 150)
-                        pygame.draw.circle(grid_surface, color, (int(grid_x), int(grid_y)), 2)
-
         # Aplica a grid na tela
-        screen.blit(grid_surface, (self.editor.screen_manager.viewport_x, self.editor.screen_manager.viewport_y))
+        screen.blit(grid_surface, (screen_manager.viewport_x, screen_manager.viewport_y))
 
     def _render_map_bounds(self, screen):
         """Renderiza os limites do mapa"""
@@ -190,10 +185,11 @@ class EditorRenderHandler:
         screen_corners = []
         for world_x, world_y in corners:
             screen_x, screen_y = self._world_to_screen(world_x, world_y)
-            screen_corners.append((screen_x, screen_y))
+            screen_corners.append((int(screen_x), int(screen_y)))
 
         # Desenha borda do mapa (limites máximos)
-        pygame.draw.polygon(screen, (255, 100, 100), screen_corners, 2)
+        if len(screen_corners) == 4:
+            pygame.draw.polygon(screen, (255, 100, 100), screen_corners, 2)
 
         # Desenha área editável atual
         current_corners = [
@@ -206,9 +202,10 @@ class EditorRenderHandler:
         screen_current_corners = []
         for world_x, world_y in current_corners:
             screen_x, screen_y = self._world_to_screen(world_x, world_y)
-            screen_current_corners.append((screen_x, screen_y))
+            screen_current_corners.append((int(screen_x), int(screen_y)))
 
-        pygame.draw.polygon(screen, (100, 255, 100), screen_current_corners, 2)
+        if len(screen_current_corners) == 4:
+            pygame.draw.polygon(screen, (100, 255, 100), screen_current_corners, 2)
 
         # Cantos com marcadores
         for screen_x, screen_y in screen_corners:
@@ -240,16 +237,17 @@ class EditorRenderHandler:
         screen.blit(info_text, (screen_corners[0][0] + 10, screen_corners[0][1] + 30))
 
     def _world_to_screen(self, world_x, world_y):
-        """Converte coordenadas do mundo para coordenadas de tela (pixel perfeito)"""
-        # Calcula posição na superfície de renderização
-        render_x = (
-                               world_x - self.editor.camera.x) * self.editor.camera.zoom + self.editor.screen_manager.render_width / 2
-        render_y = (
-                               world_y - self.editor.camera.y) * self.editor.camera.zoom + self.editor.screen_manager.render_height / 2
+        """Converte coordenadas do mundo para coordenadas de tela"""
+        camera = self.editor.camera
+        screen_manager = self.editor.screen_manager
 
-        # Converte para coordenadas de tela
-        screen_x = render_x * self.editor.screen_manager.render_scale + self.editor.screen_manager.viewport_x
-        screen_y = render_y * self.editor.screen_manager.render_scale + self.editor.screen_manager.viewport_y
+        # Usa o mesmo cálculo do layer_manager para consistência
+        screen_x = int((world_x - camera.x) * camera.zoom * screen_manager.render_scale +
+                       (screen_manager.render_width / 2) * screen_manager.render_scale +
+                       screen_manager.viewport_x)
+        screen_y = int((world_y - camera.y) * camera.zoom * screen_manager.render_scale +
+                       (screen_manager.render_height / 2) * screen_manager.render_scale +
+                       screen_manager.viewport_y)
 
         return (screen_x, screen_y)
 
@@ -330,7 +328,7 @@ class EditorRenderHandler:
         font_large = pygame.font.Font(None, 48)
         pause_text = font_large.render("PAUSADO", True, (255, 255, 255))
         text_x = self.editor.screen_manager.viewport_x + (
-                    self.editor.screen_manager.viewport_width - pause_text.get_width()) // 2
+                self.editor.screen_manager.viewport_width - pause_text.get_width()) // 2
         text_y = self.editor.screen_manager.viewport_y + (
-                    self.editor.screen_manager.viewport_height - pause_text.get_height()) // 2
+                self.editor.screen_manager.viewport_height - pause_text.get_height()) // 2
         screen.blit(pause_text, (text_x, text_y))

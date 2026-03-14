@@ -114,17 +114,19 @@ class EditorInputHandler:
             if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
                 self.dragging_camera = True
                 self.last_mouse_pos = mouse_pos
-                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)  # Muda cursor para movimento
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
                 return True
 
         # Se não clicou em botão e está no viewport, processa ações de edição
         if self.editor.mode != "preview" and self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
             world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
             if world_pos:
+                # Arredonda para evitar problemas de float
+                world_x, world_y = world_pos
                 if event.button == 1:  # Clique esquerdo
-                    self.editor._handle_left_click(world_pos)
+                    self.editor._handle_left_click((world_x, world_y))
                 elif event.button == 3:  # Clique direito
-                    self.editor._handle_right_click(world_pos)
+                    self.editor._handle_right_click((world_x, world_y))
         return True
 
     def _handle_mouseup(self, event):
