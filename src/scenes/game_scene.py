@@ -27,8 +27,13 @@ class GameScene(BaseScene):
         # Debug
         self.show_debug = True
 
+        # Controle de arrasto da câmera
+        self.dragging_camera = False
+        self.last_mouse_pos = None
+
         print(f"GameScene iniciada - Fase {phase_number} - Mundo: {self.world_width}x{self.world_height}")
         print(f"Grid ativada por padrão (tecla G para toggle)")
+        print(f"Arraste com botão do meio para mover a câmera")
 
     def handle_event(self, event):
         """Processa eventos do jogo"""
@@ -50,28 +55,89 @@ class GameScene(BaseScene):
                         print(f"[DEBUG] Posição do mouse no mundo: ({world_pos[0]:.0f}, {world_pos[1]:.0f})")
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Verifica se clicou no viewport
+            in_viewport = self.screen_manager.is_mouse_in_viewport(mouse_pos)
+
             if event.button == 1:  # Clique esquerdo
-                mouse_pos = pygame.mouse.get_pos()
-                if self.screen_manager.is_mouse_in_viewport(mouse_pos):
+                if in_viewport:
                     world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
                     if world_pos:
                         print(f"[DEBUG] Clique no mundo: ({world_pos[0]:.0f}, {world_pos[1]:.0f})")
 
+            elif event.button == 2:  # Botão do meio/scroll - ARRASTO DA CÂMERA
+                if in_viewport:
+                    self.dragging_camera = True
+                    self.last_mouse_pos = mouse_pos
+                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)  # Muda cursor para movimento
+                    return True
+
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 2:  # Botão do meio/scroll
+                if self.dragging_camera:
+                    self.dragging_camera = False
+                    self.last_mouse_pos = None
+                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)  # Volta cursor normal
+                    return True
+
+        elif event.type == pygame.MOUSEMOTION:
+            if self.dragging_camera and self.last_mouse_pos:
+                # Calcula a diferença do movimento
+                dx = event.pos[0] - self.last_mouse_pos[0]
+                dy = event.pos[1] - self.last_mouse_pos[1]
+
+                # Converte para movimento no mundo (considerando zoom)
+                world_dx = dx / self.camera.zoom
+                world_dy = dy / self.camera.zoom
+
+                # Move a câmera na direção OPOSTA ao arrasto
+                self.camera.x -= world_dx
+                self.camera.y -= world_dy
+
+                # Garante que a câmera respeita os limites
+                self.camera._clamp_position()
+
+                self.last_mouse_pos = event.pos
+                return True
+
         elif event.type == pygame.MOUSEWHEEL:
             if not self.paused:
-                self.camera.handle_zoom(event.y > 0)
+                # Só faz zoom se não estiver arrastando a câmera
+                if not self.dragging_camera:
+                    # Verifica se o mouse está sobre o viewport
+                    mouse_pos = pygame.mouse.get_pos()
+                    if self.screen_manager.is_mouse_in_viewport(mouse_pos):
+                        # Pega posição do mundo antes do zoom
+                        world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
+
+                        if world_pos:
+                            # Guarda a posição do mundo que queremos manter sob o mouse
+                            target_world_x, target_world_y = world_pos
+
+                            # Aplica zoom
+                            self.camera.handle_zoom(event.y > 0)
+
+                            # Após o zoom, recalcula onde esse ponto do mundo está na tela
+                            # e ajusta a câmera para mantê-lo na mesma posição de tela
+                            new_mouse_pos = pygame.mouse.get_pos()
+                            new_world_pos = self.screen_manager.get_mouse_world_position(new_mouse_pos, self.camera)
+
+                            if new_world_pos:
+                                # Calcula a diferença e ajusta a câmera
+                                dx = target_world_x - new_world_pos[0]
+                                dy = target_world_y - new_world_pos[1]
+
+                                self.camera.x += dx
+                                self.camera.y += dy
+
+                                # Garante que está dentro dos limites
+                                self.camera._clamp_position()
 
     def fixed_update(self, dt):
         """Update da lógica do jogo"""
         if self.paused:
             return
-
-        # Pega posição do mouse para movimento da câmera
-        mouse_pos = pygame.mouse.get_pos()
-        if self.screen_manager.is_mouse_in_viewport(mouse_pos):
-            mouse_render_pos = self.screen_manager.get_mouse_world_position(mouse_pos)
-            if mouse_render_pos:
-                self.camera.update(dt, mouse_render_pos)
 
     def render(self, screen):
         """Renderiza o jogo - Grid + Debug"""
@@ -192,7 +258,8 @@ class GameScene(BaseScene):
         grid_status = "ON" if self.show_grid else "OFF"
         grid_color = (0, 255, 0) if self.show_grid else (255, 0, 0)
 
-        inst_text = f"F1:Debug | G:Grid [{grid_status}] | P:Pause | ESC:Menu | SPACE:Log"
+        # Instruções atualizadas para incluir o arrasto
+        inst_text = f"F1:Debug | G:Grid [{grid_status}] | P:Pause | ESC:Menu | SPACE:Log | Scroll+Arrasto: Mover"
         inst = font_small.render(inst_text, True, (150, 150, 150))
         inst_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - inst.get_width()) // 2
         screen.blit(inst, (inst_x, self.screen_manager.viewport_y + 10))
@@ -255,6 +322,7 @@ class GameScene(BaseScene):
             f"FPS: {self.screen_manager.get_fps():.1f}",
             f"Delta Time: {self.screen_manager.get_delta_time()*1000:.1f}ms",
             f"Grid: {'ON' if self.show_grid else 'OFF'} (tecla G)",
+            f"Camera Drag: {'ACTIVE' if self.dragging_camera else 'inactive'}",
             "",
             "=== CAMERA ===",
             f"Position: ({self.camera.x:.0f}, {self.camera.y:.0f})",
@@ -284,7 +352,7 @@ class GameScene(BaseScene):
 
         line_height = 16
         bg_height = len(debug_lines) * line_height + 10
-        bg_width = 330
+        bg_width = 350  # Aumentei um pouco para acomodar a nova linha
         bg_surface = pygame.Surface((bg_width, bg_height))
         bg_surface.set_alpha(180)
         bg_surface.fill((0, 0, 0))
