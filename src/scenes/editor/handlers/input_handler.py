@@ -22,27 +22,34 @@ class EditorInputHandler:
                 self.editor.map_config_dialog = None
             return True
 
+        # PRIORIDADE 1: Eventos da UI (incluindo scroll)
         if self._handle_ui_events(event):
             return True
 
+        # PRIORIDADE 2: Eventos do editor (incluindo zoom)
         return self._handle_editor_events(event)
 
     def _handle_ui_events(self, event):
         """Processa eventos dos painéis UI"""
         ui_handled = False
 
-        if self.editor.mode == "layers":
-            if self.editor.tile_palette and self.editor.tile_palette.handle_event(event):
+        # Processa tile palette primeiro (tem prioridade no scroll)
+        if self.editor.tile_palette and self.editor.tile_palette.visible:
+            if self.editor.tile_palette.handle_event(event):
                 ui_handled = True
+                if event.type == pygame.MOUSEWHEEL:
+                    # Scroll na tile palette - NÃO PROPAGA para o zoom
+                    return True
                 if self.editor.tile_palette.selected_tile is not None:
                     self.editor.current_tile = self.editor.tile_palette.selected_tile + 1
 
-            if self.editor.layer_selector and self.editor.layer_selector.handle_event(event):
-                ui_handled = True
-                self.editor.layer_manager.current_layer = self.editor.layer_selector.selected_layer
-                current_layer = self.editor.layer_manager.get_current_layer()
-                if current_layer and current_layer.tileset:
-                    self.editor.tile_palette.set_tileset(current_layer.tileset)
+        # Processa layer selector
+        if self.editor.layer_selector and self.editor.layer_selector.handle_event(event):
+            ui_handled = True
+            self.editor.layer_manager.current_layer = self.editor.layer_selector.selected_layer
+            current_layer = self.editor.layer_manager.get_current_layer()
+            if current_layer and current_layer.tileset:
+                self.editor.tile_palette.set_tileset(current_layer.tileset)
 
         return ui_handled
 
@@ -156,16 +163,14 @@ class EditorInputHandler:
             dy = event.pos[1] - self.last_mouse_pos[1]
 
             # Converte para movimento no mundo (considerando zoom)
-            # Na sua câmera, o movimento é inversamente proporcional ao zoom
             world_dx = dx / self.editor.camera.zoom
             world_dy = dy / self.editor.camera.zoom
 
             # Move a câmera na direção OPOSTA ao arrasto
-            # (arrastar para direita = mundo move para esquerda)
             self.editor.camera.x -= world_dx
             self.editor.camera.y -= world_dy
 
-            # Garante que a câmera respeita os limites (usa o método existente)
+            # Garante que a câmera respeita os limites
             self.editor.camera._clamp_position()
 
             self.last_mouse_pos = event.pos
@@ -174,36 +179,47 @@ class EditorInputHandler:
 
     def _handle_mousewheel(self, event):
         """Processa scroll do mouse (zoom)"""
-        if not self.editor.paused:
-            # Só faz zoom se não estiver arrastando a câmera
-            if not self.dragging_camera:
-                # Verifica se o mouse está sobre o viewport
-                mouse_pos = pygame.mouse.get_pos()
-                if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
-                    # Pega posição do mundo antes do zoom
-                    world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
+        # SÓ FAZ ZOOM SE O MOUSE NÃO ESTIVER SOBRE A TILE PALETTE
+        mouse_pos = pygame.mouse.get_pos()
 
-                    if world_pos:
-                        # Guarda a posição do mundo que queremos manter sob o mouse
-                        target_world_x, target_world_y = world_pos
+        # Verifica se o mouse está sobre a tile palette
+        if self.editor.tile_palette and self.editor.tile_palette.visible:
+            if self.editor.tile_palette.rect.collidepoint(mouse_pos):
+                # Mouse está na tile palette - NÃO FAZ ZOOM
+                return True
 
-                        # Aplica zoom
-                        self.editor.camera.handle_zoom(event.y > 0)
+        # Verifica se o mouse está sobre o layer selector
+        if self.editor.layer_selector and self.editor.layer_selector.visible:
+            if self.editor.layer_selector.rect.collidepoint(mouse_pos):
+                # Mouse está no layer selector - NÃO FAZ ZOOM
+                return True
 
-                        # Após o zoom, recalcula onde esse ponto do mundo está na tela
-                        # e ajusta a câmera para mantê-lo na mesma posição de tela
-                        new_mouse_pos = pygame.mouse.get_pos()
-                        new_world_pos = self.editor.screen_manager.get_mouse_world_position(new_mouse_pos,
-                                                                                            self.editor.camera)
+        if not self.editor.paused and not self.dragging_camera:
+            # Verifica se o mouse está sobre o viewport
+            if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
+                # Pega posição do mundo antes do zoom
+                world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
 
-                        if new_world_pos:
-                            # Calcula a diferença e ajusta a câmera
-                            dx = target_world_x - new_world_pos[0]
-                            dy = target_world_y - new_world_pos[1]
+                if world_pos:
+                    # Guarda a posição do mundo que queremos manter sob o mouse
+                    target_world_x, target_world_y = world_pos
 
-                            self.editor.camera.x += dx
-                            self.editor.camera.y += dy
+                    # Aplica zoom
+                    self.editor.camera.handle_zoom(event.y > 0)
 
-                            # Garante que está dentro dos limites
-                            self.editor.camera._clamp_position()
+                    # Após o zoom, recalcula onde esse ponto do mundo está na tela
+                    new_mouse_pos = pygame.mouse.get_pos()
+                    new_world_pos = self.editor.screen_manager.get_mouse_world_position(new_mouse_pos,
+                                                                                        self.editor.camera)
+
+                    if new_world_pos:
+                        # Calcula a diferença e ajusta a câmera
+                        dx = target_world_x - new_world_pos[0]
+                        dy = target_world_y - new_world_pos[1]
+
+                        self.editor.camera.x += dx
+                        self.editor.camera.y += dy
+
+                        # Garante que está dentro dos limites
+                        self.editor.camera._clamp_position()
         return True

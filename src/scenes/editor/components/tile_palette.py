@@ -1,3 +1,5 @@
+# src/scenes/editor/components/tile_palette.py
+
 import pygame
 
 
@@ -31,6 +33,11 @@ class TilePalette:
         self.original_x = x
         self.original_y = y
 
+        # NOVO: Para arrastar a barra de scroll
+        self.scroll_dragging = False
+        self.scroll_drag_start_y = 0
+        self.scroll_drag_start_scroll = 0
+
     def set_tileset(self, tileset):
         """Define o tileset e atualiza a palette"""
         self.tiles = tileset
@@ -47,6 +54,8 @@ class TilePalette:
         content_height = rows * (self.tile_size + self.tile_spacing)
         visible_height = self.rect.height - 40
         self.max_scroll = max(0, content_height - visible_height)
+        # Garante que scroll não ultrapasse o limite
+        self.scroll_y = max(0, min(self.scroll_y, self.max_scroll))
 
     def handle_event(self, event):
         """Processa eventos da palette"""
@@ -61,9 +70,16 @@ class TilePalette:
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
+                # Verifica se clicou na barra de scroll
+                if self._is_mouse_on_scrollbar(mouse_x, mouse_y):
+                    self.scroll_dragging = True
+                    self.scroll_drag_start_y = mouse_y
+                    self.scroll_drag_start_scroll = self.scroll_y
+                    return True
+
                 # Redimensionamento
-                if (self.rect.right - self.resize_margin <= mouse_x <= self.rect.right + self.resize_margin and
-                    self.rect.bottom - self.resize_margin <= mouse_y <= self.rect.bottom + self.resize_margin):
+                elif (self.rect.right - self.resize_margin <= mouse_x <= self.rect.right + self.resize_margin and
+                      self.rect.bottom - self.resize_margin <= mouse_y <= self.rect.bottom + self.resize_margin):
                     self.resizing = True
                     return True
 
@@ -90,9 +106,20 @@ class TilePalette:
             if event.button == 1:
                 self.resizing = False
                 self.dragging = False
+                self.scroll_dragging = False  # Para de arrastar scroll
 
         elif event.type == pygame.MOUSEMOTION:
-            if self.resizing:
+            if self.scroll_dragging:
+                # Arrasta a barra de scroll
+                delta_y = mouse_y - self.scroll_drag_start_y
+                visible_height = self.rect.height - 35
+                scrollbar_height = max(30, visible_height * (visible_height / (visible_height + self.max_scroll)))
+                scroll_ratio = (visible_height - scrollbar_height) / self.max_scroll if self.max_scroll > 0 else 1
+
+                scroll_delta = delta_y / scroll_ratio if scroll_ratio > 0 else 0
+                self.scroll_y = max(0, min(self.max_scroll, self.scroll_drag_start_scroll + scroll_delta))
+                return True
+            elif self.resizing:
                 new_width = max(self.min_width, mouse_x - self.rect.x)
                 new_height = max(self.min_height, mouse_y - self.rect.y)
                 self.rect.width = new_width
@@ -108,6 +135,21 @@ class TilePalette:
             return self._handle_shortcuts(event)
 
         return False
+
+    def _is_mouse_on_scrollbar(self, mouse_x, mouse_y):
+        """Verifica se o mouse está sobre a barra de scroll"""
+        if not self.focused or self.max_scroll <= 0:
+            return False
+
+        # Área da barra de scroll
+        scrollbar_rect = pygame.Rect(
+            self.rect.x + self.rect.width - 15,
+            self.rect.y + 35,
+            10,
+            self.rect.height - 35
+        )
+
+        return scrollbar_rect.collidepoint(mouse_x, mouse_y)
 
     def _handle_tile_selection(self, mouse_x, mouse_y):
         """Processa a seleção de um tile"""
@@ -239,24 +281,37 @@ class TilePalette:
 
         visible_height = self.rect.height - 35
         scrollbar_height = max(30, visible_height * (visible_height / (visible_height + self.max_scroll)))
-        scrollbar_y = self.rect.y + 35 + (self.scroll_y / self.max_scroll) * (visible_height - scrollbar_height)
 
+        # Calcula posição Y da barra baseada no scroll atual
+        scroll_ratio = self.scroll_y / self.max_scroll if self.max_scroll > 0 else 0
+        scrollbar_y = self.rect.y + 35 + scroll_ratio * (visible_height - scrollbar_height)
+
+        # Fundo da scrollbar
         scrollbar_bg = pygame.Rect(
-            self.rect.x + self.rect.width - 10,
+            self.rect.x + self.rect.width - 15,
             self.rect.y + 35,
-            5,
+            10,
             visible_height
         )
         pygame.draw.rect(screen, (70, 70, 80), scrollbar_bg)
+        pygame.draw.rect(screen, (90, 90, 100), scrollbar_bg, 1)
 
+        # Barra de scroll propriamente dita
         scrollbar = pygame.Rect(
-            self.rect.x + self.rect.width - 10,
+            self.rect.x + self.rect.width - 15,
             scrollbar_y,
-            5,
+            10,
             scrollbar_height
         )
-        pygame.draw.rect(screen, (150, 150, 160), scrollbar)
-        pygame.draw.rect(screen, (200, 200, 210), scrollbar, 1)
+
+        # Cor diferente se estiver arrastando
+        if self.scroll_dragging:
+            bar_color = (180, 180, 200)
+        else:
+            bar_color = (130, 130, 150)
+
+        pygame.draw.rect(screen, bar_color, scrollbar)
+        pygame.draw.rect(screen, (200, 200, 220), scrollbar, 1)
 
     def _render_resize_handle(self, screen):
         """Renderiza a alça de redimensionamento"""
@@ -268,5 +323,5 @@ class TilePalette:
         )
         pygame.draw.rect(screen, (150, 150, 150), resize_handle)
         pygame.draw.line(screen, (200, 200, 200),
-                        (resize_handle.x + 2, resize_handle.bottom - 2),
-                        (resize_handle.right - 2, resize_handle.y + 2), 2)
+                         (resize_handle.x + 2, resize_handle.bottom - 2),
+                         (resize_handle.right - 2, resize_handle.y + 2), 2)
