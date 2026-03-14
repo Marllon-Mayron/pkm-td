@@ -6,9 +6,9 @@ Tela de seleção de fases - Versão dinâmica com scroll
 import pygame
 import math
 from src.scenes.base_scene import BaseScene
-from src.scenes.game_scene import GameScene
 from src.config.progress import progress_manager
 from src.config.phase_catalog import phase_catalog
+from src.scenes.game_scene.game_scene import GameScene
 
 
 class PhaseCard:
