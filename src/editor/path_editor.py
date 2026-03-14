@@ -1,96 +1,151 @@
-"""
-Editor de caminho dos inimigos - Versão Simplificada
-"""
+# src/editor/path_editor.py
+
 import pygame
 import math
 
 
 class Path:
     def __init__(self):
-        self.nodes = []  # Lista simples de tuplas (x, y)
+        self.nodes = []  # Lista de pontos (x, y)
         self.selected_node = -1
-        self.is_loop = False
-        print("Path inicializado com lista simples")
+        self.closed = False
 
-    def add_node(self, x, y):
-        """Adiciona um nó ao caminho"""
-        print(f"add_node: adicionando ({x}, {y})")
-        self.nodes.append((x, y))
-        print(f"  Agora com {len(self.nodes)} nós: {self.nodes}")
+        # Cores e estilos
+        self.line_color = (255, 100, 100)  # Vermelho para linha
+        self.start_color = (0, 255, 0)      # Verde para início
+        self.end_color = (255, 0, 0)         # Vermelho para fim
+        self.normal_color = (100, 100, 255)  # Azul para nós normais
+        self.selected_color = (255, 255, 0)  # Amarelo para selecionado
+        self.start_point_color = (0, 255, 255)  # Ciano para primeiro ponto
+
+        self.node_radius = 6
+        self.start_node_radius = 8  # Maior para o primeiro ponto
+        self.line_width = 3
+
+    def add_node(self, point):
+        """Adiciona um nó ao path"""
+        self.nodes.append(point)
+        self.selected_node = len(self.nodes) - 1
 
     def remove_node(self, index):
-        """Remove um nó do caminho"""
+        """Remove um nó do path"""
         if 0 <= index < len(self.nodes):
-            print(f"Removendo nó {index}")
             del self.nodes[index]
             if self.selected_node >= len(self.nodes):
                 self.selected_node = len(self.nodes) - 1
 
     def get_path_points(self):
-        """Retorna a lista de pontos"""
-        print(f"get_path_points: retornando {len(self.nodes)} nós: {self.nodes}")
+        """Retorna a lista de pontos do path"""
         return self.nodes.copy()
 
-    def render(self, screen, camera, screen_manager):
-        """Renderiza o caminho"""
-        if len(self.nodes) < 2:
-            return
-
-        # Calcula offset da câmera
-        cam_offset_x = -camera.x * camera.zoom + screen_manager.render_width / 2
-        cam_offset_y = -camera.y * camera.zoom + screen_manager.render_height / 2
-
-        # Desenha linhas do caminho
-        if len(self.nodes) > 1:
-            screen_points = []
-            for x, y in self.nodes:
-                render_x = x * camera.zoom + cam_offset_x
-                render_y = y * camera.zoom + cam_offset_y
-                screen_x, screen_y = screen_manager.get_screen_position(render_x, render_y)
-                screen_points.append((screen_x, screen_y))
-
-            line_width = max(1, int(3 * screen_manager.render_scale))
-            pygame.draw.lines(screen, (255, 255, 0), self.is_loop, screen_points, line_width)
-
-        # Desenha nós
-        for i, (x, y) in enumerate(self.nodes):
-            render_x = x * camera.zoom + cam_offset_x
-            render_y = y * camera.zoom + cam_offset_y
-            screen_x, screen_y = screen_manager.get_screen_position(render_x, render_y)
-
-            radius = int(8 * camera.zoom * screen_manager.render_scale)
-
-            # Destaca nó selecionado
-            if i == self.selected_node:
-                highlight_radius = radius + int(3 * screen_manager.render_scale)
-                pygame.draw.circle(screen, (255, 255, 255), (screen_x, screen_y), highlight_radius, 2)
-
-            # Desenha o círculo
-            pygame.draw.circle(screen, (255, 255, 0), (screen_x, screen_y), radius)
-            pygame.draw.circle(screen, (255, 255, 255), (screen_x, screen_y), radius, 1)
-
-            # Mostra índice
-            font = pygame.font.Font(None, 16)
-            text = font.render(str(i), True, (255, 255, 255))
-            screen.blit(text, (screen_x - text.get_width()//2, screen_y - radius - 20))
-
-    def get_node_at(self, x, y, threshold=20):
-        """Retorna índice do nó na posição"""
-        for i, (nx, ny) in enumerate(self.nodes):
-            distance = math.sqrt((nx - x) ** 2 + (ny - y) ** 2)
-            if distance < threshold:
-                return i
-        return -1
-
     def to_dict(self):
-        """Converte para dicionário"""
+        """Converte para dicionário para salvar"""
         return {
             "nodes": self.nodes,
-            "is_loop": self.is_loop
+            "closed": self.closed
         }
 
     def from_dict(self, data):
         """Carrega do dicionário"""
         self.nodes = data.get("nodes", [])
-        self.is_loop = data.get("is_loop", False)
-        print(f"Path carregado: {len(self.nodes)} nós")
+        self.closed = data.get("closed", False)
+
+    def render(self, screen, camera, screen_manager):
+        """Renderiza o path com destaque especial para o primeiro ponto"""
+        if not self.nodes:
+            return
+
+        # Primeiro, desenha as linhas entre os pontos
+        self._render_lines(screen, camera, screen_manager)
+
+        # Depois, desenha os pontos (nós)
+        self._render_nodes(screen, camera, screen_manager)
+
+    def _render_lines(self, screen, camera, screen_manager):
+        """Renderiza as linhas entre os pontos"""
+        if len(self.nodes) < 2:
+            return
+
+        points_screen = []
+        for node in self.nodes:
+            screen_x, screen_y = self._world_to_screen(node[0], node[1], camera, screen_manager)
+            points_screen.append((screen_x, screen_y))
+
+        # Desenha linhas entre pontos consecutivos
+        for i in range(len(points_screen) - 1):
+            start = points_screen[i]
+            end = points_screen[i + 1]
+
+            # Linha com transparência para não cobrir os pontos
+            line_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+            pygame.draw.line(line_surface, (*self.line_color, 180), start, end, self.line_width)
+            screen.blit(line_surface, (0, 0))
+
+        # Se o path for fechado, desenha linha do último ao primeiro
+        if self.closed and len(self.nodes) > 2:
+            start = points_screen[-1]
+            end = points_screen[0]
+            line_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+            pygame.draw.line(line_surface, (*self.line_color, 180), start, end, self.line_width)
+            screen.blit(line_surface, (0, 0))
+
+    def _render_nodes(self, screen, camera, screen_manager):
+        """Renderiza os nós (pontos) com destaque especial para o primeiro"""
+        for i, node in enumerate(self.nodes):
+            screen_x, screen_y = self._world_to_screen(node[0], node[1], camera, screen_manager)
+
+            # Verifica se o ponto está dentro do viewport (otimização)
+            if not (0 <= screen_x <= screen.get_width() and 0 <= screen_y <= screen.get_height()):
+                continue
+
+            # Determina a cor e tamanho baseado na posição
+            if i == 0:  # PRIMEIRO PONTO
+                color = self.start_point_color
+                radius = self.start_node_radius
+                border_color = (255, 255, 255)  # Borda branca para mais destaque
+                border_width = 2
+
+                # Desenha um halo ao redor do primeiro ponto
+                halo_surface = pygame.Surface((radius*4, radius*4), pygame.SRCALPHA)
+                pygame.draw.circle(halo_surface, (*self.start_point_color, 100),
+                                  (radius*2, radius*2), radius + 4)
+                screen.blit(halo_surface, (screen_x - radius*2, screen_y - radius*2))
+
+            elif i == len(self.nodes) - 1:  # Último ponto
+                color = self.end_color
+                radius = self.node_radius
+                border_color = None
+            else:  # Pontos intermediários
+                color = self.normal_color
+                radius = self.node_radius
+                border_color = None
+
+            # Ponto selecionado tem destaque especial
+            if i == self.selected_node:
+                color = self.selected_color
+                radius = radius + 2
+                border_color = (255, 255, 255)
+
+            # Desenha o ponto principal
+            pygame.draw.circle(screen, color, (int(screen_x), int(screen_y)), radius)
+
+            # Desenha borda se necessário
+            if border_color:
+                pygame.draw.circle(screen, border_color, (int(screen_x), int(screen_y)), radius, border_width)
+
+            # Desenha número do ponto (opcional - útil para debug)
+            if i == 0 or i == len(self.nodes) - 1 or i == self.selected_node:
+                font = pygame.font.Font(None, 14)
+                text = font.render(str(i + 1), True, (255, 255, 255))
+                text_rect = text.get_rect(center=(screen_x, screen_y - radius - 10))
+                screen.blit(text, text_rect)
+
+    def _world_to_screen(self, world_x, world_y, camera, screen_manager):
+        """Converte coordenadas do mundo para tela"""
+        render_x = (world_x - camera.x) * camera.zoom + screen_manager.render_width / 2
+        render_y = (world_y - camera.y) * camera.zoom + screen_manager.render_height / 2
+
+        screen_x = render_x * screen_manager.render_scale + screen_manager.viewport_x
+        screen_y = render_y * screen_manager.render_scale + screen_manager.viewport_y
+
+        return (screen_x, screen_y)
