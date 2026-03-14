@@ -85,34 +85,46 @@ class TowerSpotManager:
         return -1
 
     def render(self, screen, camera, screen_manager):
-        """Renderiza os spots"""
+        """Renderiza os spots usando os MESMOS cálculos que tiles e grid"""
         for i, spot in enumerate(self.spots):
-            # Calcula render position
-            render_x = (spot.x - camera.x) * camera.zoom + screen_manager.render_width / 2
-            render_y = (spot.y - camera.y) * camera.zoom + screen_manager.render_height / 2
+            # --- CÁLCULO CORRIGIDO: MESMA FÓRMULA DO LAYER_MANAGER ---
+            # Calcula posição na tela usando a mesma fórmula dos tiles
+            screen_x = round((spot.x - camera.x) * camera.zoom * screen_manager.render_scale +
+                            (screen_manager.render_width / 2) * screen_manager.render_scale +
+                            screen_manager.viewport_x)
+            screen_y = round((spot.y - camera.y) * camera.zoom * screen_manager.render_scale +
+                            (screen_manager.render_height / 2) * screen_manager.render_scale +
+                            screen_manager.viewport_y)
 
-            # Converte para tela
-            screen_x, screen_y = screen_manager.get_screen_position(render_x, render_y)
+            # Tamanho na tela - usa round() para consistência
+            size = max(1, round(spot.size * camera.zoom * screen_manager.render_scale))
 
-            # Tamanho na tela (considerando zoom E escala)
-            size = int(spot.size * camera.zoom * screen_manager.render_scale)
-
-            # Cor baseada no estado
+            # Cor baseada no estado (com alpha)
             if i == self.selected_spot:
-                color = (255, 255, 0, 180)
+                color = (255, 255, 0)  # Amarelo
+                fill_alpha = 180
                 border_color = (255, 255, 255)
             elif spot.occupied:
-                color = (255, 0, 0, 100)
+                color = (255, 0, 0)  # Vermelho
+                fill_alpha = 100
                 border_color = (255, 0, 0)
             else:
-                color = (0, 255, 0, 50)
+                color = (0, 255, 0)  # Verde
+                fill_alpha = 50
                 border_color = (0, 255, 0)
 
             # Desenha spot semi-transparente
             spot_surface = pygame.Surface((size, size), pygame.SRCALPHA)
-            spot_surface.fill(color)
-            pygame.draw.rect(spot_surface, border_color, spot_surface.get_rect(),
-                             max(1, int(2 * screen_manager.render_scale)))
+
+            # Preenchimento com alpha
+            fill_color = (*color, fill_alpha)
+            spot_surface.fill(fill_color)
+
+            # Borda
+            border_width = max(1, round(2 * screen_manager.render_scale))
+            pygame.draw.rect(spot_surface, border_color, spot_surface.get_rect(), border_width)
+
+            # Desenha na tela
             screen.blit(spot_surface, (screen_x, screen_y))
 
     def to_dict(self):
