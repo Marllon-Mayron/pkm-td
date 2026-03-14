@@ -5,7 +5,7 @@ import pygame
 
 class MapConfigDialog:
     def __init__(self, x, y, width, height, current_width, current_height,
-                 current_chapter=1, current_phase=1):
+                 current_chapter=1, current_phase=1, current_name="Fase"):
         self.rect = pygame.Rect(x, y, width, height)
         self.visible = True
         self.focused = True
@@ -13,14 +13,16 @@ class MapConfigDialog:
         self.current_height = current_height
         self.current_chapter = current_chapter
         self.current_phase = current_phase
+        self.current_name = current_name
 
         # Valores temporários
         self.temp_width = str(current_width)
         self.temp_height = str(current_height)
         self.temp_chapter = str(current_chapter)
         self.temp_phase = str(current_phase)
+        self.temp_name = current_name
 
-        self.active_input = "width"  # "width", "height", "chapter", "phase"
+        self.active_input = "name"  # "name", "width", "height", "chapter", "phase"
 
         # Botões
         button_width = 80
@@ -38,11 +40,12 @@ class MapConfigDialog:
             button_height
         )
 
-        # Input boxes
-        self.width_rect = pygame.Rect(x + 150, y + 70, 100, 30)
-        self.height_rect = pygame.Rect(x + 150, y + 110, 100, 30)
-        self.chapter_rect = pygame.Rect(x + 150, y + 150, 100, 30)
-        self.phase_rect = pygame.Rect(x + 150, y + 190, 100, 30)
+        # Input boxes (agora com campo de nome)
+        self.name_rect = pygame.Rect(x + 150, y + 40, 200, 30)
+        self.width_rect = pygame.Rect(x + 150, y + 80, 100, 30)
+        self.height_rect = pygame.Rect(x + 150, y + 120, 100, 30)
+        self.chapter_rect = pygame.Rect(x + 150, y + 160, 100, 30)
+        self.phase_rect = pygame.Rect(x + 150, y + 200, 100, 30)
 
     def handle_event(self, event):
         """Processa eventos do diálogo"""
@@ -66,12 +69,14 @@ class MapConfigDialog:
             return None
         elif event.key == pygame.K_TAB:
             # Alterna entre os inputs
-            inputs = ["width", "height", "chapter", "phase"]
+            inputs = ["name", "width", "height", "chapter", "phase"]
             current_index = inputs.index(self.active_input)
             self.active_input = inputs[(current_index + 1) % len(inputs)]
             return None
         elif event.key == pygame.K_BACKSPACE:
-            if self.active_input == "width":
+            if self.active_input == "name":
+                self.temp_name = self.temp_name[:-1]
+            elif self.active_input == "width":
                 self.temp_width = self.temp_width[:-1]
             elif self.active_input == "height":
                 self.temp_height = self.temp_height[:-1]
@@ -81,8 +86,12 @@ class MapConfigDialog:
                 self.temp_phase = self.temp_phase[:-1]
             return None
         else:
-            # Adiciona números
-            if event.unicode.isdigit():
+            # Adiciona caracteres
+            if self.active_input == "name":
+                # Permite letras, números e espaços no nome
+                if event.unicode.isprintable() and event.unicode not in ['/', '\\', ':', '*', '?', '"', '<', '>', '|']:
+                    self.temp_name += event.unicode
+            elif event.unicode.isdigit():
                 if self.active_input == "width":
                     self.temp_width += event.unicode
                 elif self.active_input == "height":
@@ -98,7 +107,10 @@ class MapConfigDialog:
         mouse_pos = pygame.mouse.get_pos()
 
         # Verifica cliques nos inputs
-        if self.width_rect.collidepoint(mouse_pos):
+        if self.name_rect.collidepoint(mouse_pos):
+            self.active_input = "name"
+            return None
+        elif self.width_rect.collidepoint(mouse_pos):
             self.active_input = "width"
             return None
         elif self.height_rect.collidepoint(mouse_pos):
@@ -128,13 +140,15 @@ class MapConfigDialog:
             new_height = max(5, min(500, int(self.temp_height) if self.temp_height else 10))
             new_chapter = max(1, min(99, int(self.temp_chapter) if self.temp_chapter else 1))
             new_phase = max(1, min(99, int(self.temp_phase) if self.temp_phase else 1))
+            new_name = self.temp_name.strip() or f"Fase {new_chapter}-{new_phase}"
 
             self.visible = False
             return {
                 'width': new_width,
                 'height': new_height,
                 'chapter': new_chapter,
-                'phase': new_phase
+                'phase': new_phase,
+                'name': new_name
             }
         except ValueError:
             return None
@@ -158,16 +172,30 @@ class MapConfigDialog:
         font_title = pygame.font.Font(None, 28)
         title = font_title.render("Configurações do Mapa", True, (255, 255, 255))
         title_x = self.rect.x + (self.rect.width - title.get_width()) // 2
-        screen.blit(title, (title_x, self.rect.y + 20))
+        screen.blit(title, (title_x, self.rect.y + 10))
 
         # Labels e inputs
         font = pygame.font.Font(None, 20)
         label_x = self.rect.x + 20
         value_x = self.rect.x + 150
 
+        # Nome da Fase
+        name_label = font.render("Nome da Fase:", True, (200, 200, 200))
+        screen.blit(name_label, (label_x, self.rect.y + 45))
+        color = (100, 150, 255) if self.active_input == "name" else (80, 80, 90)
+        pygame.draw.rect(screen, color, self.name_rect, 2)
+        # Limita o texto visível
+        display_name = self.temp_name
+        if font.size(display_name)[0] > self.name_rect.width - 10:
+            while font.size(display_name + "...")[0] > self.name_rect.width - 10 and len(display_name) > 3:
+                display_name = display_name[:-1]
+            display_name += "..."
+        name_surf = font.render(display_name, True, (255, 255, 255))
+        screen.blit(name_surf, (self.name_rect.x + 5, self.name_rect.y + 5))
+
         # Largura
         width_label = font.render("Largura (tiles):", True, (200, 200, 200))
-        screen.blit(width_label, (label_x, self.rect.y + 75))
+        screen.blit(width_label, (label_x, self.rect.y + 85))
         color = (100, 150, 255) if self.active_input == "width" else (80, 80, 90)
         pygame.draw.rect(screen, color, self.width_rect, 2)
         width_surf = font.render(self.temp_width, True, (255, 255, 255))
@@ -175,7 +203,7 @@ class MapConfigDialog:
 
         # Altura
         height_label = font.render("Altura (tiles):", True, (200, 200, 200))
-        screen.blit(height_label, (label_x, self.rect.y + 115))
+        screen.blit(height_label, (label_x, self.rect.y + 125))
         color = (100, 150, 255) if self.active_input == "height" else (80, 80, 90)
         pygame.draw.rect(screen, color, self.height_rect, 2)
         height_surf = font.render(self.temp_height, True, (255, 255, 255))
@@ -183,7 +211,7 @@ class MapConfigDialog:
 
         # Capítulo
         chapter_label = font.render("Capítulo:", True, (200, 200, 200))
-        screen.blit(chapter_label, (label_x, self.rect.y + 155))
+        screen.blit(chapter_label, (label_x, self.rect.y + 165))
         color = (100, 150, 255) if self.active_input == "chapter" else (80, 80, 90)
         pygame.draw.rect(screen, color, self.chapter_rect, 2)
         chapter_surf = font.render(self.temp_chapter, True, (255, 255, 255))
@@ -191,7 +219,7 @@ class MapConfigDialog:
 
         # Fase
         phase_label = font.render("Fase:", True, (200, 200, 200))
-        screen.blit(phase_label, (label_x, self.rect.y + 195))
+        screen.blit(phase_label, (label_x, self.rect.y + 205))
         color = (100, 150, 255) if self.active_input == "phase" else (80, 80, 90)
         pygame.draw.rect(screen, color, self.phase_rect, 2)
         phase_surf = font.render(self.temp_phase, True, (255, 255, 255))
@@ -200,7 +228,7 @@ class MapConfigDialog:
         # Informação
         info = font.render("TAB para alternar | Min: 5, Max: 500 tiles", True, (150, 150, 150))
         info_x = self.rect.x + (self.rect.width - info.get_width()) // 2
-        screen.blit(info, (info_x, self.rect.y + 235))
+        screen.blit(info, (info_x, self.rect.y + 245))
 
         # Botões
         self._render_buttons(screen, font)

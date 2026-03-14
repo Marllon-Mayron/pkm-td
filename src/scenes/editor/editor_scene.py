@@ -196,13 +196,14 @@ class EditorScene(BaseScene):
         if current_layer:
             dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
             dialog_y = self.screen_manager.viewport_y + (
-                        self.screen_manager.viewport_height - 300) // 2  # Aumentei a altura
+                    self.screen_manager.viewport_height - 350) // 2
             self.map_config_dialog = MapConfigDialog(
-                dialog_x, dialog_y, 400, 300,  # Altura aumentada para 300
+                dialog_x, dialog_y, 400, 350,
                 current_layer.width,
                 current_layer.height,
                 self.current_chapter,
-                self.current_phase
+                self.current_phase,
+                self.phase_name
             )
 
     def _handle_map_config_result(self, result):
@@ -213,12 +214,18 @@ class EditorScene(BaseScene):
                 self.layer_manager.resize_all_layers(result['width'], result['height'])
                 print(f"Mapa redimensionado para {result['width']}x{result['height']}")
 
-            # Atualiza capítulo e fase
-            if result['chapter'] != self.current_chapter or result['phase'] != self.current_phase:
-                self.current_chapter = result['chapter']
-                self.current_phase = result['phase']
-                self.phase_name = f"Fase {self.current_chapter}-{self.current_phase}"
-                print(f"Fase alterada para: {self.phase_name}")
+            # Atualiza capítulo, fase e nome
+            chapter_changed = result['chapter'] != self.current_chapter
+            phase_changed = result['phase'] != self.current_phase
+            name_changed = result['name'] != self.phase_name
+
+            self.current_chapter = result['chapter']
+            self.current_phase = result['phase']
+            self.phase_name = result['name']
+
+            if chapter_changed or phase_changed or name_changed:
+                print(
+                    f"Fase alterada para: {self.phase_name} (Capítulo {self.current_chapter}, Fase {self.current_phase})")
 
     def handle_event(self, event):
         """Delega processamento de eventos para o input handler"""
