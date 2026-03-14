@@ -60,6 +60,31 @@ class Layer:
             print(f"Erro ao carregar tileset: {e}")
             return False
 
+    def resize(self, new_width, new_height, default_tile=0):
+        """
+        Redimensiona a layer para novas dimensões
+
+        """
+        if new_width == self.width and new_height == self.height:
+            return True
+
+        print(f"Redimensionando layer '{self.name}' de {self.width}x{self.height} para {new_width}x{new_height}")
+
+        # Cria nova matriz de tiles
+        new_tiles = [[default_tile for _ in range(new_width)] for _ in range(new_height)]
+
+        # Copia tiles existentes para a nova matriz
+        for y in range(min(self.height, new_height)):
+            for x in range(min(self.width, new_width)):
+                new_tiles[y][x] = self.tiles[y][x]
+
+        # Substitui a matriz antiga pela nova
+        self.tiles = new_tiles
+        self.width = new_width
+        self.height = new_height
+
+        return True
+
     def render(self, screen, camera, screen_manager):
         """Renderiza a layer com cálculos inteiros para evitar gaps"""
         if not self.visible or not self.tileset:
@@ -155,7 +180,6 @@ class LayerManager:
         for layer in self.layers:
             if layer.layer_type == LayerType.CEILING:
                 layer.render(screen, camera, screen_manager)
-
 
     def to_dict(self):
         """Converte para dicionário para salvar em JSON"""

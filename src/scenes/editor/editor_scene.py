@@ -10,7 +10,7 @@ from src.editor.path_editor import Path
 from src.editor.tower_spot_editor import TowerSpotManager
 from src.editor.phase_exporter import PhaseExporter
 from src.scenes.editor.components.layer_selector import LayerSelector
-from src.scenes.editor.components.map_size_dialog import MapSizeDialog
+from src.scenes.editor.components.map_config_dialog import MapConfigDialog
 from src.scenes.editor.components.mode_buttons import ModeButtons
 from src.scenes.editor.components.tile_palette import TilePalette
 from src.scenes.editor.handlers.input_handler import EditorInputHandler
@@ -70,7 +70,7 @@ class EditorScene(BaseScene):
         self.font_small = pygame.font.Font(None, 18)
 
         # Diálogos
-        self.map_size_dialog = None
+        self.map_config_dialog = None
 
         # Fase atual
         self.current_chapter = chapter or 1
@@ -190,16 +190,64 @@ class EditorScene(BaseScene):
         """Delega clique direito para o map handler"""
         self.map_handler.handle_right_click(world_pos)
 
-    def _open_map_size_dialog(self):
-        """Abre diálogo para configurar tamanho do mapa"""
+    def _open_map_config_dialog(self):
+        """Abre diálogo para configurar tamanho do mapa e identificação da fase"""
         current_layer = self.layer_manager.get_current_layer()
         if current_layer:
             dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
-            dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 250) // 2
-            self.map_size_dialog = MapSizeDialog(
-                dialog_x, dialog_y, 400, 250,
-                current_layer.width, current_layer.height
+            dialog_y = self.screen_manager.viewport_y + (
+                        self.screen_manager.viewport_height - 300) // 2  # Aumentei a altura
+            self.map_config_dialog = MapConfigDialog(
+                dialog_x, dialog_y, 400, 300,  # Altura aumentada para 300
+                current_layer.width,
+                current_layer.height,
+                self.current_chapter,
+                self.current_phase
             )
+
+    def _handle_map_config_result(self, result):
+        """Processa o resultado do diálogo de configuração"""
+        if result:
+            current_layer = self.layer_manager.get_current_layer()
+            if current_layer:
+                # Redimensiona o layer se necessário
+                if result['width'] != current_layer.width or result['height'] != current_layer.height:
+                    current_layer.resize(result['width'], result['height'])
+                    print(f"Mapa redimensionado para {result['width']}x{result['height']}")
+
+                # Atualiza capítulo e fase
+                if result['chapter'] != self.current_chapter or result['phase'] != self.current_phase:
+                    self.current_chapter = result['chapter']
+                    self.current_phase = result['phase']
+                    self.phase_name = f"Fase {self.current_chapter}-{self.current_phase}"
+                    print(f"Fase alterada para: {self.phase_name}")
+
+                    # Pergunta se quer carregar a fase existente
+                    # (opcional - pode implementar um diálogo de confirmação)
+                    print(f"Dica: Use 'Load Phase' para carregar a fase {self.phase_name} se ela existir")
+
+        # Modifique o método handle_event para processar o resultado do diálogo
+
+    def handle_event(self, event):
+        """Delega processamento de eventos para o input handler"""
+        # Verifica se há um diálogo ativo
+        if self.map_config_dialog and self.map_config_dialog.visible:
+            result = self.map_config_dialog.handle_event(event)
+            if result is not None:  # Diálogo foi confirmado
+                self._handle_map_config_result(result)
+                self.map_config_dialog = None
+            elif not self.map_config_dialog.visible:  # Diálogo foi cancelado
+                self.map_config_dialog = None
+            return
+
+        # Se não houver diálogo ativo, processa normalmente
+        self.input_handler.handle_event(event)
+
+        # Adicione um método para criar novo mapa
+
+    def new_map(self):
+        """Cria um novo mapa com configurações personalizadas"""
+        self._open_map_config_dialog()
 
     def handle_event(self, event):
         """Delega processamento de eventos para o input handler"""

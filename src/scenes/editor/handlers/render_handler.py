@@ -40,8 +40,8 @@ class EditorRenderHandler:
         self._render_top_ui(screen)
 
         # Diálogo de tamanho do mapa
-        if self.editor.map_size_dialog and self.editor.map_size_dialog.visible:
-            self.editor.map_size_dialog.render(screen)
+        if self.editor.map_config_dialog and self.editor.map_config_dialog.visible:
+            self.editor.map_config_dialog.render(screen)
 
         # Pause
         if self.editor.paused:
@@ -313,7 +313,7 @@ class EditorRenderHandler:
             "path": "Esquerdo: add nó | Shift+Click: fim | Direito: remove",
             "towers": "Esquerdo: add spot | Direito: remove",
             "preview": f"Velocidade: {self.editor.preview_speed:.1f}x | +/ - para ajustar",
-            "map_size": "Configure o tamanho do mapa"
+            "map_config": "Configure o mapa"
         }
 
         info = self.editor.font_small.render(mode_info.get(self.editor.mode, ""), True, (180, 180, 180))

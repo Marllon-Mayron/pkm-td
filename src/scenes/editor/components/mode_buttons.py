@@ -31,7 +31,7 @@ class ModeButtons:
             90,
             30
         )
-        self.buttons.append((map_config_rect, "MAP SIZE", "map_size"))
+        self.buttons.append((map_config_rect, "MAP CONFIG", "map_config"))
 
     def get_buttons(self):
         """Retorna a lista de botões"""
@@ -51,7 +51,7 @@ class ModeButtons:
             if mode == current_mode:
                 color = (100, 150, 200)
                 border = (255, 255, 255)
-            elif mode == "map_size":
+            elif mode == "map_config":
                 color = (150, 100, 50)
                 border = (200, 150, 100)
             else:

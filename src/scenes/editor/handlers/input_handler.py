@@ -1,3 +1,5 @@
+# src/scenes/editor/handlers/input_handler.py
+
 import pygame
 
 
@@ -9,11 +11,13 @@ class EditorInputHandler:
 
     def handle_event(self, event):
         """Processa eventos do editor"""
-        if self.editor.map_size_dialog and self.editor.map_size_dialog.visible:
-            result = self.editor.map_size_dialog.handle_event(event)
-            if result:
-                new_width, new_height = result
-                self.editor.map_handler.resize_map(new_width, new_height)
+        # Verifica se há um diálogo de configuração ativo
+        if self.editor.map_config_dialog and self.editor.map_config_dialog.visible:
+            result = self.editor.map_config_dialog.handle_event(event)
+            if result:  # Diálogo foi confirmado
+                self.editor._handle_map_config_result(result)
+            elif not self.editor.map_config_dialog.visible:  # Diálogo foi cancelado
+                self.editor.map_config_dialog = None
             return True
 
         if self._handle_ui_events(event):
@@ -83,7 +87,7 @@ class EditorInputHandler:
         elif event.key == pygame.K_l and (pygame.key.get_mods() & pygame.KMOD_CTRL):
             self.editor.list_available_phases()
         elif event.key == pygame.K_m and (pygame.key.get_mods() & pygame.KMOD_CTRL):
-            self.editor._open_map_size_dialog()
+            self.editor._open_map_config_dialog()
         return True
 
     def _handle_mousedown(self, event):
@@ -93,8 +97,8 @@ class EditorInputHandler:
         # Verifica botões de modo
         for rect, text, mode in self.editor.mode_buttons.get_buttons():
             if rect.collidepoint(mouse_pos):
-                if mode == "map_size":
-                    self.editor._open_map_size_dialog()
+                if mode == "map_config":
+                    self.editor._open_map_config_dialog()
                 else:
                     self.editor.set_mode(mode)
                 return True
