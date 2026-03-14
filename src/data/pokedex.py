@@ -111,6 +111,14 @@ class Pokedex:
             filename += "s"
 
         return filename
+    def _format_filename_front_back(self, pokemon_id, shiny=False):
+        """Formata nome do arquivo com 3 dígitos"""
+        filename = str(pokemon_id)
+
+        if shiny:
+            filename += "s"
+
+        return filename
 
     def load_all_sprites(self):
         """Carrega todos os sprites de uma vez"""
@@ -136,7 +144,7 @@ class Pokedex:
     def _load_front_sprite(self, pokemon_id, base_path):
         """Carrega sprite frontal (96x96)"""
         # Normal
-        filename = self._format_filename(pokemon_id, shiny=False)
+        filename = self._format_filename_front_back(pokemon_id, shiny=False)
         path = base_path / "front" / f"{filename}.png"
 
         if path.exists():
@@ -147,7 +155,7 @@ class Pokedex:
                 print(f"Erro ao carregar front {pokemon_id}: {e}")
 
         # Shiny
-        filename_shiny = self._format_filename(pokemon_id, shiny=True)
+        filename_shiny = self._format_filename_front_back(pokemon_id, shiny=True)
         path_shiny = base_path / "front" / f"{filename_shiny}.png"
 
         if path_shiny.exists():
@@ -160,7 +168,7 @@ class Pokedex:
     def _load_back_sprite(self, pokemon_id, base_path):
         """Carrega sprite traseiro (96x96)"""
         # Normal
-        filename = self._format_filename(pokemon_id, shiny=False)
+        filename = self._format_filename_front_back(pokemon_id, shiny=False)
         path = base_path / "back" / f"{filename}.png"
 
         if path.exists():
@@ -171,7 +179,7 @@ class Pokedex:
                 print(f"Erro ao carregar back {pokemon_id}: {e}")
 
         # Shiny
-        filename_shiny = self._format_filename(pokemon_id, shiny=True)
+        filename_shiny = self._format_filename_front_back(pokemon_id, shiny=True)
         path_shiny = base_path / "back" / f"{filename_shiny}.png"
 
         if path_shiny.exists():
