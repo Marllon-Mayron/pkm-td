@@ -250,12 +250,6 @@ class EditorScene(BaseScene):
         if self.paused:
             return
 
-        mouse_pos = pygame.mouse.get_pos()
-        if self.screen_manager.is_mouse_in_viewport(mouse_pos):
-            mouse_render_pos = self.screen_manager.get_mouse_world_position(mouse_pos)
-            if mouse_render_pos:
-                self.camera.update(dt, mouse_render_pos)
-
         if self.mode == "preview":
             # Verifica se o path mudou e atualiza se necessário
             current_path = self.path.get_path_points()

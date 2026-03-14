@@ -8,6 +8,8 @@ class EditorInputHandler:
 
     def __init__(self, editor_scene):
         self.editor = editor_scene
+        self.dragging_camera = False
+        self.last_mouse_pos = None
 
     def handle_event(self, event):
         """Processa eventos do editor"""
@@ -50,6 +52,10 @@ class EditorInputHandler:
             return self._handle_keydown(event)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             return self._handle_mousedown(event)
+        elif event.type == pygame.MOUSEBUTTONUP:
+            return self._handle_mouseup(event)
+        elif event.type == pygame.MOUSEMOTION:
+            return self._handle_mousemotion(event)
         elif event.type == pygame.MOUSEWHEEL:
             return self._handle_mousewheel(event)
         return False
@@ -103,21 +109,90 @@ class EditorInputHandler:
                     self.editor.set_mode(mode)
                 return True
 
+        # Verifica se clicou no viewport com o botão do meio (scroll)
+        if event.button == 2:  # Botão do meio/scroll
+            if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
+                self.dragging_camera = True
+                self.last_mouse_pos = mouse_pos
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)  # Muda cursor para movimento
+                return True
+
         # Se não clicou em botão e está no viewport, processa ações de edição
         if self.editor.mode != "preview" and self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
             world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
             if world_pos:
-                # REMOVIDO: qualquer lógica de redimensionamento por clique
-                # Agora só processa cliques para edição normal
-                if event.button == 1:
+                if event.button == 1:  # Clique esquerdo
                     self.editor._handle_left_click(world_pos)
-                elif event.button == 3:
+                elif event.button == 3:  # Clique direito
                     self.editor._handle_right_click(world_pos)
         return True
 
+    def _handle_mouseup(self, event):
+        """Processa liberação do botão do mouse"""
+        if event.button == 2:  # Botão do meio/scroll
+            if self.dragging_camera:
+                self.dragging_camera = False
+                self.last_mouse_pos = None
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)  # Volta cursor normal
+                return True
+        return False
+
+    def _handle_mousemotion(self, event):
+        """Processa movimento do mouse"""
+        if self.dragging_camera and self.last_mouse_pos:
+            # Calcula a diferença do movimento
+            dx = event.pos[0] - self.last_mouse_pos[0]
+            dy = event.pos[1] - self.last_mouse_pos[1]
+
+            # Converte para movimento no mundo (considerando zoom)
+            # Na sua câmera, o movimento é inversamente proporcional ao zoom
+            world_dx = dx / self.editor.camera.zoom
+            world_dy = dy / self.editor.camera.zoom
+
+            # Move a câmera na direção OPOSTA ao arrasto
+            # (arrastar para direita = mundo move para esquerda)
+            self.editor.camera.x -= world_dx
+            self.editor.camera.y -= world_dy
+
+            # Garante que a câmera respeita os limites (usa o método existente)
+            self.editor.camera._clamp_position()
+
+            self.last_mouse_pos = event.pos
+            return True
+        return False
+
     def _handle_mousewheel(self, event):
-        """Processa scroll do mouse"""
+        """Processa scroll do mouse (zoom)"""
         if not self.editor.paused:
-            if not (self.editor.tile_palette and self.editor.tile_palette.focused):
-                self.editor.camera.handle_zoom(event.y > 0)
+            # Só faz zoom se não estiver arrastando a câmera
+            if not self.dragging_camera:
+                # Verifica se o mouse está sobre o viewport
+                mouse_pos = pygame.mouse.get_pos()
+                if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
+                    # Pega posição do mundo antes do zoom
+                    world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
+
+                    if world_pos:
+                        # Guarda a posição do mundo que queremos manter sob o mouse
+                        target_world_x, target_world_y = world_pos
+
+                        # Aplica zoom
+                        self.editor.camera.handle_zoom(event.y > 0)
+
+                        # Após o zoom, recalcula onde esse ponto do mundo está na tela
+                        # e ajusta a câmera para mantê-lo na mesma posição de tela
+                        new_mouse_pos = pygame.mouse.get_pos()
+                        new_world_pos = self.editor.screen_manager.get_mouse_world_position(new_mouse_pos,
+                                                                                            self.editor.camera)
+
+                        if new_world_pos:
+                            # Calcula a diferença e ajusta a câmera
+                            dx = target_world_x - new_world_pos[0]
+                            dy = target_world_y - new_world_pos[1]
+
+                            self.editor.camera.x += dx
+                            self.editor.camera.y += dy
+
+                            # Garante que está dentro dos limites
+                            self.editor.camera._clamp_position()
         return True
