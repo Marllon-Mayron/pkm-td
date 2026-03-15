@@ -1,6 +1,8 @@
 import pygame
 import math
 from src.scenes.base_scene import BaseScene
+from src.scenes.game_scene.game_scene import GameScene
+from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 from src.scenes.team_select_scene.components.gradient_background import GradientBackground
 from src.scenes.team_select_scene.components.pokemon_modal import PokemonModal
 from src.scenes.team_select_scene.components.navigation_buttons import NavigationButtons
@@ -12,11 +14,12 @@ from src.data.pokedex import Pokedex
 
 
 class TeamSelectScene(BaseScene):
-    def __init__(self, game):
+    def __init__(self, game, chapter ,phase):
         super().__init__(game)
 
         self.pokedex = Pokedex()
-
+        self.phase = phase
+        self.chapter = chapter
         # Managers
         self.pokemon_manager = PokemonManager(game.player)
         self.layout_manager = LayoutManager(game)
@@ -85,11 +88,16 @@ class TeamSelectScene(BaseScene):
         action_type = action.get('type')
 
         if action_type == 'GO_BACK':
-            self.game.go_to_phase_select()
+            from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
+            self.game.phase_select_scene = PhaseSelectScene(self.game)
+            self.game.current_scene = self.game.phase_select_scene
 
         elif action_type == 'START_GAME':
             print("Iniciando batalha com time:",
                   [p.name for p in self.game.player.team])
+
+            self.game.game_scene = GameScene(self.game, self.phase)
+            self.game.current_scene = self.game.game_scene
 
         elif action_type == 'PREV_PAGE':
             self.current_page -= 1

@@ -8,8 +8,6 @@ import math
 from src.scenes.base_scene import BaseScene
 from src.config.progress import progress_manager
 from src.config.phase_catalog import phase_catalog
-from src.scenes.game_scene.game_scene import GameScene
-from src.scenes.team_select_scene import TeamSelectScene
 
 
 class PhaseCard:
@@ -672,5 +670,5 @@ class PhaseSelectScene(BaseScene):
         from src.scenes.team_select_scene import TeamSelectScene
 
         # Cria a cena se não existir ou recria
-        self.game.team_select_scene = TeamSelectScene(self.game)
+        self.game.team_select_scene = TeamSelectScene(self.game, self.current_chapter_id,phase_number)
         self.game.current_scene = self.game.team_select_scene
