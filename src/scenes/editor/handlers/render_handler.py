@@ -26,7 +26,9 @@ class EditorRenderHandler:
         # Elementos de edição
         if self.editor.mode != "preview":
             self.editor.tower_spots.render(screen, self.editor.camera, self.editor.screen_manager)
-        self.editor.path.render(screen, self.editor.camera, self.editor.screen_manager)
+
+        # CORRIGIDO: Agora usa path_manager em vez de path
+        self.editor.path_manager.render(screen, self.editor.camera, self.editor.screen_manager)
 
         # Preview
         if self.editor.mode == "preview":
@@ -311,7 +313,8 @@ class EditorRenderHandler:
         # Informações do modo
         mode_info = {
             "layers": "Clique nos tiles à direita | Selecione layers à esquerda",
-            "path": "Esquerdo: add nó | Shift+Click: fim | Direito: remove",
+            "path": f"Path {self.editor.path_manager.current_path_index + 1}/{len(self.editor.path_manager.paths)} | "
+                    f"Esquerdo: add nó | Direito: remove | Ctrl+N: novo path | Ctrl+D: deletar | TAB: alternar",
             "towers": "Esquerdo: add spot | Direito: remove",
             "preview": f"Velocidade: {self.editor.preview_speed:.1f}x | +/ - para ajustar",
             "map_config": "Configure o mapa"

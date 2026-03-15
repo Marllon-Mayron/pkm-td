@@ -110,6 +110,25 @@ class EditorInputHandler:
             # Ctrl+Y = Redo
             self.editor.undo_manager.redo(self.editor)
             return True
+        elif event.key == pygame.K_n and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+            # Ctrl+N = Novo path
+            if self.editor.mode == "path":
+                self.editor.path_manager.add_path()
+                return True
+        elif event.key == pygame.K_d and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+            # Ctrl+D = Deletar path atual
+            if self.editor.mode == "path":
+                self.editor.path_manager.remove_current_path()
+                self.editor._update_preview_objects()
+                return True
+        elif event.key == pygame.K_TAB:
+            # TAB = Alternar entre paths (no modo path)
+            if self.editor.mode == "path" and self.editor.path_manager.paths:
+                current = self.editor.path_manager.current_path_index
+                next_path = (current + 1) % len(self.editor.path_manager.paths)
+                self.editor.path_manager.current_path_index = next_path
+                print(f"Path atual: {next_path + 1}")
+                return True
         return True
 
     def _handle_mousedown(self, event):

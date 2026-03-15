@@ -10,6 +10,7 @@ from src.editor.path_editor import Path
 from src.editor.tower_spot_editor import TowerSpotManager
 from src.editor.phase_exporter import PhaseExporter
 from src.scenes.editor.components.layer_selector import LayerSelector
+from src.scenes.editor.components.managers.path_manager import PathManager
 from src.scenes.editor.components.managers.undo_manager import UndoManager
 from src.scenes.editor.components.map_config_dialog import MapConfigDialog
 from src.scenes.editor.components.mode_buttons import ModeButtons
@@ -45,7 +46,7 @@ class EditorScene(BaseScene):
 
         # Gerenciadores
         self.layer_manager = LayerManager()
-        self.path = Path()
+        self.path_manager = PathManager()
         self.tower_spots = TowerSpotManager()
         self.exporter = PhaseExporter()
         self.undo_manager = UndoManager(max_steps=10)
@@ -93,6 +94,7 @@ class EditorScene(BaseScene):
         self.input_handler = EditorInputHandler(self)
         self.map_handler = MapHandler(self)
         self.render_handler = EditorRenderHandler(self)
+        self.path_manager.add_path()
 
         print(f"Editor iniciado - {self.phase_name}")
 
@@ -130,26 +132,33 @@ class EditorScene(BaseScene):
         """Atualiza objetos de visualização"""
         print("\n=== Atualizando objetos de preview ===")
 
-        path_points = self.path.get_path_points()
-        print(f"Path points do get_path_points(): {path_points}")
-        print(f"Path.nodes direto: {self.path.nodes}")
+        # MODIFIQUE ESTA PARTE - usa todos os paths para criar inimigos
+        all_paths = self.path_manager.get_all_paths()
 
-        # Atualiza inimigos
-        if path_points and len(path_points) > 1:
-            print(f"Path tem {len(path_points)} pontos, criando inimigos!")
-            self.test_enemies = []
-            for i in range(2):  # 2 inimigos para teste
-                enemy = TestEnemy(path_points)
-                # Posiciona um no início e outro no meio
-                if i == 1 and len(path_points) > 2:
-                    enemy.current_point = 1
-                    enemy.progress = 0.0
-                    enemy.position = path_points[1]
-                self.test_enemies.append(enemy)
-            print(f"Inimigos criados: {len(self.test_enemies)}")
-        else:
-            print("Path não tem pontos suficientes, limpando inimigos...")
-            self.test_enemies = []
+        # Limpa inimigos existentes
+        self.test_enemies = []
+
+        # Cria inimigos para cada path
+        for path_index, path in enumerate(all_paths):
+            path_points = path.get_path_points()
+
+            if path_points and len(path_points) > 1:
+                print(f"Path {path_index+1} tem {len(path_points)} pontos, criando inimigos!")
+
+                # Cria 2 inimigos para cada path (para teste)
+                for i in range(2):
+                    enemy = TestEnemy(path_points)
+                    enemy.path_index = path_index  # Marca qual path este inimigo segue
+
+                    # Posiciona um no início e outro no meio
+                    if i == 1 and len(path_points) > 2:
+                        enemy.current_point = 1
+                        enemy.progress = 0.0
+                        enemy.position = path_points[1]
+
+                    self.test_enemies.append(enemy)
+
+        print(f"Inimigos criados: {len(self.test_enemies)}")
 
         # Atualiza torres
         self.test_towers = []
@@ -261,31 +270,37 @@ class EditorScene(BaseScene):
             return
 
         if self.mode == "preview":
-            # Verifica se o path mudou e atualiza se necessário
-            current_path = self.path.get_path_points()
-            if not hasattr(self, '_last_path') or self._last_path != current_path:
-                self._last_path = current_path.copy() if current_path else []
+            # Verifica se os paths mudaram e atualiza se necessário
+            current_paths = [path.get_path_points() for path in self.path_manager.get_all_paths()]
+            if not hasattr(self, '_last_paths') or self._last_paths != current_paths:
+                self._last_paths = [p.copy() if p else [] for p in current_paths]
                 self._update_preview_objects()
-                print("Path mudou, atualizando preview!")  # Debug
+                print("Paths mudaram, atualizando preview!")
 
             if self.test_enemies:
-                all_finished = True
+                # Agrupa inimigos por path para reset independente
+                enemies_by_path = {}
+                for enemy in self.test_enemies:
+                    path_index = getattr(enemy, 'path_index', 0)
+                    if path_index not in enemies_by_path:
+                        enemies_by_path[path_index] = []
+                    enemies_by_path[path_index].append(enemy)
 
                 # Atualiza todos os inimigos
-                for i, enemy in enumerate(self.test_enemies):
+                for enemy in self.test_enemies:
                     enemy.update(dt * self.preview_speed)
-                    if not enemy.finished:
-                        all_finished = False
 
-                # Se todos os inimigos terminaram, reseta todos
-                if all_finished and self.test_enemies:
-                    print("Todos os inimigos terminaram! Resetando...")
-                    for enemy in self.test_enemies:
-                        enemy.reset()
+                # Reseta inimigos de cada path independentemente
+                for path_index, enemies in enemies_by_path.items():
+                    all_finished = all(enemy.finished for enemy in enemies)
+                    if all_finished and enemies:
+                        print(f"Todos os inimigos do Path {path_index + 1} terminaram! Resetando...")
+                        for enemy in enemies:
+                            enemy.reset()
 
-                # Atualiza torres
-                for tower in self.test_towers:
-                    tower.update(dt)
+            # Atualiza torres
+            for tower in self.test_towers:
+                tower.update(dt)
 
     def render(self, screen):
         """Delega renderização para o render handler"""
@@ -296,7 +311,7 @@ class EditorScene(BaseScene):
         phase_data = {
             "name": self.phase_name,
             "map": self.layer_manager.to_dict(),
-            "path": self.path.to_dict(),
+            "paths": self.path_manager.to_dict(),  # CORRIGIDO: era 'path', agora é 'paths'
             "tower_spots": self.tower_spots.to_dict(),
             "waves": [],
             "rewards": {
@@ -320,9 +335,16 @@ class EditorScene(BaseScene):
             if "map" in phase_data:
                 self.layer_manager.from_dict(phase_data["map"])
 
-            # Carrega o caminho
-            if "path" in phase_data:
-                self.path.from_dict(phase_data["path"])
+            # MODIFICADO: Carrega os paths (compatibilidade com versões antigas)
+            if "paths" in phase_data:
+                self.path_manager.from_dict(phase_data["paths"])
+            elif "path" in phase_data:  # Compatibilidade com versão antiga
+                # Converte path único para path manager
+                self.path_manager = PathManager()
+                path = Path()
+                path.from_dict(phase_data["path"])
+                self.path_manager.paths = [path]
+                self.path_manager.current_path_index = 0
 
             # Carrega os spots de torre
             if "tower_spots" in phase_data:
@@ -341,10 +363,11 @@ class EditorScene(BaseScene):
             # Atualiza objetos de preview
             self._update_preview_objects()
 
-            #Limpa historico salvo
+            # Limpa historico salvo
             self.clear_undo_history()
 
             print(f"Fase {chapter}-{phase_number} carregada com sucesso!")
+            print(f"Paths carregados: {len(self.path_manager.paths)}")
             return True
 
         except Exception as e:

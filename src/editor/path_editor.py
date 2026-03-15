@@ -10,10 +10,10 @@ class Path:
         self.selected_node = -1
         self.closed = False
 
-        # Cores e estilos
+        # Cores e estilos (agora todas com 3 valores RGB)
         self.line_color = (255, 100, 100)  # Vermelho para linha
-        self.start_color = (0, 255, 0)      # Verde para início
-        self.end_color = (255, 0, 0)         # Vermelho para fim
+        self.start_color = (0, 255, 0)  # Verde para início
+        self.end_color = (255, 0, 0)  # Vermelho para fim
         self.normal_color = (100, 100, 255)  # Azul para nós normais
         self.selected_color = (255, 255, 0)  # Amarelo para selecionado
         self.start_point_color = (0, 255, 255)  # Ciano para primeiro ponto
@@ -76,9 +76,13 @@ class Path:
             start = points_screen[i]
             end = points_screen[i + 1]
 
-            # Linha com transparência para não cobrir os pontos
+            # CORRIGIDO: Usa uma superfície com alpha e aplica a cor corretamente
             line_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
-            pygame.draw.line(line_surface, (*self.line_color, 180), start, end, self.line_width)
+
+            # Cria a cor com alpha - método correto para Pygame
+            color_with_alpha = (*self.line_color, 180)  # Isso cria (R, G, B, A)
+
+            pygame.draw.line(line_surface, color_with_alpha, start, end, self.line_width)
             screen.blit(line_surface, (0, 0))
 
         # Se o path for fechado, desenha linha do último ao primeiro
@@ -86,7 +90,8 @@ class Path:
             start = points_screen[-1]
             end = points_screen[0]
             line_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
-            pygame.draw.line(line_surface, (*self.line_color, 180), start, end, self.line_width)
+            color_with_alpha = (*self.line_color, 180)
+            pygame.draw.line(line_surface, color_with_alpha, start, end, self.line_width)
             screen.blit(line_surface, (0, 0))
 
     def _render_nodes(self, screen, camera, screen_manager):
@@ -106,10 +111,12 @@ class Path:
                 border_width = 2
 
                 # Desenha um halo ao redor do primeiro ponto
-                halo_surface = pygame.Surface((radius*4, radius*4), pygame.SRCALPHA)
-                pygame.draw.circle(halo_surface, (*self.start_point_color, 100),
-                                  (radius*2, radius*2), radius + 4)
-                screen.blit(halo_surface, (screen_x - radius*2, screen_y - radius*2))
+                halo_surface = pygame.Surface((radius * 4, radius * 4), pygame.SRCALPHA)
+                # CORRIGIDO: Cria cor com alpha corretamente
+                halo_color = (*self.start_point_color, 100)
+                pygame.draw.circle(halo_surface, halo_color,
+                                   (radius * 2, radius * 2), radius + 4)
+                screen.blit(halo_surface, (screen_x - radius * 2, screen_y - radius * 2))
 
             elif i == len(self.nodes) - 1:  # Último ponto
                 color = self.end_color

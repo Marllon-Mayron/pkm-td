@@ -90,9 +90,10 @@ class UndoManager:
 
     def _capture_state(self, editor_scene):
         """Captura o estado atual do editor"""
+        # CORRIGIDO: Agora usa path_manager em vez de path
         return {
             'layers': copy.deepcopy(editor_scene.layer_manager.to_dict()),
-            'path': copy.deepcopy(editor_scene.path.to_dict()),
+            'path_manager': copy.deepcopy(editor_scene.path_manager.to_dict()),  # Mudou aqui
             'tower_spots': copy.deepcopy(editor_scene.tower_spots.to_dict()),
             'current_tile': editor_scene.current_tile,
             'mode': editor_scene.mode,
@@ -106,9 +107,20 @@ class UndoManager:
             if 'layers' in state:
                 editor_scene.layer_manager.from_dict(state['layers'])
 
-            # Restaura path
-            if 'path' in state:
-                editor_scene.path.from_dict(state['path'])
+            # CORRIGIDO: Restaura path_manager (compatibilidade com versões antigas)
+            if 'path_manager' in state:
+                editor_scene.path_manager.from_dict(state['path_manager'])
+            elif 'path' in state:  # Compatibilidade com saves antigos
+                # Converte path antigo para path_manager
+                from src.scenes.editor.components.managers.path_manager import PathManager
+                from src.editor.path_editor import Path
+
+                new_path_manager = PathManager()
+                path = Path()
+                path.from_dict(state['path'])
+                new_path_manager.paths = [path]
+                new_path_manager.current_path_index = 0
+                editor_scene.path_manager = new_path_manager
 
             # Restaura tower spots
             if 'tower_spots' in state:

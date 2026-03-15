@@ -1,3 +1,5 @@
+# src/editor/phase_exporter.py
+
 """
 Exportador de fases para JSON
 """
@@ -18,7 +20,7 @@ class PhaseExporter:
         phase_data: {
             "name": str,
             "map": layer_manager dict,
-            "path": path dict,
+            "paths": path_manager dict,  # MODIFICADO: agora é paths (plural)
             "tower_spots": tower_spot_manager dict,
             "waves": list,
             "rewards": dict
@@ -38,7 +40,7 @@ class PhaseExporter:
             "phase": phase_number,
             "name": phase_data.get("name", f"Fase {phase_number}"),
             "map": phase_data["map"],
-            "path": phase_data["path"],
+            "paths": phase_data["paths"],  # MODIFICADO: era 'path', agora é 'paths'
             "tower_spots": phase_data["tower_spots"],
             "waves": phase_data.get("waves", []),
             "rewards": phase_data.get("rewards", {
@@ -90,7 +92,17 @@ class PhaseExporter:
             return None
 
         with open(filepath, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+
+        # Compatibilidade com versões antigas
+        if "path" in data and "paths" not in data:
+            # Converte path único para lista de paths
+            data["paths"] = {
+                "paths": [data["path"]],
+                "current_path_index": 0
+            }
+
+        return data
 
     def list_phases(self, chapter=None):
         """Lista todas as fases disponíveis"""

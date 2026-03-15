@@ -34,6 +34,15 @@ class MapHandler:
 
         # Modo path - adiciona nó
         elif self.editor.mode == "path":
+            current_path = self.editor.path_manager.get_current_path()
+            if not current_path:
+                # Se não há path atual, tenta criar um
+                if self.editor.path_manager.add_path():
+                    current_path = self.editor.path_manager.get_current_path()
+                else:
+                    print("Não foi possível criar novo path")
+                    return
+
             # Ajusta para grid se necessário
             if self.editor.snap_to_grid:
                 x = tile_x * self.editor.grid_size + self.editor.grid_size // 2
@@ -44,8 +53,8 @@ class MapHandler:
             # Salva estado ANTES da modificação
             self._save_undo_state(f"Path node em ({x:.0f}, {y:.0f})")
 
-            self.editor.path.add_node((x, y))
-            print(f"Nó do path adicionado em ({x}, {y})")
+            current_path.add_node((x, y))
+            print(f"Nó do Path {self.editor.path_manager.current_path_index + 1} adicionado em ({x}, {y})")
             self.editor._update_preview_objects()
 
         # Modo towers - adiciona spot
@@ -92,12 +101,16 @@ class MapHandler:
 
         # Modo path - remove nó
         elif self.editor.mode == "path":
+            current_path = self.editor.path_manager.get_current_path()
+            if not current_path:
+                return
+
             # Encontra nó mais próximo para remover
             min_dist = float('inf')
             node_to_remove = -1
             pos_to_remove = None
 
-            for i, node in enumerate(self.editor.path.nodes):
+            for i, node in enumerate(current_path.nodes):
                 dist = ((node[0] - world_pos[0]) ** 2 + (node[1] - world_pos[1]) ** 2) ** 0.5
                 if dist < 20 and dist < min_dist:
                     min_dist = dist
@@ -109,8 +122,8 @@ class MapHandler:
                 self._save_undo_state(
                     f"Remover path node {node_to_remove} em ({pos_to_remove[0]:.0f}, {pos_to_remove[1]:.0f})")
 
-                self.editor.path.remove_node(node_to_remove)
-                print(f"Nó {node_to_remove} removido")
+                current_path.remove_node(node_to_remove)
+                print(f"Nó {node_to_remove} removido do Path {self.editor.path_manager.current_path_index + 1}")
                 self.editor._update_preview_objects()
 
         # Modo towers - remove spot
