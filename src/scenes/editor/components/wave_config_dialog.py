@@ -48,6 +48,9 @@ class WaveConfigDialog:
         self.available_pokemon_ids = self.pokedex.get_all_ids()
         print(f"Carregados {len(self.available_pokemon_ids)} Pokémon da Pokedex")
 
+        # Cache de sprites InMap para performance
+        self.sprite_cache = {}
+
         # Inicializa botões
         self._init_buttons()
 
@@ -79,6 +82,56 @@ class WaveConfigDialog:
         self.repeat_checkbox = pygame.Rect(x + 150, y + 305, 20, 20)
         self.repeat_minus_button = pygame.Rect(x + 300, y + 295, 30, 30)
         self.repeat_plus_button = pygame.Rect(x + 340, y + 295, 30, 30)
+
+    def _get_pokemon_sprite(self, pokemon_id, size=48):
+        """Obtém sprite do Pokémon em tamanho adequado """
+        # Garante que pokemon_id é inteiro
+        try:
+            if isinstance(pokemon_id, str):
+                if pokemon_id.isdigit():
+                    pokemon_id = int(pokemon_id)
+                else:
+                    # Se for string não numérica, tenta buscar na Pokedex pelo nome
+                    for pid in self.available_pokemon_ids:
+                        if self.pokedex.get_name(pid).lower() == pokemon_id.lower():
+                            pokemon_id = pid
+                            break
+                    else:
+                        pokemon_id = 1  # fallback para Bulbasaur
+            else:
+                pokemon_id = int(pokemon_id)
+        except (ValueError, TypeError):
+            pokemon_id = 1
+
+        cache_key = (pokemon_id, size)
+
+        if cache_key in self.sprite_cache:
+            return self.sprite_cache[cache_key]
+
+        # Tenta obter o sprite InMap
+        sprite = self.pokedex.get_sprite(pokemon_id, "inmap", direction="down", frame=0)
+
+        if sprite and sprite.get_width() > 0:
+            # Redimensiona se necessário
+            if sprite.get_width() != size:
+                sprite = pygame.transform.scale(sprite, (size, size))
+        else:
+            # Cria placeholder se não encontrar
+            sprite = pygame.Surface((size, size), pygame.SRCALPHA)
+            types = self.pokedex.get_types(pokemon_id)
+            color = self.pokedex.get_type_color(types[0])
+            pygame.draw.rect(sprite, color, (0, 0, size, size))
+            pygame.draw.rect(sprite, (100, 100, 100), (0, 0, size, size), 2)
+
+            # Primeira letra do nome
+            name = self.pokedex.get_name(pokemon_id)
+            font = pygame.font.Font(None, size // 2)
+            text = font.render(name[0].upper() if name else "?", True, (255, 255, 255))
+            text_rect = text.get_rect(center=(size // 2, size // 2))
+            sprite.blit(text, text_rect)
+
+        self.sprite_cache[cache_key] = sprite
+        return sprite
 
     def _update_button_positions(self):
         """Atualiza posições dos botões após mover o diálogo"""
@@ -435,7 +488,11 @@ class WaveConfigDialog:
                     if pokemon_rect.collidepoint(mouse_x, mouse_y):
                         wave = self.wave_manager.get_current_wave()
                         if wave and self.pokemon_selector_enemy_index < len(wave.enemies):
-                            wave.enemies[self.pokemon_selector_enemy_index].pokemon_id = pokemon_id
+                            wave.enemies[self.pokemon_selector_enemy_index].pokemon_id = int(pokemon_id)
+                            # Limpa o cache do sprite para este Pokémon
+                            cache_key = (pokemon_id, 48)
+                            if cache_key in self.sprite_cache:
+                                del self.sprite_cache[cache_key]
                             self.showing_pokemon_selector = False
                         return True
 
@@ -561,9 +618,6 @@ class WaveConfigDialog:
                 self.enemies_scroll = max(0, min(self.max_enemies_scroll, self.enemies_scroll + delta))
             return True
         return False
-
-    # MÉTODO REMOVIDO: _normalize_percentages - NÃO USAMOS MAIS
-    # O usuário define manualmente as porcentagens
 
     def render(self, screen):
         """Renderiza o diálogo"""
@@ -766,21 +820,21 @@ class WaveConfigDialog:
             pygame.draw.rect(screen, bg_color, enemy_rect, border_radius=5)
             pygame.draw.rect(screen, (80, 80, 90), enemy_rect, 1, border_radius=5)
 
-            # Informações do Pokémon
+            # SPRITE DO POKÉMON - InMap em vez de círculo colorido
             pokemon_id = enemy.pokemon_id
             pokemon_name = self.pokedex.get_name(pokemon_id)
             types = self.pokedex.get_types(pokemon_id)
 
-            # Círculo de tipo
-            type_color = self.pokedex.get_type_color(types[0])
-            pygame.draw.circle(screen, type_color, (enemy_rect.x + 25, enemy_rect.y + 20), 15)
+            # Obtém e desenha o sprite InMap (48x48)
+            sprite = self._get_pokemon_sprite(pokemon_id, 48)
+            screen.blit(sprite, (enemy_rect.x + 5, enemy_rect.y + 5))
 
-            # Nome e tipos
+            # Nome e tipos - ajustado posição por causa do sprite maior
             name_text = self.font.render(pokemon_name, True, (255, 255, 255))
-            screen.blit(name_text, (enemy_rect.x + 45, enemy_rect.y + 10))
+            screen.blit(name_text, (enemy_rect.x + 60, enemy_rect.y + 10))
 
             types_text = self.font_small.render("/".join(types), True, (200, 200, 200))
-            screen.blit(types_text, (enemy_rect.x + 45, enemy_rect.y + 30))
+            screen.blit(types_text, (enemy_rect.x + 60, enemy_rect.y + 30))
 
             # Botão remover (X)
             remove_rect = pygame.Rect(enemy_rect.right - 30, enemy_rect.y + 5, 25, 25)
@@ -975,7 +1029,8 @@ class WaveConfigDialog:
         screen.blit(search_text, (search_rect.x + 5, search_rect.y + 7))
 
         # Instrução
-        info_text = self.font_small.render(f"{len(self.available_pokemon_ids)} Pokémon disponíveis", True, (200, 200, 200))
+        info_text = self.font_small.render(f"{len(self.available_pokemon_ids)} Pokémon disponíveis", True,
+                                           (200, 200, 200))
         screen.blit(info_text, (selector_rect.x + 270, selector_rect.y + 47))
 
         # Lista de Pokémon
@@ -1014,19 +1069,19 @@ class WaveConfigDialog:
 
             pygame.draw.rect(screen, bg_color, pokemon_rect)
 
-            # Ícone de tipo
-            types = self.pokedex.get_types(pokemon_id)
-            type_color = self.pokedex.get_type_color(types[0])
-            pygame.draw.rect(screen, type_color, (pokemon_rect.x, pokemon_rect.y, 5, 35))
+            # SPRITE DO POKÉMON NO SELETOR
+            sprite = self._get_pokemon_sprite(pokemon_id, 32)
+            screen.blit(sprite, (pokemon_rect.x + 5, pokemon_rect.y + 2))
 
             # ID e nome
             pokemon_name = self.pokedex.get_name(pokemon_id)
-            text = self.font.render(f"#{pokemon_id:03d} - {pokemon_name}", True, (255, 255, 255))
-            screen.blit(text, (pokemon_rect.x + 15, pokemon_rect.y + 8))
+            text = self.font_small.render(f"#{pokemon_id:03d} {pokemon_name}", True, (255, 255, 255))
+            screen.blit(text, (pokemon_rect.x + 45, pokemon_rect.y + 8))
 
-            # Tipos
-            types_text = self.font_small.render("/".join(types), True, (200, 200, 200))
-            screen.blit(types_text, (pokemon_rect.x + 280, pokemon_rect.y + 10))
+            # Tipos (mini indicador)
+            types = self.pokedex.get_types(pokemon_id)
+            type_color = self.pokedex.get_type_color(types[0])
+            pygame.draw.circle(screen, type_color, (pokemon_rect.x + 350, pokemon_rect.y + 15), 5)
 
         screen.set_clip(old_clip)
 

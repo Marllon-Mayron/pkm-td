@@ -36,8 +36,6 @@ class Wave:
 
         # Composição da wave (tipos de Pokémon)
         self.enemies = [
-            WaveEnemy("pikachu", 50),
-            WaveEnemy("charmander", 50)
         ]
 
         # Nível dos inimigos
