@@ -113,6 +113,8 @@ class GameWaveManager:
                         wave_data.get("max_level", 5)
                     )
 
+
+
                     # Cria o Pokémon inimigo
                     pokemon = Pokemon(
                         start_x,  # X inicial (exatamente como está no path)

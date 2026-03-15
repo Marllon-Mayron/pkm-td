@@ -276,7 +276,7 @@ class Pokemon(Entity):
                 self.sprite = frames_list[self.current_frame]
 
     def render(self, screen, camera=None, show_hp=True):
-        """Renderiza Pokémon - sprites já vêm redimensionados da Pokedex"""
+        """Renderiza Pokémon """
 
         if camera and hasattr(self, 'screen_manager') and self.screen_manager:
             # Obtém posição na tela (coordenadas com zoom aplicado)
@@ -289,9 +289,9 @@ class Pokemon(Entity):
             screen_y = self.y
             zoom_scale = 1.0
 
-        # SPRITE - APLICA ZOOM NO SPRITE JÁ REDIMENSIONADO
+        # SPRITE - COM PIVÔ NOS PÉS
         if self.sprite:
-            # Obtém tamanho atual (já é o tamanho redimensionado da Pokedex)
+            # Obtém tamanho atual
             current_width = self.sprite.get_width()
             current_height = self.sprite.get_height()
 
@@ -302,30 +302,50 @@ class Pokemon(Entity):
             # Redimensiona com o zoom atual
             scaled_sprite = pygame.transform.scale(self.sprite, (final_width, final_height))
 
-            # Centraliza na posição
-            sprite_rect = scaled_sprite.get_rect(center=(screen_x, screen_y))
+            # POSICIONA COM PIVÔ NOS PÉS:
+            # Em vez de centralizar, posiciona de forma que a parte inferior
+            # do sprite fique na posição (screen_x, screen_y)
+            sprite_rect = scaled_sprite.get_rect()
+            sprite_rect.bottom = int(screen_y)  # Parte inferior no Y
+            sprite_rect.centerx = int(screen_x)  # Centralizado no X
+
             screen.blit(scaled_sprite, sprite_rect)
 
-            # Debug opcional
+            # Debug - mostra o ponto de pivô (pés)
             if hasattr(self, 'show_debug') and self.show_debug:
-                pygame.draw.circle(screen, (255, 0, 0), (int(screen_x), int(screen_y)), 8, 2)
-                pygame.draw.circle(screen, (0, 255, 0), (int(screen_x), int(screen_y)), 3)
+                # Vermelho: ponto do pivô (pés)
+                pygame.draw.circle(screen, (255, 0, 0), (int(screen_x), int(screen_y)), 6, 2)
+                # Verde: centro do sprite (para referência)
+                centro_x = sprite_rect.centerx
+                centro_y = sprite_rect.centery
+                pygame.draw.circle(screen, (0, 255, 0), (centro_x, centro_y), 4, 1)
+                # Amarelo: linha do chão
+                pygame.draw.line(screen, (255, 255, 0),
+                                 (sprite_rect.left, int(screen_y)),
+                                 (sprite_rect.right, int(screen_y)), 1)
         else:
-            # Placeholder com tamanho proporcional
+            # Placeholder - também usa pivô nos pés
             size = int(self.map_sprite_size * zoom_scale)
-            rect = pygame.Rect(screen_x - size // 2, screen_y - size // 2, size, size)
+            # Desenha um retângulo com a parte inferior na posição do pivô
+            rect = pygame.Rect(0, 0, size, size)
+            rect.bottom = int(screen_y)
+            rect.centerx = int(screen_x)
             pygame.draw.rect(screen, (255, 0, 255), rect)
             pygame.draw.rect(screen, (255, 255, 255), rect, 2)
 
-        # Barra de HP - escalonada proporcionalmente
+        # Barra de HP - ajustada para ficar acima do sprite
         if show_hp:
             hp_percent = self.current_hp / self.max_hp
 
-            # Tamanhos proporcionais ao zoom - AJUSTADOS para 32x32
-            bar_width = int(32 * zoom_scale)  # Mesmo tamanho do sprite
-            bar_height = max(1, int(3 * zoom_scale))  # 3 pixels de altura
+            # Tamanhos proporcionais ao zoom
+            bar_width = int(32 * zoom_scale)
+            bar_height = max(1, int(3 * zoom_scale))
+
+            # Posiciona a barra acima do sprite
             bar_x = screen_x - bar_width // 2
-            bar_y = screen_y - int(20 * zoom_scale)  # 20 pixels acima do centro
+            # Coloca a barra 5 pixels acima do topo do sprite
+            sprite_top = screen_y - int(self.map_sprite_size * zoom_scale)
+            bar_y = sprite_top - 5
 
             # Fundo da barra
             pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))
@@ -344,8 +364,7 @@ class Pokemon(Entity):
                 pygame.draw.rect(screen, color, (bar_x, bar_y, progress_width, bar_height))
 
             # Borda
-            pygame.draw.rect(screen, (100, 100, 100),
-                             (bar_x, bar_y, bar_width, bar_height), 1)
+            pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, bar_width, bar_height), 1)
 
     def get_info_string(self):
         """Retorna string com informações do Pokémon"""
