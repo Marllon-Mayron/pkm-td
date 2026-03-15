@@ -18,6 +18,7 @@ class DragDropManager:
         self.valid_target = False
         self.hovered_spot = None
         self.place_preview_alpha = 0
+        self.tile_size = 16  # Tamanho do tile
 
         # Preview
         self.preview_surface = None
@@ -100,30 +101,37 @@ class DragDropManager:
         self.drag_screen_pos = screen_pos
         self.drag_world_pos = world_pos
 
+        # Converte posição do mouse para tile
+        mouse_tile_x = world_pos[0] // self.tile_size
+        mouse_tile_y = world_pos[1] // self.tile_size
+
         # Verifica se está sobre algum tower spot
         self.hovered_spot = None
         self.valid_target = False
 
         for spot in tower_spots:
-            # Calcula distância do mouse ao spot (acessando como atributo, não como dicionário)
-            spot_world_x = spot.x
-            spot_world_y = spot.y
-            distance = math.sqrt((world_pos[0] - spot_world_x) ** 2 +
-                                 (world_pos[1] - spot_world_y) ** 2)
+            if spot.occupied:
+                continue  # Pula spots ocupados
 
-            # Raio de tolerância (tamanho do tile)
-            tolerance = 32
+            # Converte spot para coordenadas de tile
+            spot_tile_x = spot.x // self.tile_size
+            spot_tile_y = spot.y // self.tile_size
 
-            if distance < tolerance:
+            # Verifica se é o mesmo tile
+            if spot_tile_x == mouse_tile_x and spot_tile_y == mouse_tile_y:
                 self.hovered_spot = spot
                 self.valid_target = True
 
-                # Atualiza posição para o centro do spot
-                self.drag_world_pos = (spot_world_x, spot_world_y)
+                # Posição do centro do tile em coordenadas do mundo
+                tile_center_x = (spot_tile_x * self.tile_size) + self.tile_size // 2
+                tile_center_y = (spot_tile_y * self.tile_size) + self.tile_size // 2
+
+                # Atualiza posição para o centro do tile
+                self.drag_world_pos = (tile_center_x, tile_center_y)
 
                 # Recalcula posição na tela
                 screen_x, screen_y = self.game.screen_manager.world_to_screen(
-                    spot_world_x, spot_world_y, camera
+                    tile_center_x, tile_center_y, camera
                 )
                 self.drag_screen_pos = (screen_x, screen_y)
                 break
@@ -140,17 +148,23 @@ class DragDropManager:
 
         # Se tem um spot hovered, coloca o Pokémon lá
         if self.valid_target and self.hovered_spot and self.drag_pokemon:
-            result = {
-                'pokemon': self.drag_pokemon,
-                'slot_index': self.drag_slot_index,
-                'spot': self.hovered_spot,
-                'world_pos': self.drag_world_pos
-            }
+            # Verifica novamente se o spot não foi ocupado durante o arrasto
+            if not self.hovered_spot.occupied:
+                # Calcula posição central do tile para o Pokémon
+                tile_center_x = (self.hovered_spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
+                tile_center_y = (self.hovered_spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
 
-            print(f"[DROP] Colocando {self.drag_pokemon.name} no spot ({self.hovered_spot.x}, {self.hovered_spot.y})")
+                result = {
+                    'pokemon': self.drag_pokemon,
+                    'slot_index': self.drag_slot_index,
+                    'spot': self.hovered_spot,
+                    'world_pos': (tile_center_x, tile_center_y)  # Usa centro do tile
+                }
 
-            if on_place_callback:
-                on_place_callback(result)
+                print(f"[DROP] Colocando {self.drag_pokemon.name} no spot ({self.hovered_spot.x}, {self.hovered_spot.y})")
+
+                if on_place_callback:
+                    on_place_callback(result)
 
         # Reseta estado
         self.is_dragging = False
@@ -182,12 +196,16 @@ class DragDropManager:
         if not self.is_dragging or not self.preview_surface:
             return
 
-        # Posição do preview (seguindo o mouse)
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-
-        # Offset para centralizar no cursor
-        preview_rect = self.preview_surface.get_rect()
-        preview_rect.center = (mouse_x, mouse_y - 20)  # Um pouco acima do cursor
+        # Se tem um spot hovered, desenha o preview no centro do tile
+        if self.valid_target and self.hovered_spot:
+            # Usa a posição calculada do centro do tile
+            preview_rect = self.preview_surface.get_rect()
+            preview_rect.center = (int(self.drag_screen_pos[0]), int(self.drag_screen_pos[1]) - 20)
+        else:
+            # Segue o mouse
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            preview_rect = self.preview_surface.get_rect()
+            preview_rect.center = (mouse_x, mouse_y - 20)
 
         # Aplica transparência
         preview_with_alpha = self.preview_surface.copy()
@@ -208,9 +226,13 @@ class DragDropManager:
         if not self.hovered_spot:
             return
 
-        # Posição do spot na tela
+        # Calcula centro do tile
+        tile_center_x = (self.hovered_spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
+        tile_center_y = (self.hovered_spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
+
+        # Posição do centro do tile na tela
         spot_x, spot_y = self.game.screen_manager.world_to_screen(
-            self.hovered_spot.x, self.hovered_spot.y, camera
+            tile_center_x, tile_center_y, camera
         )
 
         # Círculo pulsante

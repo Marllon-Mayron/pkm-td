@@ -6,6 +6,7 @@ class PlacementManager:
     def __init__(self, game):
         self.game = game
         self.placed_pokemon = []  # Lista de Pokémon no mapa
+        self.tile_size = 16  # <-- FALTAVA ISSO!
 
     def add_pokemon(self, spot, pokemon):
         """Adiciona um Pokémon no spot"""
@@ -15,11 +16,20 @@ class PlacementManager:
             print(f"[PLACEMENT] Spot já ocupado por {existing.name}")
             return None
 
+        # Verifica se o spot já está marcado como ocupado
+        if spot.occupied:
+            print(f"[PLACEMENT] Spot já marcado como ocupado")
+            return None
+
+        # Calcula o centro do tile para posicionar o Pokémon
+        tile_center_x = (spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
+        tile_center_y = (spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
+
         # Cria uma nova instância do Pokémon no mapa
         from src.entities.pokemon import Pokemon
         placed = Pokemon(
-            spot.x,  # Usa a posição exata do spot
-            spot.y,
+            tile_center_x,  # Usa centro do tile
+            tile_center_y,
             pokemon.id,
             level=pokemon.level,
             is_wild=False
@@ -35,14 +45,29 @@ class PlacementManager:
 
         # Marca como colocado
         placed.is_placed = True
-        placed.spot_id = id(spot)  # Identificador único do spot
+        placed.spot_id = id(spot)
 
         # Marca o spot como ocupado
         spot.occupied = True
 
         self.placed_pokemon.append(placed)
-        print(f"[PLACEMENT] {pokemon.name} colocado no spot ({spot.x}, {spot.y})")
+        print(
+            f"[PLACEMENT] {pokemon.name} colocado no spot ({spot.x}, {spot.y}) - Centro ({tile_center_x}, {tile_center_y})")
         return placed
+
+    def get_pokemon_at_spot(self, spot):
+        """Verifica se já existe um Pokémon no spot baseado no tile"""
+        # Converte spot para coordenadas de tile
+        spot_tile_x = spot.x // self.tile_size
+        spot_tile_y = spot.y // self.tile_size
+
+        for pokemon in self.placed_pokemon:
+            pokemon_tile_x = pokemon.x // self.tile_size
+            pokemon_tile_y = pokemon.y // self.tile_size
+
+            if pokemon_tile_x == spot_tile_x and pokemon_tile_y == spot_tile_y:
+                return pokemon
+        return None
 
     def remove_pokemon(self, pokemon):
         """Remove um Pokémon do mapa"""
@@ -54,13 +79,6 @@ class PlacementManager:
                     spot.occupied = False
                     break
             print(f"[PLACEMENT] {pokemon.name} removido do mapa")
-
-    def get_pokemon_at_spot(self, spot):
-        """Verifica se já existe um Pokémon no spot"""
-        for pokemon in self.placed_pokemon:
-            if abs(pokemon.x - spot.x) < 10 and abs(pokemon.y - spot.y) < 10:
-                return pokemon
-        return None
 
     def get_pokemon_at_world_pos(self, world_x, world_y, tolerance=20):
         """Retorna o Pokémon na posição do mundo (para seleção)"""

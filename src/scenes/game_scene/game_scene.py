@@ -57,6 +57,9 @@ class GameScene(BaseScene):
         # Gerenciador de waves
         self.wave_manager = GameWaveManager(phase_loader)
 
+        # Spot atualmente sob o mouse
+        self.hovered_spot = None
+
         # Lista de Pokémon colocados no mapa
         self.placed_pokemon = []
 
@@ -169,14 +172,16 @@ class GameScene(BaseScene):
         """Callback quando um Pokémon é colocado no mapa"""
         pokemon = placement_data['pokemon']
         spot = placement_data['spot']
+        world_pos = placement_data['world_pos']  # Já vem centralizado do drag_drop
 
-        print(f"[PLACED] Pokémon {pokemon.name} colocado no spot ({spot.x}, {spot.y})")
+        print(
+            f"[PLACED] Pokémon {pokemon.name} colocado no spot ({spot.x}, {spot.y}) em ({world_pos[0]}, {world_pos[1]})")
 
         # Usa o placement manager para adicionar
         placed = self.placement_manager.add_pokemon(spot, pokemon)
 
         if placed:
-            print(f"✅ Pokémon colocado! Total no mapa: {len(self.placement_manager.placed_pokemon)}")
+            print(f"Pokémon colocado! Total no mapa: {len(self.placement_manager.placed_pokemon)}")
 
     def handle_event(self, event):
         """Processa eventos do jogo"""
@@ -257,6 +262,15 @@ class GameScene(BaseScene):
                 self.last_mouse_pos = event.pos
                 return True
 
+            mouse_pos = pygame.mouse.get_pos()
+            if self.screen_manager.is_mouse_in_viewport(mouse_pos):
+                world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
+                if world_pos:
+                    # Pega o spot sob o mouse
+                    hovered_spot = self.spot_renderer.get_spot_at_world_pos(world_pos[0], world_pos[1])
+                    # Armazena para uso no render
+                    self.hovered_spot = hovered_spot
+
         elif event.type == pygame.MOUSEWHEEL:
             if not self.paused and not self.dragging_camera:
                 mouse_pos = pygame.mouse.get_pos()
@@ -286,6 +300,9 @@ class GameScene(BaseScene):
         # Atualiza Pokémon colocados
         if hasattr(self, 'placement_manager'):
             self.placement_manager.update(dt, self.active_enemies)
+
+        if hasattr(self, 'spot_renderer'):
+            self.spot_renderer.update(dt)
 
         for pokemon in self.placed_pokemon:
             pokemon.update(dt)
@@ -357,6 +374,13 @@ class GameScene(BaseScene):
         # Renderiza os paths (para debug)
         if self.show_debug:
             self.path_renderer.render(screen, self.camera, self.screen_manager, show_editing=False)
+
+        if hasattr(self, 'spot_renderer'):
+            self.spot_renderer.render(
+                screen, self.camera, self.screen_manager,
+                show_editing=False,
+                highlight_spot=self.hovered_spot if hasattr(self, 'hovered_spot') else None
+            )
 
         if hasattr(self, 'placement_manager'):
             self.placement_manager.render(screen, self.camera, self.screen_manager)

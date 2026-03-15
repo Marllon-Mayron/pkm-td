@@ -120,8 +120,7 @@ class GameTeamManager:
                 )
                 if result:
                     # Remove Pokémon do time após colocar
-                    self.game.player.team.pop(result['slot_index'])
-                    self.update_team()
+                    print(f"[TEAM] {result['pokemon'].name} colocado no mapa")
                 return result
 
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -195,10 +194,6 @@ class GameTeamManager:
         # Modo expandido
         if self.expanded and self.selected_slot_index >= 0:
             self._render_expanded_info(screen)
-
-        # Se está arrastando, desenha indicadores nos spots
-        if self.drag_manager.is_dragging:
-            self._render_spot_indicators(screen, camera, tower_spots)
 
     def _draw_modern_background(self, screen):
         """Desenha fundo moderno com gradiente e efeito glass"""
@@ -327,49 +322,7 @@ class GameTeamManager:
             value_text = stat_font.render(stat_value, True, (255, 255, 255))
             screen.blit(value_text, (stat_x + 50, stat_y))
 
-    def _render_spot_indicators(self, screen, camera, tower_spots):
-        """Renderiza indicadores nos spots disponíveis durante arrasto"""
-        for spot in tower_spots:
-            # Agora acessa como atributo, não como dicionário
-            spot_x, spot_y = self.game.screen_manager.world_to_screen(
-                spot.x, spot.y, camera
-            )
 
-            # Verifica se é o spot hovered
-            is_hovered = (self.drag_manager.hovered_spot == spot)
-
-            # Cor baseada no estado e ocupação
-            if spot.occupied:
-                # Spot ocupado - não pode colocar
-                color = (150, 150, 150)
-                alpha = 100
-                radius = 20
-            elif is_hovered:
-                color = (0, 255, 100)
-                alpha = 200
-                radius = 25
-            else:
-                color = (100, 100, 150)
-                alpha = 100
-                radius = 20
-
-            # Círculo do spot
-            spot_surface = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-            pygame.draw.circle(spot_surface, (*color, alpha),
-                               (radius, radius), radius, 2)
-
-            # Preenchimento sutil
-            pygame.draw.circle(spot_surface, (*color, alpha // 3),
-                               (radius, radius), radius - 2)
-
-            screen.blit(spot_surface, (spot_x - radius, spot_y - radius))
-
-            # Se ocupado, desenha um "X"
-            if spot.occupied:
-                x_surface = pygame.Surface((20, 20), pygame.SRCALPHA)
-                pygame.draw.line(x_surface, (255, 100, 100, 200), (2, 2), (18, 18), 3)
-                pygame.draw.line(x_surface, (255, 100, 100, 200), (18, 2), (2, 18), 3)
-                screen.blit(x_surface, (spot_x - 10, spot_y - 10))
 
     def toggle_visibility(self):
         """Alterna visibilidade do time"""
