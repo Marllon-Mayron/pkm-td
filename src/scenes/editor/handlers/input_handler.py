@@ -13,15 +13,6 @@ class EditorInputHandler:
 
     def handle_event(self, event):
         """Processa eventos do editor"""
-        # Verifica se há um diálogo de configuração ativo
-        if self.editor.map_config_dialog and self.editor.map_config_dialog.visible:
-            result = self.editor.map_config_dialog.handle_event(event)
-            if result:  # Diálogo foi confirmado
-                self.editor._handle_map_config_result(result)
-            elif not self.editor.map_config_dialog.visible:  # Diálogo foi cancelado
-                self.editor.map_config_dialog = None
-            return True
-
         # PRIORIDADE 1: Eventos da UI (incluindo scroll)
         if self._handle_ui_events(event):
             return True
@@ -128,6 +119,12 @@ class EditorInputHandler:
                 next_path = (current + 1) % len(self.editor.path_manager.paths)
                 self.editor.path_manager.current_path_index = next_path
                 print(f"Path atual: {next_path + 1}")
+                return True
+
+        elif event.key == pygame.K_w and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+            # Ctrl+W = Configurar waves (quando no modo path)
+            if self.editor.mode == "path":
+                self.editor._open_wave_config_dialog()
                 return True
         return True
 

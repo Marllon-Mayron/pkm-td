@@ -20,9 +20,9 @@ class PhaseExporter:
         phase_data: {
             "name": str,
             "map": layer_manager dict,
-            "paths": path_manager dict,  # MODIFICADO: agora é paths (plural)
+            "paths": path_manager dict,
+            "waves": wave_manager dict,
             "tower_spots": tower_spot_manager dict,
-            "waves": list,
             "rewards": dict
         }
         """
@@ -40,9 +40,9 @@ class PhaseExporter:
             "phase": phase_number,
             "name": phase_data.get("name", f"Fase {phase_number}"),
             "map": phase_data["map"],
-            "paths": phase_data["paths"],  # MODIFICADO: era 'path', agora é 'paths'
+            "paths": phase_data["paths"],
+            "waves": phase_data.get("waves", {"waves": []}),
             "tower_spots": phase_data["tower_spots"],
-            "waves": phase_data.get("waves", []),
             "rewards": phase_data.get("rewards", {
                 "money": 100,
                 "experience": 50

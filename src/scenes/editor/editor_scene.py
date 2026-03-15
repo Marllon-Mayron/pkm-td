@@ -4,11 +4,13 @@ Cena do Editor de Fases - Versão Modular
 import pygame
 from tkinter import filedialog, Tk
 
+from src.editor.wave_config import WaveManager
 from src.scenes.base_scene import BaseScene
 from src.editor.layer_manager import LayerManager, LayerType
 from src.editor.path_editor import Path
 from src.editor.tower_spot_editor import TowerSpotManager
 from src.editor.phase_exporter import PhaseExporter
+from src.scenes.editor import WaveConfigDialog
 from src.scenes.editor.components.layer_selector import LayerSelector
 from src.scenes.editor.components.managers.path_manager import PathManager
 from src.scenes.editor.components.managers.undo_manager import UndoManager
@@ -62,6 +64,10 @@ class EditorScene(BaseScene):
         self.test_enemies = []
         self.test_towers = []
         self.preview_speed = 1.0
+
+        self.wave_manager = WaveManager()
+        self.path_manager.set_wave_manager(self.wave_manager)  # Associa ao path_manager
+        self.wave_config_dialog = None
 
         # UI Panels
         self.tile_palette = None
@@ -126,6 +132,10 @@ class EditorScene(BaseScene):
     def set_mode(self, mode):
         """Altera o modo do editor"""
         self.mode = mode
+        if mode == "path":
+            # Se entrou no modo path, cria uma wave padrão se não existir
+            if not self.wave_manager.waves:
+                self.wave_manager.add_wave()
         self._update_preview_objects()
 
     def _update_preview_objects(self):
@@ -217,6 +227,25 @@ class EditorScene(BaseScene):
                 self.phase_name
             )
 
+    def _open_wave_config_dialog(self):
+        """Abre o diálogo de configuração de waves"""
+        if not self.wave_manager.waves:
+            self.wave_manager.add_wave()
+
+        dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 600) // 2
+        dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 500) // 2
+
+        # Passa a Pokedex como parâmetro
+        from src.data.pokedex import Pokedex
+        pokedex = Pokedex()
+
+        self.wave_config_dialog = WaveConfigDialog(
+            dialog_x, dialog_y, 600, 500,
+            self.wave_manager,
+            self.path_manager,
+            pokedex  # Passa a Pokedex
+        )
+
     def _handle_map_config_result(self, result):
         """Processa o resultado do diálogo de configuração"""
         if result:
@@ -241,28 +270,35 @@ class EditorScene(BaseScene):
 
     def handle_event(self, event):
         """Delega processamento de eventos para o input handler"""
-        # Verifica se há um diálogo ativo
+        # Verifica se há um diálogo de configuração de mapa ativo
         if self.map_config_dialog and self.map_config_dialog.visible:
             result = self.map_config_dialog.handle_event(event)
-            if result is not None:  # Diálogo foi confirmado
+            if result is not None:
                 self._handle_map_config_result(result)
                 self.map_config_dialog = None
-            elif not self.map_config_dialog.visible:  # Diálogo foi cancelado
+            elif not self.map_config_dialog.visible:
                 self.map_config_dialog = None
-            return
+            return  # SEMPRE retorna se tinha diálogo
+
+        # Verifica se há um diálogo de configuração de waves ativo
+        if self.wave_config_dialog and self.wave_config_dialog.visible:
+            result = self.wave_config_dialog.handle_event(event)
+            if result == "saved":
+                self._update_preview_objects()
+                self.wave_config_dialog = None
+            elif not self.wave_config_dialog.visible:
+                self.wave_config_dialog = None
+
+            # IMPORTANTE: Sempre retorna True se o diálogo estava visível
+            # Isso impede que o evento propague para o editor
+            return True
 
         # Se não houver diálogo ativo, processa normalmente
         self.input_handler.handle_event(event)
 
-        # Adicione um método para criar novo mapa
-
     def new_map(self):
         """Cria um novo mapa com configurações personalizadas"""
         self._open_map_config_dialog()
-
-    def handle_event(self, event):
-        """Delega processamento de eventos para o input handler"""
-        self.input_handler.handle_event(event)
 
     def fixed_update(self, dt):
         """Update da lógica"""
@@ -311,9 +347,9 @@ class EditorScene(BaseScene):
         phase_data = {
             "name": self.phase_name,
             "map": self.layer_manager.to_dict(),
-            "paths": self.path_manager.to_dict(),  # CORRIGIDO: era 'path', agora é 'paths'
+            "paths": self.path_manager.to_dict(),
+            "waves": self.wave_manager.to_dict(),  # Adiciona waves
             "tower_spots": self.tower_spots.to_dict(),
-            "waves": [],
             "rewards": {
                 "money": 100,
                 "experience": 50
@@ -321,6 +357,7 @@ class EditorScene(BaseScene):
         }
 
         self.exporter.export_phase(phase_data, self.current_chapter, self.current_phase)
+        print(f"Fase salva com {len(self.wave_manager.waves)} waves!")
 
     def load_phase(self, chapter, phase_number):
         """Carrega uma fase existente"""
@@ -345,6 +382,13 @@ class EditorScene(BaseScene):
                 path.from_dict(phase_data["path"])
                 self.path_manager.paths = [path]
                 self.path_manager.current_path_index = 0
+                # Carrega waves
+            if "waves" in phase_data:
+                self.wave_manager.from_dict(phase_data["waves"])
+            else:
+                # Cria uma wave padrão se não existir
+                self.wave_manager = WaveManager()
+                self.wave_manager.add_wave()
 
             # Carrega os spots de torre
             if "tower_spots" in phase_data:

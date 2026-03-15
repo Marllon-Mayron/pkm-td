@@ -11,6 +11,7 @@ class PathManager:
         self.current_path_index = 0
         self.max_paths = 5  # Limite razoável de paths por fase
 
+
         # Cores para diferentes paths (para facilitar identificação)
         self.path_colors = [
             (255, 100, 100),  # Vermelho
@@ -113,6 +114,16 @@ class PathManager:
         screen_y = render_y * screen_manager.render_scale + screen_manager.viewport_y
 
         return (screen_x, screen_y)
+
+    def set_wave_manager(self, wave_manager):
+        """Associa um gerenciador de waves a este path manager"""
+        self.wave_manager = wave_manager
+
+    def get_waves_for_current_path(self):
+        """Retorna todas as waves associadas ao path atual"""
+        if hasattr(self, 'wave_manager') and self.wave_manager:
+            return self.wave_manager.get_waves_for_path(self.current_path_index)
+        return []
 
     def to_dict(self):
         """Converte para dicionário para salvar"""

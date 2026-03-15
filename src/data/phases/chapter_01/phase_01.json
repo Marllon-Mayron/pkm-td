@@ -30641,64 +30641,46 @@
             {
                 "nodes": [
                     [
-                        8,
-                        8
-                    ],
-                    [
-                        8,
-                        152
-                    ]
-                ],
-                "closed": false
-            },
-            {
-                "nodes": [
-                    [
-                        56,
+                        24,
                         24
                     ],
                     [
-                        200,
+                        264,
                         24
-                    ],
-                    [
-                        200,
-                        168
-                    ],
-                    [
-                        56,
-                        168
-                    ]
-                ],
-                "closed": false
-            },
-            {
-                "nodes": [
-                    [
-                        104,
-                        72
-                    ],
-                    [
-                        104,
-                        104
-                    ],
-                    [
-                        152,
-                        104
-                    ],
-                    [
-                        152,
-                        72
-                    ],
-                    [
-                        120,
-                        72
                     ]
                 ],
                 "closed": false
             }
         ],
-        "current_path_index": 2
+        "current_path_index": 0
+    },
+    "waves": {
+        "waves": [
+            {
+                "wave_index": 0,
+                "path_index": 0,
+                "name": "Wave 1",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 1,
+                        "percentage": 30
+                    },
+                    {
+                        "pokemon_id": 1,
+                        "percentage": 70
+                    }
+                ],
+                "min_level": 1,
+                "max_level": 5,
+                "wave_size": 10,
+                "spawn_interval": 3.0,
+                "initial_delay": 2.0,
+                "repeat_wave": false,
+                "repeat_count": 1
+            }
+        ],
+        "selected_wave": 0
     },
     "tower_spots": {
         "spot_size": 16,
@@ -30706,7 +30688,6 @@
         "snap_to_grid": true,
         "spots": []
     },
-    "waves": [],
     "rewards": {
         "money": 100,
         "experience": 50

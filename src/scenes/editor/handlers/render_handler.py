@@ -54,6 +54,10 @@ class EditorRenderHandler:
         if self.editor.map_config_dialog and self.editor.map_config_dialog.visible:
             self.editor.map_config_dialog.render(screen)
 
+        # Diálogo de waves
+        if self.editor.wave_config_dialog and self.editor.wave_config_dialog.visible:
+            self.editor.wave_config_dialog.render(screen)
+
         # Pause
         if self.editor.paused:
             self._render_pause_overlay(screen)
@@ -314,7 +318,7 @@ class EditorRenderHandler:
         mode_info = {
             "layers": "Clique nos tiles à direita | Selecione layers à esquerda",
             "path": f"Path {self.editor.path_manager.current_path_index + 1}/{len(self.editor.path_manager.paths)} | "
-                    f"Esquerdo: add nó | Direito: remove | Ctrl+N: novo path | Ctrl+D: deletar | TAB: alternar",
+                    f"Esquerdo: add nó | Direito: remove | Ctrl+N: novo path | Ctrl+D: deletar | Ctrl+W: Wave configs | TAB: alternar",
             "towers": "Esquerdo: add spot | Direito: remove",
             "preview": f"Velocidade: {self.editor.preview_speed:.1f}x | +/ - para ajustar",
             "map_config": "Configure o mapa"
