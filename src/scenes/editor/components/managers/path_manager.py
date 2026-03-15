@@ -72,11 +72,7 @@ class PathManager:
 
             # Se não for o path atual, renderiza com transparência
             if i != self.current_path_index:
-                # CORRIGIDO: Para o path não selecionado, usamos a linha com transparência
-                # mas mantemos a cor original para os pontos
                 path.line_color = original_color  # Mantém a cor original para os pontos
-                # A linha será renderizada com transparência dentro do próprio path.render
-            # else: mantém a cor original
 
             path.render(screen, camera, screen_manager)
 
@@ -84,26 +80,8 @@ class PathManager:
             if path.nodes:
                 # Pega o primeiro ponto do path para colocar o número
                 first_node = path.nodes[0]
-                screen_x, screen_y = self._world_to_screen(first_node[0], first_node[1],
-                                                           camera, screen_manager)
-
-                # Fundo para o número
-                font = pygame.font.Font(None, 16)
-
-                # Define cor do texto baseado no path selecionado
-                if i == self.current_path_index:
-                    text_color = (255, 255, 0)  # Amarelo para path atual
-                else:
-                    text_color = (200, 200, 200)  # Cinza para outros paths
-
-                text = font.render(f"P{i + 1}", True, text_color)
-                text_bg = pygame.Surface((text.get_width() + 4, text.get_height() + 4))
-                text_bg.fill((40, 40, 50))
-                text_bg.set_alpha(200)
-                screen.blit(text_bg, (screen_x - text_bg.get_width() // 2,
-                                      screen_y - 30 - text_bg.get_height() // 2))
-                screen.blit(text, (screen_x - text.get_width() // 2,
-                                   screen_y - 30 - text.get_height() // 2))
+                # USA O MÉTODO PADRONIZADO
+                screen_x, screen_y = screen_manager.world_to_screen(first_node[0], first_node[1], camera)
 
     def _world_to_screen(self, world_x, world_y, camera, screen_manager):
         """Converte coordenadas do mundo para tela"""

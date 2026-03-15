@@ -60,13 +60,16 @@ class Pokemon(Entity):
         self.animation_timer = 0
         self.animation_speed = 0.1  # 10 frames por segundo
 
+        # Obtém o tamanho do sprite no mapa da Pokedex
+        self.map_sprite_size = self.pokedex.get_map_sprite_size(pokemon_id, shiny)
+
         # Tamanho para entidade no mapa
-        width = 32
-        height = 32
+        width = self.map_sprite_size
+        height = self.map_sprite_size
 
         # Usa o primeiro frame da direção down como sprite padrão
         sprite = None
-        if self.inmap_frames and "down" in self.inmap_frames:
+        if self.inmap_frames and "down" in self.inmap_frames and self.inmap_frames["down"]:
             sprite = self.inmap_frames["down"][0]
 
         super().__init__(x, y, width, height, sprite)
@@ -87,12 +90,16 @@ class Pokemon(Entity):
         self.attack_cooldown_max = 60  # frames
         self.target = None
 
-        # Efeitos visuais
-        self.hp_bar_width = 40
-        self.hp_bar_height = 4
+        # Efeitos visuais - AJUSTADOS para sprite 32x32
+        self.hp_bar_width = 32  # Mesmo tamanho do sprite
+        self.hp_bar_height = 3  # Mais fina
 
         # Natureza (opcional - para dar variedade)
         self.nature_multipliers = self._generate_nature()
+
+        # Armazena a última posição para calcular direção
+        self.last_x = x
+        self.last_y = y
 
     def _calculate_stats(self):
         """Calcula stats baseado em level, IVs e EVs"""
@@ -193,6 +200,10 @@ class Pokemon(Entity):
 
     def update(self, dt):
         """Atualiza Pokémon"""
+        # Guarda posição anterior para calcular direção
+        self.last_x = self.x
+        self.last_y = self.y
+
         # Cooldown de ataque
         if not self.can_attack:
             self.attack_cooldown -= 1
@@ -200,59 +211,126 @@ class Pokemon(Entity):
                 self.can_attack = True
 
         # Movimento em path (para Tower Defense)
-        if self.path and self.path_index < len(self.path):
-            target_x, target_y = self.path[self.path_index]
+        if self.path and len(self.path) > 0:
+            if self.path_index < len(self.path):
+                target_x, target_y = self.path[self.path_index]
 
-            dx = target_x - self.x
-            dy = target_y - self.y
-            distance = math.sqrt(dx * dx + dy * dy)
+                # Calcula direção
+                dx = target_x - self.x
+                dy = target_y - self.y
+                distance = math.sqrt(dx * dx + dy * dy)
 
-            if distance < self.speed:
-                self.x, self.y = target_x, target_y
-                self.path_index += 1
-            else:
-                # Move na direção
-                direction_x = dx / distance
-                direction_y = dy / distance
-                self.x += direction_x * self.speed
-                self.y += direction_y * self.speed
+                # ATUALIZA A DIREÇÃO baseada no movimento
+                if distance > 0:
+                    # Normaliza para determinar direção principal
+                    if abs(dx) > abs(dy):
+                        # Movimento horizontal
+                        if dx > 0:
+                            new_direction = "right"
+                        else:
+                            new_direction = "left"
+                    else:
+                        # Movimento vertical
+                        if dy > 0:
+                            new_direction = "down"
+                        else:
+                            new_direction = "up"
 
-            self.rect.x, self.rect.y = self.x, self.y
+                    # Só atualiza se mudou de direção
+                    if new_direction != self.current_direction:
+                        self.current_direction = new_direction
+                        self.current_frame = 0  # Reinicia animação
+                        # Atualiza o sprite atual
+                        if (self.inmap_frames and
+                                self.current_direction in self.inmap_frames and
+                                self.inmap_frames[self.current_direction]):
+                            self.sprite = self.inmap_frames[self.current_direction][0]
+
+                # Velocidade baseada em dt para ser consistente
+                move_distance = self.speed * dt * 60  # Ajusta para ~60 FPS
+
+                if distance < move_distance:
+                    # Chegou no ponto
+                    self.x, self.y = target_x, target_y
+                    self.path_index += 1
+
+                    print(f"[POKEMON] {self.name} chegou no ponto {self.path_index}/{len(self.path)}")
+                else:
+                    # Move na direção
+                    if distance > 0:
+                        self.x += (dx / distance) * self.speed * dt * 60
+                        self.y += (dy / distance) * self.speed * dt * 60
+
+                self.rect.x, self.rect.y = self.x, self.y
+
+        # Animação (troca de frames)
+        self.animation_timer += dt
+        if self.animation_timer >= self.animation_speed:
+            self.animation_timer = 0
+            # Avança para o próximo frame da direção atual
+            if (self.inmap_frames and
+                    self.current_direction in self.inmap_frames and
+                    self.inmap_frames[self.current_direction]):
+                frames_list = self.inmap_frames[self.current_direction]
+                self.current_frame = (self.current_frame + 1) % len(frames_list)
+                self.sprite = frames_list[self.current_frame]
 
     def render(self, screen, camera=None, show_hp=True):
-        """Renderiza Pokémon"""
-        screen_x = self.x - (camera.x if camera else 0)
-        screen_y = self.y - (camera.y if camera else 0)
+        """Renderiza Pokémon - sprites já vêm redimensionados da Pokedex"""
 
-        # Sombra (opcional)
-        shadow_offset = 2
-        shadow_rect = pygame.Rect(screen_x - shadow_offset, screen_y - shadow_offset,
-                                  self.width, self.height)
-        pygame.draw.rect(screen, (40, 40, 40), shadow_rect)
+        if camera and hasattr(self, 'screen_manager') and self.screen_manager:
+            # Obtém posição na tela (coordenadas com zoom aplicado)
+            screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
 
-        # Sprite
+            # Calcula a escala baseada no zoom da câmera
+            zoom_scale = camera.zoom * self.screen_manager.render_scale
+        else:
+            screen_x = self.x
+            screen_y = self.y
+            zoom_scale = 1.0
+
+        # SPRITE - APLICA ZOOM NO SPRITE JÁ REDIMENSIONADO
         if self.sprite:
-            screen.blit(self.sprite, (screen_x, screen_y))
+            # Obtém tamanho atual (já é o tamanho redimensionado da Pokedex)
+            current_width = self.sprite.get_width()
+            current_height = self.sprite.get_height()
 
-        # Efeito shiny
-        if self.is_shiny:
-            # Brilho amarelo ao redor
-            pygame.draw.rect(screen, (255, 255, 100),
-                             (screen_x - 2, screen_y - 2, self.width + 4, self.height + 4), 2)
+            # APLICA O ZOOM da câmera
+            final_width = max(1, int(current_width * zoom_scale))
+            final_height = max(1, int(current_height * zoom_scale))
 
-        # Barra de HP (se necessário)
-        if show_hp and (self.is_selected or self.current_hp < self.max_hp):
+            # Redimensiona com o zoom atual
+            scaled_sprite = pygame.transform.scale(self.sprite, (final_width, final_height))
+
+            # Centraliza na posição
+            sprite_rect = scaled_sprite.get_rect(center=(screen_x, screen_y))
+            screen.blit(scaled_sprite, sprite_rect)
+
+            # Debug opcional
+            if hasattr(self, 'show_debug') and self.show_debug:
+                pygame.draw.circle(screen, (255, 0, 0), (int(screen_x), int(screen_y)), 8, 2)
+                pygame.draw.circle(screen, (0, 255, 0), (int(screen_x), int(screen_y)), 3)
+        else:
+            # Placeholder com tamanho proporcional
+            size = int(self.map_sprite_size * zoom_scale)
+            rect = pygame.Rect(screen_x - size // 2, screen_y - size // 2, size, size)
+            pygame.draw.rect(screen, (255, 0, 255), rect)
+            pygame.draw.rect(screen, (255, 255, 255), rect, 2)
+
+        # Barra de HP - escalonada proporcionalmente
+        if show_hp:
             hp_percent = self.current_hp / self.max_hp
 
-            # Posição da barra
-            bar_x = screen_x + (self.width - self.hp_bar_width) // 2
-            bar_y = screen_y - 10
+            # Tamanhos proporcionais ao zoom - AJUSTADOS para 32x32
+            bar_width = int(32 * zoom_scale)  # Mesmo tamanho do sprite
+            bar_height = max(1, int(3 * zoom_scale))  # 3 pixels de altura
+            bar_x = screen_x - bar_width // 2
+            bar_y = screen_y - int(20 * zoom_scale)  # 20 pixels acima do centro
 
-            # Fundo
-            pygame.draw.rect(screen, (60, 60, 60),
-                             (bar_x, bar_y, self.hp_bar_width, self.hp_bar_height))
+            # Fundo da barra
+            pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))
 
-            # Barra de HP
+            # Barra de HP (cor baseada na porcentagem)
             if hp_percent > 0.5:
                 color = (0, 200, 0)
             elif hp_percent > 0.25:
@@ -260,20 +338,14 @@ class Pokemon(Entity):
             else:
                 color = (255, 0, 0)
 
-            hp_width = int(self.hp_bar_width * hp_percent)
-            pygame.draw.rect(screen, color,
-                             (bar_x, bar_y, hp_width, self.hp_bar_height))
+            # Barra de progresso
+            progress_width = int(bar_width * hp_percent)
+            if progress_width > 0:
+                pygame.draw.rect(screen, color, (bar_x, bar_y, progress_width, bar_height))
 
             # Borda
             pygame.draw.rect(screen, (100, 100, 100),
-                             (bar_x, bar_y, self.hp_bar_width, self.hp_bar_height), 1)
-
-        # Nível (opcional)
-        if self.is_selected:
-            level_font = pygame.font.Font(None, 16)
-            level_text = level_font.render(f"Lv.{self.level}", True, (255, 255, 255))
-            text_rect = level_text.get_rect(center=(screen_x + self.width // 2, screen_y - 20))
-            screen.blit(level_text, text_rect)
+                             (bar_x, bar_y, bar_width, bar_height), 1)
 
     def get_info_string(self):
         """Retorna string com informações do Pokémon"""

@@ -68,16 +68,43 @@ class PhaseLoader:
         return self.current_phase_data.get("tower_spots", {})
 
     def get_waves_data(self) -> list:
-        """Retorna dados das waves"""
+        """Retorna dados das waves como lista"""
         if not self.current_phase_data:
             return []
-        return self.current_phase_data.get("waves", [])
+
+        waves_data = self.current_phase_data.get("waves", {})
+
+        # Se for dicionário com chave "waves", extrai a lista
+        if isinstance(waves_data, dict) and "waves" in waves_data:
+            return waves_data["waves"]
+
+        # Se já for lista, retorna direto
+        if isinstance(waves_data, list):
+            return waves_data
+
+        return []
 
     def get_rewards_data(self) -> dict:
         """Retorna dados das recompensas"""
         if not self.current_phase_data:
             return {}
         return self.current_phase_data.get("rewards", {})
+
+    def get_paths_data(self) -> dict:
+        """Retorna dados dos paths (múltiplos)"""
+        if not self.current_phase_data:
+            return {"paths": []}
+
+        # Compatibilidade com versões antigas
+        if "paths" in self.current_phase_data:
+            return self.current_phase_data.get("paths", {"paths": []})
+        elif "path" in self.current_phase_data:
+            # Converte path único para formato de múltiplos paths
+            return {
+                "paths": [self.current_phase_data["path"]],
+                "current_path_index": 0
+            }
+        return {"paths": []}
 
 
 # Instância global

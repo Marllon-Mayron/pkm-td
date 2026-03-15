@@ -82,6 +82,25 @@ class ScreenManager:
 
         return (int(screen_x), int(screen_y))
 
+    def world_to_screen_with_scale(self, world_x, world_y, camera=None):
+        """
+        Versão que retorna TAMBÉM a escala para aplicar no sprite
+        Útil para objetos que DEVEM ser afetados pelo zoom (como o mapa)
+        """
+        if camera:
+            screen_x = (world_x - camera.x) * camera.zoom + self.render_width / 2
+            screen_y = (world_y - camera.y) * camera.zoom + self.render_height / 2
+            scale = camera.zoom * self.render_scale
+        else:
+            screen_x = world_x
+            screen_y = world_y
+            scale = self.render_scale
+
+        final_x = screen_x * self.render_scale + self.viewport_x
+        final_y = screen_y * self.render_scale + self.viewport_y
+
+        return (final_x, final_y), scale
+
     def get_render_position(self, world_x, world_y, camera=None):
         """
         Retorna posição para renderização SEM escala

@@ -190,7 +190,7 @@ class Pokedex:
                 print(f"Erro ao carregar back shiny {pokemon_id}: {e}")
 
     def _load_inmap_spritesheet(self, pokemon_id, base_path):
-        """Carrega spritesheet InMap (256x256, 4x4 grid)"""
+        """Carrega spritesheet InMap e redimensiona para tamanho do mapa"""
         filename = self._format_filename(pokemon_id, shiny=False)
         path = base_path / "InMaps" / f"{filename}.png"
 
@@ -199,48 +199,59 @@ class Pokedex:
                 spritesheet = pygame.image.load(str(path)).convert_alpha()
                 self.inmap_spritesheets[pokemon_id] = spritesheet
 
-                # Extrai frames individuais (64x64 cada)
-                # Organização: 4 colunas x 4 linhas
-                # Linhas: Down, Left, Right, Up
+                # TAMANHO ALVO para sprites no mapa (em pixels)
+                target_size = 32 # 32x32 pixels
+
+                # Extrai e redimensiona frames individuais
                 frames = {
-                    "down": [],   # Linha 0
-                    "left": [],   # Linha 1
+                    "down": [],  # Linha 0
+                    "left": [],  # Linha 1
                     "right": [],  # Linha 2
-                    "up": []      # Linha 3
+                    "up": []  # Linha 3
                 }
 
-                frame_size = 64  # 256/4 = 64
+                frame_size = 64  # Tamanho original dos frames (64x64)
 
                 for row in range(4):
                     direction = ["down", "left", "right", "up"][row]
                     for col in range(4):
-                        # Recorta o frame
+                        # Recorta o frame original
                         rect = pygame.Rect(col * frame_size, row * frame_size, frame_size, frame_size)
-                        frame = spritesheet.subsurface(rect)
-                        frames[direction].append(frame)
+                        original_frame = spritesheet.subsurface(rect)
+
+                        # REDIMENSIONA para o tamanho do mapa
+                        scaled_frame = pygame.transform.scale(
+                            original_frame,
+                            (target_size, target_size)
+                        )
+                        frames[direction].append(scaled_frame)
 
                 self.inmap_frames[pokemon_id] = frames
+
+                # Armazena o tamanho para referência
+                if not hasattr(self, 'map_sprite_sizes'):
+                    self.map_sprite_sizes = {}
+                self.map_sprite_sizes[pokemon_id] = target_size
 
             except Exception as e:
                 print(f"Erro ao carregar InMap {pokemon_id}: {e}")
 
-        # Versão shiny
+        # Versão shiny (mesma lógica)
         filename_shiny = self._format_filename(pokemon_id, shiny=True)
         path_shiny = base_path / "InMaps" / f"{filename_shiny}.png"
 
         if path_shiny.exists():
             try:
                 spritesheet = pygame.image.load(str(path_shiny)).convert_alpha()
-                # Podemos armazenar separadamente ou no mesmo dict com chave diferente
-                # Por simplicidade, vamos sobrescrever? Melhor não
-                # Vamos criar um dict separado para shiny
+
                 if not hasattr(self, 'inmap_shiny_spritesheets'):
                     self.inmap_shiny_spritesheets = {}
                     self.inmap_shiny_frames = {}
+                    self.map_shiny_sprite_sizes = {}
 
                 self.inmap_shiny_spritesheets[pokemon_id] = spritesheet
 
-                # Extrai frames
+                target_size = 24
                 frames = {"down": [], "left": [], "right": [], "up": []}
                 frame_size = 64
 
@@ -248,13 +259,21 @@ class Pokedex:
                     direction = ["down", "left", "right", "up"][row]
                     for col in range(4):
                         rect = pygame.Rect(col * frame_size, row * frame_size, frame_size, frame_size)
-                        frame = spritesheet.subsurface(rect)
-                        frames[direction].append(frame)
+                        original_frame = spritesheet.subsurface(rect)
+                        scaled_frame = pygame.transform.scale(original_frame, (target_size, target_size))
+                        frames[direction].append(scaled_frame)
 
                 self.inmap_shiny_frames[pokemon_id] = frames
+                self.map_shiny_sprite_sizes[pokemon_id] = target_size
 
             except Exception as e:
                 print(f"Erro ao carregar InMap shiny {pokemon_id}: {e}")
+
+    def get_map_sprite_size(self, pokemon_id, shiny=False):
+        """Retorna o tamanho do sprite no mapa para este Pokémon"""
+        if shiny and hasattr(self, 'map_shiny_sprite_sizes'):
+            return self.map_shiny_sprite_sizes.get(pokemon_id, 24)
+        return getattr(self, 'map_sprite_sizes', {}).get(pokemon_id, 24)
 
     def get_sprite(self, pokemon_id, sprite_type="front", shiny=False, direction="down", frame=0):
         """
@@ -315,12 +334,11 @@ class Pokedex:
         return sprite
 
     def get_inmap_animation(self, pokemon_id, shiny=False):
-        """Retorna dicionário com todos os frames de animação InMap"""
+        """Retorna dicionário com todos os frames de animação InMap (já redimensionados)"""
         if shiny and hasattr(self, 'inmap_shiny_frames'):
             return self.inmap_shiny_frames.get(pokemon_id, self.inmap_frames.get(pokemon_id))
         return self.inmap_frames.get(pokemon_id)
 
-    # ... (resto dos métodos existentes permanecem iguais)
     def get_pokemon(self, pokemon_id):
         """Retorna dados de um Pokémon pelo ID"""
         return self.pokemon_data.get(pokemon_id, None)

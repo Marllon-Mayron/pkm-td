@@ -1,7 +1,7 @@
-# src/scenes/game_scene.py
+# src/scenes/game_scene.py (versão modificada)
 
 """
-Cena principal do jogo - Carrega fases reais
+Cena principal do jogo - Carrega fases reais com waves
 """
 import pygame
 from src.scenes.base_scene import BaseScene
@@ -10,6 +10,7 @@ from src.scenes.game_scene.components.phase_loader import phase_loader
 from src.scenes.game_scene.components.renderer.map_renderer import MapRenderer
 from src.scenes.game_scene.components.renderer.path_renderer import PathRenderer
 from src.scenes.game_scene.components.renderer.tower_spot_renderer import TowerSpotRenderer
+from src.scenes.game_scene.components.managers.wave_manager import GameWaveManager
 
 
 class GameScene(BaseScene):
@@ -45,6 +46,16 @@ class GameScene(BaseScene):
         self.camera.x = self.world_width / 2
         self.camera.y = self.world_height / 2
 
+        # NOVO: Gerenciador de waves
+        self.wave_manager = GameWaveManager(phase_loader)
+
+        # NOVO: Lista de inimigos ativos
+        self.active_enemies = []
+
+        # NOVO: Estado do jogo
+        self.game_state = "waiting"  # waiting, in_wave, between_waves, completed
+        self.between_waves_timer = 3.0  # Tempo entre waves
+
         # Configurações da grid
         self.show_grid = True
         self.grid_size = 16
@@ -58,17 +69,25 @@ class GameScene(BaseScene):
         self.dragging_camera = False
         self.last_mouse_pos = None
 
-        # Flag para sincronização de renderização
-        self._last_camera_values = None
+        # Inicia automaticamente a primeira wave
+        self._start_game()
 
         print(f"\n=== FASE CARREGADA ===")
         print(f"Fase: {self.phase_info.get('name', 'Desconhecida')}")
         print(f"Capítulo: {self.phase_info.get('chapter', 1)}")
         print(f"Número: {self.phase_number}")
+        print(f"Waves: {len(self.wave_manager.waves_data)}")
         print(f"Mundo: {self.world_width}x{self.world_height}")
-        print(f"Grid ativada por padrão (tecla G para toggle)")
-        print(f"Arraste com botão do meio para mover a câmera")
         print("=====================\n")
+
+    def _start_game(self):
+        """Inicia o jogo"""
+        if self.wave_manager.has_more_waves():
+            self.game_state = "in_wave"
+            self.wave_manager.start_next_wave()
+        else:
+            self.game_state = "completed"
+            print("Fase não tem waves configuradas!")
 
     def _load_phase_info(self):
         """Carrega informações da fase do catálogo"""
@@ -100,13 +119,15 @@ class GameScene(BaseScene):
         map_data = phase_loader.get_map_data()
         self.map_renderer.load_from_data(map_data, "data/phases")
 
-        # Carrega path
-        path_data = phase_loader.get_path_data()
-        self.path_renderer.load_from_data(path_data)
+        # Carrega paths (agora pode ser múltiplos)
+        paths_data = phase_loader.get_paths_data()
+        self.path_renderer.load_from_data(paths_data)
 
         # Carrega spots
         spot_data = phase_loader.get_tower_spots_data()
         self.spot_renderer.load_from_data(spot_data)
+
+        # Waves já são carregadas pelo wave_manager no __init__
 
     def _setup_world_dimensions(self):
         """Configura dimensões do mundo baseado no mapa"""
@@ -121,6 +142,18 @@ class GameScene(BaseScene):
             self.world_width = 2000
             self.world_height = 2000
 
+    def _on_enemy_spawn(self, enemy):
+        """Callback chamado quando um inimigo é spawnado"""
+        print(f"\n[SPAWN] Criando inimigo:")
+        print(f"  - Pokémon ID: {enemy.id}")
+        print(f"  - Nome: {enemy.name}")
+        print(f"  - Posição: ({enemy.x}, {enemy.y})")
+        print(f"  - Path points: {len(enemy.path)}")
+        print(f"  - Sprite: {'Carregado' if enemy.sprite else 'NULO!'}")
+        print(f"  - Tipo sprite: {type(enemy.sprite)}")
+
+        self.active_enemies.append(enemy)
+
     def handle_event(self, event):
         """Processa eventos do jogo"""
         if event.type == pygame.KEYDOWN:
@@ -134,6 +167,10 @@ class GameScene(BaseScene):
                 self.show_grid = not self.show_grid
                 print(f"[DEBUG] Grid {'ativada' if self.show_grid else 'desativada'}")
             elif event.key == pygame.K_SPACE:
+                # DEBUG: Inicia próxima wave manualmente
+                if self.game_state == "between_waves":
+                    self.game_state = "in_wave"
+                    self.wave_manager.start_next_wave()
                 mouse_pos = pygame.mouse.get_pos()
                 if self.screen_manager.is_mouse_in_viewport(mouse_pos):
                     world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
@@ -210,19 +247,80 @@ class GameScene(BaseScene):
         if self.paused:
             return
 
+        # Atualiza inimigos
+        enemies_to_remove = []
+        for enemy in self.active_enemies:
+            enemy.update(dt)
+
+            # Verifica se chegou ao fim do path
+            if hasattr(enemy, 'path') and enemy.path and enemy.path_index >= len(enemy.path):
+                print(f"[GAME] {enemy.name} chegou ao fim do path! Removendo...")
+                enemies_to_remove.append(enemy)
+                self.wave_manager.enemy_destroyed()
+
+        # Remove inimigos que chegaram ao fim
+        for enemy in enemies_to_remove:
+            self.active_enemies.remove(enemy)
+
+        # DEBUG: Mostra posição dos inimigos a cada 60 frames
+        if hasattr(self, '_debug_counter'):
+            self._debug_counter += 1
+        else:
+            self._debug_counter = 0
+
+        if self._debug_counter % 60 == 0 and self.active_enemies:
+            print(f"\n[DEBUG] Inimigos ativos: {len(self.active_enemies)}")
+            for i, enemy in enumerate(self.active_enemies):
+                print(
+                    f"  {i + 1}. {enemy.name} em ({enemy.x:.1f}, {enemy.y:.1f}) - Ponto {enemy.path_index}/{len(enemy.path)}")
+
+        # Lógica das waves
+        if self.game_state == "in_wave":
+            # Obtém o path correto para esta wave
+            wave_index = self.wave_manager.current_wave_index
+            if wave_index < len(self.wave_manager.waves_data):
+                wave_data = self.wave_manager.waves_data[wave_index]
+                path_index = wave_data.get("path_index", 0)
+
+                # Pega os pontos do path correspondente
+                path_points = self.path_renderer.get_path_points(path_index)
+
+                # Atualiza wave manager
+                self.wave_manager.update(dt, path_points, self._on_enemy_spawn, self.screen_manager)
+
+                # Verifica se a wave terminou
+                if not self.wave_manager.wave_in_progress:
+                    if self.wave_manager.has_more_waves():
+                        self.game_state = "between_waves"
+                        self.between_waves_timer = 3.0
+                    else:
+                        self.game_state = "completed"
+                        print("PARABÉNS! Todas as waves concluídas!")
+
+        elif self.game_state == "between_waves":
+            self.between_waves_timer -= dt
+            if self.between_waves_timer <= 0:
+                self.game_state = "in_wave"
+                self.wave_manager.start_next_wave()
+
     def render(self, screen):
         """Renderiza o jogo"""
         # Limpa a tela
         screen.fill((0, 0, 0))
 
-        # Renderiza o mapa (usando o mesmo sistema do editor)
+        # Renderiza o mapa
         self.map_renderer.render(screen, self.camera, self.screen_manager)
 
-        # Renderiza o path (opcional - para debug)
+        # Renderiza os paths (para debug)
         if self.show_debug:
             self.path_renderer.render(screen, self.camera, self.screen_manager, show_editing=False)
 
-        # Desenha a grid se ativada (usando o mesmo cálculo dos tiles)
+
+        # Renderiza inimigos
+        for enemy in self.active_enemies:
+            enemy.render(screen, self.camera, show_hp=True)
+
+        # Desenha a grid se ativada
         if self.show_grid:
             self._draw_grid_aligned(screen)
 
@@ -233,8 +331,8 @@ class GameScene(BaseScene):
                          self.screen_manager.viewport_width,
                          self.screen_manager.viewport_height), 1)
 
-        # UI mínima
-        self._render_minimal_ui(screen)
+        # UI do jogo
+        self._render_game_ui(screen)
 
         # Overlay de pausa
         if self.paused:
@@ -244,15 +342,84 @@ class GameScene(BaseScene):
         if self.show_debug:
             self._render_debug_info(screen)
 
+    def _render_game_ui(self, screen):
+        """Renderiza a UI do jogo"""
+        font = pygame.font.Font(None, 24)
+        font_small = pygame.font.Font(None, 18)
+
+        wave_info = self.wave_manager.get_current_wave_info()
+
+        # Fundo semi-transparente para UI
+        ui_bg = pygame.Surface((300, 120))
+        ui_bg.set_alpha(180)
+        ui_bg.fill((20, 20, 30))
+        screen.blit(ui_bg, (self.screen_manager.viewport_x + 10, self.screen_manager.viewport_y + 10))
+
+        y_offset = self.screen_manager.viewport_y + 15
+
+        # Título da fase
+        phase_text = font.render(self.phase_info.get("name", f"Fase {self.phase_number}"), True, (255, 215, 0))
+        screen.blit(phase_text, (self.screen_manager.viewport_x + 15, y_offset))
+        y_offset += 25
+
+        # Informação da wave
+        if self.game_state == "waiting":
+            state_text = font_small.render("Aguardando início...", True, (200, 200, 200))
+            screen.blit(state_text, (self.screen_manager.viewport_x + 15, y_offset))
+        elif self.game_state == "in_wave":
+            wave_text = font_small.render(
+                f"Wave {wave_info['index']}/{wave_info['total']}: {wave_info['name']}",
+                True, (100, 255, 100))
+            screen.blit(wave_text, (self.screen_manager.viewport_x + 15, y_offset))
+            y_offset += 20
+
+            # Barra de progresso
+            bar_x = self.screen_manager.viewport_x + 15
+            bar_y = y_offset
+            bar_width = 270
+            bar_height = 15
+
+            # Fundo da barra
+            pygame.draw.rect(screen, (60, 60, 70), (bar_x, bar_y, bar_width, bar_height))
+
+            # Progresso
+            progress_width = int(bar_width * wave_info['progress'])
+            pygame.draw.rect(screen, (0, 200, 0), (bar_x, bar_y, progress_width, bar_height))
+
+            # Borda
+            pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, bar_width, bar_height), 1)
+
+            # Texto do progresso
+            progress_text = font_small.render(
+                f"{wave_info['enemies_spawned']}/{wave_info['enemies_total']}",
+                True, (255, 255, 255))
+            text_x = bar_x + (bar_width - progress_text.get_width()) // 2
+            screen.blit(progress_text, (text_x, bar_y + 2))
+
+            y_offset += 25
+
+            # Inimigos restantes
+            enemies_text = font_small.render(
+                f"Inimigos vivos: {len(self.active_enemies)}",
+                True, (255, 100, 100) if len(self.active_enemies) > 0 else (100, 255, 100))
+            screen.blit(enemies_text, (self.screen_manager.viewport_x + 15, y_offset))
+
+        elif self.game_state == "between_waves":
+            wave_text = font_small.render(
+                f"Wave {wave_info['index']} concluída! Próxima em {self.between_waves_timer:.1f}s",
+                True, (255, 255, 0))
+            screen.blit(wave_text, (self.screen_manager.viewport_x + 15, y_offset))
+
+        elif self.game_state == "completed":
+            complete_text = font.render("FASE COMPLETA!", True, (255, 215, 0))
+            screen.blit(complete_text, (self.screen_manager.viewport_x + 15, y_offset))
+
     def _draw_grid_aligned(self, screen):
-        """
-        Desenha a grid usando os MESMOS cálculos que o layer_manager
-        para garantir alinhamento perfeito com os tiles
-        """
+        """Desenha a grid alinhada com os tiles"""
         camera = self.camera
         sm = self.screen_manager
 
-        # Calcula offset da câmera (igual ao layer_manager)
+        # Calcula offset da câmera
         cam_offset_x = round((-camera.x * camera.zoom * sm.render_scale +
                              (sm.render_width / 2) * sm.render_scale +
                              sm.viewport_x))
@@ -283,7 +450,6 @@ class GameScene(BaseScene):
             grid_x = screen_x - sm.viewport_x
 
             if -tile_size_scaled <= grid_x <= sm.viewport_width + tile_size_scaled:
-                # Linhas mais sutis no jogo
                 if tile_x == 0:
                     color = (100, 100, 150, 150)  # Eixo Y
                 else:
@@ -318,33 +484,6 @@ class GameScene(BaseScene):
                 )
 
         screen.blit(grid_surface, (sm.viewport_x, sm.viewport_y))
-
-    def _render_minimal_ui(self, screen):
-        """UI mínima com instruções"""
-        font_small = pygame.font.Font(None, 20)
-
-        grid_status = "ON" if self.show_grid else "OFF"
-        grid_color = (0, 255, 0) if self.show_grid else (255, 0, 0)
-
-        # Nome da fase
-        phase_display = self.phase_info.get("name", f"Fase {self.phase_number}")
-        phase_text = font_small.render(phase_display, True, (200, 200, 0))
-        phase_x = self.screen_manager.viewport_x + 10
-        phase_y = self.screen_manager.viewport_y + 10
-        screen.blit(phase_text, (phase_x, phase_y))
-
-        # Instruções
-        inst_text = f"F1:Debug | G:Grid [{grid_status}] | P:Pause | ESC:Menu | SPACE:Log | Scroll+Arrasto: Mover"
-        inst = font_small.render(inst_text, True, (150, 150, 150))
-        inst_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - inst.get_width()) // 2
-        screen.blit(inst, (inst_x, self.screen_manager.viewport_y + 10))
-
-        # Dimensões do mapa
-        map_info = f"Mapa: {self.map_renderer.layer_manager.width}x{self.map_renderer.layer_manager.height} tiles"
-        map_text = font_small.render(map_info, True, (100, 100, 100))
-        map_x = self.screen_manager.viewport_x + self.screen_manager.viewport_width - map_text.get_width() - 10
-        map_y = self.screen_manager.viewport_y + 10
-        screen.blit(map_text, (map_x, map_y))
 
     def _render_pause_overlay(self, screen):
         """Overlay de pausa do jogo"""
@@ -397,6 +536,8 @@ class GameScene(BaseScene):
             tile_info = "Tile: outside"
             tile_value = "Tile ID: N/A"
 
+        wave_info = self.wave_manager.get_current_wave_info()
+
         debug_lines = [
             "=== DEBUG INFO ===",
             f"Fase: {self.phase_info.get('name', 'Desconhecida')}",
@@ -404,7 +545,14 @@ class GameScene(BaseScene):
             f"FPS: {self.screen_manager.get_fps():.1f}",
             f"Delta Time: {self.screen_manager.get_delta_time()*1000:.1f}ms",
             f"Grid: {'ON' if self.show_grid else 'OFF'}",
+            f"Game State: {self.game_state}",
             f"Camera Drag: {'ACTIVE' if self.dragging_camera else 'inactive'}",
+            "",
+            "=== WAVES ===",
+            f"Wave: {wave_info['index']}/{wave_info['total']} - {wave_info['name']}",
+            f"Inimigos: {wave_info['enemies_spawned']}/{wave_info['enemies_total']} spawnados",
+            f"Vivos: {len(self.active_enemies)}",
+            f"Progresso: {wave_info['progress']*100:.1f}%",
             "",
             "=== CAMERA ===",
             f"Position: ({self.camera.x:.0f}, {self.camera.y:.0f})",
@@ -427,7 +575,8 @@ class GameScene(BaseScene):
             f"Tiles: {self.map_renderer.layer_manager.width}x{self.map_renderer.layer_manager.height}",
             f"Pixels: {self.world_width}x{self.world_height}",
             f"Grid size: {self.grid_size}px",
-            f"Path points: {len(self.path_renderer.path.nodes)}",
+            f"Paths: {len(self.path_renderer.paths)}",
+            f"Path points: {sum(len(p.nodes) for p in self.path_renderer.paths)}",
             f"Tower spots: {len(self.spot_renderer.spot_manager.spots)}"
         ]
 
