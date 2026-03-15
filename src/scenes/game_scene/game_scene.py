@@ -6,6 +6,7 @@ Cena principal do jogo - Carrega fases reais com waves
 import pygame
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
+from src.scenes.game_scene.components.managers.team_manager import GameTeamManager
 from src.scenes.game_scene.components.phase_loader import phase_loader
 from src.scenes.game_scene.components.renderer.map_renderer import MapRenderer
 from src.scenes.game_scene.components.renderer.path_renderer import PathRenderer
@@ -46,7 +47,10 @@ class GameScene(BaseScene):
         self.camera.x = self.world_width / 2
         self.camera.y = self.world_height / 2
 
-        # NOVO: Gerenciador de waves
+        self.team_manager = GameTeamManager(game)
+        self.team_manager.update_team()
+
+        # Gerenciador de waves
         self.wave_manager = GameWaveManager(phase_loader)
 
         # NOVO: Lista de inimigos ativos
@@ -156,6 +160,10 @@ class GameScene(BaseScene):
 
     def handle_event(self, event):
         """Processa eventos do jogo"""
+
+        if hasattr(self, 'team_manager'):
+            self.team_manager.handle_event(event)
+
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_p:
                 self.toggle_pause()
@@ -247,6 +255,9 @@ class GameScene(BaseScene):
         if self.paused:
             return
 
+        if hasattr(self, 'team_manager'):
+            self.team_manager.update(dt)
+
         # Atualiza inimigos
         enemies_to_remove = []
         for enemy in self.active_enemies:
@@ -315,6 +326,8 @@ class GameScene(BaseScene):
         if self.show_debug:
             self.path_renderer.render(screen, self.camera, self.screen_manager, show_editing=False)
 
+        if hasattr(self, 'team_manager'):
+            self.team_manager.render(screen)
 
         # Renderiza inimigos
         for enemy in self.active_enemies:
