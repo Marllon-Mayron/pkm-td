@@ -4,13 +4,16 @@
 Cena principal do jogo - Carrega fases reais com waves
 """
 import pygame
+
+from src.entities.pokemon import Pokemon
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
+from src.scenes.game_scene.components.managers.placement_manager import PlacementManager
 from src.scenes.game_scene.components.managers.team_manager import GameTeamManager
 from src.scenes.game_scene.components.phase_loader import phase_loader
 from src.scenes.game_scene.components.renderer.map_renderer import MapRenderer
 from src.scenes.game_scene.components.renderer.path_renderer import PathRenderer
-from src.scenes.game_scene.components.renderer.tower_spot_renderer import TowerSpotRenderer
+from src.scenes.game_scene.components.renderer.pokemon_spot_renderer import PokemonSpotRenderer
 from src.scenes.game_scene.components.managers.wave_manager import GameWaveManager
 
 
@@ -27,7 +30,7 @@ class GameScene(BaseScene):
         # Componentes da fase
         self.map_renderer = MapRenderer()
         self.path_renderer = PathRenderer()
-        self.spot_renderer = TowerSpotRenderer()
+        self.spot_renderer = PokemonSpotRenderer()
 
         # Carrega dados da fase
         self._load_phase_data()
@@ -49,14 +52,18 @@ class GameScene(BaseScene):
 
         self.team_manager = GameTeamManager(game)
         self.team_manager.update_team()
+        self.placement_manager = PlacementManager(game)
 
         # Gerenciador de waves
         self.wave_manager = GameWaveManager(phase_loader)
 
-        # NOVO: Lista de inimigos ativos
+        # Lista de Pokémon colocados no mapa
+        self.placed_pokemon = []
+
+        #Lista de inimigos ativos
         self.active_enemies = []
 
-        # NOVO: Estado do jogo
+        #Estado do jogo
         self.game_state = "waiting"  # waiting, in_wave, between_waves, completed
         self.between_waves_timer = 3.0  # Tempo entre waves
 
@@ -158,11 +165,29 @@ class GameScene(BaseScene):
 
         self.active_enemies.append(enemy)
 
+    def _on_pokemon_placed(self, placement_data):
+        """Callback quando um Pokémon é colocado no mapa"""
+        pokemon = placement_data['pokemon']
+        spot = placement_data['spot']
+
+        print(f"[PLACED] Pokémon {pokemon.name} colocado no spot ({spot.x}, {spot.y})")
+
+        # Usa o placement manager para adicionar
+        placed = self.placement_manager.add_pokemon(spot, pokemon)
+
+        if placed:
+            print(f"✅ Pokémon colocado! Total no mapa: {len(self.placement_manager.placed_pokemon)}")
+
     def handle_event(self, event):
         """Processa eventos do jogo"""
 
         if hasattr(self, 'team_manager'):
-            self.team_manager.handle_event(event)
+            result = self.team_manager.handle_event(
+                event,
+                self.spot_renderer.get_spots(),
+                self.camera,
+                self._on_pokemon_placed  # Callback quando colocar Pokémon
+            )
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_p:
@@ -258,6 +283,13 @@ class GameScene(BaseScene):
         if hasattr(self, 'team_manager'):
             self.team_manager.update(dt)
 
+        # Atualiza Pokémon colocados
+        if hasattr(self, 'placement_manager'):
+            self.placement_manager.update(dt, self.active_enemies)
+
+        for pokemon in self.placed_pokemon:
+            pokemon.update(dt)
+
         # Atualiza inimigos
         enemies_to_remove = []
         for enemy in self.active_enemies:
@@ -326,8 +358,12 @@ class GameScene(BaseScene):
         if self.show_debug:
             self.path_renderer.render(screen, self.camera, self.screen_manager, show_editing=False)
 
-        if hasattr(self, 'team_manager'):
-            self.team_manager.render(screen)
+        if hasattr(self, 'placement_manager'):
+            self.placement_manager.render(screen, self.camera, self.screen_manager)
+
+        # Renderiza Pokémon colocados no mapa
+        for pokemon in self.placed_pokemon:
+            pokemon.render(screen, self.camera, show_hp=True)
 
         # Renderiza inimigos
         for enemy in self.active_enemies:
@@ -339,13 +375,17 @@ class GameScene(BaseScene):
 
         # Desenha borda do viewport
         pygame.draw.rect(screen, (80, 80, 80),
-                        (self.screen_manager.viewport_x,
-                         self.screen_manager.viewport_y,
-                         self.screen_manager.viewport_width,
-                         self.screen_manager.viewport_height), 1)
+                         (self.screen_manager.viewport_x,
+                          self.screen_manager.viewport_y,
+                          self.screen_manager.viewport_width,
+                          self.screen_manager.viewport_height), 1)
 
         # UI do jogo
         self._render_game_ui(screen)
+
+        # Renderiza a HUD do time (com camera e tower_spots)
+        if hasattr(self, 'team_manager'):
+            self.team_manager.render(screen, self.camera, self.spot_renderer.get_spots())
 
         # Overlay de pausa
         if self.paused:
@@ -590,7 +630,9 @@ class GameScene(BaseScene):
             f"Grid size: {self.grid_size}px",
             f"Paths: {len(self.path_renderer.paths)}",
             f"Path points: {sum(len(p.nodes) for p in self.path_renderer.paths)}",
-            f"Tower spots: {len(self.spot_renderer.spot_manager.spots)}"
+            f"Pokémon colocados: {len(self.placement_manager.placed_pokemon) if hasattr(self, 'placement_manager') else 0}",
+            f"Spots disponíveis: {len(self.spot_renderer.get_spots())}",
+            f"Spots ocupados: {sum(1 for s in self.spot_renderer.get_spots() if s.occupied)}"
         ]
 
         y_offset = self.screen_manager.viewport_y + 40

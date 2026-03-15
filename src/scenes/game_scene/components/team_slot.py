@@ -59,14 +59,28 @@ class GameTeamSlot:
             was_hovered = self.is_hovered
             self.is_hovered = self.rect.collidepoint(event.pos)
 
-            # Animação ao entrar/sair do hover
             if was_hovered != self.is_hovered:
                 self.animation_offset = 8 if self.is_hovered else 0
                 self.glow_alpha = 100 if self.is_hovered else 0
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered:
-                return self.slot_index
+                # Se tem Pokémon, pode iniciar arrasto
+                if self.pokemon:
+                    return {
+                        'action': 'start_drag',
+                        'slot_index': self.slot_index,
+                        'pokemon': self.pokemon
+                    }
+                return {
+                    'action': 'select',
+                    'slot_index': self.slot_index
+                }
+
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            # Se estava arrastando, o drag manager cuida disso
+            pass
+
         return None
 
     def update(self, dt):
@@ -84,6 +98,12 @@ class GameTeamSlot:
             self.hp_animation += dt
         else:
             self.hp_animation = 0
+
+    def start_drag(self):
+        """Inicia o arrasto deste slot"""
+        self.is_selected = True
+        # Feedback visual de que está sendo arrastado
+        self.animation_offset = 10
 
     def render(self, screen, pokedex):
         """Renderiza o slot com visual melhorado"""

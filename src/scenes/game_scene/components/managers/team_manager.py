@@ -3,6 +3,7 @@
 import pygame
 from src.data.pokedex import Pokedex
 from src.scenes.game_scene.components.team_slot import GameTeamSlot
+from src.scenes.game_scene.components.drag_drop import DragDropManager
 
 
 class GameTeamManager:
@@ -29,6 +30,9 @@ class GameTeamManager:
         # Animação
         self.slide_animation = 0
         self.target_y = 0
+
+        # Drag and Drop
+        self.drag_manager = DragDropManager(game)
 
         # Inicializa
         self._calculate_dimensions()
@@ -88,12 +92,45 @@ class GameTeamManager:
         for slot in self.team_slots:
             slot.update(dt)
 
-    def handle_event(self, event):
-        """Processa eventos nos slots"""
+    def is_dragging(self):
+        """Verifica se está arrastando um Pokémon"""
+        return self.drag_manager.is_dragging
+
+    def handle_event(self, event, tower_spots, camera, on_place_callback=None):
+        """Processa eventos nos slots com suporte a drag and drop"""
         if not self.visible:
             return None
 
-        # Recalcula dimensões em caso de resize
+        # Se está arrastando, passa para o drag manager
+        if self.drag_manager.is_dragging:
+            if event.type == pygame.MOUSEMOTION:
+                # Atualiza posição do arrasto
+                world_pos = self.game.screen_manager.get_mouse_world_position(
+                    event.pos, camera
+                )
+                if world_pos:
+                    self.drag_manager.update_drag(
+                        event.pos, world_pos, tower_spots, camera
+                    )
+
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                # Finaliza arrasto
+                result = self.drag_manager.stop_drag(
+                    tower_spots, on_place_callback
+                )
+                if result:
+                    # Remove Pokémon do time após colocar
+                    self.game.player.team.pop(result['slot_index'])
+                    self.update_team()
+                return result
+
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                # Cancela arrasto
+                self.drag_manager.cancel_drag()
+
+            return None
+
+        # Se não está arrastando, processa eventos normais
         if event.type == pygame.VIDEORESIZE:
             self._calculate_dimensions()
             self._create_slots()
@@ -102,25 +139,39 @@ class GameTeamManager:
 
         for slot in self.team_slots:
             result = slot.handle_event(event)
-            if result is not None:
-                # Atualiza seleção
-                for s in self.team_slots:
-                    s.is_selected = (s.slot_index == result)
-                self.selected_slot_index = result
+            if result:
+                if isinstance(result, dict) and result.get('action') == 'start_drag':
+                    # Inicia arrasto
+                    mouse_pos = pygame.mouse.get_pos()
+                    world_pos = self.game.screen_manager.get_mouse_world_position(
+                        mouse_pos, camera
+                    )
+                    if world_pos:
+                        self.drag_manager.start_drag(
+                            result['slot_index'],
+                            result['pokemon'],
+                            mouse_pos,
+                            world_pos
+                        )
+                        slot.start_drag()
+                    return result
+                else:
+                    # Seleção normal
+                    for s in self.team_slots:
+                        s.is_selected = (s.slot_index == result)
+                    self.selected_slot_index = result
 
-                # Feedback visual
-                if slot.pokemon:
-                    print(f"✨ {slot.pokemon.name} selecionado! Lv.{slot.pokemon.level}")
+                    if slot.pokemon:
+                        print(f"✨ {slot.pokemon.name} selecionado! Lv.{slot.pokemon.level}")
 
-                    # Alterna modo expandido no duplo clique
-                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                        if hasattr(event, 'clicks') and event.clicks >= 2:
-                            self.expanded = not self.expanded
+                        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                            if hasattr(event, 'clicks') and event.clicks >= 2:
+                                self.expanded = not self.expanded
 
-                return result
+                    return result
         return None
 
-    def render(self, screen):
+    def render(self, screen, camera, tower_spots):
         """Renderiza a HUD do time"""
         if not self.visible:
             return
@@ -137,9 +188,17 @@ class GameTeamManager:
         for slot in self.team_slots:
             slot.render(screen, self.pokedex)
 
+        # Renderiza drag and drop (se ativo)
+        if self.drag_manager.is_dragging:
+            self.drag_manager.render(screen, camera)
+
         # Modo expandido
         if self.expanded and self.selected_slot_index >= 0:
             self._render_expanded_info(screen)
+
+        # Se está arrastando, desenha indicadores nos spots
+        if self.drag_manager.is_dragging:
+            self._render_spot_indicators(screen, camera, tower_spots)
 
     def _draw_modern_background(self, screen):
         """Desenha fundo moderno com gradiente e efeito glass"""
@@ -267,6 +326,50 @@ class GameTeamManager:
             # Valor do stat
             value_text = stat_font.render(stat_value, True, (255, 255, 255))
             screen.blit(value_text, (stat_x + 50, stat_y))
+
+    def _render_spot_indicators(self, screen, camera, tower_spots):
+        """Renderiza indicadores nos spots disponíveis durante arrasto"""
+        for spot in tower_spots:
+            # Agora acessa como atributo, não como dicionário
+            spot_x, spot_y = self.game.screen_manager.world_to_screen(
+                spot.x, spot.y, camera
+            )
+
+            # Verifica se é o spot hovered
+            is_hovered = (self.drag_manager.hovered_spot == spot)
+
+            # Cor baseada no estado e ocupação
+            if spot.occupied:
+                # Spot ocupado - não pode colocar
+                color = (150, 150, 150)
+                alpha = 100
+                radius = 20
+            elif is_hovered:
+                color = (0, 255, 100)
+                alpha = 200
+                radius = 25
+            else:
+                color = (100, 100, 150)
+                alpha = 100
+                radius = 20
+
+            # Círculo do spot
+            spot_surface = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
+            pygame.draw.circle(spot_surface, (*color, alpha),
+                               (radius, radius), radius, 2)
+
+            # Preenchimento sutil
+            pygame.draw.circle(spot_surface, (*color, alpha // 3),
+                               (radius, radius), radius - 2)
+
+            screen.blit(spot_surface, (spot_x - radius, spot_y - radius))
+
+            # Se ocupado, desenha um "X"
+            if spot.occupied:
+                x_surface = pygame.Surface((20, 20), pygame.SRCALPHA)
+                pygame.draw.line(x_surface, (255, 100, 100, 200), (2, 2), (18, 18), 3)
+                pygame.draw.line(x_surface, (255, 100, 100, 200), (18, 2), (2, 18), 3)
+                screen.blit(x_surface, (spot_x - 10, spot_y - 10))
 
     def toggle_visibility(self):
         """Alterna visibilidade do time"""

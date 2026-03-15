@@ -474,7 +474,80 @@
         "spot_size": 16,
         "grid_size": 16,
         "snap_to_grid": true,
-        "spots": []
+        "spots": [
+            {
+                "x": 80,
+                "y": 48,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 128,
+                "y": 48,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 128,
+                "y": 80,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 80,
+                "y": 80,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 80,
+                "y": 112,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 128,
+                "y": 112,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 48,
+                "y": 112,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 16,
+                "y": 112,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 16,
+                "y": 48,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 48,
+                "y": 48,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 48,
+                "y": 80,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 16,
+                "y": 80,
+                "size": 16,
+                "allowed_types": []
+            }
+        ]
     },
     "rewards": {
         "money": 100,
