@@ -20,8 +20,6 @@ from src.scenes.editor.components.tile_palette import TilePalette
 from src.scenes.editor.handlers.input_handler import EditorInputHandler
 from src.scenes.editor.handlers.map_handler import MapHandler
 from src.scenes.editor.handlers.render_handler import EditorRenderHandler
-from src.scenes.editor.preview.test_enemy import TestEnemy
-
 
 class EditorScene(BaseScene):
     def __init__(self, game, chapter=None, phase=None):
@@ -53,15 +51,11 @@ class EditorScene(BaseScene):
         self.undo_manager = UndoManager(max_steps=10)
 
         # Estado do editor
-        self.mode = "layers"  # layers, path, towers, preview
+        self.mode = "layers"  # layers, path, towers
         self.current_tile = 1
         self.show_grid = True
         self.grid_size = 16
         self.snap_to_grid = True
-
-        # Elementos de visualização
-        self.test_enemies = []  # Apenas inimigos para preview
-        self.preview_speed = 1.0
 
         # Waves
         self.wave_manager = WaveManager()
@@ -134,35 +128,6 @@ class EditorScene(BaseScene):
         if mode == "path":
             if not self.wave_manager.waves:
                 self.wave_manager.add_wave()
-        self._update_preview_objects()
-
-    def _update_preview_objects(self):
-        """Atualiza objetos de visualização - AGORA SÓ INIMIGOS"""
-        print("\n=== Atualizando preview ===")
-
-        # Atualiza inimigos para cada path
-        all_paths = self.path_manager.get_all_paths()
-        self.test_enemies = []
-
-        for path_index, path in enumerate(all_paths):
-            path_points = path.get_path_points()
-            if path_points and len(path_points) > 1:
-                # Cria 2 inimigos para cada path (para teste)
-                for i in range(2):
-                    enemy = TestEnemy(path_points)
-                    enemy.path_index = path_index
-
-                    # Posiciona um no início e outro no meio
-                    if i == 1 and len(path_points) > 2:
-                        enemy.current_point = 1
-                        enemy.progress = 0.0
-                        enemy.position = path_points[1]
-
-                    self.test_enemies.append(enemy)
-
-        print(f"Inimigos de preview: {len(self.test_enemies)}")
-        print(f"Spots de Pokémons: {len(self.tower_spots.spots)}")
-        print("=== Fim da atualização ===\n")
 
     def _import_tileset(self):
         """Importa um tileset para a layer atual"""
@@ -268,7 +233,6 @@ class EditorScene(BaseScene):
         if self.wave_config_dialog and self.wave_config_dialog.visible:
             result = self.wave_config_dialog.handle_event(event)
             if result == "saved":
-                self._update_preview_objects()
                 self.wave_config_dialog = None
             elif not self.wave_config_dialog.visible:
                 self.wave_config_dialog = None
@@ -285,32 +249,6 @@ class EditorScene(BaseScene):
         """Update da lógica"""
         if self.paused:
             return
-
-        if self.mode == "preview":
-            # Verifica se os paths mudaram
-            current_paths = [path.get_path_points() for path in self.path_manager.get_all_paths()]
-            if not hasattr(self, '_last_paths') or self._last_paths != current_paths:
-                self._last_paths = [p.copy() if p else [] for p in current_paths]
-                self._update_preview_objects()
-                print("Paths mudaram, atualizando preview!")
-
-            # Atualiza inimigos de preview
-            if self.test_enemies:
-                enemies_by_path = {}
-                for enemy in self.test_enemies:
-                    path_index = getattr(enemy, 'path_index', 0)
-                    if path_index not in enemies_by_path:
-                        enemies_by_path[path_index] = []
-                    enemies_by_path[path_index].append(enemy)
-
-                for enemy in self.test_enemies:
-                    enemy.update(dt * self.preview_speed)
-
-                # Reseta inimigos quando todos terminarem
-                for path_index, enemies in enemies_by_path.items():
-                    if all(enemy.finished for enemy in enemies):
-                        for enemy in enemies:
-                            enemy.reset()
 
     def render(self, screen):
         """Delega renderização para o render handler"""
@@ -378,9 +316,6 @@ class EditorScene(BaseScene):
             current_layer = self.layer_manager.get_current_layer()
             if current_layer and current_layer.tileset:
                 self.tile_palette.set_tileset(current_layer.tileset)
-
-            # Atualiza objetos de preview
-            self._update_preview_objects()
 
             # Limpa historico
             self.clear_undo_history()

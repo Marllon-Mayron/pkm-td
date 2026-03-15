@@ -24,17 +24,12 @@ class EditorRenderHandler:
         self.editor.layer_manager.render_all(screen, self.editor.camera, self.editor.screen_manager)
 
         # Elementos de edição
-        if self.editor.mode != "preview":
-            self.editor.tower_spots.render(screen, self.editor.camera, self.editor.screen_manager)
 
-        # CORRIGIDO: Agora usa path_manager em vez de path
+        self.editor.tower_spots.render(screen, self.editor.camera, self.editor.screen_manager)
+
         self.editor.path_manager.render(screen, self.editor.camera, self.editor.screen_manager)
 
-        # Preview
-        if self.editor.mode == "preview":
-            self._render_preview(screen)
-
-        # Grid - USA OS MESMOS VALORES QUE OS TILES
+        # Grid
         if self.editor.show_grid:
             self._render_grid(screen)
 
@@ -159,14 +154,6 @@ class EditorRenderHandler:
                          sm.viewport_y)
 
         return (screen_x, screen_y)
-
-    def _render_preview(self, screen):
-        """Renderiza elementos de preview"""
-        for tower in self.editor.test_towers:
-            tower.render(screen, self.editor.camera, self.editor.screen_manager)
-
-        for enemy in self.editor.test_enemies:
-            enemy.render(screen, self.editor.camera, self.editor.screen_manager)
 
     def _render_map_bounds(self, screen):
         """Renderiza os limites do mapa"""
@@ -320,7 +307,6 @@ class EditorRenderHandler:
             "path": f"Path {self.editor.path_manager.current_path_index + 1}/{len(self.editor.path_manager.paths)} | "
                     f"Esquerdo: add nó | Direito: remove | Ctrl+N: novo path | Ctrl+D: deletar | Ctrl+W: Wave configs | TAB: alternar",
             "towers": "Esquerdo: add spot | Direito: remove",
-            "preview": f"Velocidade: {self.editor.preview_speed:.1f}x | +/ - para ajustar",
             "map_config": "Configure o mapa"
         }
 

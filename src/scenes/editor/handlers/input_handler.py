@@ -76,22 +76,6 @@ class EditorInputHandler:
             self.editor.set_mode("path")
         elif event.key == pygame.K_3:
             self.editor.set_mode("towers")
-        elif event.key == pygame.K_4:
-            self.editor.set_mode("preview")
-        elif event.key in (pygame.K_EQUALS, pygame.K_PLUS):
-            if not (pygame.key.get_mods() & pygame.KMOD_CTRL):
-                self.editor.preview_speed = min(3.0, self.editor.preview_speed + 0.2)
-        elif event.key == pygame.K_MINUS:
-            if not (pygame.key.get_mods() & pygame.KMOD_CTRL):
-                self.editor.preview_speed = max(0.2, self.editor.preview_speed - 0.2)
-        elif event.key == pygame.K_DELETE:
-            self.editor._delete_selected()
-        elif event.key == pygame.K_o and (pygame.key.get_mods() & pygame.KMOD_CTRL):
-            self.editor._open_phase_loader()
-        elif event.key == pygame.K_l and (pygame.key.get_mods() & pygame.KMOD_CTRL):
-            self.editor.list_available_phases()
-        elif event.key == pygame.K_m and (pygame.key.get_mods() & pygame.KMOD_CTRL):
-            self.editor._open_map_config_dialog()
         elif event.key == pygame.K_z and (pygame.key.get_mods() & pygame.KMOD_CTRL):
             # Ctrl+Z = Undo
             if not (pygame.key.get_mods() & pygame.KMOD_SHIFT):  # Não é Ctrl+Shift+Z
@@ -110,7 +94,6 @@ class EditorInputHandler:
             # Ctrl+D = Deletar path atual
             if self.editor.mode == "path":
                 self.editor.path_manager.remove_current_path()
-                self.editor._update_preview_objects()
                 return True
         elif event.key == pygame.K_TAB:
             # TAB = Alternar entre paths (no modo path)
@@ -150,7 +133,7 @@ class EditorInputHandler:
                 return True
 
         # Se não clicou em botão e está no viewport, processa ações de edição
-        if self.editor.mode != "preview" and self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
+        if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
             world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
             if world_pos:
                 # Arredonda para evitar problemas de float

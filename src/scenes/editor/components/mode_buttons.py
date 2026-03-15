@@ -12,7 +12,6 @@ class ModeButtons:
             ("LAYERS", "layers"),
             ("PATH", "path"),
             ("TOWERS", "towers"),
-            ("PREVIEW", "preview"),
         ]
 
         for i, (text, mode) in enumerate(modes):

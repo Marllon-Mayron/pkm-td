@@ -55,7 +55,6 @@ class MapHandler:
 
             current_path.add_node((x, y))
             print(f"Nó do Path {self.editor.path_manager.current_path_index + 1} adicionado em ({x}, {y})")
-            self.editor._update_preview_objects()
 
         # Modo towers - adiciona spot
         elif self.editor.mode == "towers":
@@ -76,7 +75,6 @@ class MapHandler:
                 self._save_undo_state(f"Tower spot em ({x:.0f}, {y:.0f})")
 
                 self.editor.tower_spots.add_spot(x, y)
-                self.editor._update_preview_objects()
 
     def handle_right_click(self, world_pos):
         """Processa clique direito no mapa (apagar)"""
@@ -124,7 +122,6 @@ class MapHandler:
 
                 current_path.remove_node(node_to_remove)
                 print(f"Nó {node_to_remove} removido do Path {self.editor.path_manager.current_path_index + 1}")
-                self.editor._update_preview_objects()
 
         # Modo towers - remove spot
         elif self.editor.mode == "towers":
@@ -149,4 +146,3 @@ class MapHandler:
 
                 self.editor.tower_spots.remove_spot(spot_to_remove)
                 print("Spot de torre removido")
-                self.editor._update_preview_objects()

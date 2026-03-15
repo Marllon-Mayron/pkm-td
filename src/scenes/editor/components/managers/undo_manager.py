@@ -130,9 +130,6 @@ class UndoManager:
             if 'current_tile' in state:
                 editor_scene.current_tile = state['current_tile']
 
-            # Atualiza preview objects
-            editor_scene._update_preview_objects()
-
             # Atualiza UI
             current_layer = editor_scene.layer_manager.get_current_layer()
             if current_layer and current_layer.tileset:
