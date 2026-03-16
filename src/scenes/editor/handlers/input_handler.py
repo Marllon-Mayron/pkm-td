@@ -85,7 +85,7 @@ class EditorInputHandler:
             self.editor.set_mode("towers")
         elif event.key == pygame.K_z and (pygame.key.get_mods() & pygame.KMOD_CTRL):
             # Ctrl+Z = Undo
-            if not (pygame.key.get_mods() & pygame.KMOD_SHIFT):  # Não é Ctrl+Shift+Z
+            if not (pygame.key.get_mods() & pygame.KMOD_SHIFT):
                 self.editor.undo_manager.undo(self.editor)
                 return True
         elif event.key == pygame.K_y and (pygame.key.get_mods() & pygame.KMOD_CTRL):
@@ -110,7 +110,8 @@ class EditorInputHandler:
                 self.editor.path_manager.current_path_index = next_path
                 print(f"Path atual: {next_path + 1}")
                 return True
-
+        elif event.key == pygame.K_l and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+            self.editor._open_load_phase_dialog()
         elif event.key == pygame.K_w and (pygame.key.get_mods() & pygame.KMOD_CTRL):
             # Ctrl+W = Configurar waves (quando no modo path)
             if self.editor.mode == "path":

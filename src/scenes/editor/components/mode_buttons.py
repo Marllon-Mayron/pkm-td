@@ -32,6 +32,15 @@ class ModeButtons:
         )
         self.buttons.append((map_config_rect, "MAP CONFIG", "map_config"))
 
+        # NOVO: Botão de carregar fase
+        load_rect = pygame.Rect(
+            viewport_x + 10,
+            viewport_y + 70 + (len(modes) + 1) * 40,
+            90,
+            30
+        )
+        self.buttons.append((load_rect, "CARREGAR", "load_phase"))
+
     def get_buttons(self):
         """Retorna a lista de botões"""
         return self.buttons
@@ -53,6 +62,9 @@ class ModeButtons:
             elif mode == "map_config":
                 color = (150, 100, 50)
                 border = (200, 150, 100)
+            elif mode == "load_phase":  # NOVO: cor para botão de carregar
+                color = (70, 70, 150)
+                border = (100, 100, 200)
             else:
                 color = (60, 60, 80)
                 border = (100, 100, 100)

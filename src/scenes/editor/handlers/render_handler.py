@@ -24,9 +24,7 @@ class EditorRenderHandler:
         self.editor.layer_manager.render_all(screen, self.editor.camera, self.editor.screen_manager)
 
         # Elementos de edição
-
         self.editor.tower_spots.render(screen, self.editor.camera, self.editor.screen_manager)
-
         self.editor.path_manager.render(screen, self.editor.camera, self.editor.screen_manager)
 
         # Grid
@@ -52,6 +50,10 @@ class EditorRenderHandler:
         # Diálogo de waves
         if self.editor.wave_config_dialog and self.editor.wave_config_dialog.visible:
             self.editor.wave_config_dialog.render(screen)
+
+        # NOVO: Diálogo de carregar fase
+        if self.editor.load_phase_dialog and self.editor.load_phase_dialog.visible:
+            self.editor.load_phase_dialog.render(screen)
 
         # Pause
         if self.editor.paused:

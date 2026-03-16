@@ -17,6 +17,8 @@ from src.scenes.editor.components.managers.undo_manager import UndoManager
 from src.scenes.editor.components.map_config_dialog import MapConfigDialog
 from src.scenes.editor.components.mode_buttons import ModeButtons
 from src.scenes.editor.components.tile_palette import TilePalette
+# NOVO: Import do diálogo de carregar
+from src.scenes.editor.components.load_phase_dialog import LoadPhaseDialog
 from src.scenes.editor.handlers.input_handler import EditorInputHandler
 from src.scenes.editor.handlers.map_handler import MapHandler
 from src.scenes.editor.handlers.render_handler import EditorRenderHandler
@@ -73,6 +75,8 @@ class EditorScene(BaseScene):
 
         # Diálogos
         self.map_config_dialog = None
+        # NOVO: Diálogo de carregar fase
+        self.load_phase_dialog = None
 
         # Fase atual
         self.current_chapter = chapter or 1
@@ -128,6 +132,9 @@ class EditorScene(BaseScene):
         if mode == "path":
             if not self.wave_manager.waves:
                 self.wave_manager.add_wave()
+        # NOVO: Modo load_phase abre o diálogo
+        elif mode == "load_phase":
+            self._open_load_phase_dialog()
 
     def _import_tileset(self):
         """Importa um tileset para a layer atual"""
@@ -179,6 +186,28 @@ class EditorScene(BaseScene):
                 self.current_phase,
                 self.phase_name
             )
+
+    # NOVO: Método para abrir diálogo de carregar fase
+    def _open_load_phase_dialog(self):
+        """Abre diálogo para carregar uma fase existente"""
+        dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
+        dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 450) // 2
+        self.load_phase_dialog = LoadPhaseDialog(
+            dialog_x, dialog_y, 400, 450,
+            self.exporter
+        )
+
+    # NOVO: Método para processar resultado do carregamento
+    def _handle_load_phase_result(self, result):
+        """Processa o resultado do diálogo de carregamento"""
+        if result and result.get('action') == 'load':
+            chapter = result['chapter']
+            phase = result['phase']
+            success = self.load_phase(chapter, phase)
+            if success:
+                print(f"Fase {chapter}-{phase} carregada com sucesso!")
+            else:
+                print(f"Falha ao carregar fase {chapter}-{phase}")
 
     def _open_wave_config_dialog(self):
         """Abre o diálogo de configuração de waves"""
@@ -237,6 +266,16 @@ class EditorScene(BaseScene):
             elif not self.wave_config_dialog.visible:
                 self.wave_config_dialog = None
             return True
+
+        # NOVO: Diálogo de carregar fase
+        if self.load_phase_dialog and self.load_phase_dialog.visible:
+            result = self.load_phase_dialog.handle_event(event)
+            if result is not None:
+                self._handle_load_phase_result(result)
+                self.load_phase_dialog = None
+            elif not self.load_phase_dialog.visible:
+                self.load_phase_dialog = None
+            return
 
         # Processa normalmente
         self.input_handler.handle_event(event)
@@ -340,19 +379,7 @@ class EditorScene(BaseScene):
         for chapter, phase in phases:
             print(f"  Capítulo {chapter}, Fase {phase}")
 
-    def _open_phase_loader(self):
-        """Abre diálogo para selecionar fase para carregar"""
-        print("\n--- CARREGAR FASE ---")
-        self.list_available_phases()
-
-        try:
-            chapter = int(input("Número do capítulo: "))
-            phase = int(input("Número da fase: "))
-            self.load_phase(chapter, phase)
-        except ValueError:
-            print("Entrada inválida!")
-        except KeyboardInterrupt:
-            print("\nCarregamento cancelado.")
+    # REMOVIDO: Método antigo _open_phase_loader que usava terminal
 
     def clear_undo_history(self):
         """Limpa o histórico de undo/redo"""
