@@ -1,4 +1,4 @@
-# src/scenes/editor/handlers/map_handler.py (modificado)
+# src/scenes/editor/handlers/map_handler.py
 
 import pygame
 
@@ -8,16 +8,41 @@ class MapHandler:
 
     def __init__(self, editor_scene):
         self.editor = editor_scene
+        # Cache para evitar múltiplos saves de undo no mesmo tile durante arrasto
+        self.last_undo_tile = None
+        self.last_undo_time = 0
+        self.undo_cooldown = 0.2  # Cooldown para salvar undo durante arrasto
 
-    def _save_undo_state(self, action_description):
-        """Método auxiliar para salvar estado antes de ações"""
+    def _save_undo_state(self, action_description, continuous=False):
+        """Método auxiliar para salvar estado antes de ações
+
+        Args:
+            action_description: Descrição da ação
+            continuous: Se True, é uma ação contínua (arrasto) - aplica cooldown
+        """
+        if continuous:
+            # Durante arrasto, aplica cooldown para não salvar undo a cada frame
+            current_time = pygame.time.get_ticks() / 1000.0  # segundos
+            if current_time - self.last_undo_time < self.undo_cooldown:
+                # Ainda está dentro do cooldown, não salva undo
+                return False
+            self.last_undo_time = current_time
+
+        # Salva o estado
         self.editor.undo_manager.save_state(self.editor, action_description)
+        return True
 
-    def handle_left_click(self, world_pos):
-        """Processa clique esquerdo no mapa"""
+    def handle_left_click(self, world_pos, continuous=False):
+        """Processa clique esquerdo no mapa
+
+        Args:
+            world_pos: Posição mundial do clique
+            continuous: Se True, é um clique durante arrasto (pintura contínua)
+        """
         # Converte posição mundial para coordenadas de tile
         tile_x = int(world_pos[0] // self.editor.grid_size)
         tile_y = int(world_pos[1] // self.editor.grid_size)
+        current_tile_pos = (tile_x, tile_y)
 
         current_layer = self.editor.layer_manager.get_current_layer()
         if not current_layer:
@@ -26,14 +51,32 @@ class MapHandler:
         # Modo layers - desenha tile
         if self.editor.mode == "layers":
             if 0 <= tile_x < current_layer.width and 0 <= tile_y < current_layer.height:
-                # Salva estado ANTES da modificação
-                self._save_undo_state(f"Tile {self.editor.current_tile} em ({tile_x}, {tile_y})")
+                # Verifica se o tile já é o que queremos colocar
+                current_tile_value = current_layer.get_tile(tile_x, tile_y)
 
-                self.editor.layer_manager.set_tile(tile_x, tile_y, self.editor.current_tile)
-                print(f"Tile {self.editor.current_tile} colocado em ({tile_x}, {tile_y})")
+                # Só faz algo se for um tile diferente
+                if current_tile_value != self.editor.current_tile:
+                    # Durante arrasto, só salva undo se for um tile diferente do último
+                    should_save_undo = True
 
-        # Modo path - adiciona nó
-        elif self.editor.mode == "path":
+                    if continuous:
+                        # Durante arrasto, verifica se mudou de tile desde o último undo
+                        if current_tile_pos == self.last_undo_tile:
+                            should_save_undo = False
+                        else:
+                            self.last_undo_tile = current_tile_pos
+
+                    if should_save_undo:
+                        self._save_undo_state(
+                            f"Tile {self.editor.current_tile} em ({tile_x}, {tile_y})",
+                            continuous
+                        )
+
+                    self.editor.layer_manager.set_tile(tile_x, tile_y, self.editor.current_tile)
+                    print(f"Tile {self.editor.current_tile} colocado em ({tile_x}, {tile_y})")
+
+        # Modo path - adiciona nó (NÃO deve ser contínuo)
+        elif self.editor.mode == "path" and not continuous:
             current_path = self.editor.path_manager.get_current_path()
             if not current_path:
                 # Se não há path atual, tenta criar um
@@ -51,13 +94,13 @@ class MapHandler:
                 x, y = world_pos
 
             # Salva estado ANTES da modificação
-            self._save_undo_state(f"Path node em ({x:.0f}, {y:.0f})")
+            self._save_undo_state(f"Path node em ({x:.0f}, {y:.0f})", continuous=False)
 
             current_path.add_node((x, y))
             print(f"Nó do Path {self.editor.path_manager.current_path_index + 1} adicionado em ({x}, {y})")
 
-        # Modo towers - adiciona spot
-        elif self.editor.mode == "towers":
+        # Modo towers - adiciona spot (NÃO deve ser contínuo)
+        elif self.editor.mode == "towers" and not continuous:
             # Ajusta para grid se necessário
             if self.editor.snap_to_grid:
                 x = tile_x * self.editor.grid_size
@@ -72,7 +115,7 @@ class MapHandler:
                 print(f"Já existe um spot em ({x}, {y})")
             else:
                 # Salva estado ANTES da modificação
-                self._save_undo_state(f"Tower spot em ({x:.0f}, {y:.0f})")
+                self._save_undo_state(f"Tower spot em ({x:.0f}, {y:.0f})", continuous=False)
 
                 self.editor.tower_spots.add_spot(x, y)
 

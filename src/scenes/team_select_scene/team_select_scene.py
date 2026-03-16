@@ -41,7 +41,8 @@ class TeamSelectScene(BaseScene):
         self.page_font = pygame.font.Font(None, FONT_SIZES['PAGE'])
 
         # Load data
-        self.pokemon_manager.load_available_pokemon()
+        #Adiciona pokemons na box
+        #self.pokemon_manager.load_available_pokemon()
 
     def _initialize_layout(self):
         """Inicializa o layout da cena"""

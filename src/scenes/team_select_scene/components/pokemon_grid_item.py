@@ -64,7 +64,7 @@ class PokemonGridItem:
     def _draw_shiny_indicator(self, screen):
         if self.pokemon.is_shiny:
             star_font = pygame.font.Font(None, 20)
-            star = star_font.render("⭐", True, COLORS['TEXT']['YELLOW'])
+            star = star_font.render("S", True, COLORS['TEXT']['YELLOW'])
             screen.blit(star, (self.rect.right - 25, self.rect.y + 5))
 
     def _draw_team_overlay(self, screen, font):

@@ -156,9 +156,9 @@ class EditorScene(BaseScene):
         elif self.mode == "towers" and self.tower_spots.selected_spot >= 0:
             self.tower_spots.remove_spot_by_index(self.tower_spots.selected_spot)
 
-    def _handle_left_click(self, world_pos):
+    def _handle_left_click(self, world_pos, continuous=False):
         """Delega clique esquerdo para o map handler"""
-        self.map_handler.handle_left_click(world_pos)
+        self.map_handler.handle_left_click(world_pos, continuous)
 
     def _handle_right_click(self, world_pos):
         """Delega clique direito para o map handler"""

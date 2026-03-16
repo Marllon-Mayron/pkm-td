@@ -1,6 +1,7 @@
 # src/scenes/editor/handlers/input_handler.py
 
 import pygame
+import time
 
 
 class EditorInputHandler:
@@ -10,6 +11,12 @@ class EditorInputHandler:
         self.editor = editor_scene
         self.dragging_camera = False
         self.last_mouse_pos = None
+
+        # Controle de arrasto para pintura contínua
+        self.painting = False  # Se está pintando (botão esquerdo pressionado)
+        self.last_paint_pos = None  # Última posição pintada
+        self.paint_cooldown = 0.05  # Cooldown entre pinturas (evita pintar no mesmo frame)
+        self.last_paint_time = 0
 
     def handle_event(self, event):
         """Processa eventos do editor"""
@@ -132,15 +139,25 @@ class EditorInputHandler:
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
                 return True
 
-        # Se não clicou em botão e está no viewport, processa ações de edição
+        # Inicia pintura contínua com botão esquerdo
+        if event.button == 1 and self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
+            self.painting = True
+            self.last_paint_pos = None  # Força a pintar na primeira posição
+            self.last_paint_time = 0
+
+            # Processa o primeiro clique (NUNCA é contínuo)
+            world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
+            if world_pos:
+                self.editor._handle_left_click(world_pos, continuous=False)  # Primeiro clique salva undo
+            return True
+
+        # Clique direito no viewport
         if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
             world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
             if world_pos:
                 # Arredonda para evitar problemas de float
                 world_x, world_y = world_pos
-                if event.button == 1:  # Clique esquerdo
-                    self.editor._handle_left_click((world_x, world_y))
-                elif event.button == 3:  # Clique direito
+                if event.button == 3:  # Clique direito
                     self.editor._handle_right_click((world_x, world_y))
         return True
 
@@ -152,10 +169,45 @@ class EditorInputHandler:
                 self.last_mouse_pos = None
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)  # Volta cursor normal
                 return True
+
+        # Para a pintura contínua quando solta o botão
+        elif event.button == 1:  # Botão esquerdo
+            if self.painting:
+                self.painting = False
+                self.last_paint_pos = None
+                return True
+
         return False
 
     def _handle_mousemotion(self, event):
         """Processa movimento do mouse"""
+        # Pintura contínua durante o movimento com botão pressionado
+        if self.painting and not self.dragging_camera:
+            current_time = time.time()
+
+            # Aplica cooldown para não pintar muito rápido
+            if current_time - self.last_paint_time >= self.paint_cooldown:
+                mouse_pos = pygame.mouse.get_pos()
+
+                # Verifica se ainda está no viewport
+                if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
+                    world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
+
+                    if world_pos:
+                        # Converte para coordenadas de tile
+                        tile_x = int(world_pos[0] // self.editor.grid_size)
+                        tile_y = int(world_pos[1] // self.editor.grid_size)
+                        current_tile_pos = (tile_x, tile_y)
+
+                        # Verifica se mudou de tile desde a última pintura
+                        if current_tile_pos != self.last_paint_pos:
+                            # Processa o clique esquerdo na posição atual (contínuo)
+                            self.editor._handle_left_click(world_pos, continuous=True)
+                            self.last_paint_pos = current_tile_pos
+                            self.last_paint_time = current_time
+                return True
+
+        # Arrasto da câmera (existente)
         if self.dragging_camera and self.last_mouse_pos:
             # Calcula a diferença do movimento
             dx = event.pos[0] - self.last_mouse_pos[0]
