@@ -67,6 +67,17 @@ class GameTeamSlot:
             if self.is_hovered:
                 # Se tem Pokémon, pode iniciar arrasto
                 if self.pokemon:
+                    # VERIFICA SE O POKÉMON JÁ ESTÁ NO MAPA
+                    if hasattr(self.pokemon, 'is_placed') and self.pokemon.is_placed:
+                        # Já está no mapa - não permite arrastar
+                        print(f"[SLOT] {self.pokemon.name} já está no mapa!")
+                        return {
+                            'action': 'already_placed',  # Novo tipo de ação
+                            'slot_index': self.slot_index,
+                            'pokemon': self.pokemon
+                        }
+
+                    # Pokémon não está no mapa - permite arrastar
                     return {
                         'action': 'start_drag',
                         'slot_index': self.slot_index,
@@ -119,8 +130,34 @@ class GameTeamSlot:
 
         if self.pokemon:
             self._draw_pokemon_info(screen, animated_rect, pokedex)
+
+            # Indicador de "no mapa" - agora usa a flag atualizada
+            if hasattr(self.pokemon, 'is_placed') and self.pokemon.is_placed:
+                self._draw_placed_indicator(screen, animated_rect)
         else:
             self._draw_empty_slot(screen, animated_rect)
+
+    def _draw_placed_indicator(self, screen, rect):
+        """Desenha indicador de que o Pokémon está no mapa"""
+        # Círculo verde no canto superior direito
+        indicator_size = 12
+        indicator_x = rect.x + rect.width - indicator_size - 5
+        indicator_y = rect.y + 5
+
+        # Círculo com brilho
+        pygame.draw.circle(screen, (0, 200, 0),
+                           (indicator_x + indicator_size // 2, indicator_y + indicator_size // 2),
+                           indicator_size // 2)
+        pygame.draw.circle(screen, (255, 255, 255),
+                           (indicator_x + indicator_size // 2, indicator_y + indicator_size // 2),
+                           indicator_size // 2 - 2)
+
+        # Ícone de check
+        font = pygame.font.Font(None, 14)
+        check = font.render("✓", True, (0, 0, 0))
+        check_rect = check.get_rect(center=(indicator_x + indicator_size // 2,
+                                            indicator_y + indicator_size // 2))
+        screen.blit(check, check_rect)
 
     def _draw_shadow(self, screen, rect):
         """Desenha sombra suave"""
@@ -144,10 +181,18 @@ class GameTeamSlot:
             border_color = self.COLORS['border_selected']
         elif self.is_hovered:
             base_color = self.COLORS['bg_hover']
-            border_color = self.COLORS['border_hover']
+            # Se estiver no mapa, borda diferente no hover
+            if self.pokemon and hasattr(self.pokemon, 'is_placed') and self.pokemon.is_placed:
+                border_color = (100, 255, 100)  # Verde quando no mapa
+            else:
+                border_color = self.COLORS['border_hover']
         else:
             base_color = self.COLORS['bg_default']
-            border_color = self.COLORS['border']
+            # Borda normal ou verde se estiver no mapa
+            if self.pokemon and hasattr(self.pokemon, 'is_placed') and self.pokemon.is_placed:
+                border_color = (0, 200, 0)  # Verde quando no mapa
+            else:
+                border_color = self.COLORS['border']
 
         # Fundo principal
         bg_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)

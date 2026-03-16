@@ -29,7 +29,13 @@ class DragDropManager:
         self.drag_cursor = pygame.SYSTEM_CURSOR_HAND
 
     def start_drag(self, slot_index, pokemon, screen_pos, world_pos):
-        """Inicia o arrasto de um Pokémon"""
+        """Inicia o arrasto de um Pokémon - com validação"""
+
+        # VALIDAÇÃO DUPLA: Verifica se já está no mapa
+        if hasattr(pokemon, 'is_placed') and pokemon.is_placed:
+            print(f"[DRAG] BLOQUEADO: {pokemon.name} já está no mapa!")
+            return False
+
         self.is_dragging = True
         self.drag_slot_index = slot_index
         self.drag_pokemon = pokemon
@@ -43,6 +49,7 @@ class DragDropManager:
         pygame.mouse.set_cursor(self.drag_cursor)
 
         print(f"[DRAG] Arrastando {pokemon.name} do slot {slot_index}")
+        return True
 
     def _create_preview(self, pokemon):
         """Cria a superfície de preview do Pokémon"""

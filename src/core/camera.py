@@ -15,8 +15,8 @@ class Camera:
 
         # Zoom
         self.zoom = 1.0
-        self.min_zoom = 0.5
-        self.max_zoom = 2.0
+        self.min_zoom = 1.0
+        self.max_zoom = 4.0
         self.zoom_speed = 0.1
         # Para zoom estabilizado
         self.use_stabilized_zoom = True  # Ativa zoom estabilizado

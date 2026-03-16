@@ -38,6 +38,8 @@ class GameScene(BaseScene):
         # Configurações de mundo baseadas no mapa
         self._setup_world_dimensions()
 
+        self.player = game.player
+
         # Inicializa câmera
         self.game.initialize_camera(self.world_width, self.world_height)
         self.camera = self.game.camera
@@ -52,7 +54,7 @@ class GameScene(BaseScene):
 
         self.team_manager = GameTeamManager(game)
         self.team_manager.update_team()
-        self.placement_manager = PlacementManager(game)
+        self.placement_manager = PlacementManager(self)
 
         # Gerenciador de waves
         self.wave_manager = GameWaveManager(phase_loader)
@@ -239,6 +241,30 @@ class GameScene(BaseScene):
                     pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
                     return True
 
+            if event.button == 3:  # Botão direito
+                world_pos = self.screen_manager.get_mouse_world_position(event.pos, self.camera)
+
+                if world_pos:
+                    print(f"[GAME] Clique direito em ({world_pos[0]:.1f}, {world_pos[1]:.1f})")
+
+                    # Tenta recolher Pokémon (sem passar o spot)
+                    pokemon = self.placement_manager.remove_pokemon_by_right_click(
+                        world_pos[0],
+                        world_pos[1]
+                    )
+
+                    if pokemon:
+                        print(f"[GAME] {pokemon.name} recolhido com sucesso!")
+                        # Atualiza a UI do time
+                        self.team_manager.update_team()
+
+                        # DEBUG: Verifica o estado do is_placed
+                        for p in self.player.team:
+                            if p.id == pokemon.id:
+                                print(f"[DEBUG] {p.name} is_placed = {p.is_placed}")
+
+                        return True
+
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 2:  # Botão do meio/scroll
                 if self.dragging_camera:
@@ -371,7 +397,7 @@ class GameScene(BaseScene):
         # Renderiza o mapa
         self.map_renderer.render(screen, self.camera, self.screen_manager)
 
-        # Renderiza os paths (para debug)
+        # Renderiza os paths
         if self.show_debug:
             self.path_renderer.render(screen, self.camera, self.screen_manager, show_editing=False)
 
@@ -407,7 +433,7 @@ class GameScene(BaseScene):
         # UI do jogo
         self._render_game_ui(screen)
 
-        # Renderiza a HUD do time (com camera e tower_spots)
+        # Renderiza a HUD do time
         if hasattr(self, 'team_manager'):
             self.team_manager.render(screen, self.camera, self.spot_renderer.get_spots())
 

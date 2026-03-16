@@ -19,6 +19,9 @@ class Pokemon(Entity):
         self.level = level
         self.is_shiny = shiny
 
+        self.is_placed = False  # False = no time, True = no mapa
+        self.spot_id = None  # ID do spot onde está colocado
+
         # Tipos
         self.types = self.pokemon_data["types"]
 
@@ -289,7 +292,7 @@ class Pokemon(Entity):
             screen_y = self.y
             zoom_scale = 1.0
 
-        # SPRITE - COM PIVÔ NOS PÉS
+        # SPRITE - COM PIVÔ NOS PÉS (AJUSTADO PARA BAIXO)
         if self.sprite:
             # Obtém tamanho atual
             current_width = self.sprite.get_width()
@@ -302,36 +305,48 @@ class Pokemon(Entity):
             # Redimensiona com o zoom atual
             scaled_sprite = pygame.transform.scale(self.sprite, (final_width, final_height))
 
-            # POSICIONA COM PIVÔ NOS PÉS:
-            # Em vez de centralizar, posiciona de forma que a parte inferior
-            # do sprite fique na posição (screen_x, screen_y)
+            # POSICIONA COM PIVÔ NOS PÉS (MAIS PARA BAIXO):
+            # Ajusta o offset para enterrar os pés no chão
+            foot_offset = int(final_height * 0.2)  # 20% do sprite para baixo
+
             sprite_rect = scaled_sprite.get_rect()
-            sprite_rect.bottom = int(screen_y)  # Parte inferior no Y
+            # Coloca o pivô (pés) mais para baixo do sprite
+            sprite_rect.bottom = int(screen_y) + foot_offset  # Parte inferior mais baixa
             sprite_rect.centerx = int(screen_x)  # Centralizado no X
 
             screen.blit(scaled_sprite, sprite_rect)
 
             # Debug - mostra o ponto de pivô (pés)
             if hasattr(self, 'show_debug') and self.show_debug:
-                # Vermelho: ponto do pivô (pés)
-                pygame.draw.circle(screen, (255, 0, 0), (int(screen_x), int(screen_y)), 6, 2)
+                # Vermelho: ponto do pivô (pés) - agora mais baixo
+                pygame.draw.circle(screen, (255, 0, 0), (int(screen_x), int(screen_y) + foot_offset), 6, 2)
                 # Verde: centro do sprite (para referência)
                 centro_x = sprite_rect.centerx
                 centro_y = sprite_rect.centery
                 pygame.draw.circle(screen, (0, 255, 0), (centro_x, centro_y), 4, 1)
-                # Amarelo: linha do chão
+                # Amarelo: linha do chão (agora mais baixa)
                 pygame.draw.line(screen, (255, 255, 0),
+                                 (sprite_rect.left, int(screen_y) + foot_offset),
+                                 (sprite_rect.right, int(screen_y) + foot_offset), 1)
+                # Azul: linha do chão original (para referência)
+                pygame.draw.line(screen, (0, 255, 255),
                                  (sprite_rect.left, int(screen_y)),
                                  (sprite_rect.right, int(screen_y)), 1)
         else:
-            # Placeholder - também usa pivô nos pés
+            # Placeholder - também usa pivô nos pés com offset
             size = int(self.map_sprite_size * zoom_scale)
-            # Desenha um retângulo com a parte inferior na posição do pivô
+            foot_offset = int(size * 0.2)  # 20% do placeholder para baixo
+
+            # Desenha um retângulo com a parte inferior na posição do pivô + offset
             rect = pygame.Rect(0, 0, size, size)
-            rect.bottom = int(screen_y)
+            rect.bottom = int(screen_y) + foot_offset
             rect.centerx = int(screen_x)
             pygame.draw.rect(screen, (255, 0, 255), rect)
             pygame.draw.rect(screen, (255, 255, 255), rect, 2)
+
+            # Debug para o placeholder
+            if hasattr(self, 'show_debug') and self.show_debug:
+                pygame.draw.circle(screen, (255, 0, 0), (int(screen_x), int(screen_y) + foot_offset), 6, 2)
 
         # Barra de HP - ajustada para ficar acima do sprite
         if show_hp:
@@ -343,9 +358,13 @@ class Pokemon(Entity):
 
             # Posiciona a barra acima do sprite
             bar_x = screen_x - bar_width // 2
-            # Coloca a barra 5 pixels acima do topo do sprite
-            sprite_top = screen_y - int(self.map_sprite_size * zoom_scale)
-            bar_y = sprite_top - 5
+
+            sprite_height = int(self.map_sprite_size * zoom_scale)
+
+            foot_offset = int(sprite_height * 0.2)
+            sprite_top = (screen_y + foot_offset) - sprite_height  # Ajustado com o offset
+
+            bar_y = sprite_top + 10
 
             # Fundo da barra
             pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))

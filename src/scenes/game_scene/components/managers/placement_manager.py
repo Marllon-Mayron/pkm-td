@@ -21,6 +21,11 @@ class PlacementManager:
             print(f"[PLACEMENT] Spot já marcado como ocupado")
             return None
 
+        # Verifica se o Pokémon já está no mapa
+        if hasattr(pokemon, 'is_placed') and pokemon.is_placed:
+            print(f"[PLACEMENT] {pokemon.name} já está no mapa!")
+            return None
+
         # Calcula o centro do tile para posicionar o Pokémon
         tile_center_x = (spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
         tile_center_y = (spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
@@ -28,7 +33,7 @@ class PlacementManager:
         # Cria uma nova instância do Pokémon no mapa
         from src.entities.pokemon import Pokemon
         placed = Pokemon(
-            tile_center_x,  # Usa centro do tile
+            tile_center_x,
             tile_center_y,
             pokemon.id,
             level=pokemon.level,
@@ -47,13 +52,72 @@ class PlacementManager:
         placed.is_placed = True
         placed.spot_id = id(spot)
 
+        # MARCA O POKÉMON ORIGINAL TAMBÉM
+        pokemon.is_placed = True
+
         # Marca o spot como ocupado
         spot.occupied = True
 
         self.placed_pokemon.append(placed)
         print(
-            f"[PLACEMENT] {pokemon.name} colocado no spot ({spot.x}, {spot.y}) - Centro ({tile_center_x}, {tile_center_y})")
+            f"[PLACEMENT] {pokemon.name} colocado no spot ({spot.x}, {spot.y}) - "
+            f"Centro ({tile_center_x}, {tile_center_y})"
+        )
         return placed
+
+    def remove_pokemon_by_right_click(self, world_x, world_y, tolerance=20):
+        """Remove o Pokémon na posição do mundo (para clique direito)"""
+        pokemon = self.get_pokemon_at_world_pos(world_x, world_y, tolerance)
+
+        if pokemon:
+            print(f"[PLACEMENT] Recolhendo {pokemon.name} com clique direito")
+            print(f"[DEBUG] Pokémon pos: ({pokemon.x}, {pokemon.y})")
+            print(f"[DEBUG] Pokémon tile: ({pokemon.x // self.tile_size}, {pokemon.y // self.tile_size})")
+
+            # Remove da lista de colocados
+            if pokemon in self.placed_pokemon:
+                self.placed_pokemon.remove(pokemon)
+                print(f"[DEBUG] Pokémon removido da lista placed_pokemon. Restam: {len(self.placed_pokemon)}")
+
+                # PROCURA O SPOT CORRESPONDENTE E DESOCUPA
+                spots = self.game.spot_renderer.get_spots()
+                pokemon_tile_x = pokemon.x // self.tile_size
+                pokemon_tile_y = pokemon.y // self.tile_size
+
+                spot_found = False
+                for spot in spots:
+                    spot_tile_x = spot.x // self.tile_size
+                    spot_tile_y = spot.y // self.tile_size
+
+                    if spot_tile_x == pokemon_tile_x and spot_tile_y == pokemon_tile_y:
+                        print(f"[DEBUG] SPOT ENCONTRADO! Antes: occupied={spot.occupied}")
+                        spot.occupied = False
+                        print(f"[DEBUG] SPOT ATUALIZADO! Depois: occupied={spot.occupied}")
+                        print(f"[PLACEMENT] Spot ({spot.x}, {spot.y}) desocupado")
+                        spot_found = True
+                        break
+
+                if not spot_found:
+                    print(f"[WARNING] Não encontrou spot para o Pokémon em ({pokemon_tile_x}, {pokemon_tile_y})")
+
+                # PROCURA O POKÉMON NO TIME E RESETA O is_placed
+                for team_pokemon in self.game.player.team:
+                    # Compara por id e level para garantir que é o mesmo Pokémon
+                    if (team_pokemon.id == pokemon.id and
+                            team_pokemon.level == pokemon.level):
+                        team_pokemon.is_placed = False
+                        print(f"[PLACEMENT] is_placed = False no Pokémon do time: {team_pokemon.name}")
+                        break
+
+                return pokemon
+
+        return None
+
+    def _get_team_pokemon(self):
+        """Método auxiliar para pegar Pokémon do time"""
+        if hasattr(self.game, 'player') and hasattr(self.game.player, 'team'):
+            return self.game.player.team
+        return []
 
     def get_pokemon_at_spot(self, spot):
         """Verifica se já existe um Pokémon no spot baseado no tile"""
@@ -69,17 +133,6 @@ class PlacementManager:
                 return pokemon
         return None
 
-    def remove_pokemon(self, pokemon):
-        """Remove um Pokémon do mapa"""
-        if pokemon in self.placed_pokemon:
-            self.placed_pokemon.remove(pokemon)
-            # Procura o spot correspondente e desocupa
-            for spot in self._get_all_spots():
-                if abs(spot.x - pokemon.x) < 10 and abs(spot.y - pokemon.y) < 10:
-                    spot.occupied = False
-                    break
-            print(f"[PLACEMENT] {pokemon.name} removido do mapa")
-
     def get_pokemon_at_world_pos(self, world_x, world_y, tolerance=20):
         """Retorna o Pokémon na posição do mundo (para seleção)"""
         for pokemon in self.placed_pokemon:
@@ -87,10 +140,6 @@ class PlacementManager:
             if distance < tolerance:
                 return pokemon
         return None
-
-    def _get_all_spots(self):
-        """Método auxiliar para pegar todos os spots (será sobrescrito)"""
-        return []
 
     def update(self, dt, enemies):
         """Atualiza todos os Pokémon colocados"""

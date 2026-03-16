@@ -77,6 +77,9 @@ class GameTeamManager:
         for i, slot in enumerate(self.team_slots):
             if i < len(team):
                 slot.set_pokemon(team[i])
+                # DEBUG: Mostra estado atual
+                if team[i].is_placed:
+                    print(f"[TEAM] Slot {i}: {team[i].name} está no mapa")
             else:
                 slot.set_pokemon(None)
 
@@ -121,6 +124,11 @@ class GameTeamManager:
                 if result:
                     # Remove Pokémon do time após colocar
                     print(f"[TEAM] {result['pokemon'].name} colocado no mapa")
+                    # Marca como colocado no slot também
+                    for slot in self.team_slots:
+                        if slot.pokemon == result['pokemon']:
+                            slot.pokemon.is_placed = True
+                            break
                 return result
 
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -139,21 +147,28 @@ class GameTeamManager:
         for slot in self.team_slots:
             result = slot.handle_event(event)
             if result:
-                if isinstance(result, dict) and result.get('action') == 'start_drag':
-                    # Inicia arrasto
-                    mouse_pos = pygame.mouse.get_pos()
-                    world_pos = self.game.screen_manager.get_mouse_world_position(
-                        mouse_pos, camera
-                    )
-                    if world_pos:
-                        self.drag_manager.start_drag(
-                            result['slot_index'],
-                            result['pokemon'],
-                            mouse_pos,
-                            world_pos
+                if isinstance(result, dict):
+                    if result.get('action') == 'start_drag':
+                        # Inicia arrasto - só se NÃO estiver no mapa
+                        mouse_pos = pygame.mouse.get_pos()
+                        world_pos = self.game.screen_manager.get_mouse_world_position(
+                            mouse_pos, camera
                         )
-                        slot.start_drag()
-                    return result
+                        if world_pos:
+                            self.drag_manager.start_drag(
+                                result['slot_index'],
+                                result['pokemon'],
+                                mouse_pos,
+                                world_pos
+                            )
+                            slot.start_drag()
+                        return result
+
+                    elif result.get('action') == 'already_placed':
+                        print(f"[TEAM] Não pode arrastar {result['pokemon'].name} - já está no mapa")
+                        # Pode adicionar efeito visual de erro
+                        slot.is_selected = True
+                        return result
                 else:
                     # Seleção normal
                     for s in self.team_slots:
@@ -161,7 +176,7 @@ class GameTeamManager:
                     self.selected_slot_index = result
 
                     if slot.pokemon:
-                        print(f"✨ {slot.pokemon.name} selecionado! Lv.{slot.pokemon.level}")
+                        print(f" {slot.pokemon.name} selecionado! Lv.{slot.pokemon.level}")
 
                         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                             if hasattr(event, 'clicks') and event.clicks >= 2:
@@ -169,6 +184,8 @@ class GameTeamManager:
 
                     return result
         return None
+
+
 
     def render(self, screen, camera, tower_spots):
         """Renderiza a HUD do time"""
