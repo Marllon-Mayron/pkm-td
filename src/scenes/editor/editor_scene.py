@@ -1,5 +1,6 @@
 """
-Cena do Editor de Fases - Versão Modular (SEM TORRES)
+Cena do Editor de Fases
+
 """
 import pygame
 from tkinter import filedialog, Tk
@@ -55,9 +56,6 @@ class EditorScene(BaseScene):
         #Gerenciador de itens alvo
         self.target_items = TargetItemManager()
 
-        #Diálogo de itens
-        self.target_item_dialog = None
-
         # Estado do editor
         self.mode = "layers"  # layers, path, towers
         self.current_tile = 1
@@ -83,6 +81,9 @@ class EditorScene(BaseScene):
         self.map_config_dialog = None
         self.load_phase_dialog = None
         self.wave_config_dialog = None
+        self.target_item_dialog = None
+
+        self.selected_item_id = None
 
         # Fase atual
         self.current_chapter = chapter or 1
@@ -134,7 +135,7 @@ class EditorScene(BaseScene):
 
     def set_mode(self, mode):
         """Altera o modo do editor"""
-        print(f"DEBUG: set_mode({mode})")  # DEBUG
+        print(f"DEBUG: set_mode({mode})")
 
         self.mode = mode
 
@@ -146,23 +147,20 @@ class EditorScene(BaseScene):
             self._open_load_phase_dialog()
 
         elif mode == "items":
-            print("DEBUG: Abrindo diálogo de itens")  # DEBUG
-            # Se já tem um diálogo aberto, só reativa
-            if not self.target_item_dialog or not self.target_item_dialog.visible:
-                self._open_target_item_dialog()
-            print("Modo Itens Ativado - Clique no mapa para posicionar itens")
+            print("DEBUG: Abrindo diálogo de seleção de item")
+            # Abre o diálogo para selecionar qual item adicionar
+            self._open_target_item_dialog()
+            # O modo continua "items", mas agora temos um item selecionado
 
         elif mode == "layers":
             # Fecha diálogo de items se estiver aberto
             if self.target_item_dialog:
                 self.target_item_dialog.visible = False
-                self.target_item_dialog = None
 
         elif mode == "towers":
             # Fecha diálogo de items se estiver aberto
             if self.target_item_dialog:
                 self.target_item_dialog.visible = False
-                self.target_item_dialog = None
 
     def _import_tileset(self):
         """Importa um tileset para a layer atual"""
@@ -194,8 +192,12 @@ class EditorScene(BaseScene):
     def _handle_left_click(self, world_pos, continuous=False):
         """Delega clique esquerdo para o map handler ou trata items"""
 
-        # Modo items - NUNCA deve ser contínuo
         if self.mode == "items" and not continuous:
+            # Verifica se temos um item selecionado (do diálogo)
+            if not hasattr(self, 'selected_item_id') or self.selected_item_id is None:
+                print("Nenhum item selecionado! Use o modo Items para selecionar um item primeiro.")
+                return True
+
             # Converte para coordenadas de tile
             tile_x = int(world_pos[0] // self.grid_size)
             tile_y = int(world_pos[1] // self.grid_size)
@@ -204,46 +206,14 @@ class EditorScene(BaseScene):
             grid_x = tile_x * self.grid_size
             grid_y = tile_y * self.grid_size
 
-            # Verifica se há um item selecionado no diálogo
-            if self.target_item_dialog and self.target_item_dialog.selected_item_index >= 0:
-                # Se há um item selecionado, move ele para a nova posição
-                selected_idx = self.target_item_dialog.selected_item_index
-                if selected_idx < len(self.target_items.items):
-                    item = self.target_items.items[selected_idx]
+            # Adiciona o item
+            item_id = self.selected_item_id
+            print(f"Adicionando item ID {item_id} em ({grid_x}, {grid_y})")
 
-                    # Salva undo ANTES da modificação
-                    self.undo_manager.save_state(self, f"Mover item para ({grid_x}, {grid_y})")
+            self.undo_manager.save_state(self, f"Criar item {item_id} em ({grid_x}, {grid_y})")
+            self.target_items.add_item(grid_x, grid_y, item_id)
 
-                    # Move o item
-                    item.x = grid_x
-                    item.y = grid_y
-                    print(f"Item movido para ({grid_x}, {grid_y})")
-
-                    # Desseleciona o item após mover
-                    self.target_item_dialog.selected_item_index = -1
-            else:
-                # MODIFICADO: Sempre cria um novo item, mesmo se já existir na posição
-                item_id = 1  # Valor padrão
-
-                if self.target_item_dialog:
-                    try:
-                        item_id = int(
-                            self.target_item_dialog.temp_item_id) if self.target_item_dialog.temp_item_id else 1
-                    except ValueError:
-                        pass
-
-                # Salva undo ANTES da criação
-                self.undo_manager.save_state(self, f"Criar item em ({grid_x}, {grid_y})")
-
-                # Cria o novo item (SEM quantidade)
-                index = self.target_items.add_item(grid_x, grid_y, item_id)
-
-                # Seleciona o item recém-criado
-                if self.target_item_dialog and index >= 0:
-                    self.target_item_dialog.selected_item_index = index
-                    print(f"Novo item {item_id} criado e selecionado")
-
-            return True  # Indica que consumiu o evento
+            return True
 
         # Para outros modos, delega para o map handler
         self.map_handler.handle_left_click(world_pos, continuous)
@@ -324,11 +294,11 @@ class EditorScene(BaseScene):
         )
 
     def _open_target_item_dialog(self):
-        """Abre diálogo para configurar itens alvo"""
+        """Abre diálogo para selecionar qual item adicionar"""
         dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
-        dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 450) // 2
+        dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 400) // 2
         self.target_item_dialog = TargetItemDialog(
-            dialog_x, dialog_y, 400, 450,
+            dialog_x, dialog_y, 400, 350,
             self.target_items
         )
 
@@ -380,8 +350,30 @@ class EditorScene(BaseScene):
                 print(f"Fase alterada para: {self.phase_name} (Capítulo {self.current_chapter}, Fase {self.current_phase})")
                 self.clear_undo_history()
 
+    def _handle_target_item_selected(self, item_id):
+        """Guarda o ID do item selecionado"""
+        self.selected_item_id = item_id
+        print(f"Item {item_id} selecionado para adicionar")
+
     def handle_event(self, event):
         """Delega processamento de eventos para o input handler"""
+
+        # Diálogo de Items - processa e pode retornar "selected"
+        if self.target_item_dialog and self.target_item_dialog.visible:
+            result = self.target_item_dialog.handle_event(event)
+            if result == "selected":
+                # Usuário selecionou um item e fechou o diálogo
+                item_id = self.target_item_dialog.selected_item_id
+                print(f"Item selecionado: ID {item_id}")
+                # CHAMA O MÉTODO PARA GUARDAR O ID
+                self._handle_target_item_selected(item_id)
+                # Fecha o diálogo
+                self.target_item_dialog = None
+            elif result is None and not self.target_item_dialog.visible:
+                # Diálogo foi fechado sem selecionar
+                self.target_item_dialog = None
+            return True  # Sempre consome o evento enquanto diálogo visível
+
         # Diálogo de configuração de mapa
         if self.map_config_dialog and self.map_config_dialog.visible:
             result = self.map_config_dialog.handle_event(event)
@@ -411,16 +403,7 @@ class EditorScene(BaseScene):
                 self.load_phase_dialog = None
             return
 
-        # Diálogo de Items
-        if self.target_item_dialog and self.target_item_dialog.visible:
-            result = self.target_item_dialog.handle_event(event)
-            if result == "saved":
-                self.target_item_dialog = None
-            elif not self.target_item_dialog.visible:
-                self.target_item_dialog = None
-            return
-
-        # Processa normalmente
+        # Processa normalmente (sem diálogos ativos)
         self.input_handler.handle_event(event)
 
     def new_map(self):
@@ -529,8 +512,6 @@ class EditorScene(BaseScene):
         print("\nFases disponíveis:")
         for chapter, phase in phases:
             print(f"  Capítulo {chapter}, Fase {phase}")
-
-    # REMOVIDO: Método antigo _open_phase_loader que usava terminal
 
     def clear_undo_history(self):
         """Limpa o histórico de undo/redo"""

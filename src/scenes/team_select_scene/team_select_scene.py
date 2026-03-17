@@ -97,7 +97,7 @@ class TeamSelectScene(BaseScene):
             print("Iniciando batalha com time:",
                   [p.name for p in self.game.player.team])
 
-            self.game.game_scene = GameScene(self.game, self.phase)
+            self.game.game_scene = GameScene(self.game, self.chapter,self.phase)
             self.game.current_scene = self.game.game_scene
 
         elif action_type == 'PREV_PAGE':

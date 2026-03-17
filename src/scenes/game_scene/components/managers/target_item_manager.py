@@ -2,7 +2,7 @@
 
 import pygame
 from src.entities.target_item import TargetItem
-from src.data.pokedex import Pokedex
+from src.data.item_catalog import item_catalog
 
 
 class TargetItemManager:
@@ -10,8 +10,8 @@ class TargetItemManager:
 
     def __init__(self, game):
         self.game = game
-        self.items = []  # Lista de TargetItem
-        self.pokedex = Pokedex()
+        self.items = []
+        self.catalog = item_catalog
         self.items_stolen = 0
         self.items_protected = 0
         self.game_over = False
@@ -40,20 +40,18 @@ class TargetItemManager:
                 items_list = items_data if isinstance(items_data, list) else []
 
             for item_data in items_list:
-                sprite = self._get_item_sprite(item_data["item_id"])
+                # Pega o ID do item
+                item_id = item_data.get("item_id", 1)
 
+                # Cria o item (o construtor já carrega sprite do catálogo)
                 item = TargetItem(
                     item_data["x"],
                     item_data["y"],
-                    item_data["item_id"],
-                    item_data.get("name", "Item"),
-                    sprite,
-                    item_data.get("quantity", 1)
+                    item_id
                 )
 
-                # PASSA O SCREEN_MANAGER para o item
+                # Passa o screen_manager
                 item.screen_manager = self.game.screen_manager
-
                 self.items.append(item)
 
             print(f"Itens alvo carregados: {len(self.items)}")
@@ -70,30 +68,6 @@ class TargetItemManager:
             self.game_over = False
             return False
 
-    def _get_item_sprite(self, item_id):
-        """Retorna um sprite para o item (placeholder por enquanto)"""
-        # Placeholder - criar sprites coloridos diferentes por ID
-        sprite = pygame.Surface((16, 16), pygame.SRCALPHA)
-
-        colors = {
-            1: (255, 215, 0),  # Ouro - Rare Candy
-            2: (255, 0, 0),    # Vermelho - Master Ball
-            3: (0, 255, 0),    # Verde - Potion
-            4: (0, 0, 255),    # Azul - Revive
-            5: (255, 165, 0),  # Laranja - Poké Ball
-        }
-
-        color = colors.get(item_id, (200, 200, 200))
-
-        # Desenha um ícone simples
-        pygame.draw.rect(sprite, color, (0, 0, 16, 16))
-        pygame.draw.rect(sprite, (255, 255, 255), (0, 0, 16, 16), 2)
-
-        # Adiciona um brilho
-        pygame.draw.line(sprite, (255, 255, 255, 100), (2, 2), (14, 2), 2)
-
-        return sprite
-
     def update(self, dt):
         """Atualiza todos os itens"""
         items_to_remove = []
@@ -106,7 +80,6 @@ class TargetItemManager:
                 items_to_remove.append(item)
                 self.items_stolen += 1
                 self.items_protected -= 1
-                #self.stolen_flash_timer = self.stolen_flash_duration
 
                 print(f"[ITENS] {item.item_name} foi levado! Restam {self.items_protected}")
 
@@ -125,7 +98,6 @@ class TargetItemManager:
 
     def check_victory(self):
         """Verifica se todos os itens estão protegidos e waves acabaram"""
-        # Vitória quando todas as waves acabaram e ainda há itens
         return self.items_protected > 0 and not self.game_over
 
     def render(self, screen, camera):

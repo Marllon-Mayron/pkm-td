@@ -1,6 +1,7 @@
 {
     "unlocked_phases": [
-        1
+        "1-1",
+        "2-1"
     ],
     "completed_phases": [],
     "current_chapter": 1,

@@ -1,7 +1,6 @@
-# src/scenes/phase_select_scene.py
-
 """
 Tela de seleção de fases - Versão dinâmica com scroll
+Adaptada para usar IDs compostos (formato "capítulo-fase")
 """
 import pygame
 import math
@@ -16,6 +15,7 @@ class PhaseCard:
         self.phase_number = phase_data["number"]
         self.phase_name = phase_data["name"]
         self.chapter_id = phase_data["chapter"]
+        self.phase_id = f"{self.chapter_id}-{self.phase_number}"  # ID composto
         self.unlocked = unlocked
         self.completed = completed
         self.rect = pygame.Rect(0, 0, 0, 0)
@@ -48,10 +48,10 @@ class PhaseCard:
         if event.type == pygame.MOUSEMOTION:
             was_hovered = self.is_hovered
             self.is_hovered = self.rect.collidepoint(event.pos)
-            return was_hovered != self.is_hovered  # Retorna se houve mudança
+            return was_hovered != self.is_hovered
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered and self.unlocked:
-                return self.phase_number
+                return self.phase_number  # Retorna o número da fase
         return None
 
     def render(self, screen, font_large, font_small, font_name):
@@ -75,13 +75,13 @@ class PhaseCard:
         pygame.draw.rect(screen, color, self.rect, border_radius=12)
         pygame.draw.rect(screen, border, self.rect, 2, border_radius=12)
 
-        # Número da fase (pequeno no canto)
-        num_text = font_small.render(f"#{self.phase_number}", True, self.text_color)
+        # Número da fase (agora mostra o ID composto)
+        num_text = font_small.render(f"{self.phase_id}", True, self.text_color)
         screen.blit(num_text, (self.rect.x + 8, self.rect.y + 8))
 
         # Nome da fase (centralizado, com quebra de linha se necessário)
         self._render_wrapped_text(screen, self.phase_name, font_name, name_color,
-                                 self.rect.centerx, self.rect.centery - 15)
+                                  self.rect.centerx, self.rect.centery - 15)
 
         # Texto de status
         if not self.unlocked:
@@ -235,6 +235,27 @@ class PhaseSelectScene(BaseScene):
         # Animação
         self.hover_changed = False
 
+        # Modo de desenvolvimento (opcional)
+        self.dev_mode = True  # Mude para False em produção
+        if self.dev_mode:
+            self._setup_dev_mode()
+
+    def _setup_dev_mode(self):
+        """Configurações para modo de desenvolvimento"""
+        # Descomente a linha abaixo para desbloquear todas as fases até o capítulo 3
+        # self.progress.unlock_all_for_testing(max_chapter=3, phases_per_chapter=5)
+
+        # Ou desbloqueie apenas a fase 2-1
+        # self.progress.unlock_specific_phase("2-1")
+
+        # Ou desbloqueie todo o capítulo 2
+        chapter_2_phases = []
+        for phase_data in self.catalog.get_chapter_phases(2):
+            chapter_2_phases.append(f"2-{phase_data['number']}")
+        if chapter_2_phases:
+            self.progress.unlock_chapter(2, chapter_2_phases)
+            print(f"Capítulo 2 desbloqueado! Fases: {chapter_2_phases}")
+
     def _get_first_available_chapter(self):
         """Retorna o primeiro capítulo com fases desbloqueadas"""
         if not self.available_chapters:
@@ -243,7 +264,8 @@ class PhaseSelectScene(BaseScene):
         for chapter_id in self.available_chapters:
             phases = self.catalog.get_chapter_phases(chapter_id)
             for phase in phases:
-                if self.progress.is_phase_unlocked(phase["number"]):
+                phase_id = f"{chapter_id}-{phase['number']}"
+                if self.progress.is_phase_unlocked(phase_id):
                     return chapter_id
         return self.available_chapters[0]
 
@@ -285,10 +307,10 @@ class PhaseSelectScene(BaseScene):
             for i, chapter_id in enumerate(self.available_chapters):
                 tab_x = tab_start_x + i * (tab_width + tab_spacing)
                 phases = self.catalog.get_chapter_phases(chapter_id)
-                progress = self.progress.get_chapter_progress(
-                    chapter_id,
-                    [p["number"] for p in phases]
-                )
+
+                # Converte para IDs compostos para o progresso
+                phase_ids = [f"{chapter_id}-{p['number']}" for p in phases]
+                progress = self.progress.get_chapter_progress(chapter_id, phase_ids)
 
                 tab = ChapterTab(chapter_id, f"CAPÍTULO {chapter_id}", progress)
                 tab.update_position(tab_x, tab_y, tab_width, tab_height)
@@ -352,8 +374,10 @@ class PhaseSelectScene(BaseScene):
             card_x = grid_start_x + col * (card_width + card_margin)
             card_y = grid_start_y + row * (card_height + card_margin) - self.scroll_y
 
-            unlocked = self.progress.is_phase_unlocked(phase_data["number"])
-            completed = self.progress.is_phase_completed(phase_data["number"])
+            # Usa ID composto para verificar status
+            phase_id = f"{self.current_chapter_id}-{phase_data['number']}"
+            unlocked = self.progress.is_phase_unlocked(phase_id)
+            completed = self.progress.is_phase_completed(phase_id)
 
             card = PhaseCard(phase_data, unlocked, completed)
             card.update_position(card_x, card_y, card_width, card_height)
@@ -384,17 +408,21 @@ class PhaseSelectScene(BaseScene):
                             tab.active = (tab.chapter_id == self.current_chapter_id)
             elif event.key == pygame.K_r and pygame.key.get_mods() & pygame.KMOD_CTRL:
                 self.progress.reset_progress()
-                self.catalog.refresh()  # Recarrega catálogo
+                self.catalog.refresh()
                 self.available_chapters = sorted(self.catalog.get_all_phases().keys())
                 self.current_chapter_id = self._get_first_available_chapter()
                 self.layout_initialized = False
+            elif event.key == pygame.K_u:  # Tecla U para desbloquear fase específica
+                self._debug_unlock_next()
+            elif event.key == pygame.K_a:  # Tecla A para desbloquear todas
+                self._debug_unlock_all()
 
         elif event.type == pygame.VIDEORESIZE:
             self.layout_initialized = False
 
         elif event.type == pygame.MOUSEWHEEL:
             if self.phase_cards and self.max_scroll > 0:
-                self.scroll_target += event.y * -30  # Invertido para scroll natural
+                self.scroll_target += event.y * -30
                 self.scroll_target = max(0, min(self.max_scroll, self.scroll_target))
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -429,7 +457,7 @@ class PhaseSelectScene(BaseScene):
                         self.start_phase(result)
                         return
 
-            elif event.button == 3:  # Right click - reset scroll (opcional)
+            elif event.button == 3:  # Right click - reset scroll
                 self.scroll_target = 0
                 self.scroll_y = 0
 
@@ -439,11 +467,8 @@ class PhaseSelectScene(BaseScene):
 
         elif event.type == pygame.MOUSEMOTION:
             # Atualiza hover dos cards
-            hover_changed = False
             for card in self.phase_cards:
-                result = card.handle_event(event)
-                if result:
-                    hover_changed = True
+                card.handle_event(event)
 
             for tab in self.chapter_tabs:
                 tab.handle_event(event)
@@ -456,22 +481,50 @@ class PhaseSelectScene(BaseScene):
                 self.scroll_target = max(0, min(self.max_scroll, self.scroll_target))
                 self.last_mouse_y = event.pos[1]
 
+    def _debug_unlock_next(self):
+        """Desbloqueia a próxima fase (para debug)"""
+        if self.phase_cards:
+            # Encontra a primeira fase não desbloqueada
+            for card in self.phase_cards:
+                if not card.unlocked:
+                    self.progress.unlock_specific_phase(card.phase_id)
+                    print(f"Fase {card.phase_id} desbloqueada via debug!")
+                    self._create_phase_cards()
+                    break
+            else:
+                # Se todas estão desbloqueadas, tenta a primeira do próximo capítulo
+                next_chapter = self.current_chapter_id + 1
+                if next_chapter in self.available_chapters:
+                    phases = self.catalog.get_chapter_phases(next_chapter)
+                    if phases:
+                        first_phase = phases[0]
+                        phase_id = f"{next_chapter}-{first_phase['number']}"
+                        self.progress.unlock_specific_phase(phase_id)
+                        print(f"Fase {phase_id} desbloqueada via debug!")
+                        self._create_phase_cards()
+
+    def _debug_unlock_all(self):
+        """Desbloqueia todas as fases (para debug)"""
+        all_phases = self.catalog.get_all_phases()
+        for chapter_id, phases in all_phases.items():
+            for phase in phases:
+                phase_id = f"{chapter_id}-{phase['number']}"
+                self.progress.unlock_specific_phase(phase_id)
+        print("Todas as fases desbloqueadas via debug!")
+        self._create_phase_cards()
+
     def fixed_update(self, dt):
         """Update com suavização do scroll"""
-        # Suaviza o scroll
         if abs(self.scroll_y - self.scroll_target) > 0.1:
             self.scroll_y += (self.scroll_target - self.scroll_y) * min(1, dt * 10)
 
-            # Atualiza posição dos cards
             if self.phase_cards:
                 viewport_x = self.screen_manager.viewport_x
                 viewport_y = self.screen_manager.viewport_y
                 viewport_width = self.screen_manager.viewport_width
 
-                # Recalcula grid (simplificado - só atualiza Y)
                 phases = self.catalog.get_chapter_phases(self.current_chapter_id)
                 if phases:
-                    # Determina número de colunas (mesmo cálculo do _create_phase_cards)
                     card_base_width = 140
                     card_margin = 20
                     available_width = viewport_width - 100
@@ -496,13 +549,9 @@ class PhaseSelectScene(BaseScene):
 
     def render(self, screen):
         """Renderiza a tela de seleção"""
-        # Verifica resize
         self._check_resize()
-
-        # Fundo
         self._draw_gradient_background(screen)
 
-        # Cria layout se necessário
         if not self.layout_initialized:
             self._create_layout()
 
@@ -528,34 +577,32 @@ class PhaseSelectScene(BaseScene):
         if self.chapter_tabs:
             phases = self.catalog.get_chapter_phases(self.current_chapter_id)
             if phases:
-                # Linhas decorativas
                 line_y = self.chapter_tabs[0].rect.bottom + 15
                 line_width = 200
                 line_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - line_width) // 2
                 pygame.draw.line(screen, (70, 70, 80), (line_x, line_y), (line_x + line_width, line_y), 1)
 
-                # Total de fases
                 total_text = f"{len(phases)} fases disponíveis"
                 total_surface = self.tab_font.render(total_text, True, (180, 180, 190))
-                total_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - total_surface.get_width()) // 2
+                total_x = self.screen_manager.viewport_x + (
+                            self.screen_manager.viewport_width - total_surface.get_width()) // 2
                 total_y = line_y + 8
                 screen.blit(total_surface, (total_x, total_y))
 
                 line_y2 = total_y + 20
                 pygame.draw.line(screen, (70, 70, 80), (line_x, line_y2), (line_x + line_width, line_y2), 1)
 
-        # Área de clipping para os cards (para scroll funcionar)
+        # Área de clipping para os cards
         viewport_x = self.screen_manager.viewport_x
         viewport_y = self.screen_manager.viewport_y
         viewport_width = self.screen_manager.viewport_width
         viewport_height = self.screen_manager.viewport_height
 
-        # Define área de clipping
         clip_rect = pygame.Rect(
             viewport_x,
-            viewport_y + 160,  # Começa depois das abas
+            viewport_y + 160,
             viewport_width,
-            viewport_height - 190  # Altura disponível
+            viewport_height - 190
         )
 
         old_clip = screen.get_clip()
@@ -563,20 +610,20 @@ class PhaseSelectScene(BaseScene):
 
         # Grid de fases
         for card in self.phase_cards:
-            # Só renderiza se estiver dentro da área de clipping
             if card.rect.bottom > clip_rect.top and card.rect.top < clip_rect.bottom:
                 card.render(screen, self.phase_font_large, self.phase_font_small, self.phase_font_name)
 
-        # Restaura clipping
         screen.set_clip(old_clip)
 
-        # Barra de scroll (se necessário)
+        # Barra de scroll
         if self.max_scroll > 0:
             self._render_scroll_bar(screen)
 
         # Instruções
         font_small = pygame.font.Font(None, 18)
         inst_text = "< >  NAVEGAR  |  CLIQUE NA FASE  |  ESC  VOLTAR"
+        if self.dev_mode:
+            inst_text += "  |  [U] próxima fase  |  [A] todas"
         inst = font_small.render(inst_text, True, (120, 120, 130))
         inst_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - inst.get_width()) // 2
         inst_y = self.screen_manager.viewport_y + self.screen_manager.viewport_height - 25
@@ -588,7 +635,6 @@ class PhaseSelectScene(BaseScene):
         debug_y = self.screen_manager.viewport_y + self.screen_manager.viewport_height - 25
         screen.blit(debug_text, (debug_x, debug_y))
 
-        # Overlay de pausa
         if self.paused:
             self._render_pause_overlay(screen)
 
@@ -625,10 +671,8 @@ class PhaseSelectScene(BaseScene):
         scroll_height = max(30, height * (height / (height + self.max_scroll)))
         scroll_pos = y + (self.scroll_y / self.max_scroll) * (height - scroll_height)
 
-        # Fundo da barra
         pygame.draw.rect(screen, (40, 40, 45), (x, y, width, height))
 
-        # Barra de scroll
         scroll_rect = pygame.Rect(x, scroll_pos, width, scroll_height)
         if self.dragging_scroll:
             color = (120, 120, 130)
@@ -660,15 +704,14 @@ class PhaseSelectScene(BaseScene):
 
     def start_phase(self, phase_number):
         """Inicia a fase selecionada"""
-        # Pega informações da fase
+        phase_id = f"{self.current_chapter_id}-{phase_number}"
         phase_info = self.catalog.get_phase_info(self.current_chapter_id, phase_number)
+
         if phase_info:
-            print(f"Iniciando fase: {phase_info['name']}")
+            print(f"Iniciando fase: {phase_id} - {phase_info['name']}")
 
         # Vai para a tela de seleção de time
-        # Importa aqui para evitar import circular
         from src.scenes.team_select_scene import TeamSelectScene
 
-        # Cria a cena se não existir ou recria
-        self.game.team_select_scene = TeamSelectScene(self.game, self.current_chapter_id,phase_number)
+        self.game.team_select_scene = TeamSelectScene(self.game, self.current_chapter_id, phase_number)
         self.game.current_scene = self.game.team_select_scene

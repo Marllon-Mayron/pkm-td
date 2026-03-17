@@ -20,10 +20,12 @@ from src.scenes.game_scene.components.renderer.target_item_renderer import Targe
 
 
 class GameScene(BaseScene):
-    def __init__(self, game, phase_number=1):
+    def __init__(self, game, chapter_id=1, phase_number=1):
         super().__init__(game)
 
+        self.chapter_id = chapter_id
         self.phase_number = phase_number
+        self.phase_id = f"{chapter_id}-{phase_number}"  # ID composto
         self.phase_info = None
 
         # Carrega informações da fase do catálogo
@@ -51,7 +53,7 @@ class GameScene(BaseScene):
 
         self.player = game.player
 
-        #Timer para game over
+        # Timer para game over
         self.game_over_timer = 0
         self.game_over_delay = 3.0
 
@@ -100,8 +102,9 @@ class GameScene(BaseScene):
 
         print(f"\n=== FASE CARREGADA ===")
         print(f"Fase: {self.phase_info.get('name', 'Desconhecida')}")
-        print(f"Capítulo: {self.phase_info.get('chapter', 1)}")
+        print(f"Capítulo: {self.chapter_id}")
         print(f"Número: {self.phase_number}")
+        print(f"ID: {self.phase_id}")
         print(f"Waves: {len(self.wave_manager.waves_data)}")
         print(f"Itens alvo: {len(self.target_item_manager.items)}")
         print(f"Mundo: {self.world_width}x{self.world_height}")
@@ -117,29 +120,25 @@ class GameScene(BaseScene):
             print("Fase não tem waves configuradas!")
 
     def _load_phase_info(self):
-        """Carrega informações da fase do catálogo"""
-        # Precisa encontrar em qual capítulo está esta fase
-        all_phases = phase_catalog.get_all_phases()
-        for chapter, phases in all_phases.items():
-            for phase in phases:
-                if phase["number"] == self.phase_number:
-                    self.phase_info = phase
-                    return
+        """Carrega informações da fase do catálogo usando chapter_id e phase_number"""
+        # Tenta pegar do catálogo usando chapter_id e phase_number
+        self.phase_info = phase_catalog.get_phase_info(self.chapter_id, self.phase_number)
 
-        # Fallback se não encontrar
-        self.phase_info = {
-            "name": f"Fase {self.phase_number}",
-            "number": self.phase_number,
-            "chapter": 1
-        }
+        # Se não encontrar, cria um fallback
+        if not self.phase_info:
+            self.phase_info = {
+                "name": f"Fase {self.chapter_id}-{self.phase_number}",
+                "number": self.phase_number,
+                "chapter": self.chapter_id
+            }
+            print(f"Fase {self.phase_id} não encontrada no catálogo, usando fallback")
 
     def _load_phase_data(self):
-        """Carrega os dados da fase do disco"""
-        chapter = self.phase_info.get("chapter", 1)
-        data = phase_loader.load_phase(chapter, self.phase_number)
+        """Carrega os dados da fase do disco usando chapter_id e phase_number"""
+        data = phase_loader.load_phase(self.chapter_id, self.phase_number)
 
         if not data:
-            print(f"ERRO: Não foi possível carregar a fase {self.phase_number}")
+            print(f"ERRO: Não foi possível carregar a fase {self.phase_id}")
             return
 
         # Carrega mapa

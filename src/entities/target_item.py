@@ -1,25 +1,51 @@
 # src/entities/target_item.py
 
 import pygame
+import os
 from src.entities.base import Entity
+from src.data.item_catalog import item_catalog
 
 
 class TargetItem(Entity):
     """Item que precisa ser protegido durante a wave"""
 
-    def __init__(self, x, y, item_id, name="Item", sprite=None, quantity=1):
-        super().__init__(x, y, 16, 16, sprite)  # Tamanho fixo 16x16
+    def __init__(self, x, y, item_id):
+        super().__init__(x, y, 16, 16, None)  # Hitbox continua 16x16
 
         self.item_id = item_id
-        self.item_name = name
-        self.quantity = quantity
-        self.is_protected = True  # Se ainda está protegido
-        self.carried_by = None  # Pokémon que está carregando
-        self.capture_progress = 0  # Progresso de captura (0-100)
-        self.capture_rate = 10  # Quanto aumenta por frame
+
+        # Carrega informações do catálogo
+        item_info = item_catalog.get_item(item_id)
+        self.item_name = item_info["name"]
+        self.sprite_path = item_info["sprite"]
+
+        self.is_protected = True
+        self.carried_by = None
+        self.capture_progress = 0
+        self.capture_rate = 10
+
+        # Carrega sprite (mantém tamanho original)
+        self.sprite = None
+        self.original_sprite_size = 32  # Tamanho original do sprite
+        self.load_sprite()
 
         # Referência ao screen_manager (será setado pelo jogo)
         self.screen_manager = None
+
+    def load_sprite(self):
+        """Carrega o sprite do item mantendo tamanho original"""
+        if self.sprite_path and os.path.exists(self.sprite_path):
+            try:
+                # Carrega o sprite no tamanho original
+                self.sprite = pygame.image.load(self.sprite_path).convert_alpha()
+                print(
+                    f"✓ Sprite do item {self.item_name} carregado ({self.sprite.get_width()}x{self.sprite.get_height()})")
+            except Exception as e:
+                print(f"✗ Erro ao carregar sprite do item {self.sprite_path}: {e}")
+                self.sprite = None
+        else:
+            print(f"✗ Sprite do item {self.item_name} não encontrado: {self.sprite_path}")
+            self.sprite = None
 
     def update(self, dt):
         """Atualiza lógica do item"""
@@ -38,7 +64,7 @@ class TargetItem(Entity):
             print(f"{pokemon.name} começou a carregar {self.item_name}")
 
     def update_capture(self, dt):
-        """Atualiza o progresso de captura (chamado pelo Pokémon)"""
+        """Atualiza o progresso de captura"""
         if self.carried_by:
             self.capture_progress += self.capture_rate * dt
             if self.capture_progress >= 100:
@@ -53,69 +79,51 @@ class TargetItem(Entity):
             print(f"{self.item_name} foi levado!")
 
     def render(self, screen, camera=None):
-        """Renderiza o item com indicadores visuais"""
-        if not self.sprite:
-            return
-
-        # CONVERSÃO CORRETA para coordenadas de tela
+        """Renderiza o item com sprite em tamanho reduzido (16x16)"""
+        # Determina posição na tela
         if camera and self.screen_manager:
-            # Usa o mesmo sistema que o Pokémon
+            # Usa a posição do tile (canto superior esquerdo)
             screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
-
-            # Calcula escala baseada no zoom
             zoom_scale = camera.zoom * self.screen_manager.render_scale
-            size = max(1, int(16 * zoom_scale))
 
-            # Redimensiona sprite se necessário
-            if self.sprite.get_width() != size:
-                sprite_to_draw = pygame.transform.scale(self.sprite, (size, size))
-            else:
-                sprite_to_draw = self.sprite
+            # Tamanho do sprite na tela - AGORA METADE (16 em vez de 32)
+            sprite_size = max(1, int(16 * zoom_scale))  # 16 é metade de 32
         else:
-            # Fallback para coordenadas diretas (sem câmera)
             screen_x = self.x
             screen_y = self.y
-            sprite_to_draw = self.sprite
-            size = 16
+            sprite_size = 16  # Tamanho fixo 16x16 sem zoom
 
-        # Desenha o sprite base
-        screen.blit(sprite_to_draw, (screen_x, screen_y))
+        # Se tem sprite, usa ele
+        if self.sprite:
+            sprite_to_draw = pygame.transform.scale(self.sprite, (sprite_size, sprite_size))
 
-        # Se está sendo carregado, mostra barra de progresso
+            screen.blit(sprite_to_draw, (screen_x, screen_y))
+        else:
+            # Fallback: desenha placeholder no tamanho do grid
+            colors = [(255, 215, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)]
+            color = colors[(self.item_id - 1) % len(colors)]
+
+            pygame.draw.rect(screen, color, (screen_x, screen_y, sprite_size, sprite_size))
+            font = pygame.font.Font(None, sprite_size // 2)
+            text = font.render(str(self.item_id), True, (255, 255, 255))
+            text_rect = text.get_rect(center=(screen_x + sprite_size // 2, screen_y + sprite_size // 2))
+            screen.blit(text, text_rect)
+
+        # Barra de progresso se está sendo carregado
         if self.carried_by:
-            # Fundo da barra
-            bar_width = 20
-            bar_height = 3
-            bar_x = screen_x - 2
-            bar_y = screen_y - 8
+            bar_width = sprite_size  # Barra do tamanho do sprite
+            bar_height = 4
+            bar_x = screen_x
+            bar_y = screen_y - 10
 
             pygame.draw.rect(screen, (50, 50, 50),
                              (bar_x, bar_y, bar_width, bar_height))
 
-            # Progresso
             progress_width = (self.capture_progress / 100) * bar_width
             if self.capture_progress < 50:
-                color = (255, 255, 0)  # Amarelo
+                color = (255, 255, 0)
             else:
-                color = (255, 100, 0)  # Laranja -> Vermelho
+                color = (255, 100, 0)
 
             pygame.draw.rect(screen, color,
                              (bar_x, bar_y, progress_width, bar_height))
-
-        # Se está protegido, mostra um brilho/contorno
-        if self.is_protected and not self.carried_by:
-            # Círculo pulsante
-            pulse = abs(pygame.time.get_ticks() % 1000 - 500) / 500
-            alpha = int(100 + 100 * pulse)
-            glow_surf = pygame.Surface((size + 4, size + 4), pygame.SRCALPHA)
-            pygame.draw.circle(glow_surf, (0, 255, 0, alpha),
-                               (size // 2 + 2, size // 2 + 2), size // 2 + 4)
-            screen.blit(glow_surf, (screen_x - 2, screen_y - 2))
-
-        # Quantidade (se maior que 1)
-        if self.quantity > 1:
-            font = pygame.font.Font(None, max(12, size // 2))
-            text = font.render(f"x{self.quantity}", True, (255, 255, 255))
-            text_x = screen_x + size - text.get_width() - 2
-            text_y = screen_y - text.get_height() - 2
-            screen.blit(text, (text_x, text_y))
