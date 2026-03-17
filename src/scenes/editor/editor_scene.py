@@ -4,6 +4,7 @@ Cena do Editor de Fases - Versão Modular (SEM TORRES)
 import pygame
 from tkinter import filedialog, Tk
 
+from src.editor.target_item_editor import TargetItemManager
 from src.editor.wave_config import WaveManager
 from src.scenes.base_scene import BaseScene
 from src.editor.layer_manager import LayerManager, LayerType
@@ -16,6 +17,7 @@ from src.scenes.editor.components.managers.path_manager import PathManager
 from src.scenes.editor.components.managers.undo_manager import UndoManager
 from src.scenes.editor.components.map_config_dialog import MapConfigDialog
 from src.scenes.editor.components.mode_buttons import ModeButtons
+from src.scenes.editor.components.target_item_dialog import TargetItemDialog
 from src.scenes.editor.components.tile_palette import TilePalette
 # NOVO: Import do diálogo de carregar
 from src.scenes.editor.components.load_phase_dialog import LoadPhaseDialog
@@ -51,6 +53,11 @@ class EditorScene(BaseScene):
         self.tower_spots = TowerSpotManager()  # Agora só marca onde colocar Pokémons
         self.exporter = PhaseExporter()
         self.undo_manager = UndoManager(max_steps=10)
+        #Gerenciador de itens alvo
+        self.target_items = TargetItemManager()
+
+        #Diálogo de itens
+        self.target_item_dialog = None
 
         # Estado do editor
         self.mode = "layers"  # layers, path, towers
@@ -128,13 +135,35 @@ class EditorScene(BaseScene):
 
     def set_mode(self, mode):
         """Altera o modo do editor"""
+        print(f"DEBUG: set_mode({mode})")  # DEBUG
+
         self.mode = mode
+
         if mode == "path":
             if not self.wave_manager.waves:
                 self.wave_manager.add_wave()
-        # NOVO: Modo load_phase abre o diálogo
+
         elif mode == "load_phase":
             self._open_load_phase_dialog()
+
+        elif mode == "items":
+            print("DEBUG: Abrindo diálogo de itens")  # DEBUG
+            # Se já tem um diálogo aberto, só reativa
+            if not self.target_item_dialog or not self.target_item_dialog.visible:
+                self._open_target_item_dialog()
+            print("Modo Itens Ativado - Clique no mapa para posicionar itens")
+
+        elif mode == "layers":
+            # Fecha diálogo de items se estiver aberto
+            if self.target_item_dialog:
+                self.target_item_dialog.visible = False
+                self.target_item_dialog = None
+
+        elif mode == "towers":
+            # Fecha diálogo de items se estiver aberto
+            if self.target_item_dialog:
+                self.target_item_dialog.visible = False
+                self.target_item_dialog = None
 
     def _import_tileset(self):
         """Importa um tileset para a layer atual"""
@@ -164,11 +193,110 @@ class EditorScene(BaseScene):
             self.tower_spots.remove_spot_by_index(self.tower_spots.selected_spot)
 
     def _handle_left_click(self, world_pos, continuous=False):
-        """Delega clique esquerdo para o map handler"""
+        """Delega clique esquerdo para o map handler ou trata items"""
+
+        # NOVO: Modo items - NUNCA deve ser contínuo
+        if self.mode == "items" and not continuous:
+            # Converte para coordenadas de tile
+            tile_x = int(world_pos[0] // self.grid_size)
+            tile_y = int(world_pos[1] // self.grid_size)
+
+            # Ajusta para grid
+            grid_x = tile_x * self.grid_size
+            grid_y = tile_y * self.grid_size
+
+            # Verifica se há um item selecionado no diálogo
+            if self.target_item_dialog and self.target_item_dialog.selected_item_index >= 0:
+                # Se há um item selecionado, move ele para a nova posição
+                selected_idx = self.target_item_dialog.selected_item_index
+                if selected_idx < len(self.target_items.items):
+                    item = self.target_items.items[selected_idx]
+
+                    # Salva undo ANTES da modificação
+                    self.undo_manager.save_state(self, f"Mover item para ({grid_x}, {grid_y})")
+
+                    # Move o item
+                    item.x = grid_x
+                    item.y = grid_y
+                    print(f"Item movido para ({grid_x}, {grid_y})")
+
+                    # Desseleciona o item após mover
+                    self.target_item_dialog.selected_item_index = -1
+            else:
+                # MODIFICADO: Sempre cria um novo item, mesmo se já existir na posição
+                item_id = 1  # Valor padrão
+
+                if self.target_item_dialog:
+                    try:
+                        item_id = int(
+                            self.target_item_dialog.temp_item_id) if self.target_item_dialog.temp_item_id else 1
+                    except ValueError:
+                        pass
+
+                # Salva undo ANTES da criação
+                self.undo_manager.save_state(self, f"Criar item em ({grid_x}, {grid_y})")
+
+                # Cria o novo item (SEM quantidade)
+                index = self.target_items.add_item(grid_x, grid_y, item_id)
+
+                # Seleciona o item recém-criado
+                if self.target_item_dialog and index >= 0:
+                    self.target_item_dialog.selected_item_index = index
+                    print(f"Novo item {item_id} criado e selecionado")
+
+            return True  # Indica que consumiu o evento
+
+        # Para outros modos, delega para o map handler
         self.map_handler.handle_left_click(world_pos, continuous)
 
     def _handle_right_click(self, world_pos):
-        """Delega clique direito para o map handler"""
+        """Delega clique direito para o map handler ou trata items"""
+
+        # NOVO: Modo items - remove item (agora com seleção de múltiplos)
+        if self.mode == "items":
+            # Converte para coordenadas de tile
+            tile_x = int(world_pos[0] // self.grid_size)
+            tile_y = int(world_pos[1] // self.grid_size)
+
+            # Ajusta para grid
+            grid_x = tile_x * self.grid_size
+            grid_y = tile_y * self.grid_size
+
+            # MODIFICADO: Pega TODOS os itens na posição
+            items_at_pos = self.target_items.get_items_at(grid_x + 8, grid_y + 8)
+
+            if items_at_pos:
+                # Se houver um item selecionado no diálogo, remove ele primeiro
+                if self.target_item_dialog and self.target_item_dialog.selected_item_index >= 0:
+                    selected_idx = self.target_item_dialog.selected_item_index
+                    if selected_idx < len(self.target_items.items):
+                        item = self.target_items.items[selected_idx]
+                        if item in items_at_pos:
+                            # Remove o item selecionado
+                            self.undo_manager.save_state(self, f"Remover item selecionado em ({grid_x}, {grid_y})")
+                            self.target_items.remove_item(item)
+                            self.target_item_dialog.selected_item_index = -1
+                            print(f"Item selecionado removido de ({grid_x}, {grid_y})")
+                            return True
+
+                # Se não removeu um específico, remove o primeiro da lista
+                self.undo_manager.save_state(self, f"Remover item em ({grid_x}, {grid_y})")
+                self.target_items.remove_item(items_at_pos[0])
+
+                # Se o item removido era o selecionado, desseleciona
+                if self.target_item_dialog:
+                    selected = self.target_item_dialog.selected_item_index
+                    if selected >= 0 and selected < len(self.target_items.items):
+                        if self.target_items.items[selected] == items_at_pos[0]:
+                            self.target_item_dialog.selected_item_index = -1
+
+                print(f"Item removido de ({grid_x}, {grid_y})")
+            else:
+                print("Nenhum item nesta posição")
+
+            return True
+
+        # Para outros modos, delega para o map handler
         self.map_handler.handle_right_click(world_pos)
 
     def _open_map_config_dialog(self):
@@ -187,7 +315,6 @@ class EditorScene(BaseScene):
                 self.phase_name
             )
 
-    # NOVO: Método para abrir diálogo de carregar fase
     def _open_load_phase_dialog(self):
         """Abre diálogo para carregar uma fase existente"""
         dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
@@ -197,7 +324,15 @@ class EditorScene(BaseScene):
             self.exporter
         )
 
-    # NOVO: Método para processar resultado do carregamento
+    def _open_target_item_dialog(self):
+        """Abre diálogo para configurar itens alvo"""
+        dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
+        dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 450) // 2
+        self.target_item_dialog = TargetItemDialog(
+            dialog_x, dialog_y, 400, 450,
+            self.target_items
+        )
+
     def _handle_load_phase_result(self, result):
         """Processa o resultado do diálogo de carregamento"""
         if result and result.get('action') == 'load':
@@ -267,7 +402,7 @@ class EditorScene(BaseScene):
                 self.wave_config_dialog = None
             return True
 
-        # NOVO: Diálogo de carregar fase
+        # Diálogo de carregar fase
         if self.load_phase_dialog and self.load_phase_dialog.visible:
             result = self.load_phase_dialog.handle_event(event)
             if result is not None:
@@ -275,6 +410,15 @@ class EditorScene(BaseScene):
                 self.load_phase_dialog = None
             elif not self.load_phase_dialog.visible:
                 self.load_phase_dialog = None
+            return
+
+        # Diálogo de Items
+        if self.target_item_dialog and self.target_item_dialog.visible:
+            result = self.target_item_dialog.handle_event(event)
+            if result == "saved":
+                self.target_item_dialog = None
+            elif not self.target_item_dialog.visible:
+                self.target_item_dialog = None
             return
 
         # Processa normalmente
@@ -300,7 +444,8 @@ class EditorScene(BaseScene):
             "map": self.layer_manager.to_dict(),
             "paths": self.path_manager.to_dict(),
             "waves": self.wave_manager.to_dict(),
-            "tower_spots": self.tower_spots.to_dict(),  # Apenas os spots
+            "tower_spots": self.tower_spots.to_dict(),
+            "target_items": self.target_items.to_dict(),
             "rewards": {
                 "money": 100,
                 "experience": 50
@@ -308,7 +453,9 @@ class EditorScene(BaseScene):
         }
 
         self.exporter.export_phase(phase_data, self.current_chapter, self.current_phase)
-        print(f"Fase salva com {len(self.wave_manager.waves)} waves e {len(self.tower_spots.spots)} spots!")
+        print(f"Fase salva com {len(self.wave_manager.waves)} waves, "
+              f"{len(self.tower_spots.spots)} spots e "
+              f"{len(self.target_items.items)} itens alvo!")
 
     def load_phase(self, chapter, phase_number):
         """Carrega uma fase existente"""
@@ -345,6 +492,11 @@ class EditorScene(BaseScene):
             if "tower_spots" in phase_data:
                 self.tower_spots.from_dict(phase_data["tower_spots"])
                 print(f"Carregados {len(self.tower_spots.spots)} spots")
+
+            # Carrega os items
+            if "target_items" in phase_data:
+                self.target_items.from_dict(phase_data["target_items"])
+                print(f"Carregados {len(self.target_items.items)} itens alvo")
 
             # Atualiza nome da fase
             self.phase_name = phase_data.get("name", f"Fase {chapter}-{phase_number}")

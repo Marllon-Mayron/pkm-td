@@ -27,6 +27,9 @@ class EditorRenderHandler:
         self.editor.tower_spots.render(screen, self.editor.camera, self.editor.screen_manager)
         self.editor.path_manager.render(screen, self.editor.camera, self.editor.screen_manager)
 
+        # Renderiza itens alvo
+        self.editor.target_items.render(screen, self.editor.camera, self.editor.screen_manager)
+
         # Grid
         if self.editor.show_grid:
             self._render_grid(screen)
@@ -43,6 +46,8 @@ class EditorRenderHandler:
         # UI Superior
         self._render_top_ui(screen)
 
+        # Diálogos (renderizar na ordem inversa de prioridade)
+
         # Diálogo de tamanho do mapa
         if self.editor.map_config_dialog and self.editor.map_config_dialog.visible:
             self.editor.map_config_dialog.render(screen)
@@ -51,11 +56,15 @@ class EditorRenderHandler:
         if self.editor.wave_config_dialog and self.editor.wave_config_dialog.visible:
             self.editor.wave_config_dialog.render(screen)
 
-        # NOVO: Diálogo de carregar fase
+        # Diálogo de carregar fase
         if self.editor.load_phase_dialog and self.editor.load_phase_dialog.visible:
             self.editor.load_phase_dialog.render(screen)
 
-        # Pause
+        # NOVO: Diálogo de itens alvo
+        if self.editor.target_item_dialog and self.editor.target_item_dialog.visible:
+            self.editor.target_item_dialog.render(screen)
+
+        # Pause (sempre por último)
         if self.editor.paused:
             self._render_pause_overlay(screen)
 

@@ -104,6 +104,9 @@ class Pokemon(Entity):
         self.last_x = x
         self.last_y = y
 
+        self.is_carrying = None  # Item que está carregando
+        self.capture_range = 20  # Distância para capturar item
+
     def _calculate_stats(self):
         """Calcula stats baseado em level, IVs e EVs"""
         stats = self.pokedex.calculate_stats(self.id, self.level, self.ivs, self.evs)
@@ -201,8 +204,11 @@ class Pokemon(Entity):
 
         return damage
 
-    def update(self, dt):
-        """Atualiza Pokémon"""
+    # src/entities/pokemon.py
+
+    def update(self, dt, player=None, enemies=None, items=None):
+        """Update simplificado - Pokémon segue path e pode carregar itens"""
+
         # Guarda posição anterior para calcular direção
         self.last_x = self.x
         self.last_y = self.y
@@ -213,70 +219,69 @@ class Pokemon(Entity):
             if self.attack_cooldown <= 0:
                 self.can_attack = True
 
-        # Movimento em path (para Tower Defense)
-        if self.path and len(self.path) > 0:
-            if self.path_index < len(self.path):
-                target_x, target_y = self.path[self.path_index]
+        # Lógica de captura de itens (só para inimigos)
+        if self.is_wild and items and not self.is_carrying:
+            # Verifica se há algum item próximo
+            for item in items:
+                if item.is_protected and not item.carried_by:
+                    dist = self.get_distance_to(item)
+                    if dist < self.capture_range:
+                        # Inicia captura do item (não desvia do path)
+                        item.start_capture(self)
+                        break  # Pega apenas o primeiro item
 
-                # Calcula direção
-                dx = target_x - self.x
-                dy = target_y - self.y
-                distance = math.sqrt(dx * dx + dy * dy)
+        # Movimento em path (sempre segue o path)
+        if self.path and len(self.path) > 0 and self.path_index < len(self.path):
+            target_x, target_y = self.path[self.path_index]
 
-                # ATUALIZA A DIREÇÃO baseada no movimento
-                if distance > 0:
-                    # Normaliza para determinar direção principal
-                    if abs(dx) > abs(dy):
-                        # Movimento horizontal
-                        if dx > 0:
-                            new_direction = "right"
-                        else:
-                            new_direction = "left"
-                    else:
-                        # Movimento vertical
-                        if dy > 0:
-                            new_direction = "down"
-                        else:
-                            new_direction = "up"
+            # Calcula direção
+            dx = target_x - self.x
+            dy = target_y - self.y
+            distance = math.sqrt(dx * dx + dy * dy)
 
-                    # Só atualiza se mudou de direção
-                    if new_direction != self.current_direction:
-                        self.current_direction = new_direction
-                        self.current_frame = 0  # Reinicia animação
-                        # Atualiza o sprite atual
-                        if (self.inmap_frames and
-                                self.current_direction in self.inmap_frames and
-                                self.inmap_frames[self.current_direction]):
-                            self.sprite = self.inmap_frames[self.current_direction][0]
-
-                # Velocidade baseada em dt para ser consistente
-                move_distance = self.speed * dt * 60  # Ajusta para ~60 FPS
-
-                if distance < move_distance:
-                    # Chegou no ponto
-                    self.x, self.y = target_x, target_y
-                    self.path_index += 1
-
-                    print(f"[POKEMON] {self.name} chegou no ponto {self.path_index}/{len(self.path)}")
+            # Atualiza direção baseada no movimento
+            if distance > 0:
+                if abs(dx) > abs(dy):
+                    self.current_direction = "right" if dx > 0 else "left"
                 else:
-                    # Move na direção
-                    if distance > 0:
-                        self.x += (dx / distance) * self.speed * dt * 60
-                        self.y += (dy / distance) * self.speed * dt * 60
+                    self.current_direction = "down" if dy > 0 else "up"
 
-                self.rect.x, self.rect.y = self.x, self.y
+            # Velocidade de movimento
+            move_distance = self.speed * dt * 60
 
-        # Animação (troca de frames)
+            if distance < move_distance:
+                # Chegou no ponto
+                self.x, self.y = target_x, target_y
+                self.path_index += 1
+                print(f"[POKEMON] {self.name} chegou no ponto {self.path_index}/{len(self.path)}")
+            else:
+                # Move na direção
+                if distance > 0:
+                    self.x += (dx / distance) * self.speed * dt * 60
+                    self.y += (dy / distance) * self.speed * dt * 60
+
+            self.rect.x, self.rect.y = self.x, self.y
+
+        # Se está carregando um item, atualiza o progresso
+        if self.is_carrying:
+            self.is_carrying.update_capture(dt)
+
+        # Animação (sempre executa)
         self.animation_timer += dt
         if self.animation_timer >= self.animation_speed:
             self.animation_timer = 0
-            # Avança para o próximo frame da direção atual
             if (self.inmap_frames and
                     self.current_direction in self.inmap_frames and
                     self.inmap_frames[self.current_direction]):
                 frames_list = self.inmap_frames[self.current_direction]
                 self.current_frame = (self.current_frame + 1) % len(frames_list)
                 self.sprite = frames_list[self.current_frame]
+
+    def get_distance_to(self, entity):
+        """Calcula distância até outra entidade"""
+        dx = self.x - entity.x
+        dy = self.y - entity.y
+        return (dx ** 2 + dy ** 2) ** 0.5
 
     def render(self, screen, camera=None, show_hp=True):
         """Renderiza Pokémon """

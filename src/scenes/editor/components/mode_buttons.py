@@ -12,6 +12,7 @@ class ModeButtons:
             ("LAYERS", "layers"),
             ("PATH", "path"),
             ("TOWERS", "towers"),
+            ("ITEMS", "items"),
         ]
 
         for i, (text, mode) in enumerate(modes):

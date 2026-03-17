@@ -23,6 +23,7 @@ class PhaseExporter:
             "paths": path_manager dict,
             "waves": wave_manager dict,
             "tower_spots": tower_spot_manager dict,
+            "target_items": target_item_manager dict,  # NOVO
             "rewards": dict
         }
         """
@@ -43,11 +44,19 @@ class PhaseExporter:
             "paths": phase_data["paths"],
             "waves": phase_data.get("waves", {"waves": []}),
             "tower_spots": phase_data["tower_spots"],
+            "target_items": phase_data.get("target_items", {"items": []}),  # <-- ADICIONADO
             "rewards": phase_data.get("rewards", {
                 "money": 100,
                 "experience": 50
             })
         }
+
+        # DEBUG: Mostra o que está sendo salvo
+        print(f"\n=== SALVANDO FASE {chapter}-{phase_number} ===")
+        print(f"Waves: {len(full_data['waves'].get('waves', []))}")
+        print(f"Target Items: {len(full_data['target_items'].get('items', []))}")
+        print(f"Spots: {len(full_data['tower_spots'].get('spots', []))}")
+        print("=====================================\n")
 
         # Salva arquivo
         with open(filepath, 'w', encoding='utf-8') as f:

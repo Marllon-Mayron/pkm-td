@@ -70,18 +70,33 @@ class PhaseLoader:
     def get_waves_data(self) -> list:
         """Retorna dados das waves como lista"""
         if not self.current_phase_data:
+            print("[PhaseLoader] Sem dados da fase carregados")
             return []
 
         waves_data = self.current_phase_data.get("waves", {})
 
-        # Se for dicionário com chave "waves", extrai a lista
-        if isinstance(waves_data, dict) and "waves" in waves_data:
-            return waves_data["waves"]
+        print(f"\n=== PHASE LOADER DEBUG ===")
+        print(f"Tipo de waves_data: {type(waves_data)}")
+        print(f"Conteúdo de waves_data: {waves_data}")
+        print("==========================\n")
 
-        # Se já for lista, retorna direto
+        # CASO 1: É um dicionário com chave "waves" (formato atual do editor)
+        if isinstance(waves_data, dict) and "waves" in waves_data:
+            waves_list = waves_data["waves"]
+            print(f"[PhaseLoader] Encontrou {len(waves_list)} waves no formato dict['waves']")
+            return waves_list
+
+        # CASO 2: É uma lista direta (formato antigo)
         if isinstance(waves_data, list):
+            print(f"[PhaseLoader] Encontrou {len(waves_data)} waves no formato lista")
             return waves_data
 
+        # CASO 3: É um dicionário sem a chave "waves" (formato muito antigo)
+        if isinstance(waves_data, dict) and waves_data:
+            print(f"[PhaseLoader] Convertendo dicionário para lista (1 wave)")
+            return [waves_data]
+
+        print("[PhaseLoader] Nenhuma wave encontrada")
         return []
 
     def get_rewards_data(self) -> dict:

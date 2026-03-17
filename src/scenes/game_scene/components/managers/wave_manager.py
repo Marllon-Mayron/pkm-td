@@ -30,16 +30,21 @@ class GameWaveManager:
         """Carrega os dados das waves do phase_loader"""
         raw_data = self.phase_loader.get_waves_data()
 
-        # Se for uma lista, usa direto
+        print(f"\n=== WAVE MANAGER DEBUG ===")
+        print(f"raw_data recebido: {raw_data}")
+        print(f"Tipo: {type(raw_data)}")
+        print(f"É lista? {isinstance(raw_data, list)}")
+
         if isinstance(raw_data, list):
             self.waves_data = raw_data
-        # Se for um dicionário com chave 'waves', extrai a lista
-        elif isinstance(raw_data, dict) and 'waves' in raw_data:
-            self.waves_data = raw_data['waves']
+            print(f"Waves carregadas: {len(self.waves_data)}")
+            if len(self.waves_data) > 0:
+                print(f"Primeira wave: {self.waves_data[0]}")
         else:
             self.waves_data = []
+            print("⚠️ raw_data não é uma lista, criando lista vazia")
 
-        print(f"Waves carregadas: {len(self.waves_data)}")
+        print("==========================\n")
 
     def start_next_wave(self):
         """Inicia a próxima wave"""
