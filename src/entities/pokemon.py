@@ -297,7 +297,7 @@ class Pokemon(Entity):
             screen_y = self.y
             zoom_scale = 1.0
 
-        # SPRITE - COM PIVÔ NOS PÉS (AJUSTADO PARA BAIXO)
+        # SPRITE - COM PIVÔ NOS PÉS
         if self.sprite:
             # Obtém tamanho atual
             current_width = self.sprite.get_width()
@@ -310,7 +310,7 @@ class Pokemon(Entity):
             # Redimensiona com o zoom atual
             scaled_sprite = pygame.transform.scale(self.sprite, (final_width, final_height))
 
-            # POSICIONA COM PIVÔ NOS PÉS (MAIS PARA BAIXO):
+            # POSICIONA COM PIVÔ NOS PÉS
             # Ajusta o offset para enterrar os pés no chão
             foot_offset = int(final_height * 0.2)  # 20% do sprite para baixo
 
@@ -353,7 +353,7 @@ class Pokemon(Entity):
             if hasattr(self, 'show_debug') and self.show_debug:
                 pygame.draw.circle(screen, (255, 0, 0), (int(screen_x), int(screen_y) + foot_offset), 6, 2)
 
-        # Barra de HP - ajustada para ficar acima do sprite
+        # Barra de HP
         if show_hp:
             hp_percent = self.current_hp / self.max_hp
 

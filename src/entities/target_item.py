@@ -51,8 +51,8 @@ class TargetItem(Entity):
         """Atualiza lógica do item"""
         if self.carried_by:
             # Item sendo carregado - segue o Pokémon
-            self.x = self.carried_by.x
-            self.y = self.carried_by.y
+            self.x = self.carried_by.x - self.height/2
+            self.y = self.carried_by.y - self.width/2
             self.rect.x = self.x
             self.rect.y = self.y
 

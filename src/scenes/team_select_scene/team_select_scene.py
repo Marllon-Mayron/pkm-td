@@ -1,8 +1,6 @@
 import pygame
-import math
 from src.scenes.base_scene import BaseScene
 from src.scenes.game_scene.game_scene import GameScene
-from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 from src.scenes.team_select_scene.components.gradient_background import GradientBackground
 from src.scenes.team_select_scene.components.pokemon_modal import PokemonModal
 from src.scenes.team_select_scene.components.navigation_buttons import NavigationButtons

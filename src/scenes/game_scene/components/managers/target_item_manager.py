@@ -17,10 +17,6 @@ class TargetItemManager:
         self.game_over = False
         self.victory = False
 
-        # Efeitos visuais
-        self.stolen_flash_timer = 0
-        self.stolen_flash_duration = 1.0
-
     def load_from_data(self, items_data: dict):
         """Carrega os itens a partir dos dados da fase"""
         if not items_data:
@@ -87,10 +83,6 @@ class TargetItemManager:
         for item in items_to_remove:
             self.items.remove(item)
 
-        # Atualiza timer do flash
-        if self.stolen_flash_timer > 0:
-            self.stolen_flash_timer -= dt
-
         # Verifica condições de game over/vitória
         if self.items_protected <= 0:
             self.game_over = True
@@ -104,14 +96,6 @@ class TargetItemManager:
         """Renderiza todos os itens"""
         for item in self.items:
             item.render(screen, camera)
-
-        # Efeito de flash quando item é levado
-        if self.stolen_flash_timer > 0:
-            alpha = int(255 * (self.stolen_flash_timer / self.stolen_flash_duration))
-            flash_surf = pygame.Surface((screen.get_width(), screen.get_height()))
-            flash_surf.set_alpha(alpha)
-            flash_surf.fill((255, 0, 0))
-            screen.blit(flash_surf, (0, 0))
 
     def get_item_at(self, x, y, tolerance=20):
         """Retorna o item na posição (para debug)"""

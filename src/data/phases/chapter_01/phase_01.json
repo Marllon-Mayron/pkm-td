@@ -132,7 +132,7 @@
                         5,
                         1,
                         1,
-                        1,
+                        0,
                         1,
                         1,
                         1,
@@ -142,7 +142,7 @@
                         5
                     ]
                 ],
-                "tileset_path": "C:/Users/marll/Downloads/PokemonMultGame-main/PokemonMultGame-main/KalebAdventures/res/Maps/Ekat's Public Tiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": null,
                 "width": 11,
                 "height": 10
             },
@@ -281,7 +281,7 @@
                         0
                     ]
                 ],
-                "tileset_path": "C:/Users/marll/Downloads/PokemonMultGame-main/PokemonMultGame-main/KalebAdventures/res/Maps/Ekat's Public Tiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": null,
                 "width": 11,
                 "height": 10
             },
@@ -447,11 +447,11 @@
                         40
                     ],
                     [
-                        56,
+                        152,
                         40
                     ],
                     [
-                        56,
+                        152,
                         152
                     ]
                 ],
@@ -542,51 +542,37 @@
             {
                 "x": 80,
                 "y": 128,
-                "item_id": 1,
-                "name": "Rare Candy",
-                "sprite_path": null
+                "item_id": 1
             },
             {
                 "x": 80,
                 "y": 128,
-                "item_id": 1,
-                "name": "Rare Candy",
-                "sprite_path": null
+                "item_id": 1
             },
             {
                 "x": 80,
                 "y": 128,
-                "item_id": 1,
-                "name": "Rare Candy",
-                "sprite_path": null
+                "item_id": 1
             },
             {
                 "x": 80,
                 "y": 128,
-                "item_id": 1,
-                "name": "Rare Candy",
-                "sprite_path": null
+                "item_id": 1
             },
             {
                 "x": 80,
                 "y": 128,
-                "item_id": 1,
-                "name": "Rare Candy",
-                "sprite_path": null
+                "item_id": 1
             },
             {
                 "x": 80,
                 "y": 32,
-                "item_id": 1,
-                "name": "Rare Candy",
-                "sprite_path": null
+                "item_id": 1
             },
             {
                 "x": 32,
                 "y": 32,
-                "item_id": 1,
-                "name": "Rare Candy",
-                "sprite_path": null
+                "item_id": 1
             }
         ]
     },

@@ -466,9 +466,6 @@ class GameScene(BaseScene):
         if self.show_debug:
             self.path_renderer.render(screen, self.camera, self.screen_manager, show_editing=False)
 
-        # Renderiza itens alvo
-        self.target_item_manager.render(screen, self.camera)
-
         if hasattr(self, 'spot_renderer'):
             self.spot_renderer.render(
                 screen, self.camera, self.screen_manager,
@@ -486,6 +483,9 @@ class GameScene(BaseScene):
         # Renderiza inimigos
         for enemy in self.active_enemies:
             enemy.render(screen, self.camera, show_hp=True)
+
+        # Renderiza itens alvo
+        self.target_item_manager.render(screen, self.camera)
 
         # Desenha a grid se ativada
         if self.show_grid:
