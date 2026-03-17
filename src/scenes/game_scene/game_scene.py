@@ -51,7 +51,7 @@ class GameScene(BaseScene):
 
         self.player = game.player
 
-        # NOVO: Timer para game over
+        #Timer para game over
         self.game_over_timer = 0
         self.game_over_delay = 3.0
 
@@ -387,7 +387,7 @@ class GameScene(BaseScene):
         for pokemon in self.placed_pokemon:
             pokemon.update(dt)
 
-        # NOVO: Atualiza itens alvo
+        # Atualiza itens alvo
         self.target_item_manager.update(dt)
 
         # Verifica game over por itens
@@ -467,7 +467,7 @@ class GameScene(BaseScene):
         if self.show_debug:
             self.path_renderer.render(screen, self.camera, self.screen_manager, show_editing=False)
 
-        # NOVO: Renderiza itens alvo (por cima do mapa)
+        # Renderiza itens alvo
         self.target_item_manager.render(screen, self.camera)
 
         if hasattr(self, 'spot_renderer'):
@@ -597,7 +597,6 @@ class GameScene(BaseScene):
             screen.blit(complete_text, (self.screen_manager.viewport_x + 15, y_offset))
 
         elif self.game_state == "game_over":
-            # NOVO: Game Over mais elaborado
             # Fundo escuro no viewport
             overlay = pygame.Surface((
                 self.screen_manager.viewport_width,

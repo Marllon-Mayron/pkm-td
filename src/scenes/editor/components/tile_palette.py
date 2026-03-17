@@ -33,7 +33,7 @@ class TilePalette:
         self.original_x = x
         self.original_y = y
 
-        # NOVO: Para arrastar a barra de scroll
+        # Para arrastar a barra de scroll
         self.scroll_dragging = False
         self.scroll_drag_start_y = 0
         self.scroll_drag_start_scroll = 0

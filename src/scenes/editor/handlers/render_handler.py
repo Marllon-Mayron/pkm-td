@@ -60,7 +60,7 @@ class EditorRenderHandler:
         if self.editor.load_phase_dialog and self.editor.load_phase_dialog.visible:
             self.editor.load_phase_dialog.render(screen)
 
-        # NOVO: Diálogo de itens alvo
+        #Diálogo de itens alvo
         if self.editor.target_item_dialog and self.editor.target_item_dialog.visible:
             self.editor.target_item_dialog.render(screen)
 
@@ -73,7 +73,7 @@ class EditorRenderHandler:
         camera = self.editor.camera
         sm = self.editor.screen_manager
 
-        # EXATAMENTE a mesma fórmula que o layer_manager usa
+        # mesma fórmula que o layer_manager usa
         self._cam_offset_x = round((-camera.x * camera.zoom * sm.render_scale +
                                     (sm.render_width / 2) * sm.render_scale +
                                     sm.viewport_x))

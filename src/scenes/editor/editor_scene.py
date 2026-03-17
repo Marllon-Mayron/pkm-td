@@ -19,7 +19,6 @@ from src.scenes.editor.components.map_config_dialog import MapConfigDialog
 from src.scenes.editor.components.mode_buttons import ModeButtons
 from src.scenes.editor.components.target_item_dialog import TargetItemDialog
 from src.scenes.editor.components.tile_palette import TilePalette
-# NOVO: Import do diálogo de carregar
 from src.scenes.editor.components.load_phase_dialog import LoadPhaseDialog
 from src.scenes.editor.handlers.input_handler import EditorInputHandler
 from src.scenes.editor.handlers.map_handler import MapHandler
@@ -69,7 +68,7 @@ class EditorScene(BaseScene):
         # Waves
         self.wave_manager = WaveManager()
         self.path_manager.set_wave_manager(self.wave_manager)
-        self.wave_config_dialog = None
+
 
         # UI Panels
         self.tile_palette = None
@@ -82,8 +81,8 @@ class EditorScene(BaseScene):
 
         # Diálogos
         self.map_config_dialog = None
-        # NOVO: Diálogo de carregar fase
         self.load_phase_dialog = None
+        self.wave_config_dialog = None
 
         # Fase atual
         self.current_chapter = chapter or 1
@@ -195,7 +194,7 @@ class EditorScene(BaseScene):
     def _handle_left_click(self, world_pos, continuous=False):
         """Delega clique esquerdo para o map handler ou trata items"""
 
-        # NOVO: Modo items - NUNCA deve ser contínuo
+        # Modo items - NUNCA deve ser contínuo
         if self.mode == "items" and not continuous:
             # Converte para coordenadas de tile
             tile_x = int(world_pos[0] // self.grid_size)
@@ -252,7 +251,7 @@ class EditorScene(BaseScene):
     def _handle_right_click(self, world_pos):
         """Delega clique direito para o map handler ou trata items"""
 
-        # NOVO: Modo items - remove item (agora com seleção de múltiplos)
+        # Modo items - remove item
         if self.mode == "items":
             # Converte para coordenadas de tile
             tile_x = int(world_pos[0] // self.grid_size)
