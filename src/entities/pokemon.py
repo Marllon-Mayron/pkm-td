@@ -178,11 +178,6 @@ class Pokemon(Entity):
         self.nature = nature["name"]
         return nature
 
-    def take_damage(self, damage):
-        """Recebe dano, retorna True se morreu"""
-        self.current_hp = max(0, self.current_hp - damage)
-        return self.current_hp <= 0
-
     def heal(self, amount=None):
         """Cura o Pokémon"""
         if amount is None:
