@@ -221,10 +221,15 @@ class PlacementManager:
 
         self.placed_pokemon.clear()
 
+    def render_hp(self, screen, camera):
+        """Renderiza todos os Pokémon colocados"""
+        for pokemon in self.placed_pokemon:
+            pokemon.render_hp(screen, camera)
+
     def render(self, screen, camera, screen_manager):
         """Renderiza todos os Pokémon colocados"""
         for pokemon in self.placed_pokemon:
-            pokemon.render(screen, camera, show_hp=True)
+            pokemon.render(screen, camera, show_hp=False)
 
             # DEBUG: Mostra estado de combate na tela
             if hasattr(self.game, 'show_debug') and self.game.show_debug:

@@ -422,12 +422,27 @@ class Pokemon(Entity):
         """Recebe dano, retorna True se morreu"""
         self.current_hp = max(0, self.current_hp - damage)
 
-        # Se morreu, reseta estado de combate
+        # Se morreu, solta o item que estava carregando
         if self.current_hp <= 0:
+            self.drop_item()
             self.combat_state = "idle"
             self.target = None
 
         return self.current_hp <= 0
+
+    def drop_item(self):
+        """
+        Faz o Pokémon soltar o item que está carregando (quando derrotado)
+        """
+        if self.is_carrying:
+            item_name = self.is_carrying.item_name
+            print(f"[POKEMON] {self.name} derrotado! Soltando {item_name}")
+
+            # Reseta o item que estava sendo carregado
+            self.is_carrying.reset_capture()
+
+            # Limpa a referência no Pokémon
+            self.is_carrying = None
 
     def calculate_damage(self, target):
         """Calcula dano contra um alvo (simplificado)"""
@@ -526,6 +541,51 @@ class Pokemon(Entity):
         dx = self.x - entity.x
         dy = self.y - entity.y
         return (dx ** 2 + dy ** 2) ** 0.5
+
+    def render_hp(self, screen, camera=None):
+        if camera and hasattr(self, 'screen_manager') and self.screen_manager:
+            screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
+            zoom_scale = camera.zoom * self.screen_manager.render_scale
+        else:
+            screen_x = self.x
+            screen_y = self.y
+            zoom_scale = 1.0
+
+        hp_percent = self.current_hp / self.max_hp
+
+        # Tamanhos proporcionais ao zoom
+        bar_width = int(32 * zoom_scale)
+        bar_height = max(1, int(3 * zoom_scale))
+
+        # Posiciona a barra acima do sprite
+        bar_x = screen_x - bar_width // 2
+
+        sprite_height = int(self.map_sprite_size * zoom_scale)
+
+        foot_offset = int(sprite_height * 0.2)
+        sprite_top = (screen_y + foot_offset) - sprite_height  # Ajustado com o offset
+
+        bar_y = sprite_top + 10
+
+        # Fundo da barra
+        pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))
+
+        # Barra de HP (cor baseada na porcentagem)
+        if hp_percent > 0.5:
+            color = (0, 200, 0)
+        elif hp_percent > 0.25:
+            color = (255, 255, 0)
+        else:
+            color = (255, 0, 0)
+
+        # Barra de progresso
+        progress_width = int(bar_width * hp_percent)
+        if progress_width > 0:
+            pygame.draw.rect(screen, color, (bar_x, bar_y, progress_width, bar_height))
+
+        # Borda
+        pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, bar_width, bar_height), 1)
+
 
     def render(self, screen, camera=None, show_hp=True):
         """Renderiza Pokémon """

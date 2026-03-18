@@ -76,6 +76,9 @@ class GameWaveManager:
             # Verifica se morreu
             if not enemy.is_alive():
                 print(f"[WAVE] {enemy.name} foi derrotado!")
+                # O drop_item já foi chamado no take_damage, mas garantimos aqui também
+                if enemy.is_carrying:
+                    enemy.drop_item()
                 enemies_to_remove.append(enemy)
                 continue
 
@@ -183,6 +186,10 @@ class GameWaveManager:
         Retorna True se removeu com sucesso
         """
         if enemy in self.active_enemies:
+            # Garante que o item seja solto ao remover (caso não tenha sido solto no take_damage)
+            if enemy.is_carrying:
+                enemy.drop_item()
+
             self.active_enemies.remove(enemy)
             self.enemies_remaining -= 1
             print(f"[WaveManager] Inimigo {enemy.name} removido! Restam {self.enemies_remaining}")

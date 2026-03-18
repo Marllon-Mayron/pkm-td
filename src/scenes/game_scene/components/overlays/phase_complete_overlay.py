@@ -73,8 +73,8 @@ class PhaseCompleteOverlay(BaseOverlay):
         y_offset += name_text.get_height() + 30
 
         # Recompensas (lado a lado)
-        money_text = font_small.render(f"💰 +${self.phase_rewards['money']}", True, (100, 255, 100))
-        exp_text = font_small.render(f"✨ +{self.phase_rewards['experience']} XP", True, (100, 100, 255))
+        money_text = font_small.render(f"+${self.phase_rewards['money']}", True, (100, 255, 100))
+        exp_text = font_small.render(f"+{self.phase_rewards['experience']} XP", True, (100, 100, 255))
 
         money_x = center_x - 150
         exp_x = center_x + 50

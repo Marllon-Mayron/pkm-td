@@ -232,12 +232,9 @@ class GameScene(BaseScene):
 
             # ANTES de remover o inimigo, verifica se ele está carregando um item
             if carried_item:
-                # Reseta o item que estava sendo carregado
-                carried_item.reset_capture()
+                # USA O MÉTODO drop_item em vez de fazer manualmente
+                enemy.drop_item()  # MODIFICADO: usa o método unificado
                 print(f"[CAPTURA] Item {item_name} foi resetado e continua no mapa")
-
-                # Limpa a referência no Pokémon
-                enemy.clear_carrying()
 
             # CORREÇÃO: Usa o método remove_enemy do WaveManager em vez de remover manualmente
             self.wave_manager.remove_enemy(enemy)
@@ -621,7 +618,7 @@ class GameScene(BaseScene):
         if self.game_state == "in_wave":
             # Verifica se a wave atual terminou completamente
             if self.wave_manager.is_wave_completely_finished():
-                print(f"[GAME] ✅ Wave {self.wave_manager.current_wave_index + 1} terminou completamente!")
+                print(f"[GAME] Wave {self.wave_manager.current_wave_index + 1} terminou completamente!")
                 print(
                     f"        Spawnados: {self.wave_manager.enemies_spawned}, Vivos: {len(self.wave_manager.active_enemies)}")
 
@@ -654,19 +651,6 @@ class GameScene(BaseScene):
                 print(f"[BETWEEN] Iniciando próxima wave!")
                 self.game_state = "in_wave"
                 self.wave_manager.start_next_wave()
-
-    def _on_enemy_spawn(self, enemy):
-        """Callback chamado quando um inimigo é spawnado"""
-        print(f"\n[SPAWN] Criando inimigo: {enemy.name}")
-        self.active_enemies.append(enemy)
-        # Não precisa incrementar enemies_remaining aqui porque o wave_manager já faz isso
-
-    def _on_enemy_destroyed(self, enemy):
-        """Callback quando um inimigo é destruído (capturado ou morto)"""
-        if enemy in self.active_enemies:
-            self.active_enemies.remove(enemy)
-            self.wave_manager.enemy_destroyed()
-            print(f"[DESTROY] {enemy.name} destruído! Restam {len(self.active_enemies)} inimigos")
 
     def _complete_phase(self):
         """Marca a fase como completada e dá as recompensas"""
@@ -725,19 +709,23 @@ class GameScene(BaseScene):
                 highlight_spot=self.hovered_spot if hasattr(self, 'hovered_spot') else None
             )
 
-        if hasattr(self, 'placement_manager'):
-            self.placement_manager.render(screen, self.camera, self.screen_manager)
-
-        for pokemon in self.placed_pokemon:
-            pokemon.render(screen, self.camera, show_hp=True)
-
         self.target_item_manager.render_in_ground(screen, self.camera)
 
         # Renderiza inimigos DO WAVE MANAGER
         for enemy in self.wave_manager.active_enemies:
-            enemy.render(screen, self.camera, show_hp=True)
+            enemy.render(screen, self.camera, show_hp=False)
+
+        if hasattr(self, 'placement_manager'):
+            self.placement_manager.render(screen, self.camera, self.screen_manager)
 
         self.target_item_manager.render_in_pokemon(screen, self.camera)
+
+        #HP ACIMA DOS SPRITES
+        for enemy in self.wave_manager.active_enemies:
+            enemy.render_hp(screen, self.camera)
+
+        if hasattr(self, 'placement_manager'):
+            self.placement_manager.render_hp(screen, self.camera)
 
         # UI do jogo
         self._render_game_ui(screen)
