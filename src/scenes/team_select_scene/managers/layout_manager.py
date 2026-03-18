@@ -19,13 +19,14 @@ class LayoutManager:
         self.items_per_page = LAYOUT['GRID']['COLS'] * 3  # 3 linhas padrão
         self.rows_per_page = 3
 
-    def create_layout(self, team, available_pokemon, page=0):
+    def create_layout(self, team, page_pokemon, page=0):
+        """create_layout agora recebe apenas os pokémons da página atual"""
         screen_width = self.game.screen_manager.window_width
         screen_height = self.game.screen_manager.window_height
 
         self.current_page = page
         self._create_team_slots(screen_width, screen_height, team)
-        self._create_grid(screen_width, screen_height, available_pokemon, page)
+        self._create_grid(screen_width, screen_height, page_pokemon, page)  # AGORA usa page_pokemon
         self._create_buttons(screen_width, screen_height)
 
         return {
@@ -39,28 +40,8 @@ class LayoutManager:
             }
         }
 
-    def _create_team_slots(self, screen_width, screen_height, team):
-        margin = LAYOUT['MARGIN']
-        top_margin = LAYOUT['TOP_MARGIN']
-
-        slot_width = min(LAYOUT['SLOT']['WIDTH'],
-                         (screen_width - 2 * margin) // 6 - LAYOUT['SLOT']['SPACING'])
-        slot_height = LAYOUT['SLOT']['HEIGHT']
-
-        slots_total_width = 6 * slot_width + 5 * LAYOUT['SLOT']['SPACING']
-        slots_start_x = (screen_width - slots_total_width) // 2
-
-        self.team_slots = []
-        for i in range(6):
-            slot_x = slots_start_x + i * (slot_width + LAYOUT['SLOT']['SPACING'])
-            slot_y = top_margin
-
-            slot = TeamSlot(slot_x, slot_y, slot_width, slot_height, i)
-            if i < len(team):
-                slot.set_pokemon(team[i])
-            self.team_slots.append(slot)
-
-    def _create_grid(self, screen_width, screen_height, available_pokemon, page):
+    def _create_grid(self, screen_width, screen_height, page_pokemon, page):
+        """Cria grid APENAS com os pokémons da página atual"""
         margin = LAYOUT['MARGIN']
         top_margin = LAYOUT['TOP_MARGIN']
         slot_height = LAYOUT['SLOT']['HEIGHT']
@@ -84,24 +65,42 @@ class LayoutManager:
                       (LAYOUT['GRID']['COLS'] - 1) * card_spacing)
         grid_start_x = (screen_width - grid_width) // 2
 
-        # Cria grid items
+        # Cria grid items DIRETO da lista page_pokemon
         self.grid_items = []
-        start_idx = page * self.items_per_page
-        end_idx = min(start_idx + self.items_per_page, len(available_pokemon))
-
-        for i in range(start_idx, end_idx):
-            row = (i - start_idx) // LAYOUT['GRID']['COLS']
-            col = (i - start_idx) % LAYOUT['GRID']['COLS']
+        for i, pokemon in enumerate(page_pokemon):
+            row = i // LAYOUT['GRID']['COLS']
+            col = i % LAYOUT['GRID']['COLS']
 
             card_x = grid_start_x + col * (card_width + card_spacing)
             card_y = grid_y + row * (card_height + card_spacing)
 
             item = PokemonGridItem(
-                available_pokemon[i],
+                pokemon,
                 card_x, card_y,
                 card_width, card_height
             )
             self.grid_items.append(item)
+
+    def _create_team_slots(self, screen_width, screen_height, team):
+        margin = LAYOUT['MARGIN']
+        top_margin = LAYOUT['TOP_MARGIN']
+
+        slot_width = min(LAYOUT['SLOT']['WIDTH'],
+                         (screen_width - 2 * margin) // 6 - LAYOUT['SLOT']['SPACING'])
+        slot_height = LAYOUT['SLOT']['HEIGHT']
+
+        slots_total_width = 6 * slot_width + 5 * LAYOUT['SLOT']['SPACING']
+        slots_start_x = (screen_width - slots_total_width) // 2
+
+        self.team_slots = []
+        for i in range(6):
+            slot_x = slots_start_x + i * (slot_width + LAYOUT['SLOT']['SPACING'])
+            slot_y = top_margin
+
+            slot = TeamSlot(slot_x, slot_y, slot_width, slot_height, i)
+            if i < len(team):
+                slot.set_pokemon(team[i])
+            self.team_slots.append(slot)
 
     def _create_buttons(self, screen_width, screen_height):
         margin = LAYOUT['MARGIN']

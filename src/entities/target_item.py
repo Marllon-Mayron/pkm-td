@@ -63,6 +63,19 @@ class TargetItem(Entity):
             pokemon.is_carrying = self
             print(f"{pokemon.name} começou a carregar {self.item_name}")
 
+    def reset_capture(self):
+        """Reseta o processo de captura quando o Pokémon é capturado/removido"""
+        if self.carried_by:
+            print(f"[ITEM] Resetando captura de {self.item_name} - {self.carried_by.name} foi capturado/removido")
+            # Limpa a referência no Pokémon ANTES de limpar a própria referência
+            if hasattr(self.carried_by, 'is_carrying'):
+                self.carried_by.is_carrying = None
+            self.carried_by = None
+            self.capture_progress = 0
+            # O item continua protegido
+            self.is_protected = True
+            print(f"[ITEM] {self.item_name} resetado e pronto para ser levado novamente")
+
     def update_capture(self, dt):
         """Atualiza o progresso de captura"""
         if self.carried_by:

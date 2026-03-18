@@ -67,26 +67,30 @@ class ItemBagRenderer:
     def handle_event(self, event):
         """Processa eventos na UI de itens"""
 
-        # ARRASTO DA UI
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:  # Clique esquerdo
-                mouse_x, mouse_y = event.pos
-                if self._is_mouse_in_title_area(mouse_x, mouse_y):
-                    # Inicia arrasto da UI
-                    self.dragging = True
-                    self.drag_offset_x = self.x - mouse_x
-                    self.drag_offset_y = self.y - mouse_y
-                    self.drag_start_mouse = (mouse_x, mouse_y)
-                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
-                    return True
+        # PRIMEIRO: Verifica se é clique em um item para arrastar
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mouse_x, mouse_y = event.pos
 
-        elif event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 1 and self.dragging:
-                # Finaliza arrasto
-                self.dragging = False
-                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
-                return True
+            # Verifica se clicou na área do título (para arrastar a UI)
+            if self._is_mouse_in_title_area(mouse_x, mouse_y):
+                self.dragging = True
+                self.drag_offset_x = self.x - mouse_x
+                self.drag_offset_y = self.y - mouse_y
+                self.drag_start_mouse = (mouse_x, mouse_y)
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
+                return True  # Evento consumido - arrastando UI
 
+            # Verifica se clicou em um item (NÃO consome o evento, apenas marca)
+            elif self._is_mouse_in_area(mouse_x, mouse_y):
+                index = self._get_item_index_at(mouse_x, mouse_y)
+                if index >= 0:
+                    # Só marca qual item foi clicado, não consome o evento
+                    # Isso permite que o GameScene também receba o evento
+                    self.clicked_item_index = index
+                    # NÃO retorna True - deixa o evento passar!
+                    # O GameScene vai capturar e iniciar o arrasto
+
+        # ARRASTO DA UI (já iniciado)
         elif event.type == pygame.MOUSEMOTION:
             if self.dragging:
                 # Move a UI
@@ -96,28 +100,23 @@ class ItemBagRenderer:
                 # Limites para não sair da tela
                 self.x = max(5, min(self.game.screen_manager.window_width - self.width - 5, self.x))
                 self.y = max(5, min(self.game.screen_manager.window_height - self.height - 5, self.y))
-                return True
+                return True  # Evento consumido - arrastando UI
 
-            # Atualiza hover
+            # Atualiza hover (sempre)
             self.update_hover(event.pos)
 
-        # SCROLL - IMPORTANTE: Retorna True para evitar que o scroll passe para outros elementos
+        # FINALIZA ARRASTO DA UI
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1 and self.dragging:
+                self.dragging = False
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+                return True  # Evento consumido - finalizou arrasto UI
+
+        # SCROLL (mantém como estava)
         if event.type == pygame.MOUSEWHEEL:
             if self.mouse_over_ui:
-                # Sincroniza o hovered_index com a seleção atual
                 self.hovered_index = self.bag.selected_item_index
                 return True  # Indica que processamos o evento
-
-        # CLIQUE para selecionar item
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.mouse_over_ui and self.hovered_index >= 0:
-                # Só seleciona se NÃO estiver arrastando a UI
-                if not self.dragging:
-                    self.bag.selected_item_index = self.hovered_index
-                    selected = self.bag.get_selected_item()
-                    if selected:
-                        print(f"[ITENS] Selecionado: {selected['name']}")
-                    return True
 
         return False
 

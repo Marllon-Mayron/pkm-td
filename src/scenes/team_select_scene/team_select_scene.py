@@ -12,12 +12,13 @@ from src.data.pokedex import Pokedex
 
 
 class TeamSelectScene(BaseScene):
-    def __init__(self, game, chapter ,phase):
+    def __init__(self, game, chapter, phase):
         super().__init__(game)
 
         self.pokedex = Pokedex()
         self.phase = phase
         self.chapter = chapter
+
         # Managers
         self.pokemon_manager = PokemonManager(game.player)
         self.layout_manager = LayoutManager(game)
@@ -38,15 +39,17 @@ class TeamSelectScene(BaseScene):
         self.grid_font = pygame.font.Font(None, FONT_SIZES['GRID'])
         self.page_font = pygame.font.Font(None, FONT_SIZES['PAGE'])
 
-        # Load data
-        #Adiciona pokemons na box
-        #self.pokemon_manager.load_available_pokemon()
-
     def _initialize_layout(self):
         """Inicializa o layout da cena"""
+        # PEGA OS POKÉMONS DA PÁGINA ATUAL DIRETO DA BOX
+        available_pokemon = self.pokemon_manager.get_available_pokemon(
+            self.current_page,
+            self.layout_manager.items_per_page
+        )
+
         layout = self.layout_manager.create_layout(
             self.game.player.team,
-            self.pokemon_manager.available_pokemon,
+            available_pokemon,
             self.current_page
         )
 
@@ -82,6 +85,26 @@ class TeamSelectScene(BaseScene):
 
         if result:
             self._handle_action(result)
+
+    def _handle_modal_action(self):
+        modal = self.event_handler.modal
+        if not modal:
+            return
+
+        if modal.pokemon.is_in_team:
+            self.pokemon_manager.remove_from_team(modal.pokemon)
+        else:
+            self.pokemon_manager.add_to_team(modal.pokemon)
+
+        # Atualiza slots
+        for i, slot in enumerate(self.team_slots):
+            if i < len(self.game.player.team):
+                slot.set_pokemon(self.game.player.team[i])
+            else:
+                slot.set_pokemon(None)
+
+        # Recria layout
+        self.layout_initialized = False
 
     def _handle_action(self, action):
         action_type = action.get('type')
@@ -131,26 +154,6 @@ class TeamSelectScene(BaseScene):
 
         elif action_type == 'RESIZE':
             pass  # Layout será recriado no próximo frame
-
-    def _handle_modal_action(self):
-        modal = self.event_handler.modal
-        if not modal:
-            return
-
-        if modal.pokemon.is_in_team:
-            self.pokemon_manager.remove_from_team(modal.pokemon)
-        else:
-            self.pokemon_manager.add_to_team(modal.pokemon)
-
-        # Atualiza slots
-        for i, slot in enumerate(self.team_slots):
-            if i < len(self.game.player.team):
-                slot.set_pokemon(self.game.player.team[i])
-            else:
-                slot.set_pokemon(None)
-
-        # Recria layout
-        self.layout_initialized = False
 
     def fixed_update(self, dt):
         if not self.layout_initialized:

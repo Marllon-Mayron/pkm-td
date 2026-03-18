@@ -1,3 +1,5 @@
+# src/scenes/team_select_scene/managers/pokemon_manager.py
+
 import random
 from src.entities.pokemon import Pokemon
 
@@ -5,48 +7,24 @@ from src.entities.pokemon import Pokemon
 class PokemonManager:
     def __init__(self, player):
         self.player = player
-        self.available_pokemon = []
 
-    def load_available_pokemon(self, limit=30):
-        """Carrega a lista de pokémons disponíveis"""
-        self.available_pokemon = []
+    def get_available_pokemon(self, page=0, items_per_page=30):
+        """Retorna os pokémons da página atual (da pc_box)"""
+        start_idx = page * items_per_page
+        end_idx = start_idx + items_per_page
 
-        # Pokémons de teste (1-151)
-        for poke_id in range(1, min(limit + 1, 152)):
-            self._add_test_pokemon(poke_id)
-
-        # Adiciona da box do jogador
-        for pokemon in self.player.pc_box:
-            self.available_pokemon.append(pokemon)
-
-        return self.available_pokemon
-
-    def _add_test_pokemon(self, poke_id):
-        """Adiciona um pokémon de teste"""
-        already_in_team = any(p.id == poke_id for p in self.player.team)
-
-        pokemon = Pokemon(
-            x=0, y=0,
-            pokemon_id=poke_id,
-            level=random.randint(5, 20),
-            is_wild=False,
-            shiny=random.random() < 0.05
-        )
-
-        if already_in_team:
-            pokemon.is_in_team = True
-
-        self.available_pokemon.append(pokemon)
-
-    def update_team_status(self):
-        """Atualiza o status 'in_team' para todos os pokémons"""
-        team_ids = [p.id for p in self.player.team]
-        for pokemon in self.available_pokemon:
-            pokemon.is_in_team = pokemon.id in team_ids
+        # Retorna um slice da pc_box
+        return list(self.player.pc_box)[start_idx:end_idx]
 
     def get_page_count(self, items_per_page):
-        """Retorna o número total de páginas"""
-        return max(1, (len(self.available_pokemon) + items_per_page - 1) // items_per_page)
+        """Retorna o número total de páginas baseado na pc_box"""
+        return max(1, (len(self.player.pc_box) + items_per_page - 1) // items_per_page)
+
+    def update_team_status(self):
+        """Atualiza o status 'in_team' para todos os pokémons da box"""
+        team_ids = [p.id for p in self.player.team]
+        for pokemon in self.player.pc_box:
+            pokemon.is_in_team = pokemon.id in team_ids
 
     def add_to_team(self, pokemon):
         """Adiciona um pokémon ao time"""
@@ -54,6 +32,7 @@ class PokemonManager:
             success, _ = self.player.add_to_team(pokemon)
             if success:
                 pokemon.is_in_team = True
+                self.update_team_status()
             return success
         return False
 
@@ -63,5 +42,6 @@ class PokemonManager:
             if p == pokemon:
                 self.player.remove_from_team(i)
                 pokemon.is_in_team = False
+                self.update_team_status()
                 return True
         return False

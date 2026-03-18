@@ -53,8 +53,8 @@ class GameTeamSlot:
         """Define o Pokémon do slot"""
         self.pokemon = pokemon
 
-    def handle_event(self, event):
-        """Processa eventos no slot"""
+    def handle_event(self, event, bag_manager=None):
+        """Processa eventos no slot - AGORA COM POKEBOLA"""
         if event.type == pygame.MOUSEMOTION:
             was_hovered = self.is_hovered
             self.is_hovered = self.rect.collidepoint(event.pos)
@@ -65,14 +65,13 @@ class GameTeamSlot:
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered:
-                # Se tem Pokémon, pode iniciar arrasto
+                # Se tem Pokémon, pode iniciar arrasto de Pokémon
                 if self.pokemon:
                     # VERIFICA SE O POKÉMON JÁ ESTÁ NO MAPA
                     if hasattr(self.pokemon, 'is_placed') and self.pokemon.is_placed:
-                        # Já está no mapa - não permite arrastar
                         print(f"[SLOT] {self.pokemon.name} já está no mapa!")
                         return {
-                            'action': 'already_placed',  # Novo tipo de ação
+                            'action': 'already_placed',
                             'slot_index': self.slot_index,
                             'pokemon': self.pokemon
                         }
@@ -83,14 +82,24 @@ class GameTeamSlot:
                         'slot_index': self.slot_index,
                         'pokemon': self.pokemon
                     }
+
+                # Slot vazio - poderia iniciar arrasto de pokebola?
+                # Por enquanto, só seleciona
                 return {
                     'action': 'select',
                     'slot_index': self.slot_index
                 }
 
-        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            # Se estava arrastando, o drag manager cuida disso
-            pass
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:  # Clique direito
+            if self.is_hovered and bag_manager and bag_manager.has_items():
+                # Se tem itens e clicou direito, usa o item selecionado no Pokémon
+                if self.pokemon:
+                    return {
+                        'action': 'use_item',
+                        'slot_index': self.slot_index,
+                        'pokemon': self.pokemon,
+                        'item': bag_manager.get_selected_item()
+                    }
 
         return None
 

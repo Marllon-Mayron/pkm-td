@@ -498,38 +498,38 @@
         "snap_to_grid": true,
         "spots": [
             {
-                "x": 96,
+                "x": 112,
                 "y": 48,
                 "size": 16,
                 "allowed_types": []
             },
             {
-                "x": 64,
+                "x": 112,
+                "y": 80,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 112,
+                "y": 112,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 48,
+                "y": 112,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 48,
+                "y": 80,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 48,
                 "y": 48,
-                "size": 16,
-                "allowed_types": []
-            },
-            {
-                "x": 64,
-                "y": 80,
-                "size": 16,
-                "allowed_types": []
-            },
-            {
-                "x": 64,
-                "y": 112,
-                "size": 16,
-                "allowed_types": []
-            },
-            {
-                "x": 96,
-                "y": 112,
-                "size": 16,
-                "allowed_types": []
-            },
-            {
-                "x": 96,
-                "y": 80,
                 "size": 16,
                 "allowed_types": []
             }

@@ -3,6 +3,7 @@ import pygame
 from src.entities.base import Entity
 from src.entities.pokemon import Pokemon
 from src.data.pokedex import Pokedex
+from src.managers.bag_manager import BagManager
 
 
 class Player(Entity):
@@ -14,6 +15,8 @@ class Player(Entity):
         super().__init__(x, y, 20, 20, sprite)
 
         self.pokedex = Pokedex()
+
+        self.bag = BagManager(self)
 
         # Recursos
         self.money = 100
@@ -58,9 +61,14 @@ class Player(Entity):
 
     def add_to_box(self, pokemon):
         """Adiciona Pokémon ao PC Box"""
-        self.pc_box.append(pokemon)
+        # Garante que é uma cópia válida
         pokemon.is_in_team = False
+        pokemon.is_placed = False
+        pokemon.is_wild = False
+
+        self.pc_box.append(pokemon)
         self.caught_pokemon.add(pokemon.id)
+        print(f"[PLAYER] {pokemon.name} adicionado à PC Box. Total: {len(self.pc_box)}")
 
     def register_seen(self, pokemon_id):
         """Registra Pokémon como visto"""

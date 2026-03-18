@@ -204,7 +204,11 @@ class Pokemon(Entity):
 
         return damage
 
-    # src/entities/pokemon.py
+    def clear_carrying(self):
+        """Limpa a referência ao item carregado (quando o Pokémon é capturado/removido)"""
+        if self.is_carrying:
+            print(f"[POKEMON] {self.name} não está mais carregando {self.is_carrying.item_name}")
+            self.is_carrying = None
 
     def update(self, dt, player=None, enemies=None, items=None):
         """Update simplificado - Pokémon segue path e pode carregar itens"""
