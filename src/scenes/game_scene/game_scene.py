@@ -19,7 +19,6 @@ from src.scenes.game_scene.components.renderer.path_renderer import PathRenderer
 from src.scenes.game_scene.components.renderer.pokemon_spot_renderer import PokemonSpotRenderer
 from src.scenes.game_scene.components.managers.wave_manager import GameWaveManager
 from src.scenes.game_scene.components.renderer.target_item_renderer import TargetItemRenderer
-from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 
 
 class GameScene(BaseScene):
@@ -328,6 +327,35 @@ class GameScene(BaseScene):
 
         if placed:
             print(f"Pokémon colocado! Total no mapa: {len(self.placement_manager.placed_pokemon)}")
+
+    def cleanup(self):
+        """Limpa o estado da fase antes de sair"""
+        print("\n=== LIMPANDO FASE ===")
+
+        # 1. Libera todos os spots (usando occupied)
+        for spot in self.spot_renderer.get_spots():
+            spot.occupied = False
+
+        # 2. Limpa todas as listas de Pokémon
+        self.placed_pokemon.clear()
+
+        if hasattr(self, 'placement_manager'):
+            self.placement_manager.placed_pokemon.clear()
+
+        # 3. Remove status de colocado dos Pokémon do time
+        if hasattr(self, 'player'):
+            for pokemon in self.player.team:
+                pokemon.is_placed = False
+
+        # 4. Atualiza o team manager
+        if hasattr(self, 'team_manager'):
+            self.team_manager.update_team()
+
+        # 5. Limpa inimigos
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.active_enemies.clear()
+
+        print("=== FASE LIMPA ===\n")
 
     def handle_event(self, event):
         """Processa eventos do jogo"""

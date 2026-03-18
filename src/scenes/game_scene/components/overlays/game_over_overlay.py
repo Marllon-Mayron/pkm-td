@@ -76,6 +76,8 @@ class GameOverOverlay(BaseOverlay):
         """Volta para a tela de seleção de time"""
         from src.scenes.team_select_scene import TeamSelectScene
 
+        self.game_scene.cleanup()
+
         team_select = TeamSelectScene(
             self.game,
             self.game_scene.phase_info.get("chapter", 1),

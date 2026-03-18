@@ -14,7 +14,7 @@
                     [
                         1,
                         1,
-                        0,
+                        1,
                         1,
                         1,
                         1,
@@ -132,7 +132,7 @@
                         5,
                         1,
                         1,
-                        0,
+                        1,
                         1,
                         1,
                         1,
@@ -142,7 +142,7 @@
                         5
                     ]
                 ],
-                "tileset_path": null,
+                "tileset_path": "C:/Users/Marllon/Desktop/Projetos/DESEN GAMES/PokemonMultGame/KalebAdventures/res/Maps/Ekat's Public Tiles/Fairy Woods - Default Pallet.png",
                 "width": 11,
                 "height": 10
             },

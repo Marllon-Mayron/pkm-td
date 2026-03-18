@@ -141,4 +141,7 @@ class PhaseCompleteOverlay(BaseOverlay):
     def _return_to_phase_select(self):
         """Volta para a seleção de fases"""
         from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
+
+        self.game_scene.cleanup()
+
         self.game.current_scene = PhaseSelectScene(self.game)
