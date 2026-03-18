@@ -94,22 +94,47 @@ class ProgressManager:
             print("Erro ao salvar progresso")
 
     def get_next_phase(self, phase_id):
-        """Retorna o ID da próxima fase baseado no formato capitulo-fase"""
+        """
+        Retorna o ID da próxima fase baseado no formato capitulo-fase
+        Agora consulta o catálogo para saber quantas fases existem em cada capítulo
+        """
         if "-" not in phase_id:
             return None
 
         chapter, phase = map(int, phase_id.split("-"))
 
-        # Aqui você precisaria saber quantas fases tem em cada capítulo
-        # Por enquanto, vamos assumir que cada capítulo tem 5 fases
-        phases_per_chapter = 5
+        # Importa o catálogo aqui para evitar circular imports
+        from src.config.phase_catalog import phase_catalog
 
-        if phase < phases_per_chapter:
-            # Próxima fase no mesmo capítulo
-            return f"{chapter}-{phase + 1}"
+        # Pega as fases do capítulo atual
+        chapter_phases = phase_catalog.get_chapter_phases(chapter)
+
+        if not chapter_phases:
+            return None
+
+        # Encontra o índice da fase atual
+        current_index = None
+        for i, p in enumerate(chapter_phases):
+            if p["number"] == phase:
+                current_index = i
+                break
+
+        if current_index is None:
+            return None
+
+        # Se não for a última fase do capítulo
+        if current_index < len(chapter_phases) - 1:
+            next_phase = chapter_phases[current_index + 1]
+            return f"{chapter}-{next_phase['number']}"
         else:
-            # Primeira fase do próximo capítulo
-            return f"{chapter + 1}-1"
+            # Última fase do capítulo - verifica se existe próximo capítulo
+            next_chapter = chapter + 1
+            next_chapter_phases = phase_catalog.get_chapter_phases(next_chapter)
+            if next_chapter_phases:
+                # Primeira fase do próximo capítulo
+                return f"{next_chapter}-{next_chapter_phases[0]['number']}"
+
+        return None  # Não há próxima fase
 
     def unlock_next_phase(self, completed_phase_id):
         """Desbloqueia a próxima fase após completar a atual"""
@@ -118,20 +143,37 @@ class ProgressManager:
         if next_phase_id and next_phase_id not in self.progress["unlocked_phases"]:
             self.progress["unlocked_phases"].append(next_phase_id)
             self.progress["unlocked_phases"].sort()
-            print(f"Fase {next_phase_id} desbloqueada!")
+            print(f"🎉 Nova fase desbloqueada: {next_phase_id}!")
             self.save_progress()
             return True
+        elif next_phase_id:
+            print(f"Fase {next_phase_id} já estava desbloqueada")
+        else:
+            print("🏆 Parabéns! Você completou todas as fases disponíveis!")
         return False
 
     def complete_phase(self, phase_id, stars=0):
         """Marca uma fase como completada"""
-        if phase_id not in self.progress["completed_phases"]:
+        # Garante que phase_id é string
+        phase_id = str(phase_id)
+
+        # Se a fase já foi completada, só atualiza as estrelas se for melhor
+        if phase_id in self.progress["completed_phases"]:
+            if stars > self.progress["stars"].get(phase_id, 0):
+                self.progress["stars"][phase_id] = stars
+                print(f"⭐ Nova pontuação na fase {phase_id}: {stars} estrelas!")
+        else:
+            # Primeira vez completando a fase
             self.progress["completed_phases"].append(phase_id)
             self.progress["completed_phases"].sort()
             self.progress["stars"][phase_id] = stars
+
+            print(f"✅ Fase {phase_id} completada com {stars} estrelas!")
+
+            # Desbloqueia a próxima fase
             self.unlock_next_phase(phase_id)
-            self.save_progress()
-            print(f"Fase {phase_id} completada!")
+
+        self.save_progress()
 
     def is_phase_unlocked(self, phase_id):
         """Verifica se uma fase está desbloqueada"""

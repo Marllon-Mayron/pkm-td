@@ -224,15 +224,20 @@ class Pokemon(Entity):
                 self.can_attack = True
 
         # Lógica de captura de itens (só para inimigos)
-        if self.is_wild and items and not self.is_carrying:
+        if self.is_wild and items is not None and not self.is_carrying:
             # Verifica se há algum item próximo
             for item in items:
-                if item.is_protected and not item.carried_by:
+                if hasattr(item, 'is_protected') and item.is_protected and not item.carried_by:
                     dist = self.get_distance_to(item)
                     if dist < self.capture_range:
                         # Inicia captura do item (não desvia do path)
                         item.start_capture(self)
+                        print(f"[POKEMON] {self.name} começou a carregar {item.item_name}")
                         break  # Pega apenas o primeiro item
+        elif items is None:
+            # Log para debug - só mostra às vezes para não floodar
+            if random.random() < 0.001:  # 0.1% de chance
+                print(f"[POKEMON] {self.name}: items=None, não pode capturar")
 
         # Movimento em path (sempre segue o path)
         if self.path and len(self.path) > 0 and self.path_index < len(self.path):

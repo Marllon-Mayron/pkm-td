@@ -3,9 +3,13 @@
         "1-1",
         "2-1"
     ],
-    "completed_phases": [],
+    "completed_phases": [
+        "1-1"
+    ],
     "current_chapter": 1,
-    "stars": {},
+    "stars": {
+        "1-1": 3
+    },
     "settings": {
         "sound_volume": 0.7,
         "music_volume": 0.5,
