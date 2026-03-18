@@ -92,10 +92,17 @@ class TargetItemManager:
         """Verifica se todos os itens estão protegidos e waves acabaram"""
         return self.items_protected > 0 and not self.game_over
 
-    def render(self, screen, camera):
+    def render_in_ground(self, screen, camera):
         """Renderiza todos os itens"""
         for item in self.items:
-            item.render(screen, camera)
+            if item.carried_by is None:
+                item.render(screen, camera)
+
+    def render_in_pokemon(self, screen, camera):
+        """Renderiza todos os itens"""
+        for item in self.items:
+            if item.carried_by:
+                item.render(screen, camera)
 
     def get_item_at(self, x, y, tolerance=20):
         """Retorna o item na posição (para debug)"""

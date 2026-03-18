@@ -330,7 +330,6 @@ class GameScene(BaseScene):
 
     def cleanup(self):
         """Limpa o estado da fase antes de sair"""
-        print("\n=== LIMPANDO FASE ===")
 
         # 1. Libera todos os spots (usando occupied)
         for spot in self.spot_renderer.get_spots():
@@ -354,8 +353,6 @@ class GameScene(BaseScene):
         # 5. Limpa inimigos
         if hasattr(self, 'wave_manager'):
             self.wave_manager.active_enemies.clear()
-
-        print("=== FASE LIMPA ===\n")
 
     def handle_event(self, event):
         """Processa eventos do jogo"""
@@ -734,11 +731,13 @@ class GameScene(BaseScene):
         for pokemon in self.placed_pokemon:
             pokemon.render(screen, self.camera, show_hp=True)
 
+        self.target_item_manager.render_in_ground(screen, self.camera)
+
         # Renderiza inimigos DO WAVE MANAGER
         for enemy in self.wave_manager.active_enemies:
             enemy.render(screen, self.camera, show_hp=True)
 
-        self.target_item_manager.render(screen, self.camera)
+        self.target_item_manager.render_in_pokemon(screen, self.camera)
 
         # UI do jogo
         self._render_game_ui(screen)
@@ -765,7 +764,7 @@ class GameScene(BaseScene):
         if self.paused:
             self._render_pause_overlay(screen)
 
-        # ===== NOVO: Renderiza overlays por cima de tudo =====
+        # Renderiza overlays por cima de tudo =====
         self.overlay_manager.render(screen)
 
         if self.show_debug:
