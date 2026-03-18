@@ -64,24 +64,31 @@ class GameWaveManager:
         print(f"[WaveManager] Itens alvo vinculados: {len(items)} itens")
 
     def update(self, dt, path_points, screen_manager):
-        """
-        Atualiza o estado da wave e todos os inimigos
-        Retorna uma lista de inimigos que chegaram ao fim (para processamento)
-        """
-        enemies_at_end = []  # Inimigos que chegaram ao fim do caminho nesta atualização
+        """Atualiza o estado da wave e todos os inimigos"""
 
-        # ===== 1. Atualiza todos os inimigos ativos =====
-        for enemy in self.active_enemies[:]:  # Itera sobre uma cópia para poder remover com segurança
-            # MODIFICADO: Passa os itens alvo para o inimigo
-            enemy.update(dt, items=self.target_items)  # Passa os itens aqui!
+        enemies_at_end = []
+        enemies_to_remove = []
 
-            # Verifica se o inimigo chegou ao fim do caminho
+        for enemy in self.active_enemies[:]:
+            # Atualiza o inimigo (movimento e captura de itens)
+            enemy.update(dt, items=self.target_items)
+
+            # Verifica se morreu
+            if not enemy.is_alive():
+                print(f"[WAVE] {enemy.name} foi derrotado!")
+                enemies_to_remove.append(enemy)
+                continue
+
+            # Verifica se chegou ao fim
             if hasattr(enemy, 'path') and enemy.path and enemy.path_index >= len(enemy.path):
                 enemies_at_end.append(enemy)
-                # Remove da lista ativa
+                enemies_to_remove.append(enemy)
+
+        # Remove inimigos
+        for enemy in enemies_to_remove:
+            if enemy in self.active_enemies:
                 self.active_enemies.remove(enemy)
                 self.enemies_remaining -= 1
-                print(f"[WaveManager] {enemy.name} chegou ao fim! Restam {self.enemies_remaining} inimigos")
 
         # ===== 2. Spawna novos inimigos (se a wave estiver em andamento) =====
         if self.wave_in_progress and self.current_wave_index < len(self.waves_data):

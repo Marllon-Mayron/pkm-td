@@ -85,7 +85,7 @@ class Pokemon(Entity):
         # Movimento (para Tower Defense)
         self.path = []
         self.path_index = 0
-        self.speed = 1.0
+        self.speed = 2.0
 
         # Batalha
         self.can_attack = True
@@ -106,6 +106,24 @@ class Pokemon(Entity):
 
         self.is_carrying = None  # Item que está carregando
         self.capture_range = 20  # Distância para capturar item
+
+        # ATRIBUTOS DE COMBATE
+        self.attack_range = 60  # Distância para iniciar investida
+        self.combat_state = "idle"  # idle, charging, returning
+        self.target = None
+        self.original_spot_x = x
+        self.original_spot_y = y
+
+        # Velocidade constante (sem aceleração)
+        self.base_speed = self.speed  # Preserva a velocidade base
+
+        # Cooldown entre investidas
+        self.charge_cooldown = 0.0
+        self.charge_cooldown_max = 1.5  # 2 segundos entre investidas
+
+        # Stats de combate
+        self.attack_damage = self._calculate_attack_damage()
+        self.defense_value = self._calculate_defense()
 
     def _calculate_stats(self):
         """Calcula stats baseado em level, IVs e EVs"""
@@ -193,6 +211,223 @@ class Pokemon(Entity):
     def get_hp_percentage(self):
         """Retorna porcentagem de HP"""
         return self.current_hp / self.max_hp
+
+    def _calculate_attack_damage(self):
+        """Calcula o poder de ataque baseado na média de Attack e Sp. Attack"""
+        return (self.attack + self.sp_attack) / 2
+
+    def _calculate_defense(self):
+        """Calcula a defesa baseada na média de Defense e Sp. Defense"""
+        return (self.defense + self.sp_defense) / 2
+
+    def find_nearest_enemy(self, enemies):
+        """Encontra o inimigo mais próximo dentro do range"""
+        if not enemies:
+            return None
+
+        nearest = None
+        min_distance = float('inf')
+
+        for enemy in enemies:
+            if enemy.is_alive() and enemy.is_wild:
+                # Calcula distância até o inimigo
+                dx = self.x - enemy.x
+                dy = self.y - enemy.y
+                distance = (dx ** 2 + dy ** 2) ** 0.5
+
+                if distance < self.attack_range and distance < min_distance:
+                    min_distance = distance
+                    nearest = enemy
+
+        return nearest
+
+    def update_combat(self, dt, enemies):
+        """Sistema de combate baseado em investidas"""
+
+        # Atualiza cooldown
+        if self.charge_cooldown > 0:
+            self.charge_cooldown -= dt
+
+        # Se o alvo morreu, volta imediatamente
+        if self.target and not self.target.is_alive():
+            self.target = None
+            self.combat_state = "returning"
+            return
+
+        # Máquina de estados simplificada
+        if self.combat_state == "idle":
+            self._handle_idle_state(dt, enemies)
+
+        elif self.combat_state == "charging":
+            self._handle_charging_state(dt)
+
+        elif self.combat_state == "returning":
+            self._handle_returning_state(dt)
+
+    def _handle_idle_state(self, dt, enemies):
+        """Estado parado: procura inimigos próximos"""
+
+        # Procura o inimigo mais próximo
+        nearest = None
+        min_distance = float('inf')
+
+        for enemy in enemies:
+            if enemy.is_alive() and enemy.is_wild:
+                distance = self.get_distance_to(enemy)
+                if distance < self.attack_range and distance < min_distance:
+                    min_distance = distance
+                    nearest = enemy
+
+        # Se encontrou um inimigo e o cooldown acabou, inicia investida
+        if nearest and self.charge_cooldown <= 0:
+            self.target = nearest
+            self.combat_state = "charging"
+            print(f"[COMBATE] {self.name} investindo contra {nearest.name}")
+
+    def _handle_charging_state(self, dt):
+        """Estado de investida: move em linha reta até o alvo"""
+
+        if not self.target or not self.target.is_alive():
+            # Alvo morreu durante a investida
+            self.combat_state = "returning"
+            self.target = None
+            return
+
+        # Calcula direção até o alvo
+        dx = self.target.x - self.x
+        dy = self.target.y - self.y
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+
+        if distance < 5:  # Chegou muito perto (colidiu)
+            # CAUSA DANO AO ENCOSTAR
+            self._perform_charge_attack(self.target)
+            self.combat_state = "returning"
+            self.charge_cooldown = self.charge_cooldown_max
+            return
+
+        # Move em linha reta com velocidade constante
+        if distance > 0:
+            # Normaliza o vetor e multiplica pela velocidade
+            move_x = (dx / distance) * self.base_speed * dt * 60
+            move_y = (dy / distance) * self.base_speed * dt * 60
+
+            # Garante que não ultrapassa o alvo
+            if abs(move_x) > abs(dx):
+                move_x = dx
+            if abs(move_y) > abs(dy):
+                move_y = dy
+
+            self.x += move_x
+            self.y += move_y
+            self.rect.x, self.rect.y = self.x, self.y
+
+            # Atualiza direção para animação
+            if abs(dx) > abs(dy):
+                self.current_direction = "right" if dx > 0 else "left"
+            else:
+                self.current_direction = "down" if dy > 0 else "up"
+
+    def _handle_returning_state(self, dt):
+        """Estado de retorno: volta para o spot original"""
+
+        # Calcula direção até o spot
+        dx = self.original_spot_x - self.x
+        dy = self.original_spot_y - self.y
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+
+        if distance < 5:  # Chegou no spot
+            self.x, self.y = self.original_spot_x, self.original_spot_y
+            self.rect.x, self.rect.y = self.x, self.y
+            self.combat_state = "idle"
+            self.target = None
+            return
+
+        # Move de volta com velocidade constante
+        if distance > 0:
+            move_x = (dx / distance) * self.base_speed * dt * 60
+            move_y = (dy / distance) * self.base_speed * dt * 60
+
+            # Garante que não ultrapassa o spot
+            if abs(move_x) > abs(dx):
+                move_x = dx
+            if abs(move_y) > abs(dy):
+                move_y = dy
+
+            self.x += move_x
+            self.y += move_y
+            self.rect.x, self.rect.y = self.x, self.y
+
+            # Atualiza direção para animação
+            if abs(dx) > abs(dy):
+                self.current_direction = "right" if dx > 0 else "left"
+            else:
+                self.current_direction = "down" if dy > 0 else "up"
+
+    def _perform_charge_attack(self, target):
+        """Executa o ataque de investida ao encostar no alvo"""
+
+        # Calcula dano base
+        base_damage = self.attack_damage * (self.level / 8)  # Ajustado para ser mais impactante
+
+        # Fator aleatório (±15%)
+        import random
+        damage_multiplier = random.uniform(0.85, 1.15)
+
+        # Dano final
+        damage = int(base_damage * damage_multiplier)
+
+        # Aplica dano ao alvo (considerando defesa)
+        defense_factor = max(0.4, 1.0 - (target.defense_value / 800))
+        final_damage = max(2, int(damage * defense_factor))
+
+        # Aplica o dano
+        target.take_damage(final_damage)
+
+        print(f"[INVESTIDA] {self.name} causou {final_damage} de dano em {target.name}")
+
+        # Feedback visual (opcional - pode adicionar um efeito de tremor depois)
+
+        # Se o alvo morreu, o estado já vai mudar para returning naturalmente
+        if not target.is_alive():
+            print(f"[COMBATE] {target.name} foi derrotado!")
+
+    def _attack_target(self, target):
+        """Executa o ataque contra o alvo"""
+        # Calcula dano base
+        base_damage = self.attack_damage * (self.level / 10)  # Escala com level
+
+        # Fator aleatório (±20%)
+        import random
+        damage_multiplier = random.uniform(0.8, 1.2)
+
+        # Dano final
+        damage = int(base_damage * damage_multiplier)
+
+        # Aplica dano ao alvo (considerando defesa)
+        defense_factor = max(0.5, 1.0 - (target.defense_value / 1000))  # Redução baseada em defesa
+        final_damage = max(1, int(damage * defense_factor))
+
+        # Aplica o dano
+        target.take_damage(final_damage)
+
+        print(f"[ATAQUE] {self.name} causou {final_damage} de dano em {target.name}")
+
+        # Se o alvo morreu, muda o estado para voltar
+        if not target.is_alive():
+            print(f"[COMBATE] {target.name} foi derrotado!")
+            self.target = None
+            self.combat_state = "returning"
+
+    def take_damage(self, damage):
+        """Recebe dano, retorna True se morreu"""
+        self.current_hp = max(0, self.current_hp - damage)
+
+        # Se morreu, reseta estado de combate
+        if self.current_hp <= 0:
+            self.combat_state = "idle"
+            self.target = None
+
+        return self.current_hp <= 0
 
     def calculate_damage(self, target):
         """Calcula dano contra um alvo (simplificado)"""

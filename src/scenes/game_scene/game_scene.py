@@ -98,7 +98,7 @@ class GameScene(BaseScene):
         self.grid_alpha = 100
 
         # Debug
-        self.show_debug = True
+        self.show_debug = False
 
         # Controle de arrasto da câmera
         self.dragging_camera = False
