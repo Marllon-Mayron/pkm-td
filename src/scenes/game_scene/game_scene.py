@@ -7,6 +7,7 @@ import pygame
 
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
+from src.scenes.game_scene.components.managers.overlay_manager import OverlayType, OverlayManager
 from src.scenes.game_scene.components.managers.placement_manager import PlacementManager
 from src.scenes.game_scene.components.managers.item_drag_manager import ItemDragManager
 from src.scenes.game_scene.components.managers.target_item_manager import TargetItemManager
@@ -44,18 +45,11 @@ class GameScene(BaseScene):
         self.target_item_manager = TargetItemManager(game)
         self.target_item_renderer = TargetItemRenderer()
 
-        # CARREGA OS DADOS DA FASE PRIMEIRO
-        self.complete_timer = 0
-        self.complete_delay = 3.0
-        self.show_complete_screen = False
-
-        # Recompensas da fase
-        self.phase_rewards = {
-            "money": 0,
-            "experience": 0
-        }
-
+        # CARREGA OS DADOS DA FASE PRIMEIRO (inclui phase_rewards)
         self._load_phase_data()
+
+        # SÓ DEPOIS de carregar os dados, cria o overlay_manager
+        self.overlay_manager = OverlayManager(self)
 
         # cria o wave_manager, depois de carregar os dados
         self.wave_manager = GameWaveManager(phase_loader)
@@ -73,10 +67,6 @@ class GameScene(BaseScene):
 
         # Gerenciador de arrasto de itens
         self.item_drag_manager = ItemDragManager(game, self.player.bag)
-
-        # Timer para game over
-        self.game_over_timer = 0
-        self.game_over_delay = 3.0
 
         # Inicializa câmera
         self.game.initialize_camera(self.world_width, self.world_height)
@@ -125,8 +115,10 @@ class GameScene(BaseScene):
         print(f"ID: {self.phase_id}")
         print(f"Waves: {len(self.wave_manager.waves_data)}")
         print(f"Itens alvo: {len(self.target_item_manager.items)}")
+        print(f"Recompensas: ${self.phase_rewards['money']} | {self.phase_rewards['experience']} XP")
         print(f"Mundo: {self.world_width}x{self.world_height}")
         print("=====================\n")
+
 
     def _start_game(self):
         """Inicia o jogo"""
@@ -340,27 +332,11 @@ class GameScene(BaseScene):
     def handle_event(self, event):
         """Processa eventos do jogo"""
 
-        # ===== PRIORIDADE 0: GAME OVER - TRAVA TUDO! =====
-        if self.game_state == "game_over":
-            # Só permite ESC para voltar
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                self._return_to_team_select()
+        # ===== PRIORIDADE 0: Overlays ativos =====
+        if self.overlay_manager.is_active:
+            if self.overlay_manager.handle_event(event):
                 return None
-            # Qualquer outro evento é ignorado
-            return None
-
-        # ===== PRIORIDADE 0.5: FASE COMPLETA - ACEITA CLIQUE NO BOTÃO =====
-        if self.show_complete_screen:
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                # Verifica se clicou no botão de voltar
-                mouse_pos = event.pos
-                button_rect = self._get_complete_button_rect()
-                if button_rect and button_rect.collidepoint(mouse_pos):
-                    self.game.current_scene = PhaseSelectScene(self.game)
-                    return None
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                self.game.current_scene = PhaseSelectScene(self.game)
-                return None
+            # Se o overlay não processou o evento, ainda assim não propaga para o jogo
             return None
 
         # ===== PRIORIDADE 1: Arrasto de item (se ativo) =====
@@ -371,7 +347,7 @@ class GameScene(BaseScene):
                     self.item_drag_manager.update_drag(
                         event.pos, world_pos,
                         self.placement_manager.placed_pokemon,
-                        self.wave_manager.active_enemies,  # MODIFICADO: usa wave_manager
+                        self.wave_manager.active_enemies,
                         self.camera
                     )
                 return None
@@ -403,7 +379,6 @@ class GameScene(BaseScene):
                 return None
 
             elif event.key == pygame.K_ESCAPE:
-                # Já tratamos game_Over acima, então aqui é só para outros estados
                 self.game.current_scene = self.game.menu_scene
                 return None
 
@@ -563,25 +538,10 @@ class GameScene(BaseScene):
         if self.paused:
             return
 
-        # ===== GAME OVER - SÓ ATUALIZA O TIMER =====
-        if self.game_state == "game_over":
-            self.game_over_timer += dt
-            if self.game_over_timer >= self.game_over_delay:
-                print("Game Over - Voltando para seleção de time...")
-                from src.scenes.team_select_scene import TeamSelectScene
-                self.game.current_scene = TeamSelectScene(
-                    self.game,
-                    self.phase_info.get("chapter", 1),
-                    self.phase_number
-                )
-            return
-
-        # ===== FASE COMPLETA - SÓ ATUALIZA O TIMER =====
-        if self.show_complete_screen:
-            self.complete_timer += dt
-            if self.complete_timer >= self.complete_delay:
-                self.game.current_scene = PhaseSelectScene(self.game)
-            return
+        # ===== PRIORIDADE 1: Atualiza overlays se ativos =====
+        if self.overlay_manager.is_active:
+            self.overlay_manager.update(dt)
+            return  # Não atualiza o jogo enquanto overlay está ativo
 
         # ===== RESTO DO UPDATE =====
 
@@ -607,6 +567,7 @@ class GameScene(BaseScene):
         # Verifica game over por itens levados
         if self.target_item_manager.game_over:
             self.game_state = "game_over"
+            self.overlay_manager.show(OverlayType.GAME_OVER)  # MOSTRA OVERLAY
             print("GAME OVER - Todos os itens foram levados!")
             return
 
@@ -636,7 +597,8 @@ class GameScene(BaseScene):
             # Verifica se a wave atual terminou completamente
             if self.wave_manager.is_wave_completely_finished():
                 print(f"[GAME] ✅ Wave {self.wave_manager.current_wave_index + 1} terminou completamente!")
-                print(f"        Spawnados: {self.wave_manager.enemies_spawned}, Vivos: {len(self.wave_manager.active_enemies)}")
+                print(
+                    f"        Spawnados: {self.wave_manager.enemies_spawned}, Vivos: {len(self.wave_manager.active_enemies)}")
 
                 if self.wave_manager.has_more_waves():
                     # Ainda tem mais waves, vai para o intervalo
@@ -652,10 +614,12 @@ class GameScene(BaseScene):
                     else:
                         print(f"[GAME] 💀 GAME OVER - Todos os itens foram levados!")
                         self.game_state = "game_over"
+                        self.overlay_manager.show(OverlayType.GAME_OVER)  # MOSTRA OVERLAY
             else:
                 # Log para ver o que está impedindo a wave de terminar
                 if not self.wave_manager.wave_in_progress and self.wave_manager.enemies_remaining > 0:
-                    print(f"[GAME] ⚠️ Wave não está em progresso mas ainda há {self.wave_manager.enemies_remaining} inimigos!")
+                    print(
+                        f"[GAME] ⚠️ Wave não está em progresso mas ainda há {self.wave_manager.enemies_remaining} inimigos!")
 
         elif self.game_state == "between_waves":
             self.between_waves_timer -= dt
@@ -716,9 +680,8 @@ class GameScene(BaseScene):
 
         print(f"Saldo atual: ${self.player.money} | Pontuação: {self.player.score}")
 
-        # Mostra tela de conclusão
-        self.show_complete_screen = True
-        self.complete_timer = 0
+        # MOSTRA OVERLAY DE FASE COMPLETA (NOVO)
+        self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
 
     def render(self, screen):
         """Renderiza o jogo"""
@@ -743,7 +706,7 @@ class GameScene(BaseScene):
         for pokemon in self.placed_pokemon:
             pokemon.render(screen, self.camera, show_hp=True)
 
-        # MODIFICADO: Renderiza inimigos DO WAVE MANAGER
+        # Renderiza inimigos DO WAVE MANAGER
         for enemy in self.wave_manager.active_enemies:
             enemy.render(screen, self.camera, show_hp=True)
 
@@ -774,100 +737,16 @@ class GameScene(BaseScene):
         if self.paused:
             self._render_pause_overlay(screen)
 
-        # Tela de conclusão (se ativa)
-        if self.show_complete_screen:
-            self._render_complete_screen(screen)
+        # ===== NOVO: Renderiza overlays por cima de tudo =====
+        self.overlay_manager.render(screen)
 
         if self.show_debug:
             self._render_debug_info(screen)
 
-    def _render_complete_screen(self, screen):
-        """Renderiza a tela de conclusão da fase"""
-        viewport_x = self.screen_manager.viewport_x
-        viewport_y = self.screen_manager.viewport_y
-        viewport_width = self.screen_manager.viewport_width
-        viewport_height = self.screen_manager.viewport_height
-
-        # Fundo escuro semi-transparente
-        overlay = pygame.Surface((viewport_width, viewport_height))
-        overlay.set_alpha(220)
-        overlay.fill((0, 0, 0))
-        screen.blit(overlay, (viewport_x, viewport_y))
-
-        # Fonte grande para o título
-        font_large = pygame.font.Font(None, 64)
-        font_medium = pygame.font.Font(None, 36)
-        font_small = pygame.font.Font(None, 24)
-
-        # Título "FASE COMPLETA!"
-        complete_text = font_large.render("FASE COMPLETA!", True, (255, 215, 0))  # Dourado
-        complete_x = viewport_x + (viewport_width - complete_text.get_width()) // 2
-        complete_y = viewport_y + viewport_height // 2 - 120
-        screen.blit(complete_text, (complete_x, complete_y))
-
-        # Nome da fase
-        phase_name = self.phase_info.get("name", f"Fase {self.phase_number}")
-        name_text = font_medium.render(phase_name, True, (200, 200, 200))
-        name_x = viewport_x + (viewport_width - name_text.get_width()) // 2
-        name_y = complete_y + complete_text.get_height() + 20
-        screen.blit(name_text, (name_x, name_y))
-
-        # Recompensas
-        money_text = font_small.render(f"💰 +${self.phase_rewards['money']}", True, (100, 255, 100))
-        exp_text = font_small.render(f"✨ +{self.phase_rewards['experience']} XP", True, (100, 100, 255))
-
-        money_x = viewport_x + viewport_width // 2 - 150
-        exp_x = viewport_x + viewport_width // 2 + 50
-        rewards_y = name_y + name_text.get_height() + 30
-
-        screen.blit(money_text, (money_x, rewards_y))
-        screen.blit(exp_text, (exp_x, rewards_y))
-
-        # Próxima fase
-        from src.config.progress import progress_manager
-        next_phase = progress_manager.get_next_phase(self.phase_id)
-        if next_phase:
-            from src.config.phase_catalog import phase_catalog
-            chapter, phase = map(int, next_phase.split("-"))
-            next_info = phase_catalog.get_phase_info(chapter, phase)
-            if next_info:
-                next_text = font_small.render(f"Próxima fase: {next_info['name']}", True, (150, 150, 255))
-                next_x = viewport_x + (viewport_width - next_text.get_width()) // 2
-                next_y = rewards_y + money_text.get_height() + 30
-                screen.blit(next_text, (next_x, next_y))
-
-        # Botão de voltar
-        button_rect = self._get_complete_button_rect()
-
-        # Verifica hover
-        mouse_pos = pygame.mouse.get_pos()
-        is_hovered = button_rect.collidepoint(mouse_pos)
-
-        button_color = (70, 100, 200) if is_hovered else (50, 70, 150)
-        hover_color = (90, 120, 220) if is_hovered else (50, 70, 150)
-
-        # Desenha botão
-        pygame.draw.rect(screen, button_color, button_rect, border_radius=8)
-        pygame.draw.rect(screen, hover_color, button_rect, 3, border_radius=8)
-
-        button_text = font_medium.render("VOLTAR", True, (255, 255, 255))
-        button_text_x = button_rect.centerx - button_text.get_width() // 2
-        button_text_y = button_rect.centery - button_text.get_height() // 2
-        screen.blit(button_text, (button_text_x, button_text_y))
-
-        # Timer opcional
-        remaining = max(0, self.complete_delay - self.complete_timer)
-        if remaining > 0:
-            timer_text = font_small.render(f"Voltando automaticamente em {remaining:.0f}...", True, (150, 150, 150))
-            timer_x = viewport_x + (viewport_width - timer_text.get_width()) // 2
-            timer_y = button_rect.bottom + 20
-            screen.blit(timer_text, (timer_x, timer_y))
-
     def _render_game_ui(self, screen):
-        """Renderiza a UI do jogo (modificada para incluir info dos itens)"""
+        """Renderiza a UI do jogo (agora sem a parte de game over)"""
         font = pygame.font.Font(None, 24)
         font_small = pygame.font.Font(None, 18)
-        font_large = pygame.font.Font(None, 48)
 
         wave_info = self.wave_manager.get_current_wave_info()
 
@@ -929,7 +808,7 @@ class GameScene(BaseScene):
 
             y_offset += 25
 
-            # MODIFICADO: Inimigos restantes (usa wave_manager)
+            # Inimigos restantes
             enemies_text = font_small.render(
                 f"Inimigos vivos: {len(self.wave_manager.active_enemies)}",
                 True, (255, 100, 100) if len(self.wave_manager.active_enemies) > 0 else (100, 255, 100))
@@ -944,81 +823,6 @@ class GameScene(BaseScene):
         elif self.game_state == "completed":
             complete_text = font.render("FASE COMPLETA!", True, (255, 215, 0))
             screen.blit(complete_text, (self.screen_manager.viewport_x + 15, y_offset))
-
-        elif self.game_state == "game_over":
-            # Fundo escuro no viewport
-            overlay = pygame.Surface((
-                self.screen_manager.viewport_width,
-                self.screen_manager.viewport_height
-            ))
-            overlay.set_alpha(200)
-            overlay.fill((0, 0, 0))
-            screen.blit(overlay, (self.screen_manager.viewport_x, self.screen_manager.viewport_y))
-
-            # Texto GAME OVER
-            game_over_text = font_large.render("GAME OVER", True, (255, 0, 0))
-            game_over_x = self.screen_manager.viewport_x + (
-                        self.screen_manager.viewport_width - game_over_text.get_width()) // 2
-            game_over_y = self.screen_manager.viewport_y + (
-                        self.screen_manager.viewport_height - game_over_text.get_height()) // 2 - 30
-            screen.blit(game_over_text, (game_over_x, game_over_y))
-
-            # Texto de itens levados
-            items_lost_text = font.render(
-                f"{self.target_item_manager.items_stolen} itens foram levados!",
-                True, (255, 100, 100)
-            )
-            items_lost_x = self.screen_manager.viewport_x + (
-                        self.screen_manager.viewport_width - items_lost_text.get_width()) // 2
-            items_lost_y = game_over_y + game_over_text.get_height() + 20
-            screen.blit(items_lost_text, (items_lost_x, items_lost_y))
-
-            # Timer para voltar
-            remaining = max(0, self.game_over_delay - self.game_over_timer)
-            timer_text = font.render(
-                f"Voltando em {remaining:.0f}...",
-                True, (200, 200, 200)
-            )
-            timer_x = self.screen_manager.viewport_x + (
-                        self.screen_manager.viewport_width - timer_text.get_width()) // 2
-            timer_y = items_lost_y + items_lost_text.get_height() + 20
-            screen.blit(timer_text, (timer_x, timer_y))
-
-            # Mensagem de ESC para cancelar (opcional)
-            esc_text = font_small.render(
-                "Pressione ESC para voltar agora",
-                True, (150, 150, 150)
-            )
-            esc_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - esc_text.get_width()) // 2
-            esc_y = timer_y + timer_text.get_height() + 30
-            screen.blit(esc_text, (esc_x, esc_y))
-
-    def _return_to_team_select(self):
-        """Volta para a tela de seleção de time"""
-        from src.scenes.team_select_scene import TeamSelectScene
-
-        # Cria a cena
-        team_select = TeamSelectScene(
-            self.game,
-            self.phase_info.get("chapter", 1),
-            self.phase_number
-        )
-
-        self.game.current_scene = team_select
-
-    def _get_complete_button_rect(self):
-        """Retorna o retângulo do botão na tela de conclusão"""
-        viewport_x = self.screen_manager.viewport_x
-        viewport_y = self.screen_manager.viewport_y
-        viewport_width = self.screen_manager.viewport_width
-        viewport_height = self.screen_manager.viewport_height
-
-        button_width = 200
-        button_height = 50
-        button_x = viewport_x + (viewport_width - button_width) // 2
-        button_y = viewport_y + viewport_height // 2 + 50
-
-        return pygame.Rect(button_x, button_y, button_width, button_height)
 
     def _draw_grid_aligned(self, screen):
         """Desenha a grid alinhada com os tiles"""
