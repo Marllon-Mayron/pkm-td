@@ -469,16 +469,20 @@ class WaveConfigDialog:
             relative_y = mouse_y - self.enemies_list_area.y
             item_index = (relative_y // self.enemy_item_height) + self.enemies_scroll
 
+            print(f"DEBUG: Clicou na área da lista, relative_y={relative_y}, item_index={item_index}")
+
             if 0 <= item_index < len(wave.enemies):
                 enemy = wave.enemies[item_index]
 
-                # Calcula posição do botão remover
-                item_x = self.enemies_list_area.x + 5
+                # Calcula posição do item na tela (considerando scroll)
                 item_y = self.enemies_list_area.y + 2 + (item_index - self.enemies_scroll) * self.enemy_item_height
 
-                # Botão remover
+                # Calcula posição do botão remover
                 remove_rect = pygame.Rect(self.enemies_list_area.right - 30, item_y + 5, 20, 20)
+
+                # Verifica se clicou no botão remover
                 if remove_rect.collidepoint(mouse_x, mouse_y):
+                    print(f"DEBUG: Clicou no botão remover do inimigo {item_index}")
                     del wave.enemies[item_index]
                     total = sum(e.percentage for e in wave.enemies)
                     if total != 100 and wave.enemies:
@@ -490,20 +494,29 @@ class WaveConfigDialog:
                     return True
 
                 # Área do Pokémon (para selecionar)
-                pokemon_rect = pygame.Rect(item_x + 35, item_y + 5, 150, 25)
+                pokemon_rect = pygame.Rect(self.enemies_list_area.x + 40, item_y + 5, 150, 25)
                 if pokemon_rect.collidepoint(mouse_x, mouse_y):
+                    print(f"DEBUG: Clicou na área do Pokémon {item_index}")
                     self.showing_pokemon_selector = True
                     self.pokemon_selector_enemy_index = item_index
                     self.pokemon_selector_scroll = 0
                     self.pokemon_search = ""
                     return True
 
-                # Campo de porcentagem
-                percent_rect = pygame.Rect(item_x + 190, item_y + 10, 45, 22)
+                # Campo de porcentagem - CORRIGIDO
+                percent_rect = pygame.Rect(self.enemies_list_area.right - 90, item_y + 10, 45, 22)
+                print(
+                    f"DEBUG: Verificando campo % em ({percent_rect.x}, {percent_rect.y}) - mouse em ({mouse_x}, {mouse_y})")
+
                 if percent_rect.collidepoint(mouse_x, mouse_y):
+                    print(f"DEBUG: Clicou no campo % do inimigo {item_index}")
                     self.active_input = f"percent_{item_index}"
                     self.input_texts[self.active_input] = str(enemy.percentage)
                     return True
+                else:
+                    print(f"DEBUG: Mouse NÃO está sobre o campo % (x: {mouse_x}, y: {mouse_y})")
+            else:
+                print(f"DEBUG: item_index {item_index} fora do range (0-{len(wave.enemies) - 1})")
 
         return True
 
@@ -936,8 +949,8 @@ class WaveConfigDialog:
                              (remove_rect.right - 5, remove_rect.y + 5),
                              (remove_rect.x + 5, remove_rect.bottom - 5), 1)
 
-            # Campo de porcentagem
-            percent_rect = pygame.Rect(item_rect.right - 90, item_y + 10, 45, 22)
+            # Campo de porcentagem - CORRIGIDO
+            percent_rect = pygame.Rect(self.enemies_list_area.right - 90, item_y + 10, 45, 22)
 
             if self.active_input == f"percent_{i}":
                 border_color = self.COLORS['input_active']
