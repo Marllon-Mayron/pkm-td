@@ -10,7 +10,9 @@ class MapHandler:
         self.editor = editor_scene
         # Cache para evitar múltiplos saves de undo no mesmo tile durante arrasto
         self.last_undo_tile = None
+        self.last_undo_erase_tile = None
         self.last_undo_time = 0
+        self.last_erase_time = 0
         self.undo_cooldown = 0.2  # Cooldown para salvar undo durante arrasto
 
     def _save_undo_state(self, action_description, continuous=False):
@@ -124,18 +126,34 @@ class MapHandler:
         # Converte posição mundial para coordenadas de tile
         tile_x = int(world_pos[0] // self.editor.grid_size)
         tile_y = int(world_pos[1] // self.editor.grid_size)
+        current_tile_pos = (tile_x, tile_y)
 
         current_layer = self.editor.layer_manager.get_current_layer()
         if not current_layer:
             return
+
+        # MODIFICADO: Agora detecta se é contínuo baseado no estado do input_handler
+        continuous = self.editor.input_handler.erasing if hasattr(self.editor.input_handler, 'erasing') else False
 
         # Modo layers - apaga tile (coloca 0)
         if self.editor.mode == "layers":
             if 0 <= tile_x < current_layer.width and 0 <= tile_y < current_layer.height:
                 # Verifica se realmente tem um tile para apagar
                 if current_layer.get_tile(tile_x, tile_y) != 0:
-                    # Salva estado ANTES da modificação
-                    self._save_undo_state(f"Remover tile em ({tile_x}, {tile_y})")
+                    # Durante arrasto, só salva undo se for um tile diferente do último
+                    should_save_undo = True
+
+                    if continuous:
+                        current_time = pygame.time.get_ticks() / 1000.0
+                        # Durante arrasto, verifica se mudou de tile desde o último undo
+                        if current_tile_pos == self.last_undo_erase_tile:
+                            should_save_undo = False
+                        else:
+                            self.last_undo_erase_tile = current_tile_pos
+                            self.last_erase_time = current_time
+
+                    if should_save_undo:
+                        self._save_undo_state(f"Remover tile em ({tile_x}, {tile_y})", continuous)
 
                     self.editor.layer_manager.set_tile(tile_x, tile_y, 0)
                     print(f"Tile removido em ({tile_x}, {tile_y})")

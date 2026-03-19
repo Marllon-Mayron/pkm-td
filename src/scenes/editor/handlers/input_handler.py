@@ -14,9 +14,12 @@ class EditorInputHandler:
 
         # Controle de arrasto para pintura contínua
         self.painting = False  # Se está pintando (botão esquerdo pressionado)
+        self.erasing = False   # Se está apagando (botão direito pressionado)  # NOVO
         self.last_paint_pos = None  # Última posição pintada
+        self.last_erase_pos = None  # Última posição apagada  # NOVO
         self.paint_cooldown = 0.05  # Cooldown entre pinturas (evita pintar no mesmo frame)
         self.last_paint_time = 0
+        self.last_erase_time = 0  # NOVO
 
     def handle_event(self, event):
         """Processa eventos do editor"""
@@ -143,6 +146,7 @@ class EditorInputHandler:
         # Inicia pintura contínua com botão esquerdo
         if event.button == 1 and self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
             self.painting = True
+            self.erasing = False  # NOVO: Garante que não está no modo apagar
             self.last_paint_pos = None  # Força a pintar na primeira posição
             self.last_paint_time = 0
 
@@ -152,14 +156,19 @@ class EditorInputHandler:
                 self.editor._handle_left_click(world_pos, continuous=False)  # Primeiro clique salva undo
             return True
 
-        # Clique direito no viewport
-        if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
+        # Inicia apagar contínuo com botão direito
+        if event.button == 3 and self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
+            self.erasing = True
+            self.painting = False
+            self.last_erase_pos = None  # Força a apagar na primeira posição
+            self.last_erase_time = 0
+
+            # Processa o primeiro clique (NUNCA é contínuo)
             world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
             if world_pos:
-                # Arredonda para evitar problemas de float
-                world_x, world_y = world_pos
-                if event.button == 3:  # Clique direito
-                    self.editor._handle_right_click((world_x, world_y))
+                self.editor._handle_right_click(world_pos)  # Primeiro clique salva undo
+            return True
+
         return True
 
     def _handle_mouseup(self, event):
@@ -178,11 +187,18 @@ class EditorInputHandler:
                 self.last_paint_pos = None
                 return True
 
+        # Para o apagar contínuo quando solta o botão direito
+        elif event.button == 3:  # Botão direito
+            if self.erasing:
+                self.erasing = False
+                self.last_erase_pos = None
+                return True
+
         return False
 
     def _handle_mousemotion(self, event):
         """Processa movimento do mouse"""
-        # Pintura contínua durante o movimento com botão pressionado
+        # Pintura contínua durante o movimento com botão esquerdo pressionado
         if self.painting and not self.dragging_camera:
             current_time = time.time()
 
@@ -206,6 +222,32 @@ class EditorInputHandler:
                             self.editor._handle_left_click(world_pos, continuous=True)
                             self.last_paint_pos = current_tile_pos
                             self.last_paint_time = current_time
+                return True
+
+        # Apagar contínuo durante o movimento com botão direito pressionado
+        if self.erasing and not self.dragging_camera:
+            current_time = time.time()
+
+            # Aplica cooldown para não apagar muito rápido
+            if current_time - self.last_erase_time >= self.paint_cooldown:
+                mouse_pos = pygame.mouse.get_pos()
+
+                # Verifica se ainda está no viewport
+                if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
+                    world_pos = self.editor.screen_manager.get_mouse_world_position(mouse_pos, self.editor.camera)
+
+                    if world_pos:
+                        # Converte para coordenadas de tile
+                        tile_x = int(world_pos[0] // self.editor.grid_size)
+                        tile_y = int(world_pos[1] // self.editor.grid_size)
+                        current_tile_pos = (tile_x, tile_y)
+
+                        # Verifica se mudou de tile desde a última vez que apagou
+                        if current_tile_pos != self.last_erase_pos:
+                            # Processa o clique direito na posição atual (contínuo)
+                            self.editor._handle_right_click(world_pos)
+                            self.last_erase_pos = current_tile_pos
+                            self.last_erase_time = current_time
                 return True
 
         # Arrasto da câmera (existente)
