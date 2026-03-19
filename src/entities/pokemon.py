@@ -105,7 +105,7 @@ class Pokemon(Entity):
         self.last_y = y
 
         self.is_carrying = None  # Item que está carregando
-        self.capture_range = 20  # Distância para capturar item
+        self.capture_range = 10  # Distância para capturar item
 
         # ATRIBUTOS DE COMBATE
         self.attack_range = 60  # Distância para iniciar investida

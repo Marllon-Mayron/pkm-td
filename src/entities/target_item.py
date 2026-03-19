@@ -2,6 +2,8 @@
 
 import pygame
 import os
+import random
+import math
 from src.entities.base import Entity
 from src.data.item_catalog import item_catalog
 
@@ -9,7 +11,7 @@ from src.data.item_catalog import item_catalog
 class TargetItem(Entity):
     """Item que precisa ser protegido durante a wave"""
 
-    def __init__(self, x, y, item_id):
+    def __init__(self, x, y, item_id, offset_range=15):
         super().__init__(x, y, 16, 16, None)  # Hitbox continua 16x16
 
         self.item_id = item_id
@@ -23,6 +25,15 @@ class TargetItem(Entity):
         self.carried_by = None
         self.capture_progress = 0
         self.capture_rate = 10
+
+        # Variação visual (não afeta hitbox)
+        self.visual_offset_x = random.uniform(-offset_range, offset_range)
+        self.visual_offset_y = random.uniform(-offset_range, offset_range)
+        self.rotation = random.uniform(-30, 30)  # Rotação entre -30 e 30 graus
+
+        # Posição base (usada para hitbox)
+        self.base_x = x
+        self.base_y = y
 
         # Carrega sprite (mantém tamanho original)
         self.sprite = None
@@ -51,8 +62,14 @@ class TargetItem(Entity):
         """Atualiza lógica do item"""
         if self.carried_by:
             # Item sendo carregado - segue o Pokémon
-            self.x = self.carried_by.x - self.height/2
-            self.y = self.carried_by.y - self.width/2
+            self.x = self.carried_by.x - self.height / 2
+            self.y = self.carried_by.y - self.width / 2
+            self.rect.x = self.x
+            self.rect.y = self.y
+        else:
+            # Quando não está sendo carregado, mantém posição base
+            self.x = self.base_x
+            self.y = self.base_y
             self.rect.x = self.x
             self.rect.y = self.y
 
@@ -90,53 +107,3 @@ class TargetItem(Entity):
             self.carried_by.is_carrying = None
             self.carried_by = None
             print(f"{self.item_name} foi levado!")
-
-    def render(self, screen, camera=None):
-        """Renderiza o item com sprite em tamanho reduzido (16x16)"""
-        # Determina posição na tela
-        if camera and self.screen_manager:
-            # Usa a posição do tile (canto superior esquerdo)
-            screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
-            zoom_scale = camera.zoom * self.screen_manager.render_scale
-
-            # Tamanho do sprite na tela - AGORA METADE (16 em vez de 32)
-            sprite_size = max(1, int(16 * zoom_scale))  # 16 é metade de 32
-        else:
-            screen_x = self.x
-            screen_y = self.y
-            sprite_size = 16  # Tamanho fixo 16x16 sem zoom
-
-        # Se tem sprite, usa ele
-        if self.sprite:
-            sprite_to_draw = pygame.transform.scale(self.sprite, (sprite_size, sprite_size))
-
-            screen.blit(sprite_to_draw, (screen_x, screen_y))
-        else:
-            # Fallback: desenha placeholder no tamanho do grid
-            colors = [(255, 215, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)]
-            color = colors[(self.item_id - 1) % len(colors)]
-
-            pygame.draw.rect(screen, color, (screen_x, screen_y, sprite_size, sprite_size))
-            font = pygame.font.Font(None, sprite_size // 2)
-            text = font.render(str(self.item_id), True, (255, 255, 255))
-            text_rect = text.get_rect(center=(screen_x + sprite_size // 2, screen_y + sprite_size // 2))
-            screen.blit(text, text_rect)
-
-        # Barra de progresso se está sendo carregado
-        if self.carried_by:
-            bar_width = sprite_size  # Barra do tamanho do sprite
-            bar_height = 4
-            bar_x = screen_x
-            bar_y = screen_y - 10
-
-            pygame.draw.rect(screen, (50, 50, 50),
-                             (bar_x, bar_y, bar_width, bar_height))
-
-            progress_width = (self.capture_progress / 100) * bar_width
-            if self.capture_progress < 50:
-                color = (255, 255, 0)
-            else:
-                color = (255, 100, 0)
-
-            pygame.draw.rect(screen, color,
-                             (bar_x, bar_y, progress_width, bar_height))

@@ -1,8 +1,11 @@
 # src/scenes/game_scene/components/managers/target_item_manager.py
 
 import pygame
+import random
+import math
 from src.entities.target_item import TargetItem
 from src.data.item_catalog import item_catalog
+from src.scenes.game_scene.components.renderer.target_item_renderer import TargetItemRenderer
 
 
 class TargetItemManager:
@@ -16,6 +19,8 @@ class TargetItemManager:
         self.items_protected = 0
         self.game_over = False
         self.victory = False
+        self.visual_variation_range = 5  # Máximo deslocamento visual em pixels
+        self.renderer = TargetItemRenderer()  # Adiciona o renderer
 
     def load_from_data(self, items_data: dict):
         """Carrega os itens a partir dos dados da fase"""
@@ -35,20 +40,59 @@ class TargetItemManager:
             else:
                 items_list = items_data if isinstance(items_data, list) else []
 
+            # Agrupa itens por posição para aplicar variação visual diferente
+            position_groups = {}
+
+            # Primeiro, agrupa itens por posição
             for item_data in items_list:
-                # Pega o ID do item
-                item_id = item_data.get("item_id", 1)
+                pos_key = (item_data["x"], item_data["y"])
+                if pos_key not in position_groups:
+                    position_groups[pos_key] = []
+                position_groups[pos_key].append(item_data)
 
-                # Cria o item (o construtor já carrega sprite do catálogo)
-                item = TargetItem(
-                    item_data["x"],
-                    item_data["y"],
-                    item_id
-                )
+            # Cria itens com variação visual baseada no grupo
+            for pos_key, group_items in position_groups.items():
+                base_x, base_y = pos_key
 
-                # Passa o screen_manager
-                item.screen_manager = self.game.screen_manager
-                self.items.append(item)
+                # Se houver múltiplos itens na mesma posição, aumenta a variação
+                variation_range = self.visual_variation_range
+                if len(group_items) > 1:
+                    variation_range = self.visual_variation_range * 1.5
+
+                for i, item_data in enumerate(group_items):
+                    # Pega o ID do item
+                    item_id = item_data.get("item_id", 1)
+
+                    # Para itens na mesma posição, adiciona variação adicional
+                    # baseada no índice para garantir que não fiquem sobrepostos
+                    if len(group_items) > 1:
+                        # Distribui os itens em um círculo ao redor do centro
+                        angle = (i / len(group_items)) * 360
+                        extra_offset_x = math.cos(math.radians(angle)) * variation_range * 0.7
+                        extra_offset_y = math.sin(math.radians(angle)) * variation_range * 0.7
+                    else:
+                        extra_offset_x = 0
+                        extra_offset_y = 0
+
+                    # Cria o item com offset específico
+                    item = TargetItem(
+                        base_x,
+                        base_y,
+                        item_id,
+                        offset_range=variation_range
+                    )
+
+                    # Ajusta o offset visual para distribuir itens na mesma posição
+                    if len(group_items) > 1:
+                        item.visual_offset_x = extra_offset_x
+                        item.visual_offset_y = extra_offset_y
+
+                        # Varia a rotação baseada no índice
+                        item.rotation = random.uniform(-45, 45)
+
+                    # Passa o screen_manager
+                    item.screen_manager = self.game.screen_manager
+                    self.items.append(item)
 
             print(f"Itens alvo carregados: {len(self.items)}")
             self.items_stolen = 0
@@ -93,21 +137,19 @@ class TargetItemManager:
         return self.items_protected > 0 and not self.game_over
 
     def render_in_ground(self, screen, camera):
-        """Renderiza todos os itens"""
-        for item in self.items:
-            if item.carried_by is None:
-                item.render(screen, camera)
+        """Renderiza todos os itens no chão usando o renderer"""
+        ground_items = [item for item in self.items if item.carried_by is None]
+        self.renderer.render(screen, camera, self.game.screen_manager, ground_items)
 
     def render_in_pokemon(self, screen, camera):
-        """Renderiza todos os itens"""
-        for item in self.items:
-            if item.carried_by:
-                item.render(screen, camera)
+        """Renderiza todos os itens sendo carregados usando o renderer"""
+        carried_items = [item for item in self.items if item.carried_by]
+        self.renderer.render(screen, camera, self.game.screen_manager, carried_items)
 
     def get_item_at(self, x, y, tolerance=20):
         """Retorna o item na posição (para debug)"""
         for item in self.items:
-            dist = ((item.x - x) ** 2 + (item.y - y) ** 2) ** 0.5
+            dist = ((item.base_x - x) ** 2 + (item.base_y - y) ** 2) ** 0.5
             if dist < tolerance:
                 return item
         return None
