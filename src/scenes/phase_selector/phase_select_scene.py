@@ -235,8 +235,10 @@ class PhaseSelectScene(BaseScene):
         # Animação
         self.hover_changed = False
 
-        # Modo de desenvolvimento (opcional)
-        self.dev_mode = True  # Mude para False em produção
+        self.refresh_data()
+
+        # Modo de desenvolvimento (desbloqueia tudo)
+        self.dev_mode = False
         if self.dev_mode:
             self._setup_dev_mode()
 
@@ -382,6 +384,23 @@ class PhaseSelectScene(BaseScene):
             card = PhaseCard(phase_data, unlocked, completed)
             card.update_position(card_x, card_y, card_width, card_height)
             self.phase_cards.append(card)
+
+    def refresh_data(self):
+        """Recarrega os dados do progresso e catálogo"""
+        # Recarrega o progresso do arquivo
+        self.progress.load_progress()
+
+        # Recarrega o catálogo de fases
+        self.catalog.refresh()
+
+        # Atualiza lista de capítulos disponíveis
+        self.available_chapters = sorted(self.catalog.get_all_phases().keys())
+        self.current_chapter_id = self._get_first_available_chapter()
+
+        # Força recriação do layout
+        self.layout_initialized = False
+
+        print("Dados da PhaseSelectScene recarregados!")
 
     def handle_event(self, event):
         """Processa eventos"""

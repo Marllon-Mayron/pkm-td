@@ -142,6 +142,14 @@ class PhaseCompleteOverlay(BaseOverlay):
         """Volta para a seleção de fases"""
         from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 
-        self.game_scene.cleanup()
+        # Se a game_scene tiver cleanup, chame-o
+        if hasattr(self.game_scene, 'cleanup'):
+            self.game_scene.cleanup()
 
-        self.game.current_scene = PhaseSelectScene(self.game)
+        # Cria nova cena de seleção
+        phase_select = PhaseSelectScene(self.game)
+
+        # Opcional: força refresh imediato
+        phase_select.refresh_data()
+
+        self.game.current_scene = phase_select
