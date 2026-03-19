@@ -194,7 +194,7 @@
                         0
                     ]
                 ],
-                "tileset_path": "C:/Users/marll/Downloads/PokemonMultGame-main/PokemonMultGame-main/KalebAdventures/res/Maps/Ekat's Public Tiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 11,
                 "height": 14
             },
@@ -385,7 +385,7 @@
                         0
                     ]
                 ],
-                "tileset_path": "C:/Users/marll/Downloads/PokemonMultGame-main/PokemonMultGame-main/KalebAdventures/res/Maps/Ekat's Public Tiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 11,
                 "height": 14
             },
@@ -576,7 +576,7 @@
                         0
                     ]
                 ],
-                "tileset_path": null,
+                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 11,
                 "height": 14
             }

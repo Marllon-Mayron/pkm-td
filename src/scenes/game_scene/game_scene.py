@@ -3,8 +3,9 @@
 """
 Cena principal do jogo - Carrega fases reais com waves
 """
-import pygame
+import pygame, os
 
+from src.config.paths import PROJECT_ROOT, RES_PATH, ALL_TILES_PATH
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
 from src.scenes.game_scene.components.managers.overlay_manager import OverlayType, OverlayManager
@@ -143,37 +144,61 @@ class GameScene(BaseScene):
 
     def _load_phase_data(self):
         """Carrega os dados da fase do disco usando chapter_id e phase_number"""
+        print(f"\n=== CARREGANDO DADOS DA FASE {self.chapter_id}-{self.phase_number} ===")
+
         data = phase_loader.load_phase(self.chapter_id, self.phase_number)
 
         if not data:
             print(f"ERRO: Não foi possível carregar a fase {self.phase_id}")
+            # Cria recompensas padrão em caso de erro
+            self.phase_rewards = {"money": 0, "experience": 0}
             return
+
+        # USA A CONSTANTE GLOBAL
+        base_path = PROJECT_ROOT
+        print(f"Usando PROJECT_ROOT: {base_path}")
+
+        # Verifica se a pasta res existe
+        print(f"Pasta RES_PATH: {RES_PATH}")
+        print(f"Existe? {os.path.exists(RES_PATH)}")
+
+        print(f"Pasta ALL_TILES_PATH: {ALL_TILES_PATH}")
+        print(f"Existe? {os.path.exists(ALL_TILES_PATH)}")
+
+        # Lista arquivos na pasta AllTiles
+        if os.path.exists(ALL_TILES_PATH):
+            files = os.listdir(ALL_TILES_PATH)
+            print(f"Arquivos em AllTiles: {files[:5]}")
 
         # Carrega mapa
         map_data = phase_loader.get_map_data()
-        self.map_renderer.load_from_data(map_data, "data/phases")
+        print(f"Map data keys: {map_data.keys()}")
+        self.map_renderer.load_from_data(map_data, base_path)
 
         # Carrega paths
         paths_data = phase_loader.get_paths_data()
+        print(f"Paths data: {len(paths_data.get('paths', []))} paths")
         self.path_renderer.load_from_data(paths_data)
 
         # Carrega spots
         spot_data = phase_loader.get_tower_spots_data()
+        print(f"Spots data: {len(spot_data.get('spots', []))} spots")
         self.spot_renderer.load_from_data(spot_data)
 
         # Carrega itens alvo
         items_data = data.get("target_items", {})
+        print(f"Itens alvo: {len(items_data.get('items', []))} itens")
         self.target_item_manager.load_from_data(items_data)
 
-        # Carrega recompensas
+        # Carrega recompensas - CRIA ANTES DE QUALQUER OUTRA COISA
         rewards = data.get("rewards", {})
         self.phase_rewards = {
             "money": rewards.get("money", 0),
             "experience": rewards.get("experience", 0)
         }
+        print(f"✓ Recompensas carregadas: ${self.phase_rewards['money']} | {self.phase_rewards['experience']} XP")
 
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.set_target_items(self.target_item_manager.items)
+        print("=== DADOS CARREGADOS COM SUCESSO ===\n")
 
     def _setup_world_dimensions(self):
         """Configura dimensões do mundo baseado no mapa"""

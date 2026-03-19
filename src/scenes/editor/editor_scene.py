@@ -2,7 +2,7 @@
 Cena do Editor de Fases
 
 """
-import pygame
+import pygame, os
 from tkinter import filedialog, Tk
 
 from src.editor.target_item_editor import TargetItemManager
@@ -441,6 +441,8 @@ class EditorScene(BaseScene):
 
     def load_phase(self, chapter, phase_number):
         """Carrega uma fase existente"""
+        print(f"\n=== CARREGANDO FASE {chapter}-{phase_number} ===")
+
         phase_data = self.exporter.load_phase(chapter, phase_number)
 
         if not phase_data:
@@ -448,13 +450,33 @@ class EditorScene(BaseScene):
             return False
 
         try:
+            # Mostra estrutura do JSON
+            print(f"Keys do phase_data: {phase_data.keys()}")
+
+            # Pega o diretório raiz do projeto
+            # Caminho atual: .../pokemon-tower-defense/src/scenes/editor/editor_scene.py
+            current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            # Sobe 4 níveis para chegar na raiz
+            project_root = os.path.abspath(os.path.join(current_dir))
+
+            # Se ainda não estiver certo, tenta com caminho fixo para teste
+            if not os.path.exists(os.path.join(project_root, "res")):
+                # Tenta caminho alternativo
+                project_root = os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+
+            print(f"Project root calculado: {project_root}")
+            print(f"Pasta res existe? {os.path.exists(os.path.join(project_root, 'res'))}")
+
             # Carrega o mapa
             if "map" in phase_data:
-                self.layer_manager.from_dict(phase_data["map"])
+                print(f"Mapa encontrado com {len(phase_data['map'].get('layers', []))} layers")
+                self.layer_manager.from_dict(phase_data["map"], project_root)
 
             # Carrega os paths
             if "paths" in phase_data:
                 self.path_manager.from_dict(phase_data["paths"])
+                print(f"Paths carregados: {len(self.path_manager.paths)}")
             elif "path" in phase_data:
                 # Compatibilidade com versão antiga
                 self.path_manager = PathManager()
@@ -462,23 +484,26 @@ class EditorScene(BaseScene):
                 path.from_dict(phase_data["path"])
                 self.path_manager.paths = [path]
                 self.path_manager.current_path_index = 0
+                print("Path carregado (formato antigo)")
 
             # Carrega waves
             if "waves" in phase_data:
                 self.wave_manager.from_dict(phase_data["waves"])
+                print(f"Waves carregadas: {len(self.wave_manager.waves)}")
             else:
                 self.wave_manager = WaveManager()
                 self.wave_manager.add_wave()
+                print("Nenhuma wave encontrada, criada wave padrão")
 
-            # Carrega os spots (onde os Pokémons serão colocados)
+            # Carrega os spots
             if "tower_spots" in phase_data:
                 self.tower_spots.from_dict(phase_data["tower_spots"])
-                print(f"Carregados {len(self.tower_spots.spots)} spots")
+                print(f"Spots carregados: {len(self.tower_spots.spots)}")
 
             # Carrega os items
             if "target_items" in phase_data:
                 self.target_items.from_dict(phase_data["target_items"])
-                print(f"Carregados {len(self.target_items.items)} itens alvo")
+                print(f"Itens alvo carregados: {len(self.target_items.items)}")
 
             # Atualiza nome da fase
             self.phase_name = phase_data.get("name", f"Fase {chapter}-{phase_number}")
@@ -489,16 +514,22 @@ class EditorScene(BaseScene):
             current_layer = self.layer_manager.get_current_layer()
             if current_layer and current_layer.tileset:
                 self.tile_palette.set_tileset(current_layer.tileset)
+                print("Tile palette atualizada")
 
             # Limpa historico
             self.clear_undo_history()
 
-            print(f"Fase {chapter}-{phase_number} carregada com sucesso!")
-            print(f"Paths: {len(self.path_manager.paths)} | Spots: {len(self.tower_spots.spots)}")
+            print(f"\n✓ Fase {chapter}-{phase_number} carregada com sucesso!")
+            print(f"  Layers: {len(self.layer_manager.layers)}")
+            print(f"  Paths: {len(self.path_manager.paths)}")
+            print(f"  Spots: {len(self.tower_spots.spots)}")
+            print(f"  Itens: {len(self.target_items.items)}")
             return True
 
         except Exception as e:
             print(f"Erro ao carregar fase: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def list_available_phases(self):

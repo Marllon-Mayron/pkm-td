@@ -16,16 +16,6 @@ class PhaseExporter:
     def export_phase(self, phase_data, chapter, phase_number):
         """
         Exporta uma fase para JSON
-
-        phase_data: {
-            "name": str,
-            "map": layer_manager dict,
-            "paths": path_manager dict,
-            "waves": wave_manager dict,
-            "tower_spots": tower_spot_manager dict,
-            "target_items": target_item_manager dict,  # NOVO
-            "rewards": dict
-        }
         """
         # Cria pasta do capítulo se não existir
         chapter_path = self.base_path / f"chapter_{chapter:02d}"
@@ -35,34 +25,74 @@ class PhaseExporter:
         filename = f"phase_{phase_number:02d}.json"
         filepath = chapter_path / filename
 
+        # ANTES DE SALVAR: Verifica e ajusta caminhos dos tilesets
+        map_data = phase_data["map"].copy()
+
+        print("\n=== AJUSTANDO CAMINHOS DOS TILESETS ANTES DE SALVAR ===")
+
+        for i, layer in enumerate(map_data["layers"]):
+            if layer.get("tileset_path"):
+                old_path = layer["tileset_path"]
+                print(f"Layer {i} ({layer['name']})")
+                print(f"  Path original: {old_path}")
+
+                # Se for caminho absoluto, converte para relativo
+                if os.path.isabs(old_path):
+                    try:
+                        # Pega o diretório raiz do projeto
+                        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+                        rel_path = os.path.relpath(old_path, project_root)
+
+                        # Garante que use / e não \
+                        rel_path = rel_path.replace('\\', '/')
+
+                        # Remove qualquer referência duplicada ao nome do projeto
+                        if 'pokemon-tower-defense/' in rel_path:
+                            rel_path = rel_path.replace('pokemon-tower-defense/', '')
+
+                        # Garante que comece com res/
+                        if not rel_path.startswith('res/'):
+                            if 'res/' in rel_path:
+                                rel_path = rel_path[rel_path.index('res/'):]
+                            else:
+                                # Se não tem res/, coloca em res/AllTiles/
+                                basename = os.path.basename(rel_path)
+                                rel_path = f"res/AllTiles/{basename}"
+
+                        layer["tileset_path"] = rel_path
+                        print(f"  Convertido para: {rel_path}")
+
+                    except Exception as e:
+                        print(f"  Erro na conversão: {e}")
+                        # Fallback: só o nome do arquivo
+                        basename = os.path.basename(old_path)
+                        layer["tileset_path"] = f"res/AllTiles/{basename}"
+                        print(f"  Fallback para: {layer['tileset_path']}")
+                else:
+                    print(f"  Já é relativo: {old_path}")
+
         # Prepara dados completos
         full_data = {
             "chapter": chapter,
             "phase": phase_number,
             "name": phase_data.get("name", f"Fase {phase_number}"),
-            "map": phase_data["map"],
+            "map": map_data,
             "paths": phase_data["paths"],
             "waves": phase_data.get("waves", {"waves": []}),
             "tower_spots": phase_data["tower_spots"],
-            "target_items": phase_data.get("target_items", {"items": []}),  # <-- ADICIONADO
+            "target_items": phase_data.get("target_items", {"items": []}),
             "rewards": phase_data.get("rewards", {
                 "money": 100,
                 "experience": 50
             })
         }
 
-        # DEBUG: Mostra o que está sendo salvo
-        print(f"\n=== SALVANDO FASE {chapter}-{phase_number} ===")
-        print(f"Waves: {len(full_data['waves'].get('waves', []))}")
-        print(f"Target Items: {len(full_data['target_items'].get('items', []))}")
-        print(f"Spots: {len(full_data['tower_spots'].get('spots', []))}")
-        print("=====================================\n")
-
         # Salva arquivo
         with open(filepath, 'w', encoding='utf-8') as f:
             json.dump(full_data, f, indent=4, ensure_ascii=False)
 
-        print(f"Fase {chapter}-{phase_number} exportada: {filepath}")
+        print(f"\n✓ Fase {chapter}-{phase_number} exportada: {filepath}")
+        print("=====================================\n")
 
         # Atualiza índice do capítulo
         self._update_chapter_index(chapter, phase_number)

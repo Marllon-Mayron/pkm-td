@@ -17,9 +17,6 @@ class PhaseLoader:
     def load_phase(self, chapter: int, phase_number: int) -> dict:
         """
         Carrega uma fase do disco
-
-        Returns:
-            dict com os dados da fase ou None se não encontrar
         """
         filepath = self.base_path / f"chapter_{chapter:02d}" / f"phase_{phase_number:02d}.json"
 
@@ -31,12 +28,33 @@ class PhaseLoader:
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
+            print(f"\n=== PHASE LOADER: Fase {chapter}-{phase_number} carregada ===")
+            print(f"Arquivo: {filepath}")
+            print(f"Keys no JSON: {data.keys()}")
+
             self.current_phase_data = data
             return data
 
         except Exception as e:
             print(f"Erro ao carregar fase: {e}")
+            import traceback
+            traceback.print_exc()
             return None
+
+    def get_base_path(self) -> str:
+        """Retorna o caminho base do projeto (onde está a pasta res)"""
+        # Sobe do diretório data/phases até a raiz do projeto
+        # .../pokemon-tower-defense/data/phases -> .../pokemon-tower-defense/
+
+        # Pega o caminho absoluto do diretório data/phases
+        data_phases_path = self.base_path.absolute()
+        print(f"data_phases_path: {data_phases_path}")
+
+        # Sobe 2 níveis: data/phases -> data -> raiz
+        project_root = data_phases_path.parent.parent
+        print(f"project_root: {project_root}")
+
+        return str(project_root)
 
     def get_phase_info(self) -> dict:
         """Retorna informações básicas da fase atual"""

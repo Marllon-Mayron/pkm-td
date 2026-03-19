@@ -39,12 +39,23 @@ class Layer:
     def load_tileset(self, image_path, tile_width, tile_height):
         """Carrega um tileset de uma imagem"""
         try:
+            print(f"\n--- load_tileset ---")
+            print(f"Tentando carregar: {image_path}")
+            print(f"Arquivo existe? {os.path.exists(image_path)}")
+
+            if not os.path.exists(image_path):
+                print(f"ERRO: Arquivo não encontrado!")
+                return False
+
             sheet = pygame.image.load(image_path).convert_alpha()
+            print(f"Imagem carregada: {sheet.get_width()}x{sheet.get_height()}")
+
             sheet_width = sheet.get_width()
             sheet_height = sheet.get_height()
 
             cols = sheet_width // tile_width
             rows = sheet_height // tile_height
+            print(f"Tilesheet dividida em {cols}x{rows} tiles")
 
             self.tileset = []
             for row in range(rows):
@@ -53,12 +64,28 @@ class Layer:
                     tile = sheet.subsurface(rect)
                     self.tileset.append(tile)
 
-            self.tileset_path = image_path
-            print(f"Tileset carregado: {len(self.tileset)} tiles de {tile_width}x{tile_height}")
+            print(f"Tileset carregado: {len(self.tileset)} tiles")
+
+            # Converte para caminho relativo se for absoluto
+            if os.path.isabs(image_path):
+                try:
+                    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                    relative_path = os.path.relpath(image_path, project_root)
+                    self.tileset_path = relative_path.replace('\\', '/')
+                    print(f"Caminho convertido para relativo: {self.tileset_path}")
+                except:
+                    self.tileset_path = os.path.basename(image_path)
+            else:
+                self.tileset_path = image_path
+
             return True
+
         except Exception as e:
             print(f"Erro ao carregar tileset: {e}")
+            import traceback
+            traceback.print_exc()
             return False
+
 
     def resize(self, new_width, new_height, default_tile=0):
         """
@@ -243,21 +270,29 @@ class LayerManager:
 
     def from_dict(self, data, base_path=""):
         """Carrega do dicionário"""
-        # Usa o tamanho máximo salvo
-        self.width = data.get("width", 100)  # fallback para 100 se não existir
+        print("\n=== INÍCIO do from_dict ===")
+        print(f"Base path recebido: {base_path}")
+        print(f"Data keys: {data.keys()}")
+
+        self.width = data.get("width", 100)
         self.height = data.get("height", 100)
         self.tile_size = data.get("tile_size", 16)
         self.layers = []
 
-        for layer_data in data["layers"]:
-            # Verifica se a layer tem tamanho próprio salvo, senão usa o global
+        for layer_idx, layer_data in enumerate(data["layers"]):
+            print(f"\n--- Processando layer {layer_idx}: {layer_data['name']} ---")
+
             layer_width = layer_data.get("width", self.width)
             layer_height = layer_data.get("height", self.height)
+            print(f"Dimensões: {layer_width}x{layer_height}")
 
             # Obtém os tiles
             loaded_tiles = layer_data["tiles"]
+            print(f"Tiles recebidos: {len(loaded_tiles)} linhas")
+            if loaded_tiles:
+                print(f"Primeira linha tem {len(loaded_tiles[0])} colunas")
 
-            # Cria a layer com as dimensões corretas
+            # Cria a layer
             layer = Layer(
                 layer_data["name"],
                 LayerType(layer_data["type"]),
@@ -266,15 +301,76 @@ class LayerManager:
                 self.tile_size
             )
 
-            # Copia os tiles, garantindo que as dimensões correspondam
-            for y in range(min(len(loaded_tiles), layer_height)):
-                for x in range(min(len(loaded_tiles[y]), layer_width)):
-                    if y < layer_height and x < layer_width:
+            # COPIA OS TILES
+            for y in range(layer_height):
+                for x in range(layer_width):
+                    if y < len(loaded_tiles) and x < len(loaded_tiles[y]):
                         layer.tiles[y][x] = loaded_tiles[y][x]
+                    else:
+                        layer.tiles[y][x] = 0
 
+            # Carrega tileset se existir
             if layer_data.get("tileset_path"):
-                tileset_path = os.path.join(base_path, layer_data["tileset_path"])
-                if os.path.exists(tileset_path):
-                    layer.load_tileset(tileset_path, self.tile_size, self.tile_size)
+                layer.tileset_path = layer_data["tileset_path"]
+                print(f"Tileset path do JSON: {layer.tileset_path}")
+
+                # Lista de possíveis caminhos para procurar
+                possible_paths = []
+                basename = os.path.basename(layer.tileset_path)
+
+                # 1. Se base_path foi fornecido, tenta com ele
+                if base_path:
+                    # Remove qualquer "pokemon-tower-defense" duplicado
+                    clean_path = layer.tileset_path
+                    if clean_path.startswith('pokemon-tower-defense/'):
+                        clean_path = clean_path[len('pokemon-tower-defense/'):]
+                    if clean_path.startswith('pokemon-tower-defense\\'):
+                        clean_path = clean_path[len('pokemon-tower-defense\\'):]
+
+                    full_path = os.path.join(base_path, clean_path)
+                    possible_paths.append(full_path)
+                    print(f"Path com base_path: {full_path}")
+
+                # 2. Caminho direto na raiz do projeto
+                root_path = os.path.join("res", "AllTiles", basename)
+                possible_paths.append(root_path)
+                print(f"Path res/AllTiles: {root_path}")
+
+                # 3. Caminho com base_path + res/AllTiles
+                if base_path:
+                    res_path = os.path.join(base_path, "res", "AllTiles", basename)
+                    possible_paths.append(res_path)
+                    print(f"Path base_path + res/AllTiles: {res_path}")
+
+                # 4. Apenas o nome do arquivo no diretório atual
+                possible_paths.append(basename)
+                print(f"Path apenas nome: {basename}")
+
+                # Tenta cada caminho
+                loaded = False
+                for path in possible_paths:
+                    normalized = os.path.normpath(path)
+                    print(f"  Verificando: {normalized}")
+                    print(f"    Existe? {os.path.exists(normalized)}")
+
+                    if os.path.exists(normalized):
+                        print(f"  ✓ ENCONTRADO: {normalized}")
+                        success = layer.load_tileset(normalized, self.tile_size, self.tile_size)
+                        if success:
+                            print(f"  ✓ Tileset carregado com {len(layer.tileset)} tiles")
+                            loaded = True
+                            break
+                        else:
+                            print(f"  ✗ Falha ao carregar tileset")
+
+                if not loaded:
+                    print(f"  ✗ NENHUM CAMINHO FUNCIONOU para {layer.tileset_path}")
+                    print("  Usando tileset vazio")
+            else:
+                print("  Sem tileset_path")
 
             self.layers.append(layer)
+            print(f"Layer adicionada. Total layers: {len(self.layers)}")
+
+        print("\n=== FIM do from_dict ===")
+        return self
