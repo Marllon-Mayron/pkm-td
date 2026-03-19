@@ -38,7 +38,7 @@ class BagManager:
     def _add_initial_items(self):
         """Adiciona itens iniciais para o jogador"""
         # 6 Pokebolas
-        self.add_item("pokeball", 60)
+        self.add_item("pokeball", 8)
 
         # 2 Poções
         self.add_item("potion", 2)
