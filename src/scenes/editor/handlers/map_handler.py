@@ -16,6 +16,13 @@ class MapHandler:
         self.last_erase_time = 0
         self.undo_cooldown = 0.2  # Cooldown para salvar undo durante arrasto
 
+    def _get_current_tile_int(self):
+        """Obtém o tile atual garantindo que seja inteiro"""
+        try:
+            return int(self.editor.current_tile)
+        except (ValueError, TypeError):
+            return 1  # Valor padrão se não conseguir converter
+
     def _save_undo_state(self, action_description, continuous=False):
         """Método auxiliar para salvar estado antes de ações
 
@@ -47,6 +54,13 @@ class MapHandler:
         Returns:
             int: Número de tiles alterados
         """
+        # Garante que new_tile_id seja inteiro
+        try:
+            new_tile_id = int(new_tile_id)
+        except (ValueError, TypeError):
+            print(f"DEBUG FloodFill: new_tile_id inválido: {new_tile_id}, usando 0")
+            new_tile_id = 0
+
         # Verifica se a posição inicial é válida
         if not (0 <= start_x < layer.width and 0 <= start_y < layer.height):
             print(f"DEBUG FloodFill: Posição inválida ({start_x}, {start_y})")
@@ -114,6 +128,9 @@ class MapHandler:
         if not current_layer:
             return
 
+        # Obtém o tile atual como inteiro
+        current_tile_int = self._get_current_tile_int()
+
         # Modo layers - desenha tile
         if self.editor.mode == "layers":
             if 0 <= tile_x < current_layer.width and 0 <= tile_y < current_layer.height:
@@ -127,7 +144,7 @@ class MapHandler:
                     current_tile_value = current_layer.get_tile(tile_x, tile_y)
 
                     # Só faz algo se for um tile diferente
-                    if current_tile_value != self.editor.current_tile:
+                    if current_tile_value != current_tile_int:
                         should_save_undo = True
 
                         if continuous:
@@ -138,12 +155,12 @@ class MapHandler:
 
                         if should_save_undo:
                             self._save_undo_state(
-                                f"Tile {self.editor.current_tile} em ({tile_x}, {tile_y})",
+                                f"Tile {current_tile_int} em ({tile_x}, {tile_y})",
                                 continuous
                             )
 
-                        self.editor.layer_manager.set_tile(tile_x, tile_y, self.editor.current_tile)
-                        print(f"Tile {self.editor.current_tile} colocado em ({tile_x}, {tile_y})")
+                        self.editor.layer_manager.set_tile(tile_x, tile_y, current_tile_int)
+                        print(f"Tile {current_tile_int} colocado em ({tile_x}, {tile_y})")
 
                 # BALDE (preenchimento) - clique esquerdo
                 elif current_brush == self.editor.brush_buttons.BRUSH_BUCKET and not continuous:
@@ -154,20 +171,19 @@ class MapHandler:
 
                     print(f"DEBUG Balde Esquerdo: Clicou em tile ({tile_x}, {tile_y}) = {target_tile}")
 
-                    if target_tile != self.editor.current_tile:  # Só preenche se for diferente
+                    if target_tile != current_tile_int:  # Só preenche se for diferente
                         # Salva estado ANTES da modificação
                         self._save_undo_state(
-                            f"Preenchimento em ({tile_x}, {tile_y}) com tile {self.editor.current_tile}"
+                            f"Preenchimento em ({tile_x}, {tile_y}) com tile {current_tile_int}"
                         )
 
-                        print(
-                            f"DEBUG Balde Esquerdo: Chamando flood fill para preencher com tile {self.editor.current_tile}")
+                        print(f"DEBUG Balde Esquerdo: Chamando flood fill para preencher com tile {current_tile_int}")
 
                         # Executa o flood fill
                         count = self._flood_fill(
                             current_layer,
                             tile_x, tile_y,
-                            self.editor.current_tile
+                            current_tile_int
                         )
 
                         print(f"Balde (esquerdo): {count} tiles preenchidos em ({tile_x}, {tile_y})")
@@ -266,6 +282,8 @@ class MapHandler:
                             tile_x, tile_y,
                             0  # Tile 0 = vazio
                         )
+
+                        print(f"Balde (direito): {count} tiles removidos em ({tile_x}, {tile_y})")
 
                     else:
                         print(f"Balde (direito): Tile em ({tile_x}, {tile_y}) já está vazio")

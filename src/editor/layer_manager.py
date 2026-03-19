@@ -1,3 +1,5 @@
+# src/editor/layer_manager.py
+
 """
 Gerenciador de layers do mapa
 """
@@ -26,12 +28,18 @@ class Layer:
         self.tileset = []
 
     def set_tile(self, x, y, tile_id):
+        """Define um tile na posição especificada - converte para inteiro"""
         if 0 <= x < self.width and 0 <= y < self.height:
-            self.tiles[y][x] = tile_id
+            # Garante que tile_id seja inteiro
+            try:
+                self.tiles[y][x] = int(tile_id)
+            except (ValueError, TypeError):
+                self.tiles[y][x] = 0
             return True
         return False
 
     def get_tile(self, x, y):
+        """Retorna o tile na posição especificada"""
         if 0 <= x < self.width and 0 <= y < self.height:
             return self.tiles[y][x]
         return 0
@@ -86,16 +94,20 @@ class Layer:
             traceback.print_exc()
             return False
 
-
     def resize(self, new_width, new_height, default_tile=0):
         """
         Redimensiona a layer para novas dimensões
-
         """
         if new_width == self.width and new_height == self.height:
             return True
 
         print(f"Redimensionando layer '{self.name}' de {self.width}x{self.height} para {new_width}x{new_height}")
+
+        # Garante que default_tile seja inteiro
+        try:
+            default_tile = int(default_tile)
+        except (ValueError, TypeError):
+            default_tile = 0
 
         # Cria nova matriz de tiles
         new_tiles = [[default_tile for _ in range(new_width)] for _ in range(new_height)]
@@ -139,7 +151,14 @@ class Layer:
         for y in range(start_y, end_y):
             for x in range(start_x, end_x):
                 tile_id = self.tiles[y][x]
-                if tile_id > 0 and tile_id - 1 < len(self.tileset):
+
+                # CONVERSÃO CRÍTICA: Garante que tile_id seja inteiro
+                try:
+                    tile_index = int(tile_id) - 1
+                except (ValueError, TypeError):
+                    tile_index = -1
+
+                if tile_index >= 0 and tile_index < len(self.tileset):
                     # Posição na tela usando os mesmos valores cacheados
                     screen_x = x * tile_size_scaled + cam_offset_x
                     screen_y = y * tile_size_scaled + cam_offset_y
@@ -150,7 +169,7 @@ class Layer:
                             screen_y + tile_size_scaled > screen_manager.viewport_y and
                             screen_y < screen_manager.viewport_y + screen_manager.viewport_height):
 
-                        tile_img = self.tileset[tile_id - 1]
+                        tile_img = self.tileset[tile_index]
 
                         # Redimensiona se necessário
                         if (tile_img.get_width() != tile_size_scaled or
@@ -187,16 +206,17 @@ class LayerManager:
     def resize_all_layers(self, new_width, new_height, default_tile=0):
         """
         Redimensiona todas as layers para as novas dimensões
-
-        Args:
-            new_width: nova largura em tiles
-            new_height: nova altura em tiles
-            default_tile: tile padrão para preencher novas áreas
         """
         if new_width == self.width and new_height == self.height:
             return True
 
         print(f"Redimensionando todas as layers de {self.width}x{self.height} para {new_width}x{new_height}")
+
+        # Garante que default_tile seja inteiro
+        try:
+            default_tile = int(default_tile)
+        except (ValueError, TypeError):
+            default_tile = 0
 
         for layer in self.layers:
             layer.resize(new_width, new_height, default_tile)
@@ -214,6 +234,7 @@ class LayerManager:
         return None
 
     def set_tile(self, x, y, tile_id):
+        """Define um tile na posição especificada"""
         layer = self.get_current_layer()
         if layer:
             return layer.set_tile(x, y, tile_id)
@@ -301,11 +322,14 @@ class LayerManager:
                 self.tile_size
             )
 
-            # COPIA OS TILES
+            # COPIA OS TILES - Garantindo que sejam inteiros
             for y in range(layer_height):
                 for x in range(layer_width):
                     if y < len(loaded_tiles) and x < len(loaded_tiles[y]):
-                        layer.tiles[y][x] = loaded_tiles[y][x]
+                        try:
+                            layer.tiles[y][x] = int(loaded_tiles[y][x])
+                        except (ValueError, TypeError):
+                            layer.tiles[y][x] = 0
                     else:
                         layer.tiles[y][x] = 0
 
