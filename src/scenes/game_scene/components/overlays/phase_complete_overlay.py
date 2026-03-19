@@ -17,6 +17,7 @@ class PhaseCompleteOverlay(BaseOverlay):
         self.phase_rewards = game_scene.phase_rewards
         self.target_item_manager = game_scene.target_item_manager
 
+        self.game_scene.game.player.auto_save()
         # Botão de voltar
         self.button_rect = None
         self.button_hovered = False

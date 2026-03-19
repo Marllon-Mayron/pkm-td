@@ -350,6 +350,7 @@ class GameWaveManager:
             if attacker:
                 attacker.gain_xp(xp_gained)
                 print(f"[XP] {attacker.name}: {damage} de dano ({proportion * 100:.1f}%) -> {xp_gained} XP")
+                self.game_scene.game.player.auto_save()
             else:
                 print(f"[XP] Não encontrou atacante com ID {attacker_id} no mapa")
 

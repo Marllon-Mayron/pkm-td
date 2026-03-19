@@ -38,8 +38,6 @@ class Player(Entity):
 
         self.save_manager = SaveManager()
 
-        # Tenta carregar dados salvos automaticamente
-        self.load_game()
 
     def add_to_team(self, pokemon, slot=None):
         """Adiciona Pokémon ao time"""
@@ -129,19 +127,22 @@ class Player(Entity):
 
     #SALVAMENTOS
 
-    def save_game(self) -> bool:
+    def save_game(self, slot=1):
         """Salva o jogo atual"""
-        success = self.save_manager.save_pokemon_data(self)
-        if success:
-            print(f"[JOGO] Progresso salvo! Box: {len(self.pc_box)} Pokémon, Time: {len(self.team)}/6")
-        return success
+        from src.managers.save_manager import save_manager
 
-    def load_game(self) -> bool:
-        """Carrega o jogo salvo"""
-        success = self.save_manager.load_pokemon_data(self)
-        if success:
-            print(f"[JOGO] Progresso carregado! Box: {len(self.pc_box)} Pokémon, Time: {len(self.team)}/6")
-        return success
+        # Você pode passar o estado atual do jogo
+        game_state = {
+            "current_chapter": getattr(self, 'current_chapter', 1),
+            "current_phase": getattr(self, 'current_phase', 1)
+        }
+
+        return save_manager.save_game(self, game_state, save_name=f"Save {slot}", slot=slot)
+
+    def load_game(self, slot=1):
+        """Carrega um jogo"""
+        from src.managers.save_manager import save_manager
+        return save_manager.load_game(self, slot)
 
     # Adicione este método para salvar automaticamente em momentos chave
     def auto_save(self):

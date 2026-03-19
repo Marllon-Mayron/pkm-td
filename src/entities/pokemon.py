@@ -190,6 +190,7 @@ class Pokemon(Entity):
 
     def gain_xp(self, amount):
         """Ganha XP e verifica level up"""
+
         old_level = self.level
         old_xp = self.xp
         self.xp += amount
@@ -205,6 +206,8 @@ class Pokemon(Entity):
             print(f"[LEVEL UP] ⬆️ {self.name} subiu de {old_level} para {self.level}!")
             self.attack_damage = self._calculate_attack_damage()
             self.defense_value = self._calculate_defense()
+
+
 
     def level_up(self):
         """Sobe de nível"""

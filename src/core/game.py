@@ -14,10 +14,21 @@ class Game:
         self.screen_manager = ScreenManager()
         self.running = True
 
-        # Cria o jogador
-        self.player = Player(100, 100)  # Posição inicial
-        # Adiciona um Pokémon inicial (Bulbasaur)
-        self.player.add_starter(7)  # ID 1 = Bulbasaur
+        # Cria o jogador primeiro (sem starter)
+        self.player = Player(100, 100)
+
+        # TENTA CARREGAR O SAVE AUTOMATICAMENTE
+        save_loaded = self.player.load_game(1)  # Tenta carregar slot 1
+
+        if not save_loaded:
+            # Se não tinha save, cria um Pokémon inicial
+            print("[GAME] Nenhum save encontrado, criando novo jogo")
+            self.player.add_starter(7)  # ID 7 = Squirtle
+        else:
+            print("[GAME] Save carregado com sucesso!")
+            print(f"  - Time: {len(self.player.team)} Pokémon")
+            print(f"  - Box: {len(self.player.pc_box)} Pokémon")
+            print(f"  - Itens: {self.player.bag.items}")
 
         # Câmera
         self.camera = None
