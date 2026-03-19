@@ -2335,23 +2335,23 @@
                 "enemies": [
                     {
                         "pokemon_id": 13,
-                        "percentage": 17
+                        "percentage": 12
                     },
                     {
                         "pokemon_id": 10,
-                        "percentage": 17
+                        "percentage": 12
                     },
                     {
                         "pokemon_id": 14,
-                        "percentage": 17
+                        "percentage": 25
                     },
                     {
                         "pokemon_id": 11,
-                        "percentage": 17
+                        "percentage": 25
                     },
                     {
                         "pokemon_id": 16,
-                        "percentage": 16
+                        "percentage": 10
                     },
                     {
                         "pokemon_id": 19,
@@ -2374,19 +2374,19 @@
                 "enemies": [
                     {
                         "pokemon_id": 10,
-                        "percentage": 17
+                        "percentage": 12
                     },
                     {
                         "pokemon_id": 13,
-                        "percentage": 17
+                        "percentage": 12
                     },
                     {
                         "pokemon_id": 11,
-                        "percentage": 17
+                        "percentage": 25
                     },
                     {
                         "pokemon_id": 14,
-                        "percentage": 17
+                        "percentage": 25
                     },
                     {
                         "pokemon_id": 19,
@@ -2394,7 +2394,7 @@
                     },
                     {
                         "pokemon_id": 16,
-                        "percentage": 16
+                        "percentage": 10
                     }
                 ],
                 "min_level": 5,
@@ -2406,7 +2406,7 @@
                 "repeat_count": 1
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 1
     },
     "tower_spots": {
         "spot_size": 16,

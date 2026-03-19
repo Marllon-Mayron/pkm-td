@@ -31,9 +31,16 @@ class TargetItem(Entity):
         self.visual_offset_y = random.uniform(-offset_range, offset_range)
         self.rotation = random.uniform(-30, 30)  # Rotação entre -30 e 30 graus
 
-        # Posição base (usada para hitbox)
+        # Posição base (usada quando o item está no chão sem ter sido pego)
         self.base_x = x
         self.base_y = y
+
+        # Posição atual (pode ser diferente quando é dropado)
+        self.current_x = x
+        self.current_y = y
+
+        # Flag para indicar se o item foi dropado (já foi carregado antes)
+        self.was_carried = False
 
         # Carrega sprite (mantém tamanho original)
         self.sprite = None
@@ -62,14 +69,16 @@ class TargetItem(Entity):
         """Atualiza lógica do item"""
         if self.carried_by:
             # Item sendo carregado - segue o Pokémon
-            self.x = self.carried_by.x - self.height / 2
-            self.y = self.carried_by.y - self.width / 2
+            self.current_x = self.carried_by.x - self.height / 2
+            self.current_y = self.carried_by.y - self.width / 2
+            self.x = self.current_x
+            self.y = self.current_y
             self.rect.x = self.x
             self.rect.y = self.y
         else:
-            # Quando não está sendo carregado, mantém posição base
-            self.x = self.base_x
-            self.y = self.base_y
+            # Quando não está sendo carregado, usa a posição atual (que pode ser onde foi dropado)
+            self.x = self.current_x
+            self.y = self.current_y
             self.rect.x = self.x
             self.rect.y = self.y
 
@@ -84,14 +93,30 @@ class TargetItem(Entity):
         """Reseta o processo de captura quando o Pokémon é capturado/removido"""
         if self.carried_by:
             print(f"[ITEM] Resetando captura de {self.item_name} - {self.carried_by.name} foi capturado/removido")
-            # Limpa a referência no Pokémon ANTES de limpar a própria referência
+
+            # IMPORTANTE: Salva a posição atual ANTES de limpar as referências
+            drop_x = self.current_x
+            drop_y = self.current_y
+
+            # Limpa a referência no Pokémon
             if hasattr(self.carried_by, 'is_carrying'):
                 self.carried_by.is_carrying = None
+
+            # Reseta o estado do item
             self.carried_by = None
             self.capture_progress = 0
-            # O item continua protegido
             self.is_protected = True
-            print(f"[ITEM] {self.item_name} resetado e pronto para ser levado novamente")
+            self.was_carried = True  # Marca que já foi carregado
+
+            # Mantém o item na posição onde o Pokémon foi derrotado/capturado
+            self.current_x = drop_x
+            self.current_y = drop_y
+            self.x = drop_x
+            self.y = drop_y
+            self.rect.x = drop_x
+            self.rect.y = drop_y
+
+            print(f"[ITEM] {self.item_name} dropado em ({drop_x:.1f}, {drop_y:.1f})")
 
     def update_capture(self, dt):
         """Atualiza o progresso de captura"""

@@ -417,7 +417,7 @@
                         0
                     ]
                 ],
-                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": "pkm-td/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 25,
                 "height": 15
             },
@@ -831,7 +831,7 @@
                         0
                     ]
                 ],
-                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": "pkm-td/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 25,
                 "height": 15
             },
@@ -1245,7 +1245,7 @@
                         0
                     ]
                 ],
-                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": "pkm-td/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 25,
                 "height": 15
             }
@@ -1298,8 +1298,8 @@
                         "percentage": 1
                     }
                 ],
-                "min_level": 3,
-                "max_level": 6,
+                "min_level": 4,
+                "max_level": 7,
                 "wave_size": 10,
                 "spawn_interval": 3.0,
                 "initial_delay": 5.0,
