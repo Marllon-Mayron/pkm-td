@@ -257,6 +257,9 @@ class EditorRenderHandler:
     def _render_ui_panels(self, screen):
         """Renderiza os painéis da UI"""
         if self.editor.mode == "layers":
+            if hasattr(self.editor, 'brush_buttons') and self.editor.brush_buttons.visible:
+                self.editor.brush_buttons.render(screen, self.editor.font_small)
+
             self.editor.layer_selector.layers = self.editor.layer_manager.layers
             self.editor.layer_selector.render(screen, self.editor.layer_manager.current_layer)
 
@@ -272,8 +275,7 @@ class EditorRenderHandler:
                 msg_y = self.editor.screen_manager.viewport_y + 180
                 screen.blit(msg, (msg_x, msg_y))
 
-        if hasattr(self.editor, 'brush_buttons') and self.editor.brush_buttons.visible:
-            self.editor.brush_buttons.render(screen, self.editor.font_small)
+
 
     def _render_top_ui(self, screen):
         """Renderiza a UI superior"""

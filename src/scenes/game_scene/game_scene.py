@@ -120,10 +120,11 @@ class GameScene(BaseScene):
 
 
     def _start_game(self):
-        """Inicia o jogo"""
+        """Inicia o jogo - AGORA INICIA TODAS AS WAVES DE TODOS OS PATHS"""
         if self.wave_manager.has_more_waves():
             self.game_state = "in_wave"
-            self.wave_manager.start_next_wave()
+            # Inicia todas as waves de todos os paths simultaneamente
+            self.wave_manager.start_all_waves()
         else:
             self.game_state = "completed"
             print("Fase não tem waves configuradas!")
@@ -566,7 +567,7 @@ class GameScene(BaseScene):
         return None
 
     def fixed_update(self, dt):
-        """Update da lógica do jogo"""
+        """Update da lógica do jogo - AGORA COM MÚLTIPLOS PATHS"""
 
         # Se estiver pausado, não atualiza nada
         if self.paused:
@@ -601,68 +602,90 @@ class GameScene(BaseScene):
         # Verifica game over por itens levados
         if self.target_item_manager.game_over:
             self.game_state = "game_over"
-            self.overlay_manager.show(OverlayType.GAME_OVER)  # MOSTRA OVERLAY
+            self.overlay_manager.show(OverlayType.GAME_OVER)
             print("GAME OVER - Todos os itens foram levados!")
             return
 
         # ===== ATUALIZA WAVE MANAGER =====
-        # Pega o path atual
-        path_points = []
-        if self.wave_manager.current_wave_index < len(self.wave_manager.waves_data):
-            wave_data = self.wave_manager.waves_data[self.wave_manager.current_wave_index]
-            path_index = wave_data.get("path_index", 0)
-            path_points = self.path_renderer.get_path_points(path_index)
+        # Monta dicionário com pontos de todos os paths
+        path_points_by_index = {}
+        for i in range(len(self.path_renderer.paths)):
+            path_points = self.path_renderer.get_path_points(i)
+            if path_points:
+                path_points_by_index[i] = path_points
+                if self.show_debug:
+                    print(f"[DEBUG] Path {i + 1} tem {len(path_points)} pontos")
 
-        # Atualiza wave manager - ele gerencia tudo e retorna inimigos que chegaram ao fim
-        enemies_at_end = self.wave_manager.update(dt, path_points, self.screen_manager)
+        # Atualiza wave manager - processa todos os paths simultaneamente
+        enemies_at_end = self.wave_manager.update(
+            dt,
+            path_points_by_index,
+            self.screen_manager
+        )
 
         # Processa inimigos que chegaram ao fim
         for enemy in enemies_at_end:
             if enemy.is_carrying:
                 item = enemy.is_carrying
                 item.is_protected = False
-                print(f"[FIM] {enemy.name} levou {item.item_name}!")
-
-                # Limpa a referência
+                path_origin = getattr(enemy, 'path_index_origin', 0) + 1
+                print(f"[FIM] Path {path_origin}: {enemy.name} levou {item.item_name}!")
                 enemy.clear_carrying()
 
         # ===== VERIFICA ESTADO DO JOGO =====
         if self.game_state == "in_wave":
-            # Verifica se a wave atual terminou completamente
+            # Verifica se TODAS as waves de TODOS os paths terminaram
             if self.wave_manager.is_wave_completely_finished():
-                print(f"[GAME] Wave {self.wave_manager.current_wave_index + 1} terminou completamente!")
-                print(
-                    f"        Spawnados: {self.wave_manager.enemies_spawned}, Vivos: {len(self.wave_manager.active_enemies)}")
+                print(f"\n{'=' * 50}")
+                print(f"[GAME] 🎉 TODAS AS WAVES DE TODOS OS PATHS FORAM CONCLUÍDAS!")
+                print(f"{'=' * 50}\n")
 
-                if self.wave_manager.has_more_waves():
-                    # Ainda tem mais waves, vai para o intervalo
-                    print(f"[GAME] ⏳ Indo para between_waves... (Próxima: {self.wave_manager.current_wave_index + 2})")
-                    self.game_state = "between_waves"
-                    self.between_waves_timer = 3.0
+                if self.target_item_manager.items_protected > 0:
+                    print(f"[GAME] 🎉 PARABÉNS! Fase concluída com sucesso!")
+                    self.game_state = "completed"
+                    self._complete_phase()
                 else:
-                    # Última wave terminou
-                    if self.target_item_manager.items_protected > 0:
-                        print(f"[GAME] 🎉 PARABÉNS! Todas as waves concluídas!")
-                        self.game_state = "completed"
-                        self._complete_phase()
-                    else:
-                        print(f"[GAME] 💀 GAME OVER - Todos os itens foram levados!")
-                        self.game_state = "game_over"
-                        self.overlay_manager.show(OverlayType.GAME_OVER)  # MOSTRA OVERLAY
+                    print(f"[GAME] 💀 GAME OVER - Nenhum item foi protegido!")
+                    self.game_state = "game_over"
+                    self.overlay_manager.show(OverlayType.GAME_OVER)
             else:
-                # Log para ver o que está impedindo a wave de terminar
-                if not self.wave_manager.wave_in_progress and self.wave_manager.enemies_remaining > 0:
-                    print(
-                        f"[GAME] ⚠️ Wave não está em progresso mas ainda há {self.wave_manager.enemies_remaining} inimigos!")
+                # Log detalhado para debug (só mostra a cada 60 frames para não floodar)
+                if hasattr(self, '_debug_frame_counter'):
+                    self._debug_frame_counter += 1
+                else:
+                    self._debug_frame_counter = 0
+
+                if self._debug_frame_counter % 60 == 0 and self.show_debug:
+                    print(f"\n[DEBUG] Status das waves por path:")
+                    for path_idx, waves in self.wave_manager.path_waves.items():
+                        status = "ATIVA" if self.wave_manager.wave_in_progress_by_path.get(path_idx,
+                                                                                           False) else "inativa"
+                        current = self.wave_manager.current_wave_index_by_path.get(path_idx, 0) + 1
+                        total = len(waves)
+                        spawned = self.wave_manager.enemies_spawned_by_path.get(path_idx, 0)
+                        remaining = self.wave_manager.enemies_remaining_by_path.get(path_idx, 0)
+                        wave_data = self.wave_manager.current_wave_data_by_path.get(path_idx, {})
+                        wave_name = wave_data.get('name', f'Wave {current}') if wave_data else 'Aguardando'
+
+                        print(f"  Path {path_idx + 1}: {status} | {wave_name} ({current}/{total}) | "
+                              f"Spawnados: {spawned} | Vivos: {remaining}")
 
         elif self.game_state == "between_waves":
             self.between_waves_timer -= dt
-            print(f"[BETWEEN] Próxima wave em {self.between_waves_timer:.1f}s")
-
             if self.between_waves_timer <= 0:
-                print(f"[BETWEEN] Iniciando próxima wave!")
-                self.game_state = "in_wave"
-                self.wave_manager.start_next_wave()
+                # Verifica se ainda tem waves para começar
+                any_wave_started = False
+                for path_idx in self.wave_manager.path_waves.keys():
+                    if self.wave_manager.current_wave_index_by_path.get(path_idx, 0) < len(
+                            self.wave_manager.path_waves[path_idx]):
+                        self.wave_manager._start_wave_for_path(path_idx)
+                        any_wave_started = True
+                        print(f"[BETWEEN] Path {path_idx + 1}: Iniciando próxima wave!")
+
+                if any_wave_started:
+                    self.game_state = "in_wave"
+                else:
+                    print(f"[BETWEEN] Não há mais waves para começar!")
 
     def _complete_phase(self):
         """Marca a fase como completada e dá as recompensas"""
@@ -771,7 +794,7 @@ class GameScene(BaseScene):
             self._render_debug_info(screen)
 
     def _render_game_ui(self, screen):
-        """Renderiza a UI do jogo (agora sem a parte de game over)"""
+        """Renderiza a UI do jogo - ADAPTADA PARA MÚLTIPLOS PATHS"""
         font = pygame.font.Font(None, 24)
         font_small = pygame.font.Font(None, 18)
 
@@ -803,14 +826,21 @@ class GameScene(BaseScene):
         if self.game_state == "waiting":
             state_text = font_small.render("Aguardando início...", True, (200, 200, 200))
             screen.blit(state_text, (self.screen_manager.viewport_x + 15, y_offset))
+
         elif self.game_state == "in_wave":
-            wave_text = font_small.render(
-                f"Wave {wave_info['index']}/{wave_info['total']}: {wave_info['name']}",
-                True, (100, 255, 100))
+            # Mostra quantos paths estão ativos
+            if wave_info.get('active_paths', 0) > 1:
+                wave_text = font_small.render(
+                    f"{wave_info['active_paths']} paths ativos | {wave_info['name']}",
+                    True, (100, 255, 100))
+            else:
+                wave_text = font_small.render(
+                    f"Wave {wave_info['index']}/{wave_info['total']}: {wave_info['name']}",
+                    True, (100, 255, 100))
             screen.blit(wave_text, (self.screen_manager.viewport_x + 15, y_offset))
             y_offset += 20
 
-            # Barra de progresso
+            # Barra de progresso (consolidada)
             bar_x = self.screen_manager.viewport_x + 15
             bar_y = y_offset
             bar_width = 370
@@ -843,7 +873,7 @@ class GameScene(BaseScene):
 
         elif self.game_state == "between_waves":
             wave_text = font_small.render(
-                f"Wave {wave_info['index']} concluída! Próxima em {self.between_waves_timer:.1f}s",
+                f"Wave concluída! Próxima em {self.between_waves_timer:.1f}s",
                 True, (255, 255, 0))
             screen.blit(wave_text, (self.screen_manager.viewport_x + 15, y_offset))
 
@@ -945,7 +975,7 @@ class GameScene(BaseScene):
         screen.blit(phase_text, (phase_x, phase_y))
 
     def _render_debug_info(self, screen):
-        """Informações de debug detalhadas"""
+        """Informações de debug detalhadas - AGORA COM DADOS DE MÚLTIPLOS PATHS"""
         mouse_pos = pygame.mouse.get_pos()
         in_viewport = self.screen_manager.is_mouse_in_viewport(mouse_pos)
 
@@ -964,17 +994,29 @@ class GameScene(BaseScene):
                         tile_id = layer.get_tile(tile_x, tile_y)
                         break
                 tile_value = f"Tile ID: {tile_id}"
+
+                # Verifica se está em algum path
+                path_info = "Nenhum path"
+                for i, path in enumerate(self.path_renderer.paths):
+                    for node in path.nodes:
+                        dist = ((node[0] - world_pos[0]) ** 2 + (node[1] - world_pos[1]) ** 2) ** 0.5
+                        if dist < 20:  # Tolerância de 20 pixels
+                            path_info = f"Próximo ao Path {i + 1} (dist: {dist:.0f}px)"
+                            break
             else:
                 world_text = "World: invalid position"
                 tile_info = "Tile: N/A"
                 tile_value = "Tile ID: N/A"
+                path_info = "N/A"
         else:
             world_text = "World: outside viewport"
             tile_info = "Tile: outside"
             tile_value = "Tile ID: N/A"
+            path_info = "N/A"
 
         wave_info = self.wave_manager.get_current_wave_info()
 
+        # Linhas básicas de debug
         debug_lines = [
             "=== DEBUG INFO ===",
             f"Fase: {self.phase_info.get('name', 'Desconhecida')}",
@@ -985,11 +1027,78 @@ class GameScene(BaseScene):
             f"Game State: {self.game_state}",
             f"Camera Drag: {'ACTIVE' if self.dragging_camera else 'inactive'}",
             "",
-            "=== WAVES ===",
-            f"Wave: {wave_info['index']}/{wave_info['total']} - {wave_info['name']}",
-            f"Inimigos: {wave_info['enemies_spawned']}/{wave_info['enemies_total']} spawnados",
-            f"Vivos: {len(self.wave_manager.active_enemies)}",  # MODIFICADO
-            f"Progresso: {wave_info['progress'] * 100:.1f}%",
+            "=== WAVES (CONSOLIDADO) ===",
+            f"Status: {wave_info['name']}",
+            f"Inimigos totais: {wave_info['enemies_spawned']}/{wave_info['enemies_total']} spawnados",
+            f"Vivos agora: {len(self.wave_manager.active_enemies)}",
+            f"Progresso geral: {wave_info['progress'] * 100:.1f}%",
+            "",
+            "=== WAVES POR PATH ===",
+        ]
+
+        # Adiciona informações detalhadas de cada path
+        if hasattr(self.wave_manager, 'path_waves'):
+            total_paths = len(self.wave_manager.path_waves)
+            debug_lines.append(f"Total de paths com waves: {total_paths}")
+            debug_lines.append("")
+
+            for path_idx, waves in sorted(self.wave_manager.path_waves.items()):
+                # Pega o estado deste path
+                current_idx = self.wave_manager.current_wave_index_by_path.get(path_idx, 0)
+                total_waves = len(waves)
+                in_progress = self.wave_manager.wave_in_progress_by_path.get(path_idx, False)
+                spawned = self.wave_manager.enemies_spawned_by_path.get(path_idx, 0)
+                remaining = self.wave_manager.enemies_remaining_by_path.get(path_idx, 0)
+
+                # Pega dados da wave atual se existir
+                wave_data = self.wave_manager.current_wave_data_by_path.get(path_idx)
+                if wave_data:
+                    wave_name = wave_data.get('name', f'Wave {current_idx + 1}')
+                    wave_size = wave_data.get('wave_size', 10)
+                    repeat = wave_data.get('repeat_wave', False)
+                    repeat_count = wave_data.get('repeat_count', 1) if repeat else 0
+                    delay = wave_data.get('initial_delay', 2.0)
+                    interval = wave_data.get('spawn_interval', 3.0)
+                else:
+                    wave_name = 'Aguardando'
+                    wave_size = 0
+                    repeat = False
+                    repeat_count = 0
+                    delay = 0
+                    interval = 0
+
+                # Status do path
+                status_icon = "🟢" if in_progress else "⏸️"
+                if current_idx >= total_waves and total_waves > 0:
+                    status_icon = "✅"  # Concluído
+
+                debug_lines.append(f"  {status_icon} Path {path_idx + 1}:")
+                debug_lines.append(
+                    f"      Waves: {current_idx + 1 if current_idx < total_waves else total_waves}/{total_waves}")
+                debug_lines.append(f"      Atual: {wave_name}")
+                debug_lines.append(f"      Progresso: {spawned}/{wave_size if wave_size > 0 else 'N/A'}")
+                debug_lines.append(f"      Vivos: {remaining}")
+
+                if in_progress and wave_data:
+                    timer = self.wave_manager.wave_timer_by_path.get(path_idx, 0)
+                    if timer > 0:
+                        debug_lines.append(f"      ⏳ Delay inicial: {timer:.1f}s")
+
+                    if repeat:
+                        debug_lines.append(f"      🔁 Repetições restantes: {repeat_count}")
+
+                debug_lines.append(f"      ⚙️ Config: delay={delay:.1f}s | intervalo={interval:.1f}s")
+
+                # Mostra composição da wave atual
+                if wave_data and wave_data.get('enemies'):
+                    debug_lines.append(f"      📊 Composição:")
+                    for e in wave_data['enemies']:
+                        from src.data.pokedex import Pokedex
+                        pokedex = Pokedex()
+                        name = pokedex.get_name(e['pokemon_id'])
+                        debug_lines.append(f"         - {name}: {e['percentage']}%")
+
+        debug_lines.extend([
             "",
             "=== CAMERA ===",
             f"Position: ({self.camera.x:.0f}, {self.camera.y:.0f})",
@@ -1007,37 +1116,62 @@ class GameScene(BaseScene):
             world_text,
             tile_info,
             tile_value,
+            path_info,
             "",
             "=== MAPA ===",
             f"Tiles: {self.map_renderer.layer_manager.width}x{self.map_renderer.layer_manager.height}",
             f"Pixels: {self.world_width}x{self.world_height}",
             f"Grid size: {self.grid_size}px",
-            f"Paths: {len(self.path_renderer.paths)}",
-            f"Path points: {sum(len(p.nodes) for p in self.path_renderer.paths)}",
+            f"Paths desenhados: {len(self.path_renderer.paths)}",
+        ])
+
+        # Detalhes dos paths renderizados
+        for i, path in enumerate(self.path_renderer.paths):
+            debug_lines.append(f"  Path {i + 1}: {len(path.nodes)} pontos | Cor: {path.line_color}")
+
+        debug_lines.extend([
             f"Pokémon colocados: {len(self.placement_manager.placed_pokemon) if hasattr(self, 'placement_manager') else 0}",
             f"Spots disponíveis: {len(self.spot_renderer.get_spots())}",
-            f"Spots ocupados: {sum(1 for s in self.spot_renderer.get_spots() if s.occupied)}"
-        ]
+            f"Spots ocupados: {sum(1 for s in self.spot_renderer.get_spots() if s.occupied)}",
+            "",
+            "=== ITENS ALVO ===",
+            f"Protegidos: {self.target_item_manager.items_protected}",
+            f"Levados: {self.target_item_manager.items_stolen}",
+            f"Restantes: {len([i for i in self.target_item_manager.items if not i.is_protected and not i.is_stolen])}",
+        ])
 
+        # Renderiza o debug
         y_offset = self.screen_manager.viewport_y + 40
         x_offset = self.screen_manager.viewport_x + 10
         font_small = pygame.font.Font(None, 18)
 
         line_height = 16
         bg_height = len(debug_lines) * line_height + 10
-        bg_width = 400
+        bg_width = 450  # Aumentado para comportar mais informações
         bg_surface = pygame.Surface((bg_width, bg_height))
-        bg_surface.set_alpha(180)
+        bg_surface.set_alpha(200)  # Mais opaco para melhor legibilidade
         bg_surface.fill((0, 0, 0))
         screen.blit(bg_surface, (x_offset - 5, y_offset - 5))
 
         for line in debug_lines:
             if line.startswith("==="):
-                color = (255, 255, 0)
+                color = (255, 255, 0)  # Amarelo para títulos
                 font_bold = pygame.font.Font(None, 20)
                 text = font_bold.render(line, True, color)
+            elif "🟢" in line or "✅" in line:
+                color = (100, 255, 100)  # Verde para paths ativos
+                text = font_small.render(line, True, color)
+            elif "⏸️" in line:
+                color = (255, 255, 100)  # Amarelo para paths inativos
+                text = font_small.render(line, True, color)
+            elif "Path" in line and not line.startswith(" "):
+                color = (100, 200, 255)  # Azul claro para cabeçalhos de path
+                text = font_small.render(line, True, color)
+            elif line.strip().startswith("-"):
+                color = (180, 180, 180)  # Cinza claro para itens de composição
+                text = font_small.render(line, True, color)
             else:
-                color = (0, 255, 0)
+                color = (0, 255, 0)  # Verde para informações normais
                 text = font_small.render(line, True, color)
 
             screen.blit(text, (x_offset, y_offset))

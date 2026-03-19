@@ -5,59 +5,109 @@ from src.entities.pokemon import Pokemon
 
 
 class GameWaveManager:
-    """Gerencia as waves durante o jogo - AGORA É A ÚNICA FONTE DE VERDADE PARA INIMIGOS"""
+    """Gerencia as waves durante o jogo - AGORA SUPORTA MÚLTIPLOS PATHS SIMULTÂNEOS"""
 
     def __init__(self, phase_loader):
         self.phase_loader = phase_loader
-        self.waves_data = []  # Lista de waves
-        self.current_wave_index = 0
-        self.wave_in_progress = False
-        self.wave_timer = 0
-        self.spawn_timer = 0
-        self.enemies_spawned = 0
-        self.enemies_remaining = 0
-        self.current_wave_data = None
+        self.waves_data = []  # Lista de todas as waves
+        self.path_waves = {}  # Dicionário: path_index -> lista de waves daquele path
 
-        # Lista principal de inimigos
+        # Estado das waves (agora por path)
+        self.current_wave_index_by_path = {}  # path_index -> índice da wave atual
+        self.wave_in_progress_by_path = {}  # path_index -> se está em progresso
+        self.wave_timer_by_path = {}  # path_index -> timer atual
+        self.spawn_timer_by_path = {}  # path_index -> timer de spawn
+        self.enemies_spawned_by_path = {}  # path_index -> inimigos spawnados
+        self.enemies_remaining_by_path = {}  # path_index -> inimigos restantes
+        self.current_wave_data_by_path = {}  # path_index -> dados da wave atual
+
+        # Lista principal de inimigos (todos juntos)
         self.active_enemies = []
 
-        # NOVO: Referência para os itens alvo (será setada pelo GameScene)
+        # Referência para os itens alvo
         self.target_items = []
+
+        self.game_scene = None
 
         # Carrega os dados
         self._load_waves_data()
 
-        self.game_scene = None
+        # Inicializa o estado para cada path
+        self._initialize_path_states()
 
     def _load_waves_data(self):
-        """Carrega os dados das waves do phase_loader"""
+        """Carrega os dados das waves do phase_loader e organiza por path"""
         raw_data = self.phase_loader.get_waves_data()
 
         if isinstance(raw_data, list):
             self.waves_data = raw_data
+
+            # Organiza waves por path
+            self.path_waves = {}
+            for wave_data in self.waves_data:
+                path_index = wave_data.get("path_index", 0)
+                if path_index not in self.path_waves:
+                    self.path_waves[path_index] = []
+                self.path_waves[path_index].append(wave_data)
+
             print(f"[WaveManager] Waves carregadas: {len(self.waves_data)}")
+            for path_idx, waves in self.path_waves.items():
+                print(f"  Path {path_idx + 1}: {len(waves)} waves")
         else:
             self.waves_data = []
+            self.path_waves = {}
             print("⚠️ raw_data não é uma lista, criando lista vazia")
 
-    def start_next_wave(self):
-        """Inicia a próxima wave"""
-        if self.current_wave_index >= len(self.waves_data):
-            print("[WaveManager] Todas as waves concluídas!")
+    def _initialize_path_states(self):
+        """Inicializa o estado para todos os paths que têm waves"""
+        for path_index in self.path_waves.keys():
+            self.current_wave_index_by_path[path_index] = 0
+            self.wave_in_progress_by_path[path_index] = False
+            self.wave_timer_by_path[path_index] = 0
+            self.spawn_timer_by_path[path_index] = 0
+            self.enemies_spawned_by_path[path_index] = 0
+            self.enemies_remaining_by_path[path_index] = 0
+            self.current_wave_data_by_path[path_index] = None
+
+    def start_all_waves(self):
+        """Inicia todas as primeiras waves de todos os paths simultaneamente"""
+        started_any = False
+
+        for path_index, waves in self.path_waves.items():
+            if waves and self.current_wave_index_by_path[path_index] < len(waves):
+                self._start_wave_for_path(path_index)
+                started_any = True
+                print(f"[WaveManager] Iniciando Wave 1 do Path {path_index + 1}")
+
+        return started_any
+
+    def _start_wave_for_path(self, path_index):
+        """Inicia a próxima wave para um path específico"""
+        if path_index not in self.path_waves:
+            print(f"[WaveManager] Path {path_index} não tem waves definidas")
             return False
 
-        self.current_wave_data = self.waves_data[self.current_wave_index]
+        waves = self.path_waves[path_index]
+        current_idx = self.current_wave_index_by_path[path_index]
 
-        # Configura a wave atual
-        self.wave_in_progress = True
-        self.wave_timer = self.current_wave_data.get("initial_delay", 2.0)
-        self.spawn_timer = 0
-        self.enemies_spawned = 0
-        # IMPORTANTE: Não resetamos enemies_remaining aqui, pois ele será incrementado conforme spawnamos
-        self.enemies_remaining = 0
+        if current_idx >= len(waves):
+            print(f"[WaveManager] Path {path_index + 1} já concluiu todas as waves")
+            return False
+
+        wave_data = waves[current_idx]
+
+        # Configura a wave atual para este path
+        self.current_wave_data_by_path[path_index] = wave_data
+        self.wave_in_progress_by_path[path_index] = True
+        self.wave_timer_by_path[path_index] = wave_data.get("initial_delay", 2.0)
+        self.spawn_timer_by_path[path_index] = 0
+        self.enemies_spawned_by_path[path_index] = 0
+        self.enemies_remaining_by_path[path_index] = 0
 
         print(
-            f"[WaveManager] Iniciando Wave {self.current_wave_index + 1}: {self.current_wave_data.get('name', 'Wave')}")
+            f"[WaveManager] Path {path_index + 1} - Iniciando Wave {current_idx + 1}: {wave_data.get('name', 'Wave')} "
+            f"(delay inicial: {self.wave_timer_by_path[path_index]:.1f}s)"
+        )
         return True
 
     def set_target_items(self, items):
@@ -65,13 +115,13 @@ class GameWaveManager:
         self.target_items = items
         print(f"[WaveManager] Itens alvo vinculados: {len(items)} itens")
 
-    def update(self, dt, path_points, screen_manager):
-        """Atualiza o estado da wave e todos os inimigos"""
-
+    def update(self, dt, path_points_by_index, screen_manager):
+        """Atualiza o estado das waves de TODOS os paths"""
         enemies_at_end = []
         enemies_to_remove = []
-        defeated_enemies = []  # NOVO: guarda inimigos derrotados para processar XP
+        defeated_enemies = []
 
+        # ===== 1. Atualiza todos os inimigos existentes =====
         for enemy in self.active_enemies[:]:
             # Atualiza o inimigo (movimento e captura de itens)
             enemy.update(dt, items=self.target_items)
@@ -79,11 +129,8 @@ class GameWaveManager:
             # Verifica se morreu
             if not enemy.is_alive():
                 print(f"[WAVE] {enemy.name} foi derrotado!")
-
-                # NOVO: Guarda para processar XP depois
                 defeated_enemies.append(enemy)
 
-                # Garante que o item seja solto
                 if enemy.is_carrying:
                     enemy.drop_item()
 
@@ -95,155 +142,125 @@ class GameWaveManager:
                 enemies_at_end.append(enemy)
                 enemies_to_remove.append(enemy)
 
-        # ===== NOVO: Processa XP dos inimigos derrotados =====
+        # Processa XP dos inimigos derrotados
         for enemy in defeated_enemies:
             self._distribute_xp(enemy)
 
         # Remove inimigos
         for enemy in enemies_to_remove:
             if enemy in self.active_enemies:
+                # Descobre de qual path este inimigo veio
+                path_index = getattr(enemy, 'path_index_origin', 0)
                 self.active_enemies.remove(enemy)
-                self.enemies_remaining -= 1
-                # Limpa tracking de dano
+                if path_index in self.enemies_remaining_by_path:
+                    self.enemies_remaining_by_path[path_index] -= 1
                 enemy.clear_damage_tracking()
 
-        # ===== 2. Spawna novos inimigos (se a wave estiver em andamento) =====
-        if self.wave_in_progress and self.current_wave_index < len(self.waves_data):
-            wave_data = self.current_wave_data or self.waves_data[self.current_wave_index]
+        # ===== 2. Processa waves para CADA PATH =====
+        for path_index, waves in self.path_waves.items():
+            if not waves:  # Path sem waves
+                continue
 
-            # Delay inicial da wave
-            if self.wave_timer > 0:
-                self.wave_timer -= dt
-                if self.wave_timer <= 0:
-                    print(f"[WaveManager] Delay inicial terminado! Iniciando spawns...")
-                return enemies_at_end  # Retorna apenas os que chegaram ao fim
+            # Pega o estado atual deste path
+            wave_in_progress = self.wave_in_progress_by_path.get(path_index, False)
+            current_idx = self.current_wave_index_by_path.get(path_index, 0)
 
-            # Spawn de inimigos
-            if self.enemies_spawned < wave_data.get("wave_size", 10):
-                self.spawn_timer -= dt
+            if current_idx >= len(waves):
+                continue  # Este path já terminou todas as waves
 
-                if self.spawn_timer <= 0:
-                    # Cria um inimigo
-                    enemy = self._create_enemy(wave_data, path_points, screen_manager)
+            wave_data = self.current_wave_data_by_path.get(path_index)
+            if not wave_data and wave_in_progress:
+                # Se não tem wave_data mas está em progresso, algo errado
+                self.wave_in_progress_by_path[path_index] = False
+                continue
 
-                    if enemy:
-                        # Adiciona à lista ativa
-                        self.active_enemies.append(enemy)
-                        self.enemies_spawned += 1
-                        self.enemies_remaining += 1
+            # Processa wave em andamento
+            if wave_in_progress and wave_data:
+                # Delay inicial da wave
+                if self.wave_timer_by_path[path_index] > 0:
+                    self.wave_timer_by_path[path_index] -= dt
+                    if self.wave_timer_by_path[path_index] <= 0:
+                        print(f"[WaveManager] Path {path_index + 1} - Delay inicial terminado! Iniciando spawns...")
+                    continue
 
-                        print(f"[WaveManager] Spawnado {enemy.name} ({self.enemies_spawned}/{wave_data.get('wave_size', 10)})")
+                # Spawn de inimigos
+                enemies_spawned = self.enemies_spawned_by_path[path_index]
+                wave_size = wave_data.get("wave_size", 10)
 
-                        # Reseta timer de spawn
-                        self.spawn_timer = wave_data.get("spawn_interval", 3.0)
+                if enemies_spawned < wave_size:
+                    self.spawn_timer_by_path[path_index] -= dt
 
-            # ===== 3. Verifica se a wave terminou de spawnar =====
-            if self.enemies_spawned >= wave_data.get("wave_size", 10):
-                # Se já spawnou todos e não há mais inimigos vivos, a wave terminou
-                if self.enemies_remaining <= 0:
-                    self._end_current_wave()
-                else:
-                    # Ainda tem inimigos vivos, mas não spawna mais
-                    if self.wave_in_progress:
-                        # Só printa ocasionalmente para não floodar o console
-                        if random.random() < 0.01:  # 1% de chance a cada frame
-                            print(f"[WaveManager] Aguardando eliminar {self.enemies_remaining} inimigos...")
+                    if self.spawn_timer_by_path[path_index] <= 0:
+                        # Pega o path correto para esta wave
+                        path_points = path_points_by_index.get(path_index, [])
+
+                        # Cria um inimigo
+                        enemy = self._create_enemy(
+                            wave_data,
+                            path_points,
+                            screen_manager,
+                            path_index
+                        )
+
+                        if enemy:
+                            # Marca o inimigo com o path de origem
+                            enemy.path_index_origin = path_index
+
+                            # Adiciona à lista ativa
+                            self.active_enemies.append(enemy)
+                            self.enemies_spawned_by_path[path_index] += 1
+                            self.enemies_remaining_by_path[path_index] += 1
+
+                            print(
+                                f"[WaveManager] Path {path_index + 1} - Spawnado {enemy.name} "
+                                f"({enemies_spawned + 1}/{wave_size})"
+                            )
+
+                            # Reseta timer de spawn
+                            self.spawn_timer_by_path[path_index] = wave_data.get("spawn_interval", 3.0)
+
+                # Verifica se a wave deste path terminou de spawnar
+                if self.enemies_spawned_by_path[path_index] >= wave_size:
+                    if self.enemies_remaining_by_path[path_index] <= 0:
+                        self._end_current_wave_for_path(path_index)
 
         return enemies_at_end
 
-    def _calculate_base_xp(self, pokemon):
-        """
-        Calcula XP base baseado no nível e espécie do Pokémon derrotado
-        """
-        # Fórmula base: nível * 10 + bônus por estágio
-        base_xp = pokemon.level * 10
-
-        # Bônus por estágio evolutivo (baseado no ID)
-        if pokemon.id <= 151:  # Kanto
-            base_xp += 5
-
-        # Bônus por shiny (mais raro)
-        if hasattr(pokemon, 'is_shiny') and pokemon.is_shiny:
-            base_xp = int(base_xp * 1.5)
-            print(f"[XP] Bônus shiny! XP ajustado para {base_xp}")
-
-        # Garante mínimo de 10 XP
-        base_xp = max(10, base_xp)
-
-        return base_xp
-
-    def _distribute_xp(self, defeated_enemy):
-        """Distribui XP para os atacantes quando um inimigo é derrotado"""
-
-        # Pega os contribuidores de dano
-        contributors = defeated_enemy.get_xp_contributors()
-
-        if not contributors:
-            print(f"[XP] Nenhum contribuidor encontrado para {defeated_enemy.name}")
+    def _end_current_wave_for_path(self, path_index):
+        """Finaliza a wave atual de um path específico"""
+        wave_data = self.current_wave_data_by_path.get(path_index)
+        if not wave_data:
             return
 
-        # XP base (pode variar conforme o nível do inimigo)
-        base_xp = 15 + (defeated_enemy.level * 5)
-        print(f"\n[XP] ===== DISTRIBUINDO XP PARA {defeated_enemy.name.upper()} =====")
-        print(f"[XP] XP base: {base_xp}")
-        print(f"[XP] Contribuidores encontrados: {len(contributors)}")
+        print(
+            f"\n[WaveManager] Path {path_index + 1} - Wave {self.current_wave_index_by_path[path_index] + 1} concluída!")
 
-        total_damage = sum(damage for _, damage in contributors)
-        print(f"[XP] Dano total causado: {total_damage}")
+        # Verifica se a wave repete
+        if wave_data.get("repeat_wave", False):
+            repeat_count = wave_data.get("repeat_count", 1)
 
-        # Distribui XP proporcional ao dano
-        for attacker_id, damage in contributors:
-            # Calcula proporção do dano
-            proportion = damage / total_damage
-            xp_gained = int(base_xp * proportion)
+            if repeat_count > 1:
+                # Decrementa contador e reinicia a mesma wave
+                wave_data["repeat_count"] = repeat_count - 1
+                self.wave_in_progress_by_path[path_index] = True
+                self.enemies_spawned_by_path[path_index] = 0
+                self.enemies_remaining_by_path[path_index] = 0
+                self.wave_timer_by_path[path_index] = wave_data.get("initial_delay", 2.0)
+                print(f"[WaveManager] Path {path_index + 1} - Repetindo wave... Restam {repeat_count - 1} repetições")
+                return
 
-            print(f"[XP] Contribuidor ID {attacker_id}: {damage} de dano")
+        # Passa para próxima wave deste path
+        self.wave_in_progress_by_path[path_index] = False
+        self.current_wave_index_by_path[path_index] += 1
+        self.current_wave_data_by_path[path_index] = None
 
-            # Encontra o Pokémon atacante no mapa ou no time
-            attacker = None
+        # Verifica se ainda tem mais waves para este path
+        if self.current_wave_index_by_path[path_index] < len(self.path_waves.get(path_index, [])):
+            print(f"[WaveManager] Path {path_index + 1} - Próxima wave disponível. Aguardando início...")
+        else:
+            print(f"[WaveManager] Path {path_index + 1} - 🏆 TODAS AS WAVES CONCLUÍDAS!")
 
-            # Procura nos Pokémon colocados
-            if hasattr(self, 'game_scene') and hasattr(self.game_scene, 'placement_manager'):
-                for pokemon in self.game_scene.placement_manager.placed_pokemon:
-                    if id(pokemon) == attacker_id:
-                        attacker = pokemon
-                        break
-
-            if attacker:
-                attacker.gain_xp(xp_gained)
-                print(f"[XP] {attacker.name}: dano {damage}/{total_damage} ({proportion * 100:.1f}%) -> {xp_gained} XP")
-            else:
-                print(f"[XP] Não encontrou atacante com ID {attacker_id} no mapa")
-
-        # REMOVA ESTA LINHA:
-        # self._update_team_ui()
-
-        print(f"[XP] Total XP distribuído: {sum(int(base_xp * (d / total_damage)) for _, d in contributors)}/{base_xp}")
-        print("[XP] ===== FIM DA DISTRIBUIÇÃO =====\n")
-
-    def _find_attacker_by_id(self, attacker_id):
-        """
-        Encontra um atacante pelo ID (procurando nos Pokémon colocados)
-        """
-        # IMPORTANTE: Verifica se tem acesso à GameScene
-        if not hasattr(self, 'game_scene'):
-            print(f"[XP] ERRO: WaveManager não tem referência para game_scene!")
-            return None
-
-        if not hasattr(self.game_scene, 'placement_manager'):
-            print(f"[XP] ERRO: game_scene não tem placement_manager!")
-            return None
-
-        # Procura nos Pokémon colocados no mapa
-        for pokemon in self.game_scene.placement_manager.placed_pokemon:
-            if id(pokemon) == attacker_id and pokemon.is_alive():
-                return pokemon
-
-        # Se não encontrou, pode ser que o Pokémon já tenha sido removido?
-        print(f"[XP] Não encontrou atacante ID {attacker_id} no mapa")
-        return None
-
-    def _create_enemy(self, wave_data, path_points, screen_manager):
+    def _create_enemy(self, wave_data, path_points, screen_manager, path_index):
         """Cria um inimigo baseado nos dados da wave"""
         enemy_data = self._get_random_enemy(wave_data)
 
@@ -273,6 +290,7 @@ class GameWaveManager:
         pokemon.path = path_points
         pokemon.speed = 0.8
         pokemon.path_index = 0
+        pokemon.path_index_origin = path_index  # Guarda de qual path veio
 
         # Define direção inicial
         if len(path_points) > 1:
@@ -285,24 +303,6 @@ class GameWaveManager:
                 pokemon.current_direction = "down" if dy > 0 else "up"
 
         return pokemon
-
-    def remove_enemy(self, enemy):
-        """
-        Remove um inimigo da lista ativa (quando capturado ou morto)
-        Retorna True se removeu com sucesso
-        """
-        if enemy in self.active_enemies:
-            # Garante que o item seja solto ao remover (caso não tenha sido solto no take_damage)
-            if enemy.is_carrying:
-                enemy.drop_item()
-
-            self.active_enemies.remove(enemy)
-            self.enemies_remaining -= 1
-            print(f"[WaveManager] Inimigo {enemy.name} removido! Restam {self.enemies_remaining}")
-            return True
-        else:
-            print(f"[WaveManager] ERRO: Tentou remover {enemy.name} mas ele não está na lista!")
-            return False
 
     def _get_random_enemy(self, wave_data):
         """Retorna um inimigo aleatório baseado nas porcentagens"""
@@ -324,70 +324,145 @@ class GameWaveManager:
 
         return enemies[-1]
 
-    def _end_current_wave(self):
-        """Finaliza a wave atual"""
-        if not self.current_wave_data:
+    def _distribute_xp(self, defeated_enemy):
+        """Distribui XP para os atacantes quando um inimigo é derrotado"""
+        contributors = defeated_enemy.get_xp_contributors()
+
+        if not contributors:
+            print(f"[XP] Nenhum contribuidor encontrado para {defeated_enemy.name}")
             return
 
-        print(f"\n[WaveManager] Wave {self.current_wave_index + 1} concluída!")
+        base_xp = 15 + (defeated_enemy.level * 5)
+        print(f"\n[XP] ===== DISTRIBUINDO XP PARA {defeated_enemy.name.upper()} =====")
+        print(f"[XP] XP base: {base_xp}")
 
-        # Verifica se a wave repete
-        if self.current_wave_data.get("repeat_wave", False):
-            repeat_count = self.current_wave_data.get("repeat_count", 1)
+        total_damage = sum(damage for _, damage in contributors)
+        print(f"[XP] Dano total causado: {total_damage}")
 
-            if repeat_count > 1:
-                # Decrementa contador e reinicia a mesma wave
-                self.current_wave_data["repeat_count"] = repeat_count - 1
-                self.wave_in_progress = True
-                self.enemies_spawned = 0
-                self.enemies_remaining = 0
-                self.wave_timer = self.current_wave_data.get("initial_delay", 2.0)
-                print(f"[WaveManager] Repetindo wave... Restam {repeat_count - 1} repetições")
-                return
+        # Distribui XP proporcional ao dano
+        for attacker_id, damage in contributors:
+            proportion = damage / total_damage
+            xp_gained = int(base_xp * proportion)
 
-        # Passa para próxima wave
-        self.wave_in_progress = False
-        self.current_wave_index += 1
-        self.current_wave_data = None
+            # Encontra o Pokémon atacante
+            attacker = self._find_attacker_by_id(attacker_id)
 
-        if self.current_wave_index < len(self.waves_data):
-            print(f"[WaveManager] Próxima wave disponível. Aguardando início...")
-        else:
-            print(f"[WaveManager] 🏆 TODAS AS WAVES CONCLUÍDAS!")
+            if attacker:
+                attacker.gain_xp(xp_gained)
+                print(f"[XP] {attacker.name}: {damage} de dano ({proportion * 100:.1f}%) -> {xp_gained} XP")
+            else:
+                print(f"[XP] Não encontrou atacante com ID {attacker_id} no mapa")
+
+    def _find_attacker_by_id(self, attacker_id):
+        """Encontra um atacante pelo ID"""
+        if not hasattr(self, 'game_scene') or not hasattr(self.game_scene, 'placement_manager'):
+            return None
+
+        for pokemon in self.game_scene.placement_manager.placed_pokemon:
+            if id(pokemon) == attacker_id and pokemon.is_alive():
+                return pokemon
+        return None
+
+    def remove_enemy(self, enemy):
+        """Remove um inimigo da lista ativa"""
+        if enemy in self.active_enemies:
+            if enemy.is_carrying:
+                enemy.drop_item()
+
+            path_index = getattr(enemy, 'path_index_origin', 0)
+            self.active_enemies.remove(enemy)
+
+            if path_index in self.enemies_remaining_by_path:
+                self.enemies_remaining_by_path[path_index] -= 1
+
+            print(f"[WaveManager] Inimigo {enemy.name} removido!")
+            return True
+        return False
 
     def get_current_wave_info(self):
-        """Retorna informações da wave atual para UI"""
-        if self.current_wave_index >= len(self.waves_data):
-            return {
-                "name": "Fim",
-                "index": self.current_wave_index,
-                "total": len(self.waves_data),
-                "enemies_remaining": 0,
-                "enemies_spawned": self.enemies_spawned,
-                "enemies_total": 0,
-                "progress": 1.0
-            }
+        """Retorna informações consolidadas de todas as waves ativas"""
+        total_active_paths = len([p for p in self.path_waves.keys()
+                                  if self.wave_in_progress_by_path.get(p, False)])
 
-        wave_data = self.waves_data[self.current_wave_index]
-        total_enemies = wave_data.get("wave_size", 10)
+        # Se não há waves ativas, mostra status de conclusão
+        if total_active_paths == 0:
+            # Verifica se todos os paths concluíram todas as waves
+            all_completed = True
+            for path_idx, waves in self.path_waves.items():
+                if self.current_wave_index_by_path.get(path_idx, 0) < len(waves):
+                    all_completed = False
+                    break
+
+            if all_completed:
+                return {
+                    "name": "Fase Completa!",
+                    "index": len(self.waves_data),
+                    "total": len(self.waves_data),
+                    "enemies_remaining": len(self.active_enemies),
+                    "enemies_spawned": sum(self.enemies_spawned_by_path.values()),
+                    "enemies_total": sum(w.get("wave_size", 10) for w in self.waves_data),
+                    "progress": 1.0,
+                    "active_paths": 0
+                }
+            else:
+                return {
+                    "name": "Aguardando...",
+                    "index": min(self.current_wave_index_by_path.values()) + 1
+                    if self.current_wave_index_by_path else 1,
+                    "total": len(self.waves_data),
+                    "enemies_remaining": len(self.active_enemies),
+                    "enemies_spawned": sum(self.enemies_spawned_by_path.values()),
+                    "enemies_total": sum(w.get("wave_size", 10) for w in self.waves_data),
+                    "progress": 0,
+                    "active_paths": 0
+                }
+
+        # Calcula progresso consolidado
+        total_spawned = sum(self.enemies_spawned_by_path.values())
+        total_enemies = sum(w.get("wave_size", 10) for w in self.waves_data)
 
         return {
-            "name": wave_data.get("name", f"Wave {self.current_wave_index + 1}"),
-            "index": self.current_wave_index + 1,
+            "name": f"{total_active_paths} wave(s) ativa(s)",
+            "index": "Múltiplas",
             "total": len(self.waves_data),
-            "enemies_remaining": self.enemies_remaining,
-            "enemies_spawned": self.enemies_spawned,
+            "enemies_remaining": len(self.active_enemies),
+            "enemies_spawned": total_spawned,
             "enemies_total": total_enemies,
-            "progress": self.enemies_spawned / total_enemies if total_enemies > 0 else 0
+            "progress": total_spawned / total_enemies if total_enemies > 0 else 0,
+            "active_paths": total_active_paths
         }
 
     def has_more_waves(self):
-        """Verifica se ainda existem waves"""
-        return self.current_wave_index < len(self.waves_data)
+        """Verifica se ainda existem waves em qualquer path"""
+        for path_idx, waves in self.path_waves.items():
+            if self.current_wave_index_by_path.get(path_idx, 0) < len(waves):
+                return True
+        return False
 
     def is_wave_completely_finished(self):
         """
-        Verifica se a wave atual terminou completamente
-        (não está mais em progresso E não há inimigos vivos)
+        Verifica se TODAS as waves de TODOS os paths terminaram
         """
-        return not self.wave_in_progress and self.enemies_remaining <= 0 < self.enemies_spawned
+        # Se ainda tem inimigos vivos, não terminou
+        if self.active_enemies:
+            return False
+
+        # Verifica cada path
+        for path_idx, waves in self.path_waves.items():
+            # Se o path ainda está em progresso, não terminou
+            if self.wave_in_progress_by_path.get(path_idx, False):
+                return False
+
+            # Se ainda tem waves para spawnar neste path, não terminou
+            if self.current_wave_index_by_path.get(path_idx, 0) < len(waves):
+                # Verifica se já spawnou todos da wave atual
+                wave_data = self.current_wave_data_by_path.get(path_idx)
+                if wave_data:
+                    wave_size = wave_data.get("wave_size", 10)
+                    if self.enemies_spawned_by_path.get(path_idx, 0) < wave_size:
+                        return False
+                else:
+                    # Se não tem wave_data mas ainda tem índices, significa que não começou
+                    return False
+
+        return True
