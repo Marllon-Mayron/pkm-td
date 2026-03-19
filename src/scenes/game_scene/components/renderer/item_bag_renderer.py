@@ -14,8 +14,8 @@ class ItemBagRenderer:
         self.catalog = item_bag_catalog
 
         # Posicionamento inicial (canto inferior esquerdo)
-        self.x = 20
-        self.y = game.screen_manager.window_height - 420  # 400 altura + 20 margem
+        self.x = game.screen_manager.window_width - 280
+        self.y = game.screen_manager.window_height - 540
         self.width = 250
         self.height = 400
 

@@ -22,26 +22,39 @@ class PokemonManager:
 
     def update_team_status(self):
         """Atualiza o status 'in_team' para todos os pokémons da box"""
-        team_ids = [p.id for p in self.player.team]
+        team_ids = [id(p) for p in self.player.team]  # Usa id() para comparação segura
         for pokemon in self.player.pc_box:
-            pokemon.is_in_team = pokemon.id in team_ids
+            # Verifica se está no time comparando objetos
+            pokemon.is_in_team = any(p is pokemon for p in self.player.team)
 
     def add_to_team(self, pokemon):
         """Adiciona um pokémon ao time"""
         if len(self.player.team) < 6:
-            success, _ = self.player.add_to_team(pokemon)
-            if success:
-                pokemon.is_in_team = True
-                self.update_team_status()
-            return success
+            # Verifica se o Pokémon está na box
+            if pokemon in self.player.pc_box:
+                success, _ = self.player.add_to_team(pokemon)
+                if success:
+                    pokemon.is_in_team = True
+                    self.update_team_status()
+                return success
+            else:
+                print(f"[ERRO] {pokemon.name} não está na PC Box!")
         return False
 
     def remove_from_team(self, pokemon):
         """Remove um pokémon do time"""
         for i, p in enumerate(self.player.team):
-            if p == pokemon:
-                self.player.remove_from_team(i)
-                pokemon.is_in_team = False
-                self.update_team_status()
-                return True
+            if p is pokemon:  # Comparação de identidade
+                removed = self.player.remove_from_team(i)
+                if removed:
+                    pokemon.is_in_team = False
+
+                    # GARANTE que o Pokémon está na box
+                    if pokemon not in self.player.pc_box:
+                        print(f"[DEBUG] {pokemon.name} não estava na box, adicionando...")
+                        self.player.pc_box.append(pokemon)
+
+                    self.update_team_status()
+                    print(f"[DEBUG] {pokemon.name} removido do time. Time: {len(self.player.team)}/6")
+                    return True
         return False
