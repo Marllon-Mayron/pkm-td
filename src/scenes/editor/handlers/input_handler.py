@@ -146,8 +146,8 @@ class EditorInputHandler:
         # Inicia pintura contínua com botão esquerdo
         if event.button == 1 and self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
             self.painting = True
-            self.erasing = False  # NOVO: Garante que não está no modo apagar
-            self.last_paint_pos = None  # Força a pintar na primeira posição
+            self.erasing = False
+            self.last_paint_pos = None
             self.last_paint_time = 0
 
             # Processa o primeiro clique (NUNCA é contínuo)
@@ -160,7 +160,7 @@ class EditorInputHandler:
         if event.button == 3 and self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
             self.erasing = True
             self.painting = False
-            self.last_erase_pos = None  # Força a apagar na primeira posição
+            self.last_erase_pos = None
             self.last_erase_time = 0
 
             # Processa o primeiro clique (NUNCA é contínuo)

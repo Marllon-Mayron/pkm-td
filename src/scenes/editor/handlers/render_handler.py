@@ -272,6 +272,9 @@ class EditorRenderHandler:
                 msg_y = self.editor.screen_manager.viewport_y + 180
                 screen.blit(msg, (msg_x, msg_y))
 
+        if hasattr(self.editor, 'brush_buttons') and self.editor.brush_buttons.visible:
+            self.editor.brush_buttons.render(screen, self.editor.font_small)
+
     def _render_top_ui(self, screen):
         """Renderiza a UI superior"""
         viewport_x = self.editor.screen_manager.viewport_x

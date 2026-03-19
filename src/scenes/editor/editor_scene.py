@@ -13,6 +13,7 @@ from src.editor.path_editor import Path
 from src.editor.tower_spot_editor import TowerSpotManager
 from src.editor.phase_exporter import PhaseExporter
 from src.scenes.editor import WaveConfigDialog
+from src.scenes.editor.components.brush_buttons import BrushButtons
 from src.scenes.editor.components.layer_selector import LayerSelector
 from src.scenes.editor.components.managers.path_manager import PathManager
 from src.scenes.editor.components.managers.undo_manager import UndoManager
@@ -132,6 +133,10 @@ class EditorScene(BaseScene):
 
         # Botões de modo
         self.mode_buttons = ModeButtons(viewport_x, viewport_y)
+
+        brush_x = viewport_x + 100
+        brush_y = viewport_y + 250
+        self.brush_buttons = BrushButtons(brush_x, brush_y)
 
     def set_mode(self, mode):
         """Altera o modo do editor"""
@@ -403,6 +408,9 @@ class EditorScene(BaseScene):
                 self.load_phase_dialog = None
             return
 
+        if self.brush_buttons.handle_event(event):
+            return True
+
         # Processa normalmente (sem diálogos ativos)
         self.input_handler.handle_event(event)
 
@@ -418,6 +426,8 @@ class EditorScene(BaseScene):
     def render(self, screen):
         """Delega renderização para o render handler"""
         self.render_handler.render(screen)
+
+
 
     def save_phase(self):
         """Salva a fase atual - AGORA SEM TORRES, SÓ SPOTS"""

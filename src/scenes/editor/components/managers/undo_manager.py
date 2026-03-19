@@ -4,7 +4,7 @@
 Gerenciador de Undo/Redo para o Editor
 """
 from collections import deque
-import copy
+import copy, os
 
 
 class UndoManager:
@@ -90,10 +90,22 @@ class UndoManager:
 
     def _capture_state(self, editor_scene):
         """Captura o estado atual do editor"""
-        # CORRIGIDO: Agora usa path_manager em vez de path
+        # Captura os dados das layers com informações dos tilesets
+        layers_data = []
+        for layer in editor_scene.layer_manager.layers:
+            layer_dict = {
+                'name': layer.name,
+                'type': layer.layer_type.value,
+                'tiles': [row[:] for row in layer.tiles],  # Cópia profunda da matriz
+                'tileset_path': layer.tileset_path,  # IMPORTANTE: salva o caminho do tileset
+                'width': layer.width,
+                'height': layer.height
+            }
+            layers_data.append(layer_dict)
+
         return {
-            'layers': copy.deepcopy(editor_scene.layer_manager.to_dict()),
-            'path_manager': copy.deepcopy(editor_scene.path_manager.to_dict()),  # Mudou aqui
+            'layers': layers_data,
+            'path_manager': copy.deepcopy(editor_scene.path_manager.to_dict()),
             'tower_spots': copy.deepcopy(editor_scene.tower_spots.to_dict()),
             'current_tile': editor_scene.current_tile,
             'mode': editor_scene.mode,
@@ -101,26 +113,47 @@ class UndoManager:
         }
 
     def _restore_state(self, editor_scene, state):
-        """Restaura um estado salvo"""
+        """Restaura um estado salvo - PRESERVANDO OS TILESETS"""
         try:
-            # Restaura layers
+            # Restaura layers preservando os tilesets
             if 'layers' in state:
-                editor_scene.layer_manager.from_dict(state['layers'])
+                # Primeiro, guarda os tilesets atuais
+                current_tilesets = {}
+                for i, layer in enumerate(editor_scene.layer_manager.layers):
+                    if layer.tileset:
+                        current_tilesets[i] = {
+                            'tileset': layer.tileset,
+                            'tileset_path': layer.tileset_path
+                        }
 
-            # CORRIGIDO: Restaura path_manager (compatibilidade com versões antigas)
+                # Restaura os dados das layers
+                for i, layer_data in enumerate(state['layers']):
+                    if i < len(editor_scene.layer_manager.layers):
+                        layer = editor_scene.layer_manager.layers[i]
+
+                        # Restaura a matriz de tiles
+                        for y in range(min(len(layer_data['tiles']), layer.height)):
+                            for x in range(min(len(layer_data['tiles'][y]), layer.width)):
+                                if y < layer.height and x < layer.width:
+                                    layer.tiles[y][x] = layer_data['tiles'][y][x]
+
+                        # PRESERVA O TILESET (não sobrescreve com None)
+                        # Só atualiza o caminho se veio algo no estado E não é None
+                        if 'tileset_path' in layer_data and layer_data['tileset_path']:
+                            layer.tileset_path = layer_data['tileset_path']
+
+                        # Se perdeu o tileset mas tem caminho, tenta recarregar
+                        if not layer.tileset and layer.tileset_path:
+                            # Tenta recarregar o tileset do caminho salvo
+                            project_root = getattr(editor_scene, 'project_root', '')
+                            if project_root:
+                                full_path = os.path.join(project_root, layer.tileset_path)
+                                if os.path.exists(full_path):
+                                    layer.load_tileset(full_path, editor_scene.grid_size, editor_scene.grid_size)
+
+            # Restaura path_manager
             if 'path_manager' in state:
                 editor_scene.path_manager.from_dict(state['path_manager'])
-            elif 'path' in state:  # Compatibilidade com saves antigos
-                # Converte path antigo para path_manager
-                from src.scenes.editor.components.managers.path_manager import PathManager
-                from src.editor.path_editor import Path
-
-                new_path_manager = PathManager()
-                path = Path()
-                path.from_dict(state['path'])
-                new_path_manager.paths = [path]
-                new_path_manager.current_path_index = 0
-                editor_scene.path_manager = new_path_manager
 
             # Restaura tower spots
             if 'tower_spots' in state:
@@ -135,10 +168,12 @@ class UndoManager:
             if current_layer and current_layer.tileset:
                 editor_scene.tile_palette.set_tileset(current_layer.tileset)
 
-            print("[Undo] Estado restaurado com sucesso")
+            print("[Undo] Estado restaurado com sucesso (tilesets preservados)")
 
         except Exception as e:
             print(f"[Undo] Erro ao restaurar estado: {e}")
+            import traceback
+            traceback.print_exc()
 
     def can_undo(self):
         """Verifica se é possível desfazer"""
