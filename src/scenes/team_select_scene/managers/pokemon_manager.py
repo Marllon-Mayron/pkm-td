@@ -1,9 +1,5 @@
 # src/scenes/team_select_scene/managers/pokemon_manager.py
 
-import random
-from src.entities.pokemon import Pokemon
-
-
 class PokemonManager:
     def __init__(self, player):
         self.player = player
@@ -36,6 +32,7 @@ class PokemonManager:
                 if success:
                     pokemon.is_in_team = True
                     self.update_team_status()
+                    self.player.auto_save()
                 return success
             else:
                 print(f"[ERRO] {pokemon.name} não está na PC Box!")
@@ -51,10 +48,9 @@ class PokemonManager:
 
                     # GARANTE que o Pokémon está na box
                     if pokemon not in self.player.pc_box:
-                        print(f"[DEBUG] {pokemon.name} não estava na box, adicionando...")
                         self.player.pc_box.append(pokemon)
 
                     self.update_team_status()
-                    print(f"[DEBUG] {pokemon.name} removido do time. Time: {len(self.player.team)}/6")
+                    self.player.auto_save()
                     return True
         return False

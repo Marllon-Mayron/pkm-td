@@ -221,6 +221,7 @@ class GameScene(BaseScene):
         if target_type == "enemy" and item_data["category"] == "pokeball":
             return self._attempt_capture(target, item_data)
 
+
         elif target_type == "ally" and item_data["category"] == "medicine":
             return self._use_medicine(target, item_data)
 
@@ -293,6 +294,8 @@ class GameScene(BaseScene):
             # Atualiza a Pokedex
             self.player.caught_pokemon.add(enemy.id)
             self.player.register_seen(enemy.id)
+            #Salva data
+            self.player.auto_save()
 
             return True
         else:

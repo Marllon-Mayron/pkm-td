@@ -4,6 +4,7 @@ from src.entities.base import Entity
 from src.entities.pokemon import Pokemon
 from src.data.pokedex import Pokedex
 from src.managers.bag_manager import BagManager
+from src.managers.save_manager import SaveManager
 
 
 class Player(Entity):
@@ -34,6 +35,11 @@ class Player(Entity):
         # Pokedex registrada (quais já viu)
         self.seen_pokemon = set()
         self.caught_pokemon = set()
+
+        self.save_manager = SaveManager()
+
+        # Tenta carregar dados salvos automaticamente
+        self.load_game()
 
     def add_to_team(self, pokemon, slot=None):
         """Adiciona Pokémon ao time"""
@@ -120,3 +126,24 @@ class Player(Entity):
             self.caught_pokemon.add(starter_id)
             self.register_seen(starter_id)
         return starter
+
+    #SALVAMENTOS
+
+    def save_game(self) -> bool:
+        """Salva o jogo atual"""
+        success = self.save_manager.save_pokemon_data(self)
+        if success:
+            print(f"[JOGO] Progresso salvo! Box: {len(self.pc_box)} Pokémon, Time: {len(self.team)}/6")
+        return success
+
+    def load_game(self) -> bool:
+        """Carrega o jogo salvo"""
+        success = self.save_manager.load_pokemon_data(self)
+        if success:
+            print(f"[JOGO] Progresso carregado! Box: {len(self.pc_box)} Pokémon, Time: {len(self.team)}/6")
+        return success
+
+    # Adicione este método para salvar automaticamente em momentos chave
+    def auto_save(self):
+        """Salvamento automático após ações importantes"""
+        self.save_game()
