@@ -27,6 +27,8 @@ class GameWaveManager:
         # Carrega os dados
         self._load_waves_data()
 
+        self.game_scene = None
+
     def _load_waves_data(self):
         """Carrega os dados das waves do phase_loader"""
         raw_data = self.phase_loader.get_waves_data()
@@ -68,6 +70,7 @@ class GameWaveManager:
 
         enemies_at_end = []
         enemies_to_remove = []
+        defeated_enemies = []  # NOVO: guarda inimigos derrotados para processar XP
 
         for enemy in self.active_enemies[:]:
             # Atualiza o inimigo (movimento e captura de itens)
@@ -76,9 +79,14 @@ class GameWaveManager:
             # Verifica se morreu
             if not enemy.is_alive():
                 print(f"[WAVE] {enemy.name} foi derrotado!")
-                # O drop_item já foi chamado no take_damage, mas garantimos aqui também
+
+                # NOVO: Guarda para processar XP depois
+                defeated_enemies.append(enemy)
+
+                # Garante que o item seja solto
                 if enemy.is_carrying:
                     enemy.drop_item()
+
                 enemies_to_remove.append(enemy)
                 continue
 
@@ -87,11 +95,17 @@ class GameWaveManager:
                 enemies_at_end.append(enemy)
                 enemies_to_remove.append(enemy)
 
+        # ===== NOVO: Processa XP dos inimigos derrotados =====
+        for enemy in defeated_enemies:
+            self._distribute_xp(enemy)
+
         # Remove inimigos
         for enemy in enemies_to_remove:
             if enemy in self.active_enemies:
                 self.active_enemies.remove(enemy)
                 self.enemies_remaining -= 1
+                # Limpa tracking de dano
+                enemy.clear_damage_tracking()
 
         # ===== 2. Spawna novos inimigos (se a wave estiver em andamento) =====
         if self.wave_in_progress and self.current_wave_index < len(self.waves_data):
@@ -136,6 +150,98 @@ class GameWaveManager:
                             print(f"[WaveManager] Aguardando eliminar {self.enemies_remaining} inimigos...")
 
         return enemies_at_end
+
+    def _calculate_base_xp(self, pokemon):
+        """
+        Calcula XP base baseado no nível e espécie do Pokémon derrotado
+        """
+        # Fórmula base: nível * 10 + bônus por estágio
+        base_xp = pokemon.level * 10
+
+        # Bônus por estágio evolutivo (baseado no ID)
+        if pokemon.id <= 151:  # Kanto
+            base_xp += 5
+
+        # Bônus por shiny (mais raro)
+        if hasattr(pokemon, 'is_shiny') and pokemon.is_shiny:
+            base_xp = int(base_xp * 1.5)
+            print(f"[XP] Bônus shiny! XP ajustado para {base_xp}")
+
+        # Garante mínimo de 10 XP
+        base_xp = max(10, base_xp)
+
+        return base_xp
+
+    def _distribute_xp(self, defeated_enemy):
+        """Distribui XP para os atacantes quando um inimigo é derrotado"""
+
+        # Pega os contribuidores de dano
+        contributors = defeated_enemy.get_xp_contributors()
+
+        if not contributors:
+            print(f"[XP] Nenhum contribuidor encontrado para {defeated_enemy.name}")
+            return
+
+        # XP base (pode variar conforme o nível do inimigo)
+        base_xp = 15 + (defeated_enemy.level * 5)
+        print(f"\n[XP] ===== DISTRIBUINDO XP PARA {defeated_enemy.name.upper()} =====")
+        print(f"[XP] XP base: {base_xp}")
+        print(f"[XP] Contribuidores encontrados: {len(contributors)}")
+
+        total_damage = sum(damage for _, damage in contributors)
+        print(f"[XP] Dano total causado: {total_damage}")
+
+        # Distribui XP proporcional ao dano
+        for attacker_id, damage in contributors:
+            # Calcula proporção do dano
+            proportion = damage / total_damage
+            xp_gained = int(base_xp * proportion)
+
+            print(f"[XP] Contribuidor ID {attacker_id}: {damage} de dano")
+
+            # Encontra o Pokémon atacante no mapa ou no time
+            attacker = None
+
+            # Procura nos Pokémon colocados
+            if hasattr(self, 'game_scene') and hasattr(self.game_scene, 'placement_manager'):
+                for pokemon in self.game_scene.placement_manager.placed_pokemon:
+                    if id(pokemon) == attacker_id:
+                        attacker = pokemon
+                        break
+
+            if attacker:
+                attacker.gain_xp(xp_gained)
+                print(f"[XP] {attacker.name}: dano {damage}/{total_damage} ({proportion * 100:.1f}%) -> {xp_gained} XP")
+            else:
+                print(f"[XP] Não encontrou atacante com ID {attacker_id} no mapa")
+
+        # REMOVA ESTA LINHA:
+        # self._update_team_ui()
+
+        print(f"[XP] Total XP distribuído: {sum(int(base_xp * (d / total_damage)) for _, d in contributors)}/{base_xp}")
+        print("[XP] ===== FIM DA DISTRIBUIÇÃO =====\n")
+
+    def _find_attacker_by_id(self, attacker_id):
+        """
+        Encontra um atacante pelo ID (procurando nos Pokémon colocados)
+        """
+        # IMPORTANTE: Verifica se tem acesso à GameScene
+        if not hasattr(self, 'game_scene'):
+            print(f"[XP] ERRO: WaveManager não tem referência para game_scene!")
+            return None
+
+        if not hasattr(self.game_scene, 'placement_manager'):
+            print(f"[XP] ERRO: game_scene não tem placement_manager!")
+            return None
+
+        # Procura nos Pokémon colocados no mapa
+        for pokemon in self.game_scene.placement_manager.placed_pokemon:
+            if id(pokemon) == attacker_id and pokemon.is_alive():
+                return pokemon
+
+        # Se não encontrou, pode ser que o Pokémon já tenha sido removido?
+        print(f"[XP] Não encontrou atacante ID {attacker_id} no mapa")
+        return None
 
     def _create_enemy(self, wave_data, path_points, screen_manager):
         """Cria um inimigo baseado nos dados da wave"""

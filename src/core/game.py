@@ -17,7 +17,7 @@ class Game:
         # Cria o jogador
         self.player = Player(100, 100)  # Posição inicial
         # Adiciona um Pokémon inicial (Bulbasaur)
-        self.player.add_starter(1)  # ID 1 = Bulbasaur
+        self.player.add_starter(7)  # ID 1 = Bulbasaur
 
         # Câmera
         self.camera = None

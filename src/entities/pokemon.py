@@ -125,6 +125,9 @@ class Pokemon(Entity):
         self.attack_damage = self._calculate_attack_damage()
         self.defense_value = self._calculate_defense()
 
+        self.damage_contributions = {}  # {attacker_id: damage_done}
+        self.last_attacker = None
+
     def _calculate_stats(self):
         """Calcula stats baseado em level, IVs e EVs"""
         stats = self.pokedex.calculate_stats(self.id, self.level, self.ivs, self.evs)
@@ -187,9 +190,21 @@ class Pokemon(Entity):
 
     def gain_xp(self, amount):
         """Ganha XP e verifica level up"""
+        old_level = self.level
+        old_xp = self.xp
         self.xp += amount
+
+        print(f"[XP] {self.name} ganhou {amount} XP (antes: {old_xp}, depois: {self.xp})")
+
+        leveled_up = False
         while self.xp >= self.xp_to_next:
             self.level_up()
+            leveled_up = True
+
+        if leveled_up:
+            print(f"[LEVEL UP] ⬆️ {self.name} subiu de {old_level} para {self.level}!")
+            self.attack_damage = self._calculate_attack_damage()
+            self.defense_value = self._calculate_defense()
 
     def level_up(self):
         """Sobe de nível"""
@@ -362,7 +377,7 @@ class Pokemon(Entity):
         """Executa o ataque de investida ao encostar no alvo"""
 
         # Calcula dano base
-        base_damage = self.attack_damage * (self.level / 8)  # Ajustado para ser mais impactante
+        base_damage = self.attack_damage * (self.level / 8)
 
         # Fator aleatório (±15%)
         import random
@@ -375,12 +390,11 @@ class Pokemon(Entity):
         defense_factor = max(0.4, 1.0 - (target.defense_value / 800))
         final_damage = max(2, int(damage * defense_factor))
 
-        # Aplica o dano
-        target.take_damage(final_damage)
+        # CORREÇÃO: Passa o atacante (self) como parâmetro
+        print(f"[INVESTIDA_DEBUG] {self.name} atacando {target.name} com dano {final_damage}")
+        target.take_damage(final_damage, attacker=self)
 
         print(f"[INVESTIDA] {self.name} causou {final_damage} de dano em {target.name}")
-
-        # Feedback visual (opcional - pode adicionar um efeito de tremor depois)
 
         # Se o alvo morreu, o estado já vai mudar para returning naturalmente
         if not target.is_alive():
@@ -413,17 +427,71 @@ class Pokemon(Entity):
             self.target = None
             self.combat_state = "returning"
 
-    def take_damage(self, damage):
-        """Recebe dano, retorna True se morreu"""
+    def take_damage(self, damage, attacker=None):
+        """
+        Recebe dano de um atacante
+        """
+        old_hp = self.current_hp
         self.current_hp = max(0, self.current_hp - damage)
 
-        # Se morreu, solta o item que estava carregando
+        # DEBUG: Mostra quem está atacando
+        if attacker:
+            print(
+                f"[DANO_DEBUG] Atacante: {attacker.name}, Alvo: {self.name}, Dano: {damage}, HP restante: {self.current_hp}")
+
+        # Registra contribuição de dano (se for um atacante válido)
+        if attacker and self.is_wild:  # Só registra para inimigos selvagens
+            attacker_id = id(attacker)
+            if attacker_id not in self.damage_contributions:
+                self.damage_contributions[attacker_id] = 0
+                print(f"[DANO] Primeiro ataque de {attacker.name} em {self.name}")
+
+            # Registra apenas o dano real causado (não excede o HP restante)
+            actual_damage = min(damage, old_hp)
+            self.damage_contributions[attacker_id] += actual_damage
+            self.last_attacker = attacker
+
+            print(f"[DANO] {attacker.name} causou {actual_damage} de dano em {self.name} "
+                  f"(total acumulado: {self.damage_contributions[attacker_id]})")
+        else:
+            if not attacker:
+                print(f"[DANO_DEBUG] Ataque sem atacante registrado em {self.name}")
+            if not self.is_wild:
+                print(f"[DANO_DEBUG] Alvo {self.name} não é selvagem, ignorando registro")
+
+        # Se morreu, solta o item
         if self.current_hp <= 0:
+            print(f"[MORTE] {self.name} foi derrotado!")
+            print(f"[MORTE] Contribuições de dano: {self.damage_contributions}")
+            if self.last_attacker:
+                print(f"[MORTE] Último atacante: {self.last_attacker.name}")
             self.drop_item()
             self.combat_state = "idle"
             self.target = None
 
         return self.current_hp <= 0
+
+    def get_xp_contributors(self):
+        """
+        Retorna lista de atacantes que contribuíram para a derrota
+        Returns: lista de tuplas (attacker_id, damage_done)
+        """
+        if not self.damage_contributions:
+            # Se não houver contribuições, usa o último atacante
+            if self.last_attacker:
+                return [(id(self.last_attacker), 1)]
+            return []
+
+        # Converte para lista e ordena por dano (maior primeiro)
+        contributors = [(attacker_id, damage)
+                        for attacker_id, damage in self.damage_contributions.items()]
+        contributors.sort(key=lambda x: x[1], reverse=True)
+        return contributors
+
+    def clear_damage_tracking(self):
+        """Limpa o rastreamento de dano (chamar quando o inimigo for removido)"""
+        self.damage_contributions.clear()
+        self.last_attacker = None
 
     def drop_item(self):
         """
@@ -457,7 +525,6 @@ class Pokemon(Entity):
 
     def update(self, dt, player=None, enemies=None, items=None):
         """Update simplificado - Pokémon segue path e pode carregar itens"""
-
         # Guarda posição anterior para calcular direção
         self.last_x = self.x
         self.last_y = self.y

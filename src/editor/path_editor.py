@@ -103,6 +103,12 @@ class Path:
             if not (0 <= screen_x <= screen.get_width() and 0 <= screen_y <= screen.get_height()):
                 continue
 
+            # Valores padrão
+            color = self.normal_color
+            radius = self.node_radius
+            border_color = None
+            border_width = 1  # Valor padrão para borda
+
             # Determina a cor e tamanho baseado na posição
             if i == 0:  # PRIMEIRO PONTO
                 color = self.start_point_color
@@ -121,17 +127,15 @@ class Path:
             elif i == len(self.nodes) - 1:  # Último ponto
                 color = self.end_color
                 radius = self.node_radius
-                border_color = None
-            else:  # Pontos intermediários
-                color = self.normal_color
-                radius = self.node_radius
-                border_color = None
+                # border_color permanece None
+                # border_width mantém o valor padrão 1
 
             # Ponto selecionado tem destaque especial
             if i == self.selected_node:
                 color = self.selected_color
                 radius = radius + 2
                 border_color = (255, 255, 255)
+                border_width = 2
 
             # Desenha o ponto principal
             pygame.draw.circle(screen, color, (int(screen_x), int(screen_y)), radius)
@@ -155,4 +159,4 @@ class Path:
         screen_x = render_x * screen_manager.render_scale + screen_manager.viewport_x
         screen_y = render_y * screen_manager.render_scale + screen_manager.viewport_y
 
-        return (screen_x, screen_y)
+        return screen_x, screen_y

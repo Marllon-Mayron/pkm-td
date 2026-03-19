@@ -10,7 +10,7 @@ class PlacementManager:
         self.tile_size = 16
 
     def add_pokemon(self, spot, pokemon):
-        """Adiciona um Pokémon no spot"""
+        """Adiciona um Pokémon no spot - USA O MESMO OBJETO"""
         # Verifica se já tem Pokémon neste spot
         existing = self.get_pokemon_at_spot(spot)
         if existing:
@@ -31,52 +31,29 @@ class PlacementManager:
         tile_center_x = (spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
         tile_center_y = (spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
 
-        # Cria uma nova instância do Pokémon no mapa
-        from src.entities.pokemon import Pokemon
-        placed = Pokemon(
-            tile_center_x,
-            tile_center_y,
-            pokemon.id,
-            level=pokemon.level,
-            is_wild=False
-        )
-
-        # Copia atributos importantes
-        placed.current_hp = pokemon.current_hp
-        placed.max_hp = pokemon.max_hp
-        placed.ivs = pokemon.ivs
-        placed.evs = pokemon.evs
-        placed.is_shiny = pokemon.is_shiny
-        placed.screen_manager = self.game.screen_manager
-
-        # NOVO: Copia stats de combate
-        placed.attack = pokemon.attack
-        placed.defense = pokemon.defense
-        placed.sp_attack = pokemon.sp_attack
-        placed.sp_defense = pokemon.sp_defense
-        placed.speed = pokemon.speed
-        placed.attack_damage = pokemon.attack_damage
-        placed.defense_value = pokemon.defense_value
+        # NÃO CRIAMOS MAIS UMA CÓPIA! Usamos o mesmo objeto
+        pokemon.x = tile_center_x
+        pokemon.y = tile_center_y
+        pokemon.original_spot_x = tile_center_x
+        pokemon.original_spot_y = tile_center_y
+        pokemon.screen_manager = self.game.screen_manager
 
         # Marca como colocado
-        placed.is_placed = True
-        placed.spot_id = id(spot)
-        placed.original_spot_x = tile_center_x
-        placed.original_spot_y = tile_center_y
-        placed.combat_state = "idle"  # Reseta estado de combate
-
-        # MARCA O POKÉMON ORIGINAL TAMBÉM
         pokemon.is_placed = True
+        pokemon.spot_id = id(spot)
+        pokemon.combat_state = "idle"
 
         # Marca o spot como ocupado
         spot.occupied = True
 
-        self.placed_pokemon.append(placed)
+        # Adiciona à lista de colocados
+        self.placed_pokemon.append(pokemon)
+
         print(
             f"[PLACEMENT] {pokemon.name} colocado no spot ({spot.x}, {spot.y}) - "
             f"Centro ({tile_center_x}, {tile_center_y})"
         )
-        return placed
+        return pokemon
 
     def remove_pokemon_by_right_click(self, world_x, world_y, tolerance=20):
         """Remove o Pokémon na posição do mundo (para clique direito)"""
@@ -84,43 +61,26 @@ class PlacementManager:
 
         if pokemon:
             print(f"[PLACEMENT] Recolhendo {pokemon.name} com clique direito")
-            print(f"[DEBUG] Pokémon pos: ({pokemon.x}, {pokemon.y})")
-            print(f"[DEBUG] Pokémon tile: ({pokemon.x // self.tile_size}, {pokemon.y // self.tile_size})")
 
             # Remove da lista de colocados
             if pokemon in self.placed_pokemon:
                 self.placed_pokemon.remove(pokemon)
-                print(f"[DEBUG] Pokémon removido da lista placed_pokemon. Restam: {len(self.placed_pokemon)}")
 
                 # PROCURA O SPOT CORRESPONDENTE E DESOCUPA
-                spots = self.game.spot_renderer.get_spots()
                 pokemon_tile_x = pokemon.x // self.tile_size
                 pokemon_tile_y = pokemon.y // self.tile_size
 
-                spot_found = False
-                for spot in spots:
+                for spot in self.game.spot_renderer.get_spots():
                     spot_tile_x = spot.x // self.tile_size
                     spot_tile_y = spot.y // self.tile_size
 
                     if spot_tile_x == pokemon_tile_x and spot_tile_y == pokemon_tile_y:
-                        print(f"[DEBUG] SPOT ENCONTRADO! Antes: occupied={spot.occupied}")
                         spot.occupied = False
-                        print(f"[DEBUG] SPOT ATUALIZADO! Depois: occupied={spot.occupied}")
                         print(f"[PLACEMENT] Spot ({spot.x}, {spot.y}) desocupado")
-                        spot_found = True
                         break
 
-                if not spot_found:
-                    print(f"[WARNING] Não encontrou spot para o Pokémon em ({pokemon_tile_x}, {pokemon_tile_y})")
-
-                # PROCURA O POKÉMON NO TIME E RESETA O is_placed
-                for team_pokemon in self.game.player.team:
-                    # Compara por id e level para garantir que é o mesmo Pokémon
-                    if (team_pokemon.id == pokemon.id and
-                            team_pokemon.level == pokemon.level):
-                        team_pokemon.is_placed = False
-                        print(f"[PLACEMENT] is_placed = False no Pokémon do time: {team_pokemon.name}")
-                        break
+                # Marca o Pokémon como não colocado (é o mesmo objeto do time!)
+                pokemon.is_placed = False
 
                 return pokemon
 
@@ -191,16 +151,8 @@ class PlacementManager:
                         print(f"[COMBATE] Spot {spot.id} liberado")
                         break
 
-            # Marca como não colocado no time
-            for team_pokemon in self.game.player.team:
-                if (team_pokemon.id == pokemon.id and
-                        team_pokemon.level == pokemon.level):
-                    team_pokemon.is_placed = False
-                    break
-
-            # Atualiza o team manager
-            if hasattr(self.game, 'team_manager'):
-                self.game.team_manager.update_team()
+            # Marca como não colocado (é o mesmo objeto do time!)
+            pokemon.is_placed = False
 
     def clear(self):
         """Remove todos os Pokémon do mapa"""

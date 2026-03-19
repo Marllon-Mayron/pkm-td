@@ -56,6 +56,7 @@ class GameScene(BaseScene):
         # Vincula os itens alvo ao wave_manager
         self.wave_manager.set_target_items(self.target_item_manager.items)
 
+        self.wave_manager.game_scene = self
         # Configurações de mundo baseadas no mapa
         self._setup_world_dimensions()
 
@@ -78,8 +79,6 @@ class GameScene(BaseScene):
         # Posiciona câmera no centro do mapa
         self.camera.x = self.world_width / 2
         self.camera.y = self.world_height / 2
-
-        self.team_manager.update_team()
 
         # Spot atualmente sob o mouse
         self.hovered_spot = None
@@ -269,10 +268,6 @@ class GameScene(BaseScene):
             self.player.caught_pokemon.add(enemy.id)
             self.player.register_seen(enemy.id)
 
-            # Atualiza a UI do time
-            if hasattr(self, 'team_manager'):
-                self.team_manager.update_team()
-
             return True
         else:
             return False
@@ -307,7 +302,6 @@ class GameScene(BaseScene):
             healed = pokemon.current_hp - old_hp
             print(f"[POÇÃO] {pokemon.name} recuperou {healed} HP!")
 
-        self.team_manager.update_team()
         return True
 
     def _on_pokemon_placed(self, placement_data):
@@ -342,10 +336,6 @@ class GameScene(BaseScene):
         if hasattr(self, 'player'):
             for pokemon in self.player.team:
                 pokemon.is_placed = False
-
-        # 4. Atualiza o team manager
-        if hasattr(self, 'team_manager'):
-            self.team_manager.update_team()
 
         # 5. Limpa inimigos
         if hasattr(self, 'wave_manager'):
@@ -511,9 +501,6 @@ class GameScene(BaseScene):
                         pokemon = self.placement_manager.remove_pokemon_by_right_click(
                             world_pos[0], world_pos[1]
                         )
-                        if pokemon:
-                            print(f"[GAME] {pokemon.name} recolhido!")
-                            self.team_manager.update_team()
                 return None
 
         elif event.type == pygame.MOUSEBUTTONUP:
