@@ -55,7 +55,12 @@ class Pokemon(Entity):
         if is_boss:
             self.level = self.base_level + 3  # Aumenta em 3 níveis
             self._calculate_stats()  # Recalcula stats com o novo level
-            print(f"[BOSS] {self.name} é um BOSS! Nível {self.level} (HP: {self.max_hp})")
+
+            # ===== NOVO: BOSS TEM 20% MAIS VIDA =====
+            original_hp = self.max_hp
+            self.max_hp = int(self.max_hp * 1.2)  # Aumenta em 20%
+            self.current_hp = self.max_hp  # Atualiza HP atual para o novo máximo
+            print(f"[BOSS] {self.name} é um BOSS! Nível {self.level} (HP: {self.max_hp} - +20% de vida)")
 
         # ===== 7. ESTADO ATUAL =====
         self.current_hp = self.max_hp
@@ -280,6 +285,10 @@ class Pokemon(Entity):
         self._calculate_stats()
         self.current_hp = self.max_hp  # Cura ao subir nível
         self.xp_to_next = self._calculate_xp_needed()
+
+    def is_boss_type(self):
+        """Verifica se é um boss"""
+        return hasattr(self, 'is_boss') and self.is_boss
 
     def is_alive(self):
         """Verifica se está vivo"""

@@ -139,14 +139,48 @@ class GameWaveManager:
 
             # Verifica se chegou ao fim
             if hasattr(enemy, 'path') and enemy.path and enemy.path_index >= len(enemy.path):
-                enemies_at_end.append(enemy)
-                enemies_to_remove.append(enemy)
+                # ===== NOVO: BOSS NÃO É REMOVIDO, VOLTA PARA O INÍCIO =====
+                if hasattr(enemy, 'is_boss') and enemy.is_boss:
+                    # BOSS: Volta para o início do path
+                    print(f"[BOSS] {enemy.name} chegou ao fim e está voltando para o início!")
+
+                    # ===== NOVO: SE BOSS ESTÁ CARRECANDO ITEM, ELE DESAPARECE =====
+                    if enemy.is_carrying:
+                        print(f"[BOSS] {enemy.name} está carregando {enemy.is_carrying.item_name} e chegou ao fim!")
+                        print(f"[BOSS] {enemy.is_carrying.item_name} foi levado com sucesso e DESAPARECE!")
+
+                        # Marca o item como levado (não pode mais ser recuperado)
+                        carried_item = enemy.is_carrying
+                        carried_item.is_protected = False
+                        carried_item.is_stolen = True  # Se existir essa flag
+                        carried_item.carried_by = None
+
+                        # Remove o item da lista de itens alvo (opcional, mas recomendado)
+                        if carried_item in self.target_items:
+                            self.target_items.remove(carried_item)
+                            print(f"[BOSS] Item {carried_item.item_name} removido permanentemente!")
+
+                        # Limpa a referência do item no boss
+                        enemy.clear_carrying()
+
+                    # Reseta para o início do path
+                    enemy.path_index = 0
+                    if enemy.path and len(enemy.path) > 0:
+                        enemy.x, enemy.y = enemy.path[0]
+                        enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+
+                    # Não adiciona à lista de remoção
+                    continue
+                else:
+                    # Inimigo normal: chega ao fim e é removido
+                    enemies_at_end.append(enemy)
+                    enemies_to_remove.append(enemy)
 
         # Processa XP dos inimigos derrotados
         for enemy in defeated_enemies:
             self._distribute_xp(enemy)
 
-        # Remove inimigos
+        # Remove inimigos normais (não bosses)
         for enemy in enemies_to_remove:
             if enemy in self.active_enemies:
                 # Descobre de qual path este inimigo veio
@@ -230,6 +264,19 @@ class GameWaveManager:
         """Finaliza a wave atual de um path específico"""
         wave_data = self.current_wave_data_by_path.get(path_index)
         if not wave_data:
+            return
+
+        # ===== NOVO: Verifica se ainda tem bosses vivos neste path =====
+        # Conta quantos bosses ainda estão vivos neste path
+        bosses_alive = sum(1 for e in self.active_enemies
+                           if hasattr(e, 'is_boss') and e.is_boss
+                           and getattr(e, 'path_index_origin', 0) == path_index)
+
+        # Se ainda tem bosses vivos, não finaliza a wave
+        if bosses_alive > 0:
+            print(
+                f"[WaveManager] Path {path_index + 1} - Ainda tem {bosses_alive} boss(es) vivo(s)! Continuando wave...")
+            # Mantém a wave em progresso e não spawna novos inimigos
             return
 
         print(

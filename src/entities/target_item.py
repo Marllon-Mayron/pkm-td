@@ -23,6 +23,7 @@ class TargetItem(Entity):
 
         self.is_protected = True
         self.carried_by = None
+        self.is_stolen = False
         self.capture_progress = 0
         self.capture_rate = 10
 
@@ -129,6 +130,6 @@ class TargetItem(Entity):
         """Completa a captura do item"""
         if self.carried_by:
             self.is_protected = False
+            self.is_stolen = True
             self.carried_by.is_carrying = None
             self.carried_by = None
-            print(f"{self.item_name} foi levado!")
