@@ -48,7 +48,8 @@ class ItemBagCatalog:
                 "usable_in_battle": True,
                 "usable_on_map": True,
                 "effect": "capture",
-                "effect_value": 1.0
+                "effect_value": 1.0,
+                "price": 200
             },
             # Poções
             "potion": {
@@ -60,7 +61,8 @@ class ItemBagCatalog:
                 "usable_in_battle": True,
                 "usable_on_map": True,
                 "effect": "heal",
-                "effect_value": 20
+                "effect_value": 20,
+                "price": 200
             }
         }
 

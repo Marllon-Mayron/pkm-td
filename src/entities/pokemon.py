@@ -17,6 +17,7 @@ class Pokemon(Entity):
         self.id = pokemon_id
         self.name = self.pokemon_data["name"].capitalize()
         self.level = level
+
         self.is_shiny = shiny
 
         self.is_placed = False  # False = no time, True = no mapa
@@ -636,12 +637,15 @@ class Pokemon(Entity):
         pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))
 
         # Barra de HP (cor baseada na porcentagem)
-        if hp_percent > 0.5:
-            color = (0, 200, 0)
-        elif hp_percent > 0.25:
-            color = (255, 255, 0)
+        if not self.is_shiny:
+            if hp_percent > 0.5:
+                color = (0, 200, 0)
+            elif hp_percent > 0.25:
+                color = (255, 255, 0)
+            else:
+                color = (255, 0, 0)
         else:
-            color = (255, 0, 0)
+            color = color = (255, 0, 0)
 
         # Barra de progresso
         progress_width = int(bar_width * hp_percent)

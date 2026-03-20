@@ -281,7 +281,8 @@ class GameWaveManager:
             start_x, start_y,
             enemy_data["pokemon_id"],
             level=level,
-            is_wild=True
+            is_wild=True,
+            shiny= random.random() < 0.025 # 0-1 / 1-400
         )
 
         pokemon.screen_manager = screen_manager

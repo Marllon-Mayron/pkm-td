@@ -7,6 +7,7 @@ import math
 from src.scenes.base_scene import BaseScene
 from src.config.progress import progress_manager
 from src.config.phase_catalog import phase_catalog
+from src.scenes.shop_scene.shop_scene import ShopScene
 
 
 class PhaseCard:
@@ -212,6 +213,7 @@ class PhaseSelectScene(BaseScene):
         self.chapter_tabs = []
         self.phase_cards = []
         self.back_button = None
+        self.shop_button = None
 
         # Scroll
         self.scroll_y = 0
@@ -231,9 +233,11 @@ class PhaseSelectScene(BaseScene):
         self.phase_font_large = pygame.font.Font(None, 36)
         self.phase_font_small = pygame.font.Font(None, 16)
         self.phase_font_name = pygame.font.Font(None, 18)
+        self.button_font = pygame.font.Font(None, 24)
 
         # Animação
         self.hover_changed = False
+        self.shop_button_hovered = False
 
         self.refresh_data()
 
@@ -294,6 +298,16 @@ class PhaseSelectScene(BaseScene):
             viewport_y + 25,
             back_size,
             back_size
+        )
+
+        # Botão da loja (centralizado na parte inferior)
+        shop_button_width = 180
+        shop_button_height = 50
+        self.shop_button = pygame.Rect(
+            viewport_x + (viewport_width - shop_button_width) // 2,
+            viewport_y + viewport_height - 70,
+            shop_button_width,
+            shop_button_height
         )
 
         # Área das abas - só mostra capítulos que existem
@@ -435,6 +449,8 @@ class PhaseSelectScene(BaseScene):
                 self._debug_unlock_next()
             elif event.key == pygame.K_a:  # Tecla A para desbloquear todas
                 self._debug_unlock_all()
+            elif event.key == pygame.K_s:  # NOVO: Tecla S para abrir a loja
+                self._open_shop()
 
         elif event.type == pygame.VIDEORESIZE:
             self.layout_initialized = False
@@ -444,11 +460,36 @@ class PhaseSelectScene(BaseScene):
                 self.scroll_target += event.y * -30
                 self.scroll_target = max(0, min(self.max_scroll, self.scroll_target))
 
+        elif event.type == pygame.MOUSEMOTION:
+            # Atualiza hover dos cards
+            for card in self.phase_cards:
+                card.handle_event(event)
+
+            for tab in self.chapter_tabs:
+                tab.handle_event(event)
+
+            # NOVO: Atualiza hover do botão da loja
+            if self.shop_button:
+                self.shop_button_hovered = self.shop_button.collidepoint(event.pos)
+
+            # Scroll dragging
+            if self.dragging_scroll:
+                dy = event.pos[1] - self.last_mouse_y
+                scroll_speed = self.max_scroll / self._get_scroll_bar_area()[1]
+                self.scroll_target += dy * scroll_speed * 2
+                self.scroll_target = max(0, min(self.max_scroll, self.scroll_target))
+                self.last_mouse_y = event.pos[1]
+
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:  # Left click
                 # Botão voltar
                 if self.back_button and self.back_button.collidepoint(event.pos):
                     self.game.current_scene = self.game.menu_scene
+                    return
+
+                # NOVO: Botão da loja
+                if self.shop_button and self.shop_button.collidepoint(event.pos):
+                    self._open_shop()
                     return
 
                 # Abas de capítulo
@@ -484,21 +525,26 @@ class PhaseSelectScene(BaseScene):
             if event.button == 1:
                 self.dragging_scroll = False
 
-        elif event.type == pygame.MOUSEMOTION:
-            # Atualiza hover dos cards
-            for card in self.phase_cards:
-                card.handle_event(event)
+    def _open_shop(self):
+        """Abre a loja"""
 
-            for tab in self.chapter_tabs:
-                tab.handle_event(event)
+        # Cria a cena da loja
+        self.game.shop_scene = ShopScene(self.game)
 
-            # Scroll dragging
-            if self.dragging_scroll:
-                dy = event.pos[1] - self.last_mouse_y
-                scroll_speed = self.max_scroll / self._get_scroll_bar_area()[1]
-                self.scroll_target += dy * scroll_speed * 2
-                self.scroll_target = max(0, min(self.max_scroll, self.scroll_target))
-                self.last_mouse_y = event.pos[1]
+        # Define um callback para quando voltar da loja (opcional)
+        # Isso permite que a tela de seleção de fases seja recriada ou atualizada ao voltar
+        self.game.shop_scene.on_close_callback = self._on_shop_closed
+
+        # Muda para a loja
+        self.game.current_scene = self.game.shop_scene
+        print("[PHASE SELECT] Indo para a loja...")
+
+    def _on_shop_closed(self):
+        """Callback chamado quando a loja é fechada"""
+        # Atualiza os dados (dinheiro, itens) se necessário
+        # Recria o layout para garantir que tudo está atualizado
+        self.layout_initialized = False
+        print("[PHASE SELECT] Voltando da loja...")
 
     def _debug_unlock_next(self):
         """Desbloqueia a próxima fase (para debug)"""
@@ -588,6 +634,43 @@ class PhaseSelectScene(BaseScene):
             text_rect = text.get_rect(center=self.back_button.center)
             screen.blit(text, text_rect)
 
+        # NOVO: Botão da loja (centralizado na parte inferior)
+        if self.shop_button:
+            # Cores baseadas no hover
+            if self.shop_button_hovered:
+                bg_color = (100, 80, 60)  # Tom mais claro de laranja/marrom
+                border_color = (255, 215, 0)  # Dourado
+                text_color = (255, 255, 255)
+            else:
+                bg_color = (70, 55, 40)  # Tom médio de laranja/marrom
+                border_color = (180, 150, 100)  # Dourado suave
+                text_color = (220, 220, 200)
+
+            # Sombra do botão
+            shadow_rect = self.shop_button.copy()
+            shadow_rect.x += 4
+            shadow_rect.y += 4
+            pygame.draw.rect(screen, (15, 15, 15), shadow_rect, border_radius=10)
+
+            # Botão principal
+            pygame.draw.rect(screen, bg_color, self.shop_button, border_radius=10)
+            pygame.draw.rect(screen, border_color, self.shop_button, 3, border_radius=10)
+
+            # Ícone e texto
+            shop_text = self.button_font.render(" IR NA LOJA", True, text_color)
+            text_rect = shop_text.get_rect(center=self.shop_button.center)
+            screen.blit(shop_text, text_rect)
+
+            # Pequeno efeito de brilho quando hover
+            if self.shop_button_hovered:
+                glow = pygame.Surface((self.shop_button.width, self.shop_button.height), pygame.SRCALPHA)
+                for i in range(3):
+                    alpha = 50 - i * 15
+                    pygame.draw.rect(glow, (255, 215, 0, alpha),
+                                    (i, i, self.shop_button.width - i*2, self.shop_button.height - i*2),
+                                    1, border_radius=10)
+                screen.blit(glow, self.shop_button)
+
         # Abas
         for tab in self.chapter_tabs:
             tab.render(screen, self.tab_font)
@@ -617,11 +700,12 @@ class PhaseSelectScene(BaseScene):
         viewport_width = self.screen_manager.viewport_width
         viewport_height = self.screen_manager.viewport_height
 
+        # Ajusta a altura do clipping para não sobrepor o botão da loja
         clip_rect = pygame.Rect(
             viewport_x,
             viewport_y + 160,
             viewport_width,
-            viewport_height - 190
+            viewport_height - 250  # Reduzido para dar espaço ao botão da loja
         )
 
         old_clip = screen.get_clip()
@@ -640,18 +724,18 @@ class PhaseSelectScene(BaseScene):
 
         # Instruções
         font_small = pygame.font.Font(None, 18)
-        inst_text = "< >  NAVEGAR  |  CLIQUE NA FASE  |  ESC  VOLTAR"
+        inst_text = "< >  NAVEGAR  |  CLIQUE NA FASE  |  S  LOJA  |  ESC  VOLTAR"
         if self.dev_mode:
             inst_text += "  |  [U] próxima fase  |  [A] todas"
         inst = font_small.render(inst_text, True, (120, 120, 130))
         inst_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - inst.get_width()) // 2
-        inst_y = self.screen_manager.viewport_y + self.screen_manager.viewport_height - 25
+        inst_y = self.screen_manager.viewport_y + self.screen_manager.viewport_height
         screen.blit(inst, (inst_x, inst_y))
 
         # Debug
         debug_text = font_small.render("CTRL+R reset", True, (70, 70, 75))
         debug_x = self.screen_manager.viewport_x + 20
-        debug_y = self.screen_manager.viewport_y + self.screen_manager.viewport_height - 25
+        debug_y = self.screen_manager.viewport_y + self.screen_manager.viewport_height - 45
         screen.blit(debug_text, (debug_x, debug_y))
 
         if self.paused:

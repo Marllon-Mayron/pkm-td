@@ -251,7 +251,7 @@ class Pokedex:
 
                 self.inmap_shiny_spritesheets[pokemon_id] = spritesheet
 
-                target_size = 24
+                target_size = 32
                 frames = {"down": [], "left": [], "right": [], "up": []}
                 frame_size = 64
 
