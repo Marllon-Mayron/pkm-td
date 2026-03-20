@@ -131,7 +131,7 @@ class ItemDragManager:
                     self.valid_target = True
                     break
 
-        # Poções funcionam em aliados
+        # Poções e itens de evolução funcionam em aliados
         elif self.drag_item_data["category"] == "medicine":
             for ally in allied_pokemon:
                 if self._is_target_valid(ally, screen_pos, camera):
@@ -139,6 +139,17 @@ class ItemDragManager:
                     self.target_type = "ally"
                     self.valid_target = True
                     break
+
+        # ===== NOVO: Itens (pedras de evolução) também funcionam em aliados =====
+        elif self.drag_item_data["category"] == "items":
+            # Verifica se é uma pedra de evolução
+            if self.drag_item_data.get("effect") == "evolution":
+                for ally in allied_pokemon:
+                    if self._is_target_valid(ally, screen_pos, camera):
+                        self.hovered_target = ally
+                        self.target_type = "ally"
+                        self.valid_target = True
+                        break
 
     def _is_target_valid(self, target, screen_pos, camera, tolerance=50):
         """Verifica se um alvo é válido baseado na posição do mouse"""
@@ -168,10 +179,19 @@ class ItemDragManager:
             # Verifica se o uso é válido para o tipo de alvo
             valid_use = False
 
+            # Pokebolas em inimigos
             if self.drag_item_data["category"] == "pokeball" and self.target_type == "enemy":
                 valid_use = True
+
+            # Poções e remédios em aliados
             elif self.drag_item_data["category"] == "medicine" and self.target_type == "ally":
                 valid_use = True
+
+            # ===== NOVO: Itens (pedras de evolução) em aliados =====
+            elif self.drag_item_data["category"] == "items" and self.target_type == "ally":
+                # Verifica se é um item que pode ser usado (evolução, etc)
+                if self.drag_item_data.get("effect") == "evolution":
+                    valid_use = True
 
             if valid_use:
                 # Remove o item da mochila
@@ -187,7 +207,7 @@ class ItemDragManager:
 
                 print(f"[ITEM] Usou {self.drag_item_data['name']} em {getattr(self.hovered_target, 'name', 'alvo')}")
 
-        # Reseta estado
+        # Reseta estado (restante do código igual...)
         self.is_dragging = False
         self.drag_item_id = None
         self.drag_item_data = None
@@ -290,7 +310,7 @@ class ItemDragManager:
             text = "SOLTAR PARA CAPTURAR"
         else:
             color = (100, 255, 100)  # Verde para aliados
-            text = "SOLTAR PARA CURAR"
+            text = "SOLTAR PARA APLICAR"
 
         # Círculo externo
         alpha = int(150 + 105 * pulse)
@@ -334,6 +354,13 @@ class ItemDragManager:
                     "ESC para cancelar"
                 ]
                 color = (100, 255, 100)
+            elif self.drag_item_data.get("effect") == "evolution":
+                instructions = [
+                    f"{self.drag_item_data['name']} - Arraste até um Pokémon aliado para evoluir",
+                    "Clique DIREITO para soltar",
+                    "ESC para cancelar"
+                ]
+                color = (255, 215, 0)
             else:
                 instructions = [
                     f"{self.drag_item_data['name']}",
