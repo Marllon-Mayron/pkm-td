@@ -56,6 +56,31 @@ class ShopItemCard:
 
         return None
 
+    def _wrap_text(self, text, font, max_width):
+        """Divide o texto em múltiplas linhas baseado na largura máxima"""
+        words = text.split(' ')
+        lines = []
+        current_line = []
+
+        for word in words:
+            # Testa se adicionar a palavra atual ultrapassa a largura
+            test_line = ' '.join(current_line + [word])
+            if font.render(test_line, True, (255, 255, 255)).get_width() <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:  # Salva a linha atual
+                    lines.append(' '.join(current_line))
+                    current_line = [word]
+                else:
+                    # Se a palavra sozinha já ultrapassa, força a quebra
+                    lines.append(word)
+                    current_line = []
+
+        if current_line:
+            lines.append(' '.join(current_line))
+
+        return lines
+
     def render(self, screen, fonts, selected=False):
         # Cores do tema clean
         colors = {
@@ -67,6 +92,7 @@ class ShopItemCard:
             'text': (255, 255, 255, 255),
             'text_dim': (180, 190, 210, 255),
             'price': (120, 255, 120, 255),
+            'description': (150, 160, 180, 255),
             'owned_bg': (45, 45, 55, 230)
         }
 
@@ -96,23 +122,42 @@ class ShopItemCard:
         # Sprite do item
         sprite = item_bag_catalog.get_sprite(self.item_id, scaled=True)
         if sprite:
-            # Fundo circular suave
-            circle_center = (self.rect.x + 32, self.rect.y + 32)
-            pygame.draw.circle(screen, (45, 50, 60), circle_center, 18)
-            screen.blit(sprite, (self.rect.x + 22, self.rect.y + 22))
+            screen.blit(sprite, (self.rect.x + 6, self.rect.y + 16))
 
         # Nome do item
         name_text = fonts['medium'].render(self.name, True, colors['text'][:3])
-        screen.blit(name_text, (self.rect.x + 60, self.rect.y + 15))
+        screen.blit(name_text, (self.rect.x + 60, self.rect.y + 10))
+        # DESCRIÇÃO
+        max_desc_width = self.rect.width - 70
+        desc_font = fonts['medium']
 
-        # Preço
-        price_text = fonts['small'].render(f"${self.price}", True, colors['price'][:3])
-        screen.blit(price_text, (self.rect.x + 60, self.rect.y + 40))
+        # Quebra o texto em múltiplas linhas
+        desc_lines = self._wrap_text(self.description, desc_font, max_desc_width)
+
+        # Renderiza cada linha da descrição
+        current_y = self.rect.y + 32
+        line_height = desc_font.get_height() + 2
+
+        # Limita a 3 linhas para não ocupar muito espaço (opcional, ajuste conforme necessário)
+        max_lines = 3
+        for i, line in enumerate(desc_lines[:max_lines]):
+            desc_text = desc_font.render(line, True, colors['description'][:3])
+            screen.blit(desc_text, (self.rect.x + 60, current_y))
+            current_y += line_height
+
+        # Se houver mais linhas, indica com um pequeno ícone (opcional)
+        if len(desc_lines) > max_lines:
+            more_text = desc_font.render("...", True, colors['description'][:3])
+            screen.blit(more_text, (self.rect.x + 60, current_y))
+
+        # PREÇO - TAMANHO AUMENTADO (agora usa fonte 'medium' em vez de 'small')
+        price_text = fonts['large'].render(f"${self.price}", True, colors['price'][:3])
+        screen.blit(price_text, (self.rect.x + 60, self.rect.y + 52))
 
         # Quantidade possuída
         if self.owned_quantity > 0:
-            qty_text = fonts['small'].render(f"x{self.owned_quantity}", True, (180, 180, 200))
-            screen.blit(qty_text, (self.rect.right - 40, self.rect.y + 15))
+            qty_text = fonts['medium'].render(f"possui: x{self.owned_quantity}", True, (180, 180, 200))
+            screen.blit(qty_text, (self.rect.right - 60, self.rect.y + 10))
 
     def render_small(self, screen, fonts, x, y, width, height):
         """Renderiza card em tamanho pequeno (para visualização compacta)"""
@@ -171,7 +216,8 @@ class InventoryItemCard:
             'border_hover': (180, 130, 100, 255),
             'text': (255, 240, 230, 255),
             'text_dim': (200, 180, 170, 255),
-            'sell_price': (255, 160, 160, 255)
+            'sell_price': (255, 160, 160, 255),
+            'description': (200, 180, 170, 255)  # Cor para descrição
         }
 
         # Determina cores baseadas no estado
@@ -200,17 +246,31 @@ class InventoryItemCard:
         # Sprite do item
         sprite = item_bag_catalog.get_sprite(self.item_id, scaled=True)
         if sprite:
-            circle_center = (self.rect.x + 32, self.rect.y + 32)
-            pygame.draw.circle(screen, (50, 40, 45), circle_center, 18)
-            screen.blit(sprite, (self.rect.x + 22, self.rect.y + 22))
+            screen.blit(sprite, (self.rect.x + 6, self.rect.y + 16))
 
         # Nome do item
         name_text = fonts['medium'].render(self.name, True, colors['text'][:3])
-        screen.blit(name_text, (self.rect.x + 60, self.rect.y + 15))
+        screen.blit(name_text, (self.rect.x + 60, self.rect.y + 10))
 
-        # Preço de venda
-        sell_text = fonts['small'].render(f"${self.sell_price}", True, colors['sell_price'][:3])
-        screen.blit(sell_text, (self.rect.x + 60, self.rect.y + 40))
+        # DESCRIÇÃO - ADICIONADO
+        # Truncar descrição se for muito longa
+        max_desc_width = self.rect.width - 70
+        description = self.description
+        if len(description) > 35:  # Se muito longa, trunca
+            description = description[:32] + "..."
+
+        desc_text = fonts['small'].render(description, True, colors['description'][:3])
+        # Limitar largura da descrição
+        if desc_text.get_width() > max_desc_width:
+            while len(description) > 3 and desc_text.get_width() > max_desc_width:
+                description = description[:-1]
+                desc_text = fonts['small'].render(description + "...", True, colors['description'][:3])
+
+        screen.blit(desc_text, (self.rect.x + 60, self.rect.y + 32))
+
+        # PREÇO DE VENDA - TAMANHO AUMENTADO
+        sell_text = fonts['medium'].render(f"${self.sell_price}", True, colors['sell_price'][:3])
+        screen.blit(sell_text, (self.rect.x + 60, self.rect.y + 52))
 
         # Quantidade
         qty_text = fonts['small'].render(f"x{self.quantity}", True, (255, 220, 100))
@@ -224,8 +284,9 @@ class CategorySelector:
         self.rect = pygame.Rect(x, y, width, 35)
         self.categories = [
             ("all", "Todos"),
-            ("pokeball", "Poké Bolas"),
-            ("medicine", "Poções")
+            ("pokeball", "Pokeballs"),
+            ("medicine", "Medicina"),
+            ("items", "Itens"),
         ]
         self.selected = "all"
         self.buttons = []
@@ -372,12 +433,6 @@ class QuantitySelector:
                 self.hide()
                 return "cancel"
 
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_RETURN:
-                return "confirm"
-            elif event.key == pygame.K_ESCAPE:
-                self.hide()
-                return "cancel"
 
         return None
 
@@ -454,7 +509,7 @@ class ShopScene(BaseScene):
 
         self.player = game.player
         self.catalog = item_bag_catalog
-
+        self.on_close_callback = None
         # Dados da loja
         self.shop_items = []
         self._load_shop_items()
@@ -571,7 +626,7 @@ class ShopScene(BaseScene):
         margin = max(20, vp_w // 40)
 
         # Botão voltar
-        btn_size = max(36, vp_h // 20)
+        btn_size = max(46, vp_h // 20)
         self.back_button = pygame.Rect(vp_x + margin, vp_y + margin, btn_size, btn_size)
 
         # Área de dinheiro
@@ -688,9 +743,12 @@ class ShopScene(BaseScene):
             if event.key == pygame.K_p:
                 self.toggle_pause()
             elif event.key == pygame.K_ESCAPE:
+                # Chama callback se existir
                 if self.on_close_callback:
                     self.on_close_callback()
-                self.game.current_scene = self.game.team_select_scene
+
+                from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
+                self.game.current_scene = PhaseSelectScene(self.game)
 
         elif event.type == pygame.VIDEORESIZE:
             self.layout_initialized = False
@@ -710,7 +768,8 @@ class ShopScene(BaseScene):
             if self.back_button and self.back_button.collidepoint(event.pos):
                 if self.on_close_callback:
                     self.on_close_callback()
-                self.game.current_scene = self.game.team_select_scene
+                from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
+                self.game.current_scene = PhaseSelectScene(self.game)
                 return
 
             if self.shop_category_selector:
@@ -868,10 +927,10 @@ class ShopScene(BaseScene):
         pygame.draw.rect(screen, (30, 35, 45), self.money_rect, border_radius=6)
         pygame.draw.rect(screen, (80, 120, 180), self.money_rect, 1, border_radius=6)
 
-        coin = self.fonts['small'].render("$", True, (255, 215, 0))
+        coin = self.fonts['title'].render("$", True, (255, 215, 0))
         screen.blit(coin, (self.money_rect.x + 10, self.money_rect.y + 10))
 
-        money_text = self.fonts['small'].render(str(self.player.money), True, (150, 255, 150))
+        money_text = self.fonts['title'].render(str(self.player.money), True, (150, 255, 150))
         screen.blit(money_text, (self.money_rect.x + 30, self.money_rect.y + 10))
 
     def _render_panels(self, screen):
@@ -901,8 +960,8 @@ class ShopScene(BaseScene):
         pygame.draw.rect(screen, color, rect, 1, border_radius=8)
 
         # Título do painel (MANTIDO NO LUGAR)
-        title_text = self.fonts['small'].render(title, True, color)
-        screen.blit(title_text, (rect.x + 12, rect.y + 8))
+        title_text = self.fonts['large'].render(title, True, color)
+        screen.blit(title_text, (category_selector.rect.x + (category_selector.rect.width/2 - 16), rect.y + 12))
 
         # Categorias (DESCEM)
         if category_selector:
@@ -919,7 +978,7 @@ class ShopScene(BaseScene):
         old_clip = screen.get_clip()
         clip_rect = pygame.Rect(
             rect.x,
-            rect.y + 60 + self.category_offset,  # Cards descem
+            rect.y + 40 + self.category_offset,  # Cards descem
             rect.width,
             rect.height - 50 - self.category_offset  # Altura ajustada
         )

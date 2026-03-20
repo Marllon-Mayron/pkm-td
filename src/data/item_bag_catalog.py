@@ -41,8 +41,8 @@ class ItemBagCatalog:
             # Pokébolas
             "pokeball": {
                 "id": "pokeball",
-                "name": "Pokébola",
-                "sprite_path": os.path.join(self.base_path, "pokeballs", "pokeball.png"),
+                "name": "POKEBALL",
+                "sprite_path": os.path.join(self.base_path, "pokeballs", "POKEBALL.png"),
                 "description": "Uma bola para capturar Pokémon selvagens",
                 "category": "pokeball",
                 "usable_in_battle": True,
@@ -51,10 +51,22 @@ class ItemBagCatalog:
                 "effect_value": 1.0,
                 "price": 200
             },
+            "greatball": {
+                "id": "greatball",
+                "name": "GREATBALL",
+                "sprite_path": os.path.join(self.base_path, "pokeballs", "GREATBALL.png"),
+                "description": "Captura Pokémon selvagens com 1,5 vezes a taxa de captura de uma Poké Bola.",
+                "category": "pokeball",
+                "usable_in_battle": True,
+                "usable_on_map": True,
+                "effect": "capture",
+                "effect_value": 1.5,
+                "price": 600
+            },
             # Poções
             "potion": {
                 "id": "potion",
-                "name": "Poção",
+                "name": "POTION",
                 "sprite_path": os.path.join(self.base_path, "medicine", "potion.png"),
                 "description": "Recupera 20 HP de um Pokémon",
                 "category": "medicine",
@@ -63,7 +75,64 @@ class ItemBagCatalog:
                 "effect": "heal",
                 "effect_value": 20,
                 "price": 200
-            }
+            },
+            # Pedras de evolição
+            "firestone": {
+                "id": "firestone",
+                "name": "FIRESTONE",
+                "sprite_path": os.path.join(self.base_path, "evo-stones", "FIRESTONE.png"),
+                "description": "Evolui certas espécies de Pokémon.",
+                "category": "items",
+                "usable_in_battle": True,
+                "usable_on_map": True,
+                "effect": "evolution",
+                "effect_value": 0,
+                "price": 1200
+            },"leafstone": {
+                "id": "leafstone",
+                "name": "LEAFSTONE",
+                "sprite_path": os.path.join(self.base_path, "evo-stones", "LEAFSTONE.png"),
+                "description": "Evolui certas espécies de Pokémon.",
+                "category": "items",
+                "usable_in_battle": True,
+                "usable_on_map": True,
+                "effect": "evolution",
+                "effect_value": 0,
+                "price": 1200
+            },"moonstone": {
+                "id": "moonstone",
+                "name": "MOONSTONE",
+                "sprite_path": os.path.join(self.base_path, "evo-stones", "MOONSTONE.png"),
+                "description": "Evolui certas espécies de Pokémon.",
+                "category": "items",
+                "usable_in_battle": True,
+                "usable_on_map": True,
+                "effect": "evolution",
+                "effect_value": 0,
+                "price": 1200
+            },"thunderstone": {
+                "id": "thunderstone",
+                "name": "THUNDERSTONE",
+                "sprite_path": os.path.join(self.base_path, "evo-stones", "THUNDERSTONE.png"),
+                "description": "Evolui certas espécies de Pokémon.",
+                "category": "items",
+                "usable_in_battle": True,
+                "usable_on_map": True,
+                "effect": "evolution",
+                "effect_value": 0,
+                "price": 1200
+            },"waterstone": {
+                "id": "waterstone",
+                "name": "WATERSTONE",
+                "sprite_path": os.path.join(self.base_path, "evo-stones", "WATERSTONE.png"),
+                "description": "Evolui certas espécies de Pokémon.",
+                "category": "items",
+                "usable_in_battle": True,
+                "usable_on_map": True,
+                "effect": "evolution",
+                "effect_value": 0,
+                "price": 1200
+            },
         }
 
         # Placeholders serão criados sob demanda
