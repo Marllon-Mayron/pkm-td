@@ -159,7 +159,7 @@
                         1,
                         1,
                         1,
-                        5,
+                        1,
                         1,
                         1,
                         2,
@@ -194,7 +194,7 @@
                         0
                     ]
                 ],
-                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": "pkm-td/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 11,
                 "height": 14
             },
@@ -226,25 +226,25 @@
                         9,
                         9,
                         0,
+                        17
+                    ],
+                    [
+                        17,
+                        0,
+                        0,
+                        9,
+                        9,
+                        9,
+                        9,
+                        9,
+                        0,
+                        17,
                         0
                     ],
                     [
                         0,
                         0,
                         0,
-                        9,
-                        9,
-                        9,
-                        9,
-                        9,
-                        0,
-                        0,
-                        0
-                    ],
-                    [
-                        0,
-                        0,
-                        0,
                         0,
                         0,
                         0,
@@ -255,7 +255,7 @@
                         0
                     ],
                     [
-                        0,
+                        6,
                         0,
                         0,
                         7,
@@ -278,13 +278,13 @@
                         0,
                         0,
                         0,
-                        0
+                        17
                     ],
                     [
                         89,
                         90,
                         91,
-                        0,
+                        6,
                         0,
                         0,
                         0,
@@ -308,6 +308,7 @@
                     ],
                     [
                         0,
+                        17,
                         0,
                         0,
                         0,
@@ -315,12 +316,11 @@
                         0,
                         0,
                         0,
-                        0,
-                        0,
+                        6,
                         0
                     ],
                     [
-                        0,
+                        17,
                         0,
                         0,
                         15,
@@ -330,9 +330,11 @@
                         7,
                         0,
                         0,
-                        0
+                        17
                     ],
                     [
+                        17,
+                        17,
                         0,
                         0,
                         0,
@@ -340,27 +342,25 @@
                         0,
                         0,
                         0,
-                        0,
-                        0,
-                        0,
-                        0
+                        17,
+                        17
                     ],
                     [
-                        0,
-                        0,
-                        0,
+                        17,
+                        17,
+                        17,
                         9,
+                        1,
+                        1,
+                        1,
                         9,
-                        9,
-                        9,
-                        9,
-                        0,
-                        0,
-                        0
+                        17,
+                        17,
+                        17
                     ],
                     [
-                        0,
-                        0,
+                        17,
+                        17,
                         9,
                         9,
                         9,
@@ -368,8 +368,8 @@
                         9,
                         9,
                         9,
-                        0,
-                        0
+                        17,
+                        17
                     ],
                     [
                         0,
@@ -385,7 +385,7 @@
                         0
                     ]
                 ],
-                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": "pkm-td/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 11,
                 "height": 14
             },
@@ -576,7 +576,7 @@
                         0
                     ]
                 ],
-                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": "pkm-td/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 11,
                 "height": 14
             }
@@ -592,7 +592,11 @@
                     ],
                     [
                         88,
-                        216
+                        200
+                    ],
+                    [
+                        88,
+                        8
                     ]
                 ],
                 "closed": false
@@ -665,27 +669,27 @@
         "items": [
             {
                 "x": 80,
-                "y": 96,
+                "y": 176,
                 "item_id": 1
             },
             {
                 "x": 80,
-                "y": 96,
+                "y": 176,
                 "item_id": 1
             },
             {
                 "x": 80,
-                "y": 96,
+                "y": 176,
                 "item_id": 1
             },
             {
                 "x": 80,
-                "y": 96,
+                "y": 176,
                 "item_id": 1
             },
             {
                 "x": 80,
-                "y": 96,
+                "y": 176,
                 "item_id": 1
             }
         ]

@@ -29,6 +29,7 @@ class ItemDragManager:
         self.hovered_target = None
         self.target_type = None  # "pokemon_ally" ou "pokemon_enemy"
         self.valid_target = False
+        self.cannot_capture_boss = False  # NOVO: Flag para indicar que é boss
 
         # Animação
         self.animation_time = 0
@@ -39,8 +40,6 @@ class ItemDragManager:
 
     def start_drag(self, item_id, screen_pos, world_pos):
         """Inicia o arrasto de um item"""
-
-        # Verifica se tem o item
         if not self.bag.has_item(item_id):
             print(f"[ITEM] Não tem {item_id}!")
             return False
@@ -50,6 +49,7 @@ class ItemDragManager:
         self.drag_item_data = self.catalog.get_item(item_id)
         self.drag_screen_pos = screen_pos
         self.drag_world_pos = world_pos
+        self.cannot_capture_boss = False  # Reseta flag
 
         # Cria preview
         self._create_preview(item_id)
@@ -108,6 +108,7 @@ class ItemDragManager:
         self.drag_screen_pos = screen_pos
         self.drag_world_pos = world_pos
         self.animation_time += 1 / 60
+        self.cannot_capture_boss = False  # Reseta flag a cada update
 
         # Atualiza rastro
         self.trail_positions.append(screen_pos)
@@ -126,9 +127,17 @@ class ItemDragManager:
         if self.drag_item_data["category"] == "pokeball":
             for enemy in enemy_pokemon:
                 if self._is_target_valid(enemy, screen_pos, camera):
-                    self.hovered_target = enemy
-                    self.target_type = "enemy"
-                    self.valid_target = True
+                    # ===== VERIFICA SE É BOSS =====
+                    if hasattr(enemy, 'is_boss') and enemy.is_boss:
+                        self.cannot_capture_boss = True
+                        self.valid_target = False
+                        self.hovered_target = enemy
+                        self.target_type = "enemy"
+                    else:
+                        self.cannot_capture_boss = False
+                        self.hovered_target = enemy
+                        self.target_type = "enemy"
+                        self.valid_target = True
                     break
 
         # Poções e itens de evolução funcionam em aliados
@@ -140,9 +149,8 @@ class ItemDragManager:
                     self.valid_target = True
                     break
 
-        # ===== NOVO: Itens (pedras de evolução) também funcionam em aliados =====
+        # Itens (pedras de evolução) também funcionam em aliados
         elif self.drag_item_data["category"] == "items":
-            # Verifica se é uma pedra de evolução
             if self.drag_item_data.get("effect") == "evolution":
                 for ally in allied_pokemon:
                     if self._is_target_valid(ally, screen_pos, camera):
@@ -175,7 +183,6 @@ class ItemDragManager:
 
         # Se tem um alvo válido, tenta usar o item
         if self.valid_target and self.hovered_target and self.drag_item_id:
-
             # Verifica se o uso é válido para o tipo de alvo
             valid_use = False
 
@@ -187,9 +194,8 @@ class ItemDragManager:
             elif self.drag_item_data["category"] == "medicine" and self.target_type == "ally":
                 valid_use = True
 
-            # ===== NOVO: Itens (pedras de evolução) em aliados =====
+            # Itens (pedras de evolução) em aliados
             elif self.drag_item_data["category"] == "items" and self.target_type == "ally":
-                # Verifica se é um item que pode ser usado (evolução, etc)
                 if self.drag_item_data.get("effect") == "evolution":
                     valid_use = True
 
@@ -207,13 +213,14 @@ class ItemDragManager:
 
                 print(f"[ITEM] Usou {self.drag_item_data['name']} em {getattr(self.hovered_target, 'name', 'alvo')}")
 
-        # Reseta estado (restante do código igual...)
+        # Reseta estado
         self.is_dragging = False
         self.drag_item_id = None
         self.drag_item_data = None
         self.hovered_target = None
         self.target_type = None
         self.valid_target = False
+        self.cannot_capture_boss = False
         self.preview_surface = None
         self.trail_positions = []
 
@@ -230,6 +237,7 @@ class ItemDragManager:
         self.hovered_target = None
         self.target_type = None
         self.valid_target = False
+        self.cannot_capture_boss = False
         self.preview_surface = None
         self.trail_positions = []
         pygame.mouse.set_cursor(self.normal_cursor)
@@ -252,8 +260,8 @@ class ItemDragManager:
 
         screen.blit(preview_with_alpha, preview_rect)
 
-        # Se tem um alvo válido, mostra indicador
-        if self.valid_target and self.hovered_target:
+        # Se tem um alvo, mostra indicador
+        if self.hovered_target:
             self._render_valid_indicator(screen, camera)
 
         # Instruções
@@ -281,14 +289,14 @@ class ItemDragManager:
 
             pygame.draw.line(
                 screen,
-                color[:3] + (alpha,),  # Pygame não aceita alpha em draw.line
+                color[:3] + (alpha,),
                 self.trail_positions[i - 1],
                 self.trail_positions[i],
                 max(1, width)
             )
 
     def _render_valid_indicator(self, screen, camera):
-        """Renderiza indicador de alvo válido"""
+        """Renderiza indicador de alvo válido ou inválido"""
         if not self.hovered_target:
             return
 
@@ -304,22 +312,48 @@ class ItemDragManager:
         # Superfície com alpha
         indicator = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
 
-        # Cor baseada no tipo
-        if self.target_type == "enemy":
-            color = (255, 100, 100)  # Vermelho para inimigos
-            text = "SOLTAR PARA CAPTURAR"
+        # ===== NOVO: Verifica se é boss e não pode capturar =====
+        if self.cannot_capture_boss and self.drag_item_data and self.drag_item_data["category"] == "pokeball":
+            # Boss - alvo inválido (X vermelho)
+            color = (255, 50, 50)
+            text = "BOSS NÃO PODE SER CAPTURADO!"
+            valid = False
+        elif self.valid_target:
+            # Alvo válido
+            if self.target_type == "enemy":
+                color = (100, 255, 100)  # Verde para captura
+                text = "✓ SOLTAR PARA CAPTURAR"
+            else:
+                color = (100, 255, 100)  # Verde para aliados
+                text = "✓ SOLTAR PARA APLICAR"
+            valid = True
         else:
-            color = (100, 255, 100)  # Verde para aliados
-            text = "SOLTAR PARA APLICAR"
+            # Alvo inválido
+            color = (255, 100, 100)
+            text = "✗ ALVO INVÁLIDO"
+            valid = False
 
         # Círculo externo
         alpha = int(150 + 105 * pulse)
         pygame.draw.circle(indicator, (*color, alpha),
                            (radius, radius), radius, 3)
 
-        # Círculo interno
-        pygame.draw.circle(indicator, (*color, 50),
-                           (radius, radius), radius - 5)
+        # Círculo interno (cor diferente se for inválido)
+        if valid:
+            pygame.draw.circle(indicator, (*color, 50),
+                               (radius, radius), radius - 5)
+        else:
+            # Desenha um X no centro para indicar inválido
+            pygame.draw.circle(indicator, (*color, 100),
+                               (radius, radius), radius - 5)
+
+            # Desenha o X
+            x_offset = radius - 15
+            x_end = radius + 15
+            pygame.draw.line(indicator, (*color, 200),
+                             (x_offset, x_offset), (x_end, x_end), 3)
+            pygame.draw.line(indicator, (*color, 200),
+                             (x_end, x_offset), (x_offset, x_end), 3)
 
         screen.blit(indicator, (target_x - radius, target_y - radius))
 
@@ -327,7 +361,7 @@ class ItemDragManager:
         font = pygame.font.Font(None, 20)
         text_surf = font.render(text, True, color)
         text_bg = pygame.Surface((text_surf.get_width() + 10, text_surf.get_height() + 4), pygame.SRCALPHA)
-        text_bg.fill((0, 0, 0, 150))
+        text_bg.fill((0, 0, 0, 180))
 
         text_x = target_x - text_surf.get_width() // 2
         text_y = target_y - radius - 25
@@ -339,7 +373,17 @@ class ItemDragManager:
         """Renderiza instruções durante o arrasto"""
         font = pygame.font.Font(None, 18)
 
-        if self.drag_item_data:
+        # ===== NOVO: Mensagem especial para boss =====
+        if self.cannot_capture_boss and self.drag_item_data and self.drag_item_data["category"] == "pokeball":
+            instructions = [
+                f"{self.hovered_target.name} é um BOSS!",
+                "BOSS NÃO PODE SER CAPTURADO!",
+                "Derrote o boss para continuar!",
+                "Clique DIREITO para soltar",
+                "ESC para cancelar"
+            ]
+            color = (255, 100, 100)
+        elif self.drag_item_data:
             if self.drag_item_data["category"] == "pokeball":
                 instructions = [
                     f"{self.drag_item_data['name']} - Arraste até um Pokémon selvagem",
@@ -392,7 +436,7 @@ class ItemDragManager:
 
         y = bg_y + 5
         for text in instructions:
-            text_color = color if "Arraste" in text or "Pokémon" in text else (200, 200, 200)
+            text_color = color if "BOSS" in text or "Arraste" in text or "Pokémon" in text else (200, 200, 200)
             text_surf = font.render(text, True, text_color)
             screen.blit(text_surf, (bg_x + 10, y))
             y += 22

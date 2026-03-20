@@ -8,7 +8,8 @@ from src.managers.evolution_manager import evolution_manager
 
 
 class Pokemon(Entity):
-    def __init__(self, x, y, pokemon_id, level=5, is_wild=False, shiny=False):
+    def __init__(self, x, y, pokemon_id, level=5, is_wild=False, shiny=False, is_boss=False):
+        # ===== 1. DADOS BÁSICOS =====
         self.pokedex = Pokedex()
         self.pokemon_data = self.pokedex.get_pokemon(pokemon_id)
 
@@ -17,17 +18,18 @@ class Pokemon(Entity):
 
         self.id = pokemon_id
         self.name = self.pokemon_data["name"].capitalize()
+        self.base_level = level  # Guarda o level base
         self.level = level
-
         self.is_shiny = shiny
+        self.is_boss = is_boss
 
-        self.is_placed = False  # False = no time, True = no mapa
-        self.spot_id = None  # ID do spot onde está colocado
-
-        # Tipos
+        # ===== 2. STATUS E ATRIBUTOS BASE =====
+        self.is_placed = False
+        self.spot_id = None
         self.types = self.pokemon_data["types"]
+        self.base_stats = self.pokemon_data["base_stats"]
 
-        # Gerar IVs aleatórios (0-31)
+        # ===== 3. IVs E EVs (ANTES DE CALCULAR STATS) =====
         self.ivs = {
             "hp": random.randint(0, 31),
             "attack": random.randint(0, 31),
@@ -37,97 +39,95 @@ class Pokemon(Entity):
             "speed": random.randint(0, 31)
         }
 
-        # EVs (inicialmente 0)
         self.evs = {
             "hp": 0, "attack": 0, "defense": 0,
             "special_attack": 0, "special_defense": 0, "speed": 0
         }
 
-        # Calcular stats
-        self.base_stats = self.pokemon_data["base_stats"]
+        # ===== 4. NATUREZA (AFETA STATS) =====
+        self.nature_multipliers = self._generate_nature()
+        self.nature = self.nature_multipliers["name"]
+
+        # ===== 5. CALCULAR STATS (USA IVs, EVs, NATUREZA) =====
         self._calculate_stats()
 
-        # Estado atual
+        # ===== 6. BOSS: AUMENTA LEVEL E RECALCULA =====
+        if is_boss:
+            self.level = self.base_level + 3  # Aumenta em 3 níveis
+            self._calculate_stats()  # Recalcula stats com o novo level
+            print(f"[BOSS] {self.name} é um BOSS! Nível {self.level} (HP: {self.max_hp})")
+
+        # ===== 7. ESTADO ATUAL =====
         self.current_hp = self.max_hp
         self.xp = 0
         self.xp_to_next = self._calculate_xp_needed()
 
-        # Sprite para UI (front)
+        # ===== 8. SPRITES =====
         self.ui_sprite = self.pokedex.get_sprite(pokemon_id, "front", shiny)
-
-        # Sprite para batalha (back) - quando é do jogador
         self.battle_sprite = self.pokedex.get_sprite(pokemon_id, "back", shiny)
-
-        # Frames de animação para o mapa
         self.inmap_frames = self.pokedex.get_inmap_animation(pokemon_id, shiny)
         self.current_direction = "down"
         self.current_frame = 0
         self.animation_timer = 0
-        self.animation_speed = 0.1  # 10 frames por segundo
+        self.animation_speed = 0.1
 
-        # Obtém o tamanho do sprite no mapa da Pokedex
+        # ===== 9. TAMANHO DO SPRITE =====
         self.map_sprite_size = self.pokedex.get_map_sprite_size(pokemon_id, shiny)
-
-        # Tamanho para entidade no mapa
         width = self.map_sprite_size
         height = self.map_sprite_size
 
-        # Usa o primeiro frame da direção down como sprite padrão
+        # Sprite padrão para o mapa
         sprite = None
         if self.inmap_frames and "down" in self.inmap_frames and self.inmap_frames["down"]:
             sprite = self.inmap_frames["down"][0]
 
         super().__init__(x, y, width, height, sprite)
 
-        # Atributos de jogo
+        # ===== 10. ATRIBUTOS DE JOGO =====
         self.is_wild = is_wild
         self.is_in_team = False
         self.is_selected = False
 
-        # Movimento (para Tower Defense)
+        # ===== 11. MOVIMENTO =====
         self.path = []
         self.path_index = 0
         self.speed = 2.0
+        self.base_speed = self.speed
 
-        # Batalha
+        # ===== 12. COMBATE =====
         self.can_attack = True
         self.attack_cooldown = 0
-        self.attack_cooldown_max = 60  # frames
+        self.attack_cooldown_max = 60
         self.target = None
 
-        # Efeitos visuais - AJUSTADOS para sprite 32x32
-        self.hp_bar_width = 32  # Mesmo tamanho do sprite
-        self.hp_bar_height = 3  # Mais fina
+        # ===== 13. EFEITOS VISUAIS =====
+        self.hp_bar_width = 32
+        self.hp_bar_height = 3
 
-        # Natureza (opcional - para dar variedade)
-        self.nature_multipliers = self._generate_nature()
-
-        # Armazena a última posição para calcular direção
+        # ===== 14. POSIÇÃO E MOVIMENTAÇÃO =====
         self.last_x = x
         self.last_y = y
 
-        self.is_carrying = None  # Item que está carregando
-        self.capture_range = 10  # Distância para capturar item
+        # ===== 15. ITENS =====
+        self.is_carrying = None
+        self.capture_range = 10
 
-        # ATRIBUTOS DE COMBATE
-        self.attack_range = 60  # Distância para iniciar investida
-        self.combat_state = "idle"  # idle, charging, returning
-        self.target = None
+        # ===== 16. ATRIBUTOS DE COMBATE =====
+        self.attack_range = 60
+        self.combat_state = "idle"
         self.original_spot_x = x
         self.original_spot_y = y
 
-        # Velocidade constante (sem aceleração)
-        self.base_speed = self.speed  # Preserva a velocidade base
-
-        # Cooldown entre investidas
+        # ===== 17. COOLDOWNS =====
         self.charge_cooldown = 0.0
-        self.charge_cooldown_max = 1.5  # 2 segundos entre investidas
+        self.charge_cooldown_max = 1.5
 
-        # Stats de combate
+        # ===== 18. STATS DE COMBATE =====
         self.attack_damage = self._calculate_attack_damage()
         self.defense_value = self._calculate_defense()
 
-        self.damage_contributions = {}  # {attacker_id: damage_done}
+        # ===== 19. RASTREAMENTO DE DANO =====
+        self.damage_contributions = {}
         self.last_attacker = None
 
     def _calculate_stats(self):
@@ -672,6 +672,7 @@ class Pokemon(Entity):
         return (dx ** 2 + dy ** 2) ** 0.5
 
     def render_hp(self, screen, camera=None):
+        """Renderiza a barra de HP (boss tem barra azul)"""
         if camera and hasattr(self, 'screen_manager') and self.screen_manager:
             screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
             zoom_scale = camera.zoom * self.screen_manager.render_scale
@@ -690,141 +691,195 @@ class Pokemon(Entity):
         bar_x = screen_x - bar_width // 2
 
         sprite_height = int(self.map_sprite_size * zoom_scale)
-
         foot_offset = int(sprite_height * 0.2)
-        sprite_top = (screen_y + foot_offset) - sprite_height  # Ajustado com o offset
-
+        sprite_top = (screen_y + foot_offset) - sprite_height
         bar_y = sprite_top + 10
 
         # Fundo da barra
         pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))
 
         # Barra de HP (cor baseada na porcentagem)
-        if not self.is_shiny:
-            if hp_percent > 0.5:
-                color = (0, 200, 0)
-            elif hp_percent > 0.25:
-                color = (255, 255, 0)
+        if self.is_boss:
+            color = (0, 0, 255)
+        else:
+            if not self.is_shiny:
+                if hp_percent > 0.5:
+                    color = (0, 200, 0)
+                elif hp_percent > 0.25:
+                    color = (255, 255, 0)
+                else:
+                    color = (255, 0, 0)
             else:
                 color = (255, 0, 0)
-        else:
-            color = color = (255, 0, 0)
 
         # Barra de progresso
         progress_width = int(bar_width * hp_percent)
         if progress_width > 0:
             pygame.draw.rect(screen, color, (bar_x, bar_y, progress_width, bar_height))
 
-        # Borda
         pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, bar_width, bar_height), 1)
 
-
     def render(self, screen, camera=None, show_hp=True):
-        """Renderiza Pokémon """
+        """Renderiza Pokémon com tamanho especial para boss (64x64)"""
 
+        # 1. OBTÉM POSIÇÃO E ESCALA
         if camera and hasattr(self, 'screen_manager') and self.screen_manager:
-            # Obtém posição na tela (coordenadas com zoom aplicado)
             screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
-
-            # Calcula a escala baseada no zoom da câmera
             zoom_scale = camera.zoom * self.screen_manager.render_scale
         else:
             screen_x = self.x
             screen_y = self.y
             zoom_scale = 1.0
 
-        # SPRITE - COM PIVÔ NOS PÉS
-        if self.sprite:
-            # Obtém tamanho atual
-            current_width = self.sprite.get_width()
-            current_height = self.sprite.get_height()
+        # 2. PREPARA O SPRITE (OU PLACEHOLDER)
+        sprite_to_render = self._prepare_sprite(zoom_scale)
 
-            # APLICA O ZOOM da câmera
-            final_width = max(1, int(current_width * zoom_scale))
-            final_height = max(1, int(current_height * zoom_scale))
-
-            # Redimensiona com o zoom atual
-            scaled_sprite = pygame.transform.scale(self.sprite, (final_width, final_height))
-
-            # POSICIONA COM PIVÔ NOS PÉS
-            # Ajusta o offset para enterrar os pés no chão
-            foot_offset = int(final_height * 0.2)  # 20% do sprite para baixo
-
-            sprite_rect = scaled_sprite.get_rect()
-            # Coloca o pivô (pés) mais para baixo do sprite
-            sprite_rect.bottom = int(screen_y) + foot_offset  # Parte inferior mais baixa
-            sprite_rect.centerx = int(screen_x)  # Centralizado no X
-
-            screen.blit(scaled_sprite, sprite_rect)
-
-            # Debug - mostra o ponto de pivô (pés)
-            if hasattr(self, 'show_debug') and self.show_debug:
-                # Vermelho: ponto do pivô (pés) - agora mais baixo
-                pygame.draw.circle(screen, (255, 0, 0), (int(screen_x), int(screen_y) + foot_offset), 6, 2)
-                # Verde: centro do sprite (para referência)
-                centro_x = sprite_rect.centerx
-                centro_y = sprite_rect.centery
-                pygame.draw.circle(screen, (0, 255, 0), (centro_x, centro_y), 4, 1)
-                # Amarelo: linha do chão (agora mais baixa)
-                pygame.draw.line(screen, (255, 255, 0),
-                                 (sprite_rect.left, int(screen_y) + foot_offset),
-                                 (sprite_rect.right, int(screen_y) + foot_offset), 1)
-                # Azul: linha do chão original (para referência)
-                pygame.draw.line(screen, (0, 255, 255),
-                                 (sprite_rect.left, int(screen_y)),
-                                 (sprite_rect.right, int(screen_y)), 1)
+        if sprite_to_render:
+            # Tem sprite - renderiza
+            sprite_rect = self._render_sprite(screen, sprite_to_render, screen_x, screen_y, zoom_scale)
         else:
-            # Placeholder - também usa pivô nos pés com offset
-            size = int(self.map_sprite_size * zoom_scale)
-            foot_offset = int(size * 0.2)  # 20% do placeholder para baixo
+            # Não tem sprite - renderiza placeholder
+            sprite_rect = self._render_placeholder(screen, screen_x, screen_y, zoom_scale)
 
-            # Desenha um retângulo com a parte inferior na posição do pivô + offset
-            rect = pygame.Rect(0, 0, size, size)
-            rect.bottom = int(screen_y) + foot_offset
-            rect.centerx = int(screen_x)
-            pygame.draw.rect(screen, (255, 0, 255), rect)
-            pygame.draw.rect(screen, (255, 255, 255), rect, 2)
+        # 3. RENDERIZA TEXTO (se for selvagem)
+        if self.is_wild and sprite_rect:
+            self._render_wild_text(screen, sprite_rect, zoom_scale)
 
-            # Debug para o placeholder
-            if hasattr(self, 'show_debug') and self.show_debug:
-                pygame.draw.circle(screen, (255, 0, 0), (int(screen_x), int(screen_y) + foot_offset), 6, 2)
-
-        # Barra de HP
+        # 4. RENDERIZA HP
         if show_hp:
-            hp_percent = self.current_hp / self.max_hp
+            self.render_hp(screen, camera)
 
-            # Tamanhos proporcionais ao zoom
-            bar_width = int(32 * zoom_scale)
-            bar_height = max(1, int(3 * zoom_scale))
+        # 5. DEBUG
+        if hasattr(self, 'show_debug') and self.show_debug:
+            self._render_debug(screen, screen_x, screen_y, zoom_scale, sprite_rect)
 
-            # Posiciona a barra acima do sprite
-            bar_x = screen_x - bar_width // 2
+    def _prepare_sprite(self, zoom_scale):
+        """Prepara o sprite para renderização (boss em escala inteira)"""
+        if not self.sprite:
+            return None
 
-            sprite_height = int(self.map_sprite_size * zoom_scale)
+        if self.is_boss:
+            orig_width, orig_height = self.sprite.get_width(), self.sprite.get_height()
 
-            foot_offset = int(sprite_height * 0.2)
-            sprite_top = (screen_y + foot_offset) - sprite_height  # Ajustado com o offset
+            scale_factor = 2
+            new_width = orig_width * scale_factor
+            new_height = orig_height * scale_factor
 
-            bar_y = sprite_top + 10
+            return pygame.transform.scale(self.sprite, (new_width, new_height))
 
-            # Fundo da barra
-            pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))
+        return self.sprite
 
-            # Barra de HP (cor baseada na porcentagem)
-            if hp_percent > 0.5:
-                color = (0, 200, 0)
-            elif hp_percent > 0.25:
-                color = (255, 255, 0)
-            else:
-                color = (255, 0, 0)
+    def _render_sprite(self, screen, sprite, screen_x, screen_y, zoom_scale):
+        """Renderiza o sprite com zoom e pivô nos pés"""
+        current_width, current_height = sprite.get_width(), sprite.get_height()
 
-            # Barra de progresso
-            progress_width = int(bar_width * hp_percent)
-            if progress_width > 0:
-                pygame.draw.rect(screen, color, (bar_x, bar_y, progress_width, bar_height))
+        # Aplica zoom
+        final_width = max(1, int(current_width * zoom_scale))
+        final_height = max(1, int(current_height * zoom_scale))
+        scaled_sprite = pygame.transform.scale(sprite, (final_width, final_height))
 
-            # Borda
-            pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, bar_width, bar_height), 1)
+        # Posiciona com pivô nos pés
+        foot_offset = int(final_height * 0.2)
+        sprite_rect = scaled_sprite.get_rect()
+        sprite_rect.bottom = int(screen_y) + foot_offset
+        sprite_rect.centerx = int(screen_x)
+
+        screen.blit(scaled_sprite, sprite_rect)
+        return sprite_rect
+
+    def _render_placeholder(self, screen, screen_x, screen_y, zoom_scale):
+        """Renderiza placeholder quando não tem sprite"""
+        size = int((64 if self.is_boss else self.map_sprite_size) * zoom_scale)
+        foot_offset = int(size * 0.2)
+
+        rect = pygame.Rect(0, 0, size, size)
+        rect.bottom = int(screen_y) + foot_offset
+        rect.centerx = int(screen_x)
+
+        pygame.draw.rect(screen, (255, 0, 255), rect)
+        pygame.draw.rect(screen, (255, 255, 255), rect, 2)
+
+        return rect
+
+    def _render_wild_text(self, screen, sprite_rect, zoom_scale):
+        """Renderiza nome e nível para Pokémon selvagem"""
+        # Tamanhos de fonte
+        name_font_size = max(5, int(6 * zoom_scale))
+        level_font_size = max(4, int(5 * zoom_scale))
+
+        try:
+            name_font = pygame.font.Font(None, name_font_size)
+            level_font = pygame.font.Font(None, level_font_size)
+        except:
+            name_font = pygame.font.SysFont('Arial', name_font_size)
+            level_font = pygame.font.SysFont('Arial', level_font_size)
+
+        # Prepara textos
+        name_text = f"{self.name} - "
+        level_text = f"lv. {self.level:02d}"
+
+        # Cores
+        text_color = (255, 255, 255)
+        outline_color = (0, 0, 0)
+
+        if self.is_shiny:
+            level_color = (255, 215, 0)
+        elif self.is_boss:
+            level_color = (255, 100, 100)
+        else:
+            level_color = (200, 200, 200)
+
+        # Renderiza
+        name_surface = name_font.render(name_text, True, text_color)
+        level_surface = level_font.render(level_text, True, level_color)
+
+        name_outline = name_font.render(name_text, True, outline_color)
+        level_outline = level_font.render(level_text, True, outline_color)
+
+        # Posiciona
+        total_width = name_surface.get_width() + 2 + level_surface.get_width()
+        start_x = sprite_rect.centerx - total_width // 2
+        text_y = sprite_rect.top - name_font_size
+
+        name_x, name_y = start_x, text_y
+        level_x = start_x + name_surface.get_width() + 2
+        level_y = text_y + (name_font_size - level_font_size)
+
+        # Desenha contorno
+        for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+            screen.blit(name_outline, (name_x + dx, name_y + dy))
+            screen.blit(level_outline, (level_x + dx, level_y + dy))
+
+        screen.blit(name_surface, (name_x, name_y))
+        screen.blit(level_surface, (level_x, level_y))
+
+    def _render_debug(self, screen, screen_x, screen_y, zoom_scale, sprite_rect):
+        """Renderiza informações de debug"""
+        # Calcula offset atual
+        if sprite_rect:
+            foot_offset = int(sprite_rect.height * 0.2)
+        else:
+            size = int((64 if self.is_boss else self.map_sprite_size) * zoom_scale)
+            foot_offset = int(size * 0.2)
+
+        # Ponto do pivô (vermelho)
+        pygame.draw.circle(screen, (255, 0, 0),
+                           (int(screen_x), int(screen_y) + foot_offset), 6, 2)
+
+        if sprite_rect:
+            # Centro do sprite (verde)
+            pygame.draw.circle(screen, (0, 255, 0),
+                               (sprite_rect.centerx, sprite_rect.centery), 4, 1)
+
+            # Linha do chão (amarelo)
+            pygame.draw.line(screen, (255, 255, 0),
+                             (sprite_rect.left, int(screen_y) + foot_offset),
+                             (sprite_rect.right, int(screen_y) + foot_offset), 1)
+
+            # Linha do chão original (azul)
+            pygame.draw.line(screen, (0, 255, 255),
+                             (sprite_rect.left, int(screen_y)),
+                             (sprite_rect.right, int(screen_y)), 1)
 
     def get_info_string(self):
         """Retorna string com informações do Pokémon"""

@@ -258,10 +258,10 @@ class GameWaveManager:
         if self.current_wave_index_by_path[path_index] < len(self.path_waves.get(path_index, [])):
             print(f"[WaveManager] Path {path_index + 1} - Próxima wave disponível. Aguardando início...")
         else:
-            print(f"[WaveManager] Path {path_index + 1} - 🏆 TODAS AS WAVES CONCLUÍDAS!")
+            print(f"[WaveManager] Path {path_index + 1} - TODAS AS WAVES CONCLUÍDAS!")
 
     def _create_enemy(self, wave_data, path_points, screen_manager, path_index):
-        """Cria um inimigo baseado nos dados da wave"""
+        """Cria um inimigo baseado nos dados da wave (com suporte a boss)"""
         enemy_data = self._get_random_enemy(wave_data)
 
         if not enemy_data or not path_points or len(path_points) < 2:
@@ -276,13 +276,22 @@ class GameWaveManager:
             wave_data.get("max_level", 5)
         )
 
+        # VERIFICA SE É O ÚLTIMO INIMIGO DA WAVE
+        enemies_spawned = self.enemies_spawned_by_path.get(path_index, 0)
+        wave_size = wave_data.get("wave_size", 10)
+        is_last_enemy = (enemies_spawned + 1) >= wave_size
+
+        # Se for o último inimigo, é boss!
+        is_boss = is_last_enemy and wave_data.get("has_boss", True)  # Padrão True
+
         # Cria o Pokémon inimigo
         pokemon = Pokemon(
             start_x, start_y,
             enemy_data["pokemon_id"],
             level=level,
             is_wild=True,
-            shiny= random.random() < 0.001 # 0-1 / 1-1000
+            shiny=random.random() < 0.001,  # 0.1% chance
+            is_boss=is_boss
         )
 
         pokemon.screen_manager = screen_manager
@@ -290,8 +299,14 @@ class GameWaveManager:
         # Configura para seguir o path
         pokemon.path = path_points
         pokemon.speed = 0.8
+
+        # Boss é mais lento (mas mais forte)
+        if is_boss:
+            pokemon.speed = 0.6
+            print(f"[BOSS] Criado {pokemon.name} (Lv.{pokemon.level}) para Path {path_index + 1}")
+
         pokemon.path_index = 0
-        pokemon.path_index_origin = path_index  # Guarda de qual path veio
+        pokemon.path_index_origin = path_index
 
         # Define direção inicial
         if len(path_points) > 1:

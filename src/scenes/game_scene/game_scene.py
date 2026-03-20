@@ -288,7 +288,14 @@ class GameScene(BaseScene):
         return True
 
     def _attempt_capture(self, enemy, item_data):
-        """Tenta capturar um Pokémon selvagem"""
+        """Tenta capturar um Pokémon selvagem (boss não pode ser capturado)"""
+
+        # ===== VERIFICA SE É BOSS =====
+        if hasattr(enemy, 'is_boss') and enemy.is_boss:
+            print(f"[CAPTURA]  {enemy.name} é um BOSS e não pode ser capturado!")
+            print(f"[CAPTURA] Derrote o boss para continuar!")
+            return False
+
         # Cálculo de chance de captura simplificado
         hp_ratio = enemy.current_hp / enemy.max_hp
         base_chance = (1 - hp_ratio * 0.5)
@@ -318,11 +325,10 @@ class GameScene(BaseScene):
 
             # ANTES de remover o inimigo, verifica se ele está carregando um item
             if carried_item:
-                # USA O MÉTODO drop_item em vez de fazer manualmente
-                enemy.drop_item()  # MODIFICADO: usa o método unificado
+                enemy.drop_item()  # Usa o método unificado
                 print(f"[CAPTURA] Item {item_name} foi resetado e continua no mapa")
 
-            # CORREÇÃO: Usa o método remove_enemy do WaveManager em vez de remover manualmente
+            # Remove o inimigo
             self.wave_manager.remove_enemy(enemy)
 
             # CRIA UMA CÓPIA do Pokémon capturado
@@ -354,7 +360,7 @@ class GameScene(BaseScene):
             # Atualiza a Pokedex
             self.player.caught_pokemon.add(enemy.id)
             self.player.register_seen(enemy.id)
-            #Salva data
+            # Salva data
             self.player.auto_save()
 
             return True
