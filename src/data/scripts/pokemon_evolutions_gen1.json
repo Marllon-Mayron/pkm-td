@@ -1,0 +1,757 @@
+{
+   "1": {
+      "lvlMin": 16,
+      "EvolveTo": 2,
+      "method": "level_up"
+   },
+   "2": {
+      "lvlMin": 32,
+      "EvolveTo": 3,
+      "method": "level_up"
+   },
+   "3": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "4": {
+      "lvlMin": 16,
+      "EvolveTo": 5,
+      "method": "level_up"
+   },
+   "5": {
+      "lvlMin": 36,
+      "EvolveTo": 6,
+      "method": "level_up"
+   },
+   "6": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "7": {
+      "lvlMin": 16,
+      "EvolveTo": 8,
+      "method": "level_up"
+   },
+   "8": {
+      "lvlMin": 36,
+      "EvolveTo": 9,
+      "method": "level_up"
+   },
+   "9": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "10": {
+      "lvlMin": 7,
+      "EvolveTo": 11,
+      "method": "level_up"
+   },
+   "11": {
+      "lvlMin": 10,
+      "EvolveTo": 12,
+      "method": "level_up"
+   },
+   "12": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "13": {
+      "lvlMin": 7,
+      "EvolveTo": 14,
+      "method": "level_up"
+   },
+   "14": {
+      "lvlMin": 10,
+      "EvolveTo": 15,
+      "method": "level_up"
+   },
+   "15": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "16": {
+      "lvlMin": 18,
+      "EvolveTo": 17,
+      "method": "level_up"
+   },
+   "17": {
+      "lvlMin": 36,
+      "EvolveTo": 18,
+      "method": "level_up"
+   },
+   "18": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "19": {
+      "lvlMin": 20,
+      "EvolveTo": 20,
+      "method": "level_up"
+   },
+   "20": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "21": {
+      "lvlMin": 20,
+      "EvolveTo": 22,
+      "method": "level_up"
+   },
+   "22": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "23": {
+      "lvlMin": 22,
+      "EvolveTo": 24,
+      "method": "level_up"
+   },
+   "24": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "25": {
+      "lvlMin": "thunder-stone",
+      "EvolveTo": 26,
+      "method": "thunder-stone"
+   },
+   "26": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "27": {
+      "lvlMin": 22,
+      "EvolveTo": 28,
+      "method": "level_up"
+   },
+   "28": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "29": {
+      "lvlMin": 16,
+      "EvolveTo": 30,
+      "method": "level_up"
+   },
+   "30": {
+      "lvlMin": "moon-stone",
+      "EvolveTo": 31,
+      "method": "moon-stone"
+   },
+   "31": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "32": {
+      "lvlMin": 16,
+      "EvolveTo": 33,
+      "method": "level_up"
+   },
+   "33": {
+      "lvlMin": "moon-stone",
+      "EvolveTo": 34,
+      "method": "moon-stone"
+   },
+   "34": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "35": {
+      "lvlMin": "moon-stone",
+      "EvolveTo": 36,
+      "method": "moon-stone"
+   },
+   "36": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "37": {
+      "lvlMin": "fire-stone",
+      "EvolveTo": 38,
+      "method": "fire-stone"
+   },
+   "38": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "39": {
+      "lvlMin": "moon-stone",
+      "EvolveTo": 40,
+      "method": "moon-stone"
+   },
+   "40": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "41": {
+      "lvlMin": 22,
+      "EvolveTo": 42,
+      "method": "level_up"
+   },
+   "42": {
+      "lvlMin": "level-up",
+      "EvolveTo": 169,
+      "method": "level-up"
+   },
+   "43": {
+      "lvlMin": 21,
+      "EvolveTo": 44,
+      "method": "level_up"
+   },
+   "44": {
+      "lvlMin": "sun-stone",
+      "EvolveTo": 182,
+      "method": "sun-stone"
+   },
+   "45": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "46": {
+      "lvlMin": 24,
+      "EvolveTo": 47,
+      "method": "level_up"
+   },
+   "47": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "48": {
+      "lvlMin": 31,
+      "EvolveTo": 49,
+      "method": "level_up"
+   },
+   "49": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "50": {
+      "lvlMin": 26,
+      "EvolveTo": 51,
+      "method": "level_up"
+   },
+   "51": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "52": {
+      "lvlMin": 28,
+      "EvolveTo": 863,
+      "method": "level_up"
+   },
+   "53": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "54": {
+      "lvlMin": 33,
+      "EvolveTo": 55,
+      "method": "level_up"
+   },
+   "55": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "56": {
+      "lvlMin": 28,
+      "EvolveTo": 57,
+      "method": "level_up"
+   },
+   "57": {
+      "lvlMin": "use-move",
+      "EvolveTo": 979,
+      "method": "use-move"
+   },
+   "58": {
+      "lvlMin": "fire-stone",
+      "EvolveTo": 59,
+      "method": "fire-stone"
+   },
+   "59": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "60": {
+      "lvlMin": 25,
+      "EvolveTo": 61,
+      "method": "level_up"
+   },
+   "61": {
+      "lvlMin": "trade",
+      "EvolveTo": 186,
+      "method": "trade"
+   },
+   "62": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "63": {
+      "lvlMin": 16,
+      "EvolveTo": 64,
+      "method": "level_up"
+   },
+   "64": {
+      "lvlMin": "trade",
+      "EvolveTo": 65,
+      "method": "trade"
+   },
+   "65": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "66": {
+      "lvlMin": 28,
+      "EvolveTo": 67,
+      "method": "level_up"
+   },
+   "67": {
+      "lvlMin": "trade",
+      "EvolveTo": 68,
+      "method": "trade"
+   },
+   "68": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "69": {
+      "lvlMin": 21,
+      "EvolveTo": 70,
+      "method": "level_up"
+   },
+   "70": {
+      "lvlMin": "leaf-stone",
+      "EvolveTo": 71,
+      "method": "leaf-stone"
+   },
+   "71": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "72": {
+      "lvlMin": 30,
+      "EvolveTo": 73,
+      "method": "level_up"
+   },
+   "73": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "74": {
+      "lvlMin": 25,
+      "EvolveTo": 75,
+      "method": "level_up"
+   },
+   "75": {
+      "lvlMin": "trade",
+      "EvolveTo": 76,
+      "method": "trade"
+   },
+   "76": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "77": {
+      "lvlMin": 40,
+      "EvolveTo": 78,
+      "method": "level_up"
+   },
+   "78": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "79": {
+      "lvlMin": "trade",
+      "EvolveTo": 199,
+      "method": "trade"
+   },
+   "80": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "81": {
+      "lvlMin": 30,
+      "EvolveTo": 82,
+      "method": "level_up"
+   },
+   "82": {
+      "lvlMin": "level-up",
+      "EvolveTo": 462,
+      "method": "level-up"
+   },
+   "83": {
+      "lvlMin": "three-critical-hits",
+      "EvolveTo": 865,
+      "method": "three-critical-hits"
+   },
+   "84": {
+      "lvlMin": 31,
+      "EvolveTo": 85,
+      "method": "level_up"
+   },
+   "85": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "86": {
+      "lvlMin": 34,
+      "EvolveTo": 87,
+      "method": "level_up"
+   },
+   "87": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "88": {
+      "lvlMin": 38,
+      "EvolveTo": 89,
+      "method": "level_up"
+   },
+   "89": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "90": {
+      "lvlMin": "water-stone",
+      "EvolveTo": 91,
+      "method": "water-stone"
+   },
+   "91": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "92": {
+      "lvlMin": 25,
+      "EvolveTo": 93,
+      "method": "level_up"
+   },
+   "93": {
+      "lvlMin": "trade",
+      "EvolveTo": 94,
+      "method": "trade"
+   },
+   "94": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "95": {
+      "lvlMin": "trade",
+      "EvolveTo": 208,
+      "method": "trade"
+   },
+   "96": {
+      "lvlMin": 26,
+      "EvolveTo": 97,
+      "method": "level_up"
+   },
+   "97": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "98": {
+      "lvlMin": 28,
+      "EvolveTo": 99,
+      "method": "level_up"
+   },
+   "99": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "100": {
+      "lvlMin": 30,
+      "EvolveTo": 101,
+      "method": "level_up"
+   },
+   "101": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "102": {
+      "lvlMin": "leaf-stone",
+      "EvolveTo": 103,
+      "method": "leaf-stone"
+   },
+   "103": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "104": {
+      "lvlMin": 28,
+      "EvolveTo": 105,
+      "method": "level_up"
+   },
+   "105": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "106": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "107": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "108": {
+      "lvlMin": 33,
+      "EvolveTo": 463,
+      "method": "level-up"
+   },
+   "109": {
+      "lvlMin": 35,
+      "EvolveTo": 110,
+      "method": "level_up"
+   },
+   "110": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "111": {
+      "lvlMin": 42,
+      "EvolveTo": 112,
+      "method": "level_up"
+   },
+   "112": {
+      "lvlMin": "trade",
+      "EvolveTo": 464,
+      "method": "trade"
+   },
+   "113": {
+      "lvlMin": "level-up",
+      "EvolveTo": 242,
+      "method": "level-up"
+   },
+   "114": {
+      "lvlMin": "level-up",
+      "EvolveTo": 465,
+      "method": "level-up"
+   },
+   "115": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "116": {
+      "lvlMin": 32,
+      "EvolveTo": 117,
+      "method": "level_up"
+   },
+   "117": {
+      "lvlMin": "trade",
+      "EvolveTo": 230,
+      "method": "trade"
+   },
+   "118": {
+      "lvlMin": 33,
+      "EvolveTo": 119,
+      "method": "level_up"
+   },
+   "119": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "120": {
+      "lvlMin": "water-stone",
+      "EvolveTo": 121,
+      "method": "water-stone"
+   },
+   "121": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "122": {
+      "lvlMin": 42,
+      "EvolveTo": 866,
+      "method": "level_up"
+   },
+   "123": {
+      "lvlMin": "black-augurite",
+      "EvolveTo": 900,
+      "method": "black-augurite"
+   },
+   "124": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "125": {
+      "lvlMin": "trade",
+      "EvolveTo": 466,
+      "method": "trade"
+   },
+   "126": {
+      "lvlMin": "trade",
+      "EvolveTo": 467,
+      "method": "trade"
+   },
+   "127": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "128": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "129": {
+      "lvlMin": 20,
+      "EvolveTo": 130,
+      "method": "level_up"
+   },
+   "130": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "131": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "132": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "133": {
+      "lvlMin": "level-up",
+      "EvolveTo": 700,
+      "method": "level-up"
+   },
+   "134": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "135": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "136": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "137": {
+      "lvlMin": "trade",
+      "EvolveTo": 233,
+      "method": "trade"
+   },
+   "138": {
+      "lvlMin": 40,
+      "EvolveTo": 139,
+      "method": "level_up"
+   },
+   "139": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "140": {
+      "lvlMin": 40,
+      "EvolveTo": 141,
+      "method": "level_up"
+   },
+   "141": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "142": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "143": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "144": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "145": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "146": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "147": {
+      "lvlMin": 30,
+      "EvolveTo": 148,
+      "method": "level_up"
+   },
+   "148": {
+      "lvlMin": 55,
+      "EvolveTo": 149,
+      "method": "level_up"
+   },
+   "149": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "150": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   },
+   "151": {
+      "lvlMin": "none",
+      "EvolveTo": "none",
+      "method": "none"
+   }
+}

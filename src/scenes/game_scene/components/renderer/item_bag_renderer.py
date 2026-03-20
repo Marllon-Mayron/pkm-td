@@ -6,7 +6,7 @@ from src.data.item_bag_catalog import item_bag_catalog
 
 
 class ItemBagRenderer:
-    """Renderiza a mochila no canto inferior esquerdo - AGORA ARRASTÁVEL"""
+    """Renderiza a mochila no canto inferior esquerdo - COM PAGINAÇÃO DE ABAS"""
 
     def __init__(self, game, bag_manager):
         self.game = game
@@ -33,8 +33,39 @@ class ItemBagRenderer:
         # Foco do scroll (só rola se mouse estiver sobre a UI)
         self.mouse_over_ui = False
 
+        # Paginação das categorias
+        self.all_categories = [
+            ("all", "Todos", (150, 150, 150)),
+            ("pokeball", "Pokébolas", (255, 100, 100)),
+            ("medicine", "Poções", (100, 255, 100)),
+            ("items", "Itens", (255, 215, 0))
+        ]
+        self.categories_per_page = 3  # Mostrar 3 abas por vez
+        self.current_page = 0  # Página atual das categorias
+        self.total_pages = (len(self.all_categories) + self.categories_per_page - 1) // self.categories_per_page
+
         # Fontes
         self._create_fonts()
+
+        # Sincroniza a página inicial com a categoria atual
+        self._sync_page_with_category()
+
+    def _sync_page_with_category(self):
+        """Sincroniza a página atual com a categoria selecionada"""
+        current_category = self.bag.selected_category
+
+        # Encontra em qual página a categoria atual está
+        for page in range(self.total_pages):
+            start_idx = page * self.categories_per_page
+            end_idx = min(start_idx + self.categories_per_page, len(self.all_categories))
+            page_categories = self.all_categories[start_idx:end_idx]
+
+            for cat_id, _, _ in page_categories:
+                if cat_id == current_category:
+                    if self.current_page != page:
+                        self.current_page = page
+                        print(f"[UI] Página sincronizada: {page + 1} para categoria {current_category}")
+                    return
 
     def _create_fonts(self):
         """Cria fontes"""
@@ -90,6 +121,24 @@ class ItemBagRenderer:
                     # NÃO retorna True - deixa o evento passar!
                     # O GameScene vai capturar e iniciar o arrasto
 
+            # Verifica se clicou nas setas de navegação das categorias
+            elif self._is_mouse_in_nav_arrows(mouse_x, mouse_y):
+                arrow = self._get_clicked_arrow(mouse_x, mouse_y)
+                if arrow == "left":
+                    self._prev_category_page()
+                    return True
+                elif arrow == "right":
+                    self._next_category_page()
+                    return True
+
+            # Verifica se clicou em alguma categoria
+            else:
+                clicked_category = self._get_clicked_category(mouse_x, mouse_y)
+                if clicked_category:
+                    self.bag.set_category(clicked_category)
+                    self._sync_page_with_category()  # Sincroniza página após mudar categoria
+                    return True
+
         # ARRASTO DA UI (já iniciado)
         elif event.type == pygame.MOUSEMOTION:
             if self.dragging:
@@ -112,13 +161,92 @@ class ItemBagRenderer:
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
                 return True  # Evento consumido - finalizou arrasto UI
 
-        # SCROLL (mantém como estava)
+        # SCROLL
         if event.type == pygame.MOUSEWHEEL:
             if self.mouse_over_ui:
+                # Scroll vertical - navega entre itens
+                if event.y > 0:  # Scroll up
+                    self.bag.prev_item()
+                else:  # Scroll down
+                    self.bag.next_item()
                 self.hovered_index = self.bag.selected_item_index
                 return True  # Indica que processamos o evento
 
         return False
+
+    def _prev_category_page(self):
+        """Vai para página anterior das categorias"""
+        if self.current_page > 0:
+            self.current_page -= 1
+            print(f"[UI] Página de categorias: {self.current_page + 1}/{self.total_pages}")
+
+    def _next_category_page(self):
+        """Vai para próxima página das categorias"""
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+            print(f"[UI] Página de categorias: {self.current_page + 1}/{self.total_pages}")
+
+    def _get_current_page_categories(self):
+        """Retorna as categorias da página atual"""
+        start_idx = self.current_page * self.categories_per_page
+        end_idx = min(start_idx + self.categories_per_page, len(self.all_categories))
+        return self.all_categories[start_idx:end_idx]
+
+    def _is_mouse_in_nav_arrows(self, mouse_x, mouse_y):
+        """Verifica se mouse está na área das setas de navegação"""
+        # Área das setas (próximo às categorias)
+        nav_y = self.y + 48
+        nav_height = 25
+
+        # Setas à direita das categorias
+        categories_width = self._get_categories_width()
+        arrows_x = self.x + 15 + categories_width + 5
+        arrows_width = 40
+
+        return (arrows_x <= mouse_x <= arrows_x + arrows_width and
+                nav_y <= mouse_y <= nav_y + nav_height)
+
+    def _get_clicked_arrow(self, mouse_x, mouse_y):
+        """Retorna qual seta foi clicada"""
+        categories_width = self._get_categories_width()
+        arrows_x = self.x + 15 + categories_width + 5
+
+        # Seta esquerda
+        if arrows_x <= mouse_x <= arrows_x + 15:
+            return "left"
+        # Seta direita
+        elif arrows_x + 25 <= mouse_x <= arrows_x + 40:
+            return "right"
+        return None
+
+    def _get_clicked_category(self, mouse_x, mouse_y):
+        """Retorna qual categoria foi clicada"""
+        # Verifica se o clique foi na área das categorias
+        if not (self.y + 45 <= mouse_y <= self.y + 70):
+            return None
+
+        start_x = self.x + 15
+        current_categories = self._get_current_page_categories()
+
+        for cat_id, cat_name, color in current_categories:
+            cat_width = max(65, len(cat_name) * 8 + 10)
+            cat_height = 25
+
+            if start_x <= mouse_x <= start_x + cat_width:
+                return cat_id
+
+            start_x += cat_width + 5
+
+        return None
+
+    def _get_categories_width(self):
+        """Calcula a largura total das categorias na página atual"""
+        categories = self._get_current_page_categories()
+        total_width = 0
+        for cat_id, cat_name, color in categories:
+            cat_width = max(65, len(cat_name) * 8 + 10)
+            total_width += cat_width + 5
+        return total_width - 5  # Remove o último espaçamento
 
     def _is_mouse_in_area(self, mouse_x, mouse_y):
         """Verifica se mouse está na área dos itens"""
@@ -148,13 +276,16 @@ class ItemBagRenderer:
     def render(self, screen):
         """Renderiza a UI da mochila"""
 
+        # Sincroniza a página com a categoria atual (caso tenha mudado externamente)
+        self._sync_page_with_category()
+
         # Fundo com efeito glass
         self._draw_background(screen)
 
         # Título (com indicador de arrasto)
         self._draw_title(screen)
 
-        # Categorias
+        # Categorias com paginação
         self._draw_categories(screen)
 
         # Itens
@@ -224,17 +355,13 @@ class ItemBagRenderer:
                          (self.x + self.width - 15, self.y + 35), 1)
 
     def _draw_categories(self, screen):
-        """Desenha seletor de categorias"""
-        categories = [
-            ("all", "Todos", (150, 150, 150)),
-            ("pokeball", "Pokébolas", (255, 100, 100)),
-            ("medicine", "Poções", (100, 255, 100))
-        ]
+        """Desenha seletor de categorias com paginação"""
+        current_categories = self._get_current_page_categories()
 
         start_x = self.x + 15
-        for cat_id, cat_name, color in categories:
-            # Fundo da categoria
-            cat_width = 70
+        for cat_id, cat_name, color in current_categories:
+            # Ajusta largura baseada no texto
+            cat_width = max(65, len(cat_name) * 8 + 10)
             cat_height = 25
 
             # Destaca categoria selecionada
@@ -263,6 +390,42 @@ class ItemBagRenderer:
 
             start_x += cat_width + 5
 
+        # Desenha setas de navegação se houver mais de uma página
+        if self.total_pages > 1:
+            self._draw_category_navigation(screen)
+
+    def _draw_category_navigation(self, screen):
+        """Desenha setas de navegação para as categorias"""
+        categories_width = self._get_categories_width()
+        arrows_x = self.x + 15 + categories_width + 5
+        nav_y = self.y + 48
+        nav_height = 25
+
+        # Seta esquerda
+        left_arrow_color = (150, 150, 150) if self.current_page > 0 else (80, 80, 80)
+        left_points = [
+            (arrows_x + 5, nav_y + nav_height // 2),
+            (arrows_x + 12, nav_y + nav_height - 5),
+            (arrows_x + 12, nav_y + 5)
+        ]
+        pygame.draw.polygon(screen, left_arrow_color, left_points)
+
+        # Seta direita
+        right_arrow_color = (150, 150, 150) if self.current_page < self.total_pages - 1 else (80, 80, 80)
+        right_points = [
+            (arrows_x + 35, nav_y + nav_height // 2),
+            (arrows_x + 28, nav_y + nav_height - 5),
+            (arrows_x + 28, nav_y + 5)
+        ]
+        pygame.draw.polygon(screen, right_arrow_color, right_points)
+
+        # Indicador de página
+        page_text = self.category_font.render(f"{self.current_page + 1}/{self.total_pages}",
+                                              True, (180, 180, 200))
+        page_x = arrows_x + 15
+        page_y = nav_y + (nav_height - page_text.get_height()) // 2
+        screen.blit(page_text, (page_x, page_y))
+
     def _draw_items(self, screen):
         """Desenha a lista de itens"""
         items = self.bag.get_items_for_render()
@@ -279,6 +442,10 @@ class ItemBagRenderer:
 
         for i, item in enumerate(items):
             item_y = start_y + i * item_height
+
+            # Verifica se ainda está dentro da área visível
+            if item_y + item_height > self.y + self.height - 10:
+                continue
 
             # Fundo do item (se hover ou selecionado)
             if i == self.bag.selected_item_index:
@@ -327,8 +494,11 @@ class ItemBagRenderer:
             screen.blit(qty_text, (self.x + self.width - qty_bg_width - 8, item_y + 12))
 
             # Descrição
-            desc_text = self.quantity_font.render(item["data"]["description"][:25] + "...",
-                                                  True, (150, 150, 170))
+            desc = item["data"]["description"]
+            if len(desc) > 25:
+                desc = desc[:25] + "..."
+
+            desc_text = self.quantity_font.render(desc, True, (150, 150, 170))
             screen.blit(desc_text, (self.x + 70, item_y + 30))
 
     def _draw_pulse_effect(self, screen, rect):
@@ -365,7 +535,7 @@ class ItemBagRenderer:
             action_text = self.quantity_font.render(action, True, (180, 180, 200))
             screen.blit(action_text, (x + 5 + key_text.get_width(), inst_y + 8))
 
-            x += 100
+            x += 85
 
     def _draw_drag_indicator(self, screen):
         """Desenha indicador de que está arrastando"""

@@ -16,15 +16,18 @@ class BagManager:
 
         # Item selecionado atual
         self.selected_item_index = 0
-        self.selected_category = "all"  # "all", "pokeball", "medicine"
+        self.selected_category = "all"  # "all", "pokeball", "medicine", "items"
 
         # Lista de itens para navegação
         self.filtered_items = []
 
+        # Ordem das categorias (mantém consistência)
+        self.categories_order = ["all", "pokeball", "medicine", "items"]
+
         # Garante que o pygame está inicializado
         self._ensure_pygame()
 
-        # Itens iniciais (6 pokebolas e 2 poções)
+        # Itens iniciais
         self._add_initial_items()
         self._update_filtered_items()
 
@@ -37,12 +40,16 @@ class BagManager:
 
     def _add_initial_items(self):
         """Adiciona itens iniciais para o jogador"""
-        # 6 Pokebolas
+        # 8 Pokebolas
         self.add_item("pokeball", 8)
 
         # 2 Poções
         self.add_item("potion", 2)
 
+        # Adiciona pedras de evolução para teste
+        self.add_item("firestone", 1)
+        self.add_item("waterstone", 1)
+        self.add_item("thunderstone", 1)
 
     def add_item(self, item_id, quantity=1):
         """Adiciona item à mochila (stack até 9999)"""
@@ -109,6 +116,8 @@ class BagManager:
                 if self.catalog.get_item(item_id)["category"] == self.selected_category
             ]
 
+        print(f"[BAG] Categoria: {self.selected_category} -> {len(self.filtered_items)} itens")
+
     def next_item(self):
         """Seleciona próximo item (rolagem para baixo)"""
         if self.filtered_items:
@@ -125,17 +134,32 @@ class BagManager:
 
     def set_category(self, category):
         """Muda a categoria de filtro"""
+        if category not in self.categories_order:
+            return
+
         self.selected_category = category
         self._update_filtered_items()
         self.selected_item_index = 0
+        print(f"[BAG] Categoria alterada para: {category}")
 
     def cycle_category(self):
         """Alterna entre as categorias"""
-        categories = ["all", "pokeball", "medicine"]
-        current_index = categories.index(self.selected_category)
-        next_index = (current_index + 1) % len(categories)
-        self.set_category(categories[next_index])
+        try:
+            current_index = self.categories_order.index(self.selected_category)
+        except ValueError:
+            current_index = 0
+
+        next_index = (current_index + 1) % len(self.categories_order)
+        new_category = self.categories_order[next_index]
+        self.set_category(new_category)
         return self.selected_category
+
+    def get_category_index(self):
+        """Retorna o índice da categoria atual na ordem"""
+        try:
+            return self.categories_order.index(self.selected_category)
+        except ValueError:
+            return 0
 
     def use_selected_item(self, target=None):
         """Usa o item selecionado em um alvo"""
