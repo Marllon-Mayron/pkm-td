@@ -599,6 +599,64 @@ class Pokemon(Entity):
             print(f"[POKEMON] {self.name} não está mais carregando {self.is_carrying.item_name}")
             self.is_carrying = None
 
+    def recalculate_path_after_capture(self):
+        """Quando captura um item, decide se volta ou segue e define novo path."""
+        if not self.path or self.path_index >= len(self.path):
+            return
+
+        current_idx = self.path_index
+        current_pos = (self.x, self.y)
+
+        # ===== CALCULAR DISTÂNCIA RESTANTE ATÉ O FIM =====
+        # Distância da posição atual até o próximo ponto do path
+        next_x, next_y = self.path[current_idx]
+        remaining_distance = math.hypot(next_x - self.x, next_y - self.y)
+
+        # Soma das distâncias entre os pontos restantes do path
+        for i in range(current_idx, len(self.path) - 1):
+            x1, y1 = self.path[i]
+            x2, y2 = self.path[i + 1]
+            remaining_distance += math.hypot(x2 - x1, y2 - y1)
+
+        # ===== CALCULAR DISTÂNCIA DE VOLTA AO INÍCIO =====
+        # Distância da posição atual até o ponto anterior (se houver)
+        back_distance = 0
+        if current_idx > 0:
+            prev_x, prev_y = self.path[current_idx - 1]
+            back_distance = math.hypot(self.x - prev_x, self.y - prev_y)
+
+            # Soma das distâncias dos pontos anteriores até o início
+            for i in range(current_idx - 1, 0, -1):
+                x1, y1 = self.path[i]
+                x2, y2 = self.path[i - 1]
+                back_distance += math.hypot(x2 - x1, y2 - y1)
+
+        print(f"[DECISAO] {self.name}: voltar={back_distance:.1f}, seguir={remaining_distance:.1f}")
+
+        if back_distance < remaining_distance:
+            # VAI VOLTAR: inverter o path e ajustar índice
+            self.path = list(reversed(self.path))
+            self.path_index = 0
+
+            # Encontra o ponto mais próximo no novo path (evita teleporte)
+            min_dist = float('inf')
+            closest_idx = 0
+            for i, point in enumerate(self.path):
+                dist = math.hypot(self.x - point[0], self.y - point[1])
+                if dist < min_dist:
+                    min_dist = dist
+                    closest_idx = i
+            self.path_index = closest_idx
+
+            # Opcional: cancelar qualquer estado de combate (se houver)
+            self.target = None
+            self.combat_state = "idle"
+
+            print(f"[FUGA] {self.name} vai VOLTAR, índice {closest_idx}")
+        else:
+            # VAI SEGUIR: não mexe no path
+            print(f"[FUGA] {self.name} vai SEGUIR")
+
     def update(self, dt, player=None, enemies=None, items=None):
         """Update simplificado - Pokémon segue path e pode carregar itens"""
         # Guarda posição anterior para calcular direção
@@ -613,22 +671,27 @@ class Pokemon(Entity):
 
         # Lógica de captura de itens (só para inimigos)
         if self.is_wild and items is not None and not self.is_carrying:
-            # Verifica se há algum item próximo
             for item in items:
                 if hasattr(item, 'is_protected') and item.is_protected and not item.carried_by:
                     dist = self.get_distance_to(item)
                     if dist < self.capture_range:
-                        # Inicia captura do item (não desvia do path)
                         item.start_capture(self)
                         print(f"[POKEMON] {self.name} começou a carregar {item.item_name}")
-                        break  # Pega apenas o primeiro item
+                        if not self.is_boss:
+                            print("[POKEMON] Chamando recalculate_path_after_capture")
+                            self.recalculate_path_after_capture()
+                        break
         elif items is None:
             # Log para debug - só mostra às vezes para não floodar
             if random.random() < 0.001:  # 0.1% de chance
                 print(f"[POKEMON] {self.name}: items=None, não pode capturar")
 
         # Movimento em path (sempre segue o path)
-        if self.path and len(self.path) > 0 and self.path_index < len(self.path):
+        if self.path and len(self.path) > 0:
+            # Se já completou o path, não move mais
+            if self.path_index >= len(self.path):
+                return
+
             target_x, target_y = self.path[self.path_index]
 
             # Calcula direção
@@ -643,19 +706,27 @@ class Pokemon(Entity):
                 else:
                     self.current_direction = "down" if dy > 0 else "up"
 
-            # Velocidade de movimento
+            # Velocidade de movimento (pixels por segundo)
             move_distance = self.speed * dt * 60
 
-            if distance < move_distance:
-                # Chegou no ponto
+            # Verifica se chegou no ponto atual
+            if distance <= move_distance:
+                # Chegou exatamente no ponto ou está muito próximo
                 self.x, self.y = target_x, target_y
                 self.path_index += 1
                 print(f"[POKEMON] {self.name} chegou no ponto {self.path_index}/{len(self.path)}")
+
+                # Se completou o path, não precisa continuar movimento neste frame
+                if self.path_index >= len(self.path):
+                    print(f"[POKEMON] {self.name} COMPLETOU o path! Aguardando remoção...")
+                    return
             else:
-                # Move na direção
+                # Move na direção do próximo ponto
                 if distance > 0:
-                    self.x += (dx / distance) * self.speed * dt * 60
-                    self.y += (dy / distance) * self.speed * dt * 60
+                    move_x = (dx / distance) * move_distance
+                    move_y = (dy / distance) * move_distance
+                    self.x += move_x
+                    self.y += move_y
 
             self.rect.x, self.rect.y = self.x, self.y
 

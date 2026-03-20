@@ -699,6 +699,10 @@ class GameScene(BaseScene):
                 item.is_protected = False
                 path_origin = getattr(enemy, 'path_index_origin', 0) + 1
                 print(f"[FIM] Path {path_origin}: {enemy.name} levou {item.item_name}!")
+
+                self.target_item_manager.items_stolen += 1
+                print(f"[FIM] Itens roubados: {self.target_item_manager.items_stolen}")
+
                 enemy.clear_carrying()
 
         # ===== VERIFICA ESTADO DO JOGO =====
@@ -787,9 +791,9 @@ class GameScene(BaseScene):
         # Mostra a próxima fase se houver
         next_phase = progress_manager.get_next_phase(self.phase_id)
         if next_phase:
-            print(f"➡️ Próxima fase desbloqueada: {next_phase}")
+            print(f"️ Próxima fase desbloqueada: {next_phase}")
         else:
-            print("🏆 Você completou todas as fases disponíveis!")
+            print(" Você completou todas as fases disponíveis!")
 
         print(f"Saldo atual: ${self.player.money} | Pontuação: {self.player.score}")
 

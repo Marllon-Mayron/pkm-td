@@ -1,6 +1,6 @@
 # src/scenes/game_scene/components/managers/wave_manager.py
 
-import random
+import random, math
 from src.entities.pokemon import Pokemon
 
 
@@ -139,28 +139,30 @@ class GameWaveManager:
 
             # Verifica se chegou ao fim
             if hasattr(enemy, 'path') and enemy.path and enemy.path_index >= len(enemy.path):
-                # ===== NOVO: BOSS NÃO É REMOVIDO, VOLTA PARA O INÍCIO =====
+                # ===== BOSS: NÃO É REMOVIDO, VOLTA PARA O INÍCIO =====
                 if hasattr(enemy, 'is_boss') and enemy.is_boss:
                     # BOSS: Volta para o início do path
                     print(f"[BOSS] {enemy.name} chegou ao fim e está voltando para o início!")
 
-                    # ===== NOVO: SE BOSS ESTÁ CARRECANDO ITEM, ELE DESAPARECE =====
+                    # Se boss está carregando item, ele desaparece
                     if enemy.is_carrying:
                         print(f"[BOSS] {enemy.name} está carregando {enemy.is_carrying.item_name} e chegou ao fim!")
                         print(f"[BOSS] {enemy.is_carrying.item_name} foi levado com sucesso e DESAPARECE!")
 
-                        # Marca o item como levado (não pode mais ser recuperado)
                         carried_item = enemy.is_carrying
                         carried_item.is_protected = False
-                        carried_item.is_stolen = True  # Se existir essa flag
+                        carried_item.is_stolen = True
                         carried_item.carried_by = None
 
-                        # Remove o item da lista de itens alvo (opcional, mas recomendado)
                         if carried_item in self.target_items:
                             self.target_items.remove(carried_item)
                             print(f"[BOSS] Item {carried_item.item_name} removido permanentemente!")
 
-                        # Limpa a referência do item no boss
+                            # ===== NOVO: INCREMENTA CONTADOR DE ITENS ROUBADOS =====
+                            if hasattr(self.game_scene, 'target_item_manager'):
+                                self.game_scene.target_item_manager.items_stolen += 1
+                                print(f"[BOSS] Itens roubados: {self.game_scene.target_item_manager.items_stolen}")
+
                         enemy.clear_carrying()
 
                     # Reseta para o início do path
@@ -173,8 +175,50 @@ class GameWaveManager:
                     continue
                 else:
                     # Inimigo normal: chega ao fim e é removido
+                    print(f"[WAVE] {enemy.name} chegou ao FIM do path! Será removido.")
+
+                    # ===== NOVO: INCREMENTA ITENS ROUBADOS SE ESTIVER CARRREGANDO =====
+                    if enemy.is_carrying:
+                        carried_item = enemy.is_carrying
+                        print(f"[WAVE] {enemy.name} levou {carried_item.item_name}!")
+
+                        # Marca o item como roubado
+                        carried_item.is_protected = False
+                        carried_item.is_stolen = True
+
+                        # INCREMENTA CONTADOR DE ITENS ROUBADOS
+                        if hasattr(self.game_scene, 'target_item_manager'):
+                            self.game_scene.target_item_manager.items_stolen += 1
+                            print(f"[WAVE] Itens roubados: {self.game_scene.target_item_manager.items_stolen}")
+
                     enemies_at_end.append(enemy)
                     enemies_to_remove.append(enemy)
+                    continue
+
+            # ===== VERIFICAÇÃO EXTRA: Inimigo voltando e próximo do início =====
+            if not enemy.is_boss and enemy.is_carrying and enemy.path and len(enemy.path) > 0:
+                # Verifica se está próximo do último ponto do path (que é o início original)
+                last_point = enemy.path[-1]
+                dist_to_start = math.hypot(enemy.x - last_point[0], enemy.y - last_point[1])
+
+                # Se está a menos de 15 pixels do início, considera que chegou
+                if dist_to_start < 15:
+                    print(f"[WAVE] {enemy.name} está voltando e próximo do início! Distância: {dist_to_start:.1f}")
+                    print(f"[WAVE] {enemy.name} levou {enemy.is_carrying.item_name}!")
+
+                    # Marca o item como roubado
+                    carried_item = enemy.is_carrying
+                    carried_item.is_protected = False
+                    carried_item.is_stolen = True
+
+                    # INCREMENTA CONTADOR DE ITENS ROUBADOS
+                    if hasattr(self.game_scene, 'target_item_manager'):
+                        self.game_scene.target_item_manager.items_stolen += 1
+                        print(f"[WAVE] Itens roubados: {self.game_scene.target_item_manager.items_stolen}")
+
+                    enemies_at_end.append(enemy)
+                    enemies_to_remove.append(enemy)
+                    continue
 
         # Processa XP dos inimigos derrotados
         for enemy in defeated_enemies:
@@ -183,41 +227,51 @@ class GameWaveManager:
         # Remove inimigos normais (não bosses)
         for enemy in enemies_to_remove:
             if enemy in self.active_enemies:
-                # Descobre de qual path este inimigo veio
                 path_index = getattr(enemy, 'path_index_origin', 0)
                 self.active_enemies.remove(enemy)
                 if path_index in self.enemies_remaining_by_path:
                     self.enemies_remaining_by_path[path_index] -= 1
                 enemy.clear_damage_tracking()
 
+                # Remove o item permanentemente se estiver carregando
+                if enemy.is_carrying:
+                    carried_item = enemy.is_carrying
+                    print(f"[WaveManager] {enemy.name} estava carregando {carried_item.item_name} e será removido!")
+
+                    # Remove da lista de itens alvo
+                    if carried_item in self.target_items:
+                        self.target_items.remove(carried_item)
+                        print(f"[WaveManager] Item {carried_item.item_name} removido permanentemente!")
+                    else:
+                        print(f"[WaveManager] Aviso: {carried_item.item_name} não está em target_items!")
+
+                    # Limpa referências
+                    carried_item.carried_by = None
+                    enemy.is_carrying = None
+
         # ===== 2. Processa waves para CADA PATH =====
         for path_index, waves in self.path_waves.items():
-            if not waves:  # Path sem waves
+            if not waves:
                 continue
 
-            # Pega o estado atual deste path
             wave_in_progress = self.wave_in_progress_by_path.get(path_index, False)
             current_idx = self.current_wave_index_by_path.get(path_index, 0)
 
             if current_idx >= len(waves):
-                continue  # Este path já terminou todas as waves
+                continue
 
             wave_data = self.current_wave_data_by_path.get(path_index)
             if not wave_data and wave_in_progress:
-                # Se não tem wave_data mas está em progresso, algo errado
                 self.wave_in_progress_by_path[path_index] = False
                 continue
 
-            # Processa wave em andamento
             if wave_in_progress and wave_data:
-                # Delay inicial da wave
                 if self.wave_timer_by_path[path_index] > 0:
                     self.wave_timer_by_path[path_index] -= dt
                     if self.wave_timer_by_path[path_index] <= 0:
                         print(f"[WaveManager] Path {path_index + 1} - Delay inicial terminado! Iniciando spawns...")
                     continue
 
-                # Spawn de inimigos
                 enemies_spawned = self.enemies_spawned_by_path[path_index]
                 wave_size = wave_data.get("wave_size", 10)
 
@@ -225,10 +279,8 @@ class GameWaveManager:
                     self.spawn_timer_by_path[path_index] -= dt
 
                     if self.spawn_timer_by_path[path_index] <= 0:
-                        # Pega o path correto para esta wave
                         path_points = path_points_by_index.get(path_index, [])
 
-                        # Cria um inimigo
                         enemy = self._create_enemy(
                             wave_data,
                             path_points,
@@ -237,10 +289,8 @@ class GameWaveManager:
                         )
 
                         if enemy:
-                            # Marca o inimigo com o path de origem
                             enemy.path_index_origin = path_index
 
-                            # Adiciona à lista ativa
                             self.active_enemies.append(enemy)
                             self.enemies_spawned_by_path[path_index] += 1
                             self.enemies_remaining_by_path[path_index] += 1
@@ -250,10 +300,8 @@ class GameWaveManager:
                                 f"({enemies_spawned + 1}/{wave_size})"
                             )
 
-                            # Reseta timer de spawn
                             self.spawn_timer_by_path[path_index] = wave_data.get("spawn_interval", 3.0)
 
-                # Verifica se a wave deste path terminou de spawnar
                 if self.enemies_spawned_by_path[path_index] >= wave_size:
                     if self.enemies_remaining_by_path[path_index] <= 0:
                         self._end_current_wave_for_path(path_index)
