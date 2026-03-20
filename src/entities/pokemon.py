@@ -4,6 +4,7 @@ import math
 import random
 from src.entities.base import Entity
 from src.data.pokedex import Pokedex
+from src.managers.evolution_manager import evolution_manager
 
 
 class Pokemon(Entity):
@@ -189,14 +190,73 @@ class Pokemon(Entity):
         else:
             self.current_hp = min(self.max_hp, self.current_hp + amount)
 
-    def gain_xp(self, amount):
-        """Ganha XP e verifica level up"""
+    def check_and_evolve(self):
+        """Verifica se o Pokémon pode evoluir e realiza a evolução se possível"""
+        # Verifica evolução por nível
+        evolution = evolution_manager.check_evolution(
+            self.id,
+            current_level=self.level
+        )
 
+        if evolution:
+            evolve_to_id = evolution["evolve_to"]
+            evolve_method = evolution["method"]
+
+            print(f"[EVOLUÇÃO] {self.name} está evoluindo para ID {evolve_to_id} por {evolve_method}!")
+
+            # Realiza a evolução
+            self._perform_evolution(evolve_to_id)
+            return True
+
+        return False
+
+    def _perform_evolution(self, new_id):
+        """Realiza a evolução do Pokémon"""
+        # Salva dados importantes antes da evolução
+        old_name = self.name
         old_level = self.level
-        old_xp = self.xp
+
+        # Obtém os dados do novo Pokémon
+        new_pokemon_data = self.pokedex.get_pokemon(new_id)
+
+        if not new_pokemon_data:
+            print(f"[ERRO] Pokémon ID {new_id} não encontrado!")
+            return
+
+        # Atualiza os dados do Pokémon
+        self.id = new_id
+        self.name = new_pokemon_data["name"].capitalize()
+        self.types = new_pokemon_data["types"]
+        self.base_stats = new_pokemon_data["base_stats"]
+
+        # Mantém level, IVs, EVs e natureza
+        # Recalcula stats com o novo base_stats
+        self._calculate_stats()
+
+        # Cura totalmente após evolução
+        self.current_hp = self.max_hp
+
+        # Atualiza sprites
+        self.ui_sprite = self.pokedex.get_sprite(new_id, "front", self.is_shiny)
+        self.battle_sprite = self.pokedex.get_sprite(new_id, "back", self.is_shiny)
+
+        # Atualiza sprites de mapa
+        self.inmap_frames = self.pokedex.get_inmap_animation(new_id, self.is_shiny)
+        if self.inmap_frames and "down" in self.inmap_frames and self.inmap_frames["down"]:
+            self.sprite = self.inmap_frames["down"][0]
+
+        # Atualiza tamanho do sprite no mapa
+        self.map_sprite_size = self.pokedex.get_map_sprite_size(new_id, self.is_shiny)
+
+        print(f"[EVOLUÇÃO] ✓ {old_name} (Lv.{old_level}) evoluiu para {self.name}!")
+
+    # Modifique o método gain_xp para chamar check_and_evolve
+    def gain_xp(self, amount):
+        """Ganha XP e verifica level up e evolução"""
+        old_level = self.level
         self.xp += amount
 
-        print(f"[XP] {self.name} ganhou {amount} XP (antes: {old_xp}, depois: {self.xp})")
+        print(f"[XP] {self.name} ganhou {amount} XP (Total: {self.xp}/{self.xp_to_next})")
 
         leveled_up = False
         while self.xp >= self.xp_to_next:
@@ -207,6 +267,9 @@ class Pokemon(Entity):
             print(f"[LEVEL UP] ⬆️ {self.name} subiu de {old_level} para {self.level}!")
             self.attack_damage = self._calculate_attack_damage()
             self.defense_value = self._calculate_defense()
+
+            # Verifica se pode evoluir após o level up
+            self.check_and_evolve()
 
 
 

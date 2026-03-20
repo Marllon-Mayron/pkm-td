@@ -218,14 +218,74 @@ class GameScene(BaseScene):
         """Callback quando um item é usado em um alvo"""
         print(f"[USO] Usando {item_data['name']} em {getattr(target, 'name', 'alvo')}")
 
-        if target_type == "enemy" and item_data["category"] == "pokeball":
+        # ===== EVOLUÇÃO POR PEDRA =====
+        if item_data["effect"] == "evolution":
+            # Só pode usar pedra em aliados (Pokémon do time)
+            if target_type == "ally":
+                return self._use_evolution_stone(target, item_data)
+            else:
+                print(f"[PEDRA] Não pode usar pedra em inimigos!")
+                return False
+
+        # Pokebolas
+        elif target_type == "enemy" and item_data["category"] == "pokeball":
             return self._attempt_capture(target, item_data)
 
-
+        # Poções e remédios
         elif target_type == "ally" and item_data["category"] == "medicine":
             return self._use_medicine(target, item_data)
 
         return False
+
+    def _use_evolution_stone(self, pokemon, item_data):
+        """Usa pedra de evolução em um Pokémon"""
+        from src.managers.evolution_manager import evolution_manager
+
+        stone_name = item_data["id"]  # ex: "firestone", "waterstone"
+        stone_display = item_data["name"]
+
+        print(f"\n{'=' * 50}")
+        print(f"[EVOLUÇÃO] Usando {stone_display} em {pokemon.name} (Lv.{pokemon.level})")
+        print(f"{'=' * 50}")
+
+        # Verifica se pode evoluir com esta pedra
+        evolution = evolution_manager.check_evolution(
+            pokemon.id,
+            stone_name=stone_name
+        )
+
+        if not evolution:
+            print(f"[EVOLUÇÃO] ❌ {pokemon.name} não pode evoluir com {stone_display}!")
+            # Devolve o item para a mochila? No jogo original, o item é consumido mesmo assim
+            # Vamos devolver para não punir o jogador
+            self.player.bag.add_item(item_data["id"], 1)
+            return False
+
+        # Armazena o ID do Pokémon evoluído
+        evolve_to_id = evolution["evolve_to"]
+        evolve_method = evolution["method"]
+
+        print(f"[EVOLUÇÃO] ✅ {pokemon.name} pode evoluir para ID {evolve_to_id}!")
+
+        # Guarda o nome antes da evolução
+        old_name = pokemon.name
+
+        # Realiza a evolução
+        pokemon._perform_evolution(evolve_to_id)
+
+        # Log de sucesso
+        print(f"[EVOLUÇÃO] ✨ {old_name} evoluiu para {pokemon.name}!")
+        print(f"[EVOLUÇÃO] Método: {evolve_method}")
+        print(f"{'=' * 50}\n")
+
+        # Atualiza a Pokedex do jogador (já viu o novo Pokémon)
+        self.player.caught_pokemon.add(evolve_to_id)
+        self.player.register_seen(evolve_to_id)
+
+        # Salva o jogo automaticamente após evolução
+        self.player.auto_save()
+
+        return True
 
     def _attempt_capture(self, enemy, item_data):
         """Tenta capturar um Pokémon selvagem"""
