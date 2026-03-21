@@ -132,117 +132,100 @@ class GameWaveManager:
                 defeated_enemies.append(enemy)
 
                 if enemy.is_carrying:
+                    # Solta o item no chão quando morre
                     enemy.drop_item()
 
                 enemies_to_remove.append(enemy)
                 continue
 
-            # ===== VERIFICA SE CHEGOU AO FIM DO PATH =====
-            if hasattr(enemy, 'path') and enemy.path and enemy.path_index >= len(enemy.path):
-                # ===== BOSS: NÃO É REMOVIDO, VOLTA PARA O INÍCIO =====
-                if hasattr(enemy, 'is_boss') and enemy.is_boss:
-                    # BOSS: Chegou ao fim do path atual
-                    print(f"[BOSS] {enemy.name} chegou ao fim do path!")
+            # ===== VERIFICA SE CHEGOU AO INÍCIO OU FIM DO PATH =====
+            if hasattr(enemy, 'path') and enemy.path:
+                # Verifica se chegou ao INÍCIO (índice 0)
+                at_start = (enemy.path_index <= 0)
 
-                    # ===== VERIFICA SE BOSS ESTÁ CARREGANDO ITEM =====
+                # Verifica se chegou ao FIM
+                at_end = (enemy.path_index >= len(enemy.path))
+
+                # Se chegou ao início OU fim
+                if at_start or at_end:
+                    # ===== VERIFICA SE ESTÁ CARREGANDO ITEM =====
                     if enemy.is_carrying:
-                        # Boss está carregando item e chegou ao fim (que é o início original do path)
-                        print(
-                            f"[BOSS] {enemy.name} está carregando {enemy.is_carrying.item_name} e completou o caminho de volta!")
-                        print(f"[BOSS] {enemy.is_carrying.item_name} foi levado com sucesso e DESAPARECE!")
-
                         carried_item = enemy.is_carrying
+                        print(
+                            f"[GAME_OVER] {enemy.name} chegou ao {'INÍCIO' if at_start else 'FIM'} carregando {carried_item.item_name}!")
+                        print(f"[GAME_OVER] ITEM PERDIDO! Game Over!")
+
+                        # Marca o item como roubado
                         carried_item.is_protected = False
                         carried_item.is_stolen = True
                         carried_item.carried_by = None
 
-                        # Marca o item como roubado no target_item_manager
+                        # Marca no target_item_manager
                         if hasattr(self.game_scene, 'target_item_manager'):
                             self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
 
                         enemy.clear_carrying()
 
-                        # Resetar a flag de retorno do boss e velocidade
-                        enemy.is_returning_with_item = False
-                        enemy.speed = 0.6  # Volta à velocidade normal do boss
-                        print(f"[BOSS] {enemy.name} perdeu o item, velocidade volta para {enemy.speed}")
-
-                        # ===== RESTAURA O PATH ORIGINAL =====
-                        if hasattr(enemy, 'original_path') and enemy.original_path:
-                            enemy.path = enemy.original_path.copy()
-                            print(f"[BOSS] {enemy.name} path restaurado para o original com {len(enemy.path)} pontos")
-
-                        # Reseta para o início do path original
-                        enemy.path_index = 0
-                        if enemy.path and len(enemy.path) > 0:
-                            enemy.x, enemy.y = enemy.path[0]
-                            enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
-                            print(f"[BOSS] {enemy.name} resetado para o início do path original")
-
-                        # Não adiciona à lista de remoção (boss continua vivo)
-                        # IMPORTANTE: CONTINUA para não processar movimento neste frame
-                        continue
-                    else:
-                        # Boss normal (sem item) reseta para o início sem perder item
-                        print(f"[BOSS] {enemy.name} sem item, resetando para o início")
-
-                        # Verifica se o path está invertido e precisa ser restaurado
-                        if enemy.is_returning_with_item:
-                            # Isso não deveria acontecer, mas por segurança
-                            enemy.is_returning_with_item = False
-                            enemy.speed = 0.6
-                            # Restaura path original se necessário
+                        # Se for boss, não é removido, apenas perde o item e reseta
+                        if enemy.is_boss:
+                            print(f"[BOSS] {enemy.name} perdeu o item e vai continuar caçando...")
+                            # Reseta para o início do path original
                             if hasattr(enemy, 'original_path') and enemy.original_path:
                                 enemy.path = enemy.original_path.copy()
-                                print(f"[BOSS] {enemy.name} path restaurado para o original")
+                                enemy.path_index = 0
+                                if enemy.path and len(enemy.path) > 0:
+                                    enemy.x, enemy.y = enemy.path[0]
+                                    enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
 
-                        # Reseta para o início
-                        enemy.path_index = 0
-                        if enemy.path and len(enemy.path) > 0:
-                            enemy.x, enemy.y = enemy.path[0]
-                            enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+                            # Reseta flag de retorno
+                            enemy.is_returning_with_item = False
+                            enemy.speed = 0.6
 
-                        # Não adiciona à lista de remoção
-                        continue
-                else:
-                    # Inimigo normal: chega ao fim e é removido
-                    print(f"[WAVE] {enemy.name} chegou ao FIM do path! Será removido.")
+                            # CONTINUA VIVO - não remove
+                            continue
+                        else:
+                            # Inimigo normal: marca para remoção
+                            enemies_at_end.append(enemy)
+                            enemies_to_remove.append(enemy)
+                            continue
+                    else:
+                        # Chegou sem item
+                        if enemy.is_boss:
+                            # Boss sem item: reseta para início
+                            print(
+                                f"[BOSS] {enemy.name} chegou ao {'início' if at_start else 'fim'} sem item, resetando...")
+                            if hasattr(enemy, 'original_path') and enemy.original_path:
+                                enemy.path = enemy.original_path.copy()
+                                enemy.path_index = 0
+                                if enemy.path and len(enemy.path) > 0:
+                                    enemy.x, enemy.y = enemy.path[0]
+                                    enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+                            continue
+                        else:
+                            # Inimigo normal sem item: remove
+                            enemies_at_end.append(enemy)
+                            enemies_to_remove.append(enemy)
+                            continue
 
-                    # ===== CORREÇÃO: Marca o item como roubado =====
-                    if enemy.is_carrying:
-                        carried_item = enemy.is_carrying
-                        print(f"[WAVE] {enemy.name} levou {carried_item.item_name}!")
-
-                        # Marca o item como roubado
-                        carried_item.is_protected = False
-                        carried_item.is_stolen = True
-
-                        # ===== Marca o item como roubado no target_item_manager =====
-                        if hasattr(self.game_scene, 'target_item_manager'):
-                            self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
-
-                    enemies_at_end.append(enemy)
-                    enemies_to_remove.append(enemy)
-                    continue
-
-            # ===== VERIFICAÇÃO EXTRA: Inimigo voltando e próximo do início =====
-            # Só para inimigos normais (não bosses)
+            # ===== VERIFICAÇÃO EXTRA: Inimigo próximo do início/fim =====
             if not enemy.is_boss and enemy.is_carrying and enemy.path and len(enemy.path) > 0:
-                # Verifica se está próximo do último ponto do path (que é o início original)
-                last_point = enemy.path[-1]
-                dist_to_start = math.hypot(enemy.x - last_point[0], enemy.y - last_point[1])
+                # Verifica proximidade com início (ponto 0)
+                start_point = enemy.path[0]
+                dist_to_start = math.hypot(enemy.x - start_point[0], enemy.y - start_point[1])
 
-                # Se está a menos de 15 pixels do início, considera que chegou
-                if dist_to_start < 15:
-                    print(f"[WAVE] {enemy.name} está voltando e próximo do início! Distância: {dist_to_start:.1f}")
-                    print(f"[WAVE] {enemy.name} levou {enemy.is_carrying.item_name}!")
+                # Verifica proximidade com fim (último ponto)
+                end_point = enemy.path[-1]
+                dist_to_end = math.hypot(enemy.x - end_point[0], enemy.y - end_point[1])
 
-                    # Marca o item como roubado
+                # Se estiver próximo de qualquer extremidade
+                if dist_to_start < 15 or dist_to_end < 15:
+                    print(
+                        f"[GAME_OVER] {enemy.name} próximo do {'INÍCIO' if dist_to_start < 15 else 'FIM'} carregando {enemy.is_carrying.item_name}!")
+
                     carried_item = enemy.is_carrying
                     carried_item.is_protected = False
                     carried_item.is_stolen = True
 
-                    # ===== Marca o item como roubado no target_item_manager =====
                     if hasattr(self.game_scene, 'target_item_manager'):
                         self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
 
@@ -254,7 +237,7 @@ class GameWaveManager:
         for enemy in defeated_enemies:
             self._distribute_xp(enemy)
 
-        # Remove inimigos normais (não bosses)
+        # Remove inimigos normais
         for enemy in enemies_to_remove:
             if enemy in self.active_enemies:
                 path_index = getattr(enemy, 'path_index_origin', 0)
@@ -263,21 +246,19 @@ class GameWaveManager:
                     self.enemies_remaining_by_path[path_index] -= 1
                 enemy.clear_damage_tracking()
 
-                # Remove o item permanentemente se estiver carregando
+                # Remove o item permanentemente
                 if enemy.is_carrying:
                     carried_item = enemy.is_carrying
                     print(f"[WaveManager] {enemy.name} estava carregando {carried_item.item_name} e será removido!")
 
-                    # Marca o item como roubado se ainda não foi marcado
                     if carried_item.is_protected:
                         if hasattr(self.game_scene, 'target_item_manager'):
                             self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
 
-                    # Limpa referências
                     carried_item.carried_by = None
                     enemy.is_carrying = None
 
-        # ===== 2. Processa waves para CADA PATH =====
+        # ===== 2. Processa waves para CADA PATH (restante igual) =====
         for path_index, waves in self.path_waves.items():
             if not waves:
                 continue
