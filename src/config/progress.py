@@ -1,66 +1,157 @@
 """
-Sistema de progresso do jogador
+Sistema de progresso do jogador - Agora usando SaveManager
 """
 import json
 import os
 from pathlib import Path
+from src.managers.save_manager import save_manager
 
 
 class ProgressManager:
     def __init__(self):
-        self.save_file = Path("save_data.json")
+        # Remove o save_file antigo
+        # self.save_file = Path("save_data.json")
+
+        # Usa o SaveManager
+        self.save_manager = save_manager
+
+        # Carrega o progresso do SaveManager
         self.progress = self.load_progress()
-        # Converte progresso antigo para o novo formato
+
+        # Converte progresso antigo para o novo formato (se necessário)
         self._migrate_old_progress()
 
     def _migrate_old_progress(self):
-        """Converte progresso antigo (números) para novo formato (strings)"""
+        """Converte progresso antigo (save_data.json) para o novo formato"""
+        # Verifica se existe o arquivo antigo
+        old_save = Path("save_data.json")
+        if old_save.exists():
+            try:
+                with open(old_save, 'r') as f:
+                    old_data = json.load(f)
+
+                print("[PROGRESS] Encontrado save_data.json antigo. Convertendo...")
+
+                # Tenta carregar o save atual do SaveManager (slot 1)
+                current_save = self.save_manager.list_saves()[0] if self.save_manager.list_saves() else None
+
+                # Se não houver save no novo formato, cria um
+                if current_save is None or current_save.get("empty", True):
+                    print("[PROGRESS] Criando novo save a partir do antigo...")
+
+                    # Atualiza o SaveManager com os dados antigos
+                    # Precisamos de um objeto player temporário para isso
+                    from src.entities.player import Player
+                    temp_player = Player(0, 0)
+                    temp_player.money = old_data.get("money", 100)
+                    temp_player.score = old_data.get("score", 0)
+
+                    # Converte o progresso antigo
+                    game_state = {
+                        "current_chapter": old_data.get("current_chapter", 1),
+                        "current_phase": old_data.get("current_phase", 1),
+                        "unlocked_phases": old_data.get("unlocked_phases", ["1-1"]),
+                        "completed_phases": old_data.get("completed_phases", []),
+                        "stars": old_data.get("stars", {})
+                    }
+
+                    # Salva no novo formato
+                    self.save_manager.save_game(temp_player, game_state, "Save 1", slot=1)
+
+                    # Agora carrega o progresso do novo save
+                    self.progress = self.load_progress()
+
+                    # Faz backup do arquivo antigo
+                    backup_name = f"save_data_backup_{old_save.stat().st_mtime}.json"
+                    old_save.rename(backup_name)
+                    print(f"[PROGRESS] Save antigo convertido e movido para {backup_name}")
+
+            except Exception as e:
+                print(f"[PROGRESS] Erro ao converter save antigo: {e}")
+
+        # Agora converte os dados do progress atual para garantir formato correto
+        self._ensure_correct_format()
+
+    def _ensure_correct_format(self):
+        """Garante que o progresso está no formato correto"""
         changed = False
 
-        # Converte unlocked_phases de int para string
-        new_unlocked = []
-        for phase in self.progress["unlocked_phases"]:
-            if isinstance(phase, int):
-                new_unlocked.append(str(phase))
-                changed = True
-            else:
-                new_unlocked.append(phase)
-        if changed:
-            self.progress["unlocked_phases"] = new_unlocked
+        # Verifica se unlocked_phases está no formato correto
+        if "unlocked_phases" not in self.progress:
+            self.progress["unlocked_phases"] = ["1-1"]
+            changed = True
+        else:
+            new_unlocked = []
+            for phase in self.progress["unlocked_phases"]:
+                if isinstance(phase, int):
+                    new_unlocked.append(str(phase))
+                    changed = True
+                else:
+                    new_unlocked.append(phase)
+            if changed:
+                self.progress["unlocked_phases"] = new_unlocked
 
-        # Converte completed_phases de int para string
-        new_completed = []
-        for phase in self.progress["completed_phases"]:
-            if isinstance(phase, int):
-                new_completed.append(str(phase))
-                changed = True
-            else:
-                new_completed.append(phase)
-        if changed:
-            self.progress["completed_phases"] = new_completed
+        # Verifica completed_phases
+        if "completed_phases" not in self.progress:
+            self.progress["completed_phases"] = []
+            changed = True
+        else:
+            new_completed = []
+            for phase in self.progress["completed_phases"]:
+                if isinstance(phase, int):
+                    new_completed.append(str(phase))
+                    changed = True
+                else:
+                    new_completed.append(phase)
+            if changed:
+                self.progress["completed_phases"] = new_completed
 
-        # Converte stars keys de int para string
-        new_stars = {}
-        for key, value in self.progress["stars"].items():
-            if isinstance(key, int):
-                new_stars[str(key)] = value
-                changed = True
-            else:
-                new_stars[key] = value
-        if changed:
-            self.progress["stars"] = new_stars
+        # Verifica stars
+        if "stars" not in self.progress:
+            self.progress["stars"] = {}
+            changed = True
+        else:
+            new_stars = {}
+            for key, value in self.progress["stars"].items():
+                if isinstance(key, int):
+                    new_stars[str(key)] = value
+                    changed = True
+                else:
+                    new_stars[key] = value
+            if changed:
+                self.progress["stars"] = new_stars
+
+        # Verifica outros campos obrigatórios
+        if "current_chapter" not in self.progress:
+            self.progress["current_chapter"] = 1
+            changed = True
+
+        if "settings" not in self.progress:
+            self.progress["settings"] = {
+                "sound_volume": 0.7,
+                "music_volume": 0.5,
+                "show_fps": False
+            }
+            changed = True
 
         if changed:
             self.save_progress()
-            print("Progresso migrado para novo formato (strings)")
+            print("[PROGRESS] Formato do progresso corrigido")
 
     def load_progress(self):
-        """Carrega o progresso salvo"""
+        """Carrega o progresso do SaveManager"""
+        # Tenta carregar do slot 1
+        saved_data = self._load_from_save_slot(1)
+
+        if saved_data:
+            return saved_data
+
+        # Se não houver save, cria o progresso padrão
         default_progress = {
             "unlocked_phases": ["1-1"],  # Fase 1-1 sempre desbloqueada
             "completed_phases": [],      # Fases completadas
             "current_chapter": 1,
-            "stars": {},                  # Estrelas por fase (para futuro)
+            "stars": {},                  # Estrelas por fase
             "settings": {
                 "sound_volume": 0.7,
                 "music_volume": 0.5,
@@ -68,30 +159,91 @@ class ProgressManager:
             }
         }
 
-        if self.save_file.exists():
+        print("[PROGRESS] Nenhum save encontrado, criando novo progresso")
+        return default_progress
+
+    def _load_from_save_slot(self, slot=1):
+        """Carrega os dados de progresso de um slot de save"""
+        # Obtém a lista de saves
+        saves = self.save_manager.list_saves()
+
+        # Verifica se o slot existe e não está vazio
+        if slot-1 < len(saves):
+            slot_info = saves[slot-1]
+            if slot_info.get("empty") or slot_info.get("error"):
+                return None
+
+            # Tenta carregar o save completo
             try:
-                with open(self.save_file, 'r') as f:
-                    saved_data = json.load(f)
-                    # Merge com default para garantir campos
-                    for key in default_progress:
-                        if key not in saved_data:
-                            saved_data[key] = default_progress[key]
-                    return saved_data
-            except:
-                print("Erro ao carregar save, criando novo progresso")
-                return default_progress
-        else:
-            print("Nenhum save encontrado, criando novo progresso")
-            return default_progress
+                # Cria um player temporário para carregar o save
+                from src.entities.player import Player
+                temp_player = Player(0, 0)
+
+                if self.save_manager.load_game(temp_player, slot):
+                    # Extrai os dados de progresso
+                    game_state = self.save_manager.save_data.get("game_state", {})
+
+                    # Converte o formato do save_manager para o formato do progress_manager
+                    progress_data = {
+                        "unlocked_phases": game_state.get("unlocked_phases", ["1-1"]),
+                        "completed_phases": game_state.get("completed_phases", []),
+                        "current_chapter": game_state.get("current_chapter", 1),
+                        "stars": game_state.get("stars", {}),
+                        "settings": self._get_settings_from_save()
+                    }
+
+                    print(f"[PROGRESS] Progresso carregado do slot {slot}")
+                    return progress_data
+
+            except Exception as e:
+                print(f"[PROGRESS] Erro ao carregar progresso do slot {slot}: {e}")
+                return None
+
+        return None
+
+    def _get_settings_from_save(self):
+        """Extrai as configurações do save"""
+        # Por enquanto, retorna padrão
+        # Futuramente, podemos salvar settings no save_manager também
+        return {
+            "sound_volume": 0.7,
+            "music_volume": 0.5,
+            "show_fps": False
+        }
 
     def save_progress(self):
-        """Salva o progresso"""
+        """Salva o progresso usando o SaveManager"""
         try:
-            with open(self.save_file, 'w') as f:
-                json.dump(self.progress, f, indent=4)
-            print("Progresso salvo com sucesso")
-        except:
-            print("Erro ao salvar progresso")
+            # Cria um player temporário para salvar os dados
+            from src.entities.player import Player
+            temp_player = Player(0, 0)
+
+            # Prepara o game_state com os dados de progresso
+            game_state = {
+                "current_chapter": self.progress["current_chapter"],
+                "current_phase": self._get_current_phase(),
+                "unlocked_phases": self.progress["unlocked_phases"],
+                "completed_phases": self.progress["completed_phases"],
+                "stars": self.progress["stars"]
+            }
+
+            # Salva no slot 1 (padrão)
+            # Você pode modificar para usar o slot atual se necessário
+            self.save_manager.save_game(temp_player, game_state, "Save 1", slot=1)
+            print("[PROGRESS] Progresso salvo com sucesso")
+
+        except Exception as e:
+            print(f"[PROGRESS] Erro ao salvar progresso: {e}")
+
+    def _get_current_phase(self):
+        """Retorna o número da fase atual baseado nas fases desbloqueadas"""
+        unlocked = self.progress["unlocked_phases"]
+        if unlocked:
+            # Pega a última fase desbloqueada
+            last_phase = unlocked[-1]
+            if "-" in last_phase:
+                return int(last_phase.split("-")[1])
+        return 1
 
     def get_next_phase(self, phase_id):
         """
