@@ -56,23 +56,18 @@ class PathRenderer:
                 self._render_game_path(path, screen, camera, screen_manager)
 
     def _render_game_path(self, path, screen, camera, screen_manager):
-        """Versão de jogo do path (mais discreta)"""
         if len(path.nodes) < 2:
             return
 
         points_screen = []
         for node in path.nodes:
-            # USA O MÉTODO PADRONIZADO
             screen_x, screen_y = screen_manager.world_to_screen(node[0], node[1], camera)
             points_screen.append((screen_x, screen_y))
 
-        # Linha mais sutil para o jogo
+        # Desenha diretamente na tela
         for i in range(len(points_screen) - 1):
-            # Cria uma superfície com alpha para transparência
-            line_surface = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
-            pygame.draw.line(line_surface, (100, 100, 150, 100),
+            pygame.draw.line(screen, (100, 100, 150, 100),
                              points_screen[i], points_screen[i + 1], 2)
-            screen.blit(line_surface, (0, 0))
 
     def _world_to_screen(self, world_x, world_y, camera, screen_manager):
         """Converte coordenadas do mundo para tela"""

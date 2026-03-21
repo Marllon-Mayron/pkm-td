@@ -48,17 +48,14 @@ class PokemonSpotRenderer:
 
         for spot in self.spot_manager.spots:
             # Converte coordenadas do mundo para tela
-            screen_x, screen_y = screen_manager.world_to_screen(spot.x, spot.y, camera)
 
             # Tamanho base
             base_size = max(4, int(self.tile_size * camera.zoom * screen_manager.render_scale))
 
-            # DEBUG: Desenha um quadrado no TILE inteiro para referência
-            tile_screen_x, tile_screen_y = screen_manager.world_to_screen(
-                (spot.x // self.tile_size) * self.tile_size,
-                (spot.y // self.tile_size) * self.tile_size,
-                camera
-            )
+            screen_x, screen_y = screen_manager.world_to_screen(spot.x, spot.y, camera)
+            tile_x = (spot.x // self.tile_size) * self.tile_size
+            tile_y = (spot.y // self.tile_size) * self.tile_size
+            tile_screen_x, tile_screen_y = screen_manager.world_to_screen(tile_x, tile_y, camera)
 
             # Desenha o tile inteiro (semi-transparente) para referência
             tile_rect = pygame.Rect(

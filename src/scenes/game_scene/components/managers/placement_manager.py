@@ -126,16 +126,11 @@ class PlacementManager:
 
                 # Atualiza animação normal
                 pokemon.update(dt)
-
-                # DEBUG: Mostra estado
-                if hasattr(self.game, 'show_debug') and self.game.show_debug:
-                    print(f"[DEBUG] {pokemon.name}: {pokemon.combat_state}")
             else:
                 defeated.append(pokemon)
 
         # Remove derrotados
         for pokemon in defeated:
-            print(f"[COMBATE] {pokemon.name} foi derrotado!")
             self._remove_pokemon(pokemon)
 
     def _remove_pokemon(self, pokemon):
