@@ -1,6 +1,7 @@
 # src/entities/pokemon.py
 import pygame
 import math
+import uuid
 import random
 from src.entities.base import Entity
 from src.data.pokedex import Pokedex
@@ -11,6 +12,7 @@ class Pokemon(Entity):
     def __init__(self, x, y, pokemon_id, level=5, is_wild=False, shiny=False, is_boss=False):
         # ===== 1. DADOS BÁSICOS =====
         self.pokedex = Pokedex()
+        self.unique_id = str(uuid.uuid4())
         self.pokemon_data = self.pokedex.get_pokemon(pokemon_id)
 
         if not self.pokemon_data:
@@ -58,10 +60,10 @@ class Pokemon(Entity):
 
             # ===== NOVO: BOSS TEM 20% MAIS VIDA =====
             original_hp = self.max_hp
-            self.max_hp = int(self.max_hp * 1.5)
+            self.max_hp = int(self.max_hp * 2)
             self.current_hp = self.max_hp
-            self.defense = int(self.defense * 1.5)
-            self.sp_defense = int(self.sp_defense * 1.5)
+            self.defense = int(self.defense * 2)
+            self.sp_defense = int(self.sp_defense * 2)
             self.defense_value = self._calculate_defense()
 
         # ===== 7. ESTADO ATUAL =====

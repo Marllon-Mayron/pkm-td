@@ -1,6 +1,7 @@
 # src/managers/save_manager.py
 
 import json
+import uuid
 import os
 import pickle
 from datetime import datetime
@@ -71,6 +72,7 @@ class SaveManager:
     def _pokemon_to_dict(self, pokemon) -> Dict:
         """Converte um objeto Pokémon para dicionário"""
         return {
+            "unique_id": getattr(pokemon, 'unique_id', str(uuid.uuid4())),
             "id": pokemon.id,
             "name": pokemon.name,
             "level": pokemon.level,
@@ -104,6 +106,8 @@ class SaveManager:
             shiny=data["is_shiny"]
         )
 
+        pokemon.unique_id = data.get("unique_id", str(uuid.uuid4()))
+
         # Restaura os atributos
         pokemon.current_hp = data["current_hp"]
         pokemon.max_hp = data["max_hp"]
@@ -126,24 +130,21 @@ class SaveManager:
         self.save_data["player"]["score"] = player.score
         self.save_data["player"]["position"] = {"x": player.x, "y": player.y}
 
-        # IMPORTANTE: Primeiro, garante que todos os Pokémon do time estão na box
-        # Cria um conjunto com os IDs dos Pokémon da box para evitar duplicatas
+        # IMPORTANTE: Usa unique_id como identificador único
         box_ids = set()
         unique_box = []
 
         # Primeiro, adiciona todos os Pokémon da box atual
         for p in player.pc_box:
-            # Usa uma combinação de id + level + shiny como identificador único
-            p_key = (p.id, p.level, p.is_shiny)
-            if p_key not in box_ids:
-                box_ids.add(p_key)
+            # Usa unique_id como identificador único
+            if p.unique_id not in box_ids:
+                box_ids.add(p.unique_id)
                 unique_box.append(p)
 
         # Depois, adiciona os Pokémon do time que não estão na box
         for p in player.team:
-            p_key = (p.id, p.level, p.is_shiny)
-            if p_key not in box_ids:
-                box_ids.add(p_key)
+            if p.unique_id not in box_ids:
+                box_ids.add(p.unique_id)
                 unique_box.append(p)
                 print(f"[SAVE] Pokémon {p.name} do time não estava na box, adicionando...")
 
@@ -152,7 +153,7 @@ class SaveManager:
             self._pokemon_to_dict(p) for p in unique_box
         ]
 
-        # Salva o time (apenas as referências, mas salvamos completos também)
+        # Salva o time (apenas as referências)
         self.save_data["player"]["team"] = [
             self._pokemon_to_dict(p) for p in player.team
         ]
@@ -229,17 +230,25 @@ class SaveManager:
                 pokemon = self._dict_to_pokemon(pokemon_data)
                 player.pc_box.append(pokemon)
 
-            # Carrega o time
+            # Carrega o time - AGORA usando unique_id para match
             player.team = []
             for pokemon_data in player_data["team"]:
-                # Encontra o Pokémon na box
+                # Encontra o Pokémon na box usando unique_id
                 for p in player.pc_box:
-                    if (p.id == pokemon_data["id"] and
-                        p.level == pokemon_data["level"] and
-                        p.is_shiny == pokemon_data["is_shiny"]):
+                    if p.unique_id == pokemon_data.get("unique_id"):
                         player.team.append(p)
                         p.is_in_team = True
                         break
+                else:
+                    # Fallback: se não encontrar por unique_id, tenta pelos atributos
+                    for p in player.pc_box:
+                        if (p.id == pokemon_data["id"] and
+                                p.level == pokemon_data["level"] and
+                                p.is_shiny == pokemon_data["is_shiny"] and
+                                p not in player.team):
+                            player.team.append(p)
+                            p.is_in_team = True
+                            break
 
             # Carrega Pokédex
             player.seen_pokemon = set(player_data["seen_pokemon"])

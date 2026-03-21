@@ -65,14 +65,18 @@ class Player(Entity):
 
     def add_to_box(self, pokemon):
         """Adiciona Pokémon ao PC Box"""
-        # Garante que é uma cópia válida
+        # Garante que o unique_id é preservado
+        if not hasattr(pokemon, 'unique_id'):
+            import uuid
+            pokemon.unique_id = str(uuid.uuid4())
+
         pokemon.is_in_team = False
         pokemon.is_placed = False
         pokemon.is_wild = False
 
         self.pc_box.append(pokemon)
         self.caught_pokemon.add(pokemon.id)
-        print(f"[PLAYER] {pokemon.name} adicionado à PC Box. Total: {len(self.pc_box)}")
+        print(f"[PLAYER] {pokemon.name} (ID: {pokemon.unique_id[:8]}) adicionado à PC Box. Total: {len(self.pc_box)}")
 
     def register_seen(self, pokemon_id):
         """Registra Pokémon como visto"""
