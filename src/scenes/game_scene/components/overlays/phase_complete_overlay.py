@@ -7,7 +7,7 @@ from src.config.phase_catalog import phase_catalog
 
 
 class PhaseCompleteOverlay(BaseOverlay):
-    """Overlay de conclusão de fase"""
+    """Overlay de conclusão de fase - SÓ RENDERIZA, NÃO COMPLETA A FASE"""
 
     def __init__(self, game_scene):
         super().__init__(game_scene)
@@ -17,7 +17,11 @@ class PhaseCompleteOverlay(BaseOverlay):
         self.phase_rewards = game_scene.phase_rewards
         self.target_item_manager = game_scene.target_item_manager
 
-        self.game_scene.game.player.auto_save()
+        # IMPORTANTE: NÃO chamar complete_phase aqui!
+        # O game_scene já chamou antes de criar este overlay
+        print(f"[OVERLAY] PhaseCompleteOverlay para {self.phase_id}")
+        print(f"[OVERLAY] A fase já foi completada pelo game_scene")
+
         # Botão de voltar
         self.button_rect = None
         self.button_hovered = False
@@ -73,7 +77,7 @@ class PhaseCompleteOverlay(BaseOverlay):
         screen.blit(name_text, (name_x, y_offset))
         y_offset += name_text.get_height() + 30
 
-        # Recompensas (lado a lado)
+        # Recompensas
         money_text = font_small.render(f"+${self.phase_rewards['money']}", True, (100, 255, 100))
         exp_text = font_small.render(f"+{self.phase_rewards['experience']} XP", True, (100, 100, 255))
 
@@ -101,7 +105,7 @@ class PhaseCompleteOverlay(BaseOverlay):
         )
         y_offset = self.button_rect.bottom + 20
 
-        # Timer opcional
+        # Timer
         remaining = max(0, self.delay - self.timer)
         if remaining > 0:
             timer_text = font_small.render(
@@ -119,7 +123,6 @@ class PhaseCompleteOverlay(BaseOverlay):
 
         button_rect = pygame.Rect(button_x, y, button_width, button_height)
 
-        # Cores baseadas no hover
         if self.button_hovered:
             button_color = (90, 120, 220)
             border_color = (120, 150, 250)
@@ -127,11 +130,9 @@ class PhaseCompleteOverlay(BaseOverlay):
             button_color = (50, 70, 150)
             border_color = (70, 100, 200)
 
-        # Desenha botão
         pygame.draw.rect(screen, button_color, button_rect, border_radius=8)
         pygame.draw.rect(screen, border_color, button_rect, 3, border_radius=8)
 
-        # Texto do botão
         button_text = font.render(text, True, (255, 255, 255))
         text_x = button_rect.centerx - button_text.get_width() // 2
         text_y = button_rect.centery - button_text.get_height() // 2
@@ -143,14 +144,10 @@ class PhaseCompleteOverlay(BaseOverlay):
         """Volta para a seleção de fases"""
         from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 
-        # Se a game_scene tiver cleanup, chame-o
         if hasattr(self.game_scene, 'cleanup'):
             self.game_scene.cleanup()
 
-        # Cria nova cena de seleção
         phase_select = PhaseSelectScene(self.game)
-
-        # Opcional: força refresh imediato
         phase_select.refresh_data()
 
         self.game.current_scene = phase_select

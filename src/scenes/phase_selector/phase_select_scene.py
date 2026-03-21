@@ -401,8 +401,8 @@ class PhaseSelectScene(BaseScene):
 
     def refresh_data(self):
         """Recarrega os dados do progresso e catálogo"""
-        # Recarrega o progresso do arquivo
-        self.progress.load_progress()
+        # Recarrega o progresso do SaveManager
+        self.progress.reload_progress()
 
         # Recarrega o catálogo de fases
         self.catalog.refresh()

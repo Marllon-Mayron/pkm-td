@@ -61,6 +61,7 @@ class SaveManager:
             "game_state": {
                 "current_chapter": 1,
                 "current_phase": 1,
+                "unlocked_chapters": [1],
                 "unlocked_phases": ["1-1"],
                 "completed_phases": [],
                 "stars": {}

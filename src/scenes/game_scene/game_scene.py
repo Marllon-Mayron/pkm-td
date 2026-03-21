@@ -770,21 +770,34 @@ class GameScene(BaseScene):
 
         # Dá as recompensas
         self.player.money += self.phase_rewards['money']
+
+        for pokemon in self.player.team:
+            pokemon.gain_xp(self.phase_rewards['experience'])
+
         self.player.score += self.phase_rewards['experience']
 
-        # Marca a fase como completada no progresso
-        # Calcula estrelas baseado em quantos itens foram protegidos
+        # Calcula estrelas
         total_items = len(self.target_item_manager.items)
         protected_items = self.target_item_manager.items_protected
         if total_items > 0:
             stars = int((protected_items / total_items) * 3)
-            stars = max(1, min(3, stars))  # Entre 1 e 3 estrelas
+            stars = max(1, min(3, stars))
         else:
-            stars = 3  # Se não tem itens, dá 3 estrelas
+            stars = 3
+
+        print(f"[GAME_SCENE] Chamando progress_manager.complete_phase({self.phase_id}, stars={stars})")
+
+        # IMPORTANTE: Verificar o estado ANTES
+        print(f"[GAME_SCENE] ANTES - Unlocked: {progress_manager.progress['unlocked_phases']}")
+        print(f"[GAME_SCENE] ANTES - Completed: {progress_manager.progress['completed_phases']}")
 
         progress_manager.complete_phase(self.phase_id, stars=stars)
 
-        # Mostra a próxima fase se houver
+        # Verificar o estado DEPOIS
+        print(f"[GAME_SCENE] DEPOIS - Unlocked: {progress_manager.progress['unlocked_phases']}")
+        print(f"[GAME_SCENE] DEPOIS - Completed: {progress_manager.progress['completed_phases']}")
+
+        # Mostra a próxima fase
         next_phase = progress_manager.get_next_phase(self.phase_id)
         if next_phase:
             print(f"️ Próxima fase desbloqueada: {next_phase}")
@@ -793,7 +806,11 @@ class GameScene(BaseScene):
 
         print(f"Saldo atual: ${self.player.money} | Pontuação: {self.player.score}")
 
-        # MOSTRA OVERLAY DE FASE COMPLETA (NOVO)
+        # Salva o estado completo do jogador
+        self.player.auto_save()
+        print("[GAME_SCENE] Auto-save executado após completar fase")
+
+        # MOSTRA OVERLAY DE FASE COMPLETA
         self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
 
     def render(self, screen):

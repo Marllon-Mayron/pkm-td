@@ -58,9 +58,11 @@ class Pokemon(Entity):
 
             # ===== NOVO: BOSS TEM 20% MAIS VIDA =====
             original_hp = self.max_hp
-            self.max_hp = int(self.max_hp * 1.3)  # Aumenta em 20%
-            self.current_hp = self.max_hp  # Atualiza HP atual para o novo máximo
-            print(f"[BOSS] {self.name} é um BOSS! Nível {self.level} (HP: {self.max_hp} - +20% de vida)")
+            self.max_hp = int(self.max_hp * 1.5)
+            self.current_hp = self.max_hp
+            self.defense = int(self.defense * 1.5)
+            self.sp_defense = int(self.sp_defense * 1.5)
+            self.defense_value = self._calculate_defense()
 
         # ===== 7. ESTADO ATUAL =====
         self.current_hp = self.max_hp
@@ -891,7 +893,7 @@ class Pokemon(Entity):
         """Renderiza nome e nível para Pokémon selvagem"""
         # Tamanhos de fonte
         name_font_size = max(5, int(6 * zoom_scale))
-        level_font_size = max(4, int(5 * zoom_scale))
+        level_font_size = max(4, int(6 * zoom_scale))
 
         try:
             name_font = pygame.font.Font(None, name_font_size)
@@ -912,8 +914,9 @@ class Pokemon(Entity):
             level_color = (255, 215, 0)
         elif self.is_boss:
             level_color = (255, 100, 100)
+            text_color = (255, 100, 100)
         else:
-            level_color = (200, 200, 200)
+            level_color = (255, 255, 255)
 
         # Renderiza
         name_surface = name_font.render(name_text, True, text_color)
