@@ -58,7 +58,7 @@ class Pokemon(Entity):
 
             # ===== NOVO: BOSS TEM 20% MAIS VIDA =====
             original_hp = self.max_hp
-            self.max_hp = int(self.max_hp * 1.2)  # Aumenta em 20%
+            self.max_hp = int(self.max_hp * 1.3)  # Aumenta em 20%
             self.current_hp = self.max_hp  # Atualiza HP atual para o novo máximo
             print(f"[BOSS] {self.name} é um BOSS! Nível {self.level} (HP: {self.max_hp} - +20% de vida)")
 
@@ -255,7 +255,6 @@ class Pokemon(Entity):
 
         print(f"[EVOLUÇÃO] ✓ {old_name} (Lv.{old_level}) evoluiu para {self.name}!")
 
-    # Modifique o método gain_xp para chamar check_and_evolve
     def gain_xp(self, amount):
         """Ganha XP e verifica level up e evolução"""
         old_level = self.level
@@ -275,8 +274,6 @@ class Pokemon(Entity):
 
             # Verifica se pode evoluir após o level up
             self.check_and_evolve()
-
-
 
     def level_up(self):
         """Sobe de nível"""

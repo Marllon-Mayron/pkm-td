@@ -154,14 +154,9 @@ class GameWaveManager:
                         carried_item.is_stolen = True
                         carried_item.carried_by = None
 
-                        if carried_item in self.target_items:
-                            self.target_items.remove(carried_item)
-                            print(f"[BOSS] Item {carried_item.item_name} removido permanentemente!")
-
-                            # ===== NOVO: INCREMENTA CONTADOR DE ITENS ROUBADOS =====
-                            if hasattr(self.game_scene, 'target_item_manager'):
-                                self.game_scene.target_item_manager.items_stolen += 1
-                                print(f"[BOSS] Itens roubados: {self.game_scene.target_item_manager.items_stolen}")
+                        # ===== CORREÇÃO: Marca o item como roubado no target_item_manager =====
+                        if hasattr(self.game_scene, 'target_item_manager'):
+                            self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
 
                         enemy.clear_carrying()
 
@@ -177,7 +172,7 @@ class GameWaveManager:
                     # Inimigo normal: chega ao fim e é removido
                     print(f"[WAVE] {enemy.name} chegou ao FIM do path! Será removido.")
 
-                    # ===== NOVO: INCREMENTA ITENS ROUBADOS SE ESTIVER CARRREGANDO =====
+                    # ===== CORREÇÃO: Marca o item como roubado =====
                     if enemy.is_carrying:
                         carried_item = enemy.is_carrying
                         print(f"[WAVE] {enemy.name} levou {carried_item.item_name}!")
@@ -186,10 +181,9 @@ class GameWaveManager:
                         carried_item.is_protected = False
                         carried_item.is_stolen = True
 
-                        # INCREMENTA CONTADOR DE ITENS ROUBADOS
+                        # ===== Marca o item como roubado no target_item_manager =====
                         if hasattr(self.game_scene, 'target_item_manager'):
-                            self.game_scene.target_item_manager.items_stolen += 1
-                            print(f"[WAVE] Itens roubados: {self.game_scene.target_item_manager.items_stolen}")
+                            self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
 
                     enemies_at_end.append(enemy)
                     enemies_to_remove.append(enemy)
@@ -211,10 +205,9 @@ class GameWaveManager:
                     carried_item.is_protected = False
                     carried_item.is_stolen = True
 
-                    # INCREMENTA CONTADOR DE ITENS ROUBADOS
+                    # ===== Marca o item como roubado no target_item_manager =====
                     if hasattr(self.game_scene, 'target_item_manager'):
-                        self.game_scene.target_item_manager.items_stolen += 1
-                        print(f"[WAVE] Itens roubados: {self.game_scene.target_item_manager.items_stolen}")
+                        self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
 
                     enemies_at_end.append(enemy)
                     enemies_to_remove.append(enemy)
@@ -238,12 +231,10 @@ class GameWaveManager:
                     carried_item = enemy.is_carrying
                     print(f"[WaveManager] {enemy.name} estava carregando {carried_item.item_name} e será removido!")
 
-                    # Remove da lista de itens alvo
-                    if carried_item in self.target_items:
-                        self.target_items.remove(carried_item)
-                        print(f"[WaveManager] Item {carried_item.item_name} removido permanentemente!")
-                    else:
-                        print(f"[WaveManager] Aviso: {carried_item.item_name} não está em target_items!")
+                    # Marca o item como roubado se ainda não foi marcado
+                    if carried_item.is_protected:
+                        if hasattr(self.game_scene, 'target_item_manager'):
+                            self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
 
                     # Limpa referências
                     carried_item.carried_by = None
@@ -314,8 +305,7 @@ class GameWaveManager:
         if not wave_data:
             return
 
-        # ===== NOVO: Verifica se ainda tem bosses vivos neste path =====
-        # Conta quantos bosses ainda estão vivos neste path
+        # Verifica se ainda tem bosses vivos neste path
         bosses_alive = sum(1 for e in self.active_enemies
                            if hasattr(e, 'is_boss') and e.is_boss
                            and getattr(e, 'path_index_origin', 0) == path_index)
@@ -324,7 +314,6 @@ class GameWaveManager:
         if bosses_alive > 0:
             print(
                 f"[WaveManager] Path {path_index + 1} - Ainda tem {bosses_alive} boss(es) vivo(s)! Continuando wave...")
-            # Mantém a wave em progresso e não spawna novos inimigos
             return
 
         print(
@@ -478,7 +467,16 @@ class GameWaveManager:
     def remove_enemy(self, enemy):
         """Remove um inimigo da lista ativa"""
         if enemy in self.active_enemies:
+            # ===== CORREÇÃO: Marca o item como roubado se estiver carregando =====
             if enemy.is_carrying:
+                carried_item = enemy.is_carrying
+                print(f"[WaveManager] Removendo {enemy.name} que estava carregando {carried_item.item_name}")
+
+                # Marca o item como roubado no target_item_manager
+                if carried_item.is_protected:
+                    if hasattr(self.game_scene, 'target_item_manager'):
+                        self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
+
                 enemy.drop_item()
 
             path_index = getattr(enemy, 'path_index_origin', 0)
