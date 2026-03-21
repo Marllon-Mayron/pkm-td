@@ -116,6 +116,7 @@ class Pokemon(Entity):
         # ===== 15. ITENS =====
         self.is_carrying = None
         self.capture_range = 10
+        self.is_returning_with_item = False  # NOVO: para boss que está voltando com item
 
         # ===== 16. ATRIBUTOS DE COMBATE =====
         self.attack_range = 60
@@ -599,30 +600,26 @@ class Pokemon(Entity):
     def recalculate_path_after_capture(self):
         """Quando captura um item, decide se volta ou segue e define novo path."""
         if not self.path or self.path_index >= len(self.path):
+            print(f"[POKEMON] {self.name}: não tem path válido para recalcular")
             return
 
         current_idx = self.path_index
-        current_pos = (self.x, self.y)
 
         # ===== CALCULAR DISTÂNCIA RESTANTE ATÉ O FIM =====
-        # Distância da posição atual até o próximo ponto do path
         next_x, next_y = self.path[current_idx]
         remaining_distance = math.hypot(next_x - self.x, next_y - self.y)
 
-        # Soma das distâncias entre os pontos restantes do path
         for i in range(current_idx, len(self.path) - 1):
             x1, y1 = self.path[i]
             x2, y2 = self.path[i + 1]
             remaining_distance += math.hypot(x2 - x1, y2 - y1)
 
         # ===== CALCULAR DISTÂNCIA DE VOLTA AO INÍCIO =====
-        # Distância da posição atual até o ponto anterior (se houver)
         back_distance = 0
         if current_idx > 0:
             prev_x, prev_y = self.path[current_idx - 1]
             back_distance = math.hypot(self.x - prev_x, self.y - prev_y)
 
-            # Soma das distâncias dos pontos anteriores até o início
             for i in range(current_idx - 1, 0, -1):
                 x1, y1 = self.path[i]
                 x2, y2 = self.path[i - 1]
@@ -632,10 +629,16 @@ class Pokemon(Entity):
 
         if back_distance < remaining_distance:
             # VAI VOLTAR: inverter o path e ajustar índice
+
+            # ===== GUARDA O PATH ORIGINAL (se ainda não tiver) =====
+            if not hasattr(self, 'original_path') or self.original_path is None:
+                self.original_path = self.path.copy()
+                print(f"[POKEMON] Path original guardado para {self.name}")
+
             self.path = list(reversed(self.path))
             self.path_index = 0
 
-            # Encontra o ponto mais próximo no novo path (evita teleporte)
+            # Encontra o ponto mais próximo no novo path
             min_dist = float('inf')
             closest_idx = 0
             for i, point in enumerate(self.path):
@@ -645,13 +648,17 @@ class Pokemon(Entity):
                     closest_idx = i
             self.path_index = closest_idx
 
-            # Opcional: cancelar qualquer estado de combate (se houver)
             self.target = None
             self.combat_state = "idle"
 
             print(f"[FUGA] {self.name} vai VOLTAR, índice {closest_idx}")
+
+            # ===== Para boss, marca que está voltando =====
+            if self.is_boss:
+                self.speed = 0.8
+                self.is_returning_with_item = True
+                print(f"[BOSS] {self.name} está voltando com o item! Velocidade: {self.speed}")
         else:
-            # VAI SEGUIR: não mexe no path
             print(f"[FUGA] {self.name} vai SEGUIR")
 
     def update(self, dt, player=None, enemies=None, items=None):
@@ -674,9 +681,11 @@ class Pokemon(Entity):
                     if dist < self.capture_range:
                         item.start_capture(self)
                         print(f"[POKEMON] {self.name} começou a carregar {item.item_name}")
-                        if not self.is_boss:
-                            print("[POKEMON] Chamando recalculate_path_after_capture")
-                            self.recalculate_path_after_capture()
+
+                        # ===== AGORA BOSS TAMBÉM RECALCULA =====
+                        # Remove a condição "if not self.is_boss" para que o boss também recalcule
+                        print("[POKEMON] Chamando recalculate_path_after_capture")
+                        self.recalculate_path_after_capture()
                         break
         elif items is None:
             # Log para debug - só mostra às vezes para não floodar

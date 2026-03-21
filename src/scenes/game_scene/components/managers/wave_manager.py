@@ -137,16 +137,18 @@ class GameWaveManager:
                 enemies_to_remove.append(enemy)
                 continue
 
-            # Verifica se chegou ao fim
+            # ===== VERIFICA SE CHEGOU AO FIM DO PATH =====
             if hasattr(enemy, 'path') and enemy.path and enemy.path_index >= len(enemy.path):
                 # ===== BOSS: NÃO É REMOVIDO, VOLTA PARA O INÍCIO =====
                 if hasattr(enemy, 'is_boss') and enemy.is_boss:
-                    # BOSS: Volta para o início do path
-                    print(f"[BOSS] {enemy.name} chegou ao fim e está voltando para o início!")
+                    # BOSS: Chegou ao fim do path atual
+                    print(f"[BOSS] {enemy.name} chegou ao fim do path!")
 
-                    # Se boss está carregando item, ele desaparece
+                    # ===== VERIFICA SE BOSS ESTÁ CARREGANDO ITEM =====
                     if enemy.is_carrying:
-                        print(f"[BOSS] {enemy.name} está carregando {enemy.is_carrying.item_name} e chegou ao fim!")
+                        # Boss está carregando item e chegou ao fim (que é o início original do path)
+                        print(
+                            f"[BOSS] {enemy.name} está carregando {enemy.is_carrying.item_name} e completou o caminho de volta!")
                         print(f"[BOSS] {enemy.is_carrying.item_name} foi levado com sucesso e DESAPARECE!")
 
                         carried_item = enemy.is_carrying
@@ -154,20 +156,54 @@ class GameWaveManager:
                         carried_item.is_stolen = True
                         carried_item.carried_by = None
 
-                        # ===== CORREÇÃO: Marca o item como roubado no target_item_manager =====
+                        # Marca o item como roubado no target_item_manager
                         if hasattr(self.game_scene, 'target_item_manager'):
                             self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
 
                         enemy.clear_carrying()
 
-                    # Reseta para o início do path
-                    enemy.path_index = 0
-                    if enemy.path and len(enemy.path) > 0:
-                        enemy.x, enemy.y = enemy.path[0]
-                        enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+                        # Resetar a flag de retorno do boss e velocidade
+                        enemy.is_returning_with_item = False
+                        enemy.speed = 0.6  # Volta à velocidade normal do boss
+                        print(f"[BOSS] {enemy.name} perdeu o item, velocidade volta para {enemy.speed}")
 
-                    # Não adiciona à lista de remoção
-                    continue
+                        # ===== RESTAURA O PATH ORIGINAL =====
+                        if hasattr(enemy, 'original_path') and enemy.original_path:
+                            enemy.path = enemy.original_path.copy()
+                            print(f"[BOSS] {enemy.name} path restaurado para o original com {len(enemy.path)} pontos")
+
+                        # Reseta para o início do path original
+                        enemy.path_index = 0
+                        if enemy.path and len(enemy.path) > 0:
+                            enemy.x, enemy.y = enemy.path[0]
+                            enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+                            print(f"[BOSS] {enemy.name} resetado para o início do path original")
+
+                        # Não adiciona à lista de remoção (boss continua vivo)
+                        # IMPORTANTE: CONTINUA para não processar movimento neste frame
+                        continue
+                    else:
+                        # Boss normal (sem item) reseta para o início sem perder item
+                        print(f"[BOSS] {enemy.name} sem item, resetando para o início")
+
+                        # Verifica se o path está invertido e precisa ser restaurado
+                        if enemy.is_returning_with_item:
+                            # Isso não deveria acontecer, mas por segurança
+                            enemy.is_returning_with_item = False
+                            enemy.speed = 0.6
+                            # Restaura path original se necessário
+                            if hasattr(enemy, 'original_path') and enemy.original_path:
+                                enemy.path = enemy.original_path.copy()
+                                print(f"[BOSS] {enemy.name} path restaurado para o original")
+
+                        # Reseta para o início
+                        enemy.path_index = 0
+                        if enemy.path and len(enemy.path) > 0:
+                            enemy.x, enemy.y = enemy.path[0]
+                            enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+
+                        # Não adiciona à lista de remoção
+                        continue
                 else:
                     # Inimigo normal: chega ao fim e é removido
                     print(f"[WAVE] {enemy.name} chegou ao FIM do path! Será removido.")
@@ -190,6 +226,7 @@ class GameWaveManager:
                     continue
 
             # ===== VERIFICAÇÃO EXTRA: Inimigo voltando e próximo do início =====
+            # Só para inimigos normais (não bosses)
             if not enemy.is_boss and enemy.is_carrying and enemy.path and len(enemy.path) > 0:
                 # Verifica se está próximo do último ponto do path (que é o início original)
                 last_point = enemy.path[-1]
@@ -366,7 +403,7 @@ class GameWaveManager:
         is_last_enemy = (enemies_spawned + 1) >= wave_size
 
         # Se for o último inimigo, é boss!
-        is_boss = is_last_enemy and wave_data.get("has_boss", True)  # Padrão True
+        is_boss = is_last_enemy and wave_data.get("has_boss", True)
 
         # Cria o Pokémon inimigo
         pokemon = Pokemon(
@@ -374,7 +411,7 @@ class GameWaveManager:
             enemy_data["pokemon_id"],
             level=level,
             is_wild=True,
-            shiny=random.random() < 0.001,  # 0.1% chance
+            shiny=random.random() < 0.001,
             is_boss=is_boss
         )
 
@@ -387,7 +424,10 @@ class GameWaveManager:
         # Boss é mais lento (mas mais forte)
         if is_boss:
             pokemon.speed = 0.6
+            # ===== GUARDA O PATH ORIGINAL =====
+            pokemon.original_path = path_points.copy()  # Cópia do path original
             print(f"[BOSS] Criado {pokemon.name} (Lv.{pokemon.level}) para Path {path_index + 1}")
+            print(f"[BOSS] Path original guardado com {len(pokemon.original_path)} pontos")
 
         pokemon.path_index = 0
         pokemon.path_index_origin = path_index
