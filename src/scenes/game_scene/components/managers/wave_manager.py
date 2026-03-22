@@ -207,31 +207,40 @@ class GameWaveManager:
                             enemies_to_remove.append(enemy)
                             continue
 
-            # ===== VERIFICAÇÃO EXTRA: Inimigo próximo do início/fim =====
-            if not enemy.is_boss and enemy.is_carrying and enemy.path and len(enemy.path) > 0:
-                # Verifica proximidade com início (ponto 0)
-                start_point = enemy.path[0]
-                dist_to_start = math.hypot(enemy.x - start_point[0], enemy.y - start_point[1])
+                # ===== VERIFICAÇÃO EXTRA: Inimigo próximo do início/fim =====
+                # CORREÇÃO: Só verifica proximidade se NÃO estiver carregando item OU
+                # se estiver carregando item mas já está no processo de retorno
+                # Isso evita remover Pokémon que acabaram de pegar o item e estão perto
+                if not enemy.is_boss and enemy.is_carrying and enemy.path and len(enemy.path) > 0:
+                    # Verifica se o Pokémon está ativamente retornando com o item
+                    # Se está retornando, NÃO deve ser removido mesmo se estiver perto do início/fim
+                    is_returning = (hasattr(enemy, 'is_returning_with_item') and enemy.is_returning_with_item)
 
-                # Verifica proximidade com fim (último ponto)
-                end_point = enemy.path[-1]
-                dist_to_end = math.hypot(enemy.x - end_point[0], enemy.y - end_point[1])
+                    # Só verifica proximidade se NÃO estiver retornando ativamente
+                    if not is_returning:
+                        # Verifica proximidade com início (ponto 0)
+                        start_point = enemy.path[0]
+                        dist_to_start = math.hypot(enemy.x - start_point[0], enemy.y - start_point[1])
 
-                # Se estiver próximo de qualquer extremidade
-                if dist_to_start < 15 or dist_to_end < 15:
-                    print(
-                        f"[GAME_OVER] {enemy.name} próximo do {'INÍCIO' if dist_to_start < 15 else 'FIM'} carregando {enemy.is_carrying.item_name}!")
+                        # Verifica proximidade com fim (último ponto)
+                        end_point = enemy.path[-1]
+                        dist_to_end = math.hypot(enemy.x - end_point[0], enemy.y - end_point[1])
 
-                    carried_item = enemy.is_carrying
-                    carried_item.is_protected = False
-                    carried_item.is_stolen = True
+                        # Se estiver próximo de qualquer extremidade e NÃO estiver retornando
+                        if dist_to_start < 15 or dist_to_end < 15:
+                            print(
+                                f"[GAME_OVER] {enemy.name} próximo do {'INÍCIO' if dist_to_start < 15 else 'FIM'} carregando {enemy.is_carrying.item_name}!")
 
-                    if hasattr(self.game_scene, 'target_item_manager'):
-                        self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
+                            carried_item = enemy.is_carrying
+                            carried_item.is_protected = False
+                            carried_item.is_stolen = True
 
-                    enemies_at_end.append(enemy)
-                    enemies_to_remove.append(enemy)
-                    continue
+                            if hasattr(self.game_scene, 'target_item_manager'):
+                                self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
+
+                            enemies_at_end.append(enemy)
+                            enemies_to_remove.append(enemy)
+                            continue
 
         # Processa XP dos inimigos derrotados
         for enemy in defeated_enemies:
