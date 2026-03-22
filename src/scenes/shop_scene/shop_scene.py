@@ -836,7 +836,6 @@ class ShopScene(BaseScene):
             if self.player.money >= total:
                 self.player.money -= total
                 self.player.bag.add_item(item_id, quantity)
-
                 self.feedback_message = f"Comprou {quantity}x {item_name}"
                 self.feedback_timer = 2.0
             else:
@@ -845,20 +844,55 @@ class ShopScene(BaseScene):
                 selector.hide()
                 return
 
-        else:
+        else:  # modo "sell"
             item_card = selector.item
             item_id = item_card.item_id
             item_name = item_card.name
 
-            self.player.money += total
-            self.player.bag.remove_item(item_id, quantity)
+            # Verifica se tem quantidade suficiente
+            current_qty = self.player.bag.get_quantity(item_id)
+            if current_qty >= quantity:
+                self.player.money += total
+                self.player.bag.remove_item(item_id, quantity)
+                self.feedback_message = f"Vendeu {quantity}x {item_name}"
+                self.feedback_timer = 2.0
+            else:
+                self.feedback_message = f"Você só tem {current_qty}x {item_name}!"
+                self.feedback_timer = 1.5
+                selector.hide()
+                return
 
-            self.feedback_message = f"Vendeu {quantity}x {item_name}"
-            self.feedback_timer = 2.0
-
+        # ========== FORÇA ATUALIZAÇÃO COMPLETA DA UI ==========
+        # 1. Atualiza os cards do inventário com os dados mais recentes
         self.refresh_inventory()
-        self._create_shop_cards()
+
+        # 2. Reaplica os filtros no inventário
+        self.filter_inventory()
+
+        # 3. Recria os cards visuais do inventário
         self._create_inventory_cards()
+
+        # 4. Atualiza a quantidade nos cards da loja
+        for card in self.shop_cards:
+            card.update_owned(self.player.bag.items)
+
+        # 5. Recria os cards da loja
+        self._create_shop_cards()
+
+        # 6. Atualiza os filtros da loja (caso necessário)
+        self.filter_shop()
+
+        # 7. Ajusta o scroll para valores válidos
+        self.inventory_scroll_target = min(self.inventory_scroll_target, self.max_inventory_scroll)
+        self.shop_scroll_target = min(self.shop_scroll_target, self.max_shop_scroll)
+
+        # 8. Garante que a seleção ainda é válida
+        if self.selected_inventory_index >= len(self.filtered_inventory_items):
+            self.selected_inventory_index = max(0, len(self.filtered_inventory_items) - 1)
+        if self.selected_shop_index >= len(self.filtered_shop_items):
+            self.selected_shop_index = max(0, len(self.filtered_shop_items) - 1)
+        # ===================================================
+
         selector.hide()
 
     def fixed_update(self, dt):
