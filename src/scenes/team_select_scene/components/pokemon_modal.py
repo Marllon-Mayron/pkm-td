@@ -115,7 +115,7 @@ class PokemonModal:
             ("Defesa", str(self.pokemon.defense)),
             ("Sp.Atk", str(self.pokemon.sp_attack)),
             ("Sp.Def", str(self.pokemon.sp_defense)),
-            ("Vel.", str(self.pokemon.speed))
+            ("Speed.", str(self.pokemon.speed_stat))
         ]
 
         for i, (stat_name, stat_value) in enumerate(stats):
