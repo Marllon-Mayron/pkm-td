@@ -88,7 +88,7 @@ class SaveManager:
             "defense": pokemon.defense,
             "sp_attack": pokemon.sp_attack,
             "sp_defense": pokemon.sp_defense,
-            "speed": pokemon.speed,
+            "speed": pokemon.speed_stat,
             "is_in_team": pokemon.is_in_team,
             "is_placed": getattr(pokemon, 'is_placed', False),
             "spot_id": getattr(pokemon, 'spot_id', None)
@@ -111,6 +111,7 @@ class SaveManager:
         # Restaura os atributos
         pokemon.current_hp = data["current_hp"]
         pokemon.max_hp = data["max_hp"]
+        pokemon.speed_stat = data["speed"]
         pokemon.xp = data["xp"]
         pokemon.ivs = data["ivs"]
         pokemon.evs = data["evs"]

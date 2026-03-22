@@ -179,7 +179,7 @@ class GameWaveManager:
 
                             # Reseta flag de retorno
                             enemy.is_returning_with_item = False
-                            enemy.speed = 0.6
+                            enemy.move_speed = enemy.base_move_speed  # Usa move_speed em vez de speed
 
                             # CONTINUA VIVO - não remove
                             continue
@@ -400,7 +400,7 @@ class GameWaveManager:
             start_x, start_y,
             enemy_data["pokemon_id"],
             level=level,
-            is_wild=True,
+            is_wild=True,  # IMPORTANTE: is_wild=True para ativar a velocidade baseada em stat
             shiny=random.random() < 0.001,
             is_boss=is_boss
         )
@@ -409,15 +409,24 @@ class GameWaveManager:
 
         # Configura para seguir o path
         pokemon.path = path_points
-        pokemon.speed = 0.8
 
-        # Boss é mais lento (mas mais forte)
+        # A velocidade JÁ FOI CALCULADA no __init__ (baseada no speed stat)
+        # Apenas aplica multiplicador da wave se existir
+        wave_speed_multiplier = wave_data.get("speed_multiplier", 1.0)
+        if wave_speed_multiplier != 1.0:
+            pokemon.move_speed = pokemon.base_move_speed * wave_speed_multiplier
+            print(
+                f"[VELOCIDADE] {pokemon.name} velocidade ajustada: {pokemon.base_move_speed:.2f} -> {pokemon.move_speed:.2f} (x{wave_speed_multiplier})")
+        # Log para debug
         if is_boss:
-            pokemon.speed = 0.6
-            # ===== GUARDA O PATH ORIGINAL =====
-            pokemon.original_path = path_points.copy()  # Cópia do path original
-            print(f"[BOSS] Criado {pokemon.name} (Lv.{pokemon.level}) para Path {path_index + 1}")
-            print(f"[BOSS] Path original guardado com {len(pokemon.original_path)} pontos")
+            # Guarda o path original
+            pokemon.original_path = path_points.copy()
+            print(
+                f"[BOSS] Criado {pokemon.name} (Lv.{pokemon.level}, Velocidade Mapa: {pokemon.move_speed:.2f}) para Path {path_index + 1}")
+            print(f"[BOSS] Speed stat: {pokemon.speed_stat}, Velocidade no mapa: {pokemon.move_speed:.2f}")
+        else:
+            print(
+                f"[ENEMY] Criado {pokemon.name} (Lv.{pokemon.level}, Speed stat: {pokemon.speed_stat}, Velocidade no mapa: {pokemon.move_speed:.2f})")
 
         pokemon.path_index = 0
         pokemon.path_index_origin = path_index

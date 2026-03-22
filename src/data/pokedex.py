@@ -94,9 +94,23 @@ class Pokedex:
 
             print(f"Carregados {len(self.pokemon_data)} Pokémon do JSON")
 
+            self._cache_base_speed_limits()
+
         except Exception as e:
             print(f"Erro ao carregar Pokémon data: {e}")
             self._load_fallback_data()
+
+    def _cache_base_speed_limits(self):
+        """Calcula e armazena os valores mínimo e máximo de base speed entre todos os Pokémon"""
+        if not self.pokemon_data:
+            self.min_base_speed = 0
+            self.max_base_speed = 1
+            return
+
+        base_speeds = [data["base_stats"]["speed"] for data in self.pokemon_data.values()]
+        self.min_base_speed = min(base_speeds)
+        self.max_base_speed = max(base_speeds)
+        print(f"[Pokedex] Base speed limits: min={self.min_base_speed}, max={self.max_base_speed}")
 
     def _format_filename(self, pokemon_id, shiny=False):
         """Formata nome do arquivo com 3 dígitos"""

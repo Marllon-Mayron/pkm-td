@@ -100,8 +100,16 @@ class Pokemon(Entity):
         # ===== 11. MOVIMENTO =====
         self.path = []
         self.path_index = 0
-        self.speed = 2.0
-        self.base_speed = self.speed
+        self.move_speed = 2.0  # Velocidade de movimento no mapa
+
+        # APENAS POKÉMONS SELVAGENS têm velocidade baseada no stat
+        if is_wild:
+            self.base_move_speed = self._calculate_wild_move_speed()
+            self.move_speed = self.base_move_speed
+            print(f"[VELOCIDADE] {self.name} velocidade de movimento: {self.move_speed:.2f}")
+        else:
+            self.base_move_speed = 2.0  # Fixo para Pokémon do jogador
+            self.move_speed = 2.0
 
         # ===== 12. COMBATE =====
         self.can_attack = True
@@ -130,7 +138,7 @@ class Pokemon(Entity):
 
         # ===== 17. COOLDOWNS =====
         self.charge_cooldown = 0.0
-        self.charge_cooldown_max = 1.5
+        self.charge_cooldown_max = 1.2
 
         # ===== 18. STATS DE COMBATE =====
         self.attack_damage = self._calculate_attack_damage()
@@ -149,7 +157,7 @@ class Pokemon(Entity):
         self.defense = stats["defense"]
         self.sp_attack = stats["special_attack"]
         self.sp_defense = stats["special_defense"]
-        self.speed = stats["speed"]
+        self.speed_stat = stats["speed"]  # Renomeado para speed_stat
 
         # Aplicar natureza
         if hasattr(self, 'nature_multipliers'):
@@ -157,7 +165,7 @@ class Pokemon(Entity):
             self.defense = int(self.defense * self.nature_multipliers["defense"])
             self.sp_attack = int(self.sp_attack * self.nature_multipliers["sp_attack"])
             self.sp_defense = int(self.sp_defense * self.nature_multipliers["sp_defense"])
-            self.speed = int(self.speed * self.nature_multipliers["speed"])
+            self.speed_stat = int(self.speed_stat * self.nature_multipliers["speed"])
 
     def _calculate_xp_needed(self):
         """Calcula XP necessário para próximo nível (formato medium-fast)"""
@@ -304,6 +312,75 @@ class Pokemon(Entity):
         """Calcula o poder de ataque baseado na média de Attack e Sp. Attack"""
         return (self.attack + self.sp_attack) / 2
 
+    def _calculate_wild_move_speed(self):
+        """
+        Converte o Speed Stat real do Pokémon em velocidade de movimento no mapa,
+        combinando a base da espécie com variações individuais (IVs, EVs, Natureza)
+        e escalando com o nível.
+        """
+        # Limites de velocidade no mapa (ajuste conforme o equilíbrio desejado)
+        MIN_MOVE_SPEED = 0.2
+        MAX_MOVE_SPEED = 4.5
+
+        # 1. Limites globais de Base Speed (já cacheados na Pokedex)
+        min_base = self.pokedex.min_base_speed
+        max_base = self.pokedex.max_base_speed
+
+        base_speed = self.base_stats["speed"]
+        # Normaliza o Base Speed entre 0 e 1 (referência da espécie)
+        if max_base > min_base:
+            base_norm = (base_speed - min_base) / (max_base - min_base)
+            base_norm = max(0.0, min(1.0, base_norm))
+        else:
+            base_norm = 0.5
+
+        # 2. Variação individual: calcula o Speed Stat mínimo e máximo possível
+        #    para esta espécie no nível atual (considerando IVs, EVs e Natureza)
+        #    Usamos os extremos: IV 0/31, EV 0/252, Natureza com penalidade/bônus de Speed.
+        nature_min = 0.9
+        nature_max = 1.1
+
+        def calc_speed_stat(iv, ev, nature_mult):
+            # Fórmula: ((2 * base + iv + (ev // 4)) * level) / 100 + 5
+            raw = ((2 * base_speed + iv + (ev // 4)) * self.level) / 100 + 5
+            return int(raw * nature_mult)
+
+        min_speed_stat = calc_speed_stat(0, 0, nature_min)
+        max_speed_stat = calc_speed_stat(31, 252, nature_max)
+
+        actual_speed = self.speed_stat
+
+        if max_speed_stat > min_speed_stat:
+            stat_norm = (actual_speed - min_speed_stat) / (max_speed_stat - min_speed_stat)
+            stat_norm = max(0.0, min(1.0, stat_norm))
+        else:
+            stat_norm = 0.5
+
+        # 3. Combina a base da espécie (80%) com a variação individual (20%)
+        combined_norm = base_norm * (0.8 + 0.2 * stat_norm)
+
+        # 4. Escala com o nível (nível 1 → fator 1.0; nível 100 → fator 1.3)
+        level_factor = 1.0 + (self.level / 100) * 0.3
+
+        # 5. Mapeia o valor normalizado para a velocidade de movimento
+        move_speed = MIN_MOVE_SPEED + (MAX_MOVE_SPEED - MIN_MOVE_SPEED) * combined_norm
+        move_speed *= level_factor
+
+        # 6. Bônus e penalidades especiais
+        if self.is_shiny:
+            move_speed *= 1.25
+        if self.is_boss:
+            move_speed *= 0.7
+
+        move_speed = max(MIN_MOVE_SPEED, min(MAX_MOVE_SPEED, move_speed))
+
+        # Log de debug (opcional)
+        print(f"[VELOCIDADE] {self.name:12} Lv.{self.level:2} | "
+              f"Base: {base_speed:3} | Stat: {actual_speed:3} | "
+              f"Combined: {combined_norm:.3f} | Vel: {move_speed:.2f}")
+
+        return round(move_speed, 2)
+
     def _calculate_defense(self):
         """Calcula a defesa baseada na média de Defense e Sp. Defense"""
         return (self.defense + self.sp_defense) / 2
@@ -393,11 +470,11 @@ class Pokemon(Entity):
             self.charge_cooldown = self.charge_cooldown_max
             return
 
-        # Move em linha reta com velocidade constante
+        # Move em linha reta com velocidade constante (usa move_speed)
         if distance > 0:
             # Normaliza o vetor e multiplica pela velocidade
-            move_x = (dx / distance) * self.base_speed * dt * 60
-            move_y = (dy / distance) * self.base_speed * dt * 60
+            move_x = (dx / distance) * self.move_speed * dt * 60
+            move_y = (dy / distance) * self.move_speed * dt * 60
 
             # Garante que não ultrapassa o alvo
             if abs(move_x) > abs(dx):
@@ -430,10 +507,10 @@ class Pokemon(Entity):
             self.target = None
             return
 
-        # Move de volta com velocidade constante
+        # Move de volta com velocidade constante (usa move_speed)
         if distance > 0:
-            move_x = (dx / distance) * self.base_speed * dt * 60
-            move_y = (dy / distance) * self.base_speed * dt * 60
+            move_x = (dx / distance) * self.move_speed * dt * 60
+            move_y = (dy / distance) * self.move_speed * dt * 60
 
             # Garante que não ultrapassa o spot
             if abs(move_x) > abs(dx):
@@ -753,8 +830,8 @@ class Pokemon(Entity):
                 else:
                     self.current_direction = "down" if dy > 0 else "up"
 
-            # Velocidade de movimento (pixels por segundo)
-            move_distance = self.speed * dt * 60
+            # Velocidade de movimento (pixels por segundo) - USAR move_speed
+            move_distance = self.move_speed * dt * 60
 
             # Verifica se chegou no ponto atual
             if distance <= move_distance:
