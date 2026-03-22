@@ -1,7 +1,6 @@
-# src/scenes/game_scene.py (versão final otimizada - sem grid)
-
+# src/scenes/game_scene.py
 """
-Cena principal do jogo - Carrega fases reais com waves
+Cena principal do jogo - OTIMIZADA
 """
 import pygame
 from src.config.paths import PROJECT_ROOT
@@ -25,7 +24,7 @@ class GameScene(BaseScene):
     def __init__(self, game, chapter_id=1, phase_number=1):
         super().__init__(game)
 
-        # Flag de debug (False para produção)
+        # Flag de debug
         self.debug_in_game = False
 
         self.chapter_id = chapter_id
@@ -33,7 +32,7 @@ class GameScene(BaseScene):
         self.phase_id = f"{chapter_id}-{phase_number}"
         self.phase_info = None
 
-        # Carrega informações da fase do catálogo
+        # Carrega informações da fase
         self._load_phase_info()
 
         # Componentes da fase
@@ -41,136 +40,110 @@ class GameScene(BaseScene):
         self.path_renderer = PathRenderer()
         self.spot_renderer = PokemonSpotRenderer()
 
-        # Cria os gerenciadores básicos
+        # Cria os gerenciadores
         self.team_manager = GameTeamManager(game)
         self.placement_manager = PlacementManager(self)
         self.target_item_manager = TargetItemManager(game)
         self.target_item_renderer = TargetItemRenderer()
 
-        # CARREGA OS DADOS DA FASE PRIMEIRO
+        # CARREGA OS DADOS DA FASE
         self._load_phase_data()
 
-        # SÓ DEPOIS de carregar os dados, cria o overlay_manager
+        # Cria o overlay_manager
         self.overlay_manager = OverlayManager(self)
 
-        # cria o wave_manager, depois de carregar os dados
+        # Cria o wave_manager
         self.wave_manager = GameWaveManager(phase_loader)
 
-        # Vincula os itens alvo ao wave_manager
+        # Vincula os itens alvo
         self.wave_manager.set_target_items(self.target_item_manager.items)
         self.wave_manager.game_scene = self
 
-        # Configurações de mundo baseadas no mapa
+        # Configurações de mundo
         self._setup_world_dimensions()
 
         self.player = game.player
 
-        # Renderizador da mochila
+        # Renderizadores
         self.item_bag_renderer = ItemBagRenderer(game, self.player.bag)
-
-        # Gerenciador de arrasto de itens
         self.item_drag_manager = ItemDragManager(game, self.player.bag)
 
         # Inicializa câmera
         self.game.initialize_camera(self.world_width, self.world_height)
         self.camera = self.game.camera
-        self.camera.set_limits(
-            -500, self.world_width + 500,
-            -500, self.world_height + 500
-        )
-
-        # Posiciona câmera no centro do mapa
+        self.camera.set_limits(-500, self.world_width + 500, -500, self.world_height + 500)
         self.camera.x = self.world_width / 2
         self.camera.y = self.world_height / 2
 
-        # Spot atualmente sob o mouse
-        self.hovered_spot = None
-
-        # Lista de Pokémon colocados no mapa
-        self.placed_pokemon = []
-
         # Estado do jogo
+        self.hovered_spot = None
+        self.placed_pokemon = []
         self.game_state = "waiting"
         self.between_waves_timer = 3.0
-
-        # Debug
         self.show_debug = False
 
-        # Fontes cacheadas para debug
+        # Fontes cacheadas
         self._debug_font = pygame.font.Font(None, 18)
         self._debug_font_bold = pygame.font.Font(None, 20)
         self._debug_font_small = pygame.font.Font(None, 16)
+        self._ui_font = None
+        self._ui_font_small = None
 
         # Controle de arrasto da câmera
         self.dragging_camera = False
         self.last_mouse_pos = None
 
-        # Inicia automaticamente a primeira wave
+        # Cache de referências para otimização
+        self._cached_spot_renderer = None
+        self._cached_placement_manager = None
+        self._cached_team_manager = None
+        self._cached_item_bag_renderer = None
+
+        # Inicia o jogo
         self._start_game()
 
-        if self.debug_in_game:
-            print(f"\n=== FASE CARREGADA ===")
-            print(f"Fase: {self.phase_info.get('name', 'Desconhecida')}")
-            print(f"Capítulo: {self.chapter_id}")
-            print(f"Número: {self.phase_number}")
-            print(f"ID: {self.phase_id}")
-            print(f"Waves: {len(self.wave_manager.waves_data)}")
-            print(f"Itens alvo: {len(self.target_item_manager.items)}")
-            print(f"Recompensas: ${self.phase_rewards['money']} | {self.phase_rewards['experience']} XP")
-            print(f"Mundo: {self.world_width}x{self.world_height}")
-            print("=====================\n")
+    def _get_ui_font(self, size=24):
+        """Obtém fonte da UI com cache"""
+        if size == 24:
+            if self._ui_font is None:
+                self._ui_font = pygame.font.Font(None, 24)
+            return self._ui_font
+        else:
+            if self._ui_font_small is None:
+                self._ui_font_small = pygame.font.Font(None, 18)
+            return self._ui_font_small
 
     def _start_game(self):
         """Inicia o jogo"""
         if self.wave_manager.has_more_waves():
             self.game_state = "in_wave"
             self.wave_manager.start_all_waves()
-        elif self.debug_in_game:
-            print("Fase não tem waves configuradas!")
 
     def _load_phase_info(self):
         """Carrega informações da fase do catálogo"""
         self.phase_info = phase_catalog.get_phase_info(self.chapter_id, self.phase_number)
-
         if not self.phase_info:
             self.phase_info = {
                 "name": f"Fase {self.chapter_id}-{self.phase_number}",
                 "number": self.phase_number,
                 "chapter": self.chapter_id
             }
-            if self.debug_in_game:
-                print(f"Fase {self.phase_id} não encontrada no catálogo, usando fallback")
 
     def _load_phase_data(self):
         """Carrega os dados da fase do disco"""
-        if self.debug_in_game:
-            print(f"\n=== CARREGANDO DADOS DA FASE {self.chapter_id}-{self.phase_number} ===")
-
         data = phase_loader.load_phase(self.chapter_id, self.phase_number)
 
         if not data:
-            if self.debug_in_game:
-                print(f"ERRO: Não foi possível carregar a fase {self.phase_id}")
             self.phase_rewards = {"money": 0, "experience": 0}
             return
 
         base_path = PROJECT_ROOT
 
-        # Carrega mapa
-        map_data = phase_loader.get_map_data()
-        self.map_renderer.load_from_data(map_data, base_path)
-
-        # Carrega paths
-        paths_data = phase_loader.get_paths_data()
-        self.path_renderer.load_from_data(paths_data)
-
-        # Carrega spots
-        spot_data = phase_loader.get_tower_spots_data()
-        self.spot_renderer.load_from_data(spot_data)
-
-        # Carrega itens alvo
-        items_data = data.get("target_items", {})
-        self.target_item_manager.load_from_data(items_data)
+        # Carrega componentes
+        self.map_renderer.load_from_data(phase_loader.get_map_data(), base_path)
+        self.path_renderer.load_from_data(phase_loader.get_paths_data())
+        self.spot_renderer.load_from_data(phase_loader.get_tower_spots_data())
+        self.target_item_manager.load_from_data(data.get("target_items", {}))
 
         # Carrega recompensas
         rewards = data.get("rewards", {})
@@ -179,14 +152,9 @@ class GameScene(BaseScene):
             "experience": rewards.get("experience", 0)
         }
 
-        if self.debug_in_game:
-            print(f"✓ Recompensas carregadas: ${self.phase_rewards['money']} | {self.phase_rewards['experience']} XP")
-            print("=== DADOS CARREGADOS COM SUCESSO ===\n")
-
     def _setup_world_dimensions(self):
         """Configura dimensões do mundo baseado no mapa"""
         map_width, map_height = self.map_renderer.get_dimensions()
-
         if map_width > 0 and map_height > 0:
             self.world_width = map_width
             self.world_height = map_height
@@ -196,18 +164,16 @@ class GameScene(BaseScene):
 
     def _on_item_use(self, target, item_data, target_type):
         """Callback quando um item é usado em um alvo"""
-        if self.debug_in_game:
-            print(f"[USO] Usando {item_data['name']} em {getattr(target, 'name', 'alvo')}")
+        effect = item_data.get("effect", "")
+        category = item_data.get("category", "")
 
-        if item_data["effect"] == "evolution":
+        if effect == "evolution":
             if target_type == "ally":
                 return self._use_evolution_stone(target, item_data)
             return False
-
-        elif target_type == "enemy" and item_data["category"] == "pokeball":
+        elif target_type == "enemy" and category == "pokeball":
             return self._attempt_capture(target, item_data)
-
-        elif target_type == "ally" and item_data["category"] == "medicine":
+        elif target_type == "ally" and category == "medicine":
             return self._use_medicine(target, item_data)
 
         return False
@@ -217,32 +183,14 @@ class GameScene(BaseScene):
         from src.managers.evolution_manager import evolution_manager
 
         stone_name = item_data["id"]
-        stone_display = item_data["name"]
-
-        if self.debug_in_game:
-            print(f"\n{'=' * 50}")
-            print(f"[EVOLUÇÃO] Usando {stone_display} em {pokemon.name} (Lv.{pokemon.level})")
-            print(f"{'=' * 50}")
-
         evolution = evolution_manager.check_evolution(pokemon.id, stone_name=stone_name)
 
         if not evolution:
-            if self.debug_in_game:
-                print(f"[EVOLUÇÃO] ❌ {pokemon.name} não pode evoluir com {stone_display}!")
             self.player.bag.add_item(item_data["id"], 1)
             return False
 
         evolve_to_id = evolution["evolve_to"]
-
-        if self.debug_in_game:
-            print(f"[EVOLUÇÃO] ✅ {pokemon.name} pode evoluir para ID {evolve_to_id}!")
-
-        old_name = pokemon.name
         pokemon._perform_evolution(evolve_to_id)
-
-        if self.debug_in_game:
-            print(f"[EVOLUÇÃO] ✨ {old_name} evoluiu para {pokemon.name}!")
-            print(f"{'=' * 50}\n")
 
         self.player.caught_pokemon.add(evolve_to_id)
         self.player.register_seen(evolve_to_id)
@@ -253,8 +201,6 @@ class GameScene(BaseScene):
     def _attempt_capture(self, enemy, item_data):
         """Tenta capturar um Pokémon selvagem"""
         if hasattr(enemy, 'is_boss') and enemy.is_boss:
-            if self.debug_in_game:
-                print(f"[CAPTURA] {enemy.name} é um BOSS e não pode ser capturado!")
             return False
 
         hp_ratio = enemy.current_hp / enemy.max_hp
@@ -271,9 +217,6 @@ class GameScene(BaseScene):
 
         import random
         roll = random.random()
-
-        if self.debug_in_game:
-            print(f"[CAPTURA] Chance: {chance * 100:.1f}% | Rolagem: {roll * 100:.1f}%")
 
         if roll < chance or item_data["id"] == "masterball":
             carried_item = enemy.is_carrying
@@ -307,8 +250,6 @@ class GameScene(BaseScene):
     def _use_medicine(self, pokemon, item_data):
         """Usa poção em um Pokémon aliado"""
         if not pokemon.is_alive() and "revive" not in item_data["id"]:
-            if self.debug_in_game:
-                print(f"[POÇÃO] {pokemon.name} está derrotado! Use um Reviver.")
             return False
 
         heal_amount = item_data["effect_value"]
@@ -323,11 +264,7 @@ class GameScene(BaseScene):
             else:
                 pokemon.heal()
         else:
-            old_hp = pokemon.current_hp
             pokemon.current_hp = min(pokemon.max_hp, pokemon.current_hp + heal_amount)
-            healed = pokemon.current_hp - old_hp
-            if self.debug_in_game:
-                print(f"[POÇÃO] {pokemon.name} recuperou {healed} HP!")
 
         return True
 
@@ -335,11 +272,7 @@ class GameScene(BaseScene):
         """Callback quando um Pokémon é colocado no mapa"""
         pokemon = placement_data['pokemon']
         spot = placement_data['spot']
-
-        placed = self.placement_manager.add_pokemon(spot, pokemon)
-
-        if placed and self.debug_in_game:
-            print(f"[PLACED] Pokémon {pokemon.name} colocado no spot ({spot.x}, {spot.y})")
+        self.placement_manager.add_pokemon(spot, pokemon)
 
     def cleanup(self):
         """Limpa o estado da fase antes de sair"""
@@ -347,128 +280,127 @@ class GameScene(BaseScene):
             spot.occupied = False
 
         self.placed_pokemon.clear()
+        self.placement_manager.placed_pokemon.clear()
 
-        if hasattr(self, 'placement_manager'):
-            self.placement_manager.placed_pokemon.clear()
+        for pokemon in self.player.team:
+            pokemon.is_placed = False
 
-        if hasattr(self, 'player'):
-            for pokemon in self.player.team:
-                pokemon.is_placed = False
-
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.active_enemies.clear()
+        self.wave_manager.active_enemies.clear()
 
     def handle_event(self, event):
-        """Processa eventos do jogo"""
-        if self.overlay_manager.is_active:
+        """Processa eventos do jogo - OTIMIZADO"""
+        # Cache de referências
+        overlay_active = self.overlay_manager.is_active
+        drag_manager = self.item_drag_manager
+        bag_renderer = self.item_bag_renderer
+        team_manager = self.team_manager
+        placement_mgr = self.placement_manager
+        spot_renderer = self.spot_renderer
+        player = self.player
+        camera = self.camera
+        screen_mgr = self.screen_manager
+
+        if overlay_active:
             if self.overlay_manager.handle_event(event):
                 return None
             return None
 
-        if self.item_drag_manager.is_dragging:
+        # Drag manager
+        if drag_manager.is_dragging:
             if event.type == pygame.MOUSEMOTION:
-                world_pos = self.screen_manager.get_mouse_world_position(event.pos, self.camera)
+                world_pos = screen_mgr.get_mouse_world_position(event.pos, camera)
                 if world_pos:
-                    self.item_drag_manager.update_drag(
+                    drag_manager.update_drag(
                         event.pos, world_pos,
-                        self.placement_manager.placed_pokemon,
+                        placement_mgr.placed_pokemon,
                         self.wave_manager.active_enemies,
-                        self.camera
+                        camera
                     )
                 return None
-
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                self.item_drag_manager.stop_drag(self._on_item_use)
+                drag_manager.stop_drag(self._on_item_use)
                 return None
-
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                self.item_drag_manager.cancel_drag()
+                drag_manager.cancel_drag()
                 return None
 
-        if hasattr(self, 'item_bag_renderer'):
-            bag_handled = self.item_bag_renderer.handle_event(event)
-            if bag_handled:
-                return None
+        # Item bag
+        if bag_renderer and bag_renderer.handle_event(event):
+            return None
 
+        # Teclado
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_TAB:
-                if hasattr(self, 'player') and hasattr(self.player, 'bag'):
-                    self.player.bag.cycle_category()
+                if hasattr(player, 'bag'):
+                    player.bag.cycle_category()
                 return None
-
             elif event.key == pygame.K_p:
                 self.toggle_pause()
                 return None
-
             elif event.key == pygame.K_ESCAPE:
                 self.game.current_scene = self.game.menu_scene
                 return None
-
             elif event.key == pygame.K_F1:
                 self.show_debug = not self.show_debug
                 return None
-
             elif event.key == pygame.K_SPACE:
                 if self.game_state == "between_waves":
                     self.game_state = "in_wave"
                     self.wave_manager.start_next_wave()
                 return None
 
+        # Mouse wheel
         if event.type == pygame.MOUSEWHEEL:
-            mouse_pos = pygame.mouse.get_pos()
-
-            if (hasattr(self.item_bag_renderer, 'mouse_over_ui') and
-                    self.item_bag_renderer.mouse_over_ui):
+            if bag_renderer and hasattr(bag_renderer, 'mouse_over_ui') and bag_renderer.mouse_over_ui:
                 if event.y > 0:
-                    self.player.bag.prev_item()
+                    player.bag.prev_item()
                 elif event.y < 0:
-                    self.player.bag.next_item()
-                self.item_bag_renderer.hovered_index = self.player.bag.selected_item_index
+                    player.bag.next_item()
+                bag_renderer.hovered_index = player.bag.selected_item_index
                 return None
-
             elif not self.paused and not self.dragging_camera:
                 mouse_pos = pygame.mouse.get_pos()
-                if self.screen_manager.is_mouse_in_viewport(mouse_pos):
-                    world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
+                if screen_mgr.is_mouse_in_viewport(mouse_pos):
+                    world_pos = screen_mgr.get_mouse_world_position(mouse_pos, camera)
                     if world_pos:
-                        target_world_x, target_world_y = world_pos
-                        self.camera.handle_zoom(event.y > 0)
-
-                        new_world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
+                        target_x, target_y = world_pos
+                        camera.handle_zoom(event.y > 0)
+                        new_world_pos = screen_mgr.get_mouse_world_position(mouse_pos, camera)
                         if new_world_pos:
-                            dx = target_world_x - new_world_pos[0]
-                            dy = target_world_y - new_world_pos[1]
-                            self.camera.x += dx
-                            self.camera.y += dy
-                            self.camera._clamp_position()
+                            dx = target_x - new_world_pos[0]
+                            dy = target_y - new_world_pos[1]
+                            camera.x += dx
+                            camera.y += dy
+                            camera._clamp_position()
                 return None
 
+        # Mouse button down
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = pygame.mouse.get_pos()
-
-            if (hasattr(self.item_bag_renderer, 'mouse_over_ui') and
-                    self.item_bag_renderer.mouse_over_ui):
-                hovered_index = self.item_bag_renderer.hovered_index
+            if bag_renderer and hasattr(bag_renderer, 'mouse_over_ui') and bag_renderer.mouse_over_ui:
+                hovered_index = bag_renderer.hovered_index
                 if hovered_index >= 0:
-                    items = self.player.bag.get_items_for_render()
+                    items = player.bag.get_items_for_render()
                     if hovered_index < len(items):
                         item = items[hovered_index]
-                        self.player.bag.selected_item_index = hovered_index
-                        world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
+                        player.bag.selected_item_index = hovered_index
+                        world_pos = screen_mgr.get_mouse_world_position(mouse_pos, camera)
                         if world_pos:
-                            self.item_drag_manager.start_drag(item["id"], mouse_pos, world_pos)
+                            drag_manager.start_drag(item["id"], mouse_pos, world_pos)
                 return None
 
-        if hasattr(self, 'team_manager'):
-            result = self.team_manager.handle_event(
-                event, self.spot_renderer.get_spots(), self.camera, self._on_pokemon_placed
+        # Team manager
+        if team_manager:
+            result = team_manager.handle_event(
+                event, spot_renderer.get_spots(), camera, self._on_pokemon_placed
             )
             if result:
                 return None
 
+        # Mouse buttons
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_pos = pygame.mouse.get_pos()
-            in_viewport = self.screen_manager.is_mouse_in_viewport(mouse_pos)
+            in_viewport = screen_mgr.is_mouse_in_viewport(mouse_pos)
 
             if event.button == 2:
                 if in_viewport:
@@ -476,13 +408,11 @@ class GameScene(BaseScene):
                     self.last_mouse_pos = mouse_pos
                     pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
                 return None
-
             elif event.button == 3:
-                if not (hasattr(self.item_bag_renderer, 'mouse_over_ui') and
-                        self.item_bag_renderer.mouse_over_ui):
-                    world_pos = self.screen_manager.get_mouse_world_position(event.pos, self.camera)
+                if not (bag_renderer and hasattr(bag_renderer, 'mouse_over_ui') and bag_renderer.mouse_over_ui):
+                    world_pos = screen_mgr.get_mouse_world_position(event.pos, camera)
                     if world_pos:
-                        self.placement_manager.remove_pokemon_by_right_click(world_pos[0], world_pos[1])
+                        placement_mgr.remove_pokemon_by_right_click(world_pos[0], world_pos[1])
                 return None
 
         elif event.type == pygame.MOUSEBUTTONUP:
@@ -496,30 +426,27 @@ class GameScene(BaseScene):
             if self.dragging_camera and self.last_mouse_pos:
                 dx = event.pos[0] - self.last_mouse_pos[0]
                 dy = event.pos[1] - self.last_mouse_pos[1]
-                world_dx = dx / self.camera.zoom
-                world_dy = dy / self.camera.zoom
-                self.camera.x -= world_dx
-                self.camera.y -= world_dy
-                self.camera._clamp_position()
+                camera.x -= dx / camera.zoom
+                camera.y -= dy / camera.zoom
+                camera._clamp_position()
                 self.last_mouse_pos = event.pos
                 return None
 
             if self.game_state != "game_over":
-                if hasattr(self.item_bag_renderer, 'update_hover'):
-                    self.item_bag_renderer.update_hover(event.pos)
+                if bag_renderer and hasattr(bag_renderer, 'update_hover'):
+                    bag_renderer.update_hover(event.pos)
 
                 mouse_pos = pygame.mouse.get_pos()
-                if self.screen_manager.is_mouse_in_viewport(mouse_pos):
-                    world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
+                if screen_mgr.is_mouse_in_viewport(mouse_pos):
+                    world_pos = screen_mgr.get_mouse_world_position(mouse_pos, camera)
                     if world_pos:
-                        self.hovered_spot = self.spot_renderer.get_spot_at_world_pos(world_pos[0], world_pos[1])
-
+                        self.hovered_spot = spot_renderer.get_spot_at_world_pos(world_pos[0], world_pos[1])
             return None
 
         return None
 
     def fixed_update(self, dt):
-        """Update da lógica do jogo"""
+        """Update da lógica do jogo - OTIMIZADO"""
         if self.paused:
             return
 
@@ -527,44 +454,61 @@ class GameScene(BaseScene):
             self.overlay_manager.update(dt)
             return
 
-        if hasattr(self, 'item_bag_renderer'):
-            self.item_bag_renderer.update(dt)
+        # Cache de referências locais para acesso mais rápido
+        wave_mgr = self.wave_manager
+        target_mgr = self.target_item_manager
+        placement_mgr = self.placement_manager
+        spot_renderer = self.spot_renderer
+        team_mgr = self.team_manager
+        bag_renderer = self.item_bag_renderer
+        placed_pokemon = self.placed_pokemon
+        screen_mgr = self.screen_manager
+        path_renderer = self.path_renderer
 
-        if hasattr(self, 'team_manager'):
-            self.team_manager.update(dt)
+        # Updates
+        if bag_renderer:
+            bag_renderer.update(dt)
 
-        if hasattr(self, 'placement_manager'):
-            self.placement_manager.update(dt, self.wave_manager.active_enemies)
+        if team_mgr:
+            team_mgr.update(dt)
 
-        if hasattr(self, 'spot_renderer'):
-            self.spot_renderer.update(dt)
+        if placement_mgr:
+            placement_mgr.update(dt, wave_mgr.active_enemies)
 
-        for pokemon in self.placed_pokemon:
+        if spot_renderer:
+            spot_renderer.update(dt)
+
+        for pokemon in placed_pokemon:
             pokemon.update(dt)
 
-        self.target_item_manager.update(dt)
+        target_mgr.update(dt)
 
-        if self.target_item_manager.game_over:
+        # Game over check
+        if target_mgr.game_over:
             self.game_state = "game_over"
             self.overlay_manager.show(OverlayType.GAME_OVER)
             return
 
+        # Build path points cache
         path_points_by_index = {}
-        for i in range(len(self.path_renderer.paths)):
-            path_points = self.path_renderer.get_path_points(i)
+        for i, path in enumerate(path_renderer.paths):
+            path_points = path_renderer.get_path_points(i)
             if path_points:
                 path_points_by_index[i] = path_points
 
-        enemies_at_end = self.wave_manager.update(dt, path_points_by_index, self.screen_manager)
+        # Update wave manager
+        enemies_at_end = wave_mgr.update(dt, path_points_by_index, screen_mgr)
 
+        # Clean up enemies at end
         for enemy in enemies_at_end:
             if enemy.is_carrying:
                 enemy.is_carrying.is_protected = False
                 enemy.clear_carrying()
 
+        # State transitions
         if self.game_state == "in_wave":
-            if self.wave_manager.is_wave_completely_finished():
-                if self.target_item_manager.items_protected > 0:
+            if wave_mgr.is_wave_completely_finished():
+                if target_mgr.items_protected > 0:
                     self.game_state = "completed"
                     self._complete_phase()
                 else:
@@ -575,10 +519,9 @@ class GameScene(BaseScene):
             self.between_waves_timer -= dt
             if self.between_waves_timer <= 0:
                 any_wave_started = False
-                for path_idx in self.wave_manager.path_waves.keys():
-                    if self.wave_manager.current_wave_index_by_path.get(path_idx, 0) < len(
-                            self.wave_manager.path_waves[path_idx]):
-                        self.wave_manager._start_wave_for_path(path_idx)
+                for path_idx in wave_mgr.path_waves.keys():
+                    if wave_mgr.current_wave_index_by_path.get(path_idx, 0) < len(wave_mgr.path_waves[path_idx]):
+                        wave_mgr._start_wave_for_path(path_idx)
                         any_wave_started = True
 
                 if any_wave_started:
@@ -588,20 +531,9 @@ class GameScene(BaseScene):
         """Marca a fase como completada e dá as recompensas"""
         from src.config.progress import progress_manager
 
-        if self.debug_in_game:
-            print(f"\n{'=' * 50}")
-            print(f"🎉 FASE COMPLETADA! 🎉".center(50))
-            print(f"{'=' * 50}")
-            print(f"Fase: {self.phase_id} - {self.phase_info.get('name', 'Desconhecida')}")
-            print(f"Itens protegidos: {self.target_item_manager.items_protected}/{len(self.target_item_manager.items)}")
-            print(f"Recompensas: ${self.phase_rewards['money']} | {self.phase_rewards['experience']} XP")
-            print(f"{'=' * 50}\n")
-
         self.player.money += self.phase_rewards['money']
-
         for pokemon in self.player.team:
             pokemon.gain_xp(self.phase_rewards['experience'])
-
         self.player.score += self.phase_rewards['experience']
 
         total_items = len(self.target_item_manager.items)
@@ -613,121 +545,140 @@ class GameScene(BaseScene):
             stars = 3
 
         progress_manager.complete_phase(self.phase_id, stars=stars)
-
         self.player.auto_save()
         self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
 
     def render(self, screen):
-        """Renderiza o jogo"""
+        """Renderiza o jogo - OTIMIZADO"""
         screen.fill((0, 0, 0))
 
+        # Cache de referências
+        camera = self.camera
+        screen_mgr = self.screen_manager
+        map_renderer = self.map_renderer
+        path_renderer = self.path_renderer
+        spot_renderer = self.spot_renderer
+        target_mgr = self.target_item_manager
+        wave_mgr = self.wave_manager
+        placement_mgr = self.placement_manager
+        bag_renderer = self.item_bag_renderer
+        team_mgr = self.team_manager
+        drag_mgr = self.item_drag_manager
+        overlay_mgr = self.overlay_manager
+        show_debug = self.show_debug
+
         # Mundo do jogo
-        self.map_renderer.render(screen, self.camera, self.screen_manager)
+        map_renderer.render(screen, camera, screen_mgr)
 
-        if self.show_debug:
-            self.path_renderer.render(screen, self.camera, self.screen_manager, show_editing=False)
+        if show_debug:
+            path_renderer.render(screen, camera, screen_mgr, show_editing=False)
 
-        if hasattr(self, 'spot_renderer'):
-            self.spot_renderer.render(
-                screen, self.camera, self.screen_manager,
+        if spot_renderer:
+            spot_renderer.render(
+                screen, camera, screen_mgr,
                 show_editing=False,
                 highlight_spot=self.hovered_spot if hasattr(self, 'hovered_spot') else None
             )
 
-        self.target_item_manager.render_in_ground(screen, self.camera)
+        target_mgr.render_in_ground(screen, camera)
 
-        # Renderiza inimigos
-        for enemy in self.wave_manager.active_enemies:
-            enemy.render(screen, self.camera, show_hp=False)
+        # Inimigos
+        for enemy in wave_mgr.active_enemies:
+            enemy.render(screen, camera, show_hp=False)
 
-        if hasattr(self, 'placement_manager'):
-            self.placement_manager.render(screen, self.camera, self.screen_manager)
+        if placement_mgr:
+            placement_mgr.render(screen, camera, screen_mgr)
 
-        self.target_item_manager.render_in_pokemon(screen, self.camera)
+        target_mgr.render_in_pokemon(screen, camera)
 
         # HP bars
-        for enemy in self.wave_manager.active_enemies:
-            enemy.render_hp(screen, self.camera)
+        for enemy in wave_mgr.active_enemies:
+            enemy.render_hp(screen, camera)
 
-        if hasattr(self, 'placement_manager'):
-            self.placement_manager.render_hp(screen, self.camera)
+        if placement_mgr:
+            placement_mgr.render_hp(screen, camera)
 
         # UI
         self._render_game_ui(screen)
 
-        if hasattr(self, 'team_manager'):
-            self.team_manager.render(screen, self.camera, self.spot_renderer.get_spots())
+        if team_mgr:
+            team_mgr.render(screen, camera, spot_renderer.get_spots() if spot_renderer else [])
 
-        if hasattr(self, 'item_drag_manager'):
-            self.item_drag_manager.render(screen, self.camera)
+        if drag_mgr:
+            drag_mgr.render(screen, camera)
 
-        if hasattr(self, 'item_bag_renderer'):
-            self.item_bag_renderer.render(screen)
+        if bag_renderer:
+            bag_renderer.render(screen)
 
         # Borda da viewport
         pygame.draw.rect(screen, (80, 80, 80),
-                         (self.screen_manager.viewport_x,
-                          self.screen_manager.viewport_y,
-                          self.screen_manager.viewport_width,
-                          self.screen_manager.viewport_height), 1)
+                         (screen_mgr.viewport_x, screen_mgr.viewport_y,
+                          screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
 
         if self.paused:
             self._render_pause_overlay(screen)
 
-        # Overlays
-        self.overlay_manager.render(screen)
+        if overlay_mgr:
+            overlay_mgr.render(screen)
 
-        if self.show_debug:
+        if show_debug:
             self._render_debug_info(screen)
 
     def _render_game_ui(self, screen):
-        """Renderiza a UI do jogo"""
-        font = pygame.font.Font(None, 24)
-        font_small = pygame.font.Font(None, 18)
+        """Renderiza a UI do jogo - OTIMIZADO"""
+        font = self._get_ui_font(24)
+        font_small = self._get_ui_font(18)
 
         wave_info = self.wave_manager.get_current_wave_info()
+        target_mgr = self.target_item_manager
+        screen_mgr = self.screen_manager
+        wave_mgr = self.wave_manager
+
+        viewport_x = screen_mgr.viewport_x
+        viewport_y = screen_mgr.viewport_y
 
         # Fundo semi-transparente
         ui_bg = pygame.Surface((400, 150))
         ui_bg.set_alpha(180)
         ui_bg.fill((20, 20, 30))
-        screen.blit(ui_bg, (self.screen_manager.viewport_x + 10, self.screen_manager.viewport_y + 10))
+        screen.blit(ui_bg, (viewport_x + 10, viewport_y + 10))
 
-        y_offset = self.screen_manager.viewport_y + 15
+        y_offset = viewport_y + 15
 
         # Título da fase
         phase_text = font.render(self.phase_info.get("name", f"Fase {self.phase_number}"), True, (255, 215, 0))
-        screen.blit(phase_text, (self.screen_manager.viewport_x + 15, y_offset))
+        screen.blit(phase_text, (viewport_x + 15, y_offset))
         y_offset += 25
 
         # Itens alvo
-        items_color = (100, 255, 100) if self.target_item_manager.items_protected > 0 else (255, 100, 100)
+        items_color = (100, 255, 100) if target_mgr.items_protected > 0 else (255, 100, 100)
         items_text = font_small.render(
-            f"Itens: {self.target_item_manager.items_protected} protegidos | {self.target_item_manager.items_stolen} levados",
+            f"Itens: {target_mgr.items_protected} protegidos | {target_mgr.items_stolen} levados",
             True, items_color
         )
-        screen.blit(items_text, (self.screen_manager.viewport_x + 15, y_offset))
+        screen.blit(items_text, (viewport_x + 15, y_offset))
         y_offset += 20
 
         # Wave info
         if self.game_state == "waiting":
             state_text = font_small.render("Aguardando início...", True, (200, 200, 200))
-            screen.blit(state_text, (self.screen_manager.viewport_x + 15, y_offset))
+            screen.blit(state_text, (viewport_x + 15, y_offset))
 
         elif self.game_state == "in_wave":
-            if wave_info.get('active_paths', 0) > 1:
+            active_paths = wave_info.get('active_paths', 0)
+            if active_paths > 1:
                 wave_text = font_small.render(
-                    f"{wave_info['active_paths']} paths ativos | {wave_info['name']}",
+                    f"{active_paths} paths ativos | {wave_info['name']}",
                     True, (100, 255, 100))
             else:
                 wave_text = font_small.render(
                     f"Wave {wave_info['index']}/{wave_info['total']}: {wave_info['name']}",
                     True, (100, 255, 100))
-            screen.blit(wave_text, (self.screen_manager.viewport_x + 15, y_offset))
+            screen.blit(wave_text, (viewport_x + 15, y_offset))
             y_offset += 20
 
             # Barra de progresso
-            bar_x = self.screen_manager.viewport_x + 15
+            bar_x = viewport_x + 15
             bar_y = y_offset
             bar_width = 370
             bar_height = 15
@@ -745,57 +696,66 @@ class GameScene(BaseScene):
 
             y_offset += 25
 
+            enemies_color = (255, 100, 100) if wave_mgr.active_enemies else (100, 255, 100)
             enemies_text = font_small.render(
-                f"Inimigos vivos: {len(self.wave_manager.active_enemies)}",
-                True, (255, 100, 100) if len(self.wave_manager.active_enemies) > 0 else (100, 255, 100))
-            screen.blit(enemies_text, (self.screen_manager.viewport_x + 15, y_offset))
+                f"Inimigos vivos: {len(wave_mgr.active_enemies)}",
+                True, enemies_color)
+            screen.blit(enemies_text, (viewport_x + 15, y_offset))
 
         elif self.game_state == "between_waves":
             wave_text = font_small.render(
                 f"Wave concluída! Próxima em {self.between_waves_timer:.1f}s",
                 True, (255, 255, 0))
-            screen.blit(wave_text, (self.screen_manager.viewport_x + 15, y_offset))
+            screen.blit(wave_text, (viewport_x + 15, y_offset))
 
         elif self.game_state == "completed":
             complete_text = font.render("FASE COMPLETA!", True, (255, 215, 0))
-            screen.blit(complete_text, (self.screen_manager.viewport_x + 15, y_offset))
+            screen.blit(complete_text, (viewport_x + 15, y_offset))
 
     def _render_pause_overlay(self, screen):
         """Overlay de pausa do jogo"""
-        overlay = pygame.Surface((self.screen_manager.viewport_width, self.screen_manager.viewport_height))
+        screen_mgr = self.screen_manager
+
+        overlay = pygame.Surface((screen_mgr.viewport_width, screen_mgr.viewport_height))
         overlay.set_alpha(128)
         overlay.fill((0, 0, 0))
-        screen.blit(overlay, (self.screen_manager.viewport_x, self.screen_manager.viewport_y))
+        screen.blit(overlay, (screen_mgr.viewport_x, screen_mgr.viewport_y))
 
         font_large = pygame.font.Font(None, 48)
         pause_text = font_large.render("PAUSADO", True, (255, 255, 255))
-        text_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - pause_text.get_width()) // 2
-        text_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - pause_text.get_height()) // 2
+        text_x = screen_mgr.viewport_x + (screen_mgr.viewport_width - pause_text.get_width()) // 2
+        text_y = screen_mgr.viewport_y + (screen_mgr.viewport_height - pause_text.get_height()) // 2
         screen.blit(pause_text, (text_x, text_y))
 
         font_small = pygame.font.Font(None, 24)
         phase_display = self.phase_info.get("name", f"Fase {self.phase_number}")
         phase_text = font_small.render(phase_display, True, (200, 200, 200))
-        phase_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - phase_text.get_width()) // 2
+        phase_x = screen_mgr.viewport_x + (screen_mgr.viewport_width - phase_text.get_width()) // 2
         phase_y = text_y + pause_text.get_height() + 10
         screen.blit(phase_text, (phase_x, phase_y))
 
+    # src/scenes/game_scene/game_scene.py - método _render_debug_info corrigido
+
     def _render_debug_info(self, screen):
-        """Informações de debug"""
+        """Informações de debug - CORRIGIDO"""
         mouse_pos = pygame.mouse.get_pos()
-        in_viewport = self.screen_manager.is_mouse_in_viewport(mouse_pos)
+        screen_mgr = self.screen_manager
+        camera = self.camera
+
+        in_viewport = screen_mgr.is_mouse_in_viewport(mouse_pos)
 
         if in_viewport:
-            world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
+            world_pos = screen_mgr.get_mouse_world_position(mouse_pos, camera)
             if world_pos:
                 world_text = f"World: ({world_pos[0]:.0f}, {world_pos[1]:.0f})"
                 tile_x = int(world_pos[0] // 16)
                 tile_y = int(world_pos[1] // 16)
                 tile_info = f"Tile: ({tile_x}, {tile_y})"
 
+                # CORREÇÃO: usa get_tile corretamente
                 tile_id = 0
                 for layer in self.map_renderer.layer_manager.layers:
-                    if hasattr(layer, 'layer_type') and layer.layer_type.value == "ground":
+                    if hasattr(layer, 'layer_type') and layer.layer_type == "ground":
                         tile_id = layer.get_tile(tile_x, tile_y)
                         break
                 tile_value = f"Tile ID: {tile_id}"
@@ -803,9 +763,10 @@ class GameScene(BaseScene):
                 path_info = "Nenhum path"
                 for i, path in enumerate(self.path_renderer.paths):
                     for node in path.nodes:
-                        dist = ((node[0] - world_pos[0]) ** 2 + (node[1] - world_pos[1]) ** 2) ** 0.5
-                        if dist < 20:
-                            path_info = f"Próximo ao Path {i + 1} (dist: {dist:.0f}px)"
+                        dx = node[0] - world_pos[0]
+                        dy = node[1] - world_pos[1]
+                        if dx * dx + dy * dy < 400:
+                            path_info = f"Próximo ao Path {i + 1}"
                             break
             else:
                 world_text = "World: invalid position"
@@ -822,7 +783,7 @@ class GameScene(BaseScene):
 
         debug_lines = [
             "=== DEBUG INFO ===",
-            f"FPS: {self.screen_manager.get_fps():.1f}",
+            f"FPS: {screen_mgr.get_fps():.1f}",
             f"Game State: {self.game_state}",
             "",
             "=== WAVES ===",
@@ -831,8 +792,8 @@ class GameScene(BaseScene):
             f"Vivos: {len(self.wave_manager.active_enemies)}",
             "",
             "=== CAMERA ===",
-            f"Position: ({self.camera.x:.0f}, {self.camera.y:.0f})",
-            f"Zoom: {self.camera.zoom:.2f}",
+            f"Position: ({camera.x:.0f}, {camera.y:.0f})",
+            f"Zoom: {camera.zoom:.2f}",
             "",
             "=== MOUSE ===",
             world_text,
@@ -847,8 +808,8 @@ class GameScene(BaseScene):
             f"Spots: {sum(1 for s in self.spot_renderer.get_spots() if s.occupied)}/{len(self.spot_renderer.get_spots())}",
         ]
 
-        y_offset = self.screen_manager.viewport_y + 40
-        x_offset = self.screen_manager.viewport_x + 10
+        y_offset = screen_mgr.viewport_y + 40
+        x_offset = screen_mgr.viewport_x + 10
         line_height = 16
         bg_height = len(debug_lines) * line_height + 10
         bg_width = 350

@@ -1,38 +1,47 @@
 # src/scenes/game_scene/components/managers/wave_manager.py
-
-import random, math
+import random
+import math
 from src.entities.pokemon import Pokemon
 
 
 class GameWaveManager:
-    """Gerencia as waves durante o jogo - AGORA SUPORTA MÚLTIPLOS PATHS SIMULTÂNEOS"""
+    """Gerencia as waves durante o jogo - OTIMIZADO"""
+
+    # Constantes
+    DEFAULT_WAVE_SIZE = 10
+    DEFAULT_SPAWN_INTERVAL = 3.0
+    DEFAULT_INITIAL_DELAY = 2.0
+    PROXIMITY_THRESHOLD = 15  # Distância para considerar "próximo" do início/fim
 
     def __init__(self, phase_loader):
         self.phase_loader = phase_loader
-        self.waves_data = []  # Lista de todas as waves
-        self.path_waves = {}  # Dicionário: path_index -> lista de waves daquele path
+        self.waves_data = []
+        self.path_waves = {}
 
-        # Estado das waves (agora por path)
-        self.current_wave_index_by_path = {}  # path_index -> índice da wave atual
-        self.wave_in_progress_by_path = {}  # path_index -> se está em progresso
-        self.wave_timer_by_path = {}  # path_index -> timer atual
-        self.spawn_timer_by_path = {}  # path_index -> timer de spawn
-        self.enemies_spawned_by_path = {}  # path_index -> inimigos spawnados
-        self.enemies_remaining_by_path = {}  # path_index -> inimigos restantes
-        self.current_wave_data_by_path = {}  # path_index -> dados da wave atual
+        # Estado das waves (por path) - usando listas para acesso mais rápido
+        self.path_indexes = []  # Lista de todos os path indexes
+        self.current_wave_index_by_path = {}
+        self.wave_in_progress_by_path = {}
+        self.wave_timer_by_path = {}
+        self.spawn_timer_by_path = {}
+        self.enemies_spawned_by_path = {}
+        self.enemies_remaining_by_path = {}
+        self.current_wave_data_by_path = {}
 
-        # Lista principal de inimigos (todos juntos)
+        # Lista principal de inimigos
         self.active_enemies = []
 
-        # Referência para os itens alvo
+        # Referências
         self.target_items = []
-
         self.game_scene = None
+
+        # Cache para evitar acessos repetidos
+        self._path_points_cache = {}
+        self._wave_completion_cache = {}
+        self._boss_check_cache = {}
 
         # Carrega os dados
         self._load_waves_data()
-
-        # Inicializa o estado para cada path
         self._initialize_path_states()
 
     def _load_waves_data(self):
@@ -41,25 +50,24 @@ class GameWaveManager:
 
         if isinstance(raw_data, list):
             self.waves_data = raw_data
-
-            # Organiza waves por path
             self.path_waves = {}
+
             for wave_data in self.waves_data:
                 path_index = wave_data.get("path_index", 0)
                 if path_index not in self.path_waves:
                     self.path_waves[path_index] = []
                 self.path_waves[path_index].append(wave_data)
 
+            self.path_indexes = list(self.path_waves.keys())
             print(f"[WaveManager] Waves carregadas: {len(self.waves_data)}")
-            for path_idx, waves in self.path_waves.items():
-                print(f"  Path {path_idx + 1}: {len(waves)} waves")
         else:
             self.waves_data = []
             self.path_waves = {}
+            self.path_indexes = []
             print("⚠️ raw_data não é uma lista, criando lista vazia")
 
     def _initialize_path_states(self):
-        """Inicializa o estado para todos os paths que têm waves"""
+        """Inicializa o estado para todos os paths"""
         for path_index in self.path_waves.keys():
             self.current_wave_index_by_path[path_index] = 0
             self.wave_in_progress_by_path[path_index] = False
@@ -73,7 +81,8 @@ class GameWaveManager:
         """Inicia todas as primeiras waves de todos os paths simultaneamente"""
         started_any = False
 
-        for path_index, waves in self.path_waves.items():
+        for path_index in self.path_indexes:
+            waves = self.path_waves[path_index]
             if waves and self.current_wave_index_by_path[path_index] < len(waves):
                 self._start_wave_for_path(path_index)
                 started_any = True
@@ -83,31 +92,25 @@ class GameWaveManager:
 
     def _start_wave_for_path(self, path_index):
         """Inicia a próxima wave para um path específico"""
-        if path_index not in self.path_waves:
-            print(f"[WaveManager] Path {path_index} não tem waves definidas")
+        waves = self.path_waves.get(path_index)
+        if not waves:
             return False
 
-        waves = self.path_waves[path_index]
-        current_idx = self.current_wave_index_by_path[path_index]
-
+        current_idx = self.current_wave_index_by_path.get(path_index, 0)
         if current_idx >= len(waves):
-            print(f"[WaveManager] Path {path_index + 1} já concluiu todas as waves")
             return False
 
         wave_data = waves[current_idx]
 
-        # Configura a wave atual para este path
         self.current_wave_data_by_path[path_index] = wave_data
         self.wave_in_progress_by_path[path_index] = True
-        self.wave_timer_by_path[path_index] = wave_data.get("initial_delay", 2.0)
+        self.wave_timer_by_path[path_index] = wave_data.get("initial_delay", self.DEFAULT_INITIAL_DELAY)
         self.spawn_timer_by_path[path_index] = 0
         self.enemies_spawned_by_path[path_index] = 0
         self.enemies_remaining_by_path[path_index] = 0
 
-        print(
-            f"[WaveManager] Path {path_index + 1} - Iniciando Wave {current_idx + 1}: {wave_data.get('name', 'Wave')} "
-            f"(delay inicial: {self.wave_timer_by_path[path_index]:.1f}s)"
-        )
+        # Log reduzido
+        # print(f"[WaveManager] Path {path_index + 1} - Iniciando Wave {current_idx + 1}")
         return True
 
     def set_target_items(self, items):
@@ -116,159 +119,155 @@ class GameWaveManager:
         print(f"[WaveManager] Itens alvo vinculados: {len(items)} itens")
 
     def update(self, dt, path_points_by_index, screen_manager):
-        """Atualiza o estado das waves de TODOS os paths"""
+        """Atualiza o estado das waves de TODOS os paths - OTIMIZADO"""
         enemies_at_end = []
         enemies_to_remove = []
         defeated_enemies = []
 
+        # Cache local para acesso rápido
+        active_enemies = self.active_enemies
+        target_items = self.target_items
+        game_scene = self.game_scene
+        proximity_threshold = self.PROXIMITY_THRESHOLD
+        proximity_threshold_sq = proximity_threshold * proximity_threshold
+
         # ===== 1. Atualiza todos os inimigos existentes =====
-        for enemy in self.active_enemies[:]:
-            # Atualiza o inimigo (movimento e captura de itens)
-            enemy.update(dt, items=self.target_items)
+        for enemy in active_enemies[:]:
+            # Atualiza o inimigo
+            enemy.update(dt, items=target_items)
 
             # Verifica se morreu
             if not enemy.is_alive():
-                print(f"[WAVE] {enemy.name} foi derrotado!")
                 defeated_enemies.append(enemy)
-
                 if enemy.is_carrying:
-                    # Solta o item no chão quando morre
                     enemy.drop_item()
-
                 enemies_to_remove.append(enemy)
                 continue
 
-            # ===== VERIFICA SE CHEGOU AO INÍCIO OU FIM DO PATH =====
+            # Verifica chegada ao início/fim do path
             if hasattr(enemy, 'path') and enemy.path:
-                # Verifica se chegou ao INÍCIO (índice 0)
-                at_start = (enemy.path_index <= 0)
+                path_len = len(enemy.path)
+                path_index_val = enemy.path_index
 
-                # Verifica se chegou ao FIM
-                at_end = (enemy.path_index >= len(enemy.path))
+                # Verifica se chegou ao início OU fim
+                at_start = (path_index_val <= 0)
+                at_end = (path_index_val >= path_len)
 
-                # Se chegou ao início OU fim
                 if at_start or at_end:
-                    # ===== VERIFICA SE ESTÁ CARREGANDO ITEM =====
-                    if enemy.is_carrying:
-                        carried_item = enemy.is_carrying
-                        print(
-                            f"[GAME_OVER] {enemy.name} chegou ao {'INÍCIO' if at_start else 'FIM'} carregando {carried_item.item_name}!")
-                        print(f"[GAME_OVER] ITEM PERDIDO! Game Over!")
+                    # Processa inimigo que chegou ao fim/início
+                    self._handle_enemy_at_boundary(enemy, at_start, at_end, enemies_at_end, enemies_to_remove)
+                    continue
 
-                        # Marca o item como roubado
-                        carried_item.is_protected = False
-                        carried_item.is_stolen = True
-                        carried_item.carried_by = None
+                # Verifica proximidade (apenas para inimigos não-boss carregando item)
+                if not enemy.is_boss and enemy.is_carrying and enemy.path:
+                    is_returning = hasattr(enemy, 'is_returning_with_item') and enemy.is_returning_with_item
 
-                        # Marca no target_item_manager
-                        if hasattr(self.game_scene, 'target_item_manager'):
-                            self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
-
-                        enemy.clear_carrying()
-
-                        # Se for boss, não é removido, apenas perde o item e reseta
-                        if enemy.is_boss:
-                            print(f"[BOSS] {enemy.name} perdeu o item e vai continuar caçando...")
-                            # Reseta para o início do path original
-                            if hasattr(enemy, 'original_path') and enemy.original_path:
-                                enemy.path = enemy.original_path.copy()
-                                enemy.path_index = 0
-                                if enemy.path and len(enemy.path) > 0:
-                                    enemy.x, enemy.y = enemy.path[0]
-                                    enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
-
-                            # Reseta flag de retorno
-                            enemy.is_returning_with_item = False
-                            enemy.move_speed = enemy.base_move_speed  # Usa move_speed em vez de speed
-
-                            # CONTINUA VIVO - não remove
-                            continue
-                        else:
-                            # Inimigo normal: marca para remoção
-                            enemies_at_end.append(enemy)
-                            enemies_to_remove.append(enemy)
-                            continue
-                    else:
-                        # Chegou sem item
-                        if enemy.is_boss:
-                            # Boss sem item: reseta para início
-                            print(
-                                f"[BOSS] {enemy.name} chegou ao {'início' if at_start else 'fim'} sem item, resetando...")
-                            if hasattr(enemy, 'original_path') and enemy.original_path:
-                                enemy.path = enemy.original_path.copy()
-                                enemy.path_index = 0
-                                if enemy.path and len(enemy.path) > 0:
-                                    enemy.x, enemy.y = enemy.path[0]
-                                    enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
-                            continue
-                        else:
-                            # Inimigo normal sem item: remove
-                            enemies_at_end.append(enemy)
-                            enemies_to_remove.append(enemy)
-                            continue
-
-                # ===== VERIFICAÇÃO EXTRA: Inimigo próximo do início/fim =====
-                # CORREÇÃO: Só verifica proximidade se NÃO estiver carregando item OU
-                # se estiver carregando item mas já está no processo de retorno
-                # Isso evita remover Pokémon que acabaram de pegar o item e estão perto
-                if not enemy.is_boss and enemy.is_carrying and enemy.path and len(enemy.path) > 0:
-                    # Verifica se o Pokémon está ativamente retornando com o item
-                    # Se está retornando, NÃO deve ser removido mesmo se estiver perto do início/fim
-                    is_returning = (hasattr(enemy, 'is_returning_with_item') and enemy.is_returning_with_item)
-
-                    # Só verifica proximidade se NÃO estiver retornando ativamente
                     if not is_returning:
-                        # Verifica proximidade com início (ponto 0)
+                        # Verifica proximidade usando distância quadrática para performance
                         start_point = enemy.path[0]
-                        dist_to_start = math.hypot(enemy.x - start_point[0], enemy.y - start_point[1])
-
-                        # Verifica proximidade com fim (último ponto)
                         end_point = enemy.path[-1]
-                        dist_to_end = math.hypot(enemy.x - end_point[0], enemy.y - end_point[1])
 
-                        # Se estiver próximo de qualquer extremidade e NÃO estiver retornando
-                        if dist_to_start < 15 or dist_to_end < 15:
-                            print(
-                                f"[GAME_OVER] {enemy.name} próximo do {'INÍCIO' if dist_to_start < 15 else 'FIM'} carregando {enemy.is_carrying.item_name}!")
+                        dx_start = enemy.x - start_point[0]
+                        dy_start = enemy.y - start_point[1]
+                        dist_start_sq = dx_start * dx_start + dy_start * dy_start
 
+                        dx_end = enemy.x - end_point[0]
+                        dy_end = enemy.y - end_point[1]
+                        dist_end_sq = dx_end * dx_end + dy_end * dy_end
+
+                        if dist_start_sq < proximity_threshold_sq or dist_end_sq < proximity_threshold_sq:
                             carried_item = enemy.is_carrying
                             carried_item.is_protected = False
                             carried_item.is_stolen = True
 
-                            if hasattr(self.game_scene, 'target_item_manager'):
-                                self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
+                            if game_scene and hasattr(game_scene, 'target_item_manager'):
+                                game_scene.target_item_manager.mark_item_as_stolen(carried_item)
 
                             enemies_at_end.append(enemy)
                             enemies_to_remove.append(enemy)
                             continue
 
         # Processa XP dos inimigos derrotados
-        for enemy in defeated_enemies:
-            self._distribute_xp(enemy)
+        if defeated_enemies:
+            for enemy in defeated_enemies:
+                self._distribute_xp(enemy)
 
-        # Remove inimigos normais
+        # Remove inimigos
+        if enemies_to_remove:
+            self._remove_enemies_batch(enemies_to_remove)
+
+        # ===== 2. Processa waves para CADA PATH =====
+        self._process_all_waves(dt, path_points_by_index, screen_manager)
+
+        return enemies_at_end
+
+    def _handle_enemy_at_boundary(self, enemy, at_start, at_end, enemies_at_end, enemies_to_remove):
+        """Processa inimigo que chegou ao início ou fim do path"""
+        if enemy.is_carrying:
+            carried_item = enemy.is_carrying
+            # Marca item como roubado
+            carried_item.is_protected = False
+            carried_item.is_stolen = True
+            carried_item.carried_by = None
+
+            if hasattr(self.game_scene, 'target_item_manager'):
+                self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
+
+            enemy.clear_carrying()
+
+            if enemy.is_boss:
+                # Boss: reseta e continua
+                if hasattr(enemy, 'original_path') and enemy.original_path:
+                    enemy.path = enemy.original_path.copy()
+                    enemy.path_index = 0
+                    if enemy.path and len(enemy.path) > 0:
+                        enemy.x, enemy.y = enemy.path[0]
+                        enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+
+                enemy.is_returning_with_item = False
+                enemy.move_speed = enemy.base_move_speed
+                return  # Boss continua vivo
+            else:
+                enemies_at_end.append(enemy)
+                enemies_to_remove.append(enemy)
+        else:
+            # Sem item
+            if enemy.is_boss:
+                # Boss sem item: reseta
+                if hasattr(enemy, 'original_path') and enemy.original_path:
+                    enemy.path = enemy.original_path.copy()
+                    enemy.path_index = 0
+                    if enemy.path and len(enemy.path) > 0:
+                        enemy.x, enemy.y = enemy.path[0]
+                        enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+                return
+            else:
+                enemies_at_end.append(enemy)
+                enemies_to_remove.append(enemy)
+
+    def _remove_enemies_batch(self, enemies_to_remove):
+        """Remove múltiplos inimigos em lote"""
         for enemy in enemies_to_remove:
             if enemy in self.active_enemies:
                 path_index = getattr(enemy, 'path_index_origin', 0)
                 self.active_enemies.remove(enemy)
+
                 if path_index in self.enemies_remaining_by_path:
                     self.enemies_remaining_by_path[path_index] -= 1
+
                 enemy.clear_damage_tracking()
 
-                # Remove o item permanentemente
                 if enemy.is_carrying:
                     carried_item = enemy.is_carrying
-                    print(f"[WaveManager] {enemy.name} estava carregando {carried_item.item_name} e será removido!")
-
-                    if carried_item.is_protected:
-                        if hasattr(self.game_scene, 'target_item_manager'):
-                            self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
-
+                    if carried_item.is_protected and hasattr(self.game_scene, 'target_item_manager'):
+                        self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
                     carried_item.carried_by = None
                     enemy.is_carrying = None
 
-        # ===== 2. Processa waves para CADA PATH (restante igual) =====
-        for path_index, waves in self.path_waves.items():
+    def _process_all_waves(self, dt, path_points_by_index, screen_manager):
+        """Processa todas as waves de todos os paths - OTIMIZADO"""
+        for path_index in self.path_indexes:
+            waves = self.path_waves.get(path_index)
             if not waves:
                 continue
 
@@ -284,149 +283,109 @@ class GameWaveManager:
                 continue
 
             if wave_in_progress and wave_data:
-                if self.wave_timer_by_path[path_index] > 0:
-                    self.wave_timer_by_path[path_index] -= dt
-                    if self.wave_timer_by_path[path_index] <= 0:
-                        print(f"[WaveManager] Path {path_index + 1} - Delay inicial terminado! Iniciando spawns...")
-                    continue
+                self._process_single_wave(dt, path_index, wave_data, path_points_by_index, screen_manager)
 
-                enemies_spawned = self.enemies_spawned_by_path[path_index]
-                wave_size = wave_data.get("wave_size", 10)
+    def _process_single_wave(self, dt, path_index, wave_data, path_points_by_index, screen_manager):
+        """Processa uma wave individual - OTIMIZADO"""
+        # Delay inicial
+        if self.wave_timer_by_path[path_index] > 0:
+            self.wave_timer_by_path[path_index] -= dt
+            return
 
-                if enemies_spawned < wave_size:
-                    self.spawn_timer_by_path[path_index] -= dt
+        enemies_spawned = self.enemies_spawned_by_path[path_index]
+        wave_size = wave_data.get("wave_size", self.DEFAULT_WAVE_SIZE)
 
-                    if self.spawn_timer_by_path[path_index] <= 0:
-                        path_points = path_points_by_index.get(path_index, [])
+        if enemies_spawned < wave_size:
+            self.spawn_timer_by_path[path_index] -= dt
 
-                        enemy = self._create_enemy(
-                            wave_data,
-                            path_points,
-                            screen_manager,
-                            path_index
-                        )
+            if self.spawn_timer_by_path[path_index] <= 0:
+                path_points = path_points_by_index.get(path_index, [])
+                enemy = self._create_enemy(wave_data, path_points, screen_manager, path_index)
 
-                        if enemy:
-                            enemy.path_index_origin = path_index
+                if enemy:
+                    enemy.path_index_origin = path_index
+                    self.active_enemies.append(enemy)
+                    self.enemies_spawned_by_path[path_index] += 1
+                    self.enemies_remaining_by_path[path_index] += 1
 
-                            self.active_enemies.append(enemy)
-                            self.enemies_spawned_by_path[path_index] += 1
-                            self.enemies_remaining_by_path[path_index] += 1
+                    self.spawn_timer_by_path[path_index] = wave_data.get("spawn_interval", self.DEFAULT_SPAWN_INTERVAL)
 
-                            print(
-                                f"[WaveManager] Path {path_index + 1} - Spawnado {enemy.name} "
-                                f"({enemies_spawned + 1}/{wave_size})"
-                            )
-
-                            self.spawn_timer_by_path[path_index] = wave_data.get("spawn_interval", 3.0)
-
-                if self.enemies_spawned_by_path[path_index] >= wave_size:
-                    if self.enemies_remaining_by_path[path_index] <= 0:
-                        self._end_current_wave_for_path(path_index)
-
-        return enemies_at_end
+        # Verifica se a wave terminou
+        if self.enemies_spawned_by_path[path_index] >= wave_size:
+            if self.enemies_remaining_by_path[path_index] <= 0:
+                self._end_current_wave_for_path(path_index)
 
     def _end_current_wave_for_path(self, path_index):
-        """Finaliza a wave atual de um path específico"""
+        """Finaliza a wave atual de um path específico - OTIMIZADO"""
         wave_data = self.current_wave_data_by_path.get(path_index)
         if not wave_data:
             return
 
-        # Verifica se ainda tem bosses vivos neste path
-        bosses_alive = sum(1 for e in self.active_enemies
-                           if hasattr(e, 'is_boss') and e.is_boss
-                           and getattr(e, 'path_index_origin', 0) == path_index)
+        # Verifica se ainda tem bosses vivos (otimizado com cache)
+        bosses_alive = 0
+        for e in self.active_enemies:
+            if hasattr(e, 'is_boss') and e.is_boss and getattr(e, 'path_index_origin', 0) == path_index:
+                bosses_alive += 1
 
-        # Se ainda tem bosses vivos, não finaliza a wave
         if bosses_alive > 0:
-            print(
-                f"[WaveManager] Path {path_index + 1} - Ainda tem {bosses_alive} boss(es) vivo(s)! Continuando wave...")
             return
 
-        print(
-            f"\n[WaveManager] Path {path_index + 1} - Wave {self.current_wave_index_by_path[path_index] + 1} concluída!")
-
-        # Verifica se a wave repete
+        # Verifica repetição
         if wave_data.get("repeat_wave", False):
             repeat_count = wave_data.get("repeat_count", 1)
-
             if repeat_count > 1:
-                # Decrementa contador e reinicia a mesma wave
                 wave_data["repeat_count"] = repeat_count - 1
                 self.wave_in_progress_by_path[path_index] = True
                 self.enemies_spawned_by_path[path_index] = 0
                 self.enemies_remaining_by_path[path_index] = 0
-                self.wave_timer_by_path[path_index] = wave_data.get("initial_delay", 2.0)
-                print(f"[WaveManager] Path {path_index + 1} - Repetindo wave... Restam {repeat_count - 1} repetições")
+                self.wave_timer_by_path[path_index] = wave_data.get("initial_delay", self.DEFAULT_INITIAL_DELAY)
                 return
 
-        # Passa para próxima wave deste path
+        # Passa para próxima wave
         self.wave_in_progress_by_path[path_index] = False
         self.current_wave_index_by_path[path_index] += 1
         self.current_wave_data_by_path[path_index] = None
 
-        # Verifica se ainda tem mais waves para este path
-        if self.current_wave_index_by_path[path_index] < len(self.path_waves.get(path_index, [])):
-            print(f"[WaveManager] Path {path_index + 1} - Próxima wave disponível. Aguardando início...")
-        else:
-            print(f"[WaveManager] Path {path_index + 1} - TODAS AS WAVES CONCLUÍDAS!")
-
     def _create_enemy(self, wave_data, path_points, screen_manager, path_index):
-        """Cria um inimigo baseado nos dados da wave (com suporte a boss)"""
+        """Cria um inimigo - OTIMIZADO"""
         enemy_data = self._get_random_enemy(wave_data)
 
         if not enemy_data or not path_points or len(path_points) < 2:
             return None
 
-        # Pega o ponto inicial
         start_x, start_y = path_points[0]
 
-        # Nível aleatório
         level = random.randint(
             wave_data.get("min_level", 1),
             wave_data.get("max_level", 5)
         )
 
-        # VERIFICA SE É O ÚLTIMO INIMIGO DA WAVE
         enemies_spawned = self.enemies_spawned_by_path.get(path_index, 0)
-        wave_size = wave_data.get("wave_size", 10)
+        wave_size = wave_data.get("wave_size", self.DEFAULT_WAVE_SIZE)
         is_last_enemy = (enemies_spawned + 1) >= wave_size
-
-        # Se for o último inimigo, é boss!
         is_boss = is_last_enemy and wave_data.get("has_boss", True)
 
-        # Cria o Pokémon inimigo
         pokemon = Pokemon(
             start_x, start_y,
             enemy_data["pokemon_id"],
             level=level,
-            is_wild=True,  # IMPORTANTE: is_wild=True para ativar a velocidade baseada em stat
+            is_wild=True,
             shiny=random.random() < 0.001,
             is_boss=is_boss
         )
 
         pokemon.screen_manager = screen_manager
-
-        # Configura para seguir o path
         pokemon.path = path_points
 
-        # A velocidade JÁ FOI CALCULADA no __init__ (baseada no speed stat)
-        # Apenas aplica multiplicador da wave se existir
+        # Aplica multiplicador de velocidade
         wave_speed_multiplier = wave_data.get("speed_multiplier", 1.0)
         if wave_speed_multiplier != 1.0:
             pokemon.move_speed = pokemon.base_move_speed * wave_speed_multiplier
-            print(
-                f"[VELOCIDADE] {pokemon.name} velocidade ajustada: {pokemon.base_move_speed:.2f} -> {pokemon.move_speed:.2f} (x{wave_speed_multiplier})")
-        # Log para debug
+
         if is_boss:
-            # Guarda o path original
             pokemon.original_path = path_points.copy()
-            print(
-                f"[BOSS] Criado {pokemon.name} (Lv.{pokemon.level}, Velocidade Mapa: {pokemon.move_speed:.2f}) para Path {path_index + 1}")
-            print(f"[BOSS] Speed stat: {pokemon.speed_stat}, Velocidade no mapa: {pokemon.move_speed:.2f}")
-        else:
-            print(
-                f"[ENEMY] Criado {pokemon.name} (Lv.{pokemon.level}, Speed stat: {pokemon.speed_stat}, Velocidade no mapa: {pokemon.move_speed:.2f})")
+            # Log reduzido
+            # print(f"[BOSS] Criado {pokemon.name} Lv.{pokemon.level}")
 
         pokemon.path_index = 0
         pokemon.path_index_origin = path_index
@@ -444,12 +403,15 @@ class GameWaveManager:
         return pokemon
 
     def _get_random_enemy(self, wave_data):
-        """Retorna um inimigo aleatório baseado nas porcentagens"""
+        """Retorna um inimigo aleatório - OTIMIZADO"""
         enemies = wave_data.get("enemies", [])
         if not enemies:
             return None
 
-        total = sum(e.get("percentage", 0) for e in enemies)
+        total = 0
+        for e in enemies:
+            total += e.get("percentage", 0)
+
         if total <= 0:
             return random.choice(enemies)
 
@@ -464,58 +426,45 @@ class GameWaveManager:
         return enemies[-1]
 
     def _distribute_xp(self, defeated_enemy):
-        """Distribui XP para os atacantes quando um inimigo é derrotado"""
+        """Distribui XP - OTIMIZADO"""
         contributors = defeated_enemy.get_xp_contributors()
 
         if not contributors:
-            print(f"[XP] Nenhum contribuidor encontrado para {defeated_enemy.name}")
             return
 
         base_xp = 15 + (defeated_enemy.level * 5)
-        print(f"\n[XP] ===== DISTRIBUINDO XP PARA {defeated_enemy.name.upper()} =====")
-        print(f"[XP] XP base: {base_xp}")
-
         total_damage = sum(damage for _, damage in contributors)
-        print(f"[XP] Dano total causado: {total_damage}")
 
-        # Distribui XP proporcional ao dano
+        if total_damage <= 0:
+            return
+
+        # Encontra o placement_manager uma vez
+        placement_manager = None
+        if hasattr(self.game_scene, 'placement_manager'):
+            placement_manager = self.game_scene.placement_manager
+
+        if not placement_manager:
+            return
+
         for attacker_id, damage in contributors:
             proportion = damage / total_damage
             xp_gained = int(base_xp * proportion)
 
-            # Encontra o Pokémon atacante
-            attacker = self._find_attacker_by_id(attacker_id)
-
-            if attacker:
-                attacker.gain_xp(xp_gained)
-                print(f"[XP] {attacker.name}: {damage} de dano ({proportion * 100:.1f}%) -> {xp_gained} XP")
-                self.game_scene.game.player.auto_save()
-            else:
-                print(f"[XP] Não encontrou atacante com ID {attacker_id} no mapa")
-
-    def _find_attacker_by_id(self, attacker_id):
-        """Encontra um atacante pelo ID"""
-        if not hasattr(self, 'game_scene') or not hasattr(self.game_scene, 'placement_manager'):
-            return None
-
-        for pokemon in self.game_scene.placement_manager.placed_pokemon:
-            if id(pokemon) == attacker_id and pokemon.is_alive():
-                return pokemon
-        return None
+            # Encontra o atacante
+            for pokemon in placement_manager.placed_pokemon:
+                if id(pokemon) == attacker_id and pokemon.is_alive():
+                    pokemon.gain_xp(xp_gained)
+                    if hasattr(self.game_scene, 'game') and self.game_scene.game:
+                        self.game_scene.game.player.auto_save()
+                    break
 
     def remove_enemy(self, enemy):
         """Remove um inimigo da lista ativa"""
         if enemy in self.active_enemies:
-            # ===== CORREÇÃO: Marca o item como roubado se estiver carregando =====
             if enemy.is_carrying:
                 carried_item = enemy.is_carrying
-                print(f"[WaveManager] Removendo {enemy.name} que estava carregando {carried_item.item_name}")
-
-                # Marca o item como roubado no target_item_manager
-                if carried_item.is_protected:
-                    if hasattr(self.game_scene, 'target_item_manager'):
-                        self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
-
+                if carried_item.is_protected and hasattr(self.game_scene, 'target_item_manager'):
+                    self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
                 enemy.drop_item()
 
             path_index = getattr(enemy, 'path_index_origin', 0)
@@ -524,21 +473,27 @@ class GameWaveManager:
             if path_index in self.enemies_remaining_by_path:
                 self.enemies_remaining_by_path[path_index] -= 1
 
-            print(f"[WaveManager] Inimigo {enemy.name} removido!")
             return True
         return False
 
     def get_current_wave_info(self):
-        """Retorna informações consolidadas de todas as waves ativas"""
-        total_active_paths = len([p for p in self.path_waves.keys()
-                                  if self.wave_in_progress_by_path.get(p, False)])
+        """Retorna informações consolidadas - OTIMIZADO"""
+        total_active_paths = 0
+        for path_index in self.path_indexes:
+            if self.wave_in_progress_by_path.get(path_index, False):
+                total_active_paths += 1
 
-        # Se não há waves ativas, mostra status de conclusão
+        # Calcula totais
+        total_spawned = sum(self.enemies_spawned_by_path.values())
+        total_enemies = 0
+        for w in self.waves_data:
+            total_enemies += w.get("wave_size", self.DEFAULT_WAVE_SIZE)
+
         if total_active_paths == 0:
-            # Verifica se todos os paths concluíram todas as waves
+            # Verifica se todos os paths concluíram
             all_completed = True
-            for path_idx, waves in self.path_waves.items():
-                if self.current_wave_index_by_path.get(path_idx, 0) < len(waves):
+            for path_idx in self.path_indexes:
+                if self.current_wave_index_by_path.get(path_idx, 0) < len(self.path_waves.get(path_idx, [])):
                     all_completed = False
                     break
 
@@ -548,27 +503,22 @@ class GameWaveManager:
                     "index": len(self.waves_data),
                     "total": len(self.waves_data),
                     "enemies_remaining": len(self.active_enemies),
-                    "enemies_spawned": sum(self.enemies_spawned_by_path.values()),
-                    "enemies_total": sum(w.get("wave_size", 10) for w in self.waves_data),
+                    "enemies_spawned": total_spawned,
+                    "enemies_total": total_enemies,
                     "progress": 1.0,
                     "active_paths": 0
                 }
             else:
                 return {
                     "name": "Aguardando...",
-                    "index": min(self.current_wave_index_by_path.values()) + 1
-                    if self.current_wave_index_by_path else 1,
+                    "index": 1,
                     "total": len(self.waves_data),
                     "enemies_remaining": len(self.active_enemies),
-                    "enemies_spawned": sum(self.enemies_spawned_by_path.values()),
-                    "enemies_total": sum(w.get("wave_size", 10) for w in self.waves_data),
+                    "enemies_spawned": total_spawned,
+                    "enemies_total": total_enemies,
                     "progress": 0,
                     "active_paths": 0
                 }
-
-        # Calcula progresso consolidado
-        total_spawned = sum(self.enemies_spawned_by_path.values())
-        total_enemies = sum(w.get("wave_size", 10) for w in self.waves_data)
 
         return {
             "name": f"{total_active_paths} wave(s) ativa(s)",
@@ -582,36 +532,28 @@ class GameWaveManager:
         }
 
     def has_more_waves(self):
-        """Verifica se ainda existem waves em qualquer path"""
-        for path_idx, waves in self.path_waves.items():
-            if self.current_wave_index_by_path.get(path_idx, 0) < len(waves):
+        """Verifica se ainda existem waves"""
+        for path_idx in self.path_indexes:
+            if self.current_wave_index_by_path.get(path_idx, 0) < len(self.path_waves.get(path_idx, [])):
                 return True
         return False
 
     def is_wave_completely_finished(self):
-        """
-        Verifica se TODAS as waves de TODOS os paths terminaram
-        """
-        # Se ainda tem inimigos vivos, não terminou
+        """Verifica se TODAS as waves terminaram - OTIMIZADO"""
         if self.active_enemies:
             return False
 
-        # Verifica cada path
-        for path_idx, waves in self.path_waves.items():
-            # Se o path ainda está em progresso, não terminou
+        for path_idx in self.path_indexes:
             if self.wave_in_progress_by_path.get(path_idx, False):
                 return False
 
-            # Se ainda tem waves para spawnar neste path, não terminou
-            if self.current_wave_index_by_path.get(path_idx, 0) < len(waves):
-                # Verifica se já spawnou todos da wave atual
+            if self.current_wave_index_by_path.get(path_idx, 0) < len(self.path_waves.get(path_idx, [])):
                 wave_data = self.current_wave_data_by_path.get(path_idx)
                 if wave_data:
-                    wave_size = wave_data.get("wave_size", 10)
+                    wave_size = wave_data.get("wave_size", self.DEFAULT_WAVE_SIZE)
                     if self.enemies_spawned_by_path.get(path_idx, 0) < wave_size:
                         return False
                 else:
-                    # Se não tem wave_data mas ainda tem índices, significa que não começou
                     return False
 
         return True

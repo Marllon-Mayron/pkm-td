@@ -55,7 +55,9 @@ class Game:
 
     def initialize_camera(self, world_width, world_height):
         """Inicializa a câmera com o tamanho do mundo"""
+        from src.core.render_context import render_context
         self.camera = Camera(world_width, world_height, self.screen_manager)
+        render_context.invalidate_cache()  # Invalida cache quando câmera muda
 
     def run(self):
         """Loop principal do jogo"""

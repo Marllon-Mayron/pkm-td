@@ -1,42 +1,41 @@
+# src/scenes/game_scene/components/renderer/map_renderer.py
+
 """
-Renderizador de mapa - Desenha o mapa da fase
+Renderizador de mapa - SIMPLIFICADO
 """
-import pygame
-from src.editor.layer_manager import LayerManager
+from src.scenes.game_scene.components.managers.game_layer_manager import GameLayerManager
 
 
 class MapRenderer:
     """Renderiza o mapa da fase"""
 
     def __init__(self):
-        self.layer_manager = LayerManager()
+        self.layer_manager = GameLayerManager()
         self.loaded = False
 
     def load_from_data(self, map_data: dict, base_path: str = ""):
         """Carrega o mapa a partir dos dados"""
         if not map_data:
-            print("Sem dados de mapa para carregar")
             return False
 
         try:
-            self.layer_manager.from_dict(map_data, base_path)
+            self.layer_manager.load_from_dict(map_data, base_path)
             self.loaded = True
-            print(f"Mapa carregado: {self.layer_manager.width}x{self.layer_manager.height} tiles")
             return True
         except Exception as e:
             print(f"Erro ao carregar mapa: {e}")
             return False
 
     def render(self, screen, camera, screen_manager):
-        """Renderiza o mapa"""
-        if self.loaded:
-            self.layer_manager.render_all(screen, camera, screen_manager)
+        """Renderiza o mapa - SEM CACHE PARA GARANTIR ALINHAMENTO"""
+        if not self.loaded:
+            return
+        self.layer_manager.render_all(screen, camera, screen_manager)
 
     def get_dimensions(self):
-        """Retorna dimensões do mapa em pixels"""
         if not self.loaded:
             return (0, 0)
-        return (
-            self.layer_manager.width * self.layer_manager.tile_size,
-            self.layer_manager.height * self.layer_manager.tile_size
-        )
+        return self.layer_manager.get_dimensions()
+
+    def invalidate_cache(self):
+        self.layer_manager.invalidate_cache()

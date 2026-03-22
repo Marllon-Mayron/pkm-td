@@ -64,23 +64,9 @@ class ScreenManager:
         self.viewport_y = (self.window_height - self.viewport_height) // 2
 
     def world_to_screen(self, world_x, world_y, camera=None):
-        """
-        Converte coordenadas do mundo para coordenadas da tela
-        SEM redimensionamento de sprites - apenas posicionamento
-        """
-        if camera:
-            # Aplica transformações da câmera
-            screen_x = (world_x - camera.x) * camera.zoom + self.render_width / 2
-            screen_y = (world_y - camera.y) * camera.zoom + self.render_height / 2
-        else:
-            screen_x = world_x
-            screen_y = world_y
-
-        # Aplica viewport transformation
-        screen_x = screen_x * self.render_scale + self.viewport_x
-        screen_y = screen_y * self.render_scale + self.viewport_y
-
-        return (int(screen_x), int(screen_y))
+        """Delega para o render_context"""
+        from src.core.render_context import render_context
+        return render_context.world_to_screen(world_x, world_y, camera, self)
 
     def world_to_screen_with_scale(self, world_x, world_y, camera=None):
         """
