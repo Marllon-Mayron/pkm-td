@@ -29,6 +29,7 @@ class GameScene(BaseScene):
         # Flag de debug
         self.debug_in_game = False
         self.move_select_overlay = None
+        self.move_learn_overlay = None
         self.game_paused = False  # Flag para pausar o jogo
 
         self.chapter_id = chapter_id
@@ -194,6 +195,39 @@ class GameScene(BaseScene):
 
         print("[MOVE_SELECT] Overlay fechado, jogo despausado")
 
+    def open_move_learn_overlay(self, pokemon, new_move_name):
+        """Abre o overlay de aprendizado de novo move"""
+        from src.scenes.game_scene.components.overlays.move_learn_overlay import MoveLearnOverlay
+
+        self.move_learn_overlay = MoveLearnOverlay(self, pokemon, new_move_name)
+        self.move_learn_overlay.active = True
+
+        # Pausa o jogo
+        self.game_paused = True
+        self.paused = True
+
+        # Trava as waves
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = True
+
+        print(f"[MOVE_LEARN] Abrindo overlay para {pokemon.name} aprender {new_move_name}")
+
+    def close_move_learn_overlay(self, cancel=False):
+        """Fecha o overlay de aprendizado de moves"""
+        if self.move_learn_overlay:
+            self.move_learn_overlay.active = False
+            self.move_learn_overlay = None
+
+        # Despausa o jogo
+        self.game_paused = False
+        self.paused = False
+
+        # Destrava as waves
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = False
+
+        print("[MOVE_LEARN] Overlay fechado, jogo despausado")
+
     def _setup_world_dimensions(self):
         """Configura dimensões do mundo baseado no mapa"""
         map_width, map_height = self.map_renderer.get_dimensions()
@@ -342,7 +376,12 @@ class GameScene(BaseScene):
         camera = self.camera
         screen_mgr = self.screen_manager
 
-        # ===== NOVO: Processa overlay de seleção de moves primeiro =====
+        # ===== NOVO: Processa overlay de aprendizado de moves primeiro =====
+        if self.move_learn_overlay and self.move_learn_overlay.active:
+            self.move_learn_overlay.handle_event(event)
+            return None
+
+        # ===== Processa overlay de seleção de moves =====
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.handle_event(event)
             return None
@@ -436,8 +475,7 @@ class GameScene(BaseScene):
                             drag_manager.start_drag(item["id"], mouse_pos, world_pos)
                 return None
 
-            # ===== NOVO: Clique em Pokémon para abrir overlay de moves =====
-            # Só processa se não estiver arrastando e não houver overlay ativo
+            # Clique em Pokémon para abrir overlay de moves
             if not self.item_drag_manager.is_dragging and not self.team_manager.is_dragging():
                 if self.screen_manager.is_mouse_in_viewport(mouse_pos):
                     world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
@@ -509,10 +547,18 @@ class GameScene(BaseScene):
 
     def fixed_update(self, dt):
         """Update da lógica do jogo - OTIMIZADO"""
-        # ===== NOVO: Se o jogo está pausado pelo overlay de moves, só atualiza o overlay =====
+        # ===== Processa overlay de aprendizado de moves =====
+        if self.move_learn_overlay and self.move_learn_overlay.active:
+            self.move_learn_overlay.update(dt)
+            return
+
+        # ===== Processa overlay de seleção de moves =====
+        if self.move_select_overlay and self.move_select_overlay.active:
+            self.move_select_overlay.update(dt)
+            return
+
+        # Se o jogo está pausado por outro motivo
         if self.game_paused:
-            if self.move_select_overlay and self.move_select_overlay.active:
-                self.move_select_overlay.update(dt)
             return
 
         if self.paused:
@@ -662,13 +708,17 @@ class GameScene(BaseScene):
                          (screen_mgr.viewport_x, screen_mgr.viewport_y,
                           screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
 
-        if self.paused and not self.game_paused:  # Não mostra pause overlay se estiver no move select
+        if self.paused and not self.game_paused:  # Não mostra pause overlay se estiver em overlays
             self._render_pause_overlay(screen)
 
         if overlay_mgr:
             overlay_mgr.render(screen)
 
-        # ===== NOVO: Renderiza overlay de seleção de moves por cima de tudo =====
+        # ===== Renderiza overlay de aprendizado de moves por cima de tudo =====
+        if self.move_learn_overlay and self.move_learn_overlay.active:
+            self.move_learn_overlay.render(screen)
+
+        # ===== Renderiza overlay de seleção de moves =====
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.render(screen)
 

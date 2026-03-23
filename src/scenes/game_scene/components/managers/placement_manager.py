@@ -43,6 +43,7 @@ class PlacementManager:
         pokemon.spot_id = id(spot)
         pokemon.combat_state = "idle"
 
+        pokemon.game_scene = self.game
         # Marca o spot como ocupado
         spot.occupied = True
 

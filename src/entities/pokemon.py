@@ -24,6 +24,7 @@ class Pokemon(Entity):
 
     def __init__(self, x, y, pokemon_id, level=5, is_wild=False, shiny=False, is_boss=False):
         # ===== 1. DADOS BÁSICOS =====
+        self.game_scene = None
         self.pokedex = Pokedex()
         self.unique_id = str(uuid.uuid4())
         self.pokemon_data = self.pokedex.get_pokemon(pokemon_id)
@@ -342,13 +343,15 @@ class Pokemon(Entity):
         self.xp_to_next = self._calculate_xp_needed()
 
         # Verifica novos moves
-        new_moves = self.check_new_moves_on_level_up(old_level)
+        new_moves, pending_moves = self.check_new_moves_on_level_up(old_level)
         if new_moves:
             print(f"[LEVEL UP] {self.name} subiu para Lv.{self.level} e aprendeu: {', '.join(new_moves)}")
 
         # Limpa cache de velocidade
         cache_key = (self.id, self.level, self.speed_stat, self.is_shiny, self.is_boss)
         self._speed_cache.pop(cache_key, None)
+
+        return pending_moves  # Retorna moves que precisam de escolha
 
     def is_boss_type(self):
         return hasattr(self, 'is_boss') and self.is_boss
@@ -929,9 +932,26 @@ class Pokemon(Entity):
     def learn_move(self, move_name: str) -> bool:
         """
         Tenta aprender um novo move
-        Retorna True se aprendeu
+        Se já tem 4 moves, abre overlay para escolher
         """
-        return self._learn_move_with_replacement(move_name)
+        move_info = self.move_data.get_move_info(move_name)
+        if not move_info:
+            return False
+
+        new_move = Move(move_name, move_info)
+
+        # Se tem menos de 4 moves, adiciona diretamente
+        if len(self.moves) < 4:
+            self.moves.append(new_move)
+            print(f"[MOVES] {self.name} aprendeu {move_name}!")
+            return True
+
+        # Se já tem 4 moves, abre overlay
+        if self.game_scene:
+            self.game_scene.open_move_learn_overlay(self, move_name)
+            return True
+
+        return False
 
     def forget_move(self, index: int) -> bool:
         """
@@ -984,12 +1004,18 @@ class Pokemon(Entity):
         """
         new_moves = self.get_new_moves_at_level(self.level)
         learned_moves = []
+        pending_moves = []  # Moves que precisam de escolha
 
         for move_name in new_moves:
-            if self.learn_move(move_name):
+            learned = self.learn_move(move_name)
+            if learned:
                 learned_moves.append(move_name)
+            else:
+                # Não aprendeu porque já tem 4 moves
+                pending_moves.append(move_name)
 
-        return learned_moves
+        # Retorna também os moves pendentes para que o game_scene possa abrir overlay
+        return learned_moves, pending_moves
 
     def restore_moves(self, moves_data: list):
         """
@@ -1025,7 +1051,9 @@ class Pokemon(Entity):
     def _learn_move_without_replacement(self, move_name: str) -> bool:
         """
         Aprende um novo move mantendo os existentes
-        Se já tiver 4 moves, substitui o último (índice 3)
+        Retorna:
+            True: move aprendido com sucesso (ainda tem espaço)
+            False: precisa de decisão do jogador (já tem 4 moves)
         """
         move_info = self.move_data.get_move_info(move_name)
         if not move_info:
@@ -1033,14 +1061,28 @@ class Pokemon(Entity):
 
         new_move = Move(move_name, move_info)
 
-        # Se tem menos de 4 moves, adiciona
+        # Se tem menos de 4 moves, adiciona diretamente
         if len(self.moves) < 4:
             self.moves.append(new_move)
             print(f"[MOVES] {self.name} aprendeu {move_name}!")
             return True
 
-        # Se já tem 4 moves, substitui o último
-        old_name = self.moves[-1].name
-        self.moves[-1] = new_move
-        print(f"[MOVES] {self.name} já tinha 4 moves! Substituiu {old_name} por {move_name}!")
-        return True
+        # Se já tem 4 moves, retorna False indicando que precisa de decisão
+        print(f"[MOVES] {self.name} quer aprender {move_name}, mas já tem 4 moves!")
+        return False  # False = precisa de overlay para decidir
+
+    def learn_move_with_selection(self, move_name: str, slot_index: int) -> bool:
+        """
+        Aprende um novo move substituindo o move no slot_index
+        """
+        move_info = self.move_data.get_move_info(move_name)
+        if not move_info:
+            return False
+
+        if 0 <= slot_index < len(self.moves):
+            old_name = self.moves[slot_index].name
+            self.moves[slot_index] = Move(move_name, move_info)
+            print(f"[MOVES] {self.name} esqueceu {old_name} e aprendeu {move_name}!")
+            return True
+
+        return False
