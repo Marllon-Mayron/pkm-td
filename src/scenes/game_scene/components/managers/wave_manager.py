@@ -13,10 +13,14 @@ class GameWaveManager:
     DEFAULT_INITIAL_DELAY = 2.0
     PROXIMITY_THRESHOLD = 15  # Distância para considerar "próximo" do início/fim
 
+
+
     def __init__(self, phase_loader):
         self.phase_loader = phase_loader
         self.waves_data = []
         self.path_waves = {}
+
+        self.paused = False
 
         # Estado das waves (por path) - usando listas para acesso mais rápido
         self.path_indexes = []  # Lista de todos os path indexes
@@ -120,6 +124,9 @@ class GameWaveManager:
 
     def update(self, dt, path_points_by_index, screen_manager):
         """Atualiza o estado das waves de TODOS os paths - OTIMIZADO"""
+        if self.paused:
+            return []
+
         enemies_at_end = []
         enemies_to_remove = []
         defeated_enemies = []

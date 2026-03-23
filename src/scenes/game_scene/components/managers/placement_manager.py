@@ -55,6 +55,16 @@ class PlacementManager:
         )
         return pokemon
 
+    def get_pokemon_at_world_pos(self, world_x, world_y, tolerance=20):
+        """Retorna o Pokémon na posição do mundo (para seleção)"""
+        tolerance_sq = tolerance * tolerance
+        for pokemon in self.placed_pokemon:
+            dx = pokemon.x - world_x
+            dy = pokemon.y - world_y
+            if dx * dx + dy * dy < tolerance_sq:
+                return pokemon
+        return None
+
     def remove_pokemon_by_right_click(self, world_x, world_y, tolerance=20):
         """Remove o Pokémon na posição do mundo (para clique direito)"""
         pokemon = self.get_pokemon_at_world_pos(world_x, world_y, tolerance)

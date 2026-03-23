@@ -160,6 +160,7 @@ class Pokemon(Entity):
         # ===== 22. MOVES =====
         self.move_data = MoveData()
         self.moves: List[Move] = []  # Lista de moves atuais (máx 4)
+        self.current_move_index = 0  # Índice do move atual
         self._initialize_moves()
 
     def _load_sprites(self, pokemon_id, shiny):
@@ -199,6 +200,12 @@ class Pokemon(Entity):
             self._speed_cache.clear()
         self._speed_cache[cache_key] = speed
         return speed
+
+    def get_current_move(self):
+        """Retorna o move atual do Pokémon"""
+        if self.moves and 0 <= self.current_move_index < len(self.moves):
+            return self.moves[self.current_move_index]
+        return None
 
     def _calculate_stats(self):
         """Calcula stats baseado em level, IVs e EVs"""
@@ -275,7 +282,6 @@ class Pokemon(Entity):
         """Realiza a evolução mantendo os moves compatíveis"""
         old_name = self.name
         old_level = self.level
-        old_move_names = set(move.name for move in self.moves)
 
         new_pokemon_data = self.pokedex.get_pokemon(new_id)
         if not new_pokemon_data:
@@ -296,22 +302,19 @@ class Pokemon(Entity):
         self.map_sprite_size = self.pokedex.get_map_sprite_size(new_id, self.is_shiny)
 
         # ===== GERENCIAMENTO DE MOVES NA EVOLUÇÃO =====
-        # Obter todos os moves que o novo Pokémon aprende até o nível atual
+
+        # Obter moves que o novo Pokémon aprende até o nível atual
         new_learnset = set(self.move_data.get_moves_at_level(self.id, self.level))
 
-        # Moves que o novo Pokémon NÃO aprende mais (deve esquecer)
-        moves_to_forget = old_move_names - new_learnset
-        for move_name in moves_to_forget:
-            for i, move in enumerate(self.moves):
-                if move.name == move_name:
-                    self.forget_move(i)
-                    break
+        # Moves que o Pokémon já tem
+        current_move_names = set(move.name.lower() for move in self.moves)
 
-        # Moves que o novo Pokémon aprende e o antigo NÃO tinha (aprender)
-        moves_to_learn = new_learnset - old_move_names
+        # Novos moves que o Pokémon evolutivo aprende e o antigo não tinha
+        moves_to_learn = new_learnset - current_move_names
+
         for move_name in moves_to_learn:
-            # Aprende novos moves, substituindo se necessário
-            self._learn_move_with_replacement(move_name)
+            # Aprende novos moves, mantendo os existentes (substitui o último se já tiver 4)
+            self._learn_move_without_replacement(move_name)
 
         print(f"[EVOLUÇÃO] ✓ {old_name} (Lv.{old_level}) evoluiu para {self.name}!")
         print(f"[EVOLUÇÃO] Moves atuais: {[m.name for m in self.moves]}")
@@ -1019,10 +1022,10 @@ class Pokemon(Entity):
 
         print(f"[LOAD] {self.name} restaurado com {len(self.moves)} moves")
 
-    def _learn_move_with_replacement(self, move_name: str) -> bool:
+    def _learn_move_without_replacement(self, move_name: str) -> bool:
         """
-        Aprende um novo move, substituindo o último se já tiver 4
-        Retorna True se aprendeu
+        Aprende um novo move mantendo os existentes
+        Se já tiver 4 moves, substitui o último (índice 3)
         """
         move_info = self.move_data.get_move_info(move_name)
         if not move_info:
@@ -1030,14 +1033,14 @@ class Pokemon(Entity):
 
         new_move = Move(move_name, move_info)
 
-        # Se tem menos de 4 moves, adiciona diretamente
+        # Se tem menos de 4 moves, adiciona
         if len(self.moves) < 4:
             self.moves.append(new_move)
             print(f"[MOVES] {self.name} aprendeu {move_name}!")
             return True
 
-        # Já tem 4 moves - substitui o último (índice 3)
+        # Se já tem 4 moves, substitui o último
         old_name = self.moves[-1].name
         self.moves[-1] = new_move
-        print(f"[MOVES] {self.name} esqueceu {old_name} e aprendeu {move_name}!")
+        print(f"[MOVES] {self.name} já tinha 4 moves! Substituiu {old_name} por {move_name}!")
         return True

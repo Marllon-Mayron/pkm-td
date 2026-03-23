@@ -3,6 +3,8 @@
 Cena principal do jogo - OTIMIZADA
 """
 import pygame
+
+from scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
 from src.config.paths import PROJECT_ROOT
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
@@ -26,6 +28,8 @@ class GameScene(BaseScene):
 
         # Flag de debug
         self.debug_in_game = False
+        self.move_select_overlay = None
+        self.game_paused = False  # Flag para pausar o jogo
 
         self.chapter_id = chapter_id
         self.phase_number = phase_number
@@ -151,6 +155,44 @@ class GameScene(BaseScene):
             "money": rewards.get("money", 0),
             "experience": rewards.get("experience", 0)
         }
+
+    def open_move_select_overlay(self, pokemon):
+        """Abre o overlay de seleção de moves para um Pokémon"""
+        if not pokemon or not pokemon.moves:
+            return
+
+        self.move_select_overlay = MoveSelectOverlay(self, pokemon)
+        self.move_select_overlay.active = True
+
+        # Pausa o jogo
+        self.game_paused = True
+        self.paused = True  # Usa o pause existente
+
+        # Trava as waves
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = True
+
+    def close_move_select_overlay(self):
+        """Fecha o overlay de seleção de moves"""
+        # Se ainda existe overlay, marca como inativo
+        if self.move_select_overlay:
+            self.move_select_overlay.active = False
+            self.move_select_overlay = None
+
+        # Despausa o jogo
+        self.game_paused = False
+        self.paused = False
+
+        # Destrava as waves
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = False
+
+        # Garante que a câmera está restaurada (caso o overlay não tenha feito)
+        if hasattr(self, 'camera'):
+            # A câmera já foi restaurada pelo overlay, mas garantimos
+            pass
+
+        print("[MOVE_SELECT] Overlay fechado, jogo despausado")
 
     def _setup_world_dimensions(self):
         """Configura dimensões do mundo baseado no mapa"""
@@ -300,6 +342,11 @@ class GameScene(BaseScene):
         camera = self.camera
         screen_mgr = self.screen_manager
 
+        # ===== NOVO: Processa overlay de seleção de moves primeiro =====
+        if self.move_select_overlay and self.move_select_overlay.active:
+            self.move_select_overlay.handle_event(event)
+            return None
+
         if overlay_active:
             if self.overlay_manager.handle_event(event):
                 return None
@@ -389,6 +436,21 @@ class GameScene(BaseScene):
                             drag_manager.start_drag(item["id"], mouse_pos, world_pos)
                 return None
 
+            # ===== NOVO: Clique em Pokémon para abrir overlay de moves =====
+            # Só processa se não estiver arrastando e não houver overlay ativo
+            if not self.item_drag_manager.is_dragging and not self.team_manager.is_dragging():
+                if self.screen_manager.is_mouse_in_viewport(mouse_pos):
+                    world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
+                    if world_pos:
+                        # Verifica se clicou em algum Pokémon colocado
+                        clicked_pokemon = self.placement_manager.get_pokemon_at_world_pos(
+                            world_pos[0], world_pos[1], tolerance=30
+                        )
+                        if clicked_pokemon and clicked_pokemon.moves:
+                            # Abre overlay de seleção de moves
+                            self.open_move_select_overlay(clicked_pokemon)
+                            return None
+
         # Team manager
         if team_manager:
             result = team_manager.handle_event(
@@ -447,6 +509,12 @@ class GameScene(BaseScene):
 
     def fixed_update(self, dt):
         """Update da lógica do jogo - OTIMIZADO"""
+        # ===== NOVO: Se o jogo está pausado pelo overlay de moves, só atualiza o overlay =====
+        if self.game_paused:
+            if self.move_select_overlay and self.move_select_overlay.active:
+                self.move_select_overlay.update(dt)
+            return
+
         if self.paused:
             return
 
@@ -527,27 +595,6 @@ class GameScene(BaseScene):
                 if any_wave_started:
                     self.game_state = "in_wave"
 
-    def _complete_phase(self):
-        """Marca a fase como completada e dá as recompensas"""
-        from src.config.progress import progress_manager
-
-        self.player.money += self.phase_rewards['money']
-        for pokemon in self.player.team:
-            pokemon.gain_xp(self.phase_rewards['experience'])
-        self.player.score += self.phase_rewards['experience']
-
-        total_items = len(self.target_item_manager.items)
-        protected_items = self.target_item_manager.items_protected
-        if total_items > 0:
-            stars = int((protected_items / total_items) * 3)
-            stars = max(1, min(3, stars))
-        else:
-            stars = 3
-
-        progress_manager.complete_phase(self.phase_id, stars=stars)
-        self.player.auto_save()
-        self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
-
     def render(self, screen):
         """Renderiza o jogo - OTIMIZADO"""
         screen.fill((0, 0, 0))
@@ -615,14 +662,39 @@ class GameScene(BaseScene):
                          (screen_mgr.viewport_x, screen_mgr.viewport_y,
                           screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
 
-        if self.paused:
+        if self.paused and not self.game_paused:  # Não mostra pause overlay se estiver no move select
             self._render_pause_overlay(screen)
 
         if overlay_mgr:
             overlay_mgr.render(screen)
 
+        # ===== NOVO: Renderiza overlay de seleção de moves por cima de tudo =====
+        if self.move_select_overlay and self.move_select_overlay.active:
+            self.move_select_overlay.render(screen)
+
         if show_debug:
             self._render_debug_info(screen)
+
+    def _complete_phase(self):
+        """Marca a fase como completada e dá as recompensas"""
+        from src.config.progress import progress_manager
+
+        self.player.money += self.phase_rewards['money']
+        for pokemon in self.player.team:
+            pokemon.gain_xp(self.phase_rewards['experience'])
+        self.player.score += self.phase_rewards['experience']
+
+        total_items = len(self.target_item_manager.items)
+        protected_items = self.target_item_manager.items_protected
+        if total_items > 0:
+            stars = int((protected_items / total_items) * 3)
+            stars = max(1, min(3, stars))
+        else:
+            stars = 3
+
+        progress_manager.complete_phase(self.phase_id, stars=stars)
+        self.player.auto_save()
+        self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
 
     def _render_game_ui(self, screen):
         """Renderiza a UI do jogo - OTIMIZADO"""
@@ -733,8 +805,6 @@ class GameScene(BaseScene):
         phase_x = screen_mgr.viewport_x + (screen_mgr.viewport_width - phase_text.get_width()) // 2
         phase_y = text_y + pause_text.get_height() + 10
         screen.blit(phase_text, (phase_x, phase_y))
-
-    # src/scenes/game_scene/game_scene.py - método _render_debug_info corrigido
 
     def _render_debug_info(self, screen):
         """Informações de debug - CORRIGIDO"""
