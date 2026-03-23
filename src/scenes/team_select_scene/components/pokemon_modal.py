@@ -1,6 +1,7 @@
 import pygame
 from src.data.pokedex import Pokedex
 
+
 class PokemonModal:
     def __init__(self, game, pokemon):
         self.game = game
@@ -75,9 +76,8 @@ class PokemonModal:
                 return "close"
 
             if self.action_button.collidepoint(event.pos):
-                # Verifica se pode adicionar ao time
                 if not self.pokemon.is_in_team and len(self.game.player.team) >= 6:
-                    return None  # Time cheio, não faz nada
+                    return None
                 return "action"
 
             if not self.rect.collidepoint(event.pos):
@@ -87,24 +87,19 @@ class PokemonModal:
         return None
 
     def _get_type_color(self, type_name):
-        """Retorna a cor do tipo"""
         color_key = f"type_{type_name.lower()}"
         return self.colors.get(color_key, (128, 128, 128))
 
     def _draw_rounded_rect(self, screen, color, rect, radius=8, border=0, border_color=None):
-        """Desenha um retângulo com bordas arredondadas"""
         pygame.draw.rect(screen, color, rect, border_radius=radius)
         if border > 0 and border_color:
             pygame.draw.rect(screen, border_color, rect, border, border_radius=radius)
 
     def _draw_hp_bar(self, screen, x, y, width=200, height=12):
-        """Desenha a barra de HP"""
         hp_percent = self.pokemon.current_hp / self.pokemon.max_hp
 
-        # Fundo
         pygame.draw.rect(screen, self.colors['hp_bar_bg'], (x, y, width, height), border_radius=6)
 
-        # Cor da barra
         if hp_percent > 0.5:
             color = self.colors['hp_green']
         elif hp_percent > 0.25:
@@ -112,82 +107,69 @@ class PokemonModal:
         else:
             color = self.colors['hp_red']
 
-        # Barra de progresso
         bar_width = int(width * hp_percent)
         if bar_width > 0:
             pygame.draw.rect(screen, color, (x, y, bar_width, height), border_radius=6)
 
-        # Texto do HP
         font_small = pygame.font.Font(None, 16)
-        hp_text = font_small.render(f"{self.pokemon.current_hp}/{self.pokemon.max_hp}", True, self.colors['text_secondary'])
+        hp_text = font_small.render(f"{self.pokemon.current_hp}/{self.pokemon.max_hp}", True,
+                                    self.colors['text_secondary'])
         screen.blit(hp_text, (x + width + 10, y - 2))
 
-    def _draw_stat_bar(self, screen, stat_name, stat_value, max_value=255, x=0, y=0):
-        """Desenha uma barra de stat"""
+    def _draw_stat_bar(self, screen, stat_name, stat_value, max_value=255, x=0, y=0, width=120):
         font_small = pygame.font.Font(None, 14)
 
-        # Nome do stat
         name_text = font_small.render(stat_name, True, self.colors['text_secondary'])
         screen.blit(name_text, (x, y))
 
-        # Valor
         value_text = font_small.render(str(stat_value), True, self.colors['text_accent'])
         screen.blit(value_text, (x + 45, y))
 
-        # Barra
-        bar_width = 120
+        bar_width = width - 70
         bar_height = 6
-        bar_x = x + 75
+        bar_x = x + 70
         bar_y = y + 2
 
         percent = min(1.0, stat_value / max_value)
         pygame.draw.rect(screen, (50, 50, 60), (bar_x, bar_y, bar_width, bar_height), border_radius=3)
-        pygame.draw.rect(screen, (100, 150, 200), (bar_x, bar_y, int(bar_width * percent), bar_height), border_radius=3)
+        pygame.draw.rect(screen, (100, 150, 200), (bar_x, bar_y, int(bar_width * percent), bar_height),
+                         border_radius=3)
 
     def _draw_move_card(self, screen, move, index, x, y, width):
-        """Desenha um card individual de move"""
-        # Fundo do move
-        move_rect = pygame.Rect(x, y, width, 70)
+        card_height = 65
+        move_rect = pygame.Rect(x, y, width, card_height)
         self._draw_rounded_rect(screen, self.colors['move_bg'], move_rect, radius=6)
         self._draw_rounded_rect(screen, self.colors['move_border'], move_rect, radius=6, border=1)
 
-        # Nome do move
-        font_name = pygame.font.Font(None, 18)
+        font_name = pygame.font.Font(None, 16)
+        font_stats = pygame.font.Font(None, 14)
+
         name_text = font_name.render(move.name.upper(), True, self.colors['text_accent'])
-        screen.blit(name_text, (x + 10, y + 8))
+        screen.blit(name_text, (x + 8, y + 8))
 
-        # Tipo do move
         type_color = self._get_type_color(move.type)
-        type_rect = pygame.Rect(x + 10, y + 32, 55, 20)
-        pygame.draw.rect(screen, type_color, type_rect, border_radius=4)
-        font_small = pygame.font.Font(None, 12)
-        type_text = font_small.render(move.type.upper(), True, (255, 255, 255))
-        screen.blit(type_text, (type_rect.x + 3, type_rect.y + 4))
+        type_rect = pygame.Rect(x + width - 60, y + 8, 52, 20)
+        pygame.draw.rect(screen, type_color, type_rect, border_radius=5)
+        font_type = pygame.font.Font(None, 11)
+        type_text = font_type.render(move.type.upper(), True, (255, 255, 255))
+        screen.blit(type_text, (type_rect.centerx - type_text.get_width() // 2,
+                                type_rect.centery - type_text.get_height() // 2))
 
-        # Categoria (físico/especial/status)
-        category_colors = {
-            'physical': (200, 100, 100),
-            'special': (100, 100, 200),
-            'status': (100, 200, 100)
-        }
-        cat_color = category_colors.get(move.category, (150, 150, 150))
-        category_rect = pygame.Rect(x + 72, y + 32, 55, 20)
-        pygame.draw.rect(screen, cat_color, category_rect, border_radius=4)
-        category_text = font_small.render(move.category[:3].upper(), True, (255, 255, 255))
-        screen.blit(category_text, (category_rect.x + 3, category_rect.y + 4))
+        stats_y = y + 38
 
-        # Poder
         if move.power > 0:
-            power_text = font_small.render(f"PWR: {move.power}", True, self.colors['text_secondary'])
-            screen.blit(power_text, (x + 10, y + 55))
+            power_text = font_stats.render(f"PWR {move.power}", True, self.colors['text_secondary'])
+        else:
+            power_text = font_stats.render(f"PWR --", True, self.colors['text_secondary'])
+        screen.blit(power_text, (x + 8, stats_y))
 
-        # PP
-        pp_text = font_small.render(f"PP: {move.current_pp}/{move.max_pp}", True, self.colors['move_pp_text'])
-        screen.blit(pp_text, (x + width - 70, y + 55))
+        acc_text = font_stats.render(f"ACC {move.accuracy}", True, self.colors['text_secondary'])
+        acc_x = x + (width // 2) - (acc_text.get_width() // 2)
+        screen.blit(acc_text, (acc_x, stats_y))
 
-        # Precisão
-        acc_text = font_small.render(f"ACC: {move.accuracy}", True, self.colors['text_secondary'])
-        screen.blit(acc_text, (x + width - 130, y + 55))
+        pp_text = font_stats.render(f"PP {move.current_pp}/{move.max_pp}", True, self.colors['move_pp_text'])
+        pp_x = x + width - pp_text.get_width() - 8
+        screen.blit(pp_text, (pp_x, stats_y))
 
     def render(self, screen):
         if not self.visible:
@@ -206,8 +188,7 @@ class PokemonModal:
         self._draw_rounded_rect(screen, self.colors['bg_primary'], self.rect, radius=15)
         self._draw_rounded_rect(screen, self.colors['border'], self.rect, radius=15, border=2)
 
-        # Cabeçalho com gradiente
-        header_rect = pygame.Rect(self.x, self.y, self.width, 80)
+        # Cabeçalho
         for i in range(80):
             alpha = 40 - int(i * 0.5)
             color = (45, 45, 55, max(0, min(255, alpha)))
@@ -220,56 +201,92 @@ class PokemonModal:
         close_rect = close_text.get_rect(center=self.close_button.center)
         screen.blit(close_text, close_rect)
 
-        # ===== LADO ESQUERDO - SPRITE E TIPOS =====
-        left_x = self.x + 30
-        left_y = self.y + 30
+        # ===== LAYOUT RESPONSIVO =====
+        # Área útil do modal (excluindo header e footer)
+        header_height = 80
+        footer_height = 80
+        usable_height = self.height - header_height - footer_height
+        usable_y = self.y + header_height
 
-        # Sprite do Pokémon
+        # Margens
+        margin = 20
+        inner_width = self.width - (margin * 2)
+        inner_x = self.x + margin
+
+        # Layout: 2 colunas, 2 linhas
+        col_width = (inner_width - margin) // 2
+        row_height = (usable_height - margin) // 2
+
+        # Definindo as 4 células
+        cells = {
+            'sprite': pygame.Rect(inner_x, usable_y, col_width, row_height),
+            'stats': pygame.Rect(inner_x + col_width + margin, usable_y, col_width, row_height),
+            'moves': pygame.Rect(inner_x, usable_y + row_height + margin, col_width, row_height),
+            'info': pygame.Rect(inner_x + col_width + margin, usable_y + row_height + margin, col_width, row_height)
+        }
+
+        # ===== CÉLULA 1: SPRITE E INFO BÁSICA =====
+        cell = cells['sprite']
+
+        # Sprite
         sprite = self.pokedex.get_sprite(self.pokemon.id, "front", self.pokemon.is_shiny)
+        sprite_size = min(cell.width - 40, cell.height - 100)
         if sprite:
-            sprite_big = pygame.transform.scale(sprite, (140, 140))
-            screen.blit(sprite_big, (left_x, left_y))
+            sprite_big = pygame.transform.scale(sprite, (sprite_size, sprite_size))
+            sprite_x = cell.x + (cell.width - sprite_size) // 2
+            sprite_y = cell.y + 10
+            screen.blit(sprite_big, (sprite_x, sprite_y))
+
+            if self.pokemon.is_shiny:
+                glow = pygame.Surface((sprite_size + 20, sprite_size + 20), pygame.SRCALPHA)
+                pygame.draw.circle(glow, (255, 215, 0, 80), (sprite_size // 2 + 10, sprite_size // 2 + 10),
+                                   sprite_size // 2 + 10)
+                screen.blit(glow, (sprite_x - 10, sprite_y - 10))
 
         # Nome e nível
-        title_font = pygame.font.Font(None, 36)
-        name_text = title_font.render(f"{self.pokemon.name}", True, self.colors['text_primary'])
-        screen.blit(name_text, (left_x + 160, left_y + 20))
+        title_font = pygame.font.Font(None, 24)
+        level_font = pygame.font.Font(None, 20)
 
-        level_font = pygame.font.Font(None, 28)
+        name_text = title_font.render(f"{self.pokemon.name}", True, self.colors['text_primary'])
         level_text = level_font.render(f"Lv.{self.pokemon.level}", True, self.colors['text_accent'])
-        screen.blit(level_text, (left_x + 160, left_y + 55))
+
+        name_y = cell.y + sprite_size + 20 if sprite else cell.y + 60
+        name_x = cell.x + (cell.width - (name_text.get_width() + level_text.get_width() + 10)) // 2
+
+        screen.blit(name_text, (name_x, name_y))
+        screen.blit(level_text, (name_x + name_text.get_width() + 10,
+                                 name_y + (name_text.get_height() - level_text.get_height()) // 2))
 
         # Tipos
-        type_y = left_y + 95
+        type_y = name_y + 35
+        type_spacing = 80
+        total_types_width = len(self.pokemon.types) * type_spacing
+        type_start_x = cell.x + (cell.width - total_types_width) // 2
+
         for i, type_name in enumerate(self.pokemon.types):
             type_color = self._get_type_color(type_name)
-            type_rect = pygame.Rect(left_x + 160 + (i * 85), type_y, 75, 28)
+            type_rect = pygame.Rect(type_start_x + (i * type_spacing), type_y, 70, 26)
             pygame.draw.rect(screen, type_color, type_rect, border_radius=6)
             pygame.draw.rect(screen, (200, 200, 200), type_rect, 1, border_radius=6)
 
-            type_text = pygame.font.Font(None, 16).render(type_name.upper(), True, (255, 255, 255))
+            type_text = pygame.font.Font(None, 12).render(type_name.upper(), True, (255, 255, 255))
             type_rect_text = type_text.get_rect(center=type_rect.center)
             screen.blit(type_text, type_rect_text)
 
         # Natureza
-        nature_font = pygame.font.Font(None, 20)
+        nature_font = pygame.font.Font(None, 14)
         nature_text = nature_font.render(f"Natureza: {self.pokemon.nature}", True, self.colors['text_secondary'])
-        screen.blit(nature_text, (left_x + 160, type_y + 45))
+        nature_x = cell.x + (cell.width - nature_text.get_width()) // 2
+        if type_y + 40 + nature_text.get_height() < cell.bottom - 5:
+            screen.blit(nature_text, (nature_x, type_y + 35))
 
-        # HP Bar
-        hp_y = left_y + 165
-        hp_label = pygame.font.Font(None, 18).render("HP", True, self.colors['text_secondary'])
-        screen.blit(hp_label, (left_x + 160, hp_y))
-        self._draw_hp_bar(screen, left_x + 190, hp_y, width=180, height=12)
+        # ===== CÉLULA 2: STATS =====
+        cell = cells['stats']
 
-        # ===== LADO DIREITO - STATS =====
-        right_x = self.x + self.width - 280
-        stats_y = self.y + 30
+        stats_title = pygame.font.Font(None, 22).render("STATS", True, self.colors['text_accent'])
+        stats_title_x = cell.x + (cell.width - stats_title.get_width()) // 2
+        screen.blit(stats_title, (stats_title_x, cell.y + 8))
 
-        stats_title = pygame.font.Font(None, 24).render("STATS", True, self.colors['text_accent'])
-        screen.blit(stats_title, (right_x, stats_y))
-
-        # Barras de stats
         stats = [
             ("ATK", self.pokemon.attack),
             ("DEF", self.pokemon.defense),
@@ -278,83 +295,192 @@ class PokemonModal:
             ("VEL", self.pokemon.speed_stat)
         ]
 
-        stat_start_y = stats_y + 35
+        stat_start_y = cell.y + 45
+        stat_spacing = 28
+        stat_bar_width = cell.width - 30
+
         for i, (name, value) in enumerate(stats):
-            self._draw_stat_bar(screen, name, value, max_value=255,
-                                x=right_x, y=stat_start_y + (i * 25))
+            y_pos = stat_start_y + (i * stat_spacing)
+            if y_pos + 20 < cell.bottom:
+                self._draw_stat_bar(screen, name, value, max_value=255,
+                                    x=cell.x + 10, y=y_pos, width=stat_bar_width)
 
-        # IVs
-        iv_y = stat_start_y + 140
-        iv_title = pygame.font.Font(None, 20).render("IVs", True, self.colors['text_accent'])
-        screen.blit(iv_title, (right_x, iv_y))
+        # ===== HP BAR (DESTAQUE) =====
+        hp_y = stat_start_y + (len(stats) * stat_spacing) + 8
 
-        iv_values = [
-            f"HP:{self.pokemon.ivs.get('hp', 0)}",
-            f"ATK:{self.pokemon.ivs.get('attack', 0)}",
-            f"DEF:{self.pokemon.ivs.get('defense', 0)}",
-            f"SPA:{self.pokemon.ivs.get('special_attack', 0)}",
-            f"SPD:{self.pokemon.ivs.get('special_defense', 0)}",
-            f"VEL:{self.pokemon.ivs.get('speed', 0)}"
-        ]
+        # Fundo para destacar a área de HP
+        hp_bg_rect = pygame.Rect(cell.x + 5, hp_y - 5, cell.width - 10, 40)
+        pygame.draw.rect(screen, (35, 35, 45), hp_bg_rect, border_radius=8)
 
-        iv_font = pygame.font.Font(None, 14)
-        for i, iv in enumerate(iv_values):
-            col = i % 3
-            row = i // 3
-            iv_x = right_x + (col * 70)
-            iv_y_pos = iv_y + 25 + (row * 22)
+        # Label HP
+        hp_label_font = pygame.font.Font(None, 18)
+        hp_label = hp_label_font.render("HP", True, self.colors['text_accent'])
+        screen.blit(hp_label, (cell.x + 15, hp_y))
 
-            # Cor baseada no valor
-            value = int(iv.split(':')[1])
-            if value >= 31:
-                color = (255, 100, 100)
-            elif value >= 20:
-                color = (255, 200, 100)
+        # Valor HP
+        hp_value_font = pygame.font.Font(None, 16)
+        hp_text = hp_value_font.render(f"{self.pokemon.current_hp}/{self.pokemon.max_hp}",
+                                       True, self.colors['text_primary'])
+        screen.blit(hp_text, (cell.x + 55, hp_y))
+
+        # Barra de HP
+        hp_bar_width = cell.width - 100
+        hp_bar_height = 12
+        hp_bar_x = cell.x + 55
+        hp_bar_y = hp_y + 20
+
+        hp_percent = self.pokemon.current_hp / self.pokemon.max_hp
+
+        # Fundo da barra
+        pygame.draw.rect(screen, self.colors['hp_bar_bg'],
+                         (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), border_radius=6)
+
+        # Cor da barra baseada no percentual
+        if hp_percent > 0.5:
+            hp_color = self.colors['hp_green']
+        elif hp_percent > 0.25:
+            hp_color = self.colors['hp_yellow']
+        else:
+            hp_color = self.colors['hp_red']
+
+        # Barra de progresso
+        bar_width = int(hp_bar_width * hp_percent)
+        if bar_width > 0:
+            pygame.draw.rect(screen, hp_color,
+                             (hp_bar_x, hp_bar_y, bar_width, hp_bar_height), border_radius=6)
+
+        # ===== IVs =====
+        iv_y = hp_y + 45
+        if iv_y + 80 < cell.bottom:
+            iv_title = pygame.font.Font(None, 16).render("IVs", True, self.colors['text_accent'])
+            iv_title_x = cell.x + (cell.width - iv_title.get_width()) // 2
+            screen.blit(iv_title, (iv_title_x, iv_y))
+
+            iv_values = [
+                f"HP:{self.pokemon.ivs.get('hp', 0)}",
+                f"ATK:{self.pokemon.ivs.get('attack', 0)}",
+                f"DEF:{self.pokemon.ivs.get('defense', 0)}",
+                f"SPA:{self.pokemon.ivs.get('special_attack', 0)}",
+                f"SPD:{self.pokemon.ivs.get('special_defense', 0)}",
+                f"VEL:{self.pokemon.ivs.get('speed', 0)}"
+            ]
+
+            iv_font = pygame.font.Font(None, 12)
+            iv_start_y = iv_y + 25
+            col_width_iv = (cell.width - 20) // 3
+
+            for i, iv in enumerate(iv_values):
+                col = i % 3
+                row = i // 3
+                iv_x = cell.x + 10 + (col * col_width_iv)
+                iv_y_pos = iv_start_y + (row * 20)
+
+                if iv_y_pos + 15 < cell.bottom:
+                    value = int(iv.split(':')[1])
+                    if value >= 31:
+                        color = (255, 100, 100)
+                    elif value >= 20:
+                        color = (255, 200, 100)
+                    else:
+                        color = (150, 150, 150)
+
+                    iv_surf = iv_font.render(iv, True, color)
+                    screen.blit(iv_surf, (iv_x, iv_y_pos))
+
+        # ===== CÉLULA 3: MOVES (GRID 2x2) =====
+        cell = cells['moves']
+
+        moves_title = pygame.font.Font(None, 22).render("MOVES", True, self.colors['text_accent'])
+        moves_title_x = cell.x + (cell.width - moves_title.get_width()) // 2
+        screen.blit(moves_title, (moves_title_x, cell.y + 8))
+
+        # Grid de moves 2x2
+        move_card_width = (cell.width - 25) // 2
+        move_card_height = 65
+        move_spacing = 10
+        moves_start_y = cell.y + 45
+
+        for i in range(4):
+            if i < len(self.pokemon.moves):
+                move = self.pokemon.moves[i]
+                col = i % 2
+                row = i // 2
+
+                card_x = cell.x + 5 + (col * (move_card_width + move_spacing))
+                card_y = moves_start_y + (row * (move_card_height + move_spacing))
+
+                if card_y + move_card_height < cell.bottom - 5:
+                    self._draw_move_card(screen, move, i, card_x, card_y, move_card_width)
             else:
-                color = (150, 150, 150)
+                col = i % 2
+                row = i // 2
 
-            iv_surf = iv_font.render(iv, True, color)
-            screen.blit(iv_surf, (iv_x, iv_y_pos))
+                card_x = cell.x + 5 + (col * (move_card_width + move_spacing))
+                card_y = moves_start_y + (row * (move_card_height + move_spacing))
 
-        # ===== SEÇÃO DE MOVES =====
-        moves_y = left_y + 220
+                if card_y + move_card_height < cell.bottom - 5:
+                    empty_rect = pygame.Rect(card_x, card_y, move_card_width, move_card_height)
+                    self._draw_rounded_rect(screen, (30, 30, 40), empty_rect, radius=6)
+                    self._draw_rounded_rect(screen, (60, 60, 70), empty_rect, radius=6, border=1)
 
-        # Título da seção
-        moves_title = pygame.font.Font(None, 28).render("MOVES", True, self.colors['text_accent'])
-        screen.blit(moves_title, (left_x, moves_y))
+                    empty_font = pygame.font.Font(None, 12)
+                    empty_text = empty_font.render("-- Vazio --", True, (80, 80, 90))
+                    text_rect = empty_text.get_rect(center=empty_rect.center)
+                    screen.blit(empty_text, text_rect)
 
-        # Linha separadora
-        pygame.draw.line(screen, self.colors['border'],
-                         (left_x, moves_y + 35),
-                         (self.x + self.width - 30, moves_y + 35), 2)
+        # ===== CÉLULA 4: INFORMAÇÕES =====
+        cell = cells['info']
 
-        # Exibe os 4 moves
-        moves_start_y = moves_y + 50
-        move_card_width = (self.width - 80) // 2  # 2 colunas
+        info_title = pygame.font.Font(None, 22).render("INFORMAÇÕES", True, self.colors['text_accent'])
+        info_title_x = cell.x + (cell.width - info_title.get_width()) // 2
+        screen.blit(info_title, (info_title_x, cell.y + 8))
 
-        for i, move in enumerate(self.pokemon.moves[:4]):  # Mostra até 4 moves
-            col = i % 2
-            row = i // 2
-            card_x = left_x + (col * (move_card_width + 20))
-            card_y = moves_start_y + (row * 80)
+        info_font = pygame.font.Font(None, 14)
+        y_offset = 45
+        line_spacing = 25
 
-            self._draw_move_card(screen, move, i, card_x, card_y, move_card_width)
+        # Experiência
+        exp_text = info_font.render(f"Experiência: {self.pokemon.xp}", True, self.colors['text_secondary'])
+        exp_x = cell.x + (cell.width - exp_text.get_width()) // 2
+        if y_offset < cell.height - 10:
+            screen.blit(exp_text, (exp_x, cell.y + y_offset))
+        y_offset += line_spacing
 
-        # Se tiver menos de 4 moves, mostra slots vazios
-        for i in range(len(self.pokemon.moves), 4):
-            col = i % 2
-            row = i // 2
-            card_x = left_x + (col * (move_card_width + 20))
-            card_y = moves_start_y + (row * 80)
+        # Próximo nível
+        exp_needed_text = info_font.render(f"Próximo nível: {self.pokemon.xp_to_next} EXP", True,
+                                           self.colors['text_secondary'])
+        exp_needed_x = cell.x + (cell.width - exp_needed_text.get_width()) // 2
+        if y_offset < cell.height - 10:
+            screen.blit(exp_needed_text, (exp_needed_x, cell.y + y_offset))
+        y_offset += line_spacing
 
-            empty_rect = pygame.Rect(card_x, card_y, move_card_width, 70)
-            self._draw_rounded_rect(screen, (30, 30, 40), empty_rect, radius=6)
-            self._draw_rounded_rect(screen, (60, 60, 70), empty_rect, radius=6, border=1)
+        # Barra de experiência
+        exp_bar_width = cell.width - 40
+        exp_bar_height = 10
+        exp_bar_x = cell.x + 20
+        exp_bar_y = cell.y + y_offset
 
-            empty_font = pygame.font.Font(None, 14)
-            empty_text = empty_font.render("-- Vazio --", True, (80, 80, 90))
-            text_rect = empty_text.get_rect(center=empty_rect.center)
-            screen.blit(empty_text, text_rect)
+        if exp_bar_y + exp_bar_height < cell.bottom - 10:
+            exp_percent = self.pokemon.xp / self.pokemon.xp_to_next if self.pokemon.xp_to_next > 0 else 0
+            pygame.draw.rect(screen, (50, 50, 60), (exp_bar_x, exp_bar_y, exp_bar_width, exp_bar_height),
+                             border_radius=5)
+            pygame.draw.rect(screen, (100, 150, 200),
+                             (exp_bar_x, exp_bar_y, int(exp_bar_width * exp_percent), exp_bar_height), border_radius=5)
+            y_offset += line_spacing
+
+        # ID
+        id_text = info_font.render(f"ID: #{self.pokemon.id:04d}", True, self.colors['text_secondary'])
+        id_x = cell.x + (cell.width - id_text.get_width()) // 2
+        if y_offset < cell.height - 10:
+            screen.blit(id_text, (id_x, cell.y + y_offset))
+        y_offset += line_spacing
+
+        # Status Boss
+        if self.pokemon.is_boss:
+            boss_text = info_font.render("⭐ BOSS ⭐", True, (255, 100, 100))
+            boss_x = cell.x + (cell.width - boss_text.get_width()) // 2
+            if y_offset < cell.height - 10:
+                screen.blit(boss_text, (boss_x, cell.y + y_offset))
 
         # ===== BOTÃO DE AÇÃO =====
         if self.pokemon.is_in_team:
@@ -377,12 +503,6 @@ class PokemonModal:
 
         # ===== INDICADOR SHINY =====
         if self.pokemon.is_shiny:
-            shiny_text = pygame.font.Font(None, 24).render("✨ SHINY ✨", True, (255, 215, 0))
-            shiny_rect = shiny_text.get_rect(center=(self.x + self.width - 100, self.y + 45))
+            shiny_text = pygame.font.Font(None, 18).render("✨ SHINY ✨", True, (255, 215, 0))
+            shiny_rect = shiny_text.get_rect(center=(self.x + self.width - 70, self.y + 45))
             screen.blit(shiny_text, shiny_rect)
-
-            # Brilho ao redor do sprite
-            if sprite:
-                glow = pygame.Surface((150, 150), pygame.SRCALPHA)
-                pygame.draw.circle(glow, (255, 215, 0, 80), (75, 75), 75)
-                screen.blit(glow, (left_x - 5, left_y - 5))
