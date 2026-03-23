@@ -1,6 +1,6 @@
 # Save data
 src/save_data.json
-src/saves/*.json
+saves/*.json
 src/*.data
 
 # IntelliJ IDEA

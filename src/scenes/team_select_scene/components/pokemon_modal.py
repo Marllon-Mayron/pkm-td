@@ -197,7 +197,7 @@ class PokemonModal:
         # Botão fechar
         self._draw_rounded_rect(screen, (60, 60, 70), self.close_button, radius=8)
         close_font = pygame.font.Font(None, 28)
-        close_text = close_font.render("✕", True, (255, 255, 255))
+        close_text = close_font.render("x", True, (255, 255, 255))
         close_rect = close_text.get_rect(center=self.close_button.center)
         screen.blit(close_text, close_rect)
 
@@ -309,31 +309,33 @@ class PokemonModal:
         hp_y = stat_start_y + (len(stats) * stat_spacing) + 8
 
         # Fundo para destacar a área de HP
-        hp_bg_rect = pygame.Rect(cell.x + 5, hp_y - 5, cell.width - 10, 40)
+        hp_bg_rect = pygame.Rect(cell.x + 5, hp_y - 5, cell.width - 10, 48)
         pygame.draw.rect(screen, (35, 35, 45), hp_bg_rect, border_radius=8)
 
         # Label HP
-        hp_label_font = pygame.font.Font(None, 18)
+        hp_label_font = pygame.font.Font(None, 20)
         hp_label = hp_label_font.render("HP", True, self.colors['text_accent'])
-        screen.blit(hp_label, (cell.x + 15, hp_y))
+        screen.blit(hp_label, (cell.x + 15, hp_y + 12))
 
-        # Valor HP
-        hp_value_font = pygame.font.Font(None, 16)
-        hp_text = hp_value_font.render(f"{self.pokemon.current_hp}/{self.pokemon.max_hp}",
-                                       True, self.colors['text_primary'])
-        screen.blit(hp_text, (cell.x + 55, hp_y))
+        # Barra de HP - CENTRALIZADA VERTICALMENTE NO FUNDO ESCURO
+        hp_bar_width = cell.width - 100  # Largura total menos margens esquerda e direita
+        hp_bar_height = 24  # Altura da barra
+        hp_bar_x = cell.x + 60  # Posição X após o label "HP"
 
-        # Barra de HP
-        hp_bar_width = cell.width - 100
-        hp_bar_height = 12
-        hp_bar_x = cell.x + 55
-        hp_bar_y = hp_y + 20
+        # Calcular posição Y para centralizar no fundo escuro (altura 48)
+        # O fundo começa em hp_y - 5 e tem altura 48, então o centro vertical é (hp_y - 5) + 24 = hp_y + 19
+        # Para centralizar a barra (altura 24), o topo deve ser centro - (altura/2) = (hp_y + 19) - 12 = hp_y + 7
+        hp_bar_y = hp_y + 7  # Posição Y centralizada dentro do fundo escuro
+
+        # Garantir que a barra não ultrapasse os limites da célula
+        if hp_bar_x + hp_bar_width > cell.right - 10:
+            hp_bar_width = cell.right - hp_bar_x - 10
 
         hp_percent = self.pokemon.current_hp / self.pokemon.max_hp
 
         # Fundo da barra
         pygame.draw.rect(screen, self.colors['hp_bar_bg'],
-                         (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), border_radius=6)
+                         (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), border_radius=8)
 
         # Cor da barra baseada no percentual
         if hp_percent > 0.5:
@@ -343,14 +345,26 @@ class PokemonModal:
         else:
             hp_color = self.colors['hp_red']
 
-        # Barra de progresso
+        # Barra de progresso - limitada pela largura disponível
         bar_width = int(hp_bar_width * hp_percent)
         if bar_width > 0:
             pygame.draw.rect(screen, hp_color,
-                             (hp_bar_x, hp_bar_y, bar_width, hp_bar_height), border_radius=6)
+                             (hp_bar_x, hp_bar_y, bar_width, hp_bar_height), border_radius=8)
+
+        # Texto do valor HP dentro da barra
+        hp_value_font = pygame.font.Font(None, 18)
+        hp_text = hp_value_font.render(f"{self.pokemon.current_hp}/{self.pokemon.max_hp}",
+                                       True, self.colors['text_primary'])
+
+        # Centralizar o texto dentro da barra de HP
+        text_x = hp_bar_x + (hp_bar_width - hp_text.get_width()) // 2
+        text_y = hp_bar_y + (hp_bar_height - hp_text.get_height()) // 2
+        # Garantir que o texto não ultrapasse os limites
+        text_x = max(hp_bar_x + 5, min(text_x, hp_bar_x + hp_bar_width - hp_text.get_width() - 5))
+        screen.blit(hp_text, (text_x, text_y))
 
         # ===== IVs =====
-        iv_y = hp_y + 45
+        iv_y = hp_y + 50
         if iv_y + 80 < cell.bottom:
             iv_title = pygame.font.Font(None, 16).render("IVs", True, self.colors['text_accent'])
             iv_title_x = cell.x + (cell.width - iv_title.get_width()) // 2

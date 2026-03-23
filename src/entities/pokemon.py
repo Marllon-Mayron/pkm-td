@@ -272,31 +272,34 @@ class Pokemon(Entity):
         return False
 
     def _perform_evolution(self, new_id):
+        """Realiza a evolução mantendo os moves compatíveis"""
         old_name = self.name
         old_level = self.level
+        old_move_names = set(move.name for move in self.moves)
 
         new_pokemon_data = self.pokedex.get_pokemon(new_id)
-
         if not new_pokemon_data:
             return
 
+        # Atualiza dados básicos
         self.id = new_id
         self.name = new_pokemon_data["name"].capitalize()
         self.types = new_pokemon_data["types"]
         self.base_stats = new_pokemon_data["base_stats"]
 
+        # Recalcula stats (nível mantido)
         self._calculate_stats()
         self.current_hp = self.max_hp
 
+        # Recarrega sprites
         self._load_sprites(new_id, self.is_shiny)
         self.map_sprite_size = self.pokedex.get_map_sprite_size(new_id, self.is_shiny)
 
-        # Recalcula moves para o novo Pokémon no mesmo nível
-        # Mantém os moves antigos se ainda são aprendidos
-        old_move_names = set(move.name for move in self.moves)
+        # ===== GERENCIAMENTO DE MOVES NA EVOLUÇÃO =====
+        # Obter todos os moves que o novo Pokémon aprende até o nível atual
         new_learnset = set(self.move_data.get_moves_at_level(self.id, self.level))
 
-        # Moves que o novo Pokémon não aprende mais
+        # Moves que o novo Pokémon NÃO aprende mais (deve esquecer)
         moves_to_forget = old_move_names - new_learnset
         for move_name in moves_to_forget:
             for i, move in enumerate(self.moves):
@@ -304,12 +307,14 @@ class Pokemon(Entity):
                     self.forget_move(i)
                     break
 
-        # Moves que o novo Pokémon aprende e o antigo não tinha
+        # Moves que o novo Pokémon aprende e o antigo NÃO tinha (aprender)
         moves_to_learn = new_learnset - old_move_names
         for move_name in moves_to_learn:
-            self.learn_move(move_name)
+            # Aprende novos moves, substituindo se necessário
+            self._learn_move_with_replacement(move_name)
 
         print(f"[EVOLUÇÃO] ✓ {old_name} (Lv.{old_level}) evoluiu para {self.name}!")
+        print(f"[EVOLUÇÃO] Moves atuais: {[m.name for m in self.moves]}")
 
     def gain_xp(self, amount):
         old_level = self.level
@@ -892,7 +897,11 @@ class Pokemon(Entity):
 
     def _initialize_moves(self):
         """Inicializa os moves do Pokémon baseado no nível atual"""
-        initial_moves = self.move_data.get_initial_moves(self.id, self.level)
+        # Obtém moves iniciais (todos os moves até o nível atual)
+        all_moves_learned = self.move_data.get_moves_at_level(self.id, self.level)
+
+        # Pega apenas os 4 primeiros (ou menos se não tiver 4)
+        initial_moves = all_moves_learned[:4]
 
         for move_name in initial_moves:
             move_info = self.move_data.get_move_info(move_name)
@@ -912,25 +921,14 @@ class Pokemon(Entity):
             }
             self.moves.append(Move("tackle", fallback_move))
 
+        print(f"[INIT] {self.name} Lv.{self.level} aprendeu: {[m.name for m in self.moves]}")
+
     def learn_move(self, move_name: str) -> bool:
         """
         Tenta aprender um novo move
         Retorna True se aprendeu
         """
-        move_info = self.move_data.get_move_info(move_name)
-        if not move_info:
-            return False
-
-        new_move = Move(move_name, move_info)
-
-        # Se tem menos de 4 moves, adiciona diretamente
-        if len(self.moves) < 4:
-            self.moves.append(new_move)
-            print(f"[MOVES] {self.name} aprendeu {move_name}!")
-            return True
-
-        # Se já tem 4 moves, precisa esquecer um
-        return False  # TODO: Implementar interface para escolher qual esquecer
+        return self._learn_move_with_replacement(move_name)
 
     def forget_move(self, index: int) -> bool:
         """
@@ -966,10 +964,14 @@ class Pokemon(Entity):
     def get_new_moves_at_level(self, new_level: int) -> List[str]:
         """
         Retorna moves que o Pokémon aprende ao subir para um novo nível
+        (considerando que já sabe os moves do nível anterior)
         """
-        old_moves = set(move.name for move in self.moves)
+        # Moves que o Pokémon aprende até o novo nível
         all_moves_at_new_level = set(self.move_data.get_moves_at_level(self.id, new_level))
+        # Moves que o Pokémon já sabe
+        old_moves = set(move.name for move in self.moves)
 
+        # Moves que estão no novo set mas não no antigo
         return list(all_moves_at_new_level - old_moves)
 
     def check_new_moves_on_level_up(self, old_level: int):
@@ -1016,3 +1018,26 @@ class Pokemon(Entity):
             self.moves.append(move)
 
         print(f"[LOAD] {self.name} restaurado com {len(self.moves)} moves")
+
+    def _learn_move_with_replacement(self, move_name: str) -> bool:
+        """
+        Aprende um novo move, substituindo o último se já tiver 4
+        Retorna True se aprendeu
+        """
+        move_info = self.move_data.get_move_info(move_name)
+        if not move_info:
+            return False
+
+        new_move = Move(move_name, move_info)
+
+        # Se tem menos de 4 moves, adiciona diretamente
+        if len(self.moves) < 4:
+            self.moves.append(new_move)
+            print(f"[MOVES] {self.name} aprendeu {move_name}!")
+            return True
+
+        # Já tem 4 moves - substitui o último (índice 3)
+        old_name = self.moves[-1].name
+        self.moves[-1] = new_move
+        print(f"[MOVES] {self.name} esqueceu {old_name} e aprendeu {move_name}!")
+        return True
