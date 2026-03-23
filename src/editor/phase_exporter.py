@@ -10,7 +10,7 @@ from pathlib import Path
 
 class PhaseExporter:
     def __init__(self):
-        self.base_path = Path("data/phases")
+        self.base_path = Path("src/data/phases")
         self.base_path.mkdir(parents=True, exist_ok=True)
 
     def export_phase(self, phase_data, chapter, phase_number):

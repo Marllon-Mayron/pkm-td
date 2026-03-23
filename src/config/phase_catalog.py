@@ -12,7 +12,7 @@ class PhaseCatalog:
     """Gerencia o catálogo de todas as fases disponíveis no jogo"""
 
     def __init__(self):
-        self.base_path = Path("data/phases")
+        self.base_path = Path("src/data/phases")
         self.cache = None  # Cache do catálogo
 
     def get_all_phases(self) -> Dict[int, List[Dict]]:
