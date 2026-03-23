@@ -1,0 +1,418 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "last_save": "2026-03-23T06:32:01.733158",
+    "play_time": 0,
+    "save_name": "Save 1"
+  },
+  "player": {
+    "money": 200,
+    "score": 50,
+    "position": {
+      "x": 100,
+      "y": 100
+    },
+    "team": [
+      {
+        "unique_id": "fe543da7-71df-45cd-b333-43582c171e99",
+        "id": 7,
+        "name": "Squirtle",
+        "level": 7,
+        "is_shiny": false,
+        "current_hp": 23,
+        "max_hp": 23,
+        "xp": 53,
+        "ivs": {
+          "hp": 11,
+          "attack": 19,
+          "defense": 7,
+          "special_attack": 23,
+          "special_defense": 20,
+          "speed": 19
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Modest",
+        "types": [
+          "water"
+        ],
+        "attack": 13,
+        "defense": 14,
+        "sp_attack": 13,
+        "sp_defense": 15,
+        "speed": 12,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 2167935727568,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          }
+        ]
+      },
+      {
+        "unique_id": "165c7e6c-9430-4a71-b540-9e2d3696ec5a",
+        "id": 10,
+        "name": "Caterpie",
+        "level": 6,
+        "is_shiny": false,
+        "current_hp": 22,
+        "max_hp": 22,
+        "xp": 123,
+        "ivs": {
+          "hp": 18,
+          "attack": 24,
+          "defense": 2,
+          "special_attack": 0,
+          "special_defense": 15,
+          "speed": 4
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Mild",
+        "types": [
+          "bug"
+        ],
+        "attack": 10,
+        "defense": 9,
+        "sp_attack": 7,
+        "sp_defense": 8,
+        "speed": 10,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 2167935729392,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          }
+        ]
+      },
+      {
+        "unique_id": "f3fe8c25-8ec5-480c-b370-de72178c0f3f",
+        "id": 13,
+        "name": "Weedle",
+        "level": 7,
+        "is_shiny": false,
+        "current_hp": 15,
+        "max_hp": 24,
+        "xp": 134,
+        "ivs": {
+          "hp": 24,
+          "attack": 23,
+          "defense": 30,
+          "special_attack": 14,
+          "special_defense": 6,
+          "speed": 19
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Gentle",
+        "types": [
+          "bug",
+          "poison"
+        ],
+        "attack": 10,
+        "defense": 10,
+        "sp_attack": 8,
+        "sp_defense": 7,
+        "speed": 14,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 2167935726416,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          }
+        ]
+      },
+      {
+        "unique_id": "bccda151-56a9-451f-9f3c-64adfce36bb0",
+        "id": 19,
+        "name": "Rattata",
+        "level": 7,
+        "is_shiny": false,
+        "current_hp": 11,
+        "max_hp": 22,
+        "xp": 32,
+        "ivs": {
+          "hp": 22,
+          "attack": 1,
+          "defense": 1,
+          "special_attack": 3,
+          "special_defense": 22,
+          "speed": 26
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Sassy",
+        "types": [
+          "normal"
+        ],
+        "attack": 13,
+        "defense": 11,
+        "sp_attack": 10,
+        "sp_defense": 9,
+        "speed": 14,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 2167935729440,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          }
+        ]
+      }
+    ],
+    "pc_box": [
+      {
+        "unique_id": "fe543da7-71df-45cd-b333-43582c171e99",
+        "id": 7,
+        "name": "Squirtle",
+        "level": 7,
+        "is_shiny": false,
+        "current_hp": 23,
+        "max_hp": 23,
+        "xp": 53,
+        "ivs": {
+          "hp": 11,
+          "attack": 19,
+          "defense": 7,
+          "special_attack": 23,
+          "special_defense": 20,
+          "speed": 19
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Modest",
+        "types": [
+          "water"
+        ],
+        "attack": 13,
+        "defense": 14,
+        "sp_attack": 13,
+        "sp_defense": 15,
+        "speed": 12,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 2167935727568,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          }
+        ]
+      },
+      {
+        "unique_id": "165c7e6c-9430-4a71-b540-9e2d3696ec5a",
+        "id": 10,
+        "name": "Caterpie",
+        "level": 6,
+        "is_shiny": false,
+        "current_hp": 22,
+        "max_hp": 22,
+        "xp": 123,
+        "ivs": {
+          "hp": 18,
+          "attack": 24,
+          "defense": 2,
+          "special_attack": 0,
+          "special_defense": 15,
+          "speed": 4
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Mild",
+        "types": [
+          "bug"
+        ],
+        "attack": 10,
+        "defense": 9,
+        "sp_attack": 7,
+        "sp_defense": 8,
+        "speed": 10,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 2167935729392,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          }
+        ]
+      },
+      {
+        "unique_id": "f3fe8c25-8ec5-480c-b370-de72178c0f3f",
+        "id": 13,
+        "name": "Weedle",
+        "level": 7,
+        "is_shiny": false,
+        "current_hp": 15,
+        "max_hp": 24,
+        "xp": 134,
+        "ivs": {
+          "hp": 24,
+          "attack": 23,
+          "defense": 30,
+          "special_attack": 14,
+          "special_defense": 6,
+          "speed": 19
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Gentle",
+        "types": [
+          "bug",
+          "poison"
+        ],
+        "attack": 10,
+        "defense": 10,
+        "sp_attack": 8,
+        "sp_defense": 7,
+        "speed": 14,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 2167935726416,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          }
+        ]
+      },
+      {
+        "unique_id": "bccda151-56a9-451f-9f3c-64adfce36bb0",
+        "id": 19,
+        "name": "Rattata",
+        "level": 7,
+        "is_shiny": false,
+        "current_hp": 11,
+        "max_hp": 22,
+        "xp": 32,
+        "ivs": {
+          "hp": 22,
+          "attack": 1,
+          "defense": 1,
+          "special_attack": 3,
+          "special_defense": 22,
+          "speed": 26
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Sassy",
+        "types": [
+          "normal"
+        ],
+        "attack": 13,
+        "defense": 11,
+        "sp_attack": 10,
+        "sp_defense": 9,
+        "speed": 14,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 2167935729440,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          }
+        ]
+      }
+    ],
+    "bag": {
+      "pokeball": 5,
+      "potion": 2,
+      "firestone": 1,
+      "waterstone": 1,
+      "thunderstone": 1
+    },
+    "seen_pokemon": [
+      10,
+      19,
+      13,
+      7
+    ],
+    "caught_pokemon": [
+      10,
+      19,
+      13,
+      7
+    ]
+  },
+  "game_state": {
+    "current_chapter": 1,
+    "current_phase": 1,
+    "unlocked_chapters": [
+      1
+    ],
+    "unlocked_phases": [
+      "1-1",
+      "1-2"
+    ],
+    "completed_phases": [
+      "1-1"
+    ],
+    "stars": {
+      "1-1": 3
+    }
+  }
+}
