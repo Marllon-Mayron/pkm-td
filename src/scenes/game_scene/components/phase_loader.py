@@ -11,7 +11,7 @@ class PhaseLoader:
     """Carrega e prepara os dados da fase para o jogo"""
 
     def __init__(self):
-        self.base_path = Path("data/phases")
+        self.base_path = Path("src/data/phases")
         self.current_phase_data = None
 
     def load_phase(self, chapter: int, phase_number: int) -> dict:
