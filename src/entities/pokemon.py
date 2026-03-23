@@ -467,17 +467,33 @@ class Pokemon(Entity):
             self.combat_state = "charging"
 
     def _handle_charging_state(self, dt):
-        """Estado indo em direção ao alvo - VERSÃO ORIGINAL QUE FUNCIONAVA"""
+        """Estado indo em direção ao alvo - com suporte para ataques de status e especiais"""
         if not self.target or not self.target.is_alive():
             self.combat_state = "returning"
             self.target = None
             return
 
+        # Verifica o tipo do move atual
+        current_move = self.get_current_move()
+        is_status_move = current_move and current_move.category == "status"
+        is_special_move = current_move and current_move.category == "special"
+
+        # Ataques de status e especiais são executados à distância
+        if is_status_move or is_special_move:
+            # Executa o ataque imediatamente sem se mover
+            attack_type = "status" if is_status_move else "especial"
+            print(f"[COMBAT] {self.name} usou {current_move.name} ({attack_type}) à distância!")
+            self._perform_charge_attack(self.target)
+            self.combat_state = "returning"
+            self.charge_cooldown = self.charge_cooldown_max
+            return
+
+        # Para ataques físicos, move em direção ao alvo
         dx = self.target.x - self.x
         dy = self.target.y - self.y
         distance = math.sqrt(dx * dx + dy * dy)
 
-        # Se estiver perto o suficiente, ataca (versão original)
+        # Se estiver perto o suficiente, ataca
         if distance < 5:
             self._perform_charge_attack(self.target)
             self.combat_state = "returning"
@@ -553,7 +569,16 @@ class Pokemon(Entity):
         self._perform_charge_attack(target)
 
     def _perform_charge_attack(self, target):
-        """Ataque simples (fallback)"""
+        """Ataque de carga - usa o sistema de moves"""
+        if self.battle_system:
+            # Usa o sistema de batalha com o move atual
+            success = self.battle_system.attempt_attack(self, target)
+            if success:
+                print(
+                    f"[ATTACK] {self.name} usou {self.get_current_move().name if self.get_current_move() else 'ataque'} em {target.name}!")
+                return
+
+        # Fallback: ataque simples (caso não tenha battle_system)
         print(f"[ATTACK] {self.name}: Ataque simples em {target.name}!")
         base_damage = self.attack_damage * (self.level / 8)
         damage_multiplier = random.uniform(0.85, 1.15)

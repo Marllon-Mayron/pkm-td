@@ -1,0 +1,272 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "last_save": "2026-03-23T20:58:04.715029",
+    "play_time": 0,
+    "save_name": "Save 1"
+  },
+  "player": {
+    "money": 200,
+    "score": 50,
+    "position": {
+      "x": 100,
+      "y": 100
+    },
+    "team": [
+      {
+        "unique_id": "26f6033e-3252-4a0b-adfc-e894c125ced9",
+        "id": 7,
+        "name": "Squirtle",
+        "level": 9,
+        "is_shiny": false,
+        "current_hp": 27,
+        "max_hp": 27,
+        "xp": 318,
+        "ivs": {
+          "hp": 7,
+          "attack": 23,
+          "defense": 25,
+          "special_attack": 16,
+          "special_defense": 16,
+          "speed": 17
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Adamant",
+        "types": [
+          "water"
+        ],
+        "attack": 16,
+        "defense": 17,
+        "sp_attack": 16,
+        "sp_defense": 17,
+        "speed": 14,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 1688902113792,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 30,
+            "max_pp": 35
+          },
+          {
+            "name": "tail-whip",
+            "current_pp": 25,
+            "max_pp": 30
+          },
+          {
+            "name": "bubble",
+            "current_pp": 4,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "85dad690-d613-4d99-a4ff-bc7919381427",
+        "id": 11,
+        "name": "Metapod",
+        "level": 7,
+        "is_shiny": false,
+        "current_hp": 24,
+        "max_hp": 24,
+        "xp": 104,
+        "ivs": {
+          "hp": 4,
+          "attack": 2,
+          "defense": 8,
+          "special_attack": 5,
+          "special_defense": 27,
+          "speed": 22
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Quirky",
+        "types": [
+          "bug"
+        ],
+        "attack": 9,
+        "defense": 14,
+        "sp_attack": 9,
+        "sp_defense": 8,
+        "speed": 10,
+        "is_in_team": true,
+        "is_placed": false,
+        "spot_id": null,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 30,
+            "max_pp": 35
+          },
+          {
+            "name": "string-shot",
+            "current_pp": 33,
+            "max_pp": 40
+          },
+          {
+            "name": "harden",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      }
+    ],
+    "pc_box": [
+      {
+        "unique_id": "26f6033e-3252-4a0b-adfc-e894c125ced9",
+        "id": 7,
+        "name": "Squirtle",
+        "level": 9,
+        "is_shiny": false,
+        "current_hp": 27,
+        "max_hp": 27,
+        "xp": 318,
+        "ivs": {
+          "hp": 7,
+          "attack": 23,
+          "defense": 25,
+          "special_attack": 16,
+          "special_defense": 16,
+          "speed": 17
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Adamant",
+        "types": [
+          "water"
+        ],
+        "attack": 16,
+        "defense": 17,
+        "sp_attack": 16,
+        "sp_defense": 17,
+        "speed": 14,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 1688902113792,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 30,
+            "max_pp": 35
+          },
+          {
+            "name": "tail-whip",
+            "current_pp": 25,
+            "max_pp": 30
+          },
+          {
+            "name": "bubble",
+            "current_pp": 4,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "85dad690-d613-4d99-a4ff-bc7919381427",
+        "id": 11,
+        "name": "Metapod",
+        "level": 7,
+        "is_shiny": false,
+        "current_hp": 24,
+        "max_hp": 24,
+        "xp": 104,
+        "ivs": {
+          "hp": 4,
+          "attack": 2,
+          "defense": 8,
+          "special_attack": 5,
+          "special_defense": 27,
+          "speed": 22
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Quirky",
+        "types": [
+          "bug"
+        ],
+        "attack": 9,
+        "defense": 14,
+        "sp_attack": 9,
+        "sp_defense": 8,
+        "speed": 10,
+        "is_in_team": true,
+        "is_placed": false,
+        "spot_id": null,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 30,
+            "max_pp": 35
+          },
+          {
+            "name": "string-shot",
+            "current_pp": 33,
+            "max_pp": 40
+          },
+          {
+            "name": "harden",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      }
+    ],
+    "bag": {
+      "pokeball": 7,
+      "potion": 2,
+      "firestone": 1,
+      "waterstone": 1,
+      "thunderstone": 1
+    },
+    "seen_pokemon": [
+      10,
+      7
+    ],
+    "caught_pokemon": [
+      10,
+      7
+    ]
+  },
+  "game_state": {
+    "current_chapter": 1,
+    "current_phase": 1,
+    "unlocked_chapters": [
+      1
+    ],
+    "unlocked_phases": [
+      "1-1",
+      "1-2"
+    ],
+    "completed_phases": [
+      "1-1"
+    ],
+    "stars": {
+      "1-1": 3
+    }
+  }
+}

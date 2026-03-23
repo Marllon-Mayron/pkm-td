@@ -26,6 +26,7 @@ class BattleSystem:
         move = attacker.get_current_move()
 
         if not move:
+            print(f"[BATTLE] {attacker.name} não tem move selecionado!")
             return False
 
         # Verificar PP
@@ -33,6 +34,14 @@ class BattleSystem:
             print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
             return False
 
+        # ===== ATAQUES DE STATUS =====
+        if move.category == "status":
+            print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")
+            move.current_pp -= 1
+            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            return True
+
+        # ===== ATAQUES QUE CAUSAM DANO =====
         # Calcular dano
         damage_result = DamageCalculator.calculate_damage(attacker, target, move)
 
@@ -46,19 +55,21 @@ class BattleSystem:
         # Consome PP
         move.current_pp -= 1
 
-        # Se for ataque especial, criar projétil
+        # ===== ATAQUES ESPECIAIS (criam projétil) =====
         if move.category == "special" and move.power > 0:
+            print(f"[BATTLE] {attacker.name} usou {move.name}! (Ataque especial)")
             self._create_projectile(attacker, target, move, damage_result)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
 
-        # Para ataques físicos, aplica dano imediatamente (já está em contato)
+        # ===== ATAQUES FÍSICOS (dano imediato) =====
         elif move.category == "physical" and move.power > 0:
+            print(f"[BATTLE] {attacker.name} usou {move.name}! (Ataque físico)")
             self._apply_damage(attacker, target, damage_result, move)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
 
-        # Ataque de status
+        # ===== FALLBACK: qualquer outro caso =====
         else:
             print(f"[BATTLE] {attacker.name} usou {move.name}!")
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
@@ -89,6 +100,9 @@ class BattleSystem:
         }
         color = type_colors.get(move.type.lower(), (255, 255, 255))
 
+        # Usar a velocidade de movimento do atacante para o projétil
+        projectile_speed = attacker.move_speed * 60  # Multiplicar por 60 para consistência com movimento
+
         projectile = Projectile(
             attacker=attacker,
             target=target,
@@ -96,7 +110,7 @@ class BattleSystem:
             damage=damage_result["damage"],
             effectiveness=damage_result["effectiveness"],
             color=color,
-            speed=300.0
+            speed=projectile_speed  # Usar velocidade de movimento do atacante
         )
         self.projectiles.append(projectile)
 
