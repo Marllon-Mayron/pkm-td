@@ -70,7 +70,20 @@ class SaveManager:
         }
 
     def _pokemon_to_dict(self, pokemon) -> Dict:
-        """Converte um objeto Pokémon para dicionário"""
+        """Converte um objeto Pokémon para dicionário, incluindo moves"""
+        # Importar MoveData aqui para evitar circular import
+        from src.data.move_data import MoveData
+
+        move_data = MoveData()
+
+        moves_data = []
+        for move in pokemon.moves:
+            moves_data.append({
+                "name": move.name,
+                "current_pp": move.current_pp,
+                "max_pp": move.max_pp
+            })
+
         return {
             "unique_id": getattr(pokemon, 'unique_id', str(uuid.uuid4())),
             "id": pokemon.id,
@@ -91,11 +104,12 @@ class SaveManager:
             "speed": pokemon.speed_stat,
             "is_in_team": pokemon.is_in_team,
             "is_placed": getattr(pokemon, 'is_placed', False),
-            "spot_id": getattr(pokemon, 'spot_id', None)
+            "spot_id": getattr(pokemon, 'spot_id', None),
+            "moves": moves_data  # Adiciona os moves ao save
         }
 
     def _dict_to_pokemon(self, data: Dict):
-        """Converte dicionário para objeto Pokémon"""
+        """Converte dicionário para objeto Pokémon, incluindo moves"""
         from src.entities.pokemon import Pokemon
 
         # Cria o Pokémon básico
@@ -119,6 +133,11 @@ class SaveManager:
         pokemon.is_in_team = data["is_in_team"]
         pokemon.is_placed = False
         pokemon.spot_id = None
+
+        # Restaura os moves
+        moves_data = data.get("moves", [])
+        if moves_data:
+            pokemon.restore_moves(moves_data)
 
         return pokemon
 
