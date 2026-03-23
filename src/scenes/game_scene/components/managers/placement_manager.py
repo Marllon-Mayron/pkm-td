@@ -54,6 +54,10 @@ class PlacementManager:
             f"[PLACEMENT] {pokemon.name} colocado no spot ({spot.x}, {spot.y}) - "
             f"Centro ({tile_center_x}, {tile_center_y})"
         )
+
+        if hasattr(self.game, 'battle_system'):
+            pokemon.set_battle_system(self.game.battle_system)
+
         return pokemon
 
     def get_pokemon_at_world_pos(self, world_x, world_y, tolerance=20):

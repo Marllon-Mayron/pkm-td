@@ -381,8 +381,12 @@ class GameWaveManager:
             is_boss=is_boss
         )
 
+
         pokemon.screen_manager = screen_manager
         pokemon.path = path_points
+
+        if hasattr(self.game_scene, 'battle_system'):
+            pokemon.set_battle_system(self.game_scene.battle_system)
 
         # Aplica multiplicador de velocidade
         wave_speed_multiplier = wave_data.get("speed_multiplier", 1.0)

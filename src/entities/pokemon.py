@@ -25,6 +25,7 @@ class Pokemon(Entity):
     def __init__(self, x, y, pokemon_id, level=5, is_wild=False, shiny=False, is_boss=False):
         # ===== 1. DADOS BÁSICOS =====
         self.game_scene = None
+        self.battle_system = None
         self.pokedex = Pokedex()
         self.unique_id = str(uuid.uuid4())
         self.pokemon_data = self.pokedex.get_pokemon(pokemon_id)
@@ -187,6 +188,10 @@ class Pokemon(Entity):
         self.current_frame = 0
         self.animation_timer = 0
         self.animation_speed = 0.1
+
+    def set_battle_system(self, battle_system):
+        """Define o sistema de combate para este Pokémon"""
+        self.battle_system = battle_system
 
     def _get_cached_move_speed(self):
         """Obtém velocidade de movimento do cache"""
@@ -415,6 +420,7 @@ class Pokemon(Entity):
         return (self.defense + self.sp_defense) / 2
 
     def find_nearest_enemy(self, enemies):
+        """Encontra o inimigo mais próximo (versão original)"""
         if not enemies:
             return None
 
@@ -435,6 +441,7 @@ class Pokemon(Entity):
         return nearest
 
     def update_combat(self, dt, enemies):
+        """Atualiza lógica de combate - versão corrigida"""
         if self.charge_cooldown > 0:
             self.charge_cooldown -= dt
 
@@ -451,13 +458,16 @@ class Pokemon(Entity):
             self._handle_returning_state(dt)
 
     def _handle_idle_state(self, dt, enemies):
+        """Estado parado - procura inimigo"""
         nearest = self.find_nearest_enemy(enemies)
 
         if nearest and self.charge_cooldown <= 0:
+            print(f"[COMBAT] {self.name}: Encontrou inimigo {nearest.name}")
             self.target = nearest
             self.combat_state = "charging"
 
     def _handle_charging_state(self, dt):
+        """Estado indo em direção ao alvo - VERSÃO ORIGINAL QUE FUNCIONAVA"""
         if not self.target or not self.target.is_alive():
             self.combat_state = "returning"
             self.target = None
@@ -467,17 +477,20 @@ class Pokemon(Entity):
         dy = self.target.y - self.y
         distance = math.sqrt(dx * dx + dy * dy)
 
+        # Se estiver perto o suficiente, ataca (versão original)
         if distance < 5:
             self._perform_charge_attack(self.target)
             self.combat_state = "returning"
             self.charge_cooldown = self.charge_cooldown_max
             return
 
+        # Move em direção ao alvo
         if distance > 0:
             move_distance = self.move_speed * dt * 60
             move_x = (dx / distance) * move_distance
             move_y = (dy / distance) * move_distance
 
+            # Não ultrapassar o alvo
             if abs(move_x) > abs(dx):
                 move_x = dx
             if abs(move_y) > abs(dy):
@@ -487,12 +500,14 @@ class Pokemon(Entity):
             self.y += move_y
             self.rect.x, self.rect.y = self.x, self.y
 
+            # Atualizar direção para animação
             if abs(dx) > abs(dy):
                 self.current_direction = "right" if dx > 0 else "left"
             else:
                 self.current_direction = "down" if dy > 0 else "up"
 
     def _handle_returning_state(self, dt):
+        """Estado voltando para posição original"""
         dx = self.original_spot_x - self.x
         dy = self.original_spot_y - self.y
         distance = math.sqrt(dx * dx + dy * dy)
@@ -523,7 +538,23 @@ class Pokemon(Entity):
             else:
                 self.current_direction = "down" if dy > 0 else "up"
 
+    def _perform_attack(self, target):
+        """Realiza ataque - usando battle_system se disponível"""
+        print(f"[ATTACK] {self.name} atacando {target.name}!")
+
+        if self.battle_system:
+            # Tenta atacar com o sistema de moves
+            success = self.battle_system.attempt_attack(self, target)
+            if success:
+                return
+
+        # Fallback: ataque simples
+        print(f"[ATTACK] {self.name}: Usando ataque simples (fallback)")
+        self._perform_charge_attack(target)
+
     def _perform_charge_attack(self, target):
+        """Ataque simples (fallback)"""
+        print(f"[ATTACK] {self.name}: Ataque simples em {target.name}!")
         base_damage = self.attack_damage * (self.level / 8)
         damage_multiplier = random.uniform(0.85, 1.15)
         damage = int(base_damage * damage_multiplier)
@@ -533,8 +564,85 @@ class Pokemon(Entity):
 
         target.take_damage(final_damage, attacker=self)
 
-        if not target.is_alive():
+    def _charge_towards_target(self, dt, target):
+        """Move em direção ao alvo"""
+        dx = target.x - self.x
+        dy = target.y - self.y
+        distance = math.sqrt(dx * dx + dy * dy)
+
+        if distance < 1:
+            return
+
+        # Velocidade de movimento (ajustada)
+        move_distance = self.move_speed * dt * 60
+
+        # Se está muito perto, não precisa se mover
+        if distance < self.map_sprite_size / 2 + 5:
+            return
+
+        move_x = (dx / distance) * move_distance
+        move_y = (dy / distance) * move_distance
+
+        # Não ultrapassar o alvo
+        if abs(move_x) > abs(dx):
+            move_x = dx
+        if abs(move_y) > abs(dy):
+            move_y = dy
+
+        self.x += move_x
+        self.y += move_y
+        self.rect.x, self.rect.y = self.x, self.y
+
+        # Atualizar direção para animação
+        if abs(dx) > abs(dy):
+            self.current_direction = "right" if dx > 0 else "left"
+        else:
+            self.current_direction = "down" if dy > 0 else "up"
+
+    def _return_to_spot(self, dt):
+        """Retorna ao ponto original"""
+        dx = self.original_spot_x - self.x
+        dy = self.original_spot_y - self.y
+        distance = math.sqrt(dx * dx + dy * dy)
+
+        if distance < 5:
+            self.x, self.y = self.original_spot_x, self.original_spot_y
+            self.rect.x, self.rect.y = self.x, self.y
+            self.combat_state = "idle"
+            self.target = None
+            return
+
+        move_distance = self.move_speed * dt * 60
+        move_x = (dx / distance) * move_distance
+        move_y = (dy / distance) * move_distance
+
+        if abs(move_x) > abs(dx):
+            move_x = dx
+        if abs(move_y) > abs(dy):
+            move_y = dy
+
+        self.x += move_x
+        self.y += move_y
+        self.rect.x, self.rect.y = self.x, self.y
+
+    def _perform_move_attack(self, target):
+        """Realiza ataque com move atual"""
+        if not self.battle_system:
+            # Fallback para sistema antigo
+            self._attack_target(target)
+            return
+
+        # Tenta atacar com o sistema de moves
+        success = self.battle_system.attempt_attack(self, target)
+
+        if success:
+            # Ataque foi executado
             pass
+        else:
+            # Não conseguiu atacar (sem PP, etc), usa ataque padrão
+            self._attack_target(target)
+
+        self.attack_cooldown = self.attack_cooldown_max
 
     def _attack_target(self, target):
         base_damage = self.attack_damage * (self.level / 10)
@@ -559,11 +667,6 @@ class Pokemon(Entity):
             actual_damage = min(damage, old_hp)
             self.damage_contributions[attacker_id] = self.damage_contributions.get(attacker_id, 0) + actual_damage
             self.last_attacker = attacker
-
-        if self.current_hp <= 0:
-            self.drop_item()
-            self.combat_state = "idle"
-            self.target = None
 
         return self.current_hp <= 0
 

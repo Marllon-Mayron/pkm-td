@@ -4,7 +4,7 @@ Cena principal do jogo - OTIMIZADA
 """
 import pygame
 
-from scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
+from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
@@ -13,6 +13,7 @@ from src.scenes.game_scene.components.managers.placement_manager import Placemen
 from src.scenes.game_scene.components.managers.item_drag_manager import ItemDragManager
 from src.scenes.game_scene.components.managers.target_item_manager import TargetItemManager
 from src.scenes.game_scene.components.managers.team_manager import GameTeamManager
+from src.scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
 from src.scenes.game_scene.components.phase_loader import phase_loader
 from src.scenes.game_scene.components.renderer.item_bag_renderer import ItemBagRenderer
 from src.scenes.game_scene.components.renderer.map_renderer import MapRenderer
@@ -59,6 +60,8 @@ class GameScene(BaseScene):
 
         # Cria o wave_manager
         self.wave_manager = GameWaveManager(phase_loader)
+
+        self.battle_system = BattleSystem(self)
 
         # Vincula os itens alvo
         self.wave_manager.set_target_items(self.target_item_manager.items)
@@ -120,6 +123,18 @@ class GameScene(BaseScene):
 
     def _start_game(self):
         """Inicia o jogo"""
+        # Configura battle_system para Pokémon já colocados
+        for pokemon in self.placement_manager.placed_pokemon:
+            pokemon.set_battle_system(self.battle_system)
+
+        # Configura para inimigos que já possam existir
+        for enemy in self.wave_manager.active_enemies:
+            enemy.set_battle_system(self.battle_system)
+
+        # Configura para Pokémon no time (por precaução)
+        for pokemon in self.player.team:
+            pokemon.set_battle_system(self.battle_system)
+
         if self.wave_manager.has_more_waves():
             self.game_state = "in_wave"
             self.wave_manager.start_all_waves()
@@ -552,6 +567,9 @@ class GameScene(BaseScene):
             self.move_learn_overlay.update(dt)
             return
 
+        if hasattr(self, 'battle_system'):
+            self.battle_system.update(dt)
+
         # ===== Processa overlay de seleção de moves =====
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.update(dt)
@@ -679,8 +697,12 @@ class GameScene(BaseScene):
         for enemy in wave_mgr.active_enemies:
             enemy.render(screen, camera, show_hp=False)
 
+
         if placement_mgr:
             placement_mgr.render(screen, camera, screen_mgr)
+
+        if hasattr(self, 'battle_system'):
+            self.battle_system.render_projectiles(screen, camera, self.screen_manager)
 
         target_mgr.render_in_pokemon(screen, camera)
 
