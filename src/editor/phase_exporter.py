@@ -6,12 +6,15 @@ Exportador de fases para JSON
 import json
 import os
 from pathlib import Path
+from src.config.paths import PROJECT_ROOT  # Importe o caminho absoluto
 
 
 class PhaseExporter:
     def __init__(self):
-        self.base_path = Path("src/data/phases")
+        # Use o PROJECT_ROOT para construir o caminho absoluto
+        self.base_path = Path(PROJECT_ROOT) / "src" / "data" / "phases"
         self.base_path.mkdir(parents=True, exist_ok=True)
+        print(f"[PhaseExporter] Base path: {self.base_path}")
 
     def export_phase(self, phase_data, chapter, phase_number):
         """
@@ -39,9 +42,8 @@ class PhaseExporter:
                 # Se for caminho absoluto, converte para relativo
                 if os.path.isabs(old_path):
                     try:
-                        # Pega o diretório raiz do projeto
-                        project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-                        rel_path = os.path.relpath(old_path, project_root)
+                        # Pega o diretório raiz do projeto (já temos o PROJECT_ROOT)
+                        rel_path = os.path.relpath(old_path, PROJECT_ROOT)
 
                         # Garante que use / e não \
                         rel_path = rel_path.replace('\\', '/')
@@ -106,7 +108,7 @@ class PhaseExporter:
 
         # Carrega índice existente ou cria novo
         if index_file.exists():
-            with open(index_file, 'r') as f:
+            with open(index_file, 'r', encoding='utf-8') as f:
                 index = json.load(f)
         else:
             index = {
@@ -119,7 +121,7 @@ class PhaseExporter:
             index["phases"].append(new_phase)
             index["phases"].sort()
 
-            with open(index_file, 'w') as f:
+            with open(index_file, 'w', encoding='utf-8') as f:
                 json.dump(index, f, indent=4)
 
     def load_phase(self, chapter, phase_number):
@@ -130,31 +132,90 @@ class PhaseExporter:
             print(f"Fase não encontrada: {filepath}")
             return None
 
-        with open(filepath, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
 
-        # Compatibilidade com versões antigas
-        if "path" in data and "paths" not in data:
-            # Converte path único para lista de paths
-            data["paths"] = {
-                "paths": [data["path"]],
-                "current_path_index": 0
-            }
+            # Compatibilidade com versões antigas
+            if "path" in data and "paths" not in data:
+                # Converte path único para lista de paths
+                data["paths"] = {
+                    "paths": [data["path"]],
+                    "current_path_index": 0
+                }
 
-        return data
+            return data
+        except Exception as e:
+            print(f"Erro ao carregar fase {filepath}: {e}")
+            return None
 
     def list_phases(self, chapter=None):
         """Lista todas as fases disponíveis"""
         if chapter:
             chapter_path = self.base_path / f"chapter_{chapter:02d}"
             if chapter_path.exists():
-                return [f.stem for f in chapter_path.glob("phase_*.json")]
+                phases = []
+                for phase_file in sorted(chapter_path.glob("phase_*.json")):
+                    phase_num = int(phase_file.stem.split("_")[1])
+                    phases.append(phase_num)
+                return phases
         else:
             phases = []
             for chapter_dir in sorted(self.base_path.glob("chapter_*")):
-                chapter_num = int(chapter_dir.name.split("_")[1])
-                for phase_file in sorted(chapter_dir.glob("phase_*.json")):
-                    phase_num = int(phase_file.stem.split("_")[1])
-                    phases.append((chapter_num, phase_num))
+                try:
+                    chapter_num = int(chapter_dir.name.split("_")[1])
+                    for phase_file in sorted(chapter_dir.glob("phase_*.json")):
+                        phase_num = int(phase_file.stem.split("_")[1])
+                        phases.append((chapter_num, phase_num))
+                except (ValueError, IndexError):
+                    continue
             return phases
-        return []
+
+    def delete_phase(self, chapter, phase_number):
+        """Remove uma fase do disco"""
+        filepath = self.base_path / f"chapter_{chapter:02d}" / f"phase_{phase_number:02d}.json"
+
+        if filepath.exists():
+            filepath.unlink()
+            print(f"✓ Fase {chapter}-{phase_number} removida: {filepath}")
+
+            # Atualiza índice do capítulo
+            self._remove_from_chapter_index(chapter, phase_number)
+            return True
+        else:
+            print(f"Fase não encontrada: {filepath}")
+            return False
+
+    def _remove_from_chapter_index(self, chapter, phase_number):
+        """Remove uma fase do arquivo de índice do capítulo"""
+        chapter_path = self.base_path / f"chapter_{chapter:02d}"
+        index_file = chapter_path / "index.json"
+
+        if index_file.exists():
+            with open(index_file, 'r', encoding='utf-8') as f:
+                index = json.load(f)
+
+            if phase_number in index["phases"]:
+                index["phases"].remove(phase_number)
+
+                with open(index_file, 'w', encoding='utf-8') as f:
+                    json.dump(index, f, indent=4)
+
+                # Se não tiver mais fases, remove o índice
+                if not index["phases"]:
+                    index_file.unlink()
+                    # Se a pasta estiver vazia, remove também
+                    if not any(chapter_path.iterdir()):
+                        chapter_path.rmdir()
+
+    def get_phase_path(self, chapter, phase_number):
+        """Retorna o caminho do arquivo da fase"""
+        return self.base_path / f"chapter_{chapter:02d}" / f"phase_{phase_number:02d}.json"
+
+    def phase_exists(self, chapter, phase_number):
+        """Verifica se uma fase existe"""
+        return self.get_phase_path(chapter, phase_number).exists()
+
+
+# Instância global
+phase_exporter = PhaseExporter()

@@ -1,3 +1,4 @@
+# src/config/phase_loader.py
 """
 Carregador de fases - Carrega dados das fases do disco
 """
@@ -5,23 +6,40 @@ import json
 import pygame
 from pathlib import Path
 from src.config.phase_catalog import phase_catalog
+from src.config.paths import PROJECT_ROOT  # Importe o caminho absoluto
 
 
 class PhaseLoader:
     """Carrega e prepara os dados da fase para o jogo"""
 
     def __init__(self):
-        self.base_path = Path("src/data/phases")
+        # Use o PROJECT_ROOT para construir o caminho absoluto
+        self.base_path = Path(PROJECT_ROOT) / "src" / "data" / "phases"
+        print(f"[PhaseLoader] Base path: {self.base_path}")
+        print(f"[PhaseLoader] Base path existe? {self.base_path.exists()}")
         self.current_phase_data = None
 
     def load_phase(self, chapter: int, phase_number: int) -> dict:
         """
         Carrega uma fase do disco
         """
+        # Formata com 2 dígitos (01, 02, etc)
         filepath = self.base_path / f"chapter_{chapter:02d}" / f"phase_{phase_number:02d}.json"
 
+        print(f"\n[PhaseLoader] Procurando fase: {filepath}")
+        print(f"[PhaseLoader] Caminho absoluto: {filepath.absolute()}")
+        print(f"[PhaseLoader] Arquivo existe? {filepath.exists()}")
+
         if not filepath.exists():
-            print(f"Fase não encontrada: {filepath}")
+            print(f"[ERRO] Fase não encontrada: {filepath}")
+            # Lista o que existe na pasta para debug
+            chapter_dir = self.base_path / f"chapter_{chapter:02d}"
+            if chapter_dir.exists():
+                print(f"[Debug] Arquivos em {chapter_dir}:")
+                for f in sorted(chapter_dir.glob("*.json")):
+                    print(f"  - {f.name}")
+            else:
+                print(f"[Debug] Pasta do capítulo não existe: {chapter_dir}")
             return None
 
         try:
@@ -43,18 +61,7 @@ class PhaseLoader:
 
     def get_base_path(self) -> str:
         """Retorna o caminho base do projeto (onde está a pasta res)"""
-        # Sobe do diretório data/phases até a raiz do projeto
-        # .../pokemon-tower-defense/data/phases -> .../pokemon-tower-defense/
-
-        # Pega o caminho absoluto do diretório data/phases
-        data_phases_path = self.base_path.absolute()
-        print(f"data_phases_path: {data_phases_path}")
-
-        # Sobe 2 níveis: data/phases -> data -> raiz
-        project_root = data_phases_path.parent.parent
-        print(f"project_root: {project_root}")
-
-        return str(project_root)
+        return str(PROJECT_ROOT)
 
     def get_phase_info(self) -> dict:
         """Retorna informações básicas da fase atual"""

@@ -1,19 +1,22 @@
 # src/config/phase_catalog.py
-
 """
 Catálogo de fases - Lista todas as fases disponíveis no jogo
 """
 import json
 from pathlib import Path
 from typing import List, Dict, Optional
+from src.config.paths import PROJECT_ROOT  # Importe o caminho absoluto
 
 
 class PhaseCatalog:
     """Gerencia o catálogo de todas as fases disponíveis no jogo"""
 
     def __init__(self):
-        self.base_path = Path("src/data/phases")
-        self.cache = None  # Cache do catálogo
+        # Use o PROJECT_ROOT para construir o caminho absoluto
+        self.base_path = Path(PROJECT_ROOT) / "src" / "data" / "phases"
+        print(f"[PhaseCatalog] Base path: {self.base_path}")
+        print(f"[PhaseCatalog] Base path existe? {self.base_path.exists()}")
+        self.cache = None
 
     def get_all_phases(self) -> Dict[int, List[Dict]]:
         """
@@ -31,15 +34,25 @@ class PhaseCatalog:
 
         catalog = {}
 
+        # Verifica se o diretório base existe
+        if not self.base_path.exists():
+            print(f"[ERRO] Diretório de fases não encontrado: {self.base_path}")
+            print(f"[ERRO] PROJECT_ROOT: {PROJECT_ROOT}")
+            return catalog
+
         # Procura por pastas de capítulo
         for chapter_dir in sorted(self.base_path.glob("chapter_*")):
             try:
                 chapter_num = int(chapter_dir.name.split("_")[1])
                 phases = []
 
+                print(f"[PhaseCatalog] Processando: {chapter_dir.name}")
+
                 # Lista todos os arquivos JSON de fase
                 for phase_file in sorted(chapter_dir.glob("phase_*.json")):
                     try:
+                        print(f"[PhaseCatalog]   Carregando: {phase_file.name}")
+
                         # Carrega o arquivo para pegar o nome
                         with open(phase_file, 'r', encoding='utf-8') as f:
                             data = json.load(f)
@@ -55,14 +68,16 @@ class PhaseCatalog:
                         print(f"Erro ao carregar fase {phase_file}: {e}")
                         continue
 
-                if phases:  # Só adiciona capítulo se tiver fases
+                if phases:
                     catalog[chapter_num] = phases
+                    print(f"[PhaseCatalog] Capítulo {chapter_num}: {len(phases)} fases")
 
-            except (ValueError, IndexError):
-                print(f"Pasta ignorada: {chapter_dir}")
+            except (ValueError, IndexError) as e:
+                print(f"Pasta ignorada: {chapter_dir} - {e}")
                 continue
 
         self.cache = catalog
+        print(f"[PhaseCatalog] Total de capítulos: {len(catalog)}")
         return catalog
 
     def get_chapter_phases(self, chapter: int) -> List[Dict]:
