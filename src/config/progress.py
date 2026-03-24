@@ -23,7 +23,10 @@ class ProgressManager:
     def __init__(self):
         # Agora usa o SaveManager como fonte única de dados
         from src.managers.save_manager import save_manager
+        from src.config.settings import settings
+
         self.save_manager = save_manager
+        self.settings = settings
         self.progress = self._load_from_save_manager()
 
     def _load_from_save_manager(self) -> Dict:
@@ -77,6 +80,34 @@ class ProgressManager:
 
         return default_settings
 
+    def _load_settings_from_save(self):
+        """Carrega configurações do save atual"""
+        if self.save_manager.current_save_file:
+            settings_data = self.save_manager.save_data.get("settings", {})
+            if settings_data:
+                # Aplica configurações ao objeto settings global
+                self.settings.sfx_volume = settings_data.get("sfx_volume", 0.7)
+                self.settings.music_volume = settings_data.get("music_volume", 0.5)
+                self.settings.music_enabled = settings_data.get("music_enabled", True)
+                self.settings.sfx_enabled = settings_data.get("sfx_enabled", True)
+                self.settings.fullscreen = settings_data.get("fullscreen", False)
+                self.settings.vsync = settings_data.get("vsync", True)
+                self.settings.target_fps = settings_data.get("target_fps", 60)
+
+                # Aplica volumes no sound_manager
+                from src.managers.sound_manager import sound_manager
+                if self.settings.sfx_enabled:
+                    sound_manager.set_sfx_volume(self.settings.sfx_volume)
+                else:
+                    sound_manager.set_sfx_volume(0)
+
+                if self.settings.music_enabled:
+                    sound_manager.set_music_volume(self.settings.music_volume)
+                else:
+                    sound_manager.set_music_volume(0)
+
+                print("[PROGRESS] Configurações carregadas do save")
+
     def _sync_with_save_manager(self):
         """Sincroniza o progresso atual com o SaveManager e salva imediatamente"""
         # Atualiza o game_state no save_data
@@ -90,6 +121,16 @@ class ProgressManager:
             "current_phase": self.progress["current_phase"],
             "stars": self.progress["stars"]
         })
+
+        self.save_manager.save_data["settings"] = {
+            "sfx_volume": self.settings.sfx_volume,
+            "music_volume": self.settings.music_volume,
+            "music_enabled": self.settings.music_enabled,
+            "sfx_enabled": self.settings.sfx_enabled,
+            "fullscreen": self.settings.fullscreen,
+            "vsync": self.settings.vsync,
+            "target_fps": self.settings.target_fps
+        }
 
         # Salva no arquivo atual usando o SaveManager
         if self.save_manager.current_save_file:

@@ -307,12 +307,16 @@ class SettingsScene(BaseScene):
         if settings.fullscreen != self.screen_manager.settings.fullscreen:
             self.screen_manager.toggle_fullscreen()
 
-        # Salva no arquivo
+        # Salva as configurações no save atual
+        from src.config.progress import progress_manager
+        progress_manager._sync_with_save_manager()  # Isso já salva as settings no save
+
+        # Salva no arquivo config.json como fallback
         settings.save_settings()
 
         # Feedback
         sound_manager.play_sound("confirm")
-        print("[SETTINGS] Configurações aplicadas e salvas!")
+        print("[SETTINGS] Configurações aplicadas e salvas no save!")
 
     def _reset_to_default(self):
         """Reseta para as configurações padrão"""

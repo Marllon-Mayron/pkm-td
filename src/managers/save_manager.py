@@ -66,6 +66,16 @@ class SaveManager:
                 "unlocked_phases": ["1-1"],
                 "completed_phases": [],
                 "stars": {}
+            },
+            # NOVO: Configurações de áudio e vídeo
+            "settings": {
+                "sfx_volume": 0.7,
+                "music_volume": 0.5,
+                "music_enabled": True,
+                "sfx_enabled": True,
+                "fullscreen": False,
+                "vsync": True,
+                "target_fps": 60
             }
         }
 
@@ -209,6 +219,36 @@ class SaveManager:
             print(f"[ERRO] Falha ao salvar: {e}")
             return False
 
+    def save_settings(self, settings_obj) -> bool:
+        """Salva as configurações atuais no save atual"""
+        if not self.current_save_file:
+            print("[SAVE] Nenhum save carregado para salvar configurações")
+            return False
+
+        # Atualiza as configurações no save_data
+        self.save_data["settings"] = {
+            "sfx_volume": settings_obj.sfx_volume,
+            "music_volume": settings_obj.music_volume,
+            "music_enabled": settings_obj.music_enabled,
+            "sfx_enabled": settings_obj.sfx_enabled,
+            "fullscreen": settings_obj.fullscreen,
+            "vsync": settings_obj.vsync,
+            "target_fps": settings_obj.target_fps
+        }
+
+        # Salva o arquivo
+        filename = f"save_{self.current_save_file}.json"
+        filepath = os.path.join(self.save_dir, filename)
+
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(self.save_data, f, indent=2, ensure_ascii=False)
+            print("[SAVE] Configurações salvas com sucesso")
+            return True
+        except Exception as e:
+            print(f"[ERRO] Falha ao salvar configurações: {e}")
+            return False
+
     def load_game(self, player, slot=1) -> bool:
         """
         Carrega um save e aplica ao jogador
@@ -282,6 +322,29 @@ class SaveManager:
         except Exception as e:
             print(f"[ERRO] Falha ao carregar: {e}")
             return False
+
+    def load_settings(self, settings_obj) -> bool:
+        """Carrega as configurações do save atual"""
+        if not self.current_save_file:
+            print("[SAVE] Nenhum save carregado")
+            return False
+
+        settings_data = self.save_data.get("settings", {})
+        if not settings_data:
+            print("[SAVE] Nenhuma configuração encontrada no save")
+            return False
+
+        # Aplica as configurações
+        settings_obj.sfx_volume = settings_data.get("sfx_volume", 0.7)
+        settings_obj.music_volume = settings_data.get("music_volume", 0.5)
+        settings_obj.music_enabled = settings_data.get("music_enabled", True)
+        settings_obj.sfx_enabled = settings_data.get("sfx_enabled", True)
+        settings_obj.fullscreen = settings_data.get("fullscreen", False)
+        settings_obj.vsync = settings_data.get("vsync", True)
+        settings_obj.target_fps = settings_data.get("target_fps", 60)
+
+        print("[SAVE] Configurações carregadas do save")
+        return True
 
     def delete_save(self, slot=1):
         """Deleta um save específico"""

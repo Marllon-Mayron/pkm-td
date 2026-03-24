@@ -21,6 +21,7 @@ class Game:
         # TENTA CARREGAR O SAVE AUTOMATICAMENTE
         save_loaded = self.player.load_game(1)  # Tenta carregar slot 1
 
+
         if not save_loaded:
             # Se não tinha save, cria um Pokémon inicial
             print("[GAME] Nenhum save encontrado, criando novo jogo")
@@ -30,6 +31,9 @@ class Game:
             print(f"  - Time: {len(self.player.team)} Pokémon")
             print(f"  - Box: {len(self.player.pc_box)} Pokémon")
             print(f"  - Itens: {self.player.bag.items}")
+            # Se carregou save, carrega também as configurações
+            from src.config.progress import progress_manager
+            progress_manager._load_settings_from_save()  # Carrega configurações do save
 
         # Câmera
         self.camera = None
