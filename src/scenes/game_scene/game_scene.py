@@ -134,7 +134,7 @@ class GameScene(BaseScene):
         # Configura para Pokémon no time (por precaução)
         for pokemon in self.player.team:
             pokemon.set_battle_system(self.battle_system)
-
+            pokemon.reset_pp()
         if self.wave_manager.has_more_waves():
             self.game_state = "in_wave"
             self.wave_manager.start_all_waves()
@@ -258,14 +258,37 @@ class GameScene(BaseScene):
         effect = item_data.get("effect", "")
         category = item_data.get("category", "")
 
-        if effect == "evolution":
+        # PP RESTORE ITEMS (restaura TODOS os moves)
+        if effect == "pp_restore":
+            if target_type == "ally" and hasattr(target, 'restore_pp'):
+                percentage = item_data.get("effect_value", 1.0)
+
+                # Restaura TODOS os moves com a porcentagem
+                restored = target.restore_pp(percentage=percentage)
+
+                if restored > 0:
+                    item_name = item_data["name"]
+                    print(f"[ITEM] {item_name} usado em {target.name}! "
+                          f"{restored} PP restaurados!")
+                    return True
+                else:
+                    print(f"[ITEM] {target.name} já está com PP máximo!")
+                    return False
+
+            return False
+
+        # EVOLUTION STONES
+        elif effect == "evolution":
             if target_type == "ally":
                 return self._use_evolution_stone(target, item_data)
-            return False
+
+        # POKEBALLS
         elif target_type == "enemy" and category == "pokeball":
             return self._attempt_capture(target, item_data)
+
+        # MEDICINE (HP)
         elif target_type == "ally" and category == "medicine":
-            return self._use_medicine(target, item_data)
+            return self.use_medicine(target, item_data)
 
         return False
 
@@ -338,7 +361,8 @@ class GameScene(BaseScene):
 
         return False
 
-    def _use_medicine(self, pokemon, item_data):
+    @staticmethod
+    def use_medicine(pokemon, item_data):
         """Usa poção em um Pokémon aliado"""
         if not pokemon.is_alive() and "revive" not in item_data["id"]:
             return False
@@ -364,6 +388,17 @@ class GameScene(BaseScene):
         pokemon = placement_data['pokemon']
         spot = placement_data['spot']
         self.placement_manager.add_pokemon(spot, pokemon)
+
+    def _reset_team_pp(self):
+        """Reseta os PP de todos os moves do time do jogador"""
+        if not self.player or not self.player.team:
+            return
+
+        total_reset = 0
+        for pokemon in self.player.team:
+            total_reset += pokemon.reset_pp()
+
+        self.game.player.auto_save()
 
     def cleanup(self):
         """Limpa o estado da fase antes de sair"""
@@ -619,6 +654,8 @@ class GameScene(BaseScene):
         if target_mgr.game_over:
             self.game_state = "game_over"
             self.overlay_manager.show(OverlayType.GAME_OVER)
+            # ===== RESETAR PP DOS MOVES DO TIME DO JOGADOR =====
+            self._reset_team_pp()
             return
 
         # Build path points cache
@@ -767,6 +804,8 @@ class GameScene(BaseScene):
         progress_manager.complete_phase(self.phase_id, stars=stars)
         self.player.auto_save()
         self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
+        # ===== RESETAR PP DOS MOVES DO TIME DO JOGADOR =====
+        self._reset_team_pp()
 
     def _render_game_ui(self, screen):
         """Renderiza a UI do jogo - OTIMIZADO"""

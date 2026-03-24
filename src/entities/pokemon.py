@@ -122,6 +122,7 @@ class Pokemon(Entity):
         self.attack_cooldown = 0
         self.attack_cooldown_max = 60
         self.target = None
+        self.has_no_pp = False  # Flag para indicar se está sem PP
 
         # ===== 13. EFEITOS VISUAIS =====
         self.hp_bar_width = 32
@@ -473,10 +474,19 @@ class Pokemon(Entity):
             self.target = None
             return
 
-        # Verifica o tipo do move atual
+        # ===== NOVO: Verificar se o Pokémon tem PP =====
         current_move = self.get_current_move()
-        is_status_move = current_move and current_move.category == "status"
-        is_special_move = current_move and current_move.category == "special"
+        if not current_move or current_move.current_pp <= 0:
+            # Se não tem PP, para de atacar e volta
+            print(f"[COMBAT] {self.name} está sem PP para {current_move.name if current_move else 'ataque'}!")
+            self.combat_state = "returning"
+            self.target = None
+            self.has_no_pp = True
+            return
+
+        # Verifica o tipo do move atual
+        is_status_move = current_move.category == "status"
+        is_special_move = current_move.category == "special"
 
         # Ataques de status e especiais são executados à distância
         if is_status_move or is_special_move:
@@ -570,12 +580,20 @@ class Pokemon(Entity):
 
     def _perform_charge_attack(self, target):
         """Ataque de carga - usa o sistema de moves"""
+        # Verificar novamente se tem PP antes de atacar
+        current_move = self.get_current_move()
+        if not current_move or current_move.current_pp <= 0:
+            print(f"[ATTACK] {self.name} não pode atacar - sem PP!")
+            self.combat_state = "returning"
+            self.target = None
+            return
+
         if self.battle_system:
             # Usa o sistema de batalha com o move atual
             success = self.battle_system.attempt_attack(self, target)
             if success:
                 print(
-                    f"[ATTACK] {self.name} usou {self.get_current_move().name if self.get_current_move() else 'ataque'} em {target.name}!")
+                    f"[ATTACK] {self.name} usou {current_move.name if current_move else 'ataque'} em {target.name}!")
                 return
 
         # Fallback: ataque simples (caso não tenha battle_system)
@@ -1028,6 +1046,34 @@ class Pokemon(Entity):
                 f"Natureza: {self.nature}")
 
     #================MOVES============================
+
+    def restore_pp(self, percentage: float = 1.0) -> int:
+        """
+        Restaura PP de TODOS os moves do Pokémon.
+
+        Args:
+            percentage: Porcentagem a restaurar (0.2 = 20%, 1.0 = 100%)
+
+        Returns:
+            int: Número total de PP restaurados
+        """
+        restored_count = 0
+
+        for move in self.moves:
+            pp_to_restore = int(move.max_pp * percentage)
+            old_pp = move.current_pp
+            move.current_pp = min(move.max_pp, move.current_pp + pp_to_restore)
+            restored_count += move.current_pp - old_pp
+
+        if restored_count > 0:
+            print(f"[PP_RESTORE] {self.name}: {restored_count} PP restaurados "
+                  f"({int(percentage * 100)}% de cada move)")
+
+        return restored_count
+
+    def reset_pp(self) -> int:
+        """Reseta os PP de todos os moves para o máximo (100%)"""
+        return self.restore_pp(percentage=1.0)
 
     def _initialize_moves(self):
         """Inicializa os moves do Pokémon baseado no nível atual"""

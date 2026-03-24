@@ -1,13 +1,13 @@
 {
   "meta": {
     "version": "1.0.0",
-    "last_save": "2026-03-23T20:58:04.715029",
+    "last_save": "2026-03-23T22:22:10.481725",
     "play_time": 0,
     "save_name": "Save 1"
   },
   "player": {
-    "money": 200,
-    "score": 50,
+    "money": 1900,
+    "score": 100,
     "position": {
       "x": 100,
       "y": 100
@@ -17,11 +17,11 @@
         "unique_id": "26f6033e-3252-4a0b-adfc-e894c125ced9",
         "id": 7,
         "name": "Squirtle",
-        "level": 9,
+        "level": 11,
         "is_shiny": false,
-        "current_hp": 27,
-        "max_hp": 27,
-        "xp": 318,
+        "current_hp": 31,
+        "max_hp": 31,
+        "xp": 583,
         "ivs": {
           "hp": 7,
           "attack": 23,
@@ -42,28 +42,28 @@
         "types": [
           "water"
         ],
-        "attack": 16,
-        "defense": 17,
-        "sp_attack": 16,
-        "sp_defense": 17,
-        "speed": 14,
+        "attack": 19,
+        "defense": 22,
+        "sp_attack": 15,
+        "sp_defense": 20,
+        "speed": 16,
         "is_in_team": true,
         "is_placed": true,
-        "spot_id": 1688902113792,
+        "spot_id": 1957562345632,
         "moves": [
           {
             "name": "tackle",
-            "current_pp": 30,
+            "current_pp": 35,
             "max_pp": 35
           },
           {
             "name": "tail-whip",
-            "current_pp": 25,
+            "current_pp": 30,
             "max_pp": 30
           },
           {
             "name": "bubble",
-            "current_pp": 4,
+            "current_pp": 30,
             "max_pp": 30
           }
         ]
@@ -72,11 +72,11 @@
         "unique_id": "85dad690-d613-4d99-a4ff-bc7919381427",
         "id": 11,
         "name": "Metapod",
-        "level": 7,
+        "level": 8,
         "is_shiny": false,
-        "current_hp": 24,
-        "max_hp": 24,
-        "xp": 104,
+        "current_hp": 26,
+        "max_hp": 26,
+        "xp": 358,
         "ivs": {
           "hp": 4,
           "attack": 2,
@@ -98,26 +98,137 @@
           "bug"
         ],
         "attack": 9,
-        "defense": 14,
+        "defense": 15,
         "sp_attack": 9,
-        "sp_defense": 8,
-        "speed": 10,
+        "sp_defense": 9,
+        "speed": 11,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": null,
+        "spot_id": 1957508380048,
         "moves": [
           {
             "name": "tackle",
-            "current_pp": 30,
+            "current_pp": 35,
             "max_pp": 35
           },
           {
             "name": "string-shot",
-            "current_pp": 33,
+            "current_pp": 40,
             "max_pp": 40
           },
           {
             "name": "harden",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "3d935a70-7fb1-462a-a428-d4c596addb19",
+        "id": 14,
+        "name": "Kakuna",
+        "level": 8,
+        "is_shiny": false,
+        "current_hp": 26,
+        "max_hp": 26,
+        "xp": 91,
+        "ivs": {
+          "hp": 12,
+          "attack": 24,
+          "defense": 10,
+          "special_attack": 19,
+          "special_defense": 18,
+          "speed": 1
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Jolly",
+        "types": [
+          "bug",
+          "poison"
+        ],
+        "attack": 11,
+        "defense": 13,
+        "sp_attack": 10,
+        "sp_defense": 10,
+        "speed": 9,
+        "is_in_team": true,
+        "is_placed": false,
+        "spot_id": 1957508380000,
+        "moves": [
+          {
+            "name": "poison-sting",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "string-shot",
+            "current_pp": 40,
+            "max_pp": 40
+          },
+          {
+            "name": "harden",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "f2120b84-2d48-4a63-930c-432e197e816b",
+        "id": 19,
+        "name": "Rattata",
+        "level": 9,
+        "is_shiny": false,
+        "current_hp": 27,
+        "max_hp": 27,
+        "xp": 248,
+        "ivs": {
+          "hp": 29,
+          "attack": 31,
+          "defense": 23,
+          "special_attack": 5,
+          "special_defense": 31,
+          "speed": 18
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Quirky",
+        "types": [
+          "normal"
+        ],
+        "attack": 17,
+        "defense": 13,
+        "sp_attack": 9,
+        "sp_defense": 14,
+        "speed": 19,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 1957561703536,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "tail-whip",
+            "current_pp": 30,
+            "max_pp": 30
+          },
+          {
+            "name": "quick-attack",
             "current_pp": 30,
             "max_pp": 30
           }
@@ -129,11 +240,11 @@
         "unique_id": "26f6033e-3252-4a0b-adfc-e894c125ced9",
         "id": 7,
         "name": "Squirtle",
-        "level": 9,
+        "level": 11,
         "is_shiny": false,
-        "current_hp": 27,
-        "max_hp": 27,
-        "xp": 318,
+        "current_hp": 31,
+        "max_hp": 31,
+        "xp": 583,
         "ivs": {
           "hp": 7,
           "attack": 23,
@@ -154,28 +265,28 @@
         "types": [
           "water"
         ],
-        "attack": 16,
-        "defense": 17,
-        "sp_attack": 16,
-        "sp_defense": 17,
-        "speed": 14,
+        "attack": 19,
+        "defense": 22,
+        "sp_attack": 15,
+        "sp_defense": 20,
+        "speed": 16,
         "is_in_team": true,
         "is_placed": true,
-        "spot_id": 1688902113792,
+        "spot_id": 1957562345632,
         "moves": [
           {
             "name": "tackle",
-            "current_pp": 30,
+            "current_pp": 35,
             "max_pp": 35
           },
           {
             "name": "tail-whip",
-            "current_pp": 25,
+            "current_pp": 30,
             "max_pp": 30
           },
           {
             "name": "bubble",
-            "current_pp": 4,
+            "current_pp": 30,
             "max_pp": 30
           }
         ]
@@ -184,11 +295,11 @@
         "unique_id": "85dad690-d613-4d99-a4ff-bc7919381427",
         "id": 11,
         "name": "Metapod",
-        "level": 7,
+        "level": 8,
         "is_shiny": false,
-        "current_hp": 24,
-        "max_hp": 24,
-        "xp": 104,
+        "current_hp": 26,
+        "max_hp": 26,
+        "xp": 358,
         "ivs": {
           "hp": 4,
           "attack": 2,
@@ -210,22 +321,22 @@
           "bug"
         ],
         "attack": 9,
-        "defense": 14,
+        "defense": 15,
         "sp_attack": 9,
-        "sp_defense": 8,
-        "speed": 10,
+        "sp_defense": 9,
+        "speed": 11,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": null,
+        "spot_id": 1957508380048,
         "moves": [
           {
             "name": "tackle",
-            "current_pp": 30,
+            "current_pp": 35,
             "max_pp": 35
           },
           {
             "name": "string-shot",
-            "current_pp": 33,
+            "current_pp": 40,
             "max_pp": 40
           },
           {
@@ -234,21 +345,138 @@
             "max_pp": 30
           }
         ]
+      },
+      {
+        "unique_id": "3d935a70-7fb1-462a-a428-d4c596addb19",
+        "id": 14,
+        "name": "Kakuna",
+        "level": 8,
+        "is_shiny": false,
+        "current_hp": 26,
+        "max_hp": 26,
+        "xp": 91,
+        "ivs": {
+          "hp": 12,
+          "attack": 24,
+          "defense": 10,
+          "special_attack": 19,
+          "special_defense": 18,
+          "speed": 1
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Jolly",
+        "types": [
+          "bug",
+          "poison"
+        ],
+        "attack": 11,
+        "defense": 13,
+        "sp_attack": 10,
+        "sp_defense": 10,
+        "speed": 9,
+        "is_in_team": true,
+        "is_placed": false,
+        "spot_id": 1957508380000,
+        "moves": [
+          {
+            "name": "poison-sting",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "string-shot",
+            "current_pp": 40,
+            "max_pp": 40
+          },
+          {
+            "name": "harden",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "f2120b84-2d48-4a63-930c-432e197e816b",
+        "id": 19,
+        "name": "Rattata",
+        "level": 9,
+        "is_shiny": false,
+        "current_hp": 27,
+        "max_hp": 27,
+        "xp": 248,
+        "ivs": {
+          "hp": 29,
+          "attack": 31,
+          "defense": 23,
+          "special_attack": 5,
+          "special_defense": 31,
+          "speed": 18
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Quirky",
+        "types": [
+          "normal"
+        ],
+        "attack": 17,
+        "defense": 13,
+        "sp_attack": 9,
+        "sp_defense": 14,
+        "speed": 19,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 1957561703536,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "tail-whip",
+            "current_pp": 30,
+            "max_pp": 30
+          },
+          {
+            "name": "quick-attack",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
       }
     ],
     "bag": {
-      "pokeball": 7,
+      "pokeball": 5,
       "potion": 2,
       "firestone": 1,
       "waterstone": 1,
-      "thunderstone": 1
+      "thunderstone": 1,
+      "pp_up": 1,
+      "pp_max": 2
     },
     "seen_pokemon": [
       10,
+      19,
+      13,
       7
     ],
     "caught_pokemon": [
       10,
+      19,
+      13,
       7
     ]
   },
@@ -260,13 +488,16 @@
     ],
     "unlocked_phases": [
       "1-1",
-      "1-2"
+      "1-2",
+      "1-3"
     ],
     "completed_phases": [
-      "1-1"
+      "1-1",
+      "1-2"
     ],
     "stars": {
-      "1-1": 3
+      "1-1": 3,
+      "1-2": 3
     }
   }
 }

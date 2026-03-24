@@ -32,8 +32,12 @@ class BattleSystem:
         # Verificar PP
         if move.current_pp <= 0:
             print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
+            # Adicionar flag para indicar que o Pokémon está sem PP
+            attacker.has_no_pp = True
             return False
 
+        # Se tem PP, limpa a flag
+        attacker.has_no_pp = False
         # ===== ATAQUES DE STATUS =====
         if move.category == "status":
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")

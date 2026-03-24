@@ -76,6 +76,31 @@ class ItemBagCatalog:
                 "effect_value": 20,
                 "price": 200
             },
+            # PP Items
+            "pp_up": {
+                "id": "pp_up",
+                "name": "PP UP",
+                "sprite_path": os.path.join(self.base_path, "medicine", "PPUP.png"),
+                "description": "Aumenta o PP de todos movimento em 20% do máximo.",
+                "category": "medicine",
+                "usable_in_battle": True,
+                "usable_on_map": True,
+                "effect": "pp_restore",
+                "effect_value": 0.2,  # 20% do max_pp
+                "price": 100
+            },
+            "pp_max": {
+                "id": "pp_max",
+                "name": "PP MAX",
+                "sprite_path": os.path.join(self.base_path, "medicine", "PPMAX.png"),
+                "description": "Aumenta o PP de todos movimento ao seu valor máximo.",
+                "category": "medicine",
+                "usable_in_battle": True,
+                "usable_on_map": True,
+                "effect": "pp_restore",
+                "effect_value": 1.0,  # 100% do max_pp
+                "price": 450
+            },
             # Pedras de evolição
             "firestone": {
                 "id": "firestone",
