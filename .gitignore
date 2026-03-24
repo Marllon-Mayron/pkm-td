@@ -1,3 +1,10 @@
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
 # Save data
 src/save_data.json
 saves/*.json
@@ -5,10 +12,3 @@ src/*.data
 
 # IntelliJ IDEA
 .idea/
-
-# Python cache files
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.pytest_cache/

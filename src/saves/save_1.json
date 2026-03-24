@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "1.0.0",
-    "last_save": "2026-03-24T12:31:21.600026",
+    "last_save": "2026-03-24T19:21:58.660672",
     "play_time": 0,
     "save_name": "Save 1"
   },
@@ -21,7 +21,7 @@
         "is_shiny": false,
         "current_hp": 36,
         "max_hp": 36,
-        "xp": 575,
+        "xp": 650,
         "ivs": {
           "hp": 29,
           "attack": 29,
@@ -42,18 +42,18 @@
         "types": [
           "water"
         ],
-        "attack": 19,
-        "defense": 21,
-        "sp_attack": 19,
-        "sp_defense": 22,
+        "attack": 18,
+        "defense": 24,
+        "sp_attack": 15,
+        "sp_defense": 23,
         "speed": 17,
         "is_in_team": true,
-        "is_placed": false,
-        "spot_id": null,
+        "is_placed": true,
+        "spot_id": 2360492614928,
         "moves": [
           {
             "name": "tackle",
-            "current_pp": 35,
+            "current_pp": 34,
             "max_pp": 35
           },
           {
@@ -63,7 +63,7 @@
           },
           {
             "name": "bubble",
-            "current_pp": 30,
+            "current_pp": 28,
             "max_pp": 30
           }
         ]
@@ -99,7 +99,7 @@
           "poison"
         ],
         "attack": 10,
-        "defense": 13,
+        "defense": 15,
         "sp_attack": 11,
         "sp_defense": 9,
         "speed": 12,
@@ -154,10 +154,10 @@
           "bug",
           "poison"
         ],
-        "attack": 9,
-        "defense": 13,
-        "sp_attack": 10,
-        "sp_defense": 8,
+        "attack": 10,
+        "defense": 15,
+        "sp_attack": 9,
+        "sp_defense": 9,
         "speed": 11,
         "is_in_team": true,
         "is_placed": false,
@@ -210,10 +210,10 @@
           "bug",
           "poison"
         ],
-        "attack": 9,
-        "defense": 16,
-        "sp_attack": 11,
-        "sp_defense": 9,
+        "attack": 10,
+        "defense": 13,
+        "sp_attack": 9,
+        "sp_defense": 11,
         "speed": 11,
         "is_in_team": true,
         "is_placed": false,
@@ -266,9 +266,9 @@
           "bug",
           "poison"
         ],
-        "attack": 10,
+        "attack": 11,
         "defense": 12,
-        "sp_attack": 11,
+        "sp_attack": 9,
         "sp_defense": 9,
         "speed": 9,
         "is_in_team": true,
@@ -321,14 +321,14 @@
         "types": [
           "electric"
         ],
-        "attack": 19,
-        "defense": 18,
-        "sp_attack": 19,
-        "sp_defense": 15,
+        "attack": 18,
+        "defense": 16,
+        "sp_attack": 20,
+        "sp_defense": 17,
         "speed": 28,
         "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 2369011066080,
+        "is_placed": false,
+        "spot_id": null,
         "moves": [
           {
             "name": "tail-whip",
@@ -337,7 +337,7 @@
           },
           {
             "name": "thunder-shock",
-            "current_pp": 22,
+            "current_pp": 30,
             "max_pp": 30
           },
           {
@@ -362,7 +362,7 @@
         "is_shiny": false,
         "current_hp": 36,
         "max_hp": 36,
-        "xp": 575,
+        "xp": 650,
         "ivs": {
           "hp": 29,
           "attack": 29,
@@ -383,18 +383,18 @@
         "types": [
           "water"
         ],
-        "attack": 19,
-        "defense": 21,
-        "sp_attack": 19,
-        "sp_defense": 22,
+        "attack": 18,
+        "defense": 24,
+        "sp_attack": 15,
+        "sp_defense": 23,
         "speed": 17,
         "is_in_team": true,
-        "is_placed": false,
-        "spot_id": null,
+        "is_placed": true,
+        "spot_id": 2360492614928,
         "moves": [
           {
             "name": "tackle",
-            "current_pp": 35,
+            "current_pp": 34,
             "max_pp": 35
           },
           {
@@ -404,7 +404,7 @@
           },
           {
             "name": "bubble",
-            "current_pp": 30,
+            "current_pp": 28,
             "max_pp": 30
           }
         ]
@@ -440,7 +440,7 @@
           "poison"
         ],
         "attack": 10,
-        "defense": 13,
+        "defense": 15,
         "sp_attack": 11,
         "sp_defense": 9,
         "speed": 12,
@@ -495,10 +495,10 @@
           "bug",
           "poison"
         ],
-        "attack": 9,
-        "defense": 13,
-        "sp_attack": 10,
-        "sp_defense": 8,
+        "attack": 10,
+        "defense": 15,
+        "sp_attack": 9,
+        "sp_defense": 9,
         "speed": 11,
         "is_in_team": true,
         "is_placed": false,
@@ -551,10 +551,10 @@
           "bug",
           "poison"
         ],
-        "attack": 9,
-        "defense": 16,
-        "sp_attack": 11,
-        "sp_defense": 9,
+        "attack": 10,
+        "defense": 13,
+        "sp_attack": 9,
+        "sp_defense": 11,
         "speed": 11,
         "is_in_team": true,
         "is_placed": false,
@@ -607,9 +607,9 @@
           "bug",
           "poison"
         ],
-        "attack": 10,
+        "attack": 11,
         "defense": 12,
-        "sp_attack": 11,
+        "sp_attack": 9,
         "sp_defense": 9,
         "speed": 9,
         "is_in_team": true,
@@ -662,14 +662,14 @@
         "types": [
           "electric"
         ],
-        "attack": 19,
-        "defense": 18,
-        "sp_attack": 19,
-        "sp_defense": 15,
+        "attack": 18,
+        "defense": 16,
+        "sp_attack": 20,
+        "sp_defense": 17,
         "speed": 28,
         "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 2369011066080,
+        "is_placed": false,
+        "spot_id": null,
         "moves": [
           {
             "name": "tail-whip",
@@ -678,7 +678,7 @@
           },
           {
             "name": "thunder-shock",
-            "current_pp": 22,
+            "current_pp": 30,
             "max_pp": 30
           },
           {
