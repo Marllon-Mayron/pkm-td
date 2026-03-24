@@ -702,14 +702,30 @@ class Pokemon(Entity):
             self.combat_state = "returning"
 
     def take_damage(self, damage, attacker=None):
+        """Recebe dano"""
         old_hp = self.current_hp
         self.current_hp = max(0, self.current_hp - damage)
+
+        # NOTA: O som de impacto já é tocado pelo BattleSystem ou Projectile
+        # Aqui só fazemos o som de low_hp (opcional) e faint
+
+        # Se o HP ficou muito baixo, toca som de aviso (opcional)
+        if self.current_hp > 0 and self.current_hp <= self.max_hp * 0.2:
+            from src.managers.move_sound_manager import move_sound_manager
+            # Tenta tocar som de low_hp se existir
+            move_sound_manager.play_attack_sound("low_hp")  # Som opcional
 
         if attacker and self.is_wild:
             attacker_id = id(attacker)
             actual_damage = min(damage, old_hp)
             self.damage_contributions[attacker_id] = self.damage_contributions.get(attacker_id, 0) + actual_damage
             self.last_attacker = attacker
+
+        # Se o Pokémon morreu, toca som de faint
+        if self.current_hp <= 0:
+            from src.managers.move_sound_manager import move_sound_manager
+            move_sound_manager.play_attack_sound("faint")
+            print(f"[BATTLE] {self.name} foi derrotado!")
 
         return self.current_hp <= 0
 

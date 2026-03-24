@@ -7,6 +7,7 @@ from src.core.screen import ScreenManager
 from src.core.camera import Camera
 from src.entities.player import Player  # Importa a classe Player
 from src.scenes.menu_scene import MenuScene
+from src.managers.sound_manager import sound_manager
 
 class Game:
     def __init__(self):

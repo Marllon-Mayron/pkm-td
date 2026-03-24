@@ -62,7 +62,8 @@ class MoveData:
                             "category": move_info["damage_class"],
                             "description": move_info["description"],
                             "effect": move_info["effect"],
-                            "is_status": move_info["is_status"]
+                            "is_status": move_info["is_status"],
+                            "sound_name": move_info["name"].lower()  # NOVO: nome do arquivo de som
                         }
                 print(f"[MoveData] Carregados dados de {len(self._moves_data)} moves")
             else:
@@ -145,7 +146,8 @@ class MoveData:
                     "category": move_info["category"],
                     "description": move_info["description"],
                     "effect": move_info["effect"],
-                    "is_status": move_info["is_status"]
+                    "is_status": move_info["is_status"],
+                    "sound_name": move_info.get("sound_name", move_name_lower)  # NOVO
                 }
 
         # Fallback: move não encontrado
@@ -159,7 +161,8 @@ class MoveData:
             "category": "physical",
             "description": f"Usa {move_name}.",
             "effect": None,
-            "is_status": False
+            "is_status": False,
+            "sound_name": move_name_lower  # NOVO: fallback usa o nome do move
         }
 
     def get_move_info_by_id(self, move_id: int) -> Optional[Dict]:
@@ -175,7 +178,8 @@ class MoveData:
                 "category": move_info["category"],
                 "description": move_info["description"],
                 "effect": move_info["effect"],
-                "is_status": move_info["is_status"]
+                "is_status": move_info["is_status"],
+                "sound_name": move_info.get("sound_name", move_info["name"].lower())  # NOVO
             }
         return None
 
@@ -183,3 +187,31 @@ class MoveData:
         """Retorna o nome do move pelo ID"""
         move_info = self._moves_data.get(move_id)
         return move_info["name"] if move_info else f"move_{move_id}"
+
+    # NOVO: Método para obter o nome do som de um move
+    def get_move_sound_name(self, move_name: str) -> str:
+        """
+        Retorna o nome do arquivo de som para um move específico
+
+        Args:
+            move_name: Nome do move
+
+        Returns:
+            str: Nome do arquivo de som (em minúsculo, sem espaços)
+        """
+        move_info = self.get_move_info(move_name)
+        if move_info:
+            sound_name = move_info.get("sound_name", move_name.lower())
+            # Remove espaços e caracteres especiais para nome de arquivo
+            sound_name = sound_name.replace(" ", "").replace("-", "").replace("'", "")
+            return sound_name
+        return move_name.lower().replace(" ", "").replace("-", "").replace("'", "")
+
+    def get_all_move_names(self) -> List[str]:
+        """
+        Retorna uma lista com todos os nomes de moves disponíveis no jogo
+
+        Returns:
+            List[str]: Lista de nomes de moves
+        """
+        return [move_info["name"] for move_info in self._moves_data.values()]

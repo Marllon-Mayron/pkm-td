@@ -105,7 +105,7 @@ class BattleSystem:
         color = type_colors.get(move.type.lower(), (255, 255, 255))
 
         # Usar a velocidade de movimento do atacante para o projétil
-        projectile_speed = attacker.move_speed * 60  # Multiplicar por 60 para consistência com movimento
+        projectile_speed = attacker.move_speed * 60
 
         projectile = Projectile(
             attacker=attacker,
@@ -114,9 +114,17 @@ class BattleSystem:
             damage=damage_result["damage"],
             effectiveness=damage_result["effectiveness"],
             color=color,
-            speed=projectile_speed  # Usar velocidade de movimento do atacante
+            speed=projectile_speed
         )
         self.projectiles.append(projectile)
+
+        from src.managers.move_sound_manager import move_sound_manager
+
+        # Toca os sons do move (atacante e alvo)
+        # Para ataques especiais, o som do impacto será quando o projétil atingir
+        # Então aqui só tocamos o som do atacante
+        move_sound_manager.play_attack_sound(move.sound_name)
+        print(f"[SOM] {move.name} - som do atacante: {move.sound_name}")
 
     def _apply_damage(self, attacker: 'Pokemon', target: 'Pokemon', damage_result: dict, move):
         """Aplica dano a um alvo"""
@@ -125,6 +133,20 @@ class BattleSystem:
         if damage_result["effectiveness"] == 0:
             print(f"[BATTLE] {move.name} não afeta {target.name}!")
             return
+
+        from src.managers.move_sound_manager import move_sound_manager
+
+        # Para ataques físicos: toca som do atacante E do impacto
+        # Para ataques especiais: o projétil já tocou o som do atacante,
+        # aqui toca só o som do impacto
+        if move.category == "physical":
+            # Toca som do atacante
+            move_sound_manager.play_attack_sound(move.sound_name)
+            print(f"[SOM] {move.name} (físico) - som do atacante: {move.sound_name}")
+
+        # Toca som de impacto (do alvo)
+        move_sound_manager.play_hit_sound(move.sound_name)
+        print(f"[SOM] {move.name} - som de impacto: {move.sound_name}_target")
 
         # Aplica dano
         target.take_damage(damage, attacker=attacker)

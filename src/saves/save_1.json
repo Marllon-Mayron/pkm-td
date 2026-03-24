@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "1.0.0",
-    "last_save": "2026-03-23T22:22:10.481725",
+    "last_save": "2026-03-24T00:16:48.983299",
     "play_time": 0,
     "save_name": "Save 1"
   },
@@ -17,11 +17,11 @@
         "unique_id": "26f6033e-3252-4a0b-adfc-e894c125ced9",
         "id": 7,
         "name": "Squirtle",
-        "level": 11,
+        "level": 12,
         "is_shiny": false,
-        "current_hp": 31,
-        "max_hp": 31,
-        "xp": 583,
+        "current_hp": 33,
+        "max_hp": 33,
+        "xp": 1161,
         "ivs": {
           "hp": 7,
           "attack": 23,
@@ -44,12 +44,12 @@
         ],
         "attack": 19,
         "defense": 22,
-        "sp_attack": 15,
-        "sp_defense": 20,
-        "speed": 16,
+        "sp_attack": 18,
+        "sp_defense": 22,
+        "speed": 17,
         "is_in_team": true,
         "is_placed": true,
-        "spot_id": 1957562345632,
+        "spot_id": 1647070654784,
         "moves": [
           {
             "name": "tackle",
@@ -63,7 +63,7 @@
           },
           {
             "name": "bubble",
-            "current_pp": 30,
+            "current_pp": 29,
             "max_pp": 30
           }
         ]
@@ -76,7 +76,7 @@
         "is_shiny": false,
         "current_hp": 26,
         "max_hp": 26,
-        "xp": 358,
+        "xp": 373,
         "ivs": {
           "hp": 4,
           "attack": 2,
@@ -98,13 +98,13 @@
           "bug"
         ],
         "attack": 9,
-        "defense": 15,
-        "sp_attack": 9,
+        "defense": 17,
+        "sp_attack": 8,
         "sp_defense": 9,
         "speed": 11,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 1957508380048,
+        "spot_id": null,
         "moves": [
           {
             "name": "tackle",
@@ -155,12 +155,12 @@
         ],
         "attack": 11,
         "defense": 13,
-        "sp_attack": 10,
-        "sp_defense": 10,
+        "sp_attack": 9,
+        "sp_defense": 8,
         "speed": 9,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 1957508380000,
+        "spot_id": null,
         "moves": [
           {
             "name": "poison-sting",
@@ -187,7 +187,7 @@
         "is_shiny": false,
         "current_hp": 27,
         "max_hp": 27,
-        "xp": 248,
+        "xp": 403,
         "ivs": {
           "hp": 29,
           "attack": 31,
@@ -208,14 +208,14 @@
         "types": [
           "normal"
         ],
-        "attack": 17,
-        "defense": 13,
-        "sp_attack": 9,
+        "attack": 15,
+        "defense": 11,
+        "sp_attack": 10,
         "sp_defense": 14,
         "speed": 19,
         "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 1957561703536,
+        "is_placed": false,
+        "spot_id": null,
         "moves": [
           {
             "name": "tackle",
@@ -240,11 +240,11 @@
         "unique_id": "26f6033e-3252-4a0b-adfc-e894c125ced9",
         "id": 7,
         "name": "Squirtle",
-        "level": 11,
+        "level": 12,
         "is_shiny": false,
-        "current_hp": 31,
-        "max_hp": 31,
-        "xp": 583,
+        "current_hp": 33,
+        "max_hp": 33,
+        "xp": 1161,
         "ivs": {
           "hp": 7,
           "attack": 23,
@@ -267,12 +267,12 @@
         ],
         "attack": 19,
         "defense": 22,
-        "sp_attack": 15,
-        "sp_defense": 20,
-        "speed": 16,
+        "sp_attack": 18,
+        "sp_defense": 22,
+        "speed": 17,
         "is_in_team": true,
         "is_placed": true,
-        "spot_id": 1957562345632,
+        "spot_id": 1647070654784,
         "moves": [
           {
             "name": "tackle",
@@ -286,7 +286,7 @@
           },
           {
             "name": "bubble",
-            "current_pp": 30,
+            "current_pp": 29,
             "max_pp": 30
           }
         ]
@@ -299,7 +299,7 @@
         "is_shiny": false,
         "current_hp": 26,
         "max_hp": 26,
-        "xp": 358,
+        "xp": 373,
         "ivs": {
           "hp": 4,
           "attack": 2,
@@ -321,13 +321,13 @@
           "bug"
         ],
         "attack": 9,
-        "defense": 15,
-        "sp_attack": 9,
+        "defense": 17,
+        "sp_attack": 8,
         "sp_defense": 9,
         "speed": 11,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 1957508380048,
+        "spot_id": null,
         "moves": [
           {
             "name": "tackle",
@@ -378,12 +378,12 @@
         ],
         "attack": 11,
         "defense": 13,
-        "sp_attack": 10,
-        "sp_defense": 10,
+        "sp_attack": 9,
+        "sp_defense": 8,
         "speed": 9,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 1957508380000,
+        "spot_id": null,
         "moves": [
           {
             "name": "poison-sting",
@@ -410,7 +410,7 @@
         "is_shiny": false,
         "current_hp": 27,
         "max_hp": 27,
-        "xp": 248,
+        "xp": 403,
         "ivs": {
           "hp": 29,
           "attack": 31,
@@ -431,14 +431,14 @@
         "types": [
           "normal"
         ],
-        "attack": 17,
-        "defense": 13,
-        "sp_attack": 9,
+        "attack": 15,
+        "defense": 11,
+        "sp_attack": 10,
         "sp_defense": 14,
         "speed": 19,
         "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 1957561703536,
+        "is_placed": false,
+        "spot_id": null,
         "moves": [
           {
             "name": "tackle",

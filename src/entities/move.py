@@ -1,4 +1,4 @@
-# src/entities/move.py
+# src/entities/move.py (atualizado)
 from typing import Dict, Optional
 
 
@@ -14,6 +14,8 @@ class Move:
         self.current_pp = self.max_pp
         self.category = move_data.get("category", "physical")  # physical, special, status
         self.description = move_data.get("description", f"Usa {name}.")
+
+        self.sound_name = move_data.get("sound_name", name.lower())
 
         # Efeitos especiais (para futura implementação)
         self.effect = move_data.get("effect", None)
@@ -47,7 +49,8 @@ class Move:
             "max_pp": self.max_pp,
             "current_pp": self.current_pp,
             "category": self.category,
-            "description": self.description
+            "description": self.description,
+            "sound_name": self.sound_name  # NOVO
         }
 
     @classmethod
@@ -60,7 +63,8 @@ class Move:
                 "accuracy": data.get("accuracy", 100),
                 "pp": data.get("max_pp", 35),
                 "category": data.get("category", "physical"),
-                "description": data.get("description", "")
+                "description": data.get("description", ""),
+                "sound_name": data.get("sound_name", data.get("name", "").lower())
             }
 
         move = cls(data["name"], move_info)

@@ -1,3 +1,4 @@
+# src/config/settings.py
 """
 Configurações do jogo - tudo centralizado aqui
 """
@@ -17,6 +18,12 @@ class Settings:
         self.target_fps = 60  # FPS alvo para renderização
         self.game_tick_rate = 60  # Updates por segundo (lógica do jogo)
         self.max_fps = 240  # FPS máximo (para evitar uso desnecessário de CPU)
+
+        # Configurações de áudio (NOVO)
+        self.sfx_volume = 0.7
+        self.music_volume = 0.5
+        self.music_enabled = True
+        self.sfx_enabled = True
 
         # Cores (útil para ter centralizado)
         self.colors = {
@@ -44,8 +51,13 @@ class Settings:
                     self.fullscreen = data.get('fullscreen', self.fullscreen)
                     self.target_fps = data.get('target_fps', self.target_fps)
                     self.vsync = data.get('vsync', self.vsync)
-            except:
-                print("Erro ao carregar configurações, usando padrões")
+                    # NOVAS configurações de áudio
+                    self.sfx_volume = data.get('sfx_volume', self.sfx_volume)
+                    self.music_volume = data.get('music_volume', self.music_volume)
+                    self.music_enabled = data.get('music_enabled', self.music_enabled)
+                    self.sfx_enabled = data.get('sfx_enabled', self.sfx_enabled)
+            except Exception as e:
+                print(f"Erro ao carregar configurações: {e}")
 
     def save_settings(self):
         """Salva configurações"""
@@ -54,11 +66,18 @@ class Settings:
             'screen_height': self.screen_height,
             'fullscreen': self.fullscreen,
             'target_fps': self.target_fps,
-            'vsync': self.vsync
+            'vsync': self.vsync,
+            'sfx_volume': self.sfx_volume,
+            'music_volume': self.music_volume,
+            'music_enabled': self.music_enabled,
+            'sfx_enabled': self.sfx_enabled
         }
 
-        with open('config.json', 'w') as f:
-            json.dump(data, f, indent=4)
+        try:
+            with open('config.json', 'w') as f:
+                json.dump(data, f, indent=4)
+        except Exception as e:
+            print(f"Erro ao salvar configurações: {e}")
 
     def get_screen_size(self):
         """Retorna tamanho atual da tela"""

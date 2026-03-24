@@ -5,6 +5,7 @@ import pygame
 import random
 from src.scenes.base_scene import BaseScene
 from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
+from src.scenes.settings_scene.settings_scene import SettingsScene
 
 
 class Button:
@@ -215,6 +216,8 @@ class MenuScene(BaseScene):
     def open_settings(self):
         """Abre configurações"""
         print("Abrindo configurações...")
+        self.game.current_scene = SettingsScene(self.game)
+
 
     def open_editor(self):
         """Abre o editor de fases"""

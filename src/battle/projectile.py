@@ -151,6 +151,10 @@ class Projectile:
         self.target.damage_contributions[attacker_id] = \
             self.target.damage_contributions.get(attacker_id, 0) + self.damage
 
+        # Toca o som de impacto (do alvo)
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_hit_sound(self.move_name)
+
         # Log
         if self.effectiveness > 1.0:
             print(f"[BATTLE] {self.move_name} é super efetivo!")
