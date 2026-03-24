@@ -43,6 +43,7 @@ class BattleSystem:
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")
             move.current_pp -= 1
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            self._apply_status(attacker, target, move)
             return True
 
         # ===== ATAQUES QUE CAUSAM DANO =====
@@ -166,6 +167,26 @@ class BattleSystem:
 
         if not target.is_alive():
             print(f"[BATTLE] {target.name} foi derrotado!")
+
+    def _apply_status(self, attacker: 'Pokemon', target: 'Pokemon', move):
+        """Aplica efeito de status ao alvo"""
+
+        from src.managers.move_sound_manager import move_sound_manager
+
+        print(f"[DEBUG STATUS] Move: {move.name}")
+        print(f"[DEBUG STATUS] move.sound_name: {move.sound_name}")
+
+        # Toca som do atacante
+        move_sound_manager.play_attack_sound(move.sound_name)
+        print(f"[SOM] {move.name} (status) - som do atacante: {move.sound_name}")
+
+        # Tenta tocar som de impacto APENAS se existir um som específico
+        # use_fallback=False impede de usar o som padrão (tackle_target)
+        result = move_sound_manager.play_hit_sound(move.sound_name, use_fallback=False)
+        print(f"[DEBUG STATUS] Resultado do play_hit_sound: {result}")
+
+        print(f"[BATTLE] {attacker.name} usou {move.name}!")
+
 
     def render_projectiles(self, screen, camera, screen_manager):
         """Renderiza projéteis"""

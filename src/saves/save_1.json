@@ -1,34 +1,34 @@
 {
   "meta": {
     "version": "1.0.0",
-    "last_save": "2026-03-24T00:18:07.020750",
+    "last_save": "2026-03-24T12:31:21.600026",
     "play_time": 0,
     "save_name": "Save 1"
   },
   "player": {
-    "money": 1900,
-    "score": 100,
+    "money": 900,
+    "score": 550,
     "position": {
       "x": 100,
       "y": 100
     },
     "team": [
       {
-        "unique_id": "26f6033e-3252-4a0b-adfc-e894c125ced9",
+        "unique_id": "447e83c8-7434-4164-9022-afe68af49041",
         "id": 7,
         "name": "Squirtle",
-        "level": 13,
+        "level": 12,
         "is_shiny": false,
-        "current_hp": 35,
-        "max_hp": 35,
-        "xp": 448,
+        "current_hp": 36,
+        "max_hp": 36,
+        "xp": 575,
         "ivs": {
-          "hp": 7,
-          "attack": 23,
-          "defense": 25,
-          "special_attack": 16,
-          "special_defense": 16,
-          "speed": 17
+          "hp": 29,
+          "attack": 29,
+          "defense": 9,
+          "special_attack": 4,
+          "special_defense": 15,
+          "speed": 22
         },
         "evs": {
           "hp": 0,
@@ -42,14 +42,14 @@
         "types": [
           "water"
         ],
-        "attack": 20,
-        "defense": 25,
-        "sp_attack": 20,
-        "sp_defense": 23,
-        "speed": 18,
+        "attack": 19,
+        "defense": 21,
+        "sp_attack": 19,
+        "sp_defense": 22,
+        "speed": 17,
         "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 1647070654784,
+        "is_placed": false,
+        "spot_id": null,
         "moves": [
           {
             "name": "tackle",
@@ -69,76 +69,21 @@
         ]
       },
       {
-        "unique_id": "85dad690-d613-4d99-a4ff-bc7919381427",
-        "id": 11,
-        "name": "Metapod",
-        "level": 8,
-        "is_shiny": false,
-        "current_hp": 26,
-        "max_hp": 26,
-        "xp": 412,
-        "ivs": {
-          "hp": 4,
-          "attack": 2,
-          "defense": 8,
-          "special_attack": 5,
-          "special_defense": 27,
-          "speed": 22
-        },
-        "evs": {
-          "hp": 0,
-          "attack": 0,
-          "defense": 0,
-          "special_attack": 0,
-          "special_defense": 0,
-          "speed": 0
-        },
-        "nature": "Quirky",
-        "types": [
-          "bug"
-        ],
-        "attack": 9,
-        "defense": 17,
-        "sp_attack": 8,
-        "sp_defense": 9,
-        "speed": 11,
-        "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 1647070654832,
-        "moves": [
-          {
-            "name": "tackle",
-            "current_pp": 35,
-            "max_pp": 35
-          },
-          {
-            "name": "string-shot",
-            "current_pp": 40,
-            "max_pp": 40
-          },
-          {
-            "name": "harden",
-            "current_pp": 30,
-            "max_pp": 30
-          }
-        ]
-      },
-      {
-        "unique_id": "3d935a70-7fb1-462a-a428-d4c596addb19",
+        "unique_id": "849622e9-81a5-4991-826f-d3705d24c7da",
         "id": 14,
         "name": "Kakuna",
         "level": 8,
         "is_shiny": false,
         "current_hp": 26,
         "max_hp": 26,
-        "xp": 113,
+        "xp": 436,
         "ivs": {
-          "hp": 12,
-          "attack": 24,
-          "defense": 10,
-          "special_attack": 19,
-          "special_defense": 18,
-          "speed": 1
+          "hp": 21,
+          "attack": 28,
+          "defense": 29,
+          "special_attack": 30,
+          "special_defense": 13,
+          "speed": 11
         },
         "evs": {
           "hp": 0,
@@ -148,19 +93,19 @@
           "special_defense": 0,
           "speed": 0
         },
-        "nature": "Jolly",
+        "nature": "Bold",
         "types": [
           "bug",
           "poison"
         ],
-        "attack": 11,
+        "attack": 10,
         "defense": 13,
-        "sp_attack": 9,
-        "sp_defense": 8,
-        "speed": 9,
+        "sp_attack": 11,
+        "sp_defense": 9,
+        "speed": 12,
         "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 1647070433104,
+        "is_placed": false,
+        "spot_id": null,
         "moves": [
           {
             "name": "poison-sting",
@@ -180,21 +125,21 @@
         ]
       },
       {
-        "unique_id": "f2120b84-2d48-4a63-930c-432e197e816b",
-        "id": 19,
-        "name": "Rattata",
-        "level": 9,
+        "unique_id": "b12a4eb4-faf2-4863-b78f-21a671857101",
+        "id": 14,
+        "name": "Kakuna",
+        "level": 8,
         "is_shiny": false,
-        "current_hp": 27,
-        "max_hp": 27,
-        "xp": 550,
+        "current_hp": 26,
+        "max_hp": 26,
+        "xp": 315,
         "ivs": {
-          "hp": 29,
-          "attack": 31,
-          "defense": 23,
-          "special_attack": 5,
-          "special_defense": 31,
-          "speed": 18
+          "hp": 16,
+          "attack": 5,
+          "defense": 26,
+          "special_attack": 23,
+          "special_defense": 6,
+          "speed": 11
         },
         "evs": {
           "hp": 0,
@@ -206,52 +151,225 @@
         },
         "nature": "Quirky",
         "types": [
-          "normal"
+          "bug",
+          "poison"
         ],
-        "attack": 15,
-        "defense": 11,
+        "attack": 9,
+        "defense": 13,
         "sp_attack": 10,
-        "sp_defense": 14,
-        "speed": 19,
+        "sp_defense": 8,
+        "speed": 11,
         "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 1647070653488,
+        "is_placed": false,
+        "spot_id": null,
         "moves": [
           {
-            "name": "tackle",
+            "name": "poison-sting",
             "current_pp": 35,
             "max_pp": 35
           },
+          {
+            "name": "string-shot",
+            "current_pp": 40,
+            "max_pp": 40
+          },
+          {
+            "name": "harden",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "4a345a19-6bf3-4ae2-832e-2ad2ec6ccd0d",
+        "id": 14,
+        "name": "Kakuna",
+        "level": 8,
+        "is_shiny": false,
+        "current_hp": 25,
+        "max_hp": 25,
+        "xp": 439,
+        "ivs": {
+          "hp": 3,
+          "attack": 29,
+          "defense": 7,
+          "special_attack": 31,
+          "special_defense": 12,
+          "speed": 6
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Lax",
+        "types": [
+          "bug",
+          "poison"
+        ],
+        "attack": 9,
+        "defense": 16,
+        "sp_attack": 11,
+        "sp_defense": 9,
+        "speed": 11,
+        "is_in_team": true,
+        "is_placed": false,
+        "spot_id": null,
+        "moves": [
+          {
+            "name": "poison-sting",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "string-shot",
+            "current_pp": 40,
+            "max_pp": 40
+          },
+          {
+            "name": "harden",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "0afe048f-abc9-40eb-b69a-e513933e5307",
+        "id": 14,
+        "name": "Kakuna",
+        "level": 8,
+        "is_shiny": false,
+        "current_hp": 27,
+        "max_hp": 27,
+        "xp": 375,
+        "ivs": {
+          "hp": 25,
+          "attack": 7,
+          "defense": 11,
+          "special_attack": 20,
+          "special_defense": 0,
+          "speed": 3
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Mild",
+        "types": [
+          "bug",
+          "poison"
+        ],
+        "attack": 10,
+        "defense": 12,
+        "sp_attack": 11,
+        "sp_defense": 9,
+        "speed": 9,
+        "is_in_team": true,
+        "is_placed": false,
+        "spot_id": null,
+        "moves": [
+          {
+            "name": "poison-sting",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "string-shot",
+            "current_pp": 40,
+            "max_pp": 40
+          },
+          {
+            "name": "harden",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "0f413f09-0457-44c1-ba5c-180f83c6fe08",
+        "id": 25,
+        "name": "Pikachu",
+        "level": 12,
+        "is_shiny": false,
+        "current_hp": 34,
+        "max_hp": 34,
+        "xp": 690,
+        "ivs": {
+          "hp": 30,
+          "attack": 2,
+          "defense": 4,
+          "special_attack": 12,
+          "special_defense": 31,
+          "speed": 13
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Quiet",
+        "types": [
+          "electric"
+        ],
+        "attack": 19,
+        "defense": 18,
+        "sp_attack": 19,
+        "sp_defense": 15,
+        "speed": 28,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 2369011066080,
+        "moves": [
           {
             "name": "tail-whip",
             "current_pp": 30,
             "max_pp": 30
           },
           {
+            "name": "thunder-shock",
+            "current_pp": 22,
+            "max_pp": 30
+          },
+          {
             "name": "quick-attack",
             "current_pp": 30,
             "max_pp": 30
+          },
+          {
+            "name": "thunder-wave",
+            "current_pp": 20,
+            "max_pp": 20
           }
         ]
       }
     ],
     "pc_box": [
       {
-        "unique_id": "26f6033e-3252-4a0b-adfc-e894c125ced9",
+        "unique_id": "447e83c8-7434-4164-9022-afe68af49041",
         "id": 7,
         "name": "Squirtle",
-        "level": 13,
+        "level": 12,
         "is_shiny": false,
-        "current_hp": 35,
-        "max_hp": 35,
-        "xp": 448,
+        "current_hp": 36,
+        "max_hp": 36,
+        "xp": 575,
         "ivs": {
-          "hp": 7,
-          "attack": 23,
-          "defense": 25,
-          "special_attack": 16,
-          "special_defense": 16,
-          "speed": 17
+          "hp": 29,
+          "attack": 29,
+          "defense": 9,
+          "special_attack": 4,
+          "special_defense": 15,
+          "speed": 22
         },
         "evs": {
           "hp": 0,
@@ -265,14 +383,14 @@
         "types": [
           "water"
         ],
-        "attack": 20,
-        "defense": 25,
-        "sp_attack": 20,
-        "sp_defense": 23,
-        "speed": 18,
+        "attack": 19,
+        "defense": 21,
+        "sp_attack": 19,
+        "sp_defense": 22,
+        "speed": 17,
         "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 1647070654784,
+        "is_placed": false,
+        "spot_id": null,
         "moves": [
           {
             "name": "tackle",
@@ -292,76 +410,21 @@
         ]
       },
       {
-        "unique_id": "85dad690-d613-4d99-a4ff-bc7919381427",
-        "id": 11,
-        "name": "Metapod",
-        "level": 8,
-        "is_shiny": false,
-        "current_hp": 26,
-        "max_hp": 26,
-        "xp": 412,
-        "ivs": {
-          "hp": 4,
-          "attack": 2,
-          "defense": 8,
-          "special_attack": 5,
-          "special_defense": 27,
-          "speed": 22
-        },
-        "evs": {
-          "hp": 0,
-          "attack": 0,
-          "defense": 0,
-          "special_attack": 0,
-          "special_defense": 0,
-          "speed": 0
-        },
-        "nature": "Quirky",
-        "types": [
-          "bug"
-        ],
-        "attack": 9,
-        "defense": 17,
-        "sp_attack": 8,
-        "sp_defense": 9,
-        "speed": 11,
-        "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 1647070654832,
-        "moves": [
-          {
-            "name": "tackle",
-            "current_pp": 35,
-            "max_pp": 35
-          },
-          {
-            "name": "string-shot",
-            "current_pp": 40,
-            "max_pp": 40
-          },
-          {
-            "name": "harden",
-            "current_pp": 30,
-            "max_pp": 30
-          }
-        ]
-      },
-      {
-        "unique_id": "3d935a70-7fb1-462a-a428-d4c596addb19",
+        "unique_id": "849622e9-81a5-4991-826f-d3705d24c7da",
         "id": 14,
         "name": "Kakuna",
         "level": 8,
         "is_shiny": false,
         "current_hp": 26,
         "max_hp": 26,
-        "xp": 113,
+        "xp": 436,
         "ivs": {
-          "hp": 12,
-          "attack": 24,
-          "defense": 10,
-          "special_attack": 19,
-          "special_defense": 18,
-          "speed": 1
+          "hp": 21,
+          "attack": 28,
+          "defense": 29,
+          "special_attack": 30,
+          "special_defense": 13,
+          "speed": 11
         },
         "evs": {
           "hp": 0,
@@ -371,19 +434,19 @@
           "special_defense": 0,
           "speed": 0
         },
-        "nature": "Jolly",
+        "nature": "Bold",
         "types": [
           "bug",
           "poison"
         ],
-        "attack": 11,
+        "attack": 10,
         "defense": 13,
-        "sp_attack": 9,
-        "sp_defense": 8,
-        "speed": 9,
+        "sp_attack": 11,
+        "sp_defense": 9,
+        "speed": 12,
         "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 1647070433104,
+        "is_placed": false,
+        "spot_id": null,
         "moves": [
           {
             "name": "poison-sting",
@@ -403,21 +466,21 @@
         ]
       },
       {
-        "unique_id": "f2120b84-2d48-4a63-930c-432e197e816b",
-        "id": 19,
-        "name": "Rattata",
-        "level": 9,
+        "unique_id": "b12a4eb4-faf2-4863-b78f-21a671857101",
+        "id": 14,
+        "name": "Kakuna",
+        "level": 8,
         "is_shiny": false,
-        "current_hp": 27,
-        "max_hp": 27,
-        "xp": 550,
+        "current_hp": 26,
+        "max_hp": 26,
+        "xp": 315,
         "ivs": {
-          "hp": 29,
-          "attack": 31,
-          "defense": 23,
-          "special_attack": 5,
-          "special_defense": 31,
-          "speed": 18
+          "hp": 16,
+          "attack": 5,
+          "defense": 26,
+          "special_attack": 23,
+          "special_defense": 6,
+          "speed": 11
         },
         "evs": {
           "hp": 0,
@@ -429,53 +492,219 @@
         },
         "nature": "Quirky",
         "types": [
-          "normal"
+          "bug",
+          "poison"
         ],
-        "attack": 15,
-        "defense": 11,
+        "attack": 9,
+        "defense": 13,
         "sp_attack": 10,
-        "sp_defense": 14,
-        "speed": 19,
+        "sp_defense": 8,
+        "speed": 11,
         "is_in_team": true,
-        "is_placed": true,
-        "spot_id": 1647070653488,
+        "is_placed": false,
+        "spot_id": null,
         "moves": [
           {
-            "name": "tackle",
+            "name": "poison-sting",
             "current_pp": 35,
             "max_pp": 35
           },
+          {
+            "name": "string-shot",
+            "current_pp": 40,
+            "max_pp": 40
+          },
+          {
+            "name": "harden",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "4a345a19-6bf3-4ae2-832e-2ad2ec6ccd0d",
+        "id": 14,
+        "name": "Kakuna",
+        "level": 8,
+        "is_shiny": false,
+        "current_hp": 25,
+        "max_hp": 25,
+        "xp": 439,
+        "ivs": {
+          "hp": 3,
+          "attack": 29,
+          "defense": 7,
+          "special_attack": 31,
+          "special_defense": 12,
+          "speed": 6
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Lax",
+        "types": [
+          "bug",
+          "poison"
+        ],
+        "attack": 9,
+        "defense": 16,
+        "sp_attack": 11,
+        "sp_defense": 9,
+        "speed": 11,
+        "is_in_team": true,
+        "is_placed": false,
+        "spot_id": null,
+        "moves": [
+          {
+            "name": "poison-sting",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "string-shot",
+            "current_pp": 40,
+            "max_pp": 40
+          },
+          {
+            "name": "harden",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "0afe048f-abc9-40eb-b69a-e513933e5307",
+        "id": 14,
+        "name": "Kakuna",
+        "level": 8,
+        "is_shiny": false,
+        "current_hp": 27,
+        "max_hp": 27,
+        "xp": 375,
+        "ivs": {
+          "hp": 25,
+          "attack": 7,
+          "defense": 11,
+          "special_attack": 20,
+          "special_defense": 0,
+          "speed": 3
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Mild",
+        "types": [
+          "bug",
+          "poison"
+        ],
+        "attack": 10,
+        "defense": 12,
+        "sp_attack": 11,
+        "sp_defense": 9,
+        "speed": 9,
+        "is_in_team": true,
+        "is_placed": false,
+        "spot_id": null,
+        "moves": [
+          {
+            "name": "poison-sting",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "string-shot",
+            "current_pp": 40,
+            "max_pp": 40
+          },
+          {
+            "name": "harden",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "0f413f09-0457-44c1-ba5c-180f83c6fe08",
+        "id": 25,
+        "name": "Pikachu",
+        "level": 12,
+        "is_shiny": false,
+        "current_hp": 34,
+        "max_hp": 34,
+        "xp": 690,
+        "ivs": {
+          "hp": 30,
+          "attack": 2,
+          "defense": 4,
+          "special_attack": 12,
+          "special_defense": 31,
+          "speed": 13
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Quiet",
+        "types": [
+          "electric"
+        ],
+        "attack": 19,
+        "defense": 18,
+        "sp_attack": 19,
+        "sp_defense": 15,
+        "speed": 28,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 2369011066080,
+        "moves": [
           {
             "name": "tail-whip",
             "current_pp": 30,
             "max_pp": 30
           },
           {
+            "name": "thunder-shock",
+            "current_pp": 22,
+            "max_pp": 30
+          },
+          {
             "name": "quick-attack",
             "current_pp": 30,
             "max_pp": 30
+          },
+          {
+            "name": "thunder-wave",
+            "current_pp": 20,
+            "max_pp": 20
           }
         ]
       }
     ],
     "bag": {
-      "pokeball": 5,
-      "potion": 2,
-      "firestone": 1,
-      "waterstone": 1,
-      "thunderstone": 1,
-      "pp_up": 1,
-      "pp_max": 2
+      "potion": 1,
+      "pp_up": 1
     },
     "seen_pokemon": [
-      10,
-      19,
+      25,
       13,
       7
     ],
     "caught_pokemon": [
-      10,
-      19,
+      25,
       13,
       7
     ]
@@ -489,15 +718,27 @@
     "unlocked_phases": [
       "1-1",
       "1-2",
-      "1-3"
+      "1-3",
+      "1-4"
     ],
     "completed_phases": [
       "1-1",
-      "1-2"
+      "1-2",
+      "1-3"
     ],
     "stars": {
       "1-1": 3,
-      "1-2": 3
+      "1-2": 3,
+      "1-3": 3
     }
+  },
+  "settings": {
+    "sfx_volume": 0.7,
+    "music_volume": 0.5,
+    "music_enabled": true,
+    "sfx_enabled": true,
+    "fullscreen": false,
+    "vsync": true,
+    "target_fps": 60
   }
 }

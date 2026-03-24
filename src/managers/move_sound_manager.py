@@ -43,7 +43,12 @@ class MoveSoundManager:
         sound_files = list(moves_path.glob("*.mp3")) + list(moves_path.glob("*.wav")) + list(moves_path.glob("*.ogg"))
 
         for sound_file in sound_files:
-            sound_name = sound_file.stem.lower()  # Nome do arquivo sem extensão, em minúsculo
+            # Nome original do arquivo
+            raw_name = sound_file.stem.lower()
+
+            # ===== NORMALIZAÇÃO: Remove espaços, hífens, aspas =====
+            sound_name = raw_name.replace(" ", "").replace("-", "").replace("'", "")
+
             try:
                 sound = pygame.mixer.Sound(str(sound_file))
                 self._sounds[sound_name] = sound
@@ -102,21 +107,10 @@ class MoveSoundManager:
     def play_move_sounds(self, move_name: str, attacker_pos: Optional[Tuple[float, float]] = None,
                          target_pos: Optional[Tuple[float, float]] = None,
                          volume: Optional[float] = None) -> bool:
-        """
-        Toca os sons de um move (atacante e alvo)
-
-        Args:
-            move_name: Nome do move (case insensitive)
-            attacker_pos: Posição do atacante (para efeito 3D, opcional)
-            target_pos: Posição do alvo (para efeito 3D, opcional)
-            volume: Volume específico (0.0 a 1.0), se None usa o volume global
-
-        Returns:
-            bool: True se tocou pelo menos um som
-        """
+        """Toca os sons de um move (atacante e alvo)"""
         played = False
 
-        # Normaliza o nome do move
+        # Normaliza o nome do move (MESMA normalização do carregamento)
         move_key = move_name.lower().strip().replace(" ", "").replace("-", "").replace("'", "")
 
         # 1. Tenta tocar o som do atacante (nome do golpe)
@@ -146,8 +140,7 @@ class MoveSoundManager:
             target_sound.set_volume(final_volume)
             try:
                 target_sound.play()
-                print(
-                    f"[MOVE_SOUND] Som do alvo: {target_sound_key if target_sound_key in self._sounds else 'tackle_target'}")
+                print(f"[MOVE_SOUND] Som do alvo: {target_sound_key}")
                 played = True
             except Exception as e:
                 print(f"[MOVE_SOUND] Erro ao tocar som do alvo: {e}")
@@ -174,18 +167,23 @@ class MoveSoundManager:
                 pass
         return False
 
-    def play_hit_sound(self, move_name: str = None, volume: Optional[float] = None) -> bool:
+    def play_hit_sound(self, move_name: str = None, volume: Optional[float] = None, use_fallback: bool = True) -> bool:
         """
         Toca o som de impacto (quando o alvo recebe dano)
 
         Args:
             move_name: Nome do move que causou o dano (opcional)
             volume: Volume específico
+            use_fallback: Se deve usar o som padrão quando não encontrar o específico
         """
         if move_name:
             # Tenta o som específico do golpe_target
             move_key = move_name.lower().strip().replace(" ", "").replace("-", "").replace("'", "")
             target_sound_key = f"{move_key}_target"
+
+            print(f"[DEBUG] Procurando som de impacto: {target_sound_key}")
+            print(f"[DEBUG] Sons disponíveis: {list(self._sounds.keys())}")
+
             sound = self._sounds.get(target_sound_key)
 
             if sound:
@@ -193,19 +191,23 @@ class MoveSoundManager:
                 sound.set_volume(final_volume)
                 try:
                     sound.play()
+                    print(f"[DEBUG] Som de impacto tocado: {target_sound_key}")
                     return True
-                except:
-                    pass
+                except Exception as e:
+                    print(f"[DEBUG] Erro ao tocar: {e}")
+            else:
+                print(f"[DEBUG] Som {target_sound_key} não encontrado!")
 
-        # Fallback: som padrão de impacto
-        if self._default_hit_sound:
+        # Fallback: som padrão de impacto (apenas se use_fallback for True)
+        if use_fallback and self._default_hit_sound:
             final_volume = volume if volume is not None else self._volume
             self._default_hit_sound.set_volume(final_volume)
             try:
                 self._default_hit_sound.play()
+                print(f"[DEBUG] Usando som padrão de impacto")
                 return True
-            except:
-                pass
+            except Exception as e:
+                print(f"[DEBUG] Erro ao tocar som padrão: {e}")
 
         return False
 
