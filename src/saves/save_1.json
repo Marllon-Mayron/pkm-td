@@ -1,13 +1,13 @@
 {
   "meta": {
     "version": "1.0.0",
-    "last_save": "2026-03-25T00:11:42.592571",
+    "last_save": "2026-03-25T07:36:38.693929",
     "play_time": 0,
     "save_name": "Save 1"
   },
   "player": {
-    "money": 5120,
-    "score": 700,
+    "money": 10610,
+    "score": 850,
     "position": {
       "x": 100,
       "y": 100
@@ -15,13 +15,13 @@
     "team": [
       {
         "unique_id": "d45ba0f8-30da-48ee-8193-0304f65a45b3",
-        "id": 7,
-        "name": "Squirtle",
-        "level": 14,
+        "id": 8,
+        "name": "Wartortle",
+        "level": 16,
         "is_shiny": false,
-        "current_hp": 37,
-        "max_hp": 37,
-        "xp": 2693,
+        "current_hp": 45,
+        "max_hp": 45,
+        "xp": 2801,
         "ivs": {
           "hp": 5,
           "attack": 1,
@@ -42,18 +42,18 @@
         "types": [
           "water"
         ],
-        "attack": 20,
-        "defense": 23,
-        "sp_attack": 22,
-        "sp_defense": 21,
-        "speed": 15,
+        "attack": 31,
+        "defense": 34,
+        "sp_attack": 28,
+        "sp_defense": 30,
+        "speed": 20,
         "is_in_team": true,
         "is_placed": true,
-        "spot_id": 2647755770288,
+        "spot_id": 1412844459776,
         "moves": [
           {
             "name": "tackle",
-            "current_pp": 35,
+            "current_pp": 34,
             "max_pp": 35
           },
           {
@@ -65,6 +65,11 @@
             "name": "bubble",
             "current_pp": 30,
             "max_pp": 30
+          },
+          {
+            "name": "water-gun",
+            "current_pp": 25,
+            "max_pp": 25
           }
         ]
       },
@@ -76,7 +81,7 @@
         "is_shiny": false,
         "current_hp": 36,
         "max_hp": 36,
-        "xp": 294,
+        "xp": 925,
         "ivs": {
           "hp": 9,
           "attack": 7,
@@ -98,14 +103,14 @@
           "bug",
           "poison"
         ],
-        "attack": 21,
-        "defense": 15,
-        "sp_attack": 17,
+        "attack": 27,
+        "defense": 17,
+        "sp_attack": 13,
         "sp_defense": 26,
         "speed": 22,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 2647755556960,
+        "spot_id": null,
         "moves": [
           {
             "name": "poison-sting",
@@ -133,11 +138,11 @@
         "unique_id": "1b519d7b-4dc9-48b3-8c9e-cf5615cf55bb",
         "id": 25,
         "name": "Pikachu",
-        "level": 14,
+        "level": 16,
         "is_shiny": false,
-        "current_hp": 34,
-        "max_hp": 34,
-        "xp": 461,
+        "current_hp": 38,
+        "max_hp": 38,
+        "xp": 2907,
         "ivs": {
           "hp": 8,
           "attack": 1,
@@ -158,14 +163,14 @@
         "types": [
           "electric"
         ],
-        "attack": 18,
-        "defense": 20,
-        "sp_attack": 19,
-        "sp_defense": 19,
-        "speed": 33,
+        "attack": 29,
+        "defense": 16,
+        "sp_attack": 23,
+        "sp_defense": 22,
+        "speed": 37,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 2647755776000,
+        "spot_id": null,
         "moves": [
           {
             "name": "quick-attack",
@@ -178,9 +183,9 @@
             "max_pp": 30
           },
           {
-            "name": "tail-whip",
-            "current_pp": 30,
-            "max_pp": 30
+            "name": "double-team",
+            "current_pp": 15,
+            "max_pp": 15
           },
           {
             "name": "thunder-wave",
@@ -193,11 +198,11 @@
         "unique_id": "bbe12a46-700c-467f-bb4e-a27bde31e1aa",
         "id": 19,
         "name": "Rattata",
-        "level": 13,
+        "level": 14,
         "is_shiny": false,
-        "current_hp": 33,
-        "max_hp": 33,
-        "xp": 1296,
+        "current_hp": 35,
+        "max_hp": 35,
+        "xp": 2238,
         "ivs": {
           "hp": 23,
           "attack": 28,
@@ -218,14 +223,14 @@
         "types": [
           "normal"
         ],
-        "attack": 18,
-        "defense": 14,
-        "sp_attack": 13,
+        "attack": 23,
+        "defense": 18,
+        "sp_attack": 12,
         "sp_defense": 16,
-        "speed": 24,
+        "speed": 26,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 2647755557296,
+        "spot_id": null,
         "moves": [
           {
             "name": "tackle",
@@ -241,6 +246,11 @@
             "name": "quick-attack",
             "current_pp": 30,
             "max_pp": 30
+          },
+          {
+            "name": "hyper-fang",
+            "current_pp": 15,
+            "max_pp": 15
           }
         ]
       },
@@ -248,11 +258,11 @@
         "unique_id": "aaa1e4f3-1efa-44a9-803a-6a4745c8f56b",
         "id": 16,
         "name": "Pidgey",
-        "level": 14,
+        "level": 15,
         "is_shiny": false,
-        "current_hp": 36,
-        "max_hp": 36,
-        "xp": 1187,
+        "current_hp": 37,
+        "max_hp": 37,
+        "xp": 2135,
         "ivs": {
           "hp": 6,
           "attack": 5,
@@ -274,14 +284,14 @@
           "normal",
           "flying"
         ],
-        "attack": 18,
-        "defense": 18,
-        "sp_attack": 17,
-        "sp_defense": 18,
-        "speed": 25,
+        "attack": 21,
+        "defense": 21,
+        "sp_attack": 20,
+        "sp_defense": 17,
+        "speed": 24,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 2647666937056,
+        "spot_id": null,
         "moves": [
           {
             "name": "gust",
@@ -304,13 +314,13 @@
     "pc_box": [
       {
         "unique_id": "d45ba0f8-30da-48ee-8193-0304f65a45b3",
-        "id": 7,
-        "name": "Squirtle",
-        "level": 14,
+        "id": 8,
+        "name": "Wartortle",
+        "level": 16,
         "is_shiny": false,
-        "current_hp": 37,
-        "max_hp": 37,
-        "xp": 2693,
+        "current_hp": 45,
+        "max_hp": 45,
+        "xp": 2801,
         "ivs": {
           "hp": 5,
           "attack": 1,
@@ -331,18 +341,18 @@
         "types": [
           "water"
         ],
-        "attack": 20,
-        "defense": 23,
-        "sp_attack": 22,
-        "sp_defense": 21,
-        "speed": 15,
+        "attack": 31,
+        "defense": 34,
+        "sp_attack": 28,
+        "sp_defense": 30,
+        "speed": 20,
         "is_in_team": true,
         "is_placed": true,
-        "spot_id": 2647755770288,
+        "spot_id": 1412844459776,
         "moves": [
           {
             "name": "tackle",
-            "current_pp": 35,
+            "current_pp": 34,
             "max_pp": 35
           },
           {
@@ -354,6 +364,11 @@
             "name": "bubble",
             "current_pp": 30,
             "max_pp": 30
+          },
+          {
+            "name": "water-gun",
+            "current_pp": 25,
+            "max_pp": 25
           }
         ]
       },
@@ -365,7 +380,7 @@
         "is_shiny": false,
         "current_hp": 36,
         "max_hp": 36,
-        "xp": 294,
+        "xp": 925,
         "ivs": {
           "hp": 9,
           "attack": 7,
@@ -387,14 +402,14 @@
           "bug",
           "poison"
         ],
-        "attack": 21,
-        "defense": 15,
-        "sp_attack": 17,
+        "attack": 27,
+        "defense": 17,
+        "sp_attack": 13,
         "sp_defense": 26,
         "speed": 22,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 2647755556960,
+        "spot_id": null,
         "moves": [
           {
             "name": "poison-sting",
@@ -449,7 +464,7 @@
           "poison"
         ],
         "attack": 7,
-        "defense": 10,
+        "defense": 11,
         "sp_attack": 7,
         "sp_defense": 8,
         "speed": 9,
@@ -468,11 +483,11 @@
         "unique_id": "1b519d7b-4dc9-48b3-8c9e-cf5615cf55bb",
         "id": 25,
         "name": "Pikachu",
-        "level": 14,
+        "level": 16,
         "is_shiny": false,
-        "current_hp": 34,
-        "max_hp": 34,
-        "xp": 461,
+        "current_hp": 38,
+        "max_hp": 38,
+        "xp": 2907,
         "ivs": {
           "hp": 8,
           "attack": 1,
@@ -493,14 +508,14 @@
         "types": [
           "electric"
         ],
-        "attack": 18,
-        "defense": 20,
-        "sp_attack": 19,
-        "sp_defense": 19,
-        "speed": 33,
+        "attack": 29,
+        "defense": 16,
+        "sp_attack": 23,
+        "sp_defense": 22,
+        "speed": 37,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 2647755776000,
+        "spot_id": null,
         "moves": [
           {
             "name": "quick-attack",
@@ -513,9 +528,9 @@
             "max_pp": 30
           },
           {
-            "name": "tail-whip",
-            "current_pp": 30,
-            "max_pp": 30
+            "name": "double-team",
+            "current_pp": 15,
+            "max_pp": 15
           },
           {
             "name": "thunder-wave",
@@ -528,11 +543,11 @@
         "unique_id": "bbe12a46-700c-467f-bb4e-a27bde31e1aa",
         "id": 19,
         "name": "Rattata",
-        "level": 13,
+        "level": 14,
         "is_shiny": false,
-        "current_hp": 33,
-        "max_hp": 33,
-        "xp": 1296,
+        "current_hp": 35,
+        "max_hp": 35,
+        "xp": 2238,
         "ivs": {
           "hp": 23,
           "attack": 28,
@@ -553,14 +568,14 @@
         "types": [
           "normal"
         ],
-        "attack": 18,
-        "defense": 14,
-        "sp_attack": 13,
+        "attack": 23,
+        "defense": 18,
+        "sp_attack": 12,
         "sp_defense": 16,
-        "speed": 24,
+        "speed": 26,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 2647755557296,
+        "spot_id": null,
         "moves": [
           {
             "name": "tackle",
@@ -576,6 +591,11 @@
             "name": "quick-attack",
             "current_pp": 30,
             "max_pp": 30
+          },
+          {
+            "name": "hyper-fang",
+            "current_pp": 15,
+            "max_pp": 15
           }
         ]
       },
@@ -583,11 +603,11 @@
         "unique_id": "aaa1e4f3-1efa-44a9-803a-6a4745c8f56b",
         "id": 16,
         "name": "Pidgey",
-        "level": 14,
+        "level": 15,
         "is_shiny": false,
-        "current_hp": 36,
-        "max_hp": 36,
-        "xp": 1187,
+        "current_hp": 37,
+        "max_hp": 37,
+        "xp": 2135,
         "ivs": {
           "hp": 6,
           "attack": 5,
@@ -609,14 +629,14 @@
           "normal",
           "flying"
         ],
-        "attack": 18,
-        "defense": 18,
-        "sp_attack": 17,
-        "sp_defense": 18,
-        "speed": 25,
+        "attack": 21,
+        "defense": 21,
+        "sp_attack": 20,
+        "sp_defense": 17,
+        "speed": 24,
         "is_in_team": true,
         "is_placed": false,
-        "spot_id": 2647666937056,
+        "spot_id": null,
         "moves": [
           {
             "name": "gust",

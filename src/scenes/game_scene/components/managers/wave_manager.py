@@ -437,22 +437,18 @@ class GameWaveManager:
         return enemies[-1]
 
     def _distribute_xp(self, defeated_enemy):
-        """Distribui XP e Ouro - OTIMIZADO"""
+        """Distribui XP e ACUMULA Ouro - NÃO adiciona ao jogador ainda"""
         contributors = defeated_enemy.get_xp_contributors()
 
         if not contributors:
             return
 
-        # ===== ADICIONAR OURO =====
+        # ===== ACUMULAR OURO (não adiciona ao jogador ainda) =====
         gold_gained = self.gold_per_defeat
         self.total_gold_earned += gold_gained
+        print(f"[GOLD] Acumulado +{gold_gained} ouro por derrotar {defeated_enemy.name} (Total acumulado: {self.total_gold_earned})")
 
-        # Atualiza o gold do jogador em tempo real
-        if hasattr(self.game_scene, 'game') and self.game_scene.game:
-            self.game_scene.game.player.money += gold_gained
-            print(f"[GOLD] +{gold_gained} ouro por derrotar {defeated_enemy.name}")
-
-        # Distribui XP normalmente
+        # Distribui XP (XP pode ser adicionado em tempo real, pois não tem bônus)
         base_xp = 15 + (defeated_enemy.level * 5)
         total_damage = sum(damage for _, damage in contributors)
 
@@ -478,7 +474,7 @@ class GameWaveManager:
                     break
 
     def get_total_gold_earned(self):
-        """Retorna o total de ouro ganho nesta fase"""
+        """Retorna o total de ouro acumulado nesta fase"""
         return self.total_gold_earned
 
     def remove_enemy(self, enemy):

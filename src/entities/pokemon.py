@@ -1253,37 +1253,58 @@ class Pokemon(Entity):
         """Retorna todos os moves que o Pokémon pode aprender (até o nível atual)"""
         return self.move_data.get_moves_at_level(self.id, self.level)
 
-    def get_new_moves_at_level(self, new_level: int) -> List[str]:
+    def get_new_moves_at_level(self, level: int) -> List[str]:
         """
-        Retorna moves que o Pokémon aprende ao subir para um novo nível
-        (considerando que já sabe os moves do nível anterior)
+        Retorna moves que o Pokémon aprende EXATAMENTE neste nível
+        e que ainda não estão na lista de moves atuais
         """
-        # Moves que o Pokémon aprende até o novo nível
-        all_moves_at_new_level = set(self.move_data.get_moves_at_level(self.id, new_level))
-        # Moves que o Pokémon já sabe
-        old_moves = set(move.name for move in self.moves)
+        # Obtém todos os moves do learnset do Pokémon
+        learnset = self.move_data.get_pokemon_learnset(self.id)
 
-        # Moves que estão no novo set mas não no antigo
-        return list(all_moves_at_new_level - old_moves)
+        # Moves que o Pokémon já conhece
+        known_moves = set(move.name for move in self.moves)
+
+        # Filtra moves aprendidos exatamente neste nível
+        new_moves = []
+        for move_info in learnset:
+            if move_info.get("level", 0) == level:
+                move_name = move_info.get("move", "")
+                if move_name and move_name not in known_moves:
+                    new_moves.append(move_name)
+
+        return new_moves
 
     def check_new_moves_on_level_up(self, old_level: int):
         """
         Verifica se o Pokémon aprende novos moves ao subir de nível
-        Retorna lista de novos moves aprendidos
+        Retorna (learned_moves, pending_moves)
         """
-        new_moves = self.get_new_moves_at_level(self.level)
+        # Obtém todos os moves que o Pokémon aprende
+        learnset = self.move_data.get_pokemon_learnset(self.id)
+
+        # Moves que o Pokémon já sabe
+        current_moves = set(move.name for move in self.moves)
+
+        # Filtra apenas moves que são aprendidos EXATAMENTE no nível atual
+        new_moves = []
+        for move_info in learnset:
+            level = move_info.get("level", 0)
+            move_name = move_info.get("move", "")
+
+            # SÓ adiciona se for aprendido no nível ATUAL E o Pokémon ainda não sabe
+            if level == self.level and move_name not in current_moves:
+                new_moves.append(move_name)
+
         learned_moves = []
-        pending_moves = []  # Moves que precisam de escolha
+        pending_moves = []
 
         for move_name in new_moves:
             learned = self.learn_move(move_name)
             if learned:
                 learned_moves.append(move_name)
             else:
-                # Não aprendeu porque já tem 4 moves
                 pending_moves.append(move_name)
 
-        # Retorna também os moves pendentes para que o game_scene possa abrir overlay
         return learned_moves, pending_moves
 
     def restore_moves(self, moves_data: list):

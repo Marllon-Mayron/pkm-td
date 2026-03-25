@@ -846,10 +846,11 @@ class GameScene(BaseScene):
         # Calcular ouro total
         gold_total = base_reward + gold_from_defeats + bonus_amount  # Ex: 100 + 55 + 16 = 171
 
-        # APLICAR RECOMPENSAS
+        # ===== APLICAR RECOMPENSAS APENAS AGORA =====
         self.player.money += gold_total
         print(
-            f"[REWARD] Ouro total: {gold_total} (Fase: {base_reward} + Derrotas: {gold_from_defeats} + Bônus: {bonus_amount})")
+            f"[REWARD] Ouro adicionado: {gold_total} (Fase: {base_reward} + Derrotas: {gold_from_defeats} + Bônus: {bonus_amount})")
+        print(f"[REWARD] Total de ouro do jogador agora: {self.player.money}")
 
         # Distribuir XP
         for pokemon in self.player.team:
