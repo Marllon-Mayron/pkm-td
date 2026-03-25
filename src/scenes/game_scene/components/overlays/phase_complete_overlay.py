@@ -7,7 +7,7 @@ from src.config.phase_catalog import phase_catalog
 
 
 class PhaseCompleteOverlay(BaseOverlay):
-    """Overlay de conclusão de fase - SÓ RENDERIZA, NÃO COMPLETA A FASE"""
+    """Overlay de conclusão de fase - sem timer automático"""
 
     def __init__(self, game_scene):
         super().__init__(game_scene)
@@ -16,6 +16,7 @@ class PhaseCompleteOverlay(BaseOverlay):
         self.phase_number = game_scene.phase_number
         self.phase_rewards = game_scene.phase_rewards
         self.target_item_manager = game_scene.target_item_manager
+        self.music_played = False  # Flag para garantir que a música toque apenas uma vez
 
         # IMPORTANTE: NÃO chamar complete_phase aqui!
         # O game_scene já chamou antes de criar este overlay
@@ -44,10 +45,21 @@ class PhaseCompleteOverlay(BaseOverlay):
         return False
 
     def update(self, dt):
-        """Atualiza o timer automático"""
-        self.timer += dt
-        if self.timer >= self.delay:
-            self._return_to_phase_select()
+        """Atualiza - toca música apenas uma vez"""
+        if not self.music_played:
+            self._play_victory_music()
+            self.music_played = True
+
+    def _play_victory_music(self):
+        """Toca a música de vitória"""
+        from src.managers.sound_manager import sound_manager
+        sound_manager.play_victory_music()
+
+    def _stop_music(self):
+        """Para a música de vitória"""
+        from src.managers.sound_manager import sound_manager
+        sound_manager.stop_music(fade_ms=300)
+        print(f"[MUSIC] Música de vitória parada")
 
     def render(self, screen):
         """Renderiza a tela de conclusão"""
@@ -101,19 +113,18 @@ class PhaseCompleteOverlay(BaseOverlay):
         # Botão de voltar
         self.button_rect = self._create_button(
             screen, center_x, y_offset + 20,
-            "VOLTAR", font_medium
+            "CONTINUAR", font_medium
         )
+
         y_offset = self.button_rect.bottom + 20
 
-        # Timer
-        remaining = max(0, self.delay - self.timer)
-        if remaining > 0:
-            timer_text = font_small.render(
-                f"Voltando automaticamente em {remaining:.0f}...",
-                True, (150, 150, 150)
-            )
-            timer_x = center_x - timer_text.get_width() // 2
-            screen.blit(timer_text, (timer_x, y_offset))
+        # Mensagem de ESC
+        esc_text = font_small.render(
+            "Pressione ESC para continuar",
+            True, (150, 150, 150)
+        )
+        esc_x = center_x - esc_text.get_width() // 2
+        screen.blit(esc_text, (esc_x, y_offset))
 
     def _create_button(self, screen, center_x, y, text, font):
         """Cria e desenha um botão"""
@@ -143,6 +154,9 @@ class PhaseCompleteOverlay(BaseOverlay):
     def _return_to_phase_select(self):
         """Volta para a seleção de fases"""
         from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
+
+        # Para a música antes de sair
+        self._stop_music()
 
         if hasattr(self.game_scene, 'cleanup'):
             self.game_scene.cleanup()

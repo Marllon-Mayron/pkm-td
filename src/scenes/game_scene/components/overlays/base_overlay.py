@@ -13,11 +13,6 @@ class BaseOverlay(ABC):
         self.screen_manager = game_scene.screen_manager
         self.camera = game_scene.camera
 
-        # Timer para transição automática
-        self.timer = 0
-        self.delay = 3.0
-        self.active = False
-
     @abstractmethod
     def handle_event(self, event):
         """Processa eventos do overlay"""

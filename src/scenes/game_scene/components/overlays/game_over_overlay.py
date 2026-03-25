@@ -5,25 +5,51 @@ from .base_overlay import BaseOverlay
 
 
 class GameOverOverlay(BaseOverlay):
-    """Overlay de Game Over"""
+    """Overlay de Game Over - sem timer automático"""
 
     def __init__(self, game_scene):
         super().__init__(game_scene)
         self.target_item_manager = game_scene.target_item_manager
+        self.music_played = False  # Flag para garantir que a música toque apenas uma vez
+
+        # Botão de voltar
+        self.button_rect = None
+        self.button_hovered = False
 
     def handle_event(self, event):
         """Processa eventos do game over"""
-        # Só permite ESC para voltar imediatamente
+        # Só permite ESC ou clique no botão para voltar
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self._return_to_team_select()
             return True
+
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.button_rect and self.button_rect.collidepoint(event.pos):
+                self._return_to_team_select()
+                return True
+
+        elif event.type == pygame.MOUSEMOTION:
+            if self.button_rect:
+                self.button_hovered = self.button_rect.collidepoint(event.pos)
+
         return False
 
     def update(self, dt):
-        """Atualiza o timer de game over"""
-        self.timer += dt
-        if self.timer >= self.delay:
-            self._return_to_team_select()
+        """Atualiza - toca música apenas uma vez"""
+        if not self.music_played:
+            self._play_defeat_music()
+            self.music_played = True
+
+    def _play_defeat_music(self):
+        """Toca a música de derrota"""
+        from src.managers.sound_manager import sound_manager
+        sound_manager.play_defeat_music()
+
+    def _stop_music(self):
+        """Para a música de derrota"""
+        from src.managers.sound_manager import sound_manager
+        sound_manager.stop_music(fade_ms=300)
+        print(f"[MUSIC] Música de derrota parada")
 
     def render(self, screen):
         """Renderiza a tela de game over"""
@@ -38,11 +64,13 @@ class GameOverOverlay(BaseOverlay):
         center_x = viewport.x + viewport.width // 2
         center_y = viewport.y + viewport.height // 2
 
+        y_offset = center_y - 80
+
         # Texto GAME OVER
         game_over_text = font_large.render("GAME OVER", True, (255, 0, 0))
         game_over_x = center_x - game_over_text.get_width() // 2
-        game_over_y = center_y - 60
-        screen.blit(game_over_text, (game_over_x, game_over_y))
+        screen.blit(game_over_text, (game_over_x, y_offset))
+        y_offset += game_over_text.get_height() + 20
 
         # Texto de itens levados
         items_lost_text = font_medium.render(
@@ -50,31 +78,56 @@ class GameOverOverlay(BaseOverlay):
             True, (255, 100, 100)
         )
         items_lost_x = center_x - items_lost_text.get_width() // 2
-        items_lost_y = game_over_y + game_over_text.get_height() + 20
-        screen.blit(items_lost_text, (items_lost_x, items_lost_y))
+        screen.blit(items_lost_text, (items_lost_x, y_offset))
+        y_offset += items_lost_text.get_height() + 40
 
-        # Timer para voltar
-        remaining = max(0, self.delay - self.timer)
-        timer_text = font_medium.render(
-            f"Voltando em {remaining:.0f}...",
-            True, (200, 200, 200)
+        # Botão de voltar
+        self.button_rect = self._create_button(
+            screen, center_x, y_offset,
+            "VOLTAR", font_medium
         )
-        timer_x = center_x - timer_text.get_width() // 2
-        timer_y = items_lost_y + items_lost_text.get_height() + 20
-        screen.blit(timer_text, (timer_x, timer_y))
+
+        y_offset = self.button_rect.bottom + 20
 
         # Mensagem de ESC
         esc_text = font_small.render(
-            "Pressione ESC para voltar agora",
+            "Pressione ESC para voltar",
             True, (150, 150, 150)
         )
         esc_x = center_x - esc_text.get_width() // 2
-        esc_y = timer_y + timer_text.get_height() + 30
-        screen.blit(esc_text, (esc_x, esc_y))
+        screen.blit(esc_text, (esc_x, y_offset))
+
+    def _create_button(self, screen, center_x, y, text, font):
+        """Cria e desenha um botão"""
+        button_width = 200
+        button_height = 50
+        button_x = center_x - button_width // 2
+
+        button_rect = pygame.Rect(button_x, y, button_width, button_height)
+
+        if self.button_hovered:
+            button_color = (180, 60, 60)
+            border_color = (220, 80, 80)
+        else:
+            button_color = (120, 40, 40)
+            border_color = (160, 60, 60)
+
+        pygame.draw.rect(screen, button_color, button_rect, border_radius=8)
+        pygame.draw.rect(screen, border_color, button_rect, 3, border_radius=8)
+
+        button_text = font.render(text, True, (255, 255, 255))
+        text_x = button_rect.centerx - button_text.get_width() // 2
+        text_y = button_rect.centery - button_text.get_height() // 2
+        screen.blit(button_text, (text_x, text_y))
+
+        return button_rect
 
     def _return_to_team_select(self):
         """Volta para a tela de seleção de time"""
         from src.scenes.team_select_scene import TeamSelectScene
+
+        # Para a música antes de sair
+        self._stop_music()
 
         self.game_scene.cleanup()
 
