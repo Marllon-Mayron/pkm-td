@@ -34,6 +34,7 @@ class GameScene(BaseScene):
         self.move_learn_overlay = None
         self.game_paused = False  # Flag para pausar o jogo
 
+
         self.chapter_id = chapter_id
         self.phase_number = phase_number
         self.phase_id = f"{chapter_id}-{phase_number}"
@@ -826,23 +827,57 @@ class GameScene(BaseScene):
         # Para a música ao completar a fase
         self._stop_battle_music(fade_ms=1000)
 
-        self.player.money += self.phase_rewards['money']
+        # ===== CALCULAR RECOMPENSAS =====
+        base_reward = self.phase_rewards['money']  # Ex: 100
+        gold_from_defeats = self.wave_manager.get_total_gold_earned()  # Ex: 55
+
+        # Verificar se nenhum item foi roubado
+        total_items = len(self.target_item_manager.items)
+        stolen_items = self.target_item_manager.items_stolen
+
+        bonus_multiplier = 1.0
+        bonus_amount = 0
+
+        if stolen_items == 0 and total_items > 0:
+            bonus_multiplier = 1.3
+            bonus_amount = int(gold_from_defeats * 0.3)  # Ex: 16 (30% de 55)
+            print(f"[BONUS] Nenhum item roubado! +30% de bônus em ouro! +{bonus_amount}")
+
+        # Calcular ouro total
+        gold_total = base_reward + gold_from_defeats + bonus_amount  # Ex: 100 + 55 + 16 = 171
+
+        # APLICAR RECOMPENSAS
+        self.player.money += gold_total
+        print(
+            f"[REWARD] Ouro total: {gold_total} (Fase: {base_reward} + Derrotas: {gold_from_defeats} + Bônus: {bonus_amount})")
+
+        # Distribuir XP
         for pokemon in self.player.team:
             pokemon.gain_xp(self.phase_rewards['experience'])
         self.player.score += self.phase_rewards['experience']
 
-        total_items = len(self.target_item_manager.items)
-        protected_items = self.target_item_manager.items_protected
+        # Calcular estrelas
         if total_items > 0:
+            protected_items = self.target_item_manager.items_protected
             stars = int((protected_items / total_items) * 3)
             stars = max(1, min(3, stars))
         else:
             stars = 3
 
+        # Salvar dados para o overlay
+        self.phase_complete_data = {
+            "base_reward": base_reward,
+            "gold_from_defeats": gold_from_defeats,
+            "bonus_amount": bonus_amount,
+            "gold_total": gold_total,
+            "total_xp": self.phase_rewards['experience'],
+            "perfect_run": stolen_items == 0 and total_items > 0,
+            "stars": stars
+        }
+
         progress_manager.complete_phase(self.phase_id, stars=stars)
         self.player.auto_save()
         self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
-        # ===== RESETAR PP DOS MOVES DO TIME DO JOGADOR =====
         self._reset_team_pp()
 
     def _render_game_ui(self, screen):

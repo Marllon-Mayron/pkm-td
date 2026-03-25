@@ -7,23 +7,19 @@ from src.config.phase_catalog import phase_catalog
 
 
 class PhaseCompleteOverlay(BaseOverlay):
-    """Overlay de conclusão de fase - sem timer automático"""
+    """Overlay de conclusão de fase - versão organizada"""
 
     def __init__(self, game_scene):
         super().__init__(game_scene)
         self.phase_info = game_scene.phase_info
         self.phase_id = game_scene.phase_id
         self.phase_number = game_scene.phase_number
-        self.phase_rewards = game_scene.phase_rewards
-        self.target_item_manager = game_scene.target_item_manager
-        self.music_played = False  # Flag para garantir que a música toque apenas uma vez
+        self.music_played = False
 
-        # IMPORTANTE: NÃO chamar complete_phase aqui!
-        # O game_scene já chamou antes de criar este overlay
-        print(f"[OVERLAY] PhaseCompleteOverlay para {self.phase_id}")
-        print(f"[OVERLAY] A fase já foi completada pelo game_scene")
+        # Dados da conclusão
+        self.complete_data = getattr(game_scene, 'phase_complete_data', {})
 
-        # Botão de voltar
+        # Botão
         self.button_rect = None
         self.button_hovered = False
 
@@ -59,7 +55,6 @@ class PhaseCompleteOverlay(BaseOverlay):
         """Para a música de vitória"""
         from src.managers.sound_manager import sound_manager
         sound_manager.stop_music(fade_ms=300)
-        print(f"[MUSIC] Música de vitória parada")
 
     def render(self, screen):
         """Renderiza a tela de conclusão"""
@@ -67,37 +62,84 @@ class PhaseCompleteOverlay(BaseOverlay):
         screen.blit(overlay, (viewport.x, viewport.y))
 
         # Fontes
-        font_large = pygame.font.Font(None, 64)
-        font_medium = pygame.font.Font(None, 36)
+        font_large = pygame.font.Font(None, 48)
+        font_medium = pygame.font.Font(None, 32)
         font_small = pygame.font.Font(None, 24)
+        font_tiny = pygame.font.Font(None, 18)
 
         center_x = viewport.x + viewport.width // 2
         center_y = viewport.y + viewport.height // 2
 
-        y_offset = center_y - 120
+        y_offset = center_y - 110
 
-        # Título "FASE COMPLETA!"
+        # Título
         complete_text = font_large.render("FASE COMPLETA!", True, (255, 215, 0))
         complete_x = center_x - complete_text.get_width() // 2
         screen.blit(complete_text, (complete_x, y_offset))
-        y_offset += complete_text.get_height() + 20
+        y_offset += complete_text.get_height() + 12
 
         # Nome da fase
         phase_name = self.phase_info.get("name", f"Fase {self.phase_number}")
-        name_text = font_medium.render(phase_name, True, (200, 200, 200))
+        name_text = font_medium.render(phase_name, True, (255, 255, 255))
         name_x = center_x - name_text.get_width() // 2
         screen.blit(name_text, (name_x, y_offset))
-        y_offset += name_text.get_height() + 30
+        y_offset += name_text.get_height() + 25
+
+        # Linha separadora
+        pygame.draw.line(screen, (80, 80, 100),
+                        (center_x - 180, y_offset),
+                        (center_x + 180, y_offset), 1)
+        y_offset += 20
 
         # Recompensas
-        money_text = font_small.render(f"+${self.phase_rewards['money']}", True, (100, 255, 100))
-        exp_text = font_small.render(f"+{self.phase_rewards['experience']} XP", True, (100, 100, 255))
+        base_reward = self.complete_data.get("base_reward", 0)
+        gold_from_defeats = self.complete_data.get("gold_from_defeats", 0)
+        bonus_amount = self.complete_data.get("bonus_amount", 0)
+        gold_total = self.complete_data.get("gold_total", 0)
+        total_xp = self.complete_data.get("total_xp", 0)
 
-        money_x = center_x - 150
-        exp_x = center_x + 50
-        screen.blit(money_text, (money_x, y_offset))
-        screen.blit(exp_text, (exp_x, y_offset))
-        y_offset += money_text.get_height() + 30
+        # Ouro - Total
+        gold_text = font_medium.render(f" Ouro: +{gold_total}", True, (255, 215, 0))
+        gold_x = center_x - gold_text.get_width() // 2
+        screen.blit(gold_text, (gold_x, y_offset))
+        y_offset += gold_text.get_height() + 5
+
+        # Detalhamento do ouro
+        if bonus_amount > 0:
+            gold_detail = font_tiny.render(
+                f"  ({base_reward} da fase + {gold_from_defeats} de derrotas + {bonus_amount} bônus 30%)",
+                True, (150, 150, 150)
+            )
+        else:
+            gold_detail = font_tiny.render(
+                f"  ({base_reward} da fase + {gold_from_defeats} de derrotas)",
+                True, (150, 150, 150)
+            )
+        gold_detail_x = center_x - gold_detail.get_width() // 2
+        screen.blit(gold_detail, (gold_detail_x, y_offset))
+        y_offset += gold_detail.get_height() + 15
+
+        # XP
+        xp_text = font_small.render(f"  XP: +{total_xp}", True, (100, 200, 255))
+        xp_x = center_x - xp_text.get_width() // 2
+        screen.blit(xp_text, (xp_x, y_offset))
+        y_offset += xp_text.get_height() + 15
+
+        # Bônus por fase perfeita
+        if self.complete_data.get("perfect_run", False):
+            bonus_text = font_tiny.render("  PERFEITO! Bônus de 30% no gold aplicado!  ",
+                                           True, (100, 255, 100))
+            bonus_x = center_x - bonus_text.get_width() // 2
+            screen.blit(bonus_text, (bonus_x, y_offset))
+            y_offset += bonus_text.get_height() + 20
+        else:
+            y_offset += 20
+
+        # Linha separadora
+        pygame.draw.line(screen, (80, 80, 100),
+                        (center_x - 180, y_offset),
+                        (center_x + 180, y_offset), 1)
+        y_offset += 20
 
         # Próxima fase
         next_phase = progress_manager.get_next_phase(self.phase_id)
@@ -105,31 +147,28 @@ class PhaseCompleteOverlay(BaseOverlay):
             chapter, phase = map(int, next_phase.split("-"))
             next_info = phase_catalog.get_phase_info(chapter, phase)
             if next_info:
-                next_text = font_small.render(f"Próxima fase: {next_info['name']}", True, (150, 150, 255))
+                next_text = font_tiny.render(f"Próxima fase: {next_info['name']}", True, (150, 150, 255))
                 next_x = center_x - next_text.get_width() // 2
                 screen.blit(next_text, (next_x, y_offset))
-                y_offset += next_text.get_height() + 30
+                y_offset += next_text.get_height() + 20
 
-        # Botão de voltar
+        # Botão
         self.button_rect = self._create_button(
-            screen, center_x, y_offset + 20,
+            screen, center_x, y_offset,
             "CONTINUAR", font_medium
         )
 
-        y_offset = self.button_rect.bottom + 20
+        y_offset = self.button_rect.bottom + 15
 
         # Mensagem de ESC
-        esc_text = font_small.render(
-            "Pressione ESC para continuar",
-            True, (150, 150, 150)
-        )
+        esc_text = font_tiny.render("Pressione ESC para continuar", True, (120, 120, 120))
         esc_x = center_x - esc_text.get_width() // 2
         screen.blit(esc_text, (esc_x, y_offset))
 
     def _create_button(self, screen, center_x, y, text, font):
         """Cria e desenha um botão"""
         button_width = 200
-        button_height = 50
+        button_height = 45
         button_x = center_x - button_width // 2
 
         button_rect = pygame.Rect(button_x, y, button_width, button_height)
@@ -155,7 +194,6 @@ class PhaseCompleteOverlay(BaseOverlay):
         """Volta para a seleção de fases"""
         from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 
-        # Para a música antes de sair
         self._stop_music()
 
         if hasattr(self.game_scene, 'cleanup'):

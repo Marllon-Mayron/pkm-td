@@ -20,19 +20,22 @@ class OverlayManager:
         self.current_overlay = None
         self.current_type = OverlayType.NONE
 
-        # Cria os overlays
-        self.overlays = {
-            OverlayType.GAME_OVER: GameOverOverlay(game_scene),
-            OverlayType.PHASE_COMPLETE: PhaseCompleteOverlay(game_scene)
-        }
-
     def show(self, overlay_type):
-        """Ativa um overlay"""
-        if overlay_type in self.overlays:
-            self.current_type = overlay_type
-            self.current_overlay = self.overlays[overlay_type]
-            self.current_overlay.active = True
-            self.current_overlay.timer = 0
+        """Ativa um overlay - Cria o overlay no momento da exibição"""
+        self.current_type = overlay_type
+
+        # Cria o overlay apenas quando for mostrar
+        if overlay_type == OverlayType.GAME_OVER:
+            self.current_overlay = GameOverOverlay(self.game_scene)
+        elif overlay_type == OverlayType.PHASE_COMPLETE:
+            self.current_overlay = PhaseCompleteOverlay(self.game_scene)
+            print(f"[OVERLAY] PhaseCompleteOverlay criado com dados: {self.game_scene.phase_complete_data}")
+        else:
+            self.current_overlay = None
+            return
+
+        self.current_overlay.active = True
+        self.current_overlay.timer = 0
 
     def hide(self):
         """Desativa o overlay atual"""

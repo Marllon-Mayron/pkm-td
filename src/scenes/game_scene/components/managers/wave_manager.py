@@ -6,14 +6,11 @@ from src.entities.pokemon import Pokemon
 
 class GameWaveManager:
     """Gerencia as waves durante o jogo - OTIMIZADO"""
-
     # Constantes
     DEFAULT_WAVE_SIZE = 10
     DEFAULT_SPAWN_INTERVAL = 3.0
     DEFAULT_INITIAL_DELAY = 2.0
     PROXIMITY_THRESHOLD = 15  # Distância para considerar "próximo" do início/fim
-
-
 
     def __init__(self, phase_loader):
         self.phase_loader = phase_loader
@@ -47,6 +44,9 @@ class GameWaveManager:
         # Carrega os dados
         self._load_waves_data()
         self._initialize_path_states()
+
+        self.total_gold_earned = 0  # Total de ouro acumulado nesta fase
+        self.gold_per_defeat = 10  # Ouro base por Pokémon derrotado
 
     def _load_waves_data(self):
         """Carrega os dados das waves do phase_loader e organiza por path"""
@@ -437,19 +437,28 @@ class GameWaveManager:
         return enemies[-1]
 
     def _distribute_xp(self, defeated_enemy):
-        """Distribui XP - OTIMIZADO"""
+        """Distribui XP e Ouro - OTIMIZADO"""
         contributors = defeated_enemy.get_xp_contributors()
 
         if not contributors:
             return
 
+        # ===== ADICIONAR OURO =====
+        gold_gained = self.gold_per_defeat
+        self.total_gold_earned += gold_gained
+
+        # Atualiza o gold do jogador em tempo real
+        if hasattr(self.game_scene, 'game') and self.game_scene.game:
+            self.game_scene.game.player.money += gold_gained
+            print(f"[GOLD] +{gold_gained} ouro por derrotar {defeated_enemy.name}")
+
+        # Distribui XP normalmente
         base_xp = 15 + (defeated_enemy.level * 5)
         total_damage = sum(damage for _, damage in contributors)
 
         if total_damage <= 0:
             return
 
-        # Encontra o placement_manager uma vez
         placement_manager = None
         if hasattr(self.game_scene, 'placement_manager'):
             placement_manager = self.game_scene.placement_manager
@@ -461,13 +470,16 @@ class GameWaveManager:
             proportion = damage / total_damage
             xp_gained = int(base_xp * proportion)
 
-            # Encontra o atacante
             for pokemon in placement_manager.placed_pokemon:
                 if id(pokemon) == attacker_id and pokemon.is_alive():
                     pokemon.gain_xp(xp_gained)
                     if hasattr(self.game_scene, 'game') and self.game_scene.game:
                         self.game_scene.game.player.auto_save()
                     break
+
+    def get_total_gold_earned(self):
+        """Retorna o total de ouro ganho nesta fase"""
+        return self.total_gold_earned
 
     def remove_enemy(self, enemy):
         """Remove um inimigo da lista ativa"""
