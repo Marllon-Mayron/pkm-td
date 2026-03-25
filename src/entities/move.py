@@ -1,4 +1,4 @@
-# src/entities/move.py (atualizado)
+# src/entities/move.py
 from typing import Dict, Optional
 
 
@@ -19,7 +19,7 @@ class Move:
 
         # Efeitos especiais (para futura implementação)
         self.effect = move_data.get("effect", None)
-        self.effect_chance = move_data.get("effect_chance", 0)
+        self.effect_chance = move_data.get("effect_chance", None)
 
     def use(self) -> bool:
         """Usa o move, retorna True se foi bem sucedido"""
@@ -50,7 +50,8 @@ class Move:
             "current_pp": self.current_pp,
             "category": self.category,
             "description": self.description,
-            "sound_name": self.sound_name  # NOVO
+            "sound_name": self.sound_name,
+            "effect_chance": self.effect_chance
         }
 
     @classmethod
@@ -64,7 +65,8 @@ class Move:
                 "pp": data.get("max_pp", 35),
                 "category": data.get("category", "physical"),
                 "description": data.get("description", ""),
-                "sound_name": data.get("sound_name", data.get("name", "").lower())
+                "sound_name": data.get("sound_name", data.get("name", "").lower()),
+                "effect_chance": data.get("effect_chance", None)
             }
 
         move = cls(data["name"], move_info)

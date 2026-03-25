@@ -10,6 +10,7 @@
          "power": 40,
          "accuracy": 100,
          "description": "Pounds with fore­ legs or tail.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -21,6 +22,7 @@
          "power": 50,
          "accuracy": 100,
          "description": "Has a high criti­ cal hit ratio.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User’s critical hit rate is one level higher when using this move.",
          "is_status": false
       },
@@ -32,6 +34,7 @@
          "power": 15,
          "accuracy": 85,
          "description": "Repeatedly slaps 2-5 times.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Hits 2–5 times in one turn. Has a 3/8 chance each to hit 2 or 3 times, and a 1/8 chance each to hit 4 or 5 times. Averages to 3 hits per use.",
          "is_status": false
       },
@@ -43,6 +46,7 @@
          "power": 18,
          "accuracy": 85,
          "description": "Repeatedly punches 2-5 times.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Hits 2–5 times in one turn. Has a 3/8 chance each to hit 2 or 3 times, and a 1/8 chance each to hit 4 or 5 times. Averages to 3 hits per use.",
          "is_status": false
       },
@@ -54,6 +58,7 @@
          "power": 80,
          "accuracy": 85,
          "description": "A powerful punch thrown very hard.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -65,6 +70,7 @@
          "power": 40,
          "accuracy": 100,
          "description": "Throws coins. Gets them back later.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. After the battle ends, the winner receives five times the user’s level in extra money for each time this move was used.",
          "is_status": false
       },
@@ -76,7 +82,8 @@
          "power": 75,
          "accuracy": 100,
          "description": "A fiery punch. May cause a burn.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to burn the target.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to burn the target.",
          "is_status": false
       },
       "8": {
@@ -87,7 +94,8 @@
          "power": 75,
          "accuracy": 100,
          "description": "An icy punch. May cause freezing.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to freeze the target.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to freeze the target.",
          "is_status": false
       },
       "9": {
@@ -98,7 +106,8 @@
          "power": 75,
          "accuracy": 100,
          "description": "An electric punch. It may paralyze.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to paralyze the target.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to paralyze the target.",
          "is_status": false
       },
       "10": {
@@ -109,6 +118,7 @@
          "power": 40,
          "accuracy": 100,
          "description": "Scratches with sharp claws.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -120,6 +130,7 @@
          "power": 55,
          "accuracy": 100,
          "description": "Grips with power­ ful pincers.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -131,6 +142,7 @@
          "power": null,
          "accuracy": 30,
          "description": "A one-hit KO, pincer attack.",
+         "effect_chance": null,
          "effect": "Inflicts damage equal to the target’s max HP. Ignores accuracy and evasion modifiers. This move’s accuracy is 30% plus 1% for each level the user is higher than the target. If the user is a lower level than the target, this move will fail. Because this move inflicts a specific and finite amount of damage, endure still prevents the target from fainting. The effects of lock on, mind reader, and no guard still apply, as long as the user is equal or higher level than the target. However, they will not give this move a chance to break through detect or protect.",
          "is_status": false
       },
@@ -142,6 +154,7 @@
          "power": 80,
          "accuracy": 100,
          "description": "1st turn: Prepare 2nd turn: Attack",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User’s critical hit rate is one level higher when using this move. User charges for one turn before attacking. This move cannot be selected by sleep talk.",
          "is_status": false
       },
@@ -153,6 +166,7 @@
          "power": null,
          "accuracy": null,
          "description": "A dance that in­ creases ATTACK.",
+         "effect_chance": null,
          "effect": "Raises the user’s Attack by two stages.",
          "is_status": true
       },
@@ -164,6 +178,7 @@
          "power": 50,
          "accuracy": 95,
          "description": "Cuts using claws, scythes, etc.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -175,6 +190,7 @@
          "power": 40,
          "accuracy": 100,
          "description": "Whips up a strong gust of wind.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. If the target is under the effect of bounce, fly, or sky drop, this move will hit with double power.",
          "is_status": false
       },
@@ -186,6 +202,7 @@
          "power": 60,
          "accuracy": 100,
          "description": "Strikes the target with wings.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -197,6 +214,7 @@
          "power": null,
          "accuracy": null,
          "description": "Blows away the foe & ends battle.",
+         "effect_chance": null,
          "effect": "Switches the target out for another of its trainer’s Pokémon selected at random. Wild battles end immediately. Doesn’t affect Pokémon with suction cups or under the effect of ingrain.",
          "is_status": true
       },
@@ -208,6 +226,7 @@
          "power": 90,
          "accuracy": 95,
          "description": "1st turn: Fly 2nd turn: Attack",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User flies high into the air for one turn, becoming immune to attack, and hits on the second turn. During the immune turn, gust, hurricane, sky uppercut, smack down, thunder, twister, and whirlwind still hit the user normally. gust and twister also have double power against the user. The damage from hail and sandstorm still applies during the immune turn. The user may be hit during its immune turn if under the effect of lock on, mind reader, or no guard. This move cannot be used while gravity is in effect. This move cannot be selected by sleep talk.",
          "is_status": false
       },
@@ -219,6 +238,7 @@
          "power": 15,
          "accuracy": 85,
          "description": "Binds the target for 2-5 turns.",
+         "effect_chance": 100,
          "effect": "Inflicts regular damage. For the next 2–5 turns, the target cannot leave the field and is damaged for 1/16 its max HP at the end of each turn. The user continues to use other moves during this time. If the user leaves the field, this effect ends. Has a 3/8 chance each to hit 2 or 3 times, and a 1/8 chance each to hit 4 or 5 times. Averages to 3 hits per use. rapid spin cancels this effect.",
          "is_status": false
       },
@@ -230,6 +250,7 @@
          "power": 80,
          "accuracy": 75,
          "description": "Slams the foe with a tail, vine, etc.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -241,6 +262,7 @@
          "power": 45,
          "accuracy": 100,
          "description": "Whips the foe with slender vines.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -252,7 +274,8 @@
          "power": 65,
          "accuracy": 100,
          "description": "An attack that may cause flinching.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to make the target flinch. Power is doubled against Pokémon that have used minimize since entering the field.",
+         "effect_chance": 30,
+         "effect": "Inflicts regular damage. Has a 30 chance to make the target flinch. Power is doubled against Pokémon that have used minimize since entering the field.",
          "is_status": false
       },
       "24": {
@@ -263,6 +286,7 @@
          "power": 30,
          "accuracy": 100,
          "description": "A double kicking attack.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Hits twice in one turn.",
          "is_status": false
       },
@@ -274,6 +298,7 @@
          "power": 120,
          "accuracy": 75,
          "description": "The target is attacked by a kick launched with muscle-packed power.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -285,6 +310,7 @@
          "power": 100,
          "accuracy": 95,
          "description": "May miss, damaging the user.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. If this move misses, is blocked by protect or detect, or has no effect, the user takes damage equal to half of its max HP rounded down. This move cannot be used while gravity is in effect.",
          "is_status": false
       },
@@ -296,7 +322,8 @@
          "power": 60,
          "accuracy": 85,
          "description": "A fast, spinning kick.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to make the target flinch.",
+         "effect_chance": 30,
+         "effect": "Inflicts regular damage. Has a 30 chance to make the target flinch.",
          "is_status": false
       },
       "28": {
@@ -307,6 +334,7 @@
          "power": null,
          "accuracy": 100,
          "description": "Reduces accuracy by throwing sand.",
+         "effect_chance": null,
          "effect": "Lowers the target’s accuracy by one stage.",
          "is_status": true
       },
@@ -318,7 +346,8 @@
          "power": 70,
          "accuracy": 100,
          "description": "An attack that may make foe flinch.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to make the target flinch.",
+         "effect_chance": 30,
+         "effect": "Inflicts regular damage. Has a 30 chance to make the target flinch.",
          "is_status": false
       },
       "30": {
@@ -329,6 +358,7 @@
          "power": 65,
          "accuracy": 100,
          "description": "An attack using a horn to jab.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -340,6 +370,7 @@
          "power": 15,
          "accuracy": 85,
          "description": "Jabs the target 2-5 times.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Hits 2–5 times in one turn. Has a 3/8 chance each to hit 2 or 3 times, and a 1/8 chance each to hit 4 or 5 times. Averages to 3 hits per use.",
          "is_status": false
       },
@@ -351,6 +382,7 @@
          "power": null,
          "accuracy": 30,
          "description": "A one-hit KO, drill attack.",
+         "effect_chance": null,
          "effect": "Inflicts damage equal to the target’s max HP. Ignores accuracy and evasion modifiers. This move’s accuracy is 30% plus 1% for each level the user is higher than the target. If the user is a lower level than the target, this move will fail. Because this move inflicts a specific and finite amount of damage, endure still prevents the target from fainting. The effects of lock on, mind reader, and no guard still apply, as long as the user is equal or higher level than the target. However, they will not give this move a chance to break through detect or protect.",
          "is_status": false
       },
@@ -362,6 +394,7 @@
          "power": 40,
          "accuracy": 100,
          "description": "A full-body charge attack.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -373,7 +406,8 @@
          "power": 85,
          "accuracy": 100,
          "description": "An attack that may cause paralysis.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to paralyze the target.",
+         "effect_chance": 30,
+         "effect": "Inflicts regular damage. Has a 30 chance to paralyze the target.",
          "is_status": false
       },
       "35": {
@@ -384,6 +418,7 @@
          "power": 15,
          "accuracy": 90,
          "description": "Squeezes the foe for 2-5 turns.",
+         "effect_chance": 100,
          "effect": "Inflicts regular damage. For the next 2–5 turns, the target cannot leave the field and is damaged for 1/16 its max HP at the end of each turn. The user continues to use other moves during this time. If the user leaves the field, this effect ends. Has a 3/8 chance each to hit 2 or 3 times, and a 1/8 chance each to hit 4 or 5 times. Averages to 3 hits per use. rapid spin cancels this effect.",
          "is_status": false
       },
@@ -395,6 +430,7 @@
          "power": 90,
          "accuracy": 85,
          "description": "A tackle that also hurts the user.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User takes 1/4 the damage it inflicts in recoil.",
          "is_status": false
       },
@@ -406,6 +442,7 @@
          "power": 120,
          "accuracy": 100,
          "description": "Works 2-3 turns and confuses user.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User is forced to attack with this move for 2–3 turns,selected at random. After the last hit, the user becomes confused. safeguard does not protect against the confusion from this move.",
          "is_status": false
       },
@@ -417,6 +454,7 @@
          "power": 120,
          "accuracy": 100,
          "description": "A tackle that also hurts the user.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User takes 1/3 the damage it inflicts in recoil.",
          "is_status": false
       },
@@ -428,6 +466,7 @@
          "power": null,
          "accuracy": 100,
          "description": "Lowers the foe's DEFENSE.",
+         "effect_chance": null,
          "effect": "Lowers the target’s Defense by one stage.",
          "is_status": true
       },
@@ -439,7 +478,8 @@
          "power": 15,
          "accuracy": 100,
          "description": "An attack that may poison the target.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to poison the target.",
+         "effect_chance": 30,
+         "effect": "Inflicts regular damage. Has a 30 chance to poison the target.",
          "is_status": false
       },
       "41": {
@@ -450,7 +490,8 @@
          "power": 25,
          "accuracy": 100,
          "description": "Jabs the foe twice using stingers.",
-         "effect": "Inflicts regular damage. Hits twice in the same turn. Has a $effect_chance% chance to poison the target.",
+         "effect_chance": 20,
+         "effect": "Inflicts regular damage. Hits twice in the same turn. Has a 20 chance to poison the target.",
          "is_status": false
       },
       "42": {
@@ -461,6 +502,7 @@
          "power": 25,
          "accuracy": 95,
          "description": "Fires pins that strike 2-5 times.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Hits 2–5 times in one turn. Has a 3/8 chance each to hit 2 or 3 times, and a 1/8 chance each to hit 4 or 5 times. Averages to 3 hits per use.",
          "is_status": false
       },
@@ -472,6 +514,7 @@
          "power": null,
          "accuracy": 100,
          "description": "Reduces the foe's DEFENSE.",
+         "effect_chance": 100,
          "effect": "Lowers the target’s Defense by one stage.",
          "is_status": true
       },
@@ -483,7 +526,8 @@
          "power": 60,
          "accuracy": 100,
          "description": "An attack that may cause flinching.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to make the target flinch.",
+         "effect_chance": 30,
+         "effect": "Inflicts regular damage. Has a 30 chance to make the target flinch.",
          "is_status": false
       },
       "45": {
@@ -494,6 +538,7 @@
          "power": null,
          "accuracy": 100,
          "description": "Reduces the foe's ATTACK.",
+         "effect_chance": null,
          "effect": "Lowers the target’s Attack by one stage.",
          "is_status": true
       },
@@ -505,6 +550,7 @@
          "power": null,
          "accuracy": null,
          "description": "Scares wild foes to end battle.",
+         "effect_chance": null,
          "effect": "Switches the target out for another of its trainer’s Pokémon selected at random. Wild battles end immediately. Doesn’t affect Pokémon with suction cups or under the effect of ingrain.",
          "is_status": true
       },
@@ -516,6 +562,7 @@
          "power": null,
          "accuracy": 55,
          "description": "May cause the foe to fall asleep.",
+         "effect_chance": null,
          "effect": "Puts the target to sleep.",
          "is_status": true
       },
@@ -527,6 +574,7 @@
          "power": null,
          "accuracy": 55,
          "description": "Sound waves that cause confusion.",
+         "effect_chance": null,
          "effect": "Confuses the target.",
          "is_status": true
       },
@@ -538,6 +586,7 @@
          "power": null,
          "accuracy": 90,
          "description": "Always inflicts 20HP damage.",
+         "effect_chance": null,
          "effect": "Inflicts exactly 20 damage.",
          "is_status": false
       },
@@ -549,6 +598,7 @@
          "power": null,
          "accuracy": 100,
          "description": "Disables the foe's most recent move.",
+         "effect_chance": null,
          "effect": "Disables the target’s last used move, preventing its use for 4–7 turns, selected at random, or until the target leaves the field. If the target hasn’t used a move since entering the field, if it tried to use a move this turn and failed, if its last used move has 0 PP remaining, or if it already has a move disabled, this move will fail.",
          "is_status": true
       },
@@ -560,7 +610,8 @@
          "power": 40,
          "accuracy": 100,
          "description": "An attack that may lower DEFENSE.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to lower the target’s Special Defense by one stage.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to lower the target’s Special Defense by one stage.",
          "is_status": false
       },
       "52": {
@@ -571,7 +622,8 @@
          "power": 40,
          "accuracy": 100,
          "description": "The foe is attacked with small flames. The foe may suffer a burn.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to burn the target.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to burn the target.",
          "is_status": false
       },
       "53": {
@@ -582,7 +634,8 @@
          "power": 90,
          "accuracy": 100,
          "description": "An attack that may inflict a burn.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to burn the target.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to burn the target.",
          "is_status": false
       },
       "54": {
@@ -593,6 +646,7 @@
          "power": null,
          "accuracy": null,
          "description": "Prevents stat reduction.",
+         "effect_chance": null,
          "effect": "Pokémon on the user’s side of the field are immune to stat-lowering effects for five turns. guard swap, heart swap, and power swap may still be used. defog used by an opponent will end this effect.",
          "is_status": true
       },
@@ -604,6 +658,7 @@
          "power": 40,
          "accuracy": 100,
          "description": "Squirts water to attack.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -615,6 +670,7 @@
          "power": 110,
          "accuracy": 80,
          "description": "A powerful water- type attack.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -626,6 +682,7 @@
          "power": 90,
          "accuracy": 100,
          "description": "A strong water- type attack.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. If the target is in the first turn of dive, this move will hit with double power.",
          "is_status": false
       },
@@ -637,7 +694,8 @@
          "power": 90,
          "accuracy": 100,
          "description": "An attack that may freeze the foe.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to freeze the target.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to freeze the target.",
          "is_status": false
       },
       "59": {
@@ -648,7 +706,8 @@
          "power": 110,
          "accuracy": 70,
          "description": "An attack that may freeze the foe.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to freeze the target. During hail, this move has 100% accuracy. It also has a (100 - accuracy)% chance to break through the protection of protect and detect.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to freeze the target. During hail, this move has 100% accuracy. It also has a (100 - accuracy)% chance to break through the protection of protect and detect.",
          "is_status": false
       },
       "60": {
@@ -659,7 +718,8 @@
          "power": 65,
          "accuracy": 100,
          "description": "An attack that may confuse the foe.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to confuse the target.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to confuse the target.",
          "is_status": false
       },
       "61": {
@@ -670,7 +730,8 @@
          "power": 65,
          "accuracy": 100,
          "description": "An attack that may lower SPEED.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to lower the target’s Speed by one stage.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to lower the target’s Speed by one stage.",
          "is_status": false
       },
       "62": {
@@ -681,7 +742,8 @@
          "power": 65,
          "accuracy": 100,
          "description": "An attack that may lower ATTACK.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to lower the target’s Attack by one stage.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to lower the target’s Attack by one stage.",
          "is_status": false
       },
       "63": {
@@ -692,6 +754,7 @@
          "power": 150,
          "accuracy": 90,
          "description": "1st turn: Attack 2nd turn: Rest",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User loses its next turn to \"recharge\", and cannot attack or switch out during that turn.",
          "is_status": false
       },
@@ -703,6 +766,7 @@
          "power": 35,
          "accuracy": 100,
          "description": "Jabs the foe with a beak, etc.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -714,6 +778,7 @@
          "power": 80,
          "accuracy": 100,
          "description": "A strong, spin­ ning-peck attack.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -725,6 +790,7 @@
          "power": 80,
          "accuracy": 80,
          "description": "An attack that al­ so hurts the user.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User takes 1/4 the damage it inflicts in recoil.",
          "is_status": false
       },
@@ -736,6 +802,7 @@
          "power": null,
          "accuracy": 100,
          "description": "An attack that may cause flinching.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Power increases with the target’s weight in kilograms, to a maximum of 120. Target’s weight | Power --------------- | ----: Up to 10kg | 20 Up to 25kg | 40 Up to 50kg | 60 Up to 100kg | 80 Up to 200kg | 100 Above 200kg | 120",
          "is_status": false
       },
@@ -747,6 +814,7 @@
          "power": null,
          "accuracy": 100,
          "description": "Returns a physical blow double.",
+         "effect_chance": null,
          "effect": "Targets the last opposing Pokémon to hit the user with a physical move this turn. Inflicts twice the damage that move did to the user. If there is no eligible target, this move will fail. Type immunity applies, but other type effects are ignored. This move cannot be copied by mirror move, nor selected by assist or metronome.",
          "is_status": false
       },
@@ -758,6 +826,7 @@
          "power": null,
          "accuracy": 100,
          "description": "The user's level equals damage HP.",
+         "effect_chance": null,
          "effect": "Inflicts damage equal to the user’s level. Type immunity applies, but other type effects are ignored.",
          "is_status": false
       },
@@ -769,6 +838,7 @@
          "power": 80,
          "accuracy": 100,
          "description": "A powerful physi­ cal attack.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -780,6 +850,7 @@
          "power": 20,
          "accuracy": 100,
          "description": "Steals 1/2 of the damage inflicted.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Drains half the damage inflicted to heal the user.",
          "is_status": false
       },
@@ -791,6 +862,7 @@
          "power": 40,
          "accuracy": 100,
          "description": "Steals 1/2 of the damage inflicted.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Drains half the damage inflicted to heal the user.",
          "is_status": false
       },
@@ -802,6 +874,7 @@
          "power": null,
          "accuracy": 90,
          "description": "Steals HP from the foe on every turn.",
+         "effect_chance": null,
          "effect": "Plants a seed on the target that drains 1/8 of its max HP at the end of every turn and heals the user for the amount taken. Has no effect on grass Pokémon. The seed remains until the target leaves the field. The user takes damage instead of being healed if the target has liquid ooze. rapid spin will remove this effect. This effect is passed on by baton pass.",
          "is_status": true
       },
@@ -813,6 +886,7 @@
          "power": null,
          "accuracy": null,
          "description": "Raises the SPCL. ATK rating.",
+         "effect_chance": null,
          "effect": "Raises the user’s Attack and Special Attack by one stage each. During sunny day, raises both stats by two stages.",
          "is_status": true
       },
@@ -824,6 +898,7 @@
          "power": 55,
          "accuracy": 95,
          "description": "A sharp-edged leaf is launched to slash at the foe. It has a high critical-hit ratio.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User’s critical hit rate is one level higher when using this move.",
          "is_status": false
       },
@@ -835,6 +910,7 @@
          "power": 120,
          "accuracy": 100,
          "description": "1st turn: Prepare 2nd turn: Attack",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User charges for one turn before attacking. During sunny day, the charge turn is skipped. During hail, rain dance, or sandstorm, power is halved. This move cannot be selected by sleep talk.",
          "is_status": false
       },
@@ -846,6 +922,7 @@
          "power": null,
          "accuracy": 75,
          "description": "A move that may poison the foe.",
+         "effect_chance": null,
          "effect": "Poisons the target.",
          "is_status": true
       },
@@ -857,6 +934,7 @@
          "power": null,
          "accuracy": 75,
          "description": "A move that may paralyze the foe.",
+         "effect_chance": null,
          "effect": "Paralyzes the target.",
          "is_status": true
       },
@@ -868,6 +946,7 @@
          "power": null,
          "accuracy": 75,
          "description": "May cause the foe to fall asleep.",
+         "effect_chance": null,
          "effect": "Puts the target to sleep.",
          "is_status": true
       },
@@ -879,6 +958,7 @@
          "power": 120,
          "accuracy": 100,
          "description": "Works 2-3 turns and confuses user.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User is forced to attack with this move for 2–3 turns,selected at random. After the last hit, the user becomes confused. safeguard does not protect against the confusion from this move.",
          "is_status": false
       },
@@ -890,6 +970,7 @@
          "power": null,
          "accuracy": 95,
          "description": "A move that lowers the foe's SPEED.",
+         "effect_chance": null,
          "effect": "Lowers the target’s Speed by two stages.",
          "is_status": true
       },
@@ -901,6 +982,7 @@
          "power": null,
          "accuracy": 100,
          "description": "Always inflicts 40HP damage.",
+         "effect_chance": null,
          "effect": "Inflicts exactly 40 damage.",
          "is_status": false
       },
@@ -912,6 +994,7 @@
          "power": 35,
          "accuracy": 85,
          "description": "Traps foe in fire for 2-5 turns.",
+         "effect_chance": 100,
          "effect": "Inflicts regular damage. For the next 2–5 turns, the target cannot leave the field and is damaged for 1/16 its max HP at the end of each turn. The user continues to use other moves during this time. If the user leaves the field, this effect ends. Has a 3/8 chance each to hit 2 or 3 times, and a 1/8 chance each to hit 4 or 5 times. Averages to 3 hits per use. rapid spin cancels this effect.",
          "is_status": false
       },
@@ -923,7 +1006,8 @@
          "power": 40,
          "accuracy": 100,
          "description": "An electrical attack that may paralyze the foe.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to paralyze the target.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to paralyze the target.",
          "is_status": false
       },
       "85": {
@@ -934,7 +1018,8 @@
          "power": 90,
          "accuracy": 100,
          "description": "An attack that may cause paralysis.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to paralyze the target.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to paralyze the target.",
          "is_status": false
       },
       "86": {
@@ -945,6 +1030,7 @@
          "power": null,
          "accuracy": 90,
          "description": "A move that may cause paralysis.",
+         "effect_chance": null,
          "effect": "Paralyzes the target.",
          "is_status": true
       },
@@ -956,7 +1042,8 @@
          "power": 110,
          "accuracy": 70,
          "description": "An attack that may cause paralysis.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to paralyze the target. During rain dance, this move has 100% accuracy. It also has a (100 - accuracy)% chance to break through the protection of protect and detect. During sunny day, this move has 50% accuracy.",
+         "effect_chance": 30,
+         "effect": "Inflicts regular damage. Has a 30 chance to paralyze the target. During rain dance, this move has 100% accuracy. It also has a (100 - accuracy)% chance to break through the protection of protect and detect. During sunny day, this move has 50% accuracy.",
          "is_status": false
       },
       "88": {
@@ -967,6 +1054,7 @@
          "power": 50,
          "accuracy": 90,
          "description": "Drops rocks on the enemy.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -978,6 +1066,7 @@
          "power": 100,
          "accuracy": 100,
          "description": "Tough but useless vs. flying foes.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. If the target is in the first turn of dig, this move will hit with double power.",
          "is_status": false
       },
@@ -989,6 +1078,7 @@
          "power": null,
          "accuracy": 30,
          "description": "A ground-type, one-hit KO attack.",
+         "effect_chance": null,
          "effect": "Inflicts damage equal to the target’s max HP. Ignores accuracy and evasion modifiers. This move’s accuracy is 30% plus 1% for each level the user is higher than the target. If the user is a lower level than the target, this move will fail. Because this move inflicts a specific and finite amount of damage, endure still prevents the target from fainting. The effects of lock on, mind reader, and no guard still apply, as long as the user is equal or higher level than the target. However, they will not give this move a chance to break through detect or protect.",
          "is_status": false
       },
@@ -1000,6 +1090,7 @@
          "power": 80,
          "accuracy": 100,
          "description": "1st turn: Burrow 2nd turn: Attack",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User digs underground for one turn, becoming immune to attack, and hits on the second turn. During the immune turn, earthquake, fissure, and magnitude still hit the user normally, and their power is doubled if appropriate. The user may be hit during its immune turn if under the effect of lock on, mind reader, or no guard. This move cannot be selected by sleep talk.",
          "is_status": false
       },
@@ -1011,6 +1102,7 @@
          "power": null,
          "accuracy": 90,
          "description": "A poison move with increasing damage.",
+         "effect_chance": null,
          "effect": "Badly poisons the target. Never misses when used by a poison-type Pokémon.",
          "is_status": true
       },
@@ -1022,7 +1114,8 @@
          "power": 50,
          "accuracy": 100,
          "description": "The foe is hit by a weak telekinetic force. It may also leave the foe confused.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to confuse the target.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to confuse the target.",
          "is_status": false
       },
       "94": {
@@ -1033,7 +1126,8 @@
          "power": 90,
          "accuracy": 100,
          "description": "An attack that may lower SPCL.DEF.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to lower the target’s Special Defense by one stage.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to lower the target’s Special Defense by one stage.",
          "is_status": false
       },
       "95": {
@@ -1044,6 +1138,7 @@
          "power": null,
          "accuracy": 60,
          "description": "May put the foe to sleep.",
+         "effect_chance": null,
          "effect": "Puts the target to sleep.",
          "is_status": true
       },
@@ -1055,6 +1150,7 @@
          "power": null,
          "accuracy": null,
          "description": "Raises the user's ATTACK.",
+         "effect_chance": null,
          "effect": "Raises the user’s Attack by one stage.",
          "is_status": true
       },
@@ -1066,6 +1162,7 @@
          "power": null,
          "accuracy": null,
          "description": "Sharply increases the user's SPEED.",
+         "effect_chance": null,
          "effect": "Raises the user’s Speed by two stages.",
          "is_status": true
       },
@@ -1077,6 +1174,7 @@
          "power": 40,
          "accuracy": 100,
          "description": "Lets the user get in the first hit.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -1088,6 +1186,7 @@
          "power": 20,
          "accuracy": 100,
          "description": "Raises ATTACK if the user is hit.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Every time the user is hit after it uses this move but before its next action, its Attack raises by one stage.",
          "is_status": false
       },
@@ -1099,6 +1198,7 @@
          "power": null,
          "accuracy": null,
          "description": "A move for fleeing from battle.",
+         "effect_chance": null,
          "effect": "Does nothing. Wild battles end immediately.",
          "is_status": true
       },
@@ -1110,6 +1210,7 @@
          "power": null,
          "accuracy": 100,
          "description": "The user's level equals damage HP.",
+         "effect_chance": null,
          "effect": "Inflicts damage equal to the user’s level. Type immunity applies, but other type effects are ignored.",
          "is_status": false
       },
@@ -1121,6 +1222,7 @@
          "power": null,
          "accuracy": null,
          "description": "Copies a move used by the foe.",
+         "effect_chance": null,
          "effect": "This move is replaced by the target’s last successfully used move, and its PP changes to 5. If the target hasn’t used a move since entering the field, if it tried to use a move this turn and failed, or if the user already knows the targeted move, this move will fail. This effect vanishes when the user leaves the field. If chatter, metronome, mimic, sketch, or struggle is selected, this move will fail. This move cannot be copied by mirror move, nor selected by assist or metronome, nor forced by encore.",
          "is_status": true
       },
@@ -1132,6 +1234,7 @@
          "power": null,
          "accuracy": 85,
          "description": "Sharply reduces the foe's DEFENSE.",
+         "effect_chance": null,
          "effect": "Lowers the target’s Defense by two stages.",
          "is_status": true
       },
@@ -1143,6 +1246,7 @@
          "power": null,
          "accuracy": null,
          "description": "Heightens evasive­ ness.",
+         "effect_chance": null,
          "effect": "Raises the user’s evasion by one stage.",
          "is_status": true
       },
@@ -1154,6 +1258,7 @@
          "power": null,
          "accuracy": null,
          "description": "Recovers up to half the user’s maximum HP.",
+         "effect_chance": null,
          "effect": "Heals the user for half its max HP.",
          "is_status": true
       },
@@ -1165,6 +1270,7 @@
          "power": null,
          "accuracy": null,
          "description": "Stiffens the body’s muscles to raise DEFENSE.",
+         "effect_chance": null,
          "effect": "Raises the user’s Defense by one stage.",
          "is_status": true
       },
@@ -1176,6 +1282,7 @@
          "power": null,
          "accuracy": null,
          "description": "Heightens evasive­ ness.",
+         "effect_chance": null,
          "effect": "Raises the user’s evasion by two stages. stomp and steamroller have double power against Pokémon that have used this move since entering the field.",
          "is_status": true
       },
@@ -1187,6 +1294,7 @@
          "power": null,
          "accuracy": 100,
          "description": "Lowers the foe's accuracy.",
+         "effect_chance": null,
          "effect": "Lowers the target’s accuracy by one stage.",
          "is_status": true
       },
@@ -1198,6 +1306,7 @@
          "power": null,
          "accuracy": 100,
          "description": "A move that causes confusion.",
+         "effect_chance": null,
          "effect": "Confuses the target.",
          "is_status": true
       },
@@ -1209,6 +1318,7 @@
          "power": null,
          "accuracy": null,
          "description": "Heightens the user's DEFENSE.",
+         "effect_chance": null,
          "effect": "Raises the user’s Defense by one stage.",
          "is_status": true
       },
@@ -1220,6 +1330,7 @@
          "power": null,
          "accuracy": null,
          "description": "Heightens the user's DEFENSE.",
+         "effect_chance": null,
          "effect": "Raises user’s Defense by one stage. After this move is used, the power of ice ball and rollout are doubled until the user leaves the field.",
          "is_status": true
       },
@@ -1231,6 +1342,7 @@
          "power": null,
          "accuracy": null,
          "description": "Sharply increases user's DEFENSE.",
+         "effect_chance": null,
          "effect": "Raises the user’s Defense by two stages.",
          "is_status": true
       },
@@ -1242,6 +1354,7 @@
          "power": null,
          "accuracy": null,
          "description": "Ups SPCL.DEF with a wall of light.",
+         "effect_chance": null,
          "effect": "Erects a barrier around the user’s side of the field that reduces damage from special attacks by half for five turns. In double battles, the reduction is 1/3. Critical hits are not affected by the barrier. If the user is holding light clay, the barrier lasts for eight turns. brick break or defog used by an opponent will destroy the barrier.",
          "is_status": true
       },
@@ -1253,6 +1366,7 @@
          "power": null,
          "accuracy": null,
          "description": "Eliminates all stat changes.",
+         "effect_chance": null,
          "effect": "Removes stat, accuracy, and evasion modifiers from every Pokémon on the field. This does not count as a stat reduction for the purposes of clear body or white smoke.",
          "is_status": true
       },
@@ -1264,6 +1378,7 @@
          "power": null,
          "accuracy": null,
          "description": "Raises DEFENSE with a barrier.",
+         "effect_chance": null,
          "effect": "Erects a barrier around the user’s side of the field that reduces damage from physical attacks by half for five turns. In double battles, the reduction is 1/3. Critical hits are not affected by the barrier. If the user is holding light clay, the barrier lasts for eight turns. brick break or defog used by an opponent will destroy the barrier.",
          "is_status": true
       },
@@ -1275,6 +1390,7 @@
          "power": null,
          "accuracy": null,
          "description": "Raises the criti­ cal hit ratio.",
+         "effect_chance": null,
          "effect": "User’s critical hit rate is two levels higher until it leaves the field. If the user has already used focus energy since entering the field, this move will fail. This effect is passed on by baton pass.",
          "is_status": true
       },
@@ -1286,6 +1402,7 @@
          "power": null,
          "accuracy": null,
          "description": "Waits 2-3 turns & hits back double.",
+         "effect_chance": null,
          "effect": "User waits for two turns. On the second turn, the user inflicts twice the damage it accumulated on the last Pokémon to hit it. Damage inflicted is typeless. This move cannot be selected by sleep talk.",
          "is_status": false
       },
@@ -1297,6 +1414,7 @@
          "power": null,
          "accuracy": null,
          "description": "Randomly uses any POKéMON move.",
+         "effect_chance": null,
          "effect": "Selects any move at random and uses it. Moves the user already knows are not eligible. Assist, meta, protection, and reflection moves are also not eligible; specifically, assist, chatter, copycat, counter, covet, destiny bond, detect, endure, feint, focus punch, follow me, helping hand, me first, metronome, mimic, mirror coat, mirror move, protect, quick guard, sketch, sleep talk, snatch, struggle, switcheroo, thief, trick, and wide guard will not be selected by this move. This move cannot be copied by mimic or mirror move, nor selected by assist, metronome, or sleep talk.",
          "is_status": true
       },
@@ -1308,6 +1426,7 @@
          "power": null,
          "accuracy": null,
          "description": "Counters with the same move.",
+         "effect_chance": null,
          "effect": "Uses the last move targeted at the user by a Pokémon still on the field. A move counts as targeting the user even if it hit multiple Pokémon, as long as the user was one of them; however, moves targeting the field itself do not count. If the user has not been targeted by an appropriate move since entering the field, or if no Pokémon that targeted the user remains on the field, this move will fail. Moves that failed, missed, had no effect, or were blocked are still copied. Assist moves, time-delayed moves, “meta” moves that operate on other moves/Pokémon/abilities, and some other special moves cannot be copied and are ignored; if the last move to hit the user was such a move, the previous move will be used instead. The full list of ignored moves is: acid armor, acupressure, after you, agility, ally switch, amnesia, aqua ring, aromatherapy, aromatic mist, assist, autotomize, barrier, baton pass, belch, belly drum, bide, bulk up, calm mind, camouflage, celebrate, charge, coil, conversion, conversion 2, copycat, cosmic power, cotton guard, counter, crafty shield, curse, defend order, defense curl, destiny bond, detect, doom desire, double team, dragon dance, electric terrain, endure, final gambit, flower shield, focus energy, focus punch, follow me, future sight, geomancy, grassy terrain, gravity, growth, grudge, guard split, hail, happy hour, harden, haze, heal bell, heal order, heal pulse, healing wish, helping hand, hold hands, hone claws, howl, imprison, ingrain, ion deluge, iron defense, kings shield, light screen, lucky chant, lunar dance, magic coat, magnet rise, magnetic flux, mat block, me first, meditate, metronome, milk drink, mimic, minimize, mirror coat, mirror move, mist, misty terrain, moonlight, morning sun, mud sport, nasty plot, nature power, perish song, power split, power trick, protect, psych up, quick guard, quiver dance, rage powder, rain dance, recover, recycle, reflect, reflect type, refresh, rest, rock polish, role play, roost, rototiller, safeguard, sandstorm, shadow blast, shadow bolt, shadow half, shadow rush, shadow shed, shadow sky, shadow storm, shadow wave, sharpen, shell smash, shift gear, sketch, slack off, sleep talk, snatch, soft boiled, spikes, spiky shield, spit up, splash, stealth rock, sticky web, stockpile, struggle, substitute, sunny day, swallow, swords dance, synthesis, tail glow, tailwind, teleport, toxic spikes, transform, water sport, wide guard, wish, withdraw and work up. This move cannot be selected by assist, metronome, or sleep talk, nor forced by encore.",
          "is_status": true
       },
@@ -1319,6 +1438,7 @@
          "power": 200,
          "accuracy": 100,
          "description": "Powerful but makes the user faint.",
+         "effect_chance": null,
          "effect": "User faints, even if the attack fails or misses. Inflicts regular damage.",
          "is_status": false
       },
@@ -1330,6 +1450,7 @@
          "power": 100,
          "accuracy": 75,
          "description": "Eggs are hurled at the foe.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage.",
          "is_status": false
       },
@@ -1341,7 +1462,8 @@
          "power": 30,
          "accuracy": 100,
          "description": "An attack that may cause paralysis.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to paralyze the target.",
+         "effect_chance": 30,
+         "effect": "Inflicts regular damage. Has a 30 chance to paralyze the target.",
          "is_status": false
       },
       "123": {
@@ -1352,7 +1474,8 @@
          "power": 30,
          "accuracy": 70,
          "description": "An attack that may poison the foe.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to poison the target.",
+         "effect_chance": 40,
+         "effect": "Inflicts regular damage. Has a 40 chance to poison the target.",
          "is_status": false
       },
       "124": {
@@ -1363,7 +1486,8 @@
          "power": 65,
          "accuracy": 100,
          "description": "An attack that may poison the foe.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to poison the target.",
+         "effect_chance": 30,
+         "effect": "Inflicts regular damage. Has a 30 chance to poison the target.",
          "is_status": false
       },
       "125": {
@@ -1374,7 +1498,8 @@
          "power": 65,
          "accuracy": 85,
          "description": "An attack that may cause flinching.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to make the target flinch.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to make the target flinch.",
          "is_status": false
       },
       "126": {
@@ -1385,7 +1510,8 @@
          "power": 110,
          "accuracy": 85,
          "description": "An attack that may cause a burn.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to burn the target.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to burn the target.",
          "is_status": false
       },
       "127": {
@@ -1396,7 +1522,8 @@
          "power": 80,
          "accuracy": 100,
          "description": "An aquatic charge attack.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to make the target flinch.",
+         "effect_chance": 20,
+         "effect": "Inflicts regular damage. Has a 20 chance to make the target flinch.",
          "is_status": false
       },
       "128": {
@@ -1407,6 +1534,7 @@
          "power": 35,
          "accuracy": 85,
          "description": "Traps the foe for 2-5 turns.",
+         "effect_chance": 100,
          "effect": "Inflicts regular damage. For the next 2–5 turns, the target cannot leave the field and is damaged for 1/16 its max HP at the end of each turn. The user continues to use other moves during this time. If the user leaves the field, this effect ends. Has a 3/8 chance each to hit 2 or 3 times, and a 1/8 chance each to hit 4 or 5 times. Averages to 3 hits per use. rapid spin cancels this effect.",
          "is_status": false
       },
@@ -1418,6 +1546,7 @@
          "power": 60,
          "accuracy": null,
          "description": "Sprays star-shaped rays that never miss.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Ignores accuracy and evasion modifiers.",
          "is_status": false
       },
@@ -1429,6 +1558,7 @@
          "power": 130,
          "accuracy": 100,
          "description": "1st turn: Prepare 2nd turn: Attack",
+         "effect_chance": 100,
          "effect": "Inflicts regular damage. Raises the user’s Defense by one stage. User then charges for one turn before attacking. This move cannot be selected by sleep talk.",
          "is_status": false
       },
@@ -1440,6 +1570,7 @@
          "power": 20,
          "accuracy": 100,
          "description": "Fires spikes to hit 2-5 times.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Hits 2–5 times in one turn. Has a 3/8 chance each to hit 2 or 3 times, and a 1/8 chance each to hit 4 or 5 times. Averages to 3 hits per use.",
          "is_status": false
       },
@@ -1451,7 +1582,8 @@
          "power": 10,
          "accuracy": 100,
          "description": "An attack that may lower SPEED.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to lower the target’s Speed by one stage.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to lower the target’s Speed by one stage.",
          "is_status": false
       },
       "133": {
@@ -1462,6 +1594,7 @@
          "power": null,
          "accuracy": null,
          "description": "Sharply raises the user's SPCL.DEF.",
+         "effect_chance": null,
          "effect": "Raises the user’s Special Defense by two stages.",
          "is_status": true
       },
@@ -1473,6 +1606,7 @@
          "power": null,
          "accuracy": 80,
          "description": "Reduces the foe's accuracy.",
+         "effect_chance": null,
          "effect": "Lowers the target’s accuracy by one stage.",
          "is_status": true
       },
@@ -1484,6 +1618,7 @@
          "power": null,
          "accuracy": null,
          "description": "Restores HP by 1/2 the user's max HP.",
+         "effect_chance": null,
          "effect": "Heals the user for half its max HP.",
          "is_status": true
       },
@@ -1495,6 +1630,7 @@
          "power": 130,
          "accuracy": 90,
          "description": "May miss and hurt the user.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. If this move misses, is blocked by protect or detect, or has no effect, the user takes damage equal to half of its max HP rounded down. This move cannot be used while gravity is in effect.",
          "is_status": false
       },
@@ -1506,6 +1642,7 @@
          "power": null,
          "accuracy": 100,
          "description": "A move that may cause paralysis.",
+         "effect_chance": null,
          "effect": "Paralyzes the target.",
          "is_status": true
       },
@@ -1517,6 +1654,7 @@
          "power": 100,
          "accuracy": 100,
          "description": "Steals HP from a sleeping victim.",
+         "effect_chance": null,
          "effect": "Fails if not used on a sleeping Pokémon. Inflicts regular damage. Drains half the damage inflicted to heal the user.",
          "is_status": false
       },
@@ -1528,6 +1666,7 @@
          "power": null,
          "accuracy": 90,
          "description": "A move that may poison the foe.",
+         "effect_chance": null,
          "effect": "Poisons the target.",
          "is_status": true
       },
@@ -1539,6 +1678,7 @@
          "power": 15,
          "accuracy": 85,
          "description": "Throws orbs to hit 2-5 times.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Hits 2–5 times in one turn. Has a 3/8 chance each to hit 2 or 3 times, and a 1/8 chance each to hit 4 or 5 times. Averages to 3 hits per use.",
          "is_status": false
       },
@@ -1550,6 +1690,7 @@
          "power": 80,
          "accuracy": 100,
          "description": "Steals 1/2 of the damage inflicted.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Drains half the damage inflicted to heal the user.",
          "is_status": false
       },
@@ -1561,6 +1702,7 @@
          "power": null,
          "accuracy": 75,
          "description": "May cause the foe to fall asleep.",
+         "effect_chance": null,
          "effect": "Puts the target to sleep.",
          "is_status": true
       },
@@ -1572,7 +1714,8 @@
          "power": 140,
          "accuracy": 90,
          "description": "1st turn: Prepare 2nd turn: Attack",
-         "effect": "Inflicts regular damage. User charges for one turn before attacking. Critical hit chance is one level higher than normal. Has a $effect_chance% chance to make the target flinch. This move cannot be selected by sleep talk.",
+         "effect_chance": 30,
+         "effect": "Inflicts regular damage. User charges for one turn before attacking. Critical hit chance is one level higher than normal. Has a 30 chance to make the target flinch. This move cannot be selected by sleep talk.",
          "is_status": false
       },
       "144": {
@@ -1583,6 +1726,7 @@
          "power": null,
          "accuracy": null,
          "description": "The user assumes the foe's guise.",
+         "effect_chance": null,
          "effect": "User copies the target’s species, weight, type, ability, calculated stats (except HP), and moves. Copied moves will all have 5 PP remaining. IVs are copied for the purposes of hidden power, but stats are not recalculated. choice band, choice scarf, and choice specs stay in effect, and the user must select a new move. This move cannot be copied by mirror move, nor forced by encore.",
          "is_status": true
       },
@@ -1594,7 +1738,8 @@
          "power": 40,
          "accuracy": 100,
          "description": "An attack that may reduce SPEED.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to lower the target’s Speed by one stage.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to lower the target’s Speed by one stage.",
          "is_status": false
       },
       "146": {
@@ -1605,7 +1750,8 @@
          "power": 70,
          "accuracy": 100,
          "description": "An attack that may cause confusion.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to confuse the target.",
+         "effect_chance": 20,
+         "effect": "Inflicts regular damage. Has a 20 chance to confuse the target.",
          "is_status": false
       },
       "147": {
@@ -1616,6 +1762,7 @@
          "power": null,
          "accuracy": 100,
          "description": "A move that induces sleep.",
+         "effect_chance": null,
          "effect": "Puts the target to sleep.",
          "is_status": true
       },
@@ -1627,6 +1774,7 @@
          "power": null,
          "accuracy": 100,
          "description": "Blinds the foe to reduce accuracy.",
+         "effect_chance": null,
          "effect": "Lowers the target’s accuracy by one stage.",
          "is_status": true
       },
@@ -1638,6 +1786,7 @@
          "power": null,
          "accuracy": 100,
          "description": "An attack with variable power.",
+         "effect_chance": null,
          "effect": "Inflicts typeless damage between 50% and 150% of the user’s level, selected at random in increments of 10%.",
          "is_status": false
       },
@@ -1649,6 +1798,7 @@
          "power": null,
          "accuracy": null,
          "description": "Has no effect whatsoever.",
+         "effect_chance": null,
          "effect": "Does nothing. This move cannot be used while gravity is in effect.",
          "is_status": true
       },
@@ -1660,6 +1810,7 @@
          "power": null,
          "accuracy": null,
          "description": "Sharply raises the user's DEFENSE.",
+         "effect_chance": null,
          "effect": "Raises the user’s Defense by two stages.",
          "is_status": true
       },
@@ -1671,6 +1822,7 @@
          "power": 100,
          "accuracy": 90,
          "description": "Has a high criti­ cal hit ratio.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User’s critical hit rate is one level higher when using this move.",
          "is_status": false
       },
@@ -1682,6 +1834,7 @@
          "power": 250,
          "accuracy": 100,
          "description": "Very powerful but makes user faint.",
+         "effect_chance": null,
          "effect": "User faints, even if the attack fails or misses. Inflicts regular damage.",
          "is_status": false
       },
@@ -1693,6 +1846,7 @@
          "power": 18,
          "accuracy": 80,
          "description": "Quickly scratches 2-5 times.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Hits 2–5 times in one turn. Has a 3/8 chance each to hit 2 or 3 times, and a 1/8 chance each to hit 4 or 5 times. Averages to 3 hits per use.",
          "is_status": false
       },
@@ -1704,6 +1858,7 @@
          "power": 50,
          "accuracy": 90,
          "description": "An attack that strikes twice.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. Hits twice in one turn.",
          "is_status": false
       },
@@ -1715,6 +1870,7 @@
          "power": null,
          "accuracy": null,
          "description": "Sleep for 2 turns to fully recover.",
+         "effect_chance": null,
          "effect": "User falls to sleep and immediately regains all its HP. If the user has another major status effect, sleep will replace it. The user will always wake up after two turns, or one turn with early bird. This move fails if the Pokémon cannot fall asleep due to uproar, insomnia, or vital spirit. It also fails if the Pokémon is at full health or is already asleep.",
          "is_status": true
       },
@@ -1726,7 +1882,8 @@
          "power": 75,
          "accuracy": 90,
          "description": "An attack that may cause flinching.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to make the target flinch.",
+         "effect_chance": 30,
+         "effect": "Inflicts regular damage. Has a 30 chance to make the target flinch.",
          "is_status": false
       },
       "158": {
@@ -1737,7 +1894,8 @@
          "power": 80,
          "accuracy": 90,
          "description": "An attack that may cause flinching.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to make the target flinch.",
+         "effect_chance": 10,
+         "effect": "Inflicts regular damage. Has a 10 chance to make the target flinch.",
          "is_status": false
       },
       "159": {
@@ -1748,6 +1906,7 @@
          "power": null,
          "accuracy": null,
          "description": "A move that raises the user's ATTACK.",
+         "effect_chance": null,
          "effect": "Raises the user’s Attack by one stage.",
          "is_status": true
       },
@@ -1759,6 +1918,7 @@
          "power": null,
          "accuracy": null,
          "description": "Change user's type to a move's type.",
+         "effect_chance": null,
          "effect": "User’s type changes to the type of one of its moves, selected at random. hidden power and weather ball are treated as normal. Only moves with a different type are eligible, and curse is never eligible. If the user has no suitable moves, this move will fail.",
          "is_status": true
       },
@@ -1770,7 +1930,8 @@
          "power": 80,
          "accuracy": 100,
          "description": "Fires three kinds of beams at once.",
-         "effect": "Inflicts regular damage. Has a $effect_chance% chance to burn, freeze, or paralyze the target. One of these effects is selected at random; they do not each have independent chances to occur.",
+         "effect_chance": 20,
+         "effect": "Inflicts regular damage. Has a 20 chance to burn, freeze, or paralyze the target. One of these effects is selected at random; they do not each have independent chances to occur.",
          "is_status": false
       },
       "162": {
@@ -1781,6 +1942,7 @@
          "power": null,
          "accuracy": 90,
          "description": "Cuts the foe's HP by 1/2.",
+         "effect_chance": null,
          "effect": "Inflicts typeless damage equal to half the target’s remaining HP.",
          "is_status": false
       },
@@ -1792,6 +1954,7 @@
          "power": 70,
          "accuracy": 100,
          "description": "Has a high criti­ cal hit ratio.",
+         "effect_chance": null,
          "effect": "Inflicts regular damage. User’s critical hit rate is one level higher when using this move.",
          "is_status": false
       },
@@ -1803,6 +1966,7 @@
          "power": null,
          "accuracy": null,
          "description": "Makes a decoy with 1/4 user's max HP.",
+         "effect_chance": null,
          "effect": "Transfers 1/4 the user’s max HP into a doll that absorbs damage and causes most negative move effects to fail. If the user leaves the field, the doll will vanish. If the user cannot pay the HP cost, this move will fail. The doll takes damage as normal, using the user’s stats and types, and will break when its HP reaches zero. Self-inflicted damage from confusion or recoil is not absorbed. Healing effects from opponents ignore the doll and heal the user as normal. Moves that work based on the user’s HP still do so; the doll’s HP does not influence any move. The doll will block major status effects, confusion, and flinching. The effects of smelling salts and wake up slap do not trigger against a doll, even if the Pokémon behind the doll has the appropriate major status effect. Multi-turn trapping moves like wrap will hit the doll for their regular damage, but the multi-turn trapping and damage effects will not activate. Moves blocked or damage absorbed by the doll do not count as hitting the user or inflicting damage for any effects that respond to such, e.g., avalanche, counter, or a rowap berry. magic coat still works as normal, even against moves the doll would block. Opposing Pokémon that damage the doll with a leech move like absorb are healed as normal. It will also block acupressure, block, the curse effect of curse, dream eater, embargo, flatter, gastro acid, grudge, heal block, leech seed, lock on, mean look, mimic, mind reader, nightmare, pain split, psycho shift, spider web, sketch, swagger, switcheroo, trick, worry seed, and yawn. A Pokémon affected by yawn before summoning the doll will still fall to sleep. The doll blocks intimidate, but all other abilities act as though the doll did not exist. If the user has an ability that absorbs moves of a certain type for HP (such as volt absorb absorbing thunder wave), such moves will not be blocked. life orb and berries that cause confusion still work as normal, but their respective HP loss and confusion are absorbed/blocked by the doll. The user is still vulnerable to damage inflicted when entering or leaving the field, such as by pursuit or spikes; however, the doll will block the poison effect of toxic spikes. The doll is passed on by baton pass. It keeps its existing HP, but uses the replacement Pokémon’s stats and types for damage calculation. All other effects work as normal.",
          "is_status": true
       },
@@ -1814,6 +1978,7 @@
          "power": 50,
          "accuracy": null,
          "description": "Used only if all PP are exhausted.",
+         "effect_chance": null,
          "effect": "Inflicts typeless regular damage. User takes 1/4 its max HP in recoil. Ignores accuracy and evasion modifiers. This move is used automatically when a Pokémon cannot use any other move legally, e.g., due to having no PP remaining or being under the effect of both encore and torment at the same time. This move’s recoil is not treated as recoil for the purposes of anything that affects recoil, such as the ability rock head. It also is not prevented by magic guard. This move cannot be copied by mimic, mirror move, or sketch, nor selected by assist or metronome, nor forced by encore.",
          "is_status": false
       }

@@ -62,8 +62,9 @@ class MoveData:
                             "category": move_info["damage_class"],
                             "description": move_info["description"],
                             "effect": move_info["effect"],
+                            "effect_chance": move_info.get("effect_chance"),  # NOVO: mapeia effect_chance
                             "is_status": move_info["is_status"],
-                            "sound_name": move_info["name"].lower()  # NOVO: nome do arquivo de som
+                            "sound_name": move_info["name"].lower()
                         }
                 print(f"[MoveData] Carregados dados de {len(self._moves_data)} moves")
             else:
@@ -146,8 +147,9 @@ class MoveData:
                     "category": move_info["category"],
                     "description": move_info["description"],
                     "effect": move_info["effect"],
+                    "effect_chance": move_info.get("effect_chance"),
                     "is_status": move_info["is_status"],
-                    "sound_name": move_info.get("sound_name", move_name_lower)  # NOVO
+                    "sound_name": move_info.get("sound_name", move_name_lower)
                 }
 
         # Fallback: move não encontrado
@@ -161,8 +163,9 @@ class MoveData:
             "category": "physical",
             "description": f"Usa {move_name}.",
             "effect": None,
+            "effect_chance": None,
             "is_status": False,
-            "sound_name": move_name_lower  # NOVO: fallback usa o nome do move
+            "sound_name": move_name_lower
         }
 
     def get_move_info_by_id(self, move_id: int) -> Optional[Dict]:
@@ -178,8 +181,9 @@ class MoveData:
                 "category": move_info["category"],
                 "description": move_info["description"],
                 "effect": move_info["effect"],
+                "effect_chance": move_info.get("effect_chance"),
                 "is_status": move_info["is_status"],
-                "sound_name": move_info.get("sound_name", move_info["name"].lower())  # NOVO
+                "sound_name": move_info.get("sound_name", move_info["name"].lower())
             }
         return None
 

@@ -8,12 +8,6 @@ from typing import Dict, List, Optional, Any
 def clean_text(text: str) -> str:
     """
     Limpa o texto removendo caracteres especiais e espaços extras
-
-    Args:
-        text: Texto original
-
-    Returns:
-        Texto limpo
     """
     if not text:
         return ""
@@ -32,16 +26,25 @@ def clean_text(text: str) -> str:
 
     return text
 
+def render_effect_text(effect_text: str, effect_chance: Optional[int]) -> str:
+    """
+    Substitui o placeholder $effect_chance% pelo valor real, se disponível.
+    """
+    if not effect_text:
+        return ""
+
+    if effect_chance is not None:
+        # Substitui o placeholder pelo número real, sem o símbolo de % para não duplicar
+        rendered_text = effect_text.replace('$effect_chance%', str(effect_chance))
+    else:
+        # Se não houver chance de efeito, remove o placeholder
+        rendered_text = effect_text.replace('$effect_chance%', '?')
+
+    return clean_text(rendered_text)
 
 def get_move_data(move_id: int) -> Optional[Dict[str, Any]]:
     """
     Obtém dados de um golpe específico da PokeAPI
-
-    Args:
-        move_id: ID do golpe
-
-    Returns:
-        Dicionário com os dados do golpe ou None se erro
     """
     url = f"https://pokeapi.co/api/v2/move/{move_id}"
     try:
@@ -56,20 +59,15 @@ def get_move_data(move_id: int) -> Optional[Dict[str, Any]]:
 def get_gen1_moves() -> List[int]:
     """
     Obtém a lista de IDs dos golpes da primeira geração
-
-    Returns:
-        Lista de IDs dos golpes
     """
     moves_ids = []
 
     # Os golpes da primeira geração são os primeiros 165 golpes
-    # (baseado na ordenação da PokeAPI)
     for move_id in range(1, 166):
         print(f"Verificando golpe #{move_id}...")
 
         move_data = get_move_data(move_id)
         if move_data:
-            # Verifica se o golpe é da primeira geração
             generation = move_data.get('generation', {})
             generation_name = generation.get('name', '')
 
@@ -77,68 +75,57 @@ def get_gen1_moves() -> List[int]:
                 moves_ids.append(move_id)
                 print(f"  -> Golpe #{move_id} ({move_data.get('name', '')}) é da Gen 1")
 
-        time.sleep(0.1)  # Pausa para não sobrecarregar a API
+        time.sleep(0.1)
 
     return moves_ids
 
 
 def extract_move_info(move_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Extrai as informações relevantes do golpe
-
-    Args:
-        move_data: Dados completos do golpe da API
-
-    Returns:
-        Dicionário com informações formatadas do golpe
+    Extrai as informações relevantes do golpe, incluindo effect_chance.
     """
-    # Extrai o tipo do golpe
     move_type = move_data.get('type', {})
     type_name = move_type.get('name', 'unknown') if move_type else 'unknown'
 
-    # Extrai a descrição em português (ou inglês como fallback)
+    # --- NOVO: Extrai effect_chance ---
+    effect_chance = move_data.get('effect_chance')
+
+    # Descrição em português
     descriptions = move_data.get('flavor_text_entries', [])
     description = ''
-
-    # Procura descrição em português
     for entry in descriptions:
         language = entry.get('language', {})
         if language.get('name') == 'pt-br':
             description = clean_text(entry.get('flavor_text', ''))
             break
-
-    # Se não encontrou português, procura inglês
     if not description:
         for entry in descriptions:
             language = entry.get('language', {})
             if language.get('name') == 'en':
                 description = clean_text(entry.get('flavor_text', ''))
                 break
-
-    # Se ainda não encontrou, usa a primeira disponível
     if not description and descriptions:
         description = clean_text(descriptions[0].get('flavor_text', ''))
 
-    # Extrai informações de dano
     damage_class = move_data.get('damage_class', {})
     damage_class_name = damage_class.get('name', 'status') if damage_class else 'status'
 
-    # Extrai PP, poder, precisão
     pp = move_data.get('pp', 0)
     power = move_data.get('power')
     accuracy = move_data.get('accuracy')
 
     # Efeitos especiais
     effect_entries = move_data.get('effect_entries', [])
-    effect = ''
-
+    raw_effect = ''
     for entry in effect_entries:
         language = entry.get('language', {})
         if language.get('name') == 'en':
-            effect = clean_text(entry.get('effect', ''))
+            raw_effect = entry.get('effect', '')
             break
 
-    # Verifica se é golpe de status
+    # --- NOVO: Cria uma versão renderizada do efeito com o valor real da chance ---
+    rendered_effect = render_effect_text(raw_effect, effect_chance)
+
     is_status = damage_class_name == 'status'
 
     return {
@@ -150,7 +137,9 @@ def extract_move_info(move_data: Dict[str, Any]) -> Dict[str, Any]:
         'power': power if power else None,
         'accuracy': accuracy if accuracy else None,
         'description': description,
-        'effect': effect if effect else None,
+        'effect_chance': effect_chance,          # <-- NOVO CAMPO
+        'effect_raw': raw_effect,                # <-- NOVO CAMPO (opcional)
+        'effect': rendered_effect,               # <-- AGORA É A VERSÃO RENDERIZADA
         'is_status': is_status,
         'generation': 'generation-i'
     }
@@ -159,12 +148,6 @@ def extract_move_info(move_data: Dict[str, Any]) -> Dict[str, Any]:
 def get_gen1_moves_detailed(move_ids: List[int]) -> List[Dict[str, Any]]:
     """
     Obtém informações detalhadas de todos os golpes da primeira geração
-
-    Args:
-        move_ids: Lista de IDs dos golpes
-
-    Returns:
-        Lista com informações detalhadas dos golpes
     """
     moves_data = []
 
@@ -175,25 +158,19 @@ def get_gen1_moves_detailed(move_ids: List[int]) -> List[Dict[str, Any]]:
         if move_data:
             move_info = extract_move_info(move_data)
             moves_data.append(move_info)
-            print(f"  -> {move_info['name']}: {move_info['type']} - {move_info['damage_class']}")
+            print(f"  -> {move_info['name']}: {move_info['type']} - {move_info['damage_class']} (Chance: {move_info['effect_chance']})")
 
-        time.sleep(0.1)  # Pausa para não sobrecarregar a API
+        time.sleep(0.1)
 
     return moves_data
 
 
 def save_moves_to_json(moves_data: List[Dict[str, Any]], filename: str = "pokemon_moves_gen1.json") -> None:
     """
-    Salva os dados dos golpes em um arquivo JSON
-
-    Args:
-        moves_data: Lista com dados dos golpes
-        filename: Nome do arquivo de saída
+    Salva os dados dos golpes em um arquivo JSON, incluindo effect_chance.
     """
-    # Organiza por ID
     moves_data.sort(key=lambda x: x['id'])
 
-    # Cria estrutura final
     output_data = {
         'generation': 'generation-i',
         'total_moves': len(moves_data),
@@ -210,11 +187,11 @@ def save_moves_to_json(moves_data: List[Dict[str, Any]], filename: str = "pokemo
             'power': move['power'],
             'accuracy': move['accuracy'],
             'description': move['description'],
-            'effect': move['effect'],
+            'effect_chance': move['effect_chance'],  # <-- NOVO CAMPO
+            'effect': move['effect'],                # <-- AGORA É A VERSÃO RENDERIZADA
             'is_status': move['is_status']
         }
 
-    # Salva arquivo
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(output_data, f, indent=3, ensure_ascii=False)
 
@@ -224,25 +201,18 @@ def save_moves_to_json(moves_data: List[Dict[str, Any]], filename: str = "pokemo
 def print_statistics(moves_data: List[Dict[str, Any]]) -> None:
     """
     Exibe estatísticas dos golpes coletados
-
-    Args:
-        moves_data: Lista com dados dos golpes
     """
     print("\n" + "=" * 50)
     print("ESTATÍSTICAS DOS GOLPES DA PRIMEIRA GERAÇÃO")
     print("=" * 50)
 
-    # Contagem por tipo
     type_count = {}
-    # Contagem por classe de dano
     damage_class_count = {'physical': 0, 'special': 0, 'status': 0}
 
     for move in moves_data:
-        # Contagem por tipo
         move_type = move['type']
         type_count[move_type] = type_count.get(move_type, 0) + 1
 
-        # Contagem por classe de dano
         damage_class = move['damage_class']
         if damage_class in damage_class_count:
             damage_class_count[damage_class] += 1
@@ -258,13 +228,11 @@ def print_statistics(moves_data: List[Dict[str, Any]]) -> None:
     for move_type, count in sorted_types:
         print(f"  - {move_type}: {count} golpes")
 
-    # Golpes com maior PP
     print("\nTop 5 golpes com maior PP:")
     pp_sorted = sorted(moves_data, key=lambda x: x['pp'], reverse=True)[:5]
     for move in pp_sorted:
         print(f"  - {move['name']}: {move['pp']} PP")
 
-    # Golpes com maior poder
     print("\nTop 5 golpes com maior poder:")
     power_moves = [m for m in moves_data if m['power'] is not None]
     if power_moves:
@@ -283,7 +251,6 @@ def main():
     print("\nEste script irá coletar todos os golpes da Gen 1 da PokeAPI")
     print("Isso pode levar alguns minutos...\n")
 
-    # Passo 1: Identificar golpes da primeira geração
     print("PASSO 1: Identificando golpes da primeira geração...")
     print("-" * 40)
     move_ids = get_gen1_moves()
@@ -294,7 +261,6 @@ def main():
 
     print(f"\nEncontrados {len(move_ids)} golpes da primeira geração!")
 
-    # Passo 2: Coletar informações detalhadas
     print("\nPASSO 2: Coletando informações detalhadas...")
     print("-" * 40)
     moves_data = get_gen1_moves_detailed(move_ids)
@@ -303,27 +269,26 @@ def main():
         print("Erro: Não foi possível coletar os dados dos golpes!")
         return
 
-    # Passo 3: Salvar dados em arquivo
     print("\nPASSO 3: Salvando dados...")
     print("-" * 40)
     save_moves_to_json(moves_data)
 
-    # Passo 4: Exibir estatísticas
     print_statistics(moves_data)
 
     print("\n" + "=" * 50)
     print("PROCESSO CONCLUÍDO COM SUCESSO!")
     print("=" * 50)
 
-    # Exemplo do formato do arquivo
-    print("\nExemplo de um golpe com descrição limpa:")
+    print("\nExemplo de um golpe com effect_chance e efeito renderizado:")
     if moves_data:
-        sample_move = moves_data[0]
+        # Procura um golpe que tenha effect_chance para exemplificar
+        sample_move = next((m for m in moves_data if m['effect_chance'] is not None), moves_data[0])
         print(f"  ID: {sample_move['id']}")
         print(f"  Nome: {sample_move['name']}")
         print(f"  Tipo: {sample_move['type']}")
+        print(f"  Chance de Efeito: {sample_move['effect_chance']}%")
         print(f"  Descrição: {sample_move['description']}")
-        print(f"  Efeito: {sample_move['effect'][:100]}..." if sample_move['effect'] else "  Efeito: Nenhum")
+        print(f"  Efeito (Renderizado): {sample_move['effect'][:100]}..." if sample_move['effect'] else "  Efeito: Nenhum")
 
 
 if __name__ == "__main__":
