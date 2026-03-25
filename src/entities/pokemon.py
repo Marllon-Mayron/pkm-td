@@ -107,7 +107,8 @@ class Pokemon(Entity):
         self.path_index = 0
         self.move_speed = 2.0
         self.original_path = None  # Mantido para compatibilidade
-
+        self.path_index_origin = 0  # Qual path este inimigo pertence
+        self.is_returning_with_item = False  # Se está voltando com item
         if is_wild:
             self.base_move_speed = self._get_cached_move_speed()
             self.move_speed = self.base_move_speed
@@ -442,23 +443,6 @@ class Pokemon(Entity):
 
         return nearest
 
-    def update_combat(self, dt, enemies):
-        """Atualiza lógica de combate - versão corrigida"""
-        if self.charge_cooldown > 0:
-            self.charge_cooldown -= dt
-
-        if self.target and not self.target.is_alive():
-            self.target = None
-            self.combat_state = "returning"
-            return
-
-        if self.combat_state == "idle":
-            self._handle_idle_state(dt, enemies)
-        elif self.combat_state == "charging":
-            self._handle_charging_state(dt)
-        elif self.combat_state == "returning":
-            self._handle_returning_state(dt)
-
     def _handle_idle_state(self, dt, enemies):
         """Estado parado - procura inimigo"""
         nearest = self.find_nearest_enemy(enemies)
@@ -760,11 +744,22 @@ class Pokemon(Entity):
             self.damage_contributions[attacker_id] = self.damage_contributions.get(attacker_id, 0) + actual_damage
             self.last_attacker = attacker
 
-        # Se o Pokémon morreu, toca som de faint
+        # Se o Pokémon morreu, toca som de faint e libera o item
         if self.current_hp <= 0:
             from src.managers.move_sound_manager import move_sound_manager
             move_sound_manager.play_attack_sound("faint")
             print(f"[BATTLE] {self.name} foi derrotado!")
+
+            # ===== LIBERA O ITEM SE ESTAVA CARRREGANDO =====
+            if self.is_carrying:
+                carried_item = self.is_carrying
+                # CORREÇÃO: usa item_name
+                print(f"[ITEM] {carried_item.item_name} será liberado com a morte de {self.name}")
+                carried_item.reset_capture()
+                carried_item.is_protected = True
+                carried_item.is_stolen = False
+                carried_item.carried_by = None
+                self.is_carrying = None
 
         return self.current_hp <= 0
 
@@ -793,67 +788,8 @@ class Pokemon(Entity):
         if self.is_carrying:
             self.is_carrying = None
 
-    def recalculate_path_after_capture(self):
-        if not self.path or self.path_index >= len(self.path):
-            return
-
-        current_idx = self.path_index
-
-        start_distance = 0
-        if current_idx > 0:
-            start_distance += math.hypot(self.x - self.path[current_idx][0],
-                                         self.y - self.path[current_idx][1])
-            for i in range(current_idx, 0, -1):
-                x1, y1 = self.path[i]
-                x2, y2 = self.path[i - 1]
-                start_distance += math.hypot(x2 - x1, y2 - y1)
-
-        end_distance = 0
-        if current_idx < len(self.path) - 1:
-            end_distance += math.hypot(self.x - self.path[current_idx][0],
-                                       self.y - self.path[current_idx][1])
-            for i in range(current_idx, len(self.path) - 1):
-                x1, y1 = self.path[i]
-                x2, y2 = self.path[i + 1]
-                end_distance += math.hypot(x2 - x1, y2 - y1)
-
-        if start_distance < end_distance:
-            if not hasattr(self, 'original_path') or self.original_path is None:
-                self.original_path = self.path.copy()
-
-            self.path = list(reversed(self.original_path.copy()))
-
-            min_dist = float('inf')
-            closest_idx = 0
-            for i, point in enumerate(self.path):
-                dist = math.hypot(self.x - point[0], self.y - point[1])
-                if dist < min_dist:
-                    min_dist = dist
-                    closest_idx = i
-            self.path_index = closest_idx
-        else:
-            if hasattr(self, 'original_path') and self.original_path is not None:
-                self.path = self.original_path.copy()
-            else:
-                self.original_path = self.path.copy()
-
-            min_dist = float('inf')
-            closest_idx = self.path_index
-            for i, point in enumerate(self.path):
-                if i >= self.path_index:
-                    dist = math.hypot(self.x - point[0], self.y - point[1])
-                    if dist < min_dist:
-                        min_dist = dist
-                        closest_idx = i
-            self.path_index = closest_idx
-
-        self.target = None
-        self.combat_state = "idle"
-
-        if self.is_boss:
-            self.is_returning_with_item = True
-
     def update(self, dt, player=None, enemies=None, items=None):
+        """Update do Pokémon - versão compatível com WaveManager"""
         self.last_x = self.x
         self.last_y = self.y
 
@@ -863,54 +799,79 @@ class Pokemon(Entity):
             if self.miss_timer < 0:
                 self.miss_timer = 0
 
+        # Cooldown de ataque
         if not self.can_attack:
             self.attack_cooldown -= 1
             if self.attack_cooldown <= 0:
                 self.can_attack = True
 
-        # Lógica de captura de itens
-        if self.is_wild and items is not None and not self.is_carrying:
-            for item in items:
-                if hasattr(item, 'is_protected') and item.is_protected and not item.carried_by:
-                    dx = self.x - item.x
-                    dy = self.y - item.y
-                    if dx * dx + dy * dy < self.capture_range * self.capture_range:
-                        item.start_capture(self)
-                        self.recalculate_path_after_capture()
-                        break
+        # ===== MOVIMENTO: SÓ EXECUTA SE NÃO FOR CONTROLADO PELO WAVE MANAGER =====
+        # Verifica se este Pokémon está sob controle do wave manager
+        # Inimigos selvagens com path_index_origin definido são controlados pelo WaveManager
+        is_wave_controlled = hasattr(self, 'path_index_origin') and self.is_wild
 
-        # Movimento em path
-        if self.path and len(self.path) > 0 and self.path_index < len(self.path):
-            target_x, target_y = self.path[self.path_index]
-            dx = target_x - self.x
-            dy = target_y - self.y
-            distance_sq = dx * dx + dy * dy
-            move_distance = self.move_speed * dt * 60
+        # BOSS também é controlado pelo WaveManager
+        if self.is_boss:
+            is_wave_controlled = True
 
-            if distance_sq <= move_distance * move_distance:
-                self.x, self.y = target_x, target_y
-                self.path_index += 1
-                if self.path_index >= len(self.path):
-                    self.rect.x, self.rect.y = self.x, self.y
-                    return
-            else:
-                distance = math.sqrt(distance_sq)
-                move_x = (dx / distance) * move_distance
-                move_y = (dy / distance) * move_distance
-                self.x += move_x
-                self.y += move_y
+        if not is_wave_controlled:
+            # Movimento para Pokémon não controlados por waves (como aliados colocados)
+            self._update_movement(dt, items)
 
-                if abs(dx) > abs(dy):
-                    self.current_direction = "right" if dx > 0 else "left"
-                else:
-                    self.current_direction = "down" if dy > 0 else "up"
+        # ===== CAPTURA DE ITENS: SÓ EXECUTA SE NÃO FOR CONTROLADO =====
+        if self.is_wild and not is_wave_controlled and items is not None and not self.is_carrying:
+            self._check_item_capture(items)
 
-            self.rect.x, self.rect.y = self.x, self.y
-
+        # Atualização do item carregado (sempre)
         if self.is_carrying:
             self.is_carrying.update_capture(dt)
 
-        # Animação
+        # ===== ANIMAÇÃO (sempre) =====
+        self._update_animation(dt)
+
+    def _update_movement(self, dt, items=None):
+        """Movimento via path (para aliados ou inimigos sem wave control)"""
+        if not self.path or len(self.path) == 0 or self.path_index >= len(self.path):
+            return
+
+        target_x, target_y = self.path[self.path_index]
+        dx = target_x - self.x
+        dy = target_y - self.y
+        distance_sq = dx * dx + dy * dy
+        move_distance = self.move_speed * dt * 60
+
+        if distance_sq <= move_distance * move_distance:
+            self.x, self.y = target_x, target_y
+            self.path_index += 1
+            if self.path_index >= len(self.path):
+                self.rect.x, self.rect.y = self.x, self.y
+                return
+        else:
+            distance = math.sqrt(distance_sq)
+            move_x = (dx / distance) * move_distance
+            move_y = (dy / distance) * move_distance
+            self.x += move_x
+            self.y += move_y
+
+            if abs(dx) > abs(dy):
+                self.current_direction = "right" if dx > 0 else "left"
+            else:
+                self.current_direction = "down" if dy > 0 else "up"
+
+        self.rect.x, self.rect.y = self.x, self.y
+
+    def _check_item_capture(self, items):
+        """Verifica captura de item (apenas para Pokémon sem wave control)"""
+        for item in items:
+            if hasattr(item, 'is_protected') and item.is_protected and not item.carried_by:
+                dx = self.x - item.x
+                dy = self.y - item.y
+                if dx * dx + dy * dy < self.capture_range * self.capture_range:
+                    item.start_capture(self)
+                    break
+
+    def _update_animation(self, dt):
+        """Atualiza animação do sprite"""
         self.animation_timer += dt
         if self.animation_timer >= self.animation_speed:
             self.animation_timer = 0
@@ -919,6 +880,23 @@ class Pokemon(Entity):
                 if frames_list:
                     self.current_frame = (self.current_frame + 1) % len(frames_list)
                     self.sprite = frames_list[self.current_frame]
+
+    def update_combat(self, dt, enemies):
+        """Atualiza lógica de combate - versão corrigida"""
+        if self.charge_cooldown > 0:
+            self.charge_cooldown -= dt
+
+        if self.target and not self.target.is_alive():
+            self.target = None
+            self.combat_state = "returning"
+            return
+
+        if self.combat_state == "idle":
+            self._handle_idle_state(dt, enemies)
+        elif self.combat_state == "charging":
+            self._handle_charging_state(dt)
+        elif self.combat_state == "returning":
+            self._handle_returning_state(dt)
 
     def get_distance_to(self, entity):
         dx = self.x - entity.x

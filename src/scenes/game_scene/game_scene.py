@@ -62,6 +62,7 @@ class GameScene(BaseScene):
 
         # Cria o wave_manager
         self.wave_manager = GameWaveManager(phase_loader)
+        self.wave_manager.set_paths_data(self.path_renderer)
 
         self.battle_system = BattleSystem(self)
 
@@ -130,6 +131,9 @@ class GameScene(BaseScene):
 
     def _start_game(self):
         """Inicia o jogo"""
+        # Reseta ouro acumulado
+        self.wave_manager.reset_gold()
+
         # Configura battle_system para Pokémon já colocados
         for pokemon in self.placement_manager.placed_pokemon:
             pokemon.set_battle_system(self.battle_system)
@@ -689,11 +693,15 @@ class GameScene(BaseScene):
 
         # State transitions
         if self.game_state == "in_wave":
-            if wave_mgr.is_wave_completely_finished():
+            wave_finished = wave_mgr.is_wave_completely_finished()
+            if wave_finished:
+                print(f"[DEBUG] Wave finished! items_protected={target_mgr.items_protected}")
                 if target_mgr.items_protected > 0:
+                    print("[DEBUG] Transitioning to completed...")
                     self.game_state = "completed"
                     self._complete_phase()
                 else:
+                    print("[DEBUG] No items protected, game over!")
                     self.game_state = "game_over"
                     self.overlay_manager.show(OverlayType.GAME_OVER)
 
@@ -829,30 +837,28 @@ class GameScene(BaseScene):
 
         # ===== CALCULAR RECOMPENSAS =====
         base_reward = self.phase_rewards['money']  # Ex: 100
-        gold_from_defeats = self.wave_manager.get_total_gold_earned()  # Ex: 55
+        gold_from_defeats = self.wave_manager.get_total_gold_earned()  # Ouro já acumulado
 
         # Verificar se nenhum item foi roubado
         total_items = len(self.target_item_manager.items)
         stolen_items = self.target_item_manager.items_stolen
 
-        bonus_multiplier = 1.0
         bonus_amount = 0
 
         if stolen_items == 0 and total_items > 0:
-            bonus_multiplier = 1.3
-            bonus_amount = int(gold_from_defeats * 0.3)  # Ex: 16 (30% de 55)
+            bonus_amount = int(gold_from_defeats * 0.3)  # Bônus de 30% sobre ouro ganho
             print(f"[BONUS] Nenhum item roubado! +30% de bônus em ouro! +{bonus_amount}")
 
-        # Calcular ouro total
-        gold_total = base_reward + gold_from_defeats + bonus_amount  # Ex: 100 + 55 + 16 = 171
+        # Calcular ouro total (já tem o gold_from_defeats acumulado)
+        gold_total = base_reward + gold_from_defeats + bonus_amount
 
-        # ===== APLICAR RECOMPENSAS APENAS AGORA =====
+        # ===== APLICAR RECOMPENSAS =====
         self.player.money += gold_total
         print(
             f"[REWARD] Ouro adicionado: {gold_total} (Fase: {base_reward} + Derrotas: {gold_from_defeats} + Bônus: {bonus_amount})")
         print(f"[REWARD] Total de ouro do jogador agora: {self.player.money}")
 
-        # Distribuir XP
+        # Distribuir XP (recompensa de fase, além do XP por derrota)
         for pokemon in self.player.team:
             pokemon.gain_xp(self.phase_rewards['experience'])
         self.player.score += self.phase_rewards['experience']

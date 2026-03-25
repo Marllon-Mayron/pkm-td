@@ -189,10 +189,7 @@ class BattleSystem:
         from src.managers.move_sound_manager import move_sound_manager
 
         # Para ataques físicos: toca som do atacante E do impacto
-        # Para ataques especiais: o projétil já tocou o som do atacante,
-        # aqui toca só o som do impacto
         if move.category == "physical":
-            # Toca som do atacante
             move_sound_manager.play_attack_sound(move.sound_name)
             print(f"[SOM] {move.name} (físico) - som do atacante: {move.sound_name}")
 
@@ -202,22 +199,6 @@ class BattleSystem:
 
         # Aplica dano
         target.take_damage(damage, attacker=attacker)
-
-        # Registrar contribuição de dano
-        attacker_id = id(attacker)
-        target.damage_contributions[attacker_id] = target.damage_contributions.get(attacker_id, 0) + damage
-
-        # Mensagens de log
-        if damage_result.get("stab"):
-            print(f"[BATTLE] {attacker.name} usou {move.name}! (STAB)")
-
-        if damage_result["message"]:
-            print(f"[BATTLE] {damage_result['message']}")
-
-        print(f"[BATTLE] Causou {damage} de dano a {target.name}!")
-
-        if not target.is_alive():
-            print(f"[BATTLE] {target.name} foi derrotado!")
 
     def _apply_status(self, attacker: 'Pokemon', target: 'Pokemon', move):
         """Aplica efeito de status ao alvo"""

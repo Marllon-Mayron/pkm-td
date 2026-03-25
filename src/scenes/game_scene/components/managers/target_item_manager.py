@@ -108,22 +108,13 @@ class TargetItemManager:
         """Atualiza todos os itens e verifica game over"""
         items_to_remove = []
 
-        for item in self.items[:]:  # Itera sobre cópia
+        for item in self.items[:]:
             item.update(dt)
 
             # ===== CRITÉRIO: Item foi roubado =====
-            # Um item é considerado roubado se:
-            # 1. Foi marcado como is_stolen (pelo wave_manager)
-            # 2. OU está sendo carregado por um Pokémon que morreu (carried_by is None mas is_protected False)
-            # 3. OU is_protected é False (item foi capturado)
-
-            is_stolen = (not item.is_protected) or item.is_stolen
-
-            # Verificação extra: se está sendo carregado mas o Pokémon morreu
-            if item.carried_by and not hasattr(item.carried_by, 'is_alive'):
-                is_stolen = True
-
-            if is_stolen and item not in items_to_remove:
+            # Um item é considerado roubado SOMENTE se foi marcado como is_stolen
+            # (quando um Pokémon chegou ao fim com ele)
+            if item.is_stolen:
                 items_to_remove.append(item)
 
         # Remove itens roubados
@@ -132,17 +123,12 @@ class TargetItemManager:
                 self.items.remove(item)
                 self.items_stolen += 1
                 self.items_protected = len(self.items)
-                print(f"[ITENS] {item.item_name} foi removido! Restam {self.items_protected}/{self.total_items}")
+                print(f"[ITENS] {item.item_name} foi ROUBADO! Restam {self.items_protected}/{self.total_items}")
 
         # ===== VERIFICA GAME OVER =====
-        # Game over quando não há mais itens protegidos (todos foram roubados)
         if self.items_protected <= 0 and self.total_items > 0:
             self.game_over = True
-            print(f"[GAME OVER] Todos os {self.total_items} itens foram levados!")
-            return
-
-        # Se ainda tem itens, mas todos estão sendo carregados ou protegidos, continua
-        # Não há game over
+            print(f"[GAME OVER] Todos os {self.total_items} itens foram roubados!")
 
     def mark_item_as_stolen(self, item):
         """Marca um item como roubado (chamado pelo wave_manager)"""

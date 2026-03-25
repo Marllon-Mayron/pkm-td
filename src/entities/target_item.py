@@ -91,11 +91,11 @@ class TargetItem(Entity):
             print(f"{pokemon.name} começou a carregar {self.item_name}")
 
     def reset_capture(self):
-        """Reseta o processo de captura quando o Pokémon é capturado/removido"""
+        """Reseta o processo de captura quando o Pokémon é morto/capturado (item volta ao chão)"""
         if self.carried_by:
-            print(f"[ITEM] Resetando captura de {self.item_name} - {self.carried_by.name} foi capturado/removido")
+            print(f"[ITEM] Resetando captura de {self.item_name} - {self.carried_by.name} foi derrotado/capturado")
 
-            # IMPORTANTE: Salva a posição atual ANTES de limpar as referências
+            # Salva a posição atual onde o Pokémon morreu
             drop_x = self.current_x
             drop_y = self.current_y
 
@@ -103,13 +103,14 @@ class TargetItem(Entity):
             if hasattr(self.carried_by, 'is_carrying'):
                 self.carried_by.is_carrying = None
 
-            # Reseta o estado do item
+            # Reseta o estado do item (volta ao chão, NÃO roubado)
             self.carried_by = None
             self.capture_progress = 0
-            self.is_protected = True
-            self.was_carried = True  # Marca que já foi carregado
+            self.is_protected = True  # Volta a ser protegido
+            self.is_stolen = False  # NÃO está roubado
+            self.was_carried = True
 
-            # Mantém o item na posição onde o Pokémon foi derrotado/capturado
+            # Mantém o item na posição onde o Pokémon foi derrotado
             self.current_x = drop_x
             self.current_y = drop_y
             self.x = drop_x
@@ -117,7 +118,7 @@ class TargetItem(Entity):
             self.rect.x = drop_x
             self.rect.y = drop_y
 
-            print(f"[ITEM] {self.item_name} dropado em ({drop_x:.1f}, {drop_y:.1f})")
+            print(f"[ITEM] {self.item_name} dropado em ({drop_x:.1f}, {drop_y:.1f}) - ainda pode ser capturado")
 
     def update_capture(self, dt):
         """Atualiza o progresso de captura"""
