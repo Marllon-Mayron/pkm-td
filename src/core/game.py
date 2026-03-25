@@ -1,3 +1,5 @@
+# src/core/game.py
+
 """
 Classe principal do jogo
 """
@@ -7,7 +9,7 @@ from src.core.screen import ScreenManager
 from src.core.camera import Camera
 from src.entities.player import Player  # Importa a classe Player
 from src.scenes.menu_scene import MenuScene
-from src.managers.sound_manager import sound_manager
+
 
 class Game:
     def __init__(self):
@@ -21,19 +23,27 @@ class Game:
         # TENTA CARREGAR O SAVE AUTOMATICAMENTE
         save_loaded = self.player.load_game(1)  # Tenta carregar slot 1
 
-
         if not save_loaded:
             # Se não tinha save, cria um Pokémon inicial
             print("[GAME] Nenhum save encontrado, criando novo jogo")
             self.player.add_starter(7)  # ID 7 = Squirtle
+
+            # Cria um save inicial com configurações padrão
+            from src.config.progress import progress_manager
+            progress_manager._sync_with_save_manager()  # Cria o save com configurações padrão
+            print("[GAME] Save inicial criado com configurações padrão")
         else:
             print("[GAME] Save carregado com sucesso!")
             print(f"  - Time: {len(self.player.team)} Pokémon")
             print(f"  - Box: {len(self.player.pc_box)} Pokémon")
             print(f"  - Itens: {self.player.bag.items}")
-            # Se carregou save, carrega também as configurações
+
+            # Carrega as configurações do save
             from src.config.progress import progress_manager
             progress_manager._load_settings_from_save()  # Carrega configurações do save
+
+            # Aplica as configurações de áudio carregadas
+            print(f"[GAME] Configurações carregadas: Música={settings.music_volume} ({'ON' if settings.music_enabled else 'OFF'}), SFX={settings.sfx_volume}")
 
         # Câmera
         self.camera = None
@@ -121,5 +131,13 @@ class Game:
 
     def quit(self):
         """Finaliza o jogo"""
+        # Salva as configurações atuais antes de sair
         settings.save_settings()
+
+        # Salva o progresso atual se houver um save carregado
+        from src.config.progress import progress_manager
+        if progress_manager.save_manager.current_save_file:
+            progress_manager._sync_with_save_manager()
+            print("[GAME] Progresso salvo antes de sair")
+
         pygame.quit()

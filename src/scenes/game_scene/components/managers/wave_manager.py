@@ -6,6 +6,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 
 from src.entities.pokemon import Pokemon
+from src.managers.sound_manager import sound_manager, SoundEffect
 
 
 class EnemyState(Enum):
@@ -90,7 +91,7 @@ class GameWaveManager:
 
         # Acumuladores
         self.total_gold_earned = 0
-        self.gold_per_defeat = 5
+        self.gold_per_defeat = 10
 
         # Carrega dados
         self._load_waves_data()
@@ -428,7 +429,7 @@ class GameWaveManager:
         print(f"[BOSS] {enemy.name} invertido - novo path_index={enemy.path_index}, path_length={len(enemy.path)}")
 
     # Adicione esta constante
-    MIN_TRAVEL_DISTANCE = 5.0  # Distância mínima para considerar que realmente andou
+    MIN_TRAVEL_DISTANCE = 15.0  # Distância mínima para considerar que realmente andou
 
     def _check_arrival(self, enemy: Pokemon) -> Tuple[bool, bool]:
         """
@@ -708,6 +709,8 @@ class GameWaveManager:
             shiny=random.random() < 0.001,
             is_boss=is_boss
         )
+        if pokemon.is_shiny:
+            sound_manager.play_effect(SoundEffect.SHINY)
 
         # Configura path - IMPORTANTE: cópia completa da lista
         pokemon.path = path_data.points.copy()

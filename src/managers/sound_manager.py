@@ -6,7 +6,15 @@ import pygame
 import os
 from pathlib import Path
 from typing import Dict, Optional, List
+from enum import Enum, auto
 from src.config.paths import RES_PATH
+
+
+class SoundEffect(Enum):
+    """Enum para os efeitos sonoros do jogo"""
+    SHINY = "Shiny"
+    CAUGHT = "Caught"
+    CLICK = "Click"
 
 
 class SoundManager:
@@ -22,6 +30,9 @@ class SoundManager:
         self.sounds: Dict[str, pygame.mixer.Sound] = {}
         self.music_playing: Optional[str] = None
 
+        # Dicionário específico para efeitos
+        self.effects: Dict[SoundEffect, pygame.mixer.Sound] = {}
+
         # Volumes (0.0 a 1.0)
         self._sfx_volume = 0.7
         self._music_volume = 0.5
@@ -32,10 +43,52 @@ class SoundManager:
 
         # Carrega todos os sons
         self.load_all_sounds()
+        self.load_effects()
 
         print("[SOUND] SoundManager inicializado")
         print(f"[SOUND] Pasta de sons: {self.sounds_path}")
         print(f"[SOUND] Sons carregados: {len(self.sounds)}")
+        print(f"[SOUND] Efeitos carregados: {len(self.effects)}")
+
+    def load_effects(self):
+        """Carrega os efeitos sonoros da pasta res/sounds/effects"""
+        effects_path = self.sounds_path / "effects"
+
+        if not effects_path.exists():
+            print(f"[SOUND] Aviso: Pasta de efeitos não encontrada: {effects_path}")
+            return
+
+        # Carrega o Shiny.mp3
+        shiny_path = effects_path / "Shiny.mp3"
+        if shiny_path.exists():
+            try:
+                self.effects[SoundEffect.SHINY] = pygame.mixer.Sound(str(shiny_path))
+                print(f"[SOUND] Efeito carregado: Shiny")
+            except Exception as e:
+                print(f"[SOUND] Erro ao carregar Shiny.mp3: {e}")
+        else:
+            print(f"[SOUND] Aviso: Shiny.mp3 não encontrado em {effects_path}")
+
+        # Carrega o Caught.mp3
+        caught_path = effects_path / "Caught.mp3"
+        if caught_path.exists():
+            try:
+                self.effects[SoundEffect.CAUGHT] = pygame.mixer.Sound(str(caught_path))
+                print(f"[SOUND] Efeito carregado: Caught")
+            except Exception as e:
+                print(f"[SOUND] Erro ao carregar Caught.mp3: {e}")
+        else:
+            print(f"[SOUND] Aviso: Caught.mp3 não encontrado em {effects_path}")
+
+        click_path = effects_path / "Click.mp3"
+        if click_path.exists():
+            try:
+                self.effects[SoundEffect.CLICK] = pygame.mixer.Sound(str(click_path))
+                print(f"[SOUND] Efeito carregado: Click")
+            except Exception as e:
+                print(f"[SOUND] Erro ao carregar Click.mp3: {e}")
+        else:
+            print(f"[SOUND] Aviso: Click.mp3 não encontrado em {effects_path}")
 
     def load_all_sounds(self):
         """Carrega todos os sons da pasta res/sounds"""
@@ -91,23 +144,23 @@ class SoundManager:
         except Exception as e:
             print(f"[SOUND] Erro ao carregar {file_path}: {e}")
 
-    def play_sound(self, sound_id: str, volume: Optional[float] = None, loops: int = 0) -> bool:
+    def play_effect(self, effect: SoundEffect, volume: Optional[float] = None, loops: int = 0) -> bool:
         """
-        Toca um efeito sonoro
+        Toca um efeito sonoro usando o enum SoundEffect
 
         Args:
-            sound_id: Identificador do som (nome do arquivo sem extensão)
-            volume: Volume específico para este som (0.0 a 1.0)
+            effect: Enum do efeito a ser tocado (SoundEffect.SHINY ou SoundEffect.CAUGHT)
+            volume: Volume específico para este efeito (0.0 a 1.0)
             loops: Número de repetições (-1 para loop infinito)
 
         Returns:
             True se tocou, False se não encontrou
         """
-        if sound_id not in self.sounds:
-            print(f"[SOUND] Som não encontrado: {sound_id}")
+        if effect not in self.effects:
+            print(f"[SOUND] Efeito não encontrado: {effect.value}")
             return False
 
-        sound = self.sounds[sound_id]
+        sound = self.effects[effect]
         if volume is not None:
             sound.set_volume(volume)
         else:
@@ -117,7 +170,7 @@ class SoundManager:
             sound.play(loops)
             return True
         except Exception as e:
-            print(f"[SOUND] Erro ao tocar {sound_id}: {e}")
+            print(f"[SOUND] Erro ao tocar efeito {effect.value}: {e}")
             return False
 
     def play_random_battle_music(self):
@@ -249,6 +302,8 @@ class SoundManager:
         self._sfx_volume = max(0.0, min(1.0, volume))
         for sound in self.sounds.values():
             sound.set_volume(self._sfx_volume)
+        for effect in self.effects.values():
+            effect.set_volume(self._sfx_volume)
         print(f"[SOUND] SFX volume: {self._sfx_volume}")
 
     def set_music_volume(self, volume: float):

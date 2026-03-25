@@ -8,20 +8,9 @@ import os
 from pathlib import Path
 from typing import Dict, List, Optional
 
-# src/managers/progress.py
-
-"""
-Sistema de progresso do jogador - Integrado com SaveManager
-"""
-import json
-import os
-from pathlib import Path
-from typing import Dict, List, Optional
-
 
 class ProgressManager:
     def __init__(self):
-        # Agora usa o SaveManager como fonte única de dados
         from src.managers.save_manager import save_manager
         from src.config.settings import settings
 
@@ -53,32 +42,8 @@ class ProgressManager:
             "completed_phases": completed_phases,
             "current_chapter": game_state.get("current_chapter", 1),
             "current_phase": game_state.get("current_phase", 1),
-            "stars": converted_stars,
-            "settings": self._load_settings()
+            "stars": converted_stars
         }
-
-    def _load_settings(self) -> Dict:
-        """Carrega configurações"""
-        config_path = Path('config.json')
-        default_settings = {
-            "sound_volume": 0.7,
-            "music_volume": 0.5,
-            "show_fps": False
-        }
-
-        if config_path.exists():
-            try:
-                with open(config_path, 'r') as f:
-                    data = json.load(f)
-                    return {
-                        "sound_volume": data.get("sound_volume", default_settings["sound_volume"]),
-                        "music_volume": data.get("music_volume", default_settings["music_volume"]),
-                        "show_fps": data.get("show_fps", default_settings["show_fps"])
-                    }
-            except:
-                pass
-
-        return default_settings
 
     def _load_settings_from_save(self):
         """Carrega configurações do save atual"""
@@ -106,7 +71,16 @@ class ProgressManager:
                 else:
                     sound_manager.set_music_volume(0)
 
-                print("[PROGRESS] Configurações carregadas do save")
+                print(
+                    f"[PROGRESS] Configurações carregadas do save: Música={self.settings.music_volume} ({'ON' if self.settings.music_enabled else 'OFF'}), SFX={self.settings.sfx_volume}")
+                return True
+
+        return False
+
+    def _save_settings_to_save(self):
+        """Salva as configurações atuais no save manager"""
+        if self.save_manager.current_save_file:
+            self.save_manager.save_settings(self.settings)
 
     def _sync_with_save_manager(self):
         """Sincroniza o progresso atual com o SaveManager e salva imediatamente"""
@@ -122,6 +96,7 @@ class ProgressManager:
             "stars": self.progress["stars"]
         })
 
+        # Salva as configurações atuais
         self.save_manager.save_data["settings"] = {
             "sfx_volume": self.settings.sfx_volume,
             "music_volume": self.settings.music_volume,
@@ -134,14 +109,18 @@ class ProgressManager:
 
         # Salva no arquivo atual usando o SaveManager
         if self.save_manager.current_save_file:
-            # Importante: usar save_game do SaveManager diretamente
-            self.save_manager.save_game(
-                player=None,  # O jogador será salvo separadamente pelo auto_save()
-                game_state=self.save_manager.save_data["game_state"],
-                save_name=self.save_manager.save_data["meta"]["save_name"],
-                slot=self.save_manager.current_save_file
-            )
-            print(f"[PROGRESS] Progresso sincronizado com save {self.save_manager.current_save_file}")
+            # Salva o arquivo completo
+            filename = f"save_{self.save_manager.current_save_file}.json"
+            filepath = os.path.join(self.save_manager.save_dir, filename)
+
+            try:
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    json.dump(self.save_manager.save_data, f, indent=2, ensure_ascii=False)
+                print(f"[PROGRESS] Progresso sincronizado com save {self.save_manager.current_save_file}")
+                print(
+                    f"[PROGRESS] Configurações salvas: Música={self.settings.music_volume}, SFX={self.settings.sfx_volume}")
+            except Exception as e:
+                print(f"[ERRO] Falha ao sincronizar progresso: {e}")
 
     def get_next_phase(self, phase_id: str) -> Optional[str]:
         """Retorna o ID da próxima fase"""
@@ -252,6 +231,7 @@ class ProgressManager:
     def reload_progress(self):
         """Recarrega o progresso do save atual"""
         self.progress = self._load_from_save_manager()
+        self._load_settings_from_save()  # Também recarrega as configurações
         print("[PROGRESS] Progresso recarregado do SaveManager")
 
     def reset_progress(self):
@@ -261,8 +241,7 @@ class ProgressManager:
             "completed_phases": [],
             "current_chapter": 1,
             "current_phase": 1,
-            "stars": {},
-            "settings": self.progress.get("settings", {})
+            "stars": {}
         }
         self._sync_with_save_manager()
         print("Progresso resetado!")

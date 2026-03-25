@@ -28,7 +28,7 @@ class SaveManager:
 
         self._initialized = True
         self.save_dir = "saves"  # Pasta de saves
-        self.current_save_file = None
+        self.current_save_file = None  # Armazena o slot atual
         self.save_data = self._get_default_save_data()
 
         # Garante que a pasta de saves existe
@@ -67,7 +67,7 @@ class SaveManager:
                 "completed_phases": [],
                 "stars": {}
             },
-            # NOVO: Configurações de áudio e vídeo
+            # Configurações de áudio e vídeo
             "settings": {
                 "sfx_volume": 0.7,
                 "music_volume": 0.5,
@@ -151,10 +151,13 @@ class SaveManager:
 
         return pokemon
 
-    def save_game(self, player, game_state=None, save_name="save", slot=1):
+    def save_game(self, player, game_state=None, save_name="save", slot=1) -> bool:
         """
         Salva o estado completo do jogo
         """
+        # Atualiza o slot atual
+        self.current_save_file = slot
+
         # Atualiza os dados do jogador
         self.save_data["player"]["money"] = player.money
         self.save_data["player"]["score"] = player.score
@@ -214,6 +217,8 @@ class SaveManager:
             print(f"[SAVE] Jogo salvo em {filepath}")
             print(f"[SAVE] Box: {len(unique_box)} Pokémon | Time: {len(player.team)} Pokémon")
             print(f"[SAVE] Itens salvos: {self.save_data['player']['bag']}")
+            print(
+                f"[SAVE] Configurações salvas: Volume Música={self.save_data['settings']['music_volume']}, SFX={self.save_data['settings']['sfx_volume']}")
             return True
         except Exception as e:
             print(f"[ERRO] Falha ao salvar: {e}")
@@ -222,7 +227,7 @@ class SaveManager:
     def save_settings(self, settings_obj) -> bool:
         """Salva as configurações atuais no save atual"""
         if not self.current_save_file:
-            print("[SAVE] Nenhum save carregado para salvar configurações")
+            print("[SAVE] Nenhum save carregado, não é possível salvar configurações")
             return False
 
         # Atualiza as configurações no save_data
@@ -243,7 +248,7 @@ class SaveManager:
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(self.save_data, f, indent=2, ensure_ascii=False)
-            print("[SAVE] Configurações salvas com sucesso")
+            print(f"[SAVE] Configurações salvas: Música={settings_obj.music_volume}, SFX={settings_obj.sfx_volume}")
             return True
         except Exception as e:
             print(f"[ERRO] Falha ao salvar configurações: {e}")
@@ -270,6 +275,9 @@ class SaveManager:
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 self.save_data = json.load(f)
+
+            # Define o slot atual
+            self.current_save_file = slot
 
             # Aplica dados ao jogador
             player_data = self.save_data["player"]
@@ -314,6 +322,14 @@ class SaveManager:
             player.seen_pokemon = set(player_data["seen_pokemon"])
             player.caught_pokemon = set(player_data["caught_pokemon"])
 
+            # Carrega configurações do save
+            settings_data = self.save_data.get("settings", {})
+            if settings_data:
+                print(
+                    f"[SAVE] Configurações carregadas do save: Música={settings_data.get('music_volume', 0.5)}, SFX={settings_data.get('sfx_volume', 0.7)}")
+            else:
+                print("[SAVE] Nenhuma configuração encontrada no save, usando padrões")
+
             print(f"[SAVE] Jogo carregado de {filepath}")
             print(f"[SAVE] Itens carregados: {player.bag.items}")
             print(f"[SAVE] Pokémons: {len(player.pc_box)} na box, {len(player.team)} no time")
@@ -324,14 +340,17 @@ class SaveManager:
             return False
 
     def load_settings(self, settings_obj) -> bool:
-        """Carrega as configurações do save atual"""
+        """
+        Carrega as configurações do save atual
+        IMPORTANTE: Deve ser chamado APÓS load_game()
+        """
         if not self.current_save_file:
-            print("[SAVE] Nenhum save carregado")
+            print("[SAVE] Nenhum save carregado, não é possível carregar configurações")
             return False
 
         settings_data = self.save_data.get("settings", {})
         if not settings_data:
-            print("[SAVE] Nenhuma configuração encontrada no save")
+            print("[SAVE] Nenhuma configuração encontrada no save, usando padrões")
             return False
 
         # Aplica as configurações
@@ -343,7 +362,8 @@ class SaveManager:
         settings_obj.vsync = settings_data.get("vsync", True)
         settings_obj.target_fps = settings_data.get("target_fps", 60)
 
-        print("[SAVE] Configurações carregadas do save")
+        print(
+            f"[SAVE] Configurações carregadas: Música={settings_obj.music_volume} ({'ON' if settings_obj.music_enabled else 'OFF'}), SFX={settings_obj.sfx_volume} ({'ON' if settings_obj.sfx_enabled else 'OFF'})")
         return True
 
     def delete_save(self, slot=1):
@@ -377,7 +397,8 @@ class SaveManager:
                         "phase": data["game_state"]["current_phase"],
                         "pokemon_count": len(data["player"]["pc_box"]),
                         "team_size": len(data["player"]["team"]),
-                        "item_count": sum(data["player"]["bag"].values())
+                        "item_count": sum(data["player"]["bag"].values()),
+                        "settings": data.get("settings", {})  # Inclui settings na listagem
                     })
                 except:
                     saves.append({
