@@ -1,0 +1,255 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "last_save": "2026-03-24T22:36:50.186620",
+    "play_time": 0,
+    "save_name": "Save 1"
+  },
+  "player": {
+    "money": 100,
+    "score": 0,
+    "position": {
+      "x": 100,
+      "y": 100
+    },
+    "team": [
+      {
+        "unique_id": "d45ba0f8-30da-48ee-8193-0304f65a45b3",
+        "id": 7,
+        "name": "Squirtle",
+        "level": 5,
+        "is_shiny": false,
+        "current_hp": 19,
+        "max_hp": 19,
+        "xp": 107,
+        "ivs": {
+          "hp": 5,
+          "attack": 1,
+          "defense": 0,
+          "special_attack": 15,
+          "special_defense": 5,
+          "speed": 2
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Hardy",
+        "types": [
+          "water"
+        ],
+        "attack": 10,
+        "defense": 12,
+        "sp_attack": 11,
+        "sp_defense": 11,
+        "speed": 9,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 1587814053072,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "tail-whip",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "544599af-0055-4f69-b5a9-202ab9a413f7",
+        "id": 13,
+        "name": "Weedle",
+        "level": 4,
+        "is_shiny": false,
+        "current_hp": 7,
+        "max_hp": 17,
+        "xp": 7,
+        "ivs": {
+          "hp": 9,
+          "attack": 7,
+          "defense": 26,
+          "special_attack": 1,
+          "special_defense": 31,
+          "speed": 11
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Relaxed",
+        "types": [
+          "bug",
+          "poison"
+        ],
+        "attack": 7,
+        "defense": 8,
+        "sp_attack": 7,
+        "sp_defense": 7,
+        "speed": 9,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 1587814039728,
+        "moves": [
+          {
+            "name": "poison-sting",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "string-shot",
+            "current_pp": 40,
+            "max_pp": 40
+          }
+        ]
+      }
+    ],
+    "pc_box": [
+      {
+        "unique_id": "d45ba0f8-30da-48ee-8193-0304f65a45b3",
+        "id": 7,
+        "name": "Squirtle",
+        "level": 5,
+        "is_shiny": false,
+        "current_hp": 19,
+        "max_hp": 19,
+        "xp": 107,
+        "ivs": {
+          "hp": 5,
+          "attack": 1,
+          "defense": 0,
+          "special_attack": 15,
+          "special_defense": 5,
+          "speed": 2
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Hardy",
+        "types": [
+          "water"
+        ],
+        "attack": 10,
+        "defense": 12,
+        "sp_attack": 11,
+        "sp_defense": 11,
+        "speed": 9,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 1587814053072,
+        "moves": [
+          {
+            "name": "tackle",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "tail-whip",
+            "current_pp": 30,
+            "max_pp": 30
+          }
+        ]
+      },
+      {
+        "unique_id": "544599af-0055-4f69-b5a9-202ab9a413f7",
+        "id": 13,
+        "name": "Weedle",
+        "level": 4,
+        "is_shiny": false,
+        "current_hp": 7,
+        "max_hp": 17,
+        "xp": 7,
+        "ivs": {
+          "hp": 9,
+          "attack": 7,
+          "defense": 26,
+          "special_attack": 1,
+          "special_defense": 31,
+          "speed": 11
+        },
+        "evs": {
+          "hp": 0,
+          "attack": 0,
+          "defense": 0,
+          "special_attack": 0,
+          "special_defense": 0,
+          "speed": 0
+        },
+        "nature": "Relaxed",
+        "types": [
+          "bug",
+          "poison"
+        ],
+        "attack": 7,
+        "defense": 8,
+        "sp_attack": 7,
+        "sp_defense": 7,
+        "speed": 9,
+        "is_in_team": true,
+        "is_placed": true,
+        "spot_id": 1587814039728,
+        "moves": [
+          {
+            "name": "poison-sting",
+            "current_pp": 35,
+            "max_pp": 35
+          },
+          {
+            "name": "string-shot",
+            "current_pp": 40,
+            "max_pp": 40
+          }
+        ]
+      }
+    ],
+    "bag": {
+      "pokeball": 5,
+      "potion": 2
+    },
+    "seen_pokemon": [
+      13,
+      7
+    ],
+    "caught_pokemon": [
+      13,
+      7
+    ]
+  },
+  "game_state": {
+    "current_chapter": 1,
+    "current_phase": 1,
+    "unlocked_chapters": [
+      1
+    ],
+    "unlocked_phases": [
+      "1-1"
+    ],
+    "completed_phases": [],
+    "stars": {}
+  },
+  "settings": {
+    "sfx_volume": 0.7,
+    "music_volume": 0.5,
+    "music_enabled": true,
+    "sfx_enabled": true,
+    "fullscreen": false,
+    "vsync": true,
+    "target_fps": 60
+  }
+}

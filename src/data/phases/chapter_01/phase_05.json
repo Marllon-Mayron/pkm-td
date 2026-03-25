@@ -412,7 +412,7 @@
                         1
                     ]
                 ],
-                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": "pkm-td/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 14,
                 "height": 25
             },
@@ -821,7 +821,7 @@
                         0
                     ]
                 ],
-                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": "pkm-td/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 14,
                 "height": 25
             },
@@ -1230,7 +1230,7 @@
                         0
                     ]
                 ],
-                "tileset_path": "pokemon-tower-defense/res/AllTiles/Fairy Woods - Default Pallet.png",
+                "tileset_path": "pkm-td/res/AllTiles/Fairy Woods - Default Pallet.png",
                 "width": 14,
                 "height": 25
             }
@@ -1250,15 +1250,7 @@
                     ],
                     [
                         120,
-                        24
-                    ],
-                    [
-                        120,
-                        200
-                    ],
-                    [
-                        8,
-                        200
+                        8
                     ]
                 ],
                 "closed": false
@@ -1275,15 +1267,7 @@
                     ],
                     [
                         120,
-                        376
-                    ],
-                    [
-                        120,
-                        200
-                    ],
-                    [
-                        8,
-                        200
+                        392
                     ]
                 ],
                 "closed": false
@@ -1429,22 +1413,22 @@
         "items": [
             {
                 "x": 112,
-                "y": 16,
+                "y": 32,
                 "item_id": 1
             },
             {
                 "x": 112,
-                "y": 16,
+                "y": 32,
                 "item_id": 1
             },
             {
                 "x": 112,
-                "y": 368,
+                "y": 352,
                 "item_id": 1
             },
             {
                 "x": 112,
-                "y": 368,
+                "y": 352,
                 "item_id": 1
             },
             {

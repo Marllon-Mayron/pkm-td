@@ -120,6 +120,57 @@ class SoundManager:
             print(f"[SOUND] Erro ao tocar {sound_id}: {e}")
             return False
 
+    def play_random_battle_music(self):
+        """Toca uma música de batalha aleatória da pasta music"""
+        from src.config.settings import settings
+
+        # Verifica se música está habilitada
+        if not settings.music_enabled:
+            print(f"[SOUND] Música desabilitada, não tocando música aleatória")
+            return False
+
+        music_files = []
+
+        # Procura por arquivos de música na pasta music
+        music_path = self.sounds_path / "music"
+
+        if music_path.exists():
+            # Procura por arquivos .mp3, .ogg, .wav
+            for ext in ['.mp3', '.ogg', '.wav']:
+                music_files.extend(music_path.glob(f"*{ext}"))
+
+        # Se não encontrou na pasta music, procura na raiz
+        if not music_files:
+            for ext in ['.mp3', '.ogg', '.wav']:
+                music_files.extend(self.sounds_path.glob(f"*{ext}"))
+
+        if not music_files:
+            print(f"[SOUND] Nenhuma música encontrada em {music_path}")
+            return False
+
+        # Filtra apenas arquivos que não são de efeitos especiais (opcional)
+        # Exclui sons comuns de efeitos
+        exclude_patterns = ['hit', 'attack', 'menu', 'click', 'button', 'error']
+        filtered_files = []
+        for file in music_files:
+            filename = file.stem.lower()
+            if not any(pattern in filename for pattern in exclude_patterns):
+                filtered_files.append(file)
+
+        # Se todos foram filtrados, usa todos
+        if not filtered_files:
+            filtered_files = music_files
+
+        # Escolhe uma música aleatória
+        import random
+        selected_music = random.choice(filtered_files)
+        music_id = selected_music.stem  # Nome sem extensão
+
+        # Toca a música
+        self.play_music(music_id, fade_ms=1000, loop=True)
+        print(f"[SOUND] Tocando música aleatória: {music_id}")
+        return True
+
     def play_music(self, music_id: str, fade_ms: int = 1000, loop: bool = True):
         """
         Toca música de fundo
@@ -129,6 +180,12 @@ class SoundManager:
             fade_ms: Tempo de fade in em milissegundos
             loop: Se deve tocar em loop
         """
+        # Verifica se música está habilitada
+        from src.config.settings import settings
+        if not settings.music_enabled:
+            print(f"[SOUND] Música desabilitada, não tocando {music_id}")
+            return
+
         music_file = None
 
         # Procura o arquivo em várias pastas
@@ -154,7 +211,8 @@ class SoundManager:
             # Para a música atual com fade
             if pygame.mixer.music.get_busy():
                 pygame.mixer.music.fadeout(fade_ms)
-                pygame.time.wait(fade_ms)
+                # Pequeno delay para o fadeout
+                pygame.time.wait(fade_ms // 10)
 
             # Carrega e toca a nova música
             pygame.mixer.music.load(music_file)

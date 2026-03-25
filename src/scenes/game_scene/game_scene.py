@@ -6,6 +6,7 @@ import pygame
 
 from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
+from src.config.settings import settings
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
 from src.scenes.game_scene.components.managers.overlay_manager import OverlayType, OverlayManager
@@ -75,6 +76,11 @@ class GameScene(BaseScene):
         # Renderizadores
         self.item_bag_renderer = ItemBagRenderer(game, self.player.bag)
         self.item_drag_manager = ItemDragManager(game, self.player.bag)
+
+        # Controle de música
+        self.music_playing = False
+        self.current_music = None
+        self._start_battle_music()
 
         # Inicializa câmera
         self.game.initialize_camera(self.world_width, self.world_height)
@@ -402,6 +408,9 @@ class GameScene(BaseScene):
 
     def cleanup(self):
         """Limpa o estado da fase antes de sair"""
+        # Para a música ao sair da fase
+        self._stop_battle_music(fade_ms=500)
+
         for spot in self.spot_renderer.get_spots():
             spot.occupied = False
 
@@ -474,6 +483,7 @@ class GameScene(BaseScene):
                 self.toggle_pause()
                 return None
             elif event.key == pygame.K_ESCAPE:
+                self.cleanup()
                 self.game.current_scene = self.game.menu_scene
                 return None
             elif event.key == pygame.K_F1:
@@ -652,6 +662,8 @@ class GameScene(BaseScene):
 
         # Game over check
         if target_mgr.game_over:
+            # ===== PARAR MÚSICA AO GAME OVER =====
+            self._stop_battle_music(fade_ms=1000)
             self.game_state = "game_over"
             self.overlay_manager.show(OverlayType.GAME_OVER)
             # ===== RESETAR PP DOS MOVES DO TIME DO JOGADOR =====
@@ -695,6 +707,29 @@ class GameScene(BaseScene):
 
                 if any_wave_started:
                     self.game_state = "in_wave"
+
+    def _start_battle_music(self):
+        """Inicia a música de batalha aleatória"""
+        if not self.music_playing:
+            from src.managers.sound_manager import sound_manager
+            # Verifica se o som está habilitado
+            if hasattr(settings, 'music_enabled') and settings.music_enabled:
+                success = sound_manager.play_random_battle_music()
+                if success:
+                    self.music_playing = True
+                    print(f"[MUSIC] Música de batalha iniciada para fase {self.phase_id}")
+                else:
+                    print(f"[MUSIC] Falha ao iniciar música de batalha")
+            else:
+                print(f"[MUSIC] Música desabilitada nas configurações")
+
+    def _stop_battle_music(self, fade_ms=1000):
+        """Para a música de batalha"""
+        if self.music_playing:
+            from src.managers.sound_manager import sound_manager
+            sound_manager.stop_music(fade_ms)
+            self.music_playing = False
+            print(f"[MUSIC] Música de batalha parada")
 
     def render(self, screen):
         """Renderiza o jogo - OTIMIZADO"""
@@ -787,6 +822,9 @@ class GameScene(BaseScene):
     def _complete_phase(self):
         """Marca a fase como completada e dá as recompensas"""
         from src.config.progress import progress_manager
+
+        # Para a música ao completar a fase
+        self._stop_battle_music(fade_ms=1000)
 
         self.player.money += self.phase_rewards['money']
         for pokemon in self.player.team:
