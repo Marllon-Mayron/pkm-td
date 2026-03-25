@@ -1,10 +1,12 @@
 # src/battle/battle_system.py
+import random
 from src.battle.damage_calculator import DamageCalculator
 from src.battle.projectile import Projectile
 
 from typing import List
 
 from src.entities.pokemon import Pokemon
+
 
 
 class BattleSystem:
@@ -38,49 +40,97 @@ class BattleSystem:
 
         # Se tem PP, limpa a flag
         attacker.has_no_pp = False
+
+        # ===== CALCULAR ACERTO PRIMEIRO =====
+        hit_chance = move.accuracy / 100
+        will_hit = random.random() <= hit_chance
+
         # ===== ATAQUES DE STATUS =====
         if move.category == "status":
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")
+
+            # Toca o som do atacante (sempre, mesmo errando)
+            from src.managers.move_sound_manager import move_sound_manager
+            move_sound_manager.play_attack_sound(move.sound_name)
+            print(f"[SOM] {move.name} (status) - som do atacante: {move.sound_name}")
+
+            # Consome PP
             move.current_pp -= 1
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
-            self._apply_status(attacker, target, move)
+
+            if will_hit:
+                self._apply_status(attacker, target, move)
+            else:
+                # Errou - mostra MISS no ATACANTE
+                print(f"[BATTLE] {move.name} errou!")
+                self._show_miss_on_attacker(attacker)
             return True
 
         # ===== ATAQUES QUE CAUSAM DANO =====
-        # Calcular dano
-        damage_result = DamageCalculator.calculate_damage(attacker, target, move)
-
-        if not damage_result["hit"]:
-            # Move errou
-            move.current_pp -= 1
-            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
-            print(f"[BATTLE] {attacker.name} usou {move.name} e errou!")
-            return True
-
-        # Consome PP
-        move.current_pp -= 1
+        # Calcular dano (se acertar)
+        if will_hit:
+            damage_result = DamageCalculator.calculate_damage(attacker, target, move)
+        else:
+            # Move errou - cria resultado com dano 0
+            damage_result = {
+                "damage": 0,
+                "effectiveness": 1.0,
+                "hit": False,
+                "message": f"O ataque errou!",
+                "stab": False
+            }
 
         # ===== ATAQUES ESPECIAIS (criam projétil) =====
         if move.category == "special" and move.power > 0:
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Ataque especial)")
-            self._create_projectile(attacker, target, move, damage_result)
+            # Consome PP ANTES de criar projétil
+            move.current_pp -= 1
+            self._create_projectile(attacker, target, move, damage_result, will_hit)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
 
         # ===== ATAQUES FÍSICOS (dano imediato) =====
         elif move.category == "physical" and move.power > 0:
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Ataque físico)")
-            self._apply_damage(attacker, target, damage_result, move)
+
+            # Toca o som do atacante (sempre, mesmo errando)
+            from src.managers.move_sound_manager import move_sound_manager
+            move_sound_manager.play_attack_sound(move.sound_name)
+            print(f"[SOM] {move.name} (físico) - som do atacante: {move.sound_name}")
+
+            # Consome PP
+            move.current_pp -= 1
+            if will_hit:
+                self._apply_damage(attacker, target, damage_result, move)
+            else:
+                print(f"[BATTLE] {move.name} errou!")
+                # Mostra MISS no ATACANTE
+                self._show_miss_on_attacker(attacker)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
 
         # ===== FALLBACK: qualquer outro caso =====
         else:
             print(f"[BATTLE] {attacker.name} usou {move.name}!")
+            # Consome PP
+            move.current_pp -= 1
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
 
-    def _create_projectile(self, attacker: 'Pokemon', target: 'Pokemon', move, damage_result: dict):
+    def _show_miss_on_attacker(self, attacker):
+        """Mostra o texto MISS no ATACANTE (quem usou o golpe)"""
+        # Inicia o timer para mostrar o texto MISS
+        if not hasattr(attacker, 'miss_timer'):
+            attacker.miss_timer = 0.0
+        attacker.miss_timer = 0.6  # 0.6 segundos de duração
+
+    def _show_miss_on_target(self, target):
+        """Mostra o texto MISS no alvo (mantido para compatibilidade, mas não usado)"""
+        if not hasattr(target, 'miss_timer'):
+            target.miss_timer = 0.0
+        target.miss_timer = 0.6
+
+    def _create_projectile(self, attacker: 'Pokemon', target: 'Pokemon', move, damage_result: dict, will_hit: bool):
         """Cria um projétil para ataque especial"""
         # Cores baseadas no tipo
         type_colors = {
@@ -115,7 +165,8 @@ class BattleSystem:
             damage=damage_result["damage"],
             effectiveness=damage_result["effectiveness"],
             color=color,
-            speed=projectile_speed
+            speed=projectile_speed,
+            will_hit=will_hit  # Passa se o ataque acertou ou não
         )
         self.projectiles.append(projectile)
 
@@ -186,7 +237,6 @@ class BattleSystem:
         print(f"[DEBUG STATUS] Resultado do play_hit_sound: {result}")
 
         print(f"[BATTLE] {attacker.name} usou {move.name}!")
-
 
     def render_projectiles(self, screen, camera, screen_manager):
         """Renderiza projéteis"""

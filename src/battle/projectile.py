@@ -2,14 +2,15 @@
 """
 Projétil para ataques especiais
 """
-import pygame, random
+import pygame
+import random
 import math
 
 
 class Projectile:
     """Projétil que viaja do atacante ao alvo"""
 
-    def __init__(self, attacker, target, move_name, damage, effectiveness, color, speed=300.0):
+    def __init__(self, attacker, target, move_name, damage, effectiveness, color, speed=300.0, will_hit=True):
         self.attacker = attacker
         self.target = target
         self.move_name = move_name
@@ -17,6 +18,7 @@ class Projectile:
         self.effectiveness = effectiveness
         self.color = color
         self.speed = speed
+        self.will_hit = will_hit  # Se o ataque vai acertar ou errar
 
         # Posição inicial (posição do atacante)
         self.x = attacker.x
@@ -25,6 +27,10 @@ class Projectile:
         # Estado
         self.is_finished = False
         self.hit = False
+
+        # Controle de exibição do texto MISS
+        self.miss_text_timer = 0.0
+        self.miss_text_duration = 0.6  # Duração do texto MISS em segundos
 
         # Para animação - AUMENTADO para mais rastros
         self.size = 10  # Aumentado de 8 para 10
@@ -57,6 +63,10 @@ class Projectile:
         if not self.target or not self.target.is_alive():
             self.is_finished = True
             return
+
+        # Atualizar timer do texto MISS
+        if self.miss_text_timer > 0:
+            self.miss_text_timer -= dt
 
         # Guardar posição anterior para trail
         self.trail.append((self.x, self.y))
@@ -105,10 +115,17 @@ class Projectile:
         dy = self.target.y - self.y
         distance = math.sqrt(dx * dx + dy * dy)
 
-        # Se estiver perto o suficiente, causa dano
+        # Se estiver perto o suficiente, causa dano ou mostra MISS
         if distance < self.target.map_sprite_size / 2 and not self.hit:
             self.hit = True
-            self._apply_damage()
+
+            if self.will_hit:
+                # Acerrou - aplica dano
+                self._apply_damage()
+            else:
+                # Errou - mostra texto MISS e não aplica dano
+                self._apply_miss()
+
             self.is_finished = True
 
     def _create_particles(self):
@@ -164,6 +181,16 @@ class Projectile:
             print(f"[BATTLE] {self.move_name} não afeta {self.target.name}!")
 
         print(f"[BATTLE] {self.move_name} causou {self.damage} de dano a {self.target.name}!")
+
+    def _apply_miss(self):
+        """Aplica efeito de erro (MISS) - não causa dano, mostra texto no ATACANTE"""
+        print(f"[BATTLE] {self.move_name} errou {self.target.name}!")
+
+        # Mostra MISS no ATACANTE (quem usou o golpe)
+        if hasattr(self.attacker, 'miss_timer'):
+            self.attacker.miss_timer = 0.6
+        else:
+            self.attacker.miss_timer = 0.6
 
     def render(self, screen, camera, screen_manager):
         """Renderiza o projétil com efeitos visuais melhorados"""

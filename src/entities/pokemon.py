@@ -127,6 +127,7 @@ class Pokemon(Entity):
         # ===== 13. EFEITOS VISUAIS =====
         self.hp_bar_width = 32
         self.hp_bar_height = 3
+        self.miss_timer = 0.0
 
         # ===== 14. POSIÇÃO E MOVIMENTAÇÃO =====
         self.last_x = x
@@ -493,7 +494,21 @@ class Pokemon(Entity):
             # Executa o ataque imediatamente sem se mover
             attack_type = "status" if is_status_move else "especial"
             print(f"[COMBAT] {self.name} usou {current_move.name} ({attack_type}) à distância!")
-            self._perform_charge_attack(self.target)
+
+            # SEMPRE chama o battle_system - ele cuida do acerto/erro, PP, projétil, etc
+            if self.battle_system:
+                self.battle_system.attempt_attack(self, self.target)
+            else:
+                # Fallback se não tiver battle_system
+                hit_chance = current_move.accuracy / 100
+                will_hit = random.random() <= hit_chance
+                if will_hit:
+                    self._perform_charge_attack(self.target)
+                else:
+                    print(f"[COMBAT] {current_move.name} errou!")
+                    self._show_miss_on_self()
+                current_move.current_pp -= 1
+
             self.combat_state = "returning"
             self.charge_cooldown = self.charge_cooldown_max
             return
@@ -505,7 +520,20 @@ class Pokemon(Entity):
 
         # Se estiver perto o suficiente, ataca
         if distance < 5:
-            self._perform_charge_attack(self.target)
+            # SEMPRE chama o battle_system - ele cuida do acerto/erro, PP, etc
+            if self.battle_system:
+                self.battle_system.attempt_attack(self, self.target)
+            else:
+                # Fallback
+                hit_chance = current_move.accuracy / 100
+                will_hit = random.random() <= hit_chance
+                if will_hit:
+                    self._perform_charge_attack(self.target)
+                else:
+                    print(f"[COMBAT] {current_move.name} errou!")
+                    self._show_miss_on_self()
+                current_move.current_pp -= 1
+
             self.combat_state = "returning"
             self.charge_cooldown = self.charge_cooldown_max
             return
@@ -531,6 +559,17 @@ class Pokemon(Entity):
                 self.current_direction = "right" if dx > 0 else "left"
             else:
                 self.current_direction = "down" if dy > 0 else "up"
+
+    def _show_miss_on_self(self):
+        """Mostra o texto MISS no próprio Pokémon (atacante)"""
+        # Inicia o timer para mostrar o texto MISS
+        self.miss_timer = 0.6  # 0.6 segundos de duração
+
+    def _show_miss_on_target(self, target):
+        """Mostra o texto MISS no alvo (mantido para compatibilidade)"""
+        if not hasattr(target, 'miss_timer'):
+            target.miss_timer = 0.0
+        target.miss_timer = 0.6
 
     def _handle_returning_state(self, dt):
         """Estado voltando para posição original"""
@@ -818,6 +857,12 @@ class Pokemon(Entity):
         self.last_x = self.x
         self.last_y = self.y
 
+        # Atualizar timer do MISS
+        if hasattr(self, 'miss_timer') and self.miss_timer > 0:
+            self.miss_timer -= dt
+            if self.miss_timer < 0:
+                self.miss_timer = 0
+
         if not self.can_attack:
             self.attack_cooldown -= 1
             if self.attack_cooldown <= 0:
@@ -952,8 +997,42 @@ class Pokemon(Entity):
         if show_hp:
             self.render_hp(screen, camera)
 
+        # ===== ADICIONAR RENDERIZAÇÃO DO TEXTO MISS =====
+        if hasattr(self, 'miss_timer') and self.miss_timer > 0:
+            self._render_miss_text(screen, screen_x, screen_y, zoom_scale, sprite_rect)
+
         if hasattr(self, 'show_debug') and self.show_debug:
             self._render_debug(screen, screen_x, screen_y, zoom_scale, sprite_rect)
+
+    def _render_miss_text(self, screen, screen_x, screen_y, zoom_scale, sprite_rect):
+        """Renderiza o texto MISS acima do Pokémon (atacante)"""
+        # Atualiza o timer (usando delta time real)
+        # Nota: idealmente deveria receber dt, mas por enquanto decrementamos manualmente
+        # O timer será decrementado no update do jogo, não aqui
+
+        if self.miss_timer <= 0:
+            return
+
+        # Configurar fonte - TAMANHO REDUZIDO
+        font_size = max(8, int(14 * zoom_scale))  # Reduzido de 24 para 14
+        font = self._get_font(font_size)
+
+        # Texto MISS
+        text = "MISS!"
+        text_surface = font.render(text, True, (255, 100, 100))
+        text_outline = font.render(text, True, (100, 0, 0))
+
+        # Calcular posição acima do Pokémon (atacante)
+        if sprite_rect:
+            text_width = text_surface.get_width()
+            text_height = text_surface.get_height()
+            text_x = sprite_rect.centerx - text_width // 2
+            text_y = sprite_rect.top - text_height - 2  # Reduzido espaçamento de 5 para 2
+
+            # Desenhar com contorno
+            for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+                screen.blit(text_outline, (text_x + dx, text_y + dy))
+            screen.blit(text_surface, (text_x, text_y))
 
     def _prepare_sprite(self, zoom_scale):
         if not self.sprite:
