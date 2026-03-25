@@ -348,7 +348,7 @@ class GameScene(BaseScene):
             if carried_item:
                 enemy.drop_item()
 
-            self.wave_manager.remove_enemy(enemy)
+            self.wave_manager._remove_enemy(enemy)
 
             from src.entities.pokemon import Pokemon
             caught = Pokemon(0, 0, enemy.id, level=enemy.level, is_wild=False, shiny=enemy.is_shiny)

@@ -47,6 +47,9 @@ class WaveData:
     speed_multiplier: float = 1.0
     min_level: int = 1
     max_level: int = 5
+    repeat_wave: bool = False  # Se deve repetir a wave
+    repeat_count: int = 1  # Número de repetições (0 = infinito)
+    current_repeat: int = 0  # Contador de repetições atuais
 
 
 class GameWaveManager:
@@ -87,7 +90,7 @@ class GameWaveManager:
 
         # Acumuladores
         self.total_gold_earned = 0
-        self.gold_per_defeat = 10
+        self.gold_per_defeat = 5
 
         # Carrega dados
         self._load_waves_data()
@@ -112,6 +115,8 @@ class GameWaveManager:
             speed_multiplier = wave_dict.get("speed_multiplier", 1.0)
             min_level = wave_dict.get("min_level", 1)
             max_level = wave_dict.get("max_level", 5)
+            repeat_wave = wave_dict.get("repeat_wave", False)
+            repeat_count = wave_dict.get("repeat_count", 1)
 
             # Configura inimigos
             enemies = []
@@ -137,7 +142,10 @@ class GameWaveManager:
                 has_boss=has_boss,
                 speed_multiplier=speed_multiplier,
                 min_level=min_level,
-                max_level=max_level
+                max_level=max_level,
+                repeat_wave=repeat_wave,
+                repeat_count=repeat_count,
+                current_repeat=0
             )
 
             if path_index not in self.waves:
@@ -206,13 +214,20 @@ class GameWaveManager:
 
         wave_data = waves[wave_idx]
 
+        # Se esta é a primeira vez que a wave está sendo iniciada, reseta o contador de repetição
+        # (Isso acontece quando avançamos para uma nova wave)
+        if wave_data.current_repeat == 0:
+            # Já está no estado inicial
+            pass
+
         self.wave_active[path_idx] = True
         self.wave_timer[path_idx] = wave_data.initial_delay
         self.spawn_timer[path_idx] = 0
         self.spawned_count[path_idx] = 0
         self.alive_count[path_idx] = 0
 
-        print(f"[WaveManager] Path {path_idx}: Iniciando wave {wave_idx + 1}")
+        print(f"[WaveManager] Path {path_idx}: Iniciando wave {wave_idx + 1}" +
+              (f" (repetição {wave_data.current_repeat + 1})" if wave_data.current_repeat > 0 else ""))
         return True
 
     def update(self, dt: float, path_points_by_index: dict, screen_manager) -> List[Pokemon]:
@@ -413,7 +428,7 @@ class GameWaveManager:
         print(f"[BOSS] {enemy.name} invertido - novo path_index={enemy.path_index}, path_length={len(enemy.path)}")
 
     # Adicione esta constante
-    MIN_TRAVEL_DISTANCE = 30.0  # Distância mínima para considerar que realmente andou
+    MIN_TRAVEL_DISTANCE = 5.0  # Distância mínima para considerar que realmente andou
 
     def _check_arrival(self, enemy: Pokemon) -> Tuple[bool, bool]:
         """
@@ -649,14 +664,20 @@ class GameWaveManager:
 
                         self.spawn_timer[path_idx] = wave_data.spawn_interval
             else:
-                # Wave terminou de spawnar
-                # Verifica se todos os inimigos NÃO-BOSS morreram
+                # Wave terminou de spawnar TODOS os inimigos (incluindo boss)
+                # Verifica se todos os inimigos NÃO-BOSS morreram E o boss NÃO está vivo
                 non_boss_alive = sum(1 for e in self.active_enemies
                                      if getattr(e, 'path_index_origin', 0) == path_idx
                                      and not e.is_boss and e.is_alive())
 
-                # Se não há inimigos não-boss vivos, avança para próxima wave
-                if non_boss_alive == 0:
+                # Verifica se o boss está vivo
+                boss_alive = any(e for e in self.active_enemies
+                                 if getattr(e, 'path_index_origin', 0) == path_idx
+                                 and e.is_boss and e.is_alive())
+
+                # Se não há inimigos não-boss vivos, e (se não tem boss OU o boss morreu)
+                # Então pode avançar para próxima wave
+                if non_boss_alive == 0 and not boss_alive:
                     # Passa para próxima wave
                     self._advance_to_next_wave(path_idx)
 
@@ -747,10 +768,28 @@ class GameWaveManager:
         return enemies[-1]
 
     def _advance_to_next_wave(self, path_idx: int):
-        """Avança para a próxima wave do path"""
+        """Avança para a próxima wave do path, com suporte a repetição"""
         current_idx = self.current_wave_idx.get(path_idx, 0)
         waves = self.waves.get(path_idx, [])
 
+        if current_idx >= len(waves):
+            return
+
+        wave_data = waves[current_idx]
+
+        # Verifica se a wave atual deve repetir
+        if wave_data.repeat_wave:
+            wave_data.current_repeat += 1
+
+            # Verifica se ainda deve repetir (repeat_count == 0 = infinito)
+            if wave_data.repeat_count == 0 or wave_data.current_repeat < wave_data.repeat_count:
+                print(
+                    f"[WaveManager] Path {path_idx}: repetindo wave {current_idx + 1} (repetição {wave_data.current_repeat}/{wave_data.repeat_count if wave_data.repeat_count > 0 else '∞'})")
+                # Reinicia a wave atual
+                self._start_wave_for_path(path_idx)
+                return
+
+        # Se não deve repetir mais, avança para a próxima wave
         if current_idx + 1 < len(waves):
             self.current_wave_idx[path_idx] = current_idx + 1
             print(f"[WaveManager] Path {path_idx}: avançando para wave {current_idx + 2}")
@@ -758,7 +797,6 @@ class GameWaveManager:
         else:
             # Todas as waves concluídas
             self.wave_active[path_idx] = False
-            # Incrementa para indicar que a última wave foi concluída
             self.current_wave_idx[path_idx] = current_idx + 1
             print(f"[WaveManager] Path {path_idx}: todas as waves concluídas")
 
