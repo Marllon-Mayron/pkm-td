@@ -9,6 +9,7 @@ __pycache__/
 src/save_data.json
 saves/*.json
 src/*.data
+src/saves/*.json
 
 # IntelliJ IDEA
 .idea/
