@@ -50,8 +50,8 @@ class GameScene(BaseScene):
         self.spot_renderer = PokemonSpotRenderer()
 
         # Cria os gerenciadores
-        self.team_manager = GameTeamManager(game)
         self.placement_manager = PlacementManager(self)
+        self.team_manager = GameTeamManager(game)
         self.target_item_manager = TargetItemManager(game)
         self.target_item_renderer = TargetItemRenderer()
 
@@ -475,11 +475,49 @@ class GameScene(BaseScene):
 
         return True
 
-    def _on_pokemon_placed(self, placement_data):
-        """Callback quando um Pokémon é colocado no mapa"""
-        pokemon = placement_data['pokemon']
-        spot = placement_data['spot']
-        self.placement_manager.add_pokemon(spot, pokemon)
+    def _swap_pokemon_positions(self, swap_data):
+        """Troca as posições de dois Pokémon"""
+        pokemon_a = swap_data['pokemon_a']
+        pokemon_b = swap_data['pokemon_b']
+        spot_a = swap_data['spot_a']
+        spot_b = swap_data['spot_b']
+
+        # Guarda as posições originais
+        pos_a_x = pokemon_a.x
+        pos_a_y = pokemon_a.y
+        tile_a_x = pokemon_a.placed_tile_x
+        tile_a_y = pokemon_a.placed_tile_y
+
+        # Move Pokémon A para o spot B
+        tile_center_x_b = (
+                                      spot_b.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+        tile_center_y_b = (
+                                      spot_b.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+
+        pokemon_a.x = tile_center_x_b
+        pokemon_a.y = tile_center_y_b
+        pokemon_a.original_spot_x = tile_center_x_b
+        pokemon_a.original_spot_y = tile_center_y_b
+        pokemon_a.placed_tile_x = tile_center_x_b // self.placement_manager.tile_size
+        pokemon_a.placed_tile_y = tile_center_y_b // self.placement_manager.tile_size
+
+        # Move Pokémon B para o spot A
+        tile_center_x_a = (
+                                      spot_a.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+        tile_center_y_a = (
+                                      spot_a.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+
+        pokemon_b.x = tile_center_x_a
+        pokemon_b.y = tile_center_y_a
+        pokemon_b.original_spot_x = tile_center_x_a
+        pokemon_b.original_spot_y = tile_center_y_a
+        pokemon_b.placed_tile_x = tile_center_x_a // self.placement_manager.tile_size
+        pokemon_b.placed_tile_y = tile_center_y_a // self.placement_manager.tile_size
+
+        # Atualiza os spots (não precisa marcar occupied porque já estão)
+        # Os spots já estão ocupados, apenas os Pokémon trocaram de lugar
+
+        print(f"[SWAP] {pokemon_a.name} ↔ {pokemon_b.name} trocaram de posição!")
 
     def _reset_team_pp(self):
         """Reseta os PP de todos os moves do time do jogador"""
@@ -509,7 +547,7 @@ class GameScene(BaseScene):
         self.wave_manager.active_enemies.clear()
 
     def handle_event(self, event):
-        """Processa eventos do jogo - OTIMIZADO"""
+        """Processa eventos do jogo - OTIMIZADO com suporte a drag de Pokémon colocados"""
         # Cache de referências
         overlay_active = self.overlay_manager.is_active
         drag_manager = self.item_drag_manager
@@ -526,7 +564,7 @@ class GameScene(BaseScene):
             self.evolution_overlay.handle_event(event)
             return None
 
-        # ===== NOVO: Processa overlay de aprendizado de moves primeiro =====
+        # ===== Processa overlay de aprendizado de moves primeiro =====
         if self.move_learn_overlay and self.move_learn_overlay.active:
             self.move_learn_overlay.handle_event(event)
             return None
@@ -541,7 +579,7 @@ class GameScene(BaseScene):
                 return None
             return None
 
-        # Drag manager
+        # Drag manager de itens
         if drag_manager.is_dragging:
             if event.type == pygame.MOUSEMOTION:
                 world_pos = screen_mgr.get_mouse_world_position(event.pos, camera)
@@ -611,9 +649,11 @@ class GameScene(BaseScene):
                             camera._clamp_position()
                 return None
 
-        # Mouse button down
+        # ===== Mouse button down =====
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = pygame.mouse.get_pos()
+
+            # Verifica se clicou na bag
             if bag_renderer and hasattr(bag_renderer, 'mouse_over_ui') and bag_renderer.mouse_over_ui:
                 hovered_index = bag_renderer.hovered_index
                 if hovered_index >= 0:
@@ -626,40 +666,65 @@ class GameScene(BaseScene):
                             drag_manager.start_drag(item["id"], mouse_pos, world_pos)
                 return None
 
-            # Clique em Pokémon para abrir overlay de moves
-            if not self.item_drag_manager.is_dragging and not self.team_manager.is_dragging():
+            # Verifica se clicou em um Pokémon colocado
+            if not self.item_drag_manager.is_dragging and not team_manager.is_dragging():
                 if self.screen_manager.is_mouse_in_viewport(mouse_pos):
                     world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
                     if world_pos:
                         # Verifica se clicou em algum Pokémon colocado
-                        clicked_pokemon = self.placement_manager.get_pokemon_at_world_pos(
+                        clicked_pokemon = placement_mgr.get_pokemon_at_world_pos(
                             world_pos[0], world_pos[1], tolerance=30
                         )
-                        if clicked_pokemon and clicked_pokemon.moves:
-                            # Abre overlay de seleção de moves
-                            self.open_move_select_overlay(clicked_pokemon)
-                            return None
+                        if clicked_pokemon:
+                            # ===== NOVO: Inicia drag do Pokémon colocado =====
+                            # Encontra o spot do Pokémon
+                            clicked_spot = None
+                            for spot in spot_renderer.get_spots():
+                                spot_tile_x = spot.x // placement_mgr.tile_size
+                                spot_tile_y = spot.y // placement_mgr.tile_size
+                                if (hasattr(clicked_pokemon, 'placed_tile_x') and
+                                        spot_tile_x == clicked_pokemon.placed_tile_x and
+                                        spot_tile_y == clicked_pokemon.placed_tile_y):
+                                    clicked_spot = spot
+                                    break
 
-        # Team manager
+                            if clicked_spot:
+                                # Inicia drag do Pokémon colocado
+                                team_manager.drag_manager.start_drag_placed(
+                                    clicked_pokemon,
+                                    clicked_spot,
+                                    mouse_pos,
+                                    world_pos
+                                )
+                                return None
+                            else:
+                                # Fallback: abre overlay de moves se não encontrou spot
+                                if clicked_pokemon.moves:
+                                    self.open_move_select_overlay(clicked_pokemon)
+                                    return None
+
+        # Team manager (processa eventos dos slots e drag)
         if team_manager:
             result = team_manager.handle_event(
-                event, spot_renderer.get_spots(), camera, self._on_pokemon_placed
+                event, spot_renderer.get_spots(), camera,
+                self._on_pokemon_placed,  # callback para place/move
+                self._on_pokemon_swap  # callback para swap
             )
             if result:
                 return None
 
-        # Mouse buttons
+        # ===== Mouse buttons para câmera e remoção =====
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_pos = pygame.mouse.get_pos()
             in_viewport = screen_mgr.is_mouse_in_viewport(mouse_pos)
 
-            if event.button == 2:
+            if event.button == 2:  # Middle click para arrastar câmera
                 if in_viewport:
                     self.dragging_camera = True
                     self.last_mouse_pos = mouse_pos
                     pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
                 return None
-            elif event.button == 3:
+            elif event.button == 3:  # Right click para remover Pokémon
                 if not (bag_renderer and hasattr(bag_renderer, 'mouse_over_ui') and bag_renderer.mouse_over_ui):
                     world_pos = screen_mgr.get_mouse_world_position(event.pos, camera)
                     if world_pos:
@@ -695,6 +760,102 @@ class GameScene(BaseScene):
             return None
 
         return None
+
+    def _on_pokemon_swap(self, swap_data):
+        """Callback quando dois Pokémon trocam de posição"""
+        pokemon_a = swap_data['pokemon_a']
+        pokemon_b = swap_data['pokemon_b']
+        spot_a = swap_data['spot_a']
+        spot_b = swap_data['spot_b']
+
+        # Guarda as posições originais
+        pos_a_x = pokemon_a.x
+        pos_a_y = pokemon_a.y
+        tile_a_x = pokemon_a.placed_tile_x
+        tile_a_y = pokemon_a.placed_tile_y
+
+        # Move Pokémon A para o spot B
+        tile_center_x_b = (
+                                      spot_b.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+        tile_center_y_b = (
+                                      spot_b.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+
+        pokemon_a.x = tile_center_x_b
+        pokemon_a.y = tile_center_y_b
+        pokemon_a.original_spot_x = tile_center_x_b
+        pokemon_a.original_spot_y = tile_center_y_b
+        pokemon_a.placed_tile_x = tile_center_x_b // self.placement_manager.tile_size
+        pokemon_a.placed_tile_y = tile_center_y_b // self.placement_manager.tile_size
+
+        # Move Pokémon B para o spot A
+        tile_center_x_a = (
+                                      spot_a.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+        tile_center_y_a = (
+                                      spot_a.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+
+        pokemon_b.x = tile_center_x_a
+        pokemon_b.y = tile_center_y_a
+        pokemon_b.original_spot_x = tile_center_x_a
+        pokemon_b.original_spot_y = tile_center_y_a
+        pokemon_b.placed_tile_x = tile_center_x_a // self.placement_manager.tile_size
+        pokemon_b.placed_tile_y = tile_center_y_a // self.placement_manager.tile_size
+
+        # Atualiza os spots (já estão ocupados, não precisa alterar)
+        print(f"[SWAP] {pokemon_a.name} ↔ {pokemon_b.name} trocaram de posição!")
+
+        # Toca som de troca
+        #from src.managers.sound_manager import SoundEffect, sound_manager
+        #sound_manager.play_effect(SoundEffect.SWITCH)
+
+    def _on_pokemon_placed(self, placement_data):
+        """Callback quando um Pokémon é colocado no mapa OU movido"""
+        action = placement_data.get('action', 'place')
+
+        if action == 'swap':
+            # Troca entre dois Pokémon
+            self._on_pokemon_swap(placement_data)
+        elif action == 'move':
+            # Move Pokémon para novo spot vazio
+            self._move_pokemon_to_spot(placement_data)
+        else:
+            # Coloca Pokémon do time no mapa
+            pokemon = placement_data['pokemon']
+            spot = placement_data['spot']
+            self.placement_manager.add_pokemon(spot, pokemon)
+
+    def _move_pokemon_to_spot(self, move_data):
+        """Move um Pokémon para um novo spot vazio"""
+        pokemon = move_data['pokemon']
+        from_spot = move_data.get('from_spot')
+        to_spot = move_data['to_spot']
+
+        # Desocupa o spot antigo
+        if from_spot:
+            from_spot.occupied = False
+            print(f"[MOVE] Spot antigo ({from_spot.x}, {from_spot.y}) desocupado")
+
+        # Move o Pokémon para o novo spot
+        tile_center_x = (
+                                    to_spot.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+        tile_center_y = (
+                                    to_spot.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+
+        pokemon.x = tile_center_x
+        pokemon.y = tile_center_y
+        pokemon.original_spot_x = tile_center_x
+        pokemon.original_spot_y = tile_center_y
+        pokemon.placed_tile_x = tile_center_x // self.placement_manager.tile_size
+        pokemon.placed_tile_y = tile_center_y // self.placement_manager.tile_size
+
+        # Marca o novo spot como ocupado
+        to_spot.occupied = True
+
+        print(
+            f"[MOVE] {pokemon.name} movido para novo spot ({to_spot.x}, {to_spot.y}) - Tile ({pokemon.placed_tile_x}, {pokemon.placed_tile_y})")
+
+        # Toca som de movimento
+        #from src.managers.sound_manager import SoundEffect, sound_manager
+        #sound_manager.play_effect(SoundEffect.SWITCH)
 
     def fixed_update(self, dt):
         """Update da lógica do jogo - OTIMIZADO"""

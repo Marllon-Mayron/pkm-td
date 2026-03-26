@@ -81,7 +81,7 @@ class GameTeamManager:
         """Verifica se está arrastando um Pokémon"""
         return self.drag_manager.is_dragging
 
-    def handle_event(self, event, tower_spots, camera, on_place_callback=None):
+    def handle_event(self, event, tower_spots, camera, on_place_callback=None, on_swap_callback=None):
         """Processa eventos nos slots com suporte a drag and drop"""
         if not self.visible:
             return None
@@ -93,14 +93,28 @@ class GameTeamManager:
                     event.pos, camera
                 )
                 if world_pos:
+                    # CORREÇÃO: acessa placement_manager através da game_scene
+                    # que está em self.game.current_scene
+                    game_scene = self.game.current_scene
+                    placement_manager = game_scene.placement_manager if hasattr(game_scene,
+                                                                                'placement_manager') else None
+
                     self.drag_manager.update_drag(
-                        event.pos, world_pos, tower_spots, camera
+                        event.pos, world_pos, tower_spots,
+                        placement_manager.placed_pokemon if placement_manager else [],
+                        camera,
+                        placement_manager
                     )
 
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                result = self.drag_manager.stop_drag(tower_spots, on_place_callback)
+                result = self.drag_manager.stop_drag(tower_spots, on_place_callback, on_swap_callback)
                 if result:
-                    print(f"[TEAM] {result['pokemon'].name} colocado no mapa")
+                    if result.get('action') == 'swap':
+                        print(f"[TEAM] Swap entre {result['pokemon_a'].name} e {result['pokemon_b'].name}")
+                    elif result.get('action') == 'move':
+                        print(f"[TEAM] Movendo {result['pokemon'].name} para novo spot")
+                    elif result.get('action') == 'place':
+                        print(f"[TEAM] {result['pokemon'].name} colocado no mapa")
                 return result
 
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
