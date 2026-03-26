@@ -15,6 +15,7 @@ class SoundEffect(Enum):
     SHINY = "Shiny"
     CAUGHT = "Caught"
     CLICK = "Click"
+    EVOLUTION = "Evolution"
 
 
 class SoundManager:
@@ -89,6 +90,16 @@ class SoundManager:
                 print(f"[SOUND] Erro ao carregar Click.mp3: {e}")
         else:
             print(f"[SOUND] Aviso: Click.mp3 não encontrado em {effects_path}")
+
+        evolution_path = effects_path / "Evolution.mp3"
+        if evolution_path.exists():
+            try:
+                self.effects[SoundEffect.EVOLUTION] = pygame.mixer.Sound(str(evolution_path))
+                print(f"[SOUND] Efeito carregado: Evolution")
+            except Exception as e:
+                print(f"[SOUND] Erro ao carregar Evolution.mp3: {e}")
+        else:
+            print(f"[SOUND] Aviso: Evolution.mp3 não encontrado em {effects_path}")
 
     def load_all_sounds(self):
         """Carrega todos os sons da pasta res/sounds"""
@@ -296,6 +307,11 @@ class SoundManager:
     def unpause_music(self):
         """Despausa a música"""
         pygame.mixer.music.unpause()
+
+    def stop_effect(self, effect: SoundEffect):
+        """Para um efeito sonoro específico"""
+        if effect in self.effects:
+            self.effects[effect].stop()
 
     def set_sfx_volume(self, volume: float):
         """Define o volume dos efeitos sonoros"""

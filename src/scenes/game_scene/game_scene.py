@@ -290,8 +290,12 @@ class GameScene(BaseScene):
         """Abre o overlay de evolução para um Pokémon"""
         from src.scenes.game_scene.components.overlays.evolution_overlay import EvolutionOverlay
 
+        # Toca o efeito sonoro de evolução
+        sound_manager.play_effect(SoundEffect.EVOLUTION)
+
         self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data)
         self.evolution_overlay.active = True
+
         # Trava as waves para não spawnar novos inimigos durante a evolução
         if hasattr(self, 'wave_manager'):
             self.wave_manager.paused = True
@@ -300,6 +304,9 @@ class GameScene(BaseScene):
 
     def close_evolution_overlay(self, cancel=False):
         """Fecha o overlay de evolução"""
+
+        sound_manager.stop_effect(SoundEffect.EVOLUTION)
+
         if cancel:
             print(f"[EVOLUTION] Evolução cancelada")
         else:
