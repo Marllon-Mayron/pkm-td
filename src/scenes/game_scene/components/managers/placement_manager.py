@@ -40,7 +40,9 @@ class PlacementManager:
 
         # Marca como colocado
         pokemon.is_placed = True
-        pokemon.spot_id = id(spot)
+        # ARMAZENA A POSIÇÃO DO TILE PARA REFERÊNCIA FUTURA
+        pokemon.placed_tile_x = tile_center_x // self.tile_size
+        pokemon.placed_tile_y = tile_center_y // self.tile_size
         pokemon.combat_state = "idle"
 
         pokemon.game_scene = self.game
@@ -52,7 +54,8 @@ class PlacementManager:
 
         print(
             f"[PLACEMENT] {pokemon.name} colocado no spot ({spot.x}, {spot.y}) - "
-            f"Centro ({tile_center_x}, {tile_center_y})"
+            f"Centro ({tile_center_x}, {tile_center_y}) - "
+            f"Tile ({pokemon.placed_tile_x}, {pokemon.placed_tile_y})"
         )
 
         if hasattr(self.game, 'battle_system'):
@@ -81,18 +84,25 @@ class PlacementManager:
             if pokemon in self.placed_pokemon:
                 self.placed_pokemon.remove(pokemon)
 
-                # PROCURA O SPOT CORRESPONDENTE E DESOCUPA
-                pokemon_tile_x = pokemon.x // self.tile_size
-                pokemon_tile_y = pokemon.y // self.tile_size
+                # ===== CORREÇÃO: DESOCUPA O SPOT USANDO COORDENADAS DE TILE =====
+                # Usa as coordenadas de tile armazenadas no Pokémon
+                pokemon_tile_x = pokemon.placed_tile_x
+                pokemon_tile_y = pokemon.placed_tile_y
 
+                # Procura e desocupa o spot correspondente
+                spot_found = False
                 for spot in self.game.spot_renderer.get_spots():
                     spot_tile_x = spot.x // self.tile_size
                     spot_tile_y = spot.y // self.tile_size
 
                     if spot_tile_x == pokemon_tile_x and spot_tile_y == pokemon_tile_y:
                         spot.occupied = False
+                        spot_found = True
                         print(f"[PLACEMENT] Spot ({spot.x}, {spot.y}) desocupado")
                         break
+
+                if not spot_found:
+                    print(f"[PLACEMENT] ERRO: Spot não encontrado para tile ({pokemon_tile_x}, {pokemon_tile_y})")
 
                 # Marca o Pokémon como não colocado (é o mesmo objeto do time!)
                 pokemon.is_placed = False
@@ -101,12 +111,6 @@ class PlacementManager:
 
         return None
 
-    def _get_team_pokemon(self):
-        """Método auxiliar para pegar Pokémon do time"""
-        if hasattr(self.game, 'player') and hasattr(self.game.player, 'team'):
-            return self.game.player.team
-        return []
-
     def get_pokemon_at_spot(self, spot):
         """Verifica se já existe um Pokémon no spot baseado no tile"""
         # Converte spot para coordenadas de tile
@@ -114,18 +118,15 @@ class PlacementManager:
         spot_tile_y = spot.y // self.tile_size
 
         for pokemon in self.placed_pokemon:
-            pokemon_tile_x = pokemon.x // self.tile_size
-            pokemon_tile_y = pokemon.y // self.tile_size
+            # Usa as coordenadas armazenadas ou calcula
+            if hasattr(pokemon, 'placed_tile_x'):
+                pokemon_tile_x = pokemon.placed_tile_x
+                pokemon_tile_y = pokemon.placed_tile_y
+            else:
+                pokemon_tile_x = pokemon.x // self.tile_size
+                pokemon_tile_y = pokemon.y // self.tile_size
 
             if pokemon_tile_x == spot_tile_x and pokemon_tile_y == spot_tile_y:
-                return pokemon
-        return None
-
-    def get_pokemon_at_world_pos(self, world_x, world_y, tolerance=20):
-        """Retorna o Pokémon na posição do mundo (para seleção)"""
-        for pokemon in self.placed_pokemon:
-            distance = ((pokemon.x - world_x) ** 2 + (pokemon.y - world_y) ** 2) ** 0.5
-            if distance < tolerance:
                 return pokemon
         return None
 
@@ -149,17 +150,33 @@ class PlacementManager:
             self._remove_pokemon(pokemon)
 
     def _remove_pokemon(self, pokemon):
-        """Remove um Pokémon do mapa (por derrota)"""
+        """Remove um Pokémon do mapa (por derrota) - CORRIGIDO"""
         if pokemon in self.placed_pokemon:
             self.placed_pokemon.remove(pokemon)
 
-            # Libera o spot
-            if hasattr(pokemon, 'spot_id') and pokemon.spot_id:
-                for spot in self.game.spot_renderer.get_spots():
-                    if spot.id == pokemon.spot_id:
-                        spot.occupied = False
-                        print(f"[COMBATE] Spot {spot.id} liberado")
-                        break
+            # ===== CORREÇÃO: LIBERA O SPOT USANDO COORDENADAS DE TILE =====
+            # Usa as coordenadas de tile armazenadas
+            if hasattr(pokemon, 'placed_tile_x') and hasattr(pokemon, 'placed_tile_y'):
+                pokemon_tile_x = pokemon.placed_tile_x
+                pokemon_tile_y = pokemon.placed_tile_y
+            else:
+                # Fallback: calcula da posição atual
+                pokemon_tile_x = pokemon.x // self.tile_size
+                pokemon_tile_y = pokemon.y // self.tile_size
+
+            spot_found = False
+            for spot in self.game.spot_renderer.get_spots():
+                spot_tile_x = spot.x // self.tile_size
+                spot_tile_y = spot.y // self.tile_size
+
+                if spot_tile_x == pokemon_tile_x and spot_tile_y == pokemon_tile_y:
+                    spot.occupied = False
+                    spot_found = True
+                    print(f"[COMBATE] Spot ({spot.x}, {spot.y}) liberado")
+                    break
+
+            if not spot_found:
+                print(f"[COMBATE] ERRO: Spot não encontrado para tile ({pokemon_tile_x}, {pokemon_tile_y})")
 
             # Marca como não colocado (é o mesmo objeto do time!)
             pokemon.is_placed = False
@@ -167,12 +184,21 @@ class PlacementManager:
     def clear(self):
         """Remove todos os Pokémon do mapa"""
         for pokemon in self.placed_pokemon:
-            # Libera os spots
-            if hasattr(pokemon, 'spot_id') and pokemon.spot_id:
-                for spot in self.game.spot_renderer.get_spots():
-                    if spot.id == pokemon.spot_id:
-                        spot.occupied = False
-                        break
+            # Libera os spots usando coordenadas de tile
+            if hasattr(pokemon, 'placed_tile_x') and hasattr(pokemon, 'placed_tile_y'):
+                pokemon_tile_x = pokemon.placed_tile_x
+                pokemon_tile_y = pokemon.placed_tile_y
+            else:
+                pokemon_tile_x = pokemon.x // self.tile_size
+                pokemon_tile_y = pokemon.y // self.tile_size
+
+            for spot in self.game.spot_renderer.get_spots():
+                spot_tile_x = spot.x // self.tile_size
+                spot_tile_y = spot.y // self.tile_size
+
+                if spot_tile_x == pokemon_tile_x and spot_tile_y == pokemon_tile_y:
+                    spot.occupied = False
+                    break
 
             # Reseta is_placed no time
             for team_pokemon in self.game.player.team:
