@@ -312,7 +312,7 @@ class ItemDragManager:
         # Superfície com alpha
         indicator = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
 
-        # ===== NOVO: Verifica se é boss e não pode capturar =====
+        # =====  Verifica se é boss e não pode capturar =====
         if self.cannot_capture_boss and self.drag_item_data and self.drag_item_data["category"] == "pokeball":
             # Boss - alvo inválido (X vermelho)
             color = (255, 50, 50)

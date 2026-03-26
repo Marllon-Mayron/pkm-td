@@ -7,6 +7,7 @@ import pygame
 from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
 from src.config.settings import settings
+from src.managers.sound_manager import SoundEffect, sound_manager
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
 from src.scenes.game_scene.components.managers.overlay_manager import OverlayType, OverlayManager
@@ -254,6 +255,37 @@ class GameScene(BaseScene):
 
         print("[MOVE_LEARN] Overlay fechado, jogo despausado")
 
+    def show_capture_overlay(self, pokemon, is_to_team=True):
+        """Mostra o overlay de captura de Pokémon"""
+        # Pausa o jogo
+        self.game_paused = True
+        self.paused = True
+
+        # Trava as waves
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = True
+
+        sound_manager.play_effect(SoundEffect.CAUGHT)
+        # Mostra o overlay de captura
+        self.overlay_manager.show(OverlayType.CAPTURE, pokemon=pokemon, is_to_team=is_to_team)
+
+        print(f"[CAPTURE] Overlay de captura aberto para {pokemon.name}")
+
+    def close_capture_overlay(self):
+        """Fecha o overlay de captura"""
+        # Despausa o jogo
+        self.game_paused = False
+        self.paused = False
+
+        # Destrava as waves
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = False
+
+        # Esconde o overlay
+        self.overlay_manager.hide()
+
+        print("[CAPTURE] Overlay de captura fechado, jogo despausado")
+
     def _setup_world_dimensions(self):
         """Configura dimensões do mundo baseado no mapa"""
         map_width, map_height = self.map_renderer.get_dimensions()
@@ -344,14 +376,23 @@ class GameScene(BaseScene):
         roll = random.random()
 
         if roll < chance or item_data["id"] == "masterball":
+            # Guarda o item que o inimigo carregava
             carried_item = enemy.is_carrying
             if carried_item:
                 enemy.drop_item()
 
+            # Remove o inimigo do jogo
             self.wave_manager._remove_enemy(enemy)
 
+            # Cria o Pokémon capturado
             from src.entities.pokemon import Pokemon
-            caught = Pokemon(0, 0, enemy.id, level=enemy.level, is_wild=False, shiny=enemy.is_shiny)
+            caught = Pokemon(
+                enemy.x, enemy.y,  # Mantém a posição do inimigo para o zoom do overlay
+                enemy.id,
+                level=enemy.level,
+                is_wild=False,
+                shiny=enemy.is_shiny
+            )
             caught.current_hp = enemy.current_hp
             caught.max_hp = enemy.max_hp
             caught.ivs = enemy.ivs.copy()
@@ -359,14 +400,20 @@ class GameScene(BaseScene):
             caught.xp = enemy.xp
             caught.nature = enemy.nature
 
-            if self.player.has_team_space():
+            # Verifica se vai para o time ou para a box
+            is_to_team = self.player.has_team_space()
+            if is_to_team:
                 self.player.add_to_team(caught)
             else:
                 self.player.add_to_box(caught)
 
+            # Registra na Pokédex
             self.player.caught_pokemon.add(enemy.id)
             self.player.register_seen(enemy.id)
             self.player.auto_save()
+
+            # Mostra o overlay de captura
+            self.show_capture_overlay(caught, is_to_team)
 
             return True
 
