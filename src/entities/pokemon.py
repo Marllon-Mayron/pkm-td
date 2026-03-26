@@ -340,7 +340,15 @@ class Pokemon(Entity):
         if leveled_up:
             self.attack_damage = self._calculate_attack_damage()
             self.defense_value = self._calculate_defense()
-            self.check_and_evolve()
+
+            # Verifica evolução - agora com overlay
+            evolution = evolution_manager.check_evolution(self.id, current_level=self.level)
+            if evolution and self.game_scene:
+                # Se tem overlay de evolução, abre ele
+                self.game_scene.open_evolution_overlay(self, evolution)
+                return True  # Indica que a evolução está pendente
+
+        return leveled_up
 
     def level_up(self):
         old_level = self.level
@@ -359,7 +367,8 @@ class Pokemon(Entity):
         cache_key = (self.id, self.level, self.speed_stat, self.is_shiny, self.is_boss)
         self._speed_cache.pop(cache_key, None)
 
-        return pending_moves  # Retorna moves que precisam de escolha
+        # NÃO chama evolução automática aqui - será chamada no gain_xp após level_up
+        return pending_moves
 
     def is_boss_type(self):
         return hasattr(self, 'is_boss') and self.is_boss

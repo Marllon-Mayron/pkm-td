@@ -286,6 +286,33 @@ class GameScene(BaseScene):
 
         print("[CAPTURE] Overlay de captura fechado, jogo despausado")
 
+    def open_evolution_overlay(self, pokemon, evolution_data):
+        """Abre o overlay de evolução para um Pokémon"""
+        from src.scenes.game_scene.components.overlays.evolution_overlay import EvolutionOverlay
+
+        self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data)
+        self.evolution_overlay.active = True
+        # Trava as waves para não spawnar novos inimigos durante a evolução
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = True
+
+        print(f"[EVOLUTION] Abrindo overlay para evolução de {pokemon.name}")
+
+    def close_evolution_overlay(self, cancel=False):
+        """Fecha o overlay de evolução"""
+        if cancel:
+            print(f"[EVOLUTION] Evolução cancelada")
+        else:
+            print(f"[EVOLUTION] Evolução concluída")
+
+        # Limpa a referência do overlay
+        if hasattr(self, 'evolution_overlay'):
+            self.evolution_overlay = None
+
+        # Destrava as waves
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = False
+
     def _setup_world_dimensions(self):
         """Configura dimensões do mundo baseado no mapa"""
         map_width, map_height = self.map_renderer.get_dimensions()
@@ -487,6 +514,11 @@ class GameScene(BaseScene):
         camera = self.camera
         screen_mgr = self.screen_manager
 
+        # ===== Processa overlay de evolução primeiro =====
+        if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
+            self.evolution_overlay.handle_event(event)
+            return None
+
         # ===== NOVO: Processa overlay de aprendizado de moves primeiro =====
         if self.move_learn_overlay and self.move_learn_overlay.active:
             self.move_learn_overlay.handle_event(event)
@@ -659,30 +691,34 @@ class GameScene(BaseScene):
 
     def fixed_update(self, dt):
         """Update da lógica do jogo - OTIMIZADO"""
-        # ===== Processa overlay de aprendizado de moves =====
+
+        # ===== PROCESSAMENTO DE OVERLAYS (NÃO VERIFICAM PAUSA) =====
+        # Overlay de evolução - prioridade máxima
+        if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
+            self.evolution_overlay.update(dt)
+            return
+
+        # Overlay de aprendizado de moves
         if self.move_learn_overlay and self.move_learn_overlay.active:
             self.move_learn_overlay.update(dt)
             return
 
-        if hasattr(self, 'battle_system'):
-            self.battle_system.update(dt)
-
-        # ===== Processa overlay de seleção de moves =====
+        # Overlay de seleção de moves
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.update(dt)
             return
 
-        # Se o jogo está pausado por outro motivo
-        if self.game_paused:
-            return
-
-        if self.paused:
-            return
-
+        # Overlay manager (capture, game over, etc)
         if self.overlay_manager.is_active:
             self.overlay_manager.update(dt)
             return
 
+        # ===== SE CHEGOU AQUI, NÃO HÁ OVERLAYS ATIVOS =====
+        # Verifica se o jogo está pausado
+        if self.game_paused or self.paused:
+            return
+
+        # ===== ATUALIZAÇÃO NORMAL DO JOGO =====
         # Cache de referências locais para acesso mais rápido
         wave_mgr = self.wave_manager
         target_mgr = self.target_item_manager
@@ -695,6 +731,9 @@ class GameScene(BaseScene):
         path_renderer = self.path_renderer
 
         # Updates
+        if hasattr(self, 'battle_system'):
+            self.battle_system.update(dt)
+
         if bag_renderer:
             bag_renderer.update(dt)
 
@@ -714,11 +753,9 @@ class GameScene(BaseScene):
 
         # Game over check
         if target_mgr.game_over:
-            # ===== PARAR MÚSICA AO GAME OVER =====
             self._stop_battle_music(fade_ms=1000)
             self.game_state = "game_over"
             self.overlay_manager.show(OverlayType.GAME_OVER)
-            # ===== RESETAR PP DOS MOVES DO TIME DO JOGADOR =====
             self._reset_team_pp()
             return
 
@@ -806,6 +843,8 @@ class GameScene(BaseScene):
         overlay_mgr = self.overlay_manager
         show_debug = self.show_debug
 
+
+
         # Mundo do jogo
         map_renderer.render(screen, camera, screen_mgr)
 
@@ -872,6 +911,9 @@ class GameScene(BaseScene):
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.render(screen)
 
+        # ===== Renderiza overlay de evolução =====
+        if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
+                self.evolution_overlay.render(screen)
         if show_debug:
             self._render_debug_info(screen)
 

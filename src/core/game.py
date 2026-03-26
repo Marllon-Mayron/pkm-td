@@ -26,7 +26,7 @@ class Game:
         if not save_loaded:
             # Se não tinha save, cria um Pokémon inicial
             print("[GAME] Nenhum save encontrado, criando novo jogo")
-            self.player.add_starter(7)  # ID 7 = Squirtle
+            self.player.add_starter(4)  # ID 7 = Squirtle
 
             # Cria um save inicial com configurações padrão
             from src.config.progress import progress_manager
