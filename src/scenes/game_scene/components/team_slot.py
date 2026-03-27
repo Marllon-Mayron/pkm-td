@@ -67,6 +67,12 @@ class GameTeamSlot:
 
     def handle_event(self, event, bag_manager=None):
         """Processa eventos no slot"""
+        # Variáveis para detectar clique vs arrasto
+        if not hasattr(self, 'click_start_time'):
+            self.click_start_time = 0
+            self.click_start_pos = None
+            self.is_dragging_started = False
+
         if event.type == pygame.MOUSEMOTION:
             was_hovered = self.is_hovered
             self.is_hovered = self.rect.collidepoint(event.pos)
@@ -75,28 +81,84 @@ class GameTeamSlot:
                 self.animation_offset = 8 if self.is_hovered else 0
                 self.glow_alpha = 100 if self.is_hovered else 0
 
+            # Verifica se está com o botão pressionado e já moveu o suficiente para iniciar drag
+            if self.click_start_time > 0 and not self.is_dragging_started:
+                if self.click_start_pos:
+                    distance = ((event.pos[0] - self.click_start_pos[0]) ** 2 +
+                                (event.pos[1] - self.click_start_pos[1]) ** 2) ** 0.5
+
+                    # Se moveu mais de 10 pixels, inicia o drag
+                    if distance >= 10:
+                        pokemon = self.pokemon
+                        if pokemon:
+                            is_placed = hasattr(pokemon, 'is_placed') and pokemon.is_placed
+
+                            # Só inicia drag se NÃO estiver no mapa
+                            if not is_placed:
+                                print(f"[SLOT] Arrasto detectado em {pokemon.name} - Iniciando drag")
+                                self.is_dragging_started = True
+                                return {
+                                    'action': 'start_drag',
+                                    'slot_index': self.slot_index,
+                                    'pokemon': pokemon
+                                }
+
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered:
                 pokemon = self.pokemon
                 if pokemon:
-                    if hasattr(pokemon, 'is_placed') and pokemon.is_placed:
-                        print(f"[SLOT] {pokemon.name} já está no mapa!")
-                        return {
-                            'action': 'already_placed',
-                            'slot_index': self.slot_index,
-                            'pokemon': pokemon
-                        }
-
+                    # Registra o início do clique
+                    self.click_start_time = pygame.time.get_ticks()
+                    self.click_start_pos = event.pos
+                    self.is_dragging_started = False
+                    return None  # Aguarda para ver se é clique ou arrasto
+                else:
+                    # Slot vazio - apenas seleciona
                     return {
-                        'action': 'start_drag',
-                        'slot_index': self.slot_index,
-                        'pokemon': pokemon
+                        'action': 'select',
+                        'slot_index': self.slot_index
                     }
 
-                return {
-                    'action': 'select',
-                    'slot_index': self.slot_index
-                }
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            # Se não houve drag, é um clique
+            if self.click_start_time > 0 and not self.is_dragging_started:
+                pokemon = self.pokemon
+                if pokemon and self.is_hovered:
+                    # Verifica se foi um clique simples (curto e pouco movimento)
+                    click_duration = pygame.time.get_ticks() - self.click_start_time
+                    distance = 0
+                    if self.click_start_pos:
+                        distance = ((event.pos[0] - self.click_start_pos[0]) ** 2 +
+                                    (event.pos[1] - self.click_start_pos[1]) ** 2) ** 0.5
+
+                    # Se foi um clique simples (menos de 200ms e pouco movimento)
+                    if click_duration < 200 and distance < 10:
+                        is_placed = hasattr(pokemon, 'is_placed') and pokemon.is_placed
+
+                        if is_placed:
+                            # Pokémon no mapa - ABRE OVERLAY DE MOVES
+                            print(f"[SLOT] Clique em {pokemon.name} (no mapa) - Abrindo overlay de moves")
+                            self.click_start_time = 0
+                            self.click_start_pos = None
+                            return {
+                                'action': 'open_move_select',
+                                'slot_index': self.slot_index,
+                                'pokemon': pokemon
+                            }
+                        else:
+                            # Pokémon no time (não colocado) - apenas seleciona
+                            print(f"[SLOT] Clique em {pokemon.name} (no time) - Selecionando")
+                            self.click_start_time = 0
+                            self.click_start_pos = None
+                            return {
+                                'action': 'select',
+                                'slot_index': self.slot_index
+                            }
+
+            # Limpa os dados do clique
+            self.click_start_time = 0
+            self.click_start_pos = None
+            self.is_dragging_started = False
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
             if self.is_hovered and bag_manager and bag_manager.has_items():

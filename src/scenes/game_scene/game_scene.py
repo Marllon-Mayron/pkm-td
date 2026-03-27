@@ -51,7 +51,7 @@ class GameScene(BaseScene):
 
         # Cria os gerenciadores
         self.placement_manager = PlacementManager(self)
-        self.team_manager = GameTeamManager(game)
+        self.team_manager = GameTeamManager(game, self)
         self.target_item_manager = TargetItemManager(game)
         self.target_item_renderer = TargetItemRenderer()
 

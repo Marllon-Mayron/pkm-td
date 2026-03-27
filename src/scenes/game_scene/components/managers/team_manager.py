@@ -8,8 +8,9 @@ from src.scenes.game_scene.components.drag_drop import DragDropManager
 class GameTeamManager:
     """Gerencia a HUD do time durante o jogo"""
 
-    def __init__(self, game):
+    def __init__(self, game, game_scene=None):  # ADICIONADO: parâmetro game_scene
         self.game = game
+        self.game_scene = game_scene  # ARMAZENA a referência da game_scene
 
         # Configurações responsivas
         self.slot_width_ratio = 0.16
@@ -34,6 +35,10 @@ class GameTeamManager:
         # Inicializa
         self._calculate_dimensions()
         self._create_slots()
+
+    def set_game_scene(self, game_scene):  # ADICIONADO: método para definir game_scene
+        """Define a referência da game_scene"""
+        self.game_scene = game_scene
 
     def _calculate_dimensions(self):
         """Calcula dimensões baseado no tamanho da tela"""
@@ -150,6 +155,15 @@ class GameTeamManager:
                     elif result.get('action') == 'already_placed':
                         print(f"[TEAM] Não pode arrastar {result['pokemon'].name} - já está no mapa")
                         slot.is_selected = True
+                        return result
+
+                    # ADICIONADO: NOVO - quando clica no Pokémon para abrir overlay de moves
+                    elif result.get('action') == 'open_move_select':
+                        pokemon = result.get('pokemon')
+                        if pokemon and self.game_scene:
+                            # Abre o overlay de seleção de moves
+                            print(f"[TEAM] Abrindo overlay de moves para {pokemon.name}")
+                            self.game_scene.open_move_select_overlay(pokemon)
                         return result
                 else:
                     for s in self.team_slots:
