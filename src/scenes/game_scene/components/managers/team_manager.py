@@ -157,12 +157,12 @@ class GameTeamManager:
                         slot.is_selected = True
                         return result
 
-                    # ADICIONADO: NOVO - quando clica no Pokémon para abrir overlay de moves
+                    # NOVO: Processa o clique para abrir overlay de moves
                     elif result.get('action') == 'open_move_select':
                         pokemon = result.get('pokemon')
                         if pokemon and self.game_scene:
                             # Abre o overlay de seleção de moves
-                            print(f"[TEAM] Abrindo overlay de moves para {pokemon.name}")
+                            print(f"[TEAM] Abrindo overlay de moves para {pokemon.name} via slot")
                             self.game_scene.open_move_select_overlay(pokemon)
                         return result
                 else:
