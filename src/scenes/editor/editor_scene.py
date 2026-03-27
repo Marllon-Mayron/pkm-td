@@ -5,6 +5,8 @@ Cena do Editor de Fases
 import pygame, os
 from tkinter import filedialog, Tk
 
+from editor.event_system import EventManager
+from scenes.editor.components.event_config_dialog import EventConfigDialog
 from src.editor.target_item_editor import TargetItemManager
 from src.editor.wave_config import WaveManager
 from src.scenes.base_scene import BaseScene
@@ -54,9 +56,8 @@ class EditorScene(BaseScene):
         self.tower_spots = TowerSpotManager()  # Agora só marca onde colocar Pokémons
         self.exporter = PhaseExporter()
         self.undo_manager = UndoManager(max_steps=10)
-        #Gerenciador de itens alvo
         self.target_items = TargetItemManager()
-
+        self.event_manager = EventManager()
         # Estado do editor
         self.mode = "layers"  # layers, path, towers
         self.current_tile = 1
@@ -83,6 +84,7 @@ class EditorScene(BaseScene):
         self.load_phase_dialog = None
         self.wave_config_dialog = None
         self.target_item_dialog = None
+        self.event_config_dialog = None
 
         self.selected_item_id = None
 
@@ -166,6 +168,10 @@ class EditorScene(BaseScene):
             # Fecha diálogo de items se estiver aberto
             if self.target_item_dialog:
                 self.target_item_dialog.visible = False
+
+        elif mode == "events":
+            print("DEBUG: Abrindo diálogo de configuração de eventos")
+            self._open_event_config_dialog()
 
     def _import_tileset(self):
         """Importa um tileset para a layer atual"""
@@ -307,6 +313,20 @@ class EditorScene(BaseScene):
             self.target_items
         )
 
+    def _open_event_config_dialog(self):
+        """Abre o diálogo de configuração de eventos."""
+        if not self.event_manager.triggers:
+            self.event_manager.add_trigger()  # Cria um gatilho padrão se não houver nenhum
+
+        dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 700) // 2
+        dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 500) // 2
+
+        self.event_config_dialog = EventConfigDialog(
+            dialog_x, dialog_y, 700, 500,
+            self.event_manager,
+            self.wave_manager  # Passa o wave_manager para saber o número de waves
+        )
+
     def _handle_load_phase_result(self, result):
         """Processa o resultado do diálogo de carregamento"""
         if result and result.get('action') == 'load':
@@ -408,6 +428,14 @@ class EditorScene(BaseScene):
                 self.load_phase_dialog = None
             return
 
+        if self.event_config_dialog and self.event_config_dialog.visible:
+            result = self.event_config_dialog.handle_event(event)
+            if result == "saved":
+                self.event_config_dialog = None
+            elif not self.event_config_dialog.visible:
+                self.event_config_dialog = None
+            return True
+
         if self.brush_buttons.handle_event(event):
             return True
 
@@ -427,10 +455,8 @@ class EditorScene(BaseScene):
         """Delega renderização para o render handler"""
         self.render_handler.render(screen)
 
-
-
     def save_phase(self):
-        """Salva a fase atual - AGORA SEM TORRES, SÓ SPOTS"""
+        """Salva a fase atual - AGORA COM EVENTOS"""
         phase_data = {
             "name": self.phase_name,
             "map": self.layer_manager.to_dict(),
@@ -438,6 +464,7 @@ class EditorScene(BaseScene):
             "waves": self.wave_manager.to_dict(),
             "tower_spots": self.tower_spots.to_dict(),
             "target_items": self.target_items.to_dict(),
+            "events": self.event_manager.to_dict(),  # NOVO: Salva eventos
             "rewards": {
                 "money": 100,
                 "experience": 50
@@ -446,8 +473,9 @@ class EditorScene(BaseScene):
 
         self.exporter.export_phase(phase_data, self.current_chapter, self.current_phase)
         print(f"Fase salva com {len(self.wave_manager.waves)} waves, "
-              f"{len(self.tower_spots.spots)} spots e "
-              f"{len(self.target_items.items)} itens alvo!")
+              f"{len(self.tower_spots.spots)} spots, "
+              f"{len(self.target_items.items)} itens alvo e "
+              f"{len(self.event_manager.triggers)} gatilhos de evento!")
 
     def load_phase(self, chapter, phase_number):
         """Carrega uma fase existente"""
@@ -514,6 +542,13 @@ class EditorScene(BaseScene):
             if "target_items" in phase_data:
                 self.target_items.from_dict(phase_data["target_items"])
                 print(f"Itens alvo carregados: {len(self.target_items.items)}")
+
+            if "events" in phase_data:
+                self.event_manager.from_dict(phase_data["events"])
+                print(f"Gatilhos de eventos carregados: {len(self.event_manager.triggers)}")
+            else:
+                self.event_manager = EventManager()
+                print("Nenhum evento encontrado, criado gerenciador vazio")
 
             # Atualiza nome da fase
             self.phase_name = phase_data.get("name", f"Fase {chapter}-{phase_number}")

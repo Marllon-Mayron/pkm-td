@@ -60,9 +60,13 @@ class EditorRenderHandler:
         if self.editor.load_phase_dialog and self.editor.load_phase_dialog.visible:
             self.editor.load_phase_dialog.render(screen)
 
-        #Diálogo de itens alvo
+        # Diálogo de itens alvo
         if self.editor.target_item_dialog and self.editor.target_item_dialog.visible:
             self.editor.target_item_dialog.render(screen)
+
+        # NOVO: Diálogo de eventos
+        if hasattr(self.editor, 'event_config_dialog') and self.editor.event_config_dialog and self.editor.event_config_dialog.visible:
+            self.editor.event_config_dialog.render(screen)
 
         # Pause (sempre por último)
         if self.editor.paused:

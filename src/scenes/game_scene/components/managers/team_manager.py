@@ -157,7 +157,6 @@ class GameTeamManager:
                         slot.is_selected = True
                         return result
 
-                    # NOVO: Processa o clique para abrir overlay de moves
                     elif result.get('action') == 'open_move_select':
                         pokemon = result.get('pokemon')
                         if pokemon and self.game_scene:

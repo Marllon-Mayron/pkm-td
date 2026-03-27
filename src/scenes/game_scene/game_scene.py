@@ -676,11 +676,6 @@ class GameScene(BaseScene):
                             world_pos[0], world_pos[1], tolerance=30
                         )
                         if clicked_pokemon:
-                            # MODIFICADO: Abre overlay de moves em vez de iniciar drag
-                            if clicked_pokemon.moves:
-                                print(f"[GAME] Clicou em {clicked_pokemon.name} no mapa - Abrindo overlay de moves")
-                                self.open_move_select_overlay(clicked_pokemon)
-                                return None
                             for spot in spot_renderer.get_spots():
                                 spot_tile_x = spot.x // placement_mgr.tile_size
                                 spot_tile_y = spot.y // placement_mgr.tile_size
