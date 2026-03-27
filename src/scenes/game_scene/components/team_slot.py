@@ -14,9 +14,13 @@ class GameTeamSlot:
         'bg_default': (25, 30, 40, 200),
         'bg_hover': (35, 45, 60, 220),
         'bg_selected': (45, 60, 80, 230),
+        'bg_placed': (25, 50, 70, 180),  # Fundo azulado para Pokémon no mapa
+        'bg_hover_placed': (35, 65, 90, 200),  # Hover quando está no mapa
         'border': (70, 80, 100),
         'border_hover': (100, 140, 200),
         'border_selected': (255, 215, 0),
+        'border_placed': (50, 150, 255),  # Borda azul para Pokémon no mapa
+        'border_hover_placed': (100, 200, 255),  # Borda hover para Pokémon no mapa
         'text': (255, 255, 255),
         'text_dim': (150, 150, 170),
         'hp_green': (78, 201, 96),
@@ -28,7 +32,11 @@ class GameTeamSlot:
         'xp_bar': (100, 180, 255),
         'xp_bg': (40, 45, 60),
         'level_bg': (50, 40, 70),
+        'map_indicator': (50, 150, 255),  # Cor do indicador de mapa
     }
+
+    # Variável de classe para controlar o pulso global
+    _global_pulse_time = 0
 
     def __init__(self, x, y, width, height, slot_index, game):
         self.rect = pygame.Rect(x, y, width, height)
@@ -55,6 +63,12 @@ class GameTeamSlot:
         if self.slot_index < len(self.game.player.team):
             return self.game.player.team[self.slot_index]
         return None
+
+    @property
+    def is_placed(self):
+        """Verifica se o Pokémon está no mapa"""
+        pokemon = self.pokemon
+        return pokemon and hasattr(pokemon, 'is_placed') and pokemon.is_placed
 
     def _create_fonts(self):
         """Cria fontes com tamanhos responsivos"""
@@ -181,6 +195,9 @@ class GameTeamSlot:
         target_glow = 100 if self.is_hovered else 0
         self.glow_alpha += (target_glow - self.glow_alpha) * dt * 8
 
+        # Atualiza o pulso global
+        GameTeamSlot._global_pulse_time += dt
+
         if self.pokemon:
             self.hp_animation += dt
         else:
@@ -204,29 +221,57 @@ class GameTeamSlot:
         if pokemon:
             self._draw_pokemon_info(screen, animated_rect, pokemon)
 
-            if hasattr(pokemon, 'is_placed') and pokemon.is_placed:
+            if self.is_placed:
                 self._draw_placed_indicator(screen, animated_rect)
         else:
             self._draw_empty_slot(screen, animated_rect)
 
     def _draw_placed_indicator(self, screen, rect):
-        """Desenha indicador de que o Pokémon está no mapa"""
-        indicator_size = 12
-        indicator_x = rect.x + 5
-        indicator_y = rect.y + 5
+        """Desenha indicador de que o Pokémon está no mapa - versão com pulso global"""
+        indicator_size = 20
+        indicator_x = rect.x + 8
+        indicator_y = rect.y + 8
 
-        pygame.draw.circle(screen, (0, 200, 0),
+        # Usa o pulso global (mais lento - 2 segundos para ciclo completo)
+        # Seno de 0 a 1, onde 0 = mínimo, 1 = máximo
+        pulse_value = (math.sin(GameTeamSlot._global_pulse_time * 0.5) + 1) / 2
+        # Ajusta para pulsar entre 0.8 e 1.2
+        pulse = 0.8 + (pulse_value * 0.4)
+
+        # Círculo externo com brilho
+        for i in range(3):
+            alpha = int(100 - i * 30)
+            # O alpha também pulsa suavemente
+            alpha = int(alpha * (0.6 + pulse_value * 0.4))
+            glow_radius = int(indicator_size // 2 + i * 2)
+            glow_surface = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
+            glow_color = (self.COLORS['map_indicator'][0],
+                          self.COLORS['map_indicator'][1],
+                          self.COLORS['map_indicator'][2],
+                          alpha)
+            pygame.draw.circle(glow_surface, glow_color,
+                               (glow_radius, glow_radius), glow_radius)
+            screen.blit(glow_surface,
+                        (indicator_x + indicator_size // 2 - glow_radius,
+                         indicator_y + indicator_size // 2 - glow_radius))
+
+        # Círculo principal (tamanho também pulsa)
+        pygame.draw.circle(screen, self.COLORS['map_indicator'],
                            (indicator_x + indicator_size // 2, indicator_y + indicator_size // 2),
-                           indicator_size // 2)
+                           int(indicator_size // 2 * pulse))
+
+        # Círculo interno branco
+        inner_radius = int(indicator_size // 3 * pulse)
         pygame.draw.circle(screen, (255, 255, 255),
                            (indicator_x + indicator_size // 2, indicator_y + indicator_size // 2),
-                           indicator_size // 2 - 2)
+                           inner_radius)
 
-        font = pygame.font.Font(None, 14)
-        check = font.render("✓", True, (0, 0, 0))
-        check_rect = check.get_rect(center=(indicator_x + indicator_size // 2,
-                                            indicator_y + indicator_size // 2))
-        screen.blit(check, check_rect)
+        # Ícone de mapa (globo simplificado)
+        icon_font = pygame.font.Font(None, int(indicator_size * 0.6))
+        map_icon = icon_font.render("🌍", True, self.COLORS['map_indicator'])
+        icon_rect = map_icon.get_rect(center=(indicator_x + indicator_size // 2,
+                                              indicator_y + indicator_size // 2))
+        screen.blit(map_icon, icon_rect)
 
     def _draw_shadow(self, screen, rect):
         """Desenha sombra suave"""
@@ -242,23 +287,28 @@ class GameTeamSlot:
                 screen.blit(shadow, (shadow_rect.x + i, shadow_rect.y + i))
 
     def _draw_background(self, screen, rect, pokemon=None):
-        """Desenha fundo do slot com gradiente"""
+        """Desenha fundo do slot com gradiente - versão com fundo azulado para Pokémon no mapa"""
+        is_on_map = self.is_placed
+
+        # Define as cores base baseado no estado
         if self.is_selected:
             base_color = self.COLORS['bg_selected']
             border_color = self.COLORS['border_selected']
+        elif is_on_map:
+            if self.is_hovered:
+                base_color = self.COLORS['bg_hover_placed']
+                border_color = self.COLORS['border_hover_placed']
+            else:
+                base_color = self.COLORS['bg_placed']
+                border_color = self.COLORS['border_placed']
         elif self.is_hovered:
             base_color = self.COLORS['bg_hover']
-            if pokemon and hasattr(pokemon, 'is_placed') and pokemon.is_placed:
-                border_color = (100, 255, 100)
-            else:
-                border_color = self.COLORS['border_hover']
+            border_color = self.COLORS['border_hover']
         else:
             base_color = self.COLORS['bg_default']
-            if pokemon and hasattr(pokemon, 'is_placed') and pokemon.is_placed:
-                border_color = (0, 200, 0)
-            else:
-                border_color = self.COLORS['border']
+            border_color = self.COLORS['border']
 
+        # Cria superfície com gradiente
         bg_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
 
         for y in range(rect.height):
@@ -274,12 +324,24 @@ class GameTeamSlot:
 
         screen.blit(bg_surface, rect)
 
+        # Efeito de brilho extra para Pokémon no mapa (pulsante global)
+        if is_on_map:
+            # Usa o mesmo pulso global para o brilho de fundo
+            pulse_value = (math.sin(GameTeamSlot._global_pulse_time * 0.5) + 1) / 2
+            glow_alpha = int(30 + 20 * pulse_value)  # Pulsa entre 30 e 50
+            glow_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+            glow_color = (50, 150, 255, glow_alpha)
+            pygame.draw.rect(glow_surface, glow_color, glow_surface.get_rect(), border_radius=8)
+            screen.blit(glow_surface, rect)
+
+        # Efeito de hover glow
         if self.glow_alpha > 0:
             glow_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
             glow_color = (100, 150, 255, int(self.glow_alpha * 0.3))
             pygame.draw.rect(glow_surface, glow_color, glow_surface.get_rect(), border_radius=8)
             screen.blit(glow_surface, rect)
 
+        # Borda
         pygame.draw.rect(screen, border_color, rect, 2, border_radius=10)
 
     def _draw_pokemon_info(self, screen, rect, pokemon):
