@@ -351,3 +351,101 @@ class Pokedex:
                 "catch_rate": 120,
                 "evolution": None
             }
+
+    # ===== MÉTODOS PARA RETRATOS (PORTRAITS) =====
+
+    def get_portrait(self, pokemon_id: int, expression: str = "normal", shiny: bool = False) -> Optional[
+        pygame.Surface]:
+        """
+        Retorna o retrato do Pokémon para o expression solicitado.
+
+        Args:
+            pokemon_id: ID do Pokémon (ex: 5)
+            expression: "normal", "happy", "angry", etc.
+            shiny: Se é versão shiny
+
+        Returns:
+            Surface do retrato (40x40) ou None se não encontrar
+        """
+        # Cache para retratos
+        if not hasattr(self, '_portrait_cache'):
+            self._portrait_cache = {}
+
+        cache_key = f"{pokemon_id}_{expression}_{shiny}"
+        if cache_key in self._portrait_cache:
+            return self._portrait_cache[cache_key]
+
+        # Monta o caminho base
+        base_path = Path(__file__).parent.parent.parent / "res" / "PokemonSprites" / "Portrait"
+        pokemon_dir = f"{pokemon_id:04d}"
+
+        if shiny:
+            # Shiny: .../Portrait/0005/0000/0001/
+            portrait_path = base_path / pokemon_dir / "0000" / "0001" / f"{expression}.png"
+        else:
+            # Normal: .../Portrait/0005/
+            portrait_path = base_path / pokemon_dir / f"{expression}.png"
+
+        # Tenta carregar
+        portrait = None
+        if portrait_path.exists():
+            try:
+                portrait = pygame.image.load(str(portrait_path)).convert_alpha()
+                # Garante tamanho 40x40 (já deve ser, mas escala se necessário)
+                if portrait.get_width() != 40 or portrait.get_height() != 40:
+                    portrait = pygame.transform.scale(portrait, (40, 40))
+                print(f"[PORTRAIT] Carregado: {pokemon_id}/{expression} (shiny={shiny})")
+            except Exception as e:
+                print(f"[PORTRAIT] Erro ao carregar {portrait_path}: {e}")
+
+        # Se não encontrou e não é o normal, tenta o normal
+        if portrait is None and expression != "normal":
+            portrait = self.get_portrait(pokemon_id, "normal", shiny)
+
+        # Se ainda não encontrou, cria placeholder
+        if portrait is None:
+            portrait = self._create_portrait_placeholder(pokemon_id, expression)
+
+        # Guarda no cache
+        self._portrait_cache[cache_key] = portrait
+        return portrait
+
+    def _create_portrait_placeholder(self, pokemon_id: int, expression: str) -> pygame.Surface:
+        """Cria um placeholder para retratos que não existem"""
+        portrait = pygame.Surface((40, 40), pygame.SRCALPHA)
+
+        # Fundo baseado no ID
+        color = self._get_placeholder_color(pokemon_id)
+        pygame.draw.rect(portrait, color, (0, 0, 40, 40))
+        pygame.draw.rect(portrait, (100, 100, 100), (0, 0, 40, 40), 2)
+
+        # Texto do expression
+        font = pygame.font.Font(None, 16)
+        expr_text = expression[0].upper() if expression else "?"
+        text = font.render(expr_text, True, (255, 255, 255))
+        text_rect = text.get_rect(center=(20, 20))
+        portrait.blit(text, text_rect)
+
+        return portrait
+
+    def get_portraits_info(self, pokemon_id: int, shiny: bool = False) -> Dict[str, bool]:
+        """
+        Retorna informações sobre quais retratos estão disponíveis para um Pokémon.
+
+        Returns:
+            Dict com keys: "normal", "happy", "angry" e valores booleanos
+        """
+        result = {}
+        expressions = ["normal", "happy", "angry"]
+
+        base_path = Path(__file__).parent.parent.parent / "res" / "PokemonSprites" / "Portrait"
+        pokemon_dir = f"{pokemon_id:04d}"
+
+        for expr in expressions:
+            if shiny:
+                path = base_path / pokemon_dir / "0000" / "0001" / f"{expr}.png"
+            else:
+                path = base_path / pokemon_dir / f"{expr}.png"
+            result[expr] = path.exists()
+
+        return result

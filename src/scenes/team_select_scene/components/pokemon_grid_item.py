@@ -1,3 +1,5 @@
+# src/scenes/team_select_scene/components/pokemon_grid_item.py
+
 import pygame
 from src.scenes.team_select_scene.utils.constants import COLORS
 
@@ -7,6 +9,7 @@ class PokemonGridItem:
         self.pokemon = pokemon
         self.rect = pygame.Rect(x, y, width, height)
         self.is_hovered = False
+        self._portrait_cache = None  # Cache do retrato carregado
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
@@ -16,10 +19,29 @@ class PokemonGridItem:
                 return self.pokemon
         return None
 
+    def _get_portrait(self, pokedex):
+        """Obtém o retrato do Pokémon com cache"""
+        if self._portrait_cache is None:
+            # Tenta carregar o retrato normal primeiro
+            portrait = pokedex.get_portrait(self.pokemon.id, "normal", self.pokemon.is_shiny)
+
+            # Se for shiny, adiciona efeito de brilho
+            if self.pokemon.is_shiny and portrait:
+                # Cria uma cópia com overlay dourado
+                shiny_portrait = portrait.copy()
+                overlay = pygame.Surface((40, 40), pygame.SRCALPHA)
+                overlay.fill((255, 215, 0, 80))  # Amarelo dourado semi-transparente
+                shiny_portrait.blit(overlay, (0, 0))
+                self._portrait_cache = shiny_portrait
+            else:
+                self._portrait_cache = portrait
+
+        return self._portrait_cache
+
     def render(self, screen, font, pokedex):
         self._draw_shadow(screen)
         self._draw_card_background(screen)
-        self._draw_sprite(screen, pokedex)
+        self._draw_portrait(screen, pokedex)  # ALTERADO: agora usa portrait
         self._draw_info(screen, font)
         self._draw_shiny_indicator(screen)
 
@@ -46,25 +68,57 @@ class PokemonGridItem:
         pygame.draw.rect(screen, color, self.rect, border_radius=6)
         pygame.draw.rect(screen, border_color, self.rect, 1, border_radius=6)
 
-    def _draw_sprite(self, screen, pokedex):
-        sprite = pokedex.get_sprite(self.pokemon.id, "inmap", self.pokemon.is_shiny)
-        if sprite:
-            sprite_scaled = pygame.transform.scale(sprite, (48, 48))
-            screen.blit(sprite_scaled, (self.rect.x + 5, self.rect.y + 5))
+    def _draw_portrait(self, screen, pokedex):
+        """Desenha o retrato do Pokémon (40x40)"""
+        portrait = self._get_portrait(pokedex)
+        if portrait:
+            # Centraliza o retrato na área esquerda do card
+            portrait_x = self.rect.x + 5
+            portrait_y = self.rect.y + (self.rect.height - 40) // 2
+            screen.blit(portrait, (portrait_x, portrait_y))
 
     def _draw_info(self, screen, font):
-        # Nome
+        # Nome - ajustado para começar depois do retrato (40px + 10px margem)
+        name_x = self.rect.x + 55
         name_text = font.render(self.pokemon.name, True, COLORS['TEXT']['WHITE'])
-        screen.blit(name_text, (self.rect.x + 60, self.rect.y + 10))
+        screen.blit(name_text, (name_x, self.rect.y + 10))
 
         # Nível
         lvl_text = font.render(f"Lv.{self.pokemon.level}", True, COLORS['TEXT']['YELLOW'])
-        screen.blit(lvl_text, (self.rect.x + 60, self.rect.y + 30))
+        screen.blit(lvl_text, (name_x, self.rect.y + 30))
+
+        # Tipos
+        type_font = pygame.font.Font(None, 11)
+        type_colors = {
+            "normal": (168, 168, 120),
+            "fire": (240, 128, 48),
+            "water": (104, 144, 240),
+            "electric": (248, 208, 48),
+            "grass": (120, 200, 80),
+            "ice": (152, 216, 216),
+            "fighting": (192, 48, 40),
+            "poison": (160, 64, 160),
+            "ground": (224, 192, 104),
+            "flying": (168, 144, 240),
+            "psychic": (248, 88, 136),
+            "bug": (168, 184, 32),
+            "rock": (184, 160, 56),
+            "ghost": (112, 88, 152),
+            "dragon": (112, 56, 248),
+            "dark": (112, 88, 72),
+            "steel": (184, 184, 208),
+            "fairy": (238, 153, 172),
+        }
+
+        for i, type_name in enumerate(self.pokemon.types):
+            color = type_colors.get(type_name.lower(), (128, 128, 128))
+            type_text = type_font.render(type_name.upper(), True, color)
+            screen.blit(type_text, (name_x + (i * 45), self.rect.y + 50))
 
     def _draw_shiny_indicator(self, screen):
         if self.pokemon.is_shiny:
             star_font = pygame.font.Font(None, 20)
-            star = star_font.render("S", True, COLORS['TEXT']['YELLOW'])
+            star = star_font.render("⭐", True, COLORS['TEXT']['YELLOW'])
             screen.blit(star, (self.rect.right - 25, self.rect.y + 5))
 
     def _draw_team_overlay(self, screen, font):
