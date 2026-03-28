@@ -3,6 +3,8 @@ import json
 import os
 import pygame
 from pathlib import Path
+from typing import Dict, List, Optional, Any
+from src.data.sprite_loader import PokemonSpriteManager
 
 
 class Pokedex:
@@ -22,13 +24,17 @@ class Pokedex:
         self.pokemon_data = {}
         self.max_id = 151
 
-        # Cache de sprites
-        self.front_sprites = {}          # 96x96 front
-        self.back_sprites = {}           # 96x96 back
-        self.front_shiny_sprites = {}    # 96x96 front shiny
-        self.back_shiny_sprites = {}     # 96x96 back shiny
-        self.inmap_spritesheets = {}     # 256x256 spritesheets (4x4)
-        self.inmap_frames = {}           # Frames individuais extraídos
+        # NOVO: Usa o gerenciador de sprites APENAS para InMap
+        self.sprite_manager = PokemonSpriteManager()
+
+        # Cache de sprites front/back (mantém o sistema antigo)
+        self.front_sprites = {}
+        self.back_sprites = {}
+        self.front_shiny_sprites = {}
+        self.back_shiny_sprites = {}
+
+        # Cache para sprites InMap (novo sistema)
+        self.inmap_animations_cache = {}  # Cache para animações carregadas
 
         # Tipos
         self.type_colors = {
@@ -53,12 +59,11 @@ class Pokedex:
         }
 
         self.load_pokemon_data()
-        self.load_all_sprites()
+        self.load_sprites()  # Carrega front e back (mantém igual)
 
     def load_pokemon_data(self):
         """Carrega dados do arquivo JSON"""
         try:
-            # Caminho relativo ao arquivo atual
             json_path = Path(__file__).parent.parent.parent / "res" / "json" / "pokemon_data.json"
 
             with open(json_path, 'r', encoding='utf-8') as file:
@@ -100,63 +105,22 @@ class Pokedex:
             print(f"Erro ao carregar Pokémon data: {e}")
             self._load_fallback_data()
 
-    def _cache_base_speed_limits(self):
-        """Calcula e armazena os valores mínimo e máximo de base speed entre todos os Pokémon"""
-        if not self.pokemon_data:
-            self.min_base_speed = 0
-            self.max_base_speed = 1
-            return
-
-        base_speeds = [data["base_stats"]["speed"] for data in self.pokemon_data.values()]
-        self.min_base_speed = min(base_speeds)
-        self.max_base_speed = max(base_speeds)
-        print(f"[Pokedex] Base speed limits: min={self.min_base_speed}, max={self.max_base_speed}")
-
-    def _format_filename(self, pokemon_id, shiny=False):
-        """Formata nome do arquivo com 3 dígitos"""
-        if pokemon_id < 10:
-            filename = f"00{pokemon_id}"
-        elif pokemon_id < 100:
-            filename = f"0{pokemon_id}"
-        else:
-            filename = str(pokemon_id)
-
-        if shiny:
-            filename += "s"
-
-        return filename
-    def _format_filename_front_back(self, pokemon_id, shiny=False):
-        """Formata nome do arquivo com 3 dígitos"""
-        filename = str(pokemon_id)
-
-        if shiny:
-            filename += "s"
-
-        return filename
-
-    def load_all_sprites(self):
-        """Carrega todos os sprites de uma vez"""
+    def load_sprites(self):
+        """Carrega os sprites front e back (mantém o sistema original)"""
         base_path = Path(__file__).parent.parent.parent / "res" / "PokemonSprites"
 
-        # Verifica se o diretório base existe
         if not base_path.exists():
             print(f"Diretório de sprites não encontrado: {base_path}")
             return
 
-        # Carrega sprites para cada Pokémon
         for pokemon_id in range(1, self.max_id + 1):
-            # Front sprites
             self._load_front_sprite(pokemon_id, base_path)
-            # Back sprites
             self._load_back_sprite(pokemon_id, base_path)
-            # InMap spritesheets
-            self._load_inmap_spritesheet(pokemon_id, base_path)
 
-        print(f"Sprites carregados: Front({len(self.front_sprites)}), "
-              f"Back({len(self.back_sprites)}), InMap({len(self.inmap_spritesheets)})")
+        print(f"Sprites carregados: Front({len(self.front_sprites)}), Back({len(self.back_sprites)})")
 
     def _load_front_sprite(self, pokemon_id, base_path):
-        """Carrega sprite frontal (96x96)"""
+        """Carrega sprite frontal (96x96) - MANTIDO ORIGINAL"""
         # Normal
         filename = self._format_filename_front_back(pokemon_id, shiny=False)
         path = base_path / "front" / f"{filename}.png"
@@ -180,7 +144,7 @@ class Pokedex:
                 print(f"Erro ao carregar front shiny {pokemon_id}: {e}")
 
     def _load_back_sprite(self, pokemon_id, base_path):
-        """Carrega sprite traseiro (96x96)"""
+        """Carrega sprite traseiro (96x96) - MANTIDO ORIGINAL"""
         # Normal
         filename = self._format_filename_front_back(pokemon_id, shiny=False)
         path = base_path / "back" / f"{filename}.png"
@@ -203,91 +167,48 @@ class Pokedex:
             except Exception as e:
                 print(f"Erro ao carregar back shiny {pokemon_id}: {e}")
 
-    def _load_inmap_spritesheet(self, pokemon_id, base_path):
-        """Carrega spritesheet InMap e redimensiona para tamanho do mapa"""
-        filename = self._format_filename(pokemon_id, shiny=False)
-        path = base_path / "InMaps" / f"{filename}.png"
+    def _format_filename_front_back(self, pokemon_id, shiny=False):
+        """Formata nome do arquivo para front/back (mantém original)"""
+        filename = str(pokemon_id)
+        if shiny:
+            filename += "s"
+        return filename
 
-        if path.exists():
-            try:
-                spritesheet = pygame.image.load(str(path)).convert_alpha()
-                self.inmap_spritesheets[pokemon_id] = spritesheet
+    # ===== MÉTODOS PARA INMAP (NOVO SISTEMA) =====
 
-                # TAMANHO ALVO para sprites no mapa (em pixels)
-                target_size = 32 # 32x32 pixels
+    def get_inmap_animation(self, pokemon_id: int, shiny: bool = False) -> Dict:
+        """
+        Retorna animações InMap no formato compatível com 4 direções
+        """
+        cache_key = f"{pokemon_id}_{shiny}"
+        if cache_key in self.inmap_animations_cache:
+            return self.inmap_animations_cache[cache_key]
 
-                # Extrai e redimensiona frames individuais
-                frames = {
-                    "down": [],  # Linha 0
-                    "left": [],  # Linha 1
-                    "right": [],  # Linha 2
-                    "up": []  # Linha 3
-                }
+        # Carrega do novo sistema
+        animation = self.sprite_manager.get_inmap_animation(pokemon_id, shiny)
+        self.inmap_animations_cache[cache_key] = animation
+        return animation
 
-                frame_size = 64  # Tamanho original dos frames (64x64)
+    def get_map_sprite_size(self, pokemon_id: int, shiny: bool = False) -> int:
+        """Retorna o tamanho do sprite InMap"""
+        return self.sprite_manager.get_sprite_size(pokemon_id, shiny)
 
-                for row in range(4):
-                    direction = ["down", "left", "right", "up"][row]
-                    for col in range(4):
-                        # Recorta o frame original
-                        rect = pygame.Rect(col * frame_size, row * frame_size, frame_size, frame_size)
-                        original_frame = spritesheet.subsurface(rect)
+    def get_raw_inmap_data(self, pokemon_id: int, shiny: bool = False) -> Dict:
+        """Retorna dados brutos do InMap (com 8 direções e AnimData)"""
+        return self.sprite_manager.loader.load_pokemon_sprites(pokemon_id, shiny)
 
-                        # REDIMENSIONA para o tamanho do mapa
-                        scaled_frame = pygame.transform.scale(
-                            original_frame,
-                            (target_size, target_size)
-                        )
-                        frames[direction].append(scaled_frame)
+    # ===== MÉTODOS EXISTENTES (MANTIDOS) =====
 
-                self.inmap_frames[pokemon_id] = frames
+    def _cache_base_speed_limits(self):
+        """Calcula e armazena os valores mínimo e máximo de base speed"""
+        if not self.pokemon_data:
+            self.min_base_speed = 0
+            self.max_base_speed = 1
+            return
 
-                # Armazena o tamanho para referência
-                if not hasattr(self, 'map_sprite_sizes'):
-                    self.map_sprite_sizes = {}
-                self.map_sprite_sizes[pokemon_id] = target_size
-
-            except Exception as e:
-                print(f"Erro ao carregar InMap {pokemon_id}: {e}")
-
-        # Versão shiny (mesma lógica)
-        filename_shiny = self._format_filename(pokemon_id, shiny=True)
-        path_shiny = base_path / "InMaps" / f"{filename_shiny}.png"
-
-        if path_shiny.exists():
-            try:
-                spritesheet = pygame.image.load(str(path_shiny)).convert_alpha()
-
-                if not hasattr(self, 'inmap_shiny_spritesheets'):
-                    self.inmap_shiny_spritesheets = {}
-                    self.inmap_shiny_frames = {}
-                    self.map_shiny_sprite_sizes = {}
-
-                self.inmap_shiny_spritesheets[pokemon_id] = spritesheet
-
-                target_size = 32
-                frames = {"down": [], "left": [], "right": [], "up": []}
-                frame_size = 64
-
-                for row in range(4):
-                    direction = ["down", "left", "right", "up"][row]
-                    for col in range(4):
-                        rect = pygame.Rect(col * frame_size, row * frame_size, frame_size, frame_size)
-                        original_frame = spritesheet.subsurface(rect)
-                        scaled_frame = pygame.transform.scale(original_frame, (target_size, target_size))
-                        frames[direction].append(scaled_frame)
-
-                self.inmap_shiny_frames[pokemon_id] = frames
-                self.map_shiny_sprite_sizes[pokemon_id] = target_size
-
-            except Exception as e:
-                print(f"Erro ao carregar InMap shiny {pokemon_id}: {e}")
-
-    def get_map_sprite_size(self, pokemon_id, shiny=False):
-        """Retorna o tamanho do sprite no mapa para este Pokémon"""
-        if shiny and hasattr(self, 'map_shiny_sprite_sizes'):
-            return self.map_shiny_sprite_sizes.get(pokemon_id, 24)
-        return getattr(self, 'map_sprite_sizes', {}).get(pokemon_id, 24)
+        base_speeds = [data["base_stats"]["speed"] for data in self.pokemon_data.values()]
+        self.min_base_speed = min(base_speeds)
+        self.max_base_speed = max(base_speeds)
 
     def get_sprite(self, pokemon_id, sprite_type="front", shiny=False, direction="down", frame=0):
         """
@@ -298,60 +219,45 @@ class Pokedex:
             sprite_type: "front", "back", ou "inmap"
             shiny: True para versão shiny
             direction: para inmap: "down", "left", "right", "up"
-            frame: para inmap: 0-3 (frame de animação)
+            frame: para inmap: índice do frame
         """
         if sprite_type == "front":
             cache = self.front_shiny_sprites if shiny else self.front_sprites
-            return cache.get(pokemon_id, self._create_placeholder(pokemon_id, "front"))
+            return cache.get(pokemon_id, self._create_placeholder(pokemon_id, "front", 96))
 
         elif sprite_type == "back":
             cache = self.back_shiny_sprites if shiny else self.back_sprites
-            return cache.get(pokemon_id, self._create_placeholder(pokemon_id, "back"))
+            return cache.get(pokemon_id, self._create_placeholder(pokemon_id, "back", 96))
 
         elif sprite_type == "inmap":
-            if shiny and hasattr(self, 'inmap_shiny_frames'):
-                frames_dict = self.inmap_shiny_frames.get(pokemon_id)
-            else:
-                frames_dict = self.inmap_frames.get(pokemon_id)
+            anim = self.get_inmap_animation(pokemon_id, shiny)
+            if direction in anim and anim[direction]:
+                frames = anim[direction]
+                if 0 <= frame < len(frames):
+                    return frames[frame]
+            return self._create_placeholder(pokemon_id, "inmap", 32)
 
-            if frames_dict and direction in frames_dict:
-                frames_list = frames_dict[direction]
-                if 0 <= frame < len(frames_list):
-                    return frames_list[frame]
-
-            # Fallback para placeholder
-            return self._create_placeholder(pokemon_id, "inmap", 64)
-
-        return self._create_placeholder(pokemon_id, "front")
+        return self._create_placeholder(pokemon_id, "front", 96)
 
     def _create_placeholder(self, pokemon_id, sprite_type="front", size=96):
         """Cria sprite placeholder"""
         sprite = pygame.Surface((size, size), pygame.SRCALPHA)
         color = self._get_placeholder_color(pokemon_id)
 
-        # Fundo
         pygame.draw.rect(sprite, color, (0, 0, size, size))
         pygame.draw.rect(sprite, (100, 100, 100), (0, 0, size, size), 2)
 
-        # Texto identificador
         font = pygame.font.Font(None, size // 2)
         text = font.render(f"?", True, (255, 255, 255))
         text_rect = text.get_rect(center=(size // 2, size // 2))
         sprite.blit(text, text_rect)
 
-        # Tipo do sprite
         type_font = pygame.font.Font(None, size // 4)
         type_text = type_font.render(sprite_type[0].upper(), True, (200, 200, 200))
         type_rect = type_text.get_rect(topright=(size - 5, 5))
         sprite.blit(type_text, type_rect)
 
         return sprite
-
-    def get_inmap_animation(self, pokemon_id, shiny=False):
-        """Retorna dicionário com todos os frames de animação InMap (já redimensionados)"""
-        if shiny and hasattr(self, 'inmap_shiny_frames'):
-            return self.inmap_shiny_frames.get(pokemon_id, self.inmap_frames.get(pokemon_id))
-        return self.inmap_frames.get(pokemon_id)
 
     def get_pokemon(self, pokemon_id):
         """Retorna dados de um Pokémon pelo ID"""
@@ -388,10 +294,7 @@ class Pokedex:
         return self.type_colors.get(type_name.lower(), (150, 150, 150))
 
     def calculate_stats(self, pokemon_id, level, ivs=None, evs=None):
-        """
-        Calcula stats reais baseado em level, IVs e EVs
-        Fórmula simplificada dos jogos principais
-        """
+        """Calcula stats reais baseado em level, IVs e EVs"""
         base = self.get_base_stats(pokemon_id)
 
         if ivs is None:
@@ -404,10 +307,8 @@ class Pokedex:
 
         stats = {}
 
-        # HP tem fórmula diferente
         stats["hp"] = int(((2 * base["hp"] + ivs["hp"] + (evs["hp"] // 4)) * level) / 100) + level + 10
 
-        # Outros stats
         for stat in ["attack", "defense", "special_attack", "special_defense", "speed"]:
             base_val = base[stat]
             iv_val = ivs[stat]
@@ -430,3 +331,23 @@ class Pokedex:
     def get_all_ids(self):
         """Retorna todos os IDs disponíveis"""
         return sorted(self.pokemon_data.keys())
+
+    def _load_fallback_data(self):
+        """Dados de fallback em caso de erro"""
+        print("Carregando dados de fallback...")
+        for i in range(1, self.max_id + 1):
+            self.pokemon_data[i] = {
+                "id": i,
+                "name": f"Pokemon{i}",
+                "is_legendary": False,
+                "is_mythical": False,
+                "types": ["normal"],
+                "base_stats": {
+                    "hp": 50, "attack": 50, "defense": 50,
+                    "special_attack": 50, "special_defense": 50, "speed": 50
+                },
+                "ev_yield": {"hp": 0, "attack": 0, "defense": 0,
+                             "special_attack": 0, "special_defense": 0, "speed": 0},
+                "catch_rate": 120,
+                "evolution": None
+            }

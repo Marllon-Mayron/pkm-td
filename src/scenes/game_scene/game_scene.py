@@ -1040,7 +1040,7 @@ class GameScene(BaseScene):
 
         # HP bars
         for enemy in wave_mgr.active_enemies:
-            enemy.render_hp(screen, camera)
+            enemy.render_hp_enemy(screen, camera)
 
         if placement_mgr:
             placement_mgr.render_hp(screen, camera)

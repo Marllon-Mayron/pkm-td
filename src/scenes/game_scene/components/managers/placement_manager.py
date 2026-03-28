@@ -210,9 +210,31 @@ class PlacementManager:
         self.placed_pokemon.clear()
 
     def render_hp(self, screen, camera):
-        """Renderiza todos os Pokémon colocados"""
+        """Renderiza as barras de HP de todos os Pokémon colocados"""
         for pokemon in self.placed_pokemon:
-            pokemon.render_hp(screen, camera)
+            # Agora usamos o método interno _render_hp_bar
+            # Mas precisamos passar os parâmetros corretos
+            if camera and hasattr(pokemon, 'screen_manager') and pokemon.screen_manager:
+                screen_x, screen_y = pokemon.screen_manager.world_to_screen(pokemon.x, pokemon.y, camera)
+                zoom_scale = camera.zoom * pokemon.screen_manager.render_scale
+
+                # Calcula o sprite_rect para posicionar a barra
+                sprite_to_render = pokemon._prepare_sprite(zoom_scale)
+                if sprite_to_render:
+                    current_width, current_height = sprite_to_render.get_width(), sprite_to_render.get_height()
+                    final_width = max(1, int(current_width * zoom_scale))
+                    final_height = max(1, int(current_height * zoom_scale))
+
+                    if final_width != current_width or final_height != current_height:
+                        scaled_sprite = pygame.transform.scale(sprite_to_render, (final_width, final_height))
+                    else:
+                        scaled_sprite = sprite_to_render
+
+                    sprite_rect = scaled_sprite.get_rect()
+                    sprite_rect.center = (int(screen_x), int(screen_y))
+
+                    # Renderiza a barra de HP
+                    pokemon._render_hp_bar(screen, sprite_rect, zoom_scale)
 
     def render(self, screen, camera, screen_manager):
         """Renderiza todos os Pokémon colocados"""

@@ -83,89 +83,98 @@ class Pokemon(Entity):
         self.xp = 0
         self.xp_to_next = self._calculate_xp_needed()
 
-        # ===== 8. SPRITES (COM CACHE) =====
-        self._load_sprites(pokemon_id, shiny)
-
-        # ===== 9. TAMANHO DO SPRITE =====
+        # ===== 8. TAMANHO DO SPRITE (antes de carregar sprites) =====
         self.map_sprite_size = self.pokedex.get_map_sprite_size(pokemon_id, shiny)
         width = self.map_sprite_size
         height = self.map_sprite_size
 
+        # ===== 9. INICIALIZAR ATRIBUTOS DE ANIMAÇÃO (antes de _load_sprites) =====
+        self.raw_animations = None
+        self.inmap_animations = {}  # Dicionário para animações separadas
+        self.current_animation = "idle"  # "idle" ou "walk"
+        self.is_moving = False
+        self.walk_frame_durations = []
+        self.idle_frame_durations = []
+        self.frame_durations = []
+
+        # ===== 10. CARREGAR SPRITES =====
+        self._load_sprites(pokemon_id, shiny)
+
+        # Pega o primeiro sprite da animação idle como inicial
         sprite = None
         if self.inmap_frames and "down" in self.inmap_frames and self.inmap_frames["down"]:
             sprite = self.inmap_frames["down"][0]
 
         super().__init__(x, y, width, height, sprite)
 
-        # ===== 10. ATRIBUTOS DE JOGO =====
+        # ===== 11. ATRIBUTOS DE JOGO =====
         self.is_wild = is_wild
         self.is_in_team = False
         self.is_selected = False
 
-        # ===== 11. MOVIMENTO =====
+        # ===== 12. MOVIMENTO =====
         self.path = []
         self.path_index = 0
         self.move_speed = 2.0
-        self.original_path = None  # Mantido para compatibilidade
-        self.path_index_origin = 0  # Qual path este inimigo pertence
-        self.is_returning_with_item = False  # Se está voltando com item
+        self.original_path = None
+        self.path_index_origin = 0
+        self.is_returning_with_item = False
         if is_wild:
             self.base_move_speed = self._get_cached_move_speed()
             self.move_speed = self.base_move_speed
-            # Log reduzido - apenas em debug
-            # print(f"[VELOCIDADE] {self.name} velocidade de movimento: {self.move_speed:.2f}")
         else:
             self.base_move_speed = 2.0
             self.move_speed = 2.0
 
-        # ===== 12. COMBATE =====
+        # ===== 13. COMBATE =====
         self.can_attack = True
         self.attack_cooldown = 0
         self.attack_cooldown_max = 60
         self.target = None
-        self.has_no_pp = False  # Flag para indicar se está sem PP
+        self.has_no_pp = False
 
-        # ===== 13. EFEITOS VISUAIS =====
-        self.hp_bar_width = 32
-        self.hp_bar_height = 3
+        # ===== 14. EFEITOS VISUAIS =====
+        self.hp_bar_width = 48
+        self.hp_bar_height = 5
         self.miss_timer = 0.0
 
-        # ===== 14. POSIÇÃO E MOVIMENTAÇÃO =====
+        # ===== 15. POSIÇÃO E MOVIMENTAÇÃO =====
         self.last_x = x
         self.last_y = y
 
-        # ===== 15. ITENS =====
+        # ===== 16. ITENS =====
         self.is_carrying = None
         self.capture_range = 10
         self.is_returning_with_item = False
 
-        # ===== 16. ATRIBUTOS DE COMBATE =====
+        # ===== 17. ATRIBUTOS DE COMBATE =====
         self.attack_range = 60
         self.combat_state = "idle"
         self.original_spot_x = x
         self.original_spot_y = y
 
-        # ===== 17. COOLDOWNS =====
+        # ===== 18. COOLDOWNS =====
         self.charge_cooldown = 0.0
         self.charge_cooldown_max = 1.2
 
-        # ===== 18. STATS DE COMBATE =====
+        # ===== 19. STATS DE COMBATE =====
         self.attack_damage = self._calculate_attack_damage()
         self.defense_value = self._calculate_defense()
 
-        # ===== 19. RASTREAMENTO DE DANO =====
+        # ===== 20. RASTREAMENTO DE DANO =====
         self.damage_contributions = {}
         self.last_attacker = None
 
-        # ===== 20. SCREEN MANAGER (para renderização) =====
+        # ===== 21. SCREEN MANAGER =====
         self.screen_manager = None
 
-        # ===== 21. DEBUG (desativado por padrão) =====
+        # ===== 22. DEBUG =====
         self.show_debug = False
-        # ===== 22. MOVES =====
+
+        # ===== 23. MOVES =====
         self.move_data = MoveData()
-        self.moves: List[Move] = []  # Lista de moves atuais (máx 4)
-        self.current_move_index = 0  # Índice do move atual
+        self.moves: List[Move] = []
+        self.current_move_index = 0
         self._initialize_moves()
 
     def _load_sprites(self, pokemon_id, shiny):
@@ -177,20 +186,210 @@ class Pokemon(Entity):
             self.ui_sprite = cached["ui"]
             self.battle_sprite = cached["battle"]
             self.inmap_frames = cached["inmap"]
+            self.inmap_animations = cached.get("animations", {})
         else:
             self.ui_sprite = self.pokedex.get_sprite(pokemon_id, "front", shiny)
             self.battle_sprite = self.pokedex.get_sprite(pokemon_id, "back", shiny)
             self.inmap_frames = self.pokedex.get_inmap_animation(pokemon_id, shiny)
+
+            # Tenta carregar animações separadas
+            self.inmap_animations = {}
+            if hasattr(self.pokedex, 'get_raw_inmap_data'):
+                try:
+                    raw_data = self.pokedex.get_raw_inmap_data(pokemon_id, shiny)
+                    self.inmap_animations = raw_data.get("animations", {})
+                    self.raw_animations = raw_data  # Guarda os dados brutos
+                except Exception as e:
+                    print(f"[ERRO] Falha ao carregar dados brutos: {e}")
+
             _SPRITE_CACHE[cache_key] = {
                 "ui": self.ui_sprite,
                 "battle": self.battle_sprite,
-                "inmap": self.inmap_frames
+                "inmap": self.inmap_frames,
+                "animations": self.inmap_animations
             }
 
         self.current_direction = "down"
         self.current_frame = 0
         self.animation_timer = 0
         self.animation_speed = 0.1
+
+        # Carrega os timings das animações
+        self._load_animation_timings()
+
+    def _load_animation_timings(self):
+        """Carrega os tempos de duração dos frames do AnimData.xml"""
+        # Verifica se temos os dados brutos
+        if not hasattr(self, 'raw_animations') or not self.raw_animations:
+            # Fallback: timings padrão
+            self.walk_frame_durations = [8, 8, 8, 8]  # 4 frames com 8 ticks cada
+            self.idle_frame_durations = [10, 10, 10, 10]  # 4 frames com 10 ticks cada
+            self.frame_durations = self.idle_frame_durations
+            return
+
+        anim_data = self.raw_animations.get("anim_data", {})
+
+        # Carrega timings para Walk
+        walk_info = anim_data.get("Walk", {})
+        if "durations" in walk_info and walk_info["durations"]:
+            self.walk_frame_durations = walk_info["durations"]
+        else:
+            self.walk_frame_durations = [8, 8, 8, 8]
+
+        # Carrega timings para Idle
+        idle_info = anim_data.get("Idle", {})
+        if "durations" in idle_info and idle_info["durations"]:
+            self.idle_frame_durations = idle_info["durations"]
+        else:
+            self.idle_frame_durations = [10, 10, 10, 10]
+
+        # Define duração atual baseada na animação atual
+        self._update_current_durations()
+
+    def _update_current_durations(self):
+        """Atualiza as durações dos frames baseado na animação atual"""
+        if hasattr(self, 'current_animation'):
+            if self.current_animation == "walk" and hasattr(self, 'walk_frame_durations'):
+                self.frame_durations = self.walk_frame_durations
+            elif hasattr(self, 'idle_frame_durations'):
+                self.frame_durations = self.idle_frame_durations
+            else:
+                self.frame_durations = [8, 8, 8, 8]  # Fallback
+
+            # Reseta o frame atual se necessário
+            if hasattr(self, 'current_frame') and self.current_frame >= len(self.frame_durations):
+                self.current_frame = 0
+
+    def set_animation(self, animation_name: str):
+        """
+        Troca a animação atual
+        animation_name: "idle" ou "walk"
+        """
+        if not hasattr(self, 'current_animation'):
+            return
+
+        if animation_name == self.current_animation:
+            return
+
+        self.current_animation = animation_name
+        self.current_frame = 0
+        self.animation_timer = 0
+        self._update_current_durations()
+
+        # Atualiza o sprite imediatamente com o primeiro frame da nova animação
+        self._update_sprite_from_current_animation()
+
+    def _update_sprite_from_current_animation(self):
+        """Atualiza o sprite baseado na animação atual, direção e frame"""
+        # Tenta usar as animações separadas primeiro (com 8 direções)
+        if hasattr(self, 'inmap_animations') and self.current_animation in self.inmap_animations:
+            anim_frames = self.inmap_animations[self.current_animation]
+
+            # Tenta pegar a direção completa
+            if self.current_direction in anim_frames:
+                frames = anim_frames[self.current_direction]
+                if frames and hasattr(self, 'current_frame') and self.current_frame < len(frames):
+                    self.sprite = frames[self.current_frame]
+                    return
+
+            # Fallback: mapeia direção de 4 para 8
+            dir_mapping = {
+                "down": ["down", "down-left", "down-right"],
+                "left": ["left", "down-left", "up-left"],
+                "right": ["right", "down-right", "up-right"],
+                "up": ["up", "up-left", "up-right"]
+            }
+
+            for src_dir in dir_mapping.get(self.current_direction, [self.current_direction]):
+                if src_dir in anim_frames:
+                    frames = anim_frames[src_dir]
+                    if frames and hasattr(self, 'current_frame') and self.current_frame < len(frames):
+                        self.sprite = frames[self.current_frame]
+                        return
+
+        # Fallback: usa o sistema antigo (inmap_frames)
+        if hasattr(self, 'inmap_frames') and self.current_direction in self.inmap_frames:
+            frames_list = self.inmap_frames[self.current_direction]
+            if frames_list and hasattr(self, 'current_frame') and self.current_frame < len(frames_list):
+                self.sprite = frames_list[self.current_frame]
+
+    def _get_current_animation_frame_count(self) -> int:
+        """Retorna o número de frames da animação atual para a direção atual"""
+        # Tenta pegar das animações separadas
+        if hasattr(self, 'inmap_animations') and self.current_animation in self.inmap_animations:
+            anim_frames = self.inmap_animations[self.current_animation]
+
+            # Tenta pegar a direção completa
+            if self.current_direction in anim_frames:
+                return len(anim_frames[self.current_direction])
+
+            # Fallback: verifica direções alternativas
+            dir_mapping = {
+                "down": ["down", "down-left", "down-right"],
+                "left": ["left", "down-left", "up-left"],
+                "right": ["right", "down-right", "up-right"],
+                "up": ["up", "up-left", "up-right"]
+            }
+
+            for src_dir in dir_mapping.get(self.current_direction, [self.current_direction]):
+                if src_dir in anim_frames:
+                    return len(anim_frames[src_dir])
+
+        # Fallback: usa o sistema antigo
+        if hasattr(self, 'inmap_frames') and self.current_direction in self.inmap_frames:
+            return len(self.inmap_frames[self.current_direction])
+
+        return 1  # Mínimo 1 frame
+
+    def _is_moving(self) -> bool:
+        """
+        Verifica se o Pokémon está em movimento
+        Baseado na posição atual vs última posição
+        """
+        if hasattr(self, 'last_x') and hasattr(self, 'last_y'):
+            dx = abs(self.x - self.last_x)
+            dy = abs(self.y - self.last_y)
+            # Se moveu mais que 0.5 pixels, considera que está se movendo
+            return (dx + dy) > 0.5
+        return False
+
+    def _update_animation(self, dt):
+        """
+        Atualiza animação do sprite baseado no movimento
+        """
+        # Verifica se está em movimento para trocar animação
+        is_moving_now = self._is_moving()
+
+        if is_moving_now and not self.is_moving:
+            # Começou a se mover
+            self.is_moving = True
+            self.set_animation("walk")
+        elif not is_moving_now and self.is_moving:
+            # Parou de se mover
+            self.is_moving = False
+            self.set_animation("idle")
+
+        # Atualiza o timer da animação
+        self.animation_timer += dt
+
+        # Calcula o tempo necessário para o frame atual
+        frame_time = self.animation_speed
+        if hasattr(self, 'frame_durations') and self.frame_durations and hasattr(self,
+                                                                                 'current_frame') and self.current_frame < len(
+                self.frame_durations):
+            # Converte duração (em ticks de 60fps) para segundos
+            # Cada tick = 1/60 segundo
+            frame_time = self.frame_durations[self.current_frame] / 60.0
+
+        if self.animation_timer >= frame_time:
+            self.animation_timer = 0
+
+            # Avança para o próximo frame
+            max_frames = self._get_current_animation_frame_count()
+            if max_frames > 0:
+                self.current_frame = (self.current_frame + 1) % max_frames
+                self._update_sprite_from_current_animation()
+
 
     def set_battle_system(self, battle_system):
         """Define o sistema de combate para este Pokémon"""
@@ -468,10 +667,9 @@ class Pokemon(Entity):
             self.target = None
             return
 
-        # ===== NOVO: Verificar se o Pokémon tem PP =====
+        # Verificar se o Pokémon tem PP
         current_move = self.get_current_move()
         if not current_move or current_move.current_pp <= 0:
-            # Se não tem PP, para de atacar e volta
             print(f"[COMBAT] {self.name} está sem PP para {current_move.name if current_move else 'ataque'}!")
             self.combat_state = "returning"
             self.target = None
@@ -484,15 +682,12 @@ class Pokemon(Entity):
 
         # Ataques de status e especiais são executados à distância
         if is_status_move or is_special_move:
-            # Executa o ataque imediatamente sem se mover
             attack_type = "status" if is_status_move else "especial"
             print(f"[COMBAT] {self.name} usou {current_move.name} ({attack_type}) à distância!")
 
-            # SEMPRE chama o battle_system - ele cuida do acerto/erro, PP, projétil, etc
             if self.battle_system:
                 self.battle_system.attempt_attack(self, self.target)
             else:
-                # Fallback se não tiver battle_system
                 hit_chance = current_move.accuracy / 100
                 will_hit = random.random() <= hit_chance
                 if will_hit:
@@ -512,12 +707,10 @@ class Pokemon(Entity):
         distance = math.sqrt(dx * dx + dy * dy)
 
         # Se estiver perto o suficiente, ataca
-        if distance < 5:
-            # SEMPRE chama o battle_system - ele cuida do acerto/erro, PP, etc
+        if distance < 8:  # Aumentado de 5 para 8 para dar espaço aos sprites maiores
             if self.battle_system:
                 self.battle_system.attempt_attack(self, self.target)
             else:
-                # Fallback
                 hit_chance = current_move.accuracy / 100
                 will_hit = random.random() <= hit_chance
                 if will_hit:
@@ -547,11 +740,25 @@ class Pokemon(Entity):
             self.y += move_y
             self.rect.x, self.rect.y = self.x, self.y
 
-            # Atualizar direção para animação
-            if abs(dx) > abs(dy):
-                self.current_direction = "right" if dx > 0 else "left"
+            # Atualizar direção para animação (8 direções baseado no ângulo)
+            angle = math.atan2(dy, dx)
+            # Converte ângulo para direção (8 direções)
+            if angle >= -math.pi/8 and angle < math.pi/8:
+                self.current_direction = "right"
+            elif angle >= math.pi/8 and angle < 3*math.pi/8:
+                self.current_direction = "down-right"
+            elif angle >= 3*math.pi/8 and angle < 5*math.pi/8:
+                self.current_direction = "down"
+            elif angle >= 5*math.pi/8 and angle < 7*math.pi/8:
+                self.current_direction = "down-left"
+            elif angle >= 7*math.pi/8 or angle < -7*math.pi/8:
+                self.current_direction = "left"
+            elif angle >= -7*math.pi/8 and angle < -5*math.pi/8:
+                self.current_direction = "up-left"
+            elif angle >= -5*math.pi/8 and angle < -3*math.pi/8:
+                self.current_direction = "up"
             else:
-                self.current_direction = "down" if dy > 0 else "up"
+                self.current_direction = "up-right"
 
     def _show_miss_on_self(self):
         """Mostra o texto MISS no próprio Pokémon (atacante)"""
@@ -565,7 +772,7 @@ class Pokemon(Entity):
         target.miss_timer = 0.6
 
     def _handle_returning_state(self, dt):
-        """Estado voltando para posição original"""
+        """Estado voltando para posição original - atualiza direção"""
         dx = self.original_spot_x - self.x
         dy = self.original_spot_y - self.y
         distance = math.sqrt(dx * dx + dy * dy)
@@ -591,6 +798,7 @@ class Pokemon(Entity):
             self.y += move_y
             self.rect.x, self.rect.y = self.x, self.y
 
+            # Atualizar direção para animação
             if abs(dx) > abs(dy):
                 self.current_direction = "right" if dx > 0 else "left"
             else:
@@ -799,6 +1007,7 @@ class Pokemon(Entity):
 
     def update(self, dt, player=None, enemies=None, items=None):
         """Update do Pokémon - versão compatível com WaveManager"""
+        # Guarda posição anterior para detectar movimento
         self.last_x = self.x
         self.last_y = self.y
 
@@ -862,6 +1071,7 @@ class Pokemon(Entity):
             self.x += move_x
             self.y += move_y
 
+            # Atualiza direção baseado no movimento
             if abs(dx) > abs(dy):
                 self.current_direction = "right" if dx > 0 else "left"
             else:
@@ -878,17 +1088,6 @@ class Pokemon(Entity):
                 if dx * dx + dy * dy < self.capture_range * self.capture_range:
                     item.start_capture(self)
                     break
-
-    def _update_animation(self, dt):
-        """Atualiza animação do sprite"""
-        self.animation_timer += dt
-        if self.animation_timer >= self.animation_speed:
-            self.animation_timer = 0
-            if self.inmap_frames and self.current_direction in self.inmap_frames:
-                frames_list = self.inmap_frames[self.current_direction]
-                if frames_list:
-                    self.current_frame = (self.current_frame + 1) % len(frames_list)
-                    self.sprite = frames_list[self.current_frame]
 
     def update_combat(self, dt, enemies):
         """Atualiza lógica de combate - versão corrigida"""
@@ -912,7 +1111,50 @@ class Pokemon(Entity):
         dy = self.y - entity.y
         return math.sqrt(dx * dx + dy * dy)
 
-    def render_hp(self, screen, camera=None):
+    def _get_font(self, size):
+        """Obtém fonte do cache"""
+        if size not in _FONT_CACHE:
+            try:
+                _FONT_CACHE[size] = pygame.font.Font(None, size)
+            except:
+                _FONT_CACHE[size] = pygame.font.SysFont('Arial', size)
+        return _FONT_CACHE[size]
+
+    def _prepare_sprite(self, zoom_scale):
+        if not self.sprite:
+            return None
+
+        if self.is_boss:
+            orig_width, orig_height = self.sprite.get_width(), self.sprite.get_height()
+            new_width = orig_width * 2
+            new_height = orig_height * 2
+            return pygame.transform.scale(self.sprite, (new_width, new_height))
+
+        return self.sprite
+
+    def _render_sprite(self, screen, sprite, screen_x, screen_y, zoom_scale):
+        """
+        Renderiza o sprite com posicionamento correto.
+        O ponto (screen_x, screen_y) é o centro do spot onde o Pokémon deve ficar.
+        """
+        current_width, current_height = sprite.get_width(), sprite.get_height()
+        final_width = max(1, int(current_width * zoom_scale))
+        final_height = max(1, int(current_height * zoom_scale))
+
+        if final_width != current_width or final_height != current_height:
+            scaled_sprite = pygame.transform.scale(sprite, (final_width, final_height))
+        else:
+            scaled_sprite = sprite
+
+        # Ancoragem pelo CENTRO do sprite (não pela base)
+        sprite_rect = scaled_sprite.get_rect()
+        sprite_rect.center = (int(screen_x), int(screen_y))
+
+        screen.blit(scaled_sprite, sprite_rect)
+        return sprite_rect
+
+    def render(self, screen, camera=None, show_hp=True):
+        """Renderiza o Pokémon com todos os elementos visuais ajustados"""
         if camera and hasattr(self, 'screen_manager') and self.screen_manager:
             screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
             zoom_scale = camera.zoom * self.screen_manager.render_scale
@@ -921,19 +1163,74 @@ class Pokemon(Entity):
             screen_y = self.y
             zoom_scale = 1.0
 
+        sprite_to_render = self._prepare_sprite(zoom_scale)
+
+        sprite_rect = None
+        if sprite_to_render:
+            sprite_rect = self._render_sprite(screen, sprite_to_render, screen_x, screen_y, zoom_scale)
+        else:
+            sprite_rect = self._render_placeholder(screen, screen_x, screen_y, zoom_scale)
+
+        # Renderiza textos e barras acima do sprite
+        if sprite_rect:
+            # Ajusta a posição dos elementos visuais baseado no sprite_rect
+            if self.is_wild:
+                self._render_wild_text(screen, sprite_rect, zoom_scale)
+
+            if show_hp:
+                self._render_hp_bar(screen, sprite_rect, zoom_scale)
+
+            # Renderiza texto MISS
+            if hasattr(self, 'miss_timer') and self.miss_timer > 0:
+                self._render_miss_text(screen, sprite_rect, zoom_scale)
+
+        if hasattr(self, 'show_debug') and self.show_debug and sprite_rect:
+            self._render_debug(screen, screen_x, screen_y, zoom_scale, sprite_rect)
+
+    def render_hp_enemy(self, screen, camera=None):
+        """Método de compatibilidade para chamar o _render_hp_bar"""
+        if camera and hasattr(self, 'screen_manager') and self.screen_manager:
+            screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
+            zoom_scale = camera.zoom * self.screen_manager.render_scale
+
+            # Prepara o sprite para obter o retângulo
+            sprite_to_render = self._prepare_sprite(zoom_scale)
+            if sprite_to_render:
+                current_width, current_height = sprite_to_render.get_width(), sprite_to_render.get_height()
+                final_width = max(1, int(current_width * zoom_scale))
+                final_height = max(1, int(current_height * zoom_scale))
+
+                if final_width != current_width or final_height != current_height:
+                    scaled_sprite = pygame.transform.scale(sprite_to_render, (final_width, final_height))
+                else:
+                    scaled_sprite = sprite_to_render
+
+                sprite_rect = scaled_sprite.get_rect()
+                sprite_rect.center = (int(screen_x), int(screen_y))
+
+                self._render_hp_bar(screen, sprite_rect, zoom_scale)
+        else:
+            # Fallback: cria um retângulo temporário
+            temp_rect = pygame.Rect(0, 0, self.map_sprite_size, self.map_sprite_size)
+            temp_rect.center = (int(self.x), int(self.y))
+            self._render_hp_bar(screen, temp_rect, 1.0)
+
+    def _render_hp_bar(self, screen, sprite_rect, zoom_scale):
+        """Renderiza barra de HP ajustada baseada no retângulo do sprite"""
         hp_percent = self.current_hp / self.max_hp
 
-        bar_width = int(32 * zoom_scale)
-        bar_height = max(1, int(3 * zoom_scale))
-        bar_x = screen_x - bar_width // 2
+        # Ajusta tamanho da barra baseado no tamanho do sprite
+        bar_width = int(self.hp_bar_width * zoom_scale)
+        bar_height = max(2, int(self.hp_bar_height * zoom_scale))
+        bar_x = sprite_rect.centerx - bar_width // 2
 
-        sprite_height = int(self.map_sprite_size * zoom_scale)
-        foot_offset = int(sprite_height * 0.2)
-        sprite_top = (screen_y + foot_offset) - sprite_height
-        bar_y = sprite_top + 10
+        # Barra fica a 5 pixels ACIMA do sprite (não dentro)
+        bar_y = sprite_rect.top - bar_height - 5
 
+        # Fundo da barra
         pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, bar_width, bar_height))
 
+        # Cor da barra baseado no HP
         if self.is_boss:
             color = (0, 0, 255)
         else:
@@ -951,121 +1248,14 @@ class Pokemon(Entity):
         if progress_width > 0:
             pygame.draw.rect(screen, color, (bar_x, bar_y, progress_width, bar_height))
 
+        # Borda da barra
         pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, bar_width, bar_height), 1)
 
-    def _get_font(self, size):
-        """Obtém fonte do cache"""
-        if size not in _FONT_CACHE:
-            try:
-                _FONT_CACHE[size] = pygame.font.Font(None, size)
-            except:
-                _FONT_CACHE[size] = pygame.font.SysFont('Arial', size)
-        return _FONT_CACHE[size]
-
-    def render(self, screen, camera=None, show_hp=True):
-        if camera and hasattr(self, 'screen_manager') and self.screen_manager:
-            screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
-            zoom_scale = camera.zoom * self.screen_manager.render_scale
-        else:
-            screen_x = self.x
-            screen_y = self.y
-            zoom_scale = 1.0
-
-        sprite_to_render = self._prepare_sprite(zoom_scale)
-
-        if sprite_to_render:
-            sprite_rect = self._render_sprite(screen, sprite_to_render, screen_x, screen_y, zoom_scale)
-        else:
-            sprite_rect = self._render_placeholder(screen, screen_x, screen_y, zoom_scale)
-
-        if self.is_wild and sprite_rect:
-            self._render_wild_text(screen, sprite_rect, zoom_scale)
-
-        if show_hp:
-            self.render_hp(screen, camera)
-
-        # ===== ADICIONAR RENDERIZAÇÃO DO TEXTO MISS =====
-        if hasattr(self, 'miss_timer') and self.miss_timer > 0:
-            self._render_miss_text(screen, screen_x, screen_y, zoom_scale, sprite_rect)
-
-        if hasattr(self, 'show_debug') and self.show_debug:
-            self._render_debug(screen, screen_x, screen_y, zoom_scale, sprite_rect)
-
-    def _render_miss_text(self, screen, screen_x, screen_y, zoom_scale, sprite_rect):
-        """Renderiza o texto MISS acima do Pokémon (atacante)"""
-        # Atualiza o timer (usando delta time real)
-        # Nota: idealmente deveria receber dt, mas por enquanto decrementamos manualmente
-        # O timer será decrementado no update do jogo, não aqui
-
-        if self.miss_timer <= 0:
-            return
-
-        # Configurar fonte - TAMANHO REDUZIDO
-        font_size = max(8, int(14 * zoom_scale))  # Reduzido de 24 para 14
-        font = self._get_font(font_size)
-
-        # Texto MISS
-        text = "MISS!"
-        text_surface = font.render(text, True, (255, 100, 100))
-        text_outline = font.render(text, True, (100, 0, 0))
-
-        # Calcular posição acima do Pokémon (atacante)
-        if sprite_rect:
-            text_width = text_surface.get_width()
-            text_height = text_surface.get_height()
-            text_x = sprite_rect.centerx - text_width // 2
-            text_y = sprite_rect.top - text_height - 2  # Reduzido espaçamento de 5 para 2
-
-            # Desenhar com contorno
-            for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
-                screen.blit(text_outline, (text_x + dx, text_y + dy))
-            screen.blit(text_surface, (text_x, text_y))
-
-    def _prepare_sprite(self, zoom_scale):
-        if not self.sprite:
-            return None
-
-        if self.is_boss:
-            orig_width, orig_height = self.sprite.get_width(), self.sprite.get_height()
-            new_width = orig_width * 2
-            new_height = orig_height * 2
-            return pygame.transform.scale(self.sprite, (new_width, new_height))
-
-        return self.sprite
-
-    def _render_sprite(self, screen, sprite, screen_x, screen_y, zoom_scale):
-        current_width, current_height = sprite.get_width(), sprite.get_height()
-        final_width = max(1, int(current_width * zoom_scale))
-        final_height = max(1, int(current_height * zoom_scale))
-
-        if final_width != current_width or final_height != current_height:
-            scaled_sprite = pygame.transform.scale(sprite, (final_width, final_height))
-        else:
-            scaled_sprite = sprite
-
-        foot_offset = int(final_height * 0.2)
-        sprite_rect = scaled_sprite.get_rect()
-        sprite_rect.bottom = int(screen_y) + foot_offset
-        sprite_rect.centerx = int(screen_x)
-
-        screen.blit(scaled_sprite, sprite_rect)
-        return sprite_rect
-
-    def _render_placeholder(self, screen, screen_x, screen_y, zoom_scale):
-        size = int((64 if self.is_boss else self.map_sprite_size) * zoom_scale)
-        foot_offset = int(size * 0.2)
-
-        rect = pygame.Rect(0, 0, size, size)
-        rect.bottom = int(screen_y) + foot_offset
-        rect.centerx = int(screen_x)
-
-        pygame.draw.rect(screen, (255, 0, 255), rect)
-        pygame.draw.rect(screen, (255, 255, 255), rect, 2)
-        return rect
-
     def _render_wild_text(self, screen, sprite_rect, zoom_scale):
-        name_font_size = max(5, int(6 * zoom_scale))
-        level_font_size = max(4, int(6 * zoom_scale))
+        """Renderiza nome e nível do Pokémon selvagem acima do sprite"""
+        # Aumenta o tamanho da fonte para sprites maiores
+        name_font_size = max(8, int(10 * zoom_scale))
+        level_font_size = max(7, int(9 * zoom_scale))
 
         name_font = self._get_font(name_font_size)
         level_font = self._get_font(level_font_size)
@@ -1094,32 +1284,74 @@ class Pokemon(Entity):
         total_width = name_width + 2 + level_width
         start_x = sprite_rect.centerx - total_width // 2
 
-        text_y = sprite_rect.top - name_font_size
+        # Posiciona ACIMA da barra de HP (barra está a -5 do topo)
+        # Então texto fica acima da barra
+        text_y = sprite_rect.top - self.hp_bar_height - 10 - name_font_size
+
         name_x, name_y = start_x, text_y
         level_x = start_x + name_width + 2
         level_y = text_y + (name_font_size - level_font_size)
 
+        # Desenha contorno
         for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
             screen.blit(name_outline, (name_x + dx, name_y + dy))
             screen.blit(level_outline, (level_x + dx, level_y + dy))
 
+        # Desenha texto principal
         screen.blit(name_surface, (name_x, name_y))
         screen.blit(level_surface, (level_x, level_y))
 
+    def _render_miss_text(self, screen, sprite_rect, zoom_scale):
+        """Renderiza o texto MISS acima do Pokémon (atacante)"""
+        if self.miss_timer <= 0:
+            return
+
+        font_size = max(10, int(16 * zoom_scale))
+        font = self._get_font(font_size)
+
+        text = "MISS!"
+        text_surface = font.render(text, True, (255, 100, 100))
+        text_outline = font.render(text, True, (100, 0, 0))
+
+        text_width = text_surface.get_width()
+        text_height = text_surface.get_height()
+        text_x = sprite_rect.centerx - text_width // 2
+        # Fica acima da barra de HP
+        text_y = sprite_rect.top - self.hp_bar_height - 25
+
+        for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+            screen.blit(text_outline, (text_x + dx, text_y + dy))
+        screen.blit(text_surface, (text_x, text_y))
+
     def _render_debug(self, screen, screen_x, screen_y, zoom_scale, sprite_rect):
-        if sprite_rect:
-            foot_offset = int(sprite_rect.height * 0.2)
-        else:
-            size = int((64 if self.is_boss else self.map_sprite_size) * zoom_scale)
-            foot_offset = int(size * 0.2)
+        """Renderiza informações de debug"""
+        # Centro do sprite (ponto de ancoragem)
+        pygame.draw.circle(screen, (255, 0, 0), (sprite_rect.centerx, sprite_rect.centery), 6, 2)
 
-        pygame.draw.circle(screen, (255, 0, 0), (int(screen_x), int(screen_y) + foot_offset), 6, 2)
+        # Retângulo do sprite
+        pygame.draw.rect(screen, (255, 0, 255), sprite_rect, 1)
 
-        if sprite_rect:
-            pygame.draw.circle(screen, (0, 255, 0), (sprite_rect.centerx, sprite_rect.centery), 4, 1)
-            pygame.draw.line(screen, (255, 255, 0),
-                           (sprite_rect.left, int(screen_y) + foot_offset),
-                           (sprite_rect.right, int(screen_y) + foot_offset), 1)
+        # Mostra animação atual e frame
+        font = self._get_font(10)
+        debug_text = f"{self.current_animation} f{self.current_frame} dir:{self.current_direction}"
+        text_surf = font.render(debug_text, True, (255, 255, 255))
+        screen.blit(text_surf, (sprite_rect.left, sprite_rect.top - 25))
+
+        # Mostra coordenadas
+        coord_text = f"({self.x:.0f}, {self.y:.0f})"
+        coord_surf = font.render(coord_text, True, (200, 200, 200))
+        screen.blit(coord_surf, (sprite_rect.left, sprite_rect.bottom + 5))
+
+    def _render_placeholder(self, screen, screen_x, screen_y, zoom_scale):
+        """Renderiza placeholder para quando sprite não existe"""
+        size = int((64 if self.is_boss else self.map_sprite_size) * zoom_scale)
+
+        rect = pygame.Rect(0, 0, size, size)
+        rect.center = (int(screen_x), int(screen_y))
+
+        pygame.draw.rect(screen, (255, 0, 255), rect)
+        pygame.draw.rect(screen, (255, 255, 255), rect, 2)
+        return rect
 
     def get_info_string(self):
         return (f"{self.name} Lv.{self.level}\n"
