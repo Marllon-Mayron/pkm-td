@@ -6,21 +6,23 @@ import math
 
 class Path:
     def __init__(self):
-        self.nodes = []  # Lista de pontos (x, y)
+        self.nodes = []
         self.selected_node = -1
         self.closed = False
 
-        # Cores e estilos (agora todas com 3 valores RGB)
-        self.line_color = (255, 100, 100)  # Vermelho para linha
-        self.start_color = (0, 255, 0)  # Verde para início
-        self.end_color = (255, 0, 0)  # Vermelho para fim
-        self.normal_color = (100, 100, 255)  # Azul para nós normais
-        self.selected_color = (255, 255, 0)  # Amarelo para selecionado
-        self.start_point_color = (0, 255, 255)  # Ciano para primeiro ponto
+        # Cores e estilos
+        self.line_color = (255, 100, 100)
+        self.start_color = (0, 255, 0)
+        self.end_color = (255, 0, 0)
+        self.normal_color = (100, 100, 255)
+        self.selected_color = (255, 255, 0)
+        self.start_point_color = (0, 255, 255)
 
-        self.node_radius = 6
-        self.start_node_radius = 8  # Maior para o primeiro ponto
+        # Ajustado para tile 24x24
+        self.node_radius = 8  # Aumentado
+        self.start_node_radius = 10  # Aumentado
         self.line_width = 3
+
 
     def add_node(self, point):
         """Adiciona um nó ao path"""

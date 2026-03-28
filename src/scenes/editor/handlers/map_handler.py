@@ -5,16 +5,13 @@ from collections import deque
 
 
 class MapHandler:
-    """Gerencia as operações de edição do mapa"""
-
     def __init__(self, editor_scene):
         self.editor = editor_scene
-        # Cache para evitar múltiplos saves de undo no mesmo tile durante arrasto
         self.last_undo_tile = None
         self.last_undo_erase_tile = None
         self.last_undo_time = 0
         self.last_erase_time = 0
-        self.undo_cooldown = 0.2  # Cooldown para salvar undo durante arrasto
+        self.undo_cooldown = 0.2
 
     def _get_current_tile_int(self):
         """Obtém o tile atual garantindo que seja inteiro"""
@@ -119,7 +116,6 @@ class MapHandler:
 
     def handle_left_click(self, world_pos, continuous=False):
         """Processa clique esquerdo no mapa"""
-        # Converte posição mundial para coordenadas de tile
         tile_x = int(world_pos[0] // self.editor.grid_size)
         tile_y = int(world_pos[1] // self.editor.grid_size)
         current_tile_pos = (tile_x, tile_y)

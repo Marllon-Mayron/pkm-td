@@ -1,16 +1,17 @@
 # src/scenes/game_scene/components/renderer/game_layer_manager.py
 
 """
-Gerenciador de camadas para o jogo - SEM GAPS
+Gerenciador de camadas para o jogo - Suporte a múltiplos tilesets e tile_size 24
 """
 import pygame
+import os
 from src.core.render_context import render_context
 
 
 class GameLayer:
     """Camada do mapa para o jogo"""
 
-    def __init__(self, name, layer_type, width, height, tile_size=16):
+    def __init__(self, name, layer_type, width, height, tile_size=24):  # ALTERADO: default 24
         self.name = name
         self.layer_type = layer_type
         self.width = width
@@ -19,7 +20,9 @@ class GameLayer:
         self.tiles = [[0 for _ in range(width)] for _ in range(height)]
         self.visible = True
         self.opacity = 255
-        self.tileset = []
+        self.tileset = []  # Lista com TODOS os tiles de TODOS os tilesets
+        self.tilesets = []  # Lista de informações de cada tileset
+        self.tileset_paths = []  # Lista de caminhos dos tilesets
         self._cached_tiles = {}
         self._last_scale = None
 
@@ -34,48 +37,176 @@ class GameLayer:
             return self.tiles[y][x]
         return 0
 
-    def load_tileset(self, image_path, tile_width, tile_height):
-        """Carrega tileset de uma imagem"""
+    def load_tileset_6x8(self, image_path, tile_width, tile_height):
+        """
+        Carrega um tileset organizado em 6 colunas x 8 linhas
+        Retorna lista de tiles e número de tilesets detectados
+        """
         try:
-            sheet = pygame.image.load(image_path).convert_alpha()
-            cols = sheet.get_width() // tile_width
-            rows = sheet.get_height() // tile_height
+            print(f"\n--- GameLayer load_tileset_6x8 ---")
+            print(f"Tentando carregar: {image_path}")
 
-            self.tileset = []
-            for row in range(rows):
-                for col in range(cols):
-                    rect = pygame.Rect(col * tile_width, row * tile_height,
-                                       tile_width, tile_height)
-                    tile = sheet.subsurface(rect)
-                    self.tileset.append(tile)
-            return True
+            if not os.path.exists(image_path):
+                print(f"ERRO: Arquivo não encontrado!")
+                return None, 0
+
+            sheet = pygame.image.load(image_path).convert_alpha()
+            img_width = sheet.get_width()
+            img_height = sheet.get_height()
+
+            COLS_PER_SET = 6
+            ROWS_PER_SET = 8
+            tileset_width = COLS_PER_SET * tile_width
+
+            num_tilesets = img_width // tileset_width
+            print(f"Imagem: {img_width}x{img_height}, tilesets detectados: {num_tilesets}")
+
+            all_tiles = []
+
+            for ts_idx in range(num_tilesets):
+                offset_x = ts_idx * tileset_width
+                print(f"  Processando tileset {ts_idx + 1}/{num_tilesets}, offset X: {offset_x}")
+
+                for row in range(ROWS_PER_SET):
+                    for col in range(COLS_PER_SET):
+                        rect = pygame.Rect(
+                            offset_x + col * tile_width,
+                            row * tile_height,
+                            tile_width,
+                            tile_height
+                        )
+                        if rect.right <= img_width and rect.bottom <= img_height:
+                            tile = sheet.subsurface(rect)
+                            all_tiles.append(tile)
+                        else:
+                            empty_tile = pygame.Surface((tile_width, tile_height), pygame.SRCALPHA)
+                            empty_tile.fill((0, 0, 0, 0))
+                            all_tiles.append(empty_tile)
+
+            print(f"Total de tiles carregados: {len(all_tiles)}")
+            return all_tiles, num_tilesets
+
         except Exception as e:
             print(f"Erro ao carregar tileset: {e}")
+            import traceback
+            traceback.print_exc()
+            return None, 0
+
+    def load_tileset(self, image_path, tile_width, tile_height):
+        """Carrega um tileset (primeiro da layer)"""
+        all_tiles, num_tilesets = self.load_tileset_6x8(image_path, tile_width, tile_height)
+
+        if all_tiles is None:
             return False
+
+        self.tileset = all_tiles
+        self.tilesets = []
+        self.tileset_paths = []
+
+        # Cria informações para cada tileset
+        current_start = 0
+        for ts_idx in range(num_tilesets):
+            ts_count = 48  # 6x8 = 48 tiles
+            tileset_info = {
+                'path': image_path,
+                'tiles': all_tiles[current_start:current_start + ts_count],
+                'start_id': current_start + 1,
+                'count': ts_count,
+                'cols': 6,
+                'rows': 8,
+                'tileset_index': ts_idx
+            }
+            self.tilesets.append(tileset_info)
+            current_start += ts_count
+
+        # Adiciona caminho
+        if os.path.isabs(image_path):
+            try:
+                from src.config.paths import PROJECT_ROOT
+                relative_path = os.path.relpath(image_path, PROJECT_ROOT)
+                self.tileset_paths.append(relative_path.replace('\\', '/'))
+            except:
+                self.tileset_paths.append(os.path.basename(image_path))
+        else:
+            self.tileset_paths.append(image_path)
+
+        print(f"✓ Tileset carregado: {num_tilesets} tilesets, {len(self.tileset)} tiles")
+        return True
+
+    def add_tileset(self, image_path, tile_width, tile_height):
+        """Adiciona um tileset adicional à layer"""
+        all_tiles, num_tilesets = self.load_tileset_6x8(image_path, tile_width, tile_height)
+
+        if all_tiles is None:
+            return False
+
+        # Adiciona os novos tiles
+        current_start = len(self.tileset)
+        self.tileset.extend(all_tiles)
+
+        # Adiciona informações de cada tileset
+        for ts_idx in range(num_tilesets):
+            ts_count = 48
+            tileset_info = {
+                'path': image_path,
+                'tiles': all_tiles[ts_idx * ts_count:(ts_idx + 1) * ts_count],
+                'start_id': current_start + 1,
+                'count': ts_count,
+                'cols': 6,
+                'rows': 8,
+                'tileset_index': len(self.tilesets) + ts_idx
+            }
+            self.tilesets.append(tileset_info)
+            current_start += ts_count
+
+        # Adiciona caminho
+        if os.path.isabs(image_path):
+            try:
+                from src.config.paths import PROJECT_ROOT
+                relative_path = os.path.relpath(image_path, PROJECT_ROOT)
+                rel_path = relative_path.replace('\\', '/')
+                if rel_path not in self.tileset_paths:
+                    self.tileset_paths.append(rel_path)
+            except:
+                if image_path not in self.tileset_paths:
+                    self.tileset_paths.append(os.path.basename(image_path))
+        else:
+            if image_path not in self.tileset_paths:
+                self.tileset_paths.append(image_path)
+
+        print(f"✓ Tileset adicionado: +{num_tilesets} tilesets, total {len(self.tileset)} tiles")
+        return True
+
+    def get_tile_image(self, tile_id):
+        """Retorna a imagem do tile pelo ID (1-based)"""
+        try:
+            tile_index = int(tile_id) - 1
+            if 0 <= tile_index < len(self.tileset):
+                return self.tileset[tile_index]
+            return None
+        except (ValueError, TypeError):
+            return None
 
     def _get_scaled_tile(self, tile_index, target_size):
         """Obtém tile escalado do cache"""
         cache_key = (tile_index, target_size)
         if cache_key not in self._cached_tiles:
             original = self.tileset[tile_index]
-            # Adiciona 1 pixel extra para evitar gaps
-            scaled = pygame.transform.scale(original, (target_size + 1, target_size + 1))
+            scaled = pygame.transform.scale(original, (target_size, target_size))
             self._cached_tiles[cache_key] = scaled
         return self._cached_tiles[cache_key]
 
     def render(self, screen, camera, screen_manager):
-        """Renderiza a camada - SEM GAPS (com sobreposição)"""
+        """Renderiza a camada com tile_size 24"""
         if not self.visible or not self.tileset:
             return
 
         scale = render_context.get_scale(camera, screen_manager)
         tile_size_scaled = max(1, int(self.tile_size * scale))
-        # Adiciona 1 pixel extra para sobreposição e evitar gaps
-        tile_size_render = tile_size_scaled + 1
 
         visible_rect = camera.get_visible_rect()
-        start_x = max(0, int(visible_rect.x // self.tile_size) - 1)
-        start_y = max(0, int(visible_rect.y // self.tile_size) - 1)
+        start_x = max(0, int(visible_rect.x // self.tile_size))
+        start_y = max(0, int(visible_rect.y // self.tile_size))
         end_x = min(self.width, int((visible_rect.x + visible_rect.width) // self.tile_size) + 2)
         end_y = min(self.height, int((visible_rect.y + visible_rect.height) // self.tile_size) + 2)
 
@@ -92,12 +223,11 @@ class GameLayer:
                     world_x = x * self.tile_size
                     world_y = y * self.tile_size
 
-                    # Usa float para posição
                     screen_x, screen_y = render_context.world_to_screen(
                         world_x, world_y, camera, screen_manager
                     )
 
-                    tile_img = self._get_scaled_tile(tile_index, tile_size_render)
+                    tile_img = self._get_scaled_tile(tile_index, tile_size_scaled)
                     screen.blit(tile_img, (int(screen_x), int(screen_y)))
 
 
@@ -108,7 +238,7 @@ class GameLayerManager:
         self.layers = []
         self.width = 100
         self.height = 100
-        self.tile_size = 16
+        self.tile_size = 24  # ALTERADO: default 24
 
     def add_layer(self, name, layer_type):
         layer = GameLayer(name, layer_type, self.width, self.height, self.tile_size)
@@ -116,24 +246,25 @@ class GameLayerManager:
         return layer
 
     def load_from_dict(self, data, base_path=""):
-        """Carrega do dicionário"""
+        """Carrega do dicionário - suporte a múltiplos tilesets"""
         print("\n=== Carregando GameLayerManager ===")
 
         self.width = data.get("width", 100)
         self.height = data.get("height", 100)
-        self.tile_size = data.get("tile_size", 16)
+        self.tile_size = data.get("tile_size", 24)  # ALTERADO: default 24
         self.layers = []
 
         for layer_data in data.get("layers", []):
             layer_width = layer_data.get("width", self.width)
             layer_height = layer_data.get("height", self.height)
+            layer_tile_size = layer_data.get("tile_size", self.tile_size)
 
             layer = GameLayer(
                 layer_data["name"],
                 layer_data["type"],
                 layer_width,
                 layer_height,
-                self.tile_size
+                layer_tile_size
             )
 
             # Carrega os tiles
@@ -146,18 +277,37 @@ class GameLayerManager:
                     except (ValueError, TypeError):
                         layer.tiles[y][x] = 0
 
-            # Carrega tileset
-            tileset_path = layer_data.get("tileset_path")
-            if tileset_path:
-                found_path = self._find_tileset_path(tileset_path, base_path)
+            # Carrega tilesets (múltiplos)
+            tileset_paths = []
+            if layer_data.get("tileset_paths"):
+                tileset_paths = layer_data["tileset_paths"]
+            elif layer_data.get("tileset_path"):
+                tileset_paths = [layer_data["tileset_path"]]
+
+            print(f"Layer {layer_data['name']}: {len(tileset_paths)} tileset(s) para carregar")
+
+            for ts_idx, ts_path in enumerate(tileset_paths):
+                if not ts_path:
+                    continue
+
+                found_path = self._find_tileset_path(ts_path, base_path)
                 if found_path:
-                    layer.load_tileset(found_path, self.tile_size, self.tile_size)
-                    print(f"  ✓ Tileset carregado para {layer.name}")
+                    if ts_idx == 0 and not layer.tileset:
+                        success = layer.load_tileset(found_path, layer_tile_size, layer_tile_size)
+                    else:
+                        success = layer.add_tileset(found_path, layer_tile_size, layer_tile_size)
+
+                    if success:
+                        print(f"  ✓ Tileset {ts_idx + 1} carregado")
+                    else:
+                        print(f"  ✗ Falha ao carregar tileset {ts_idx + 1}")
+                else:
+                    print(f"  ✗ Tileset {ts_idx + 1} não encontrado: {ts_path}")
 
             self.layers.append(layer)
-            print(f"  ✓ Camada {layer.name} carregada")
+            print(f"  ✓ Camada {layer.name} carregada com {len(layer.tileset)} tiles")
 
-        print(f"GameLayerManager carregado: {len(self.layers)} camadas")
+        print(f"GameLayerManager carregado: {len(self.layers)} camadas, tile_size={self.tile_size}")
         return self
 
     def _find_tileset_path(self, tileset_path, base_path):
@@ -167,24 +317,29 @@ class GameLayerManager:
         basename = os.path.basename(tileset_path)
         possible_paths = []
 
+        # 1. Caminho usando base_path (geralmente PROJECT_ROOT)
         if base_path:
             clean_path = tileset_path
-            if clean_path.startswith('pokemon-tower-defense/'):
-                clean_path = clean_path[len('pokemon-tower-defense/'):]
-            if clean_path.startswith('pokemon-tower-defense\\'):
-                clean_path = clean_path[len('pokemon-tower-defense\\'):]
+            if clean_path.startswith('pkm-td/'):
+                clean_path = clean_path[len('pkm-td/'):]
+            if clean_path.startswith('pkm-td\\'):
+                clean_path = clean_path[len('pkm-td\\'):]
             possible_paths.append(os.path.join(base_path, clean_path))
 
+        # 2. Caminho direto na pasta res/AllTiles
         possible_paths.append(os.path.join("res", "AllTiles", basename))
 
+        # 3. Caminho com base_path + res/AllTiles
         if base_path:
             possible_paths.append(os.path.join(base_path, "res", "AllTiles", basename))
 
+        # 4. Apenas o nome do arquivo
         possible_paths.append(basename)
 
         for path in possible_paths:
             normalized = os.path.normpath(path)
             if os.path.exists(normalized):
+                print(f"  Encontrado: {normalized}")
                 return normalized
 
         return None

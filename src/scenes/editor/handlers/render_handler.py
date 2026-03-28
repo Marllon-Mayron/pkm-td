@@ -3,15 +3,14 @@
 import pygame
 
 
-class EditorRenderHandler:
-    """Gerencia a renderização do editor"""
+# src/scenes/editor/handlers/render_handler.py
 
+class EditorRenderHandler:
     def __init__(self, editor_scene):
         self.editor = editor_scene
-        # Cache compartilhado
         self._cam_offset_x = 0
         self._cam_offset_y = 0
-        self._tile_size_scaled = 16
+        self._tile_size_scaled = 24  # ALTERADO: 24
 
     def render(self, screen):
         """Renderiza todos os elementos do editor"""
@@ -48,6 +47,10 @@ class EditorRenderHandler:
 
         # Diálogos (renderizar na ordem inversa de prioridade)
 
+        # NOVO: Diálogo de gerenciamento de tilesets (deve ser o primeiro para aparecer por cima)
+        if hasattr(self.editor, 'tileset_manager_dialog') and self.editor.tileset_manager_dialog and self.editor.tileset_manager_dialog.visible:
+            self.editor.tileset_manager_dialog.render(screen)
+
         # Diálogo de tamanho do mapa
         if self.editor.map_config_dialog and self.editor.map_config_dialog.visible:
             self.editor.map_config_dialog.render(screen)
@@ -64,7 +67,7 @@ class EditorRenderHandler:
         if self.editor.target_item_dialog and self.editor.target_item_dialog.visible:
             self.editor.target_item_dialog.render(screen)
 
-        # NOVO: Diálogo de eventos
+        # Diálogo de eventos
         if hasattr(self.editor, 'event_config_dialog') and self.editor.event_config_dialog and self.editor.event_config_dialog.visible:
             self.editor.event_config_dialog.render(screen)
 
@@ -88,24 +91,21 @@ class EditorRenderHandler:
         self._tile_size_scaled = max(1, round(self.editor.grid_size * camera.zoom * sm.render_scale))
 
     def _render_grid(self, screen):
-        """Renderiza o grid usando os MESMOS valores que os tiles"""
+        """Renderiza o grid com tile_size 24"""
         sm = self.editor.screen_manager
 
-        # Calcula primeiro tile visível (igual ao layer_manager)
         first_visible_x = (-self._cam_offset_x) // self._tile_size_scaled
         first_visible_y = (-self._cam_offset_y) // self._tile_size_scaled
 
-        # Quantos tiles cabem na tela (com margem)
         tiles_visible_x = (sm.viewport_width // self._tile_size_scaled) + 2
         tiles_visible_y = (sm.viewport_height // self._tile_size_scaled) + 2
 
-        # Cria superfície para a grid
         grid_surface = pygame.Surface(
             (sm.viewport_width, sm.viewport_height),
             pygame.SRCALPHA
         )
 
-        # Desenha linhas verticais
+        # Linhas verticais
         for i in range(tiles_visible_x):
             tile_x = first_visible_x + i
             screen_x = tile_x * self._tile_size_scaled + self._cam_offset_x
@@ -119,9 +119,7 @@ class EditorRenderHandler:
                     color = (100, 100, 100, 100)
                     width = 1
 
-                # Garante que a linha está em posição inteira
                 grid_x_int = int(round(grid_x))
-
                 pygame.draw.line(
                     grid_surface,
                     color,
@@ -130,7 +128,7 @@ class EditorRenderHandler:
                     width
                 )
 
-        # Desenha linhas horizontais
+        # Linhas horizontais
         for i in range(tiles_visible_y):
             tile_y = first_visible_y + i
             screen_y = tile_y * self._tile_size_scaled + self._cam_offset_y
@@ -145,7 +143,6 @@ class EditorRenderHandler:
                     width = 1
 
                 grid_y_int = int(round(grid_y))
-
                 pygame.draw.line(
                     grid_surface,
                     color,
@@ -278,8 +275,6 @@ class EditorRenderHandler:
                 msg_x = self.editor.screen_manager.viewport_x + self.editor.screen_manager.viewport_width - 250
                 msg_y = self.editor.screen_manager.viewport_y + 180
                 screen.blit(msg, (msg_x, msg_y))
-
-
 
     def _render_top_ui(self, screen):
         """Renderiza a UI superior"""

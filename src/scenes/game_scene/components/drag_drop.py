@@ -19,7 +19,7 @@ class DragDropManager:
         self.hovered_spot = None
         self.hovered_pokemon = None  # NOVO: Pokémon sob o mouse (para troca)
         self.place_preview_alpha = 0
-        self.tile_size = 16  # Tamanho do tile
+        self.tile_size = 24  # Tamanho do tile
 
         # NOVO: Tipo de drag (team ou placed)
         self.drag_type = None  # "team" ou "placed"

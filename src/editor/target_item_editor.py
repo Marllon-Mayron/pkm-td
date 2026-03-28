@@ -5,12 +5,14 @@ import os
 from src.data.item_catalog import item_catalog
 
 
+# src/editor/target_item_editor.py
+
 class TargetItem:
     def __init__(self, x, y, item_id=1):
         self.x = x
         self.y = y
         self.item_id = item_id
-        self.size = 16  # Tamanho 16x16 (grid)
+        self.size = 24  # ALTERADO: 24x24
 
         # Carrega informações do catálogo
         item_info = item_catalog.get_item(item_id)
@@ -22,21 +24,17 @@ class TargetItem:
         self.load_sprite()
 
     def load_sprite(self):
-        """Carrega o sprite do item e redimensiona para 16x16"""
+        """Carrega o sprite do item e redimensiona para 24x24"""
         if self.sprite_path:
-            # Normaliza o caminho
             normalized_path = os.path.normpath(self.sprite_path)
             if os.path.exists(normalized_path):
                 try:
                     original_sprite = pygame.image.load(normalized_path).convert_alpha()
-                    # Redimensiona para 16x16
                     self.sprite = pygame.transform.scale(original_sprite, (self.size, self.size))
-                    print(f"✓ Sprite carregado: {self.name} redimensionado para 16x16 de {normalized_path}")
                 except Exception as e:
                     print(f"✗ Erro ao carregar sprite {normalized_path}: {e}")
                     self.sprite = None
             else:
-                print(f"✗ Sprite não encontrado: {normalized_path}")
                 self.sprite = None
         else:
             self.sprite = None

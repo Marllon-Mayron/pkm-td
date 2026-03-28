@@ -14,6 +14,7 @@ class ModeButtons:
             ("TOWERS", "towers"),
             ("ITEMS", "items"),
             ("EVENTS", "events"),
+            ("TILESETS", "tilesets"),  # NOVO
         ]
 
         for i, (text, mode) in enumerate(modes):
@@ -34,7 +35,7 @@ class ModeButtons:
         )
         self.buttons.append((map_config_rect, "MAP CONFIG", "map_config"))
 
-        #Botão de carregar fase
+        # Botão de carregar fase
         load_rect = pygame.Rect(
             viewport_x + 10,
             viewport_y + 70 + (len(modes) + 1) * 40,

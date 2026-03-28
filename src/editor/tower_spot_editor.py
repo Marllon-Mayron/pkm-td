@@ -5,12 +5,12 @@ import pygame
 
 
 class TowerSpot:
-    def __init__(self, x, y, size=16):
+    def __init__(self, x, y, size=24):
         self.x = x
         self.y = y
         self.size = size
         self.occupied = False
-        self.allowed_types = []  # Tipos de pokemon permitidos
+        self.allowed_types = []
 
     def get_rect(self):
         return pygame.Rect(self.x, self.y, self.size, self.size)
@@ -30,9 +30,9 @@ class TowerSpotManager:
     def __init__(self):
         self.spots = []
         self.selected_spot = -1
-        self.spot_size = 16
+        self.spot_size = 24
         self.snap_to_grid = True
-        self.grid_size = 16
+        self.grid_size = 24
 
     def add_spot(self, x, y):
         """Adiciona um spot se não existir outro na mesma posição"""

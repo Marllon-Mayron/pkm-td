@@ -14,7 +14,7 @@ class PokemonSpotRenderer:
     def __init__(self):
         self.spot_manager = TowerSpotManager()
         self.loaded = False
-        self.tile_size = 16
+        self.tile_size = 24
         self._cached_spots = {}  # Cache de superfícies
 
     def load_from_data(self, spot_data: dict):

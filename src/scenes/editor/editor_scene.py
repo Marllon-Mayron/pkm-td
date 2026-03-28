@@ -7,6 +7,7 @@ from tkinter import filedialog, Tk
 
 from editor.event_system import EventManager
 from scenes.editor.components.event_config_dialog import EventConfigDialog
+from scenes.editor.components.tileset_manager_dialog import TilesetManagerDialog
 from src.editor.target_item_editor import TargetItemManager
 from src.editor.wave_config import WaveManager
 from src.scenes.base_scene import BaseScene
@@ -27,6 +28,7 @@ from src.scenes.editor.components.load_phase_dialog import LoadPhaseDialog
 from src.scenes.editor.handlers.input_handler import EditorInputHandler
 from src.scenes.editor.handlers.map_handler import MapHandler
 from src.scenes.editor.handlers.render_handler import EditorRenderHandler
+
 
 class EditorScene(BaseScene):
     def __init__(self, game, chapter=None, phase=None):
@@ -53,22 +55,22 @@ class EditorScene(BaseScene):
         # Gerenciadores
         self.layer_manager = LayerManager()
         self.path_manager = PathManager()
-        self.tower_spots = TowerSpotManager()  # Agora só marca onde colocar Pokémons
+        self.tower_spots = TowerSpotManager()
         self.exporter = PhaseExporter()
         self.undo_manager = UndoManager(max_steps=10)
         self.target_items = TargetItemManager()
         self.event_manager = EventManager()
-        # Estado do editor
+
+        # Estado do editor - NOVO TAMANHO 24
         self.mode = "layers"  # layers, path, towers
         self.current_tile = 1
         self.show_grid = True
-        self.grid_size = 16
+        self.grid_size = 24  # ALTERADO: 24x24 pixels por tile
         self.snap_to_grid = True
 
         # Waves
         self.wave_manager = WaveManager()
         self.path_manager.set_wave_manager(self.wave_manager)
-
 
         # UI Panels
         self.tile_palette = None
@@ -85,6 +87,7 @@ class EditorScene(BaseScene):
         self.wave_config_dialog = None
         self.target_item_dialog = None
         self.event_config_dialog = None
+        self.tileset_manager_dialog = None
 
         self.selected_item_id = None
 
@@ -103,13 +106,13 @@ class EditorScene(BaseScene):
         # Inicializa UI
         self._init_ui()
 
-        # Handlers (devem ser inicializados após a UI)
+        # Handlers
         self.input_handler = EditorInputHandler(self)
         self.map_handler = MapHandler(self)
         self.render_handler = EditorRenderHandler(self)
         self.path_manager.add_path()
 
-        print(f"Editor iniciado - {self.phase_name}")
+        print(f"Editor iniciado - {self.phase_name} - Grid size: {self.grid_size}px")
 
     def _create_default_layers(self):
         """Cria layers padrão"""
@@ -123,10 +126,10 @@ class EditorScene(BaseScene):
         viewport_y = self.screen_manager.viewport_y
         viewport_width = self.screen_manager.viewport_width
 
-        # Palette de tiles
-        palette_x = viewport_x + viewport_width - 250
+        # Palette de tiles - ajustada para 6 colunas (mais larga)
+        palette_x = viewport_x + viewport_width - 280  # Aumentado para 280
         palette_y = viewport_y + 200
-        self.tile_palette = TilePalette(palette_x, palette_y, 230, 300)
+        self.tile_palette = TilePalette(palette_x, palette_y, 260, 350)  # Largura 260, altura 350
 
         # Seletor de layers
         selector_x = viewport_x + 10
@@ -137,7 +140,7 @@ class EditorScene(BaseScene):
         self.mode_buttons = ModeButtons(viewport_x, viewport_y)
 
         brush_x = viewport_x + 100
-        brush_y = viewport_y + 250
+        brush_y = viewport_y + 300
         self.brush_buttons = BrushButtons(brush_x, brush_y)
 
     def set_mode(self, mode):
@@ -155,17 +158,13 @@ class EditorScene(BaseScene):
 
         elif mode == "items":
             print("DEBUG: Abrindo diálogo de seleção de item")
-            # Abre o diálogo para selecionar qual item adicionar
             self._open_target_item_dialog()
-            # O modo continua "items", mas agora temos um item selecionado
 
         elif mode == "layers":
-            # Fecha diálogo de items se estiver aberto
             if self.target_item_dialog:
                 self.target_item_dialog.visible = False
 
         elif mode == "towers":
-            # Fecha diálogo de items se estiver aberto
             if self.target_item_dialog:
                 self.target_item_dialog.visible = False
 
@@ -173,22 +172,59 @@ class EditorScene(BaseScene):
             print("DEBUG: Abrindo diálogo de configuração de eventos")
             self._open_event_config_dialog()
 
+        elif mode == "tilesets":
+            print("DEBUG: Abrindo gerenciador de tilesets")
+            self._open_tileset_manager_dialog()
+
     def _import_tileset(self):
-        """Importa um tileset para a layer atual"""
+        """Importa um tileset (suporta múltiplos tilesets na mesma imagem)"""
         file_path = filedialog.askopenfilename(
-            title="Selecione uma imagem de tileset",
+            title="Selecione uma imagem de tileset (pode conter múltiplos tilesets lado a lado)",
             filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.gif")]
         )
 
         if file_path:
             current_layer = self.layer_manager.get_current_layer()
             if current_layer:
-                success = current_layer.load_tileset(file_path, self.grid_size, self.grid_size)
+                print(f"\n=== IMPORTANDO TILESET ===")
+                print(f"Layer: {current_layer.name}")
+                print(f"Arquivo: {file_path}")
+
+                # Tenta detectar quantos tilesets tem na imagem
+                try:
+                    import pygame
+                    test_img = pygame.image.load(file_path)
+                    img_width = test_img.get_width()
+                    expected_width_per_set = 6 * self.grid_size  # 144px
+                    estimated_sets = img_width // expected_width_per_set
+                    print(f"Imagem detectada: {img_width}x{test_img.get_height()}px")
+                    print(f"Estimativa: {estimated_sets} tilesets de {6}x{8} tiles")
+                except:
+                    pass
+
+                if not current_layer.tileset:
+                    success = current_layer.load_tileset(file_path, self.grid_size, self.grid_size)
+                else:
+                    success = current_layer.add_tileset_6x8(file_path, self.grid_size, self.grid_size)
+
                 if success:
-                    self.tile_palette.set_tileset(current_layer.tileset)
-                    print(f"Tileset importado para layer: {current_layer.name}")
+                    # Atualiza a tile palette
+                    all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
+                    self.tile_palette.set_tileset(all_tiles, boundaries)
+                    self.tile_palette._update_max_scroll()
+
+                    print(f"\n✓ IMPORTADO COM SUCESSO!")
+                    print(f"  Total de tiles: {len(current_layer.tileset)}")
+                    print(f"  Total de tilesets: {len(current_layer.tilesets)}")
                 else:
                     print("Erro ao importar tileset")
+
+    def _update_tile_palette_from_layer(self):
+        """Atualiza a tile palette a partir da layer atual"""
+        current_layer = self.layer_manager.get_current_layer()
+        if current_layer and current_layer.tileset:
+            all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
+            self.tile_palette.set_tileset(all_tiles, boundaries)
 
     def _delete_selected(self):
         """Deleta item selecionado"""
@@ -356,6 +392,21 @@ class EditorScene(BaseScene):
             pokedex
         )
 
+    def _open_tileset_manager_dialog(self):
+        """Abre o diálogo de gerenciamento de tilesets"""
+        current_layer = self.layer_manager.get_current_layer()
+        if not current_layer:
+            print("Nenhuma layer selecionada!")
+            return
+
+        dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 600) // 2
+        dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 500) // 2
+
+        self.tileset_manager_dialog = TilesetManagerDialog(
+            dialog_x, dialog_y, 600, 500,
+            current_layer, self
+        )
+
     def _handle_map_config_result(self, result):
         """Processa o resultado do diálogo de configuração"""
         if result:
@@ -382,6 +433,12 @@ class EditorScene(BaseScene):
 
     def handle_event(self, event):
         """Delega processamento de eventos para o input handler"""
+
+        if self.tileset_manager_dialog and self.tileset_manager_dialog.visible:
+            self.tileset_manager_dialog.handle_event(event)
+            if not self.tileset_manager_dialog.visible:
+                self.tileset_manager_dialog = None
+            return True
 
         # Diálogo de Items - processa e pode retornar "selected"
         if self.target_item_dialog and self.target_item_dialog.visible:

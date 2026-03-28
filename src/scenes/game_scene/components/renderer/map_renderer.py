@@ -7,11 +7,10 @@ from src.scenes.game_scene.components.managers.game_layer_manager import GameLay
 
 
 class MapRenderer:
-    """Renderiza o mapa da fase"""
-
     def __init__(self):
         self.layer_manager = GameLayerManager()
         self.loaded = False
+        self.tile_size = 24  # NOVO: tile_size padrão
 
     def load_from_data(self, map_data: dict, base_path: str = ""):
         """Carrega o mapa a partir dos dados"""
@@ -19,8 +18,14 @@ class MapRenderer:
             return False
 
         try:
+            # Pega o tile_size do mapa
+            self.tile_size = map_data.get("tile_size", 24)
+            # Define no layer_manager
+            self.layer_manager.tile_size = self.tile_size
+
             self.layer_manager.load_from_dict(map_data, base_path)
             self.loaded = True
+            print(f"[MapRenderer] Mapa carregado com tile_size={self.tile_size}")
             return True
         except Exception as e:
             print(f"Erro ao carregar mapa: {e}")

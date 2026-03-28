@@ -7,7 +7,7 @@ class PlacementManager:
     def __init__(self, game):
         self.game = game
         self.placed_pokemon = []  # Lista de Pokémon no mapa
-        self.tile_size = 16
+        self.tile_size = 24
 
     def add_pokemon(self, spot, pokemon):
         """Adiciona um Pokémon no spot - USA O MESMO OBJETO"""

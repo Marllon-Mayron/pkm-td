@@ -6,7 +6,7 @@ Exportador de fases para JSON
 import json
 import os
 from pathlib import Path
-from src.config.paths import PROJECT_ROOT  # Importe o caminho absoluto
+from src.config.paths import PROJECT_ROOT, RES_PATH
 
 
 class PhaseExporter:
@@ -15,6 +15,45 @@ class PhaseExporter:
         self.base_path = Path(PROJECT_ROOT) / "src" / "data" / "phases"
         self.base_path.mkdir(parents=True, exist_ok=True)
         print(f"[PhaseExporter] Base path: {self.base_path}")
+
+    def _make_relative_path(self, absolute_path):
+        """
+        Converte um caminho absoluto para relativo à pasta res/
+        Ex: C:/.../pkm-td/res/AllTiles/xxx.png -> res/AllTiles/xxx.png
+        """
+        try:
+            # Normaliza o caminho
+            abs_path = os.path.normpath(absolute_path)
+
+            # Se o caminho já contém "res/", extrai a partir de "res"
+            if "res" in abs_path:
+                # Procura pela pasta "res" no caminho
+                res_index = abs_path.find("res")
+                if res_index != -1:
+                    relative = abs_path[res_index:].replace('\\', '/')
+                    print(f"  Convertendo: {abs_path} -> {relative}")
+                    return relative
+
+            # Tenta calcular caminho relativo ao PROJECT_ROOT
+            rel_path = os.path.relpath(abs_path, PROJECT_ROOT)
+            rel_path = rel_path.replace('\\', '/')
+
+            # Se não começar com res/, tenta extrair apenas o nome do arquivo
+            if not rel_path.startswith('res/'):
+                # Procura se tem res/ no caminho
+                if 'res/' in rel_path:
+                    rel_path = rel_path[rel_path.index('res/'):]
+                else:
+                    # Fallback: só o nome do arquivo na pasta AllTiles
+                    basename = os.path.basename(rel_path)
+                    rel_path = f"res/AllTiles/{basename}"
+
+            print(f"  Convertendo: {abs_path} -> {rel_path}")
+            return rel_path
+
+        except Exception as e:
+            print(f"  Erro ao converter caminho: {e}")
+            return os.path.basename(absolute_path)
 
     def export_phase(self, phase_data, chapter, phase_number):
         """
@@ -28,50 +67,40 @@ class PhaseExporter:
         filename = f"phase_{phase_number:02d}.json"
         filepath = chapter_path / filename
 
-        # ANTES DE SALVAR: Verifica e ajusta caminhos dos tilesets
+        # Processa os tilesets
         map_data = phase_data["map"].copy()
 
         print("\n=== AJUSTANDO CAMINHOS DOS TILESETS ANTES DE SALVAR ===")
 
         for i, layer in enumerate(map_data["layers"]):
-            if layer.get("tileset_path"):
-                old_path = layer["tileset_path"]
-                print(f"Layer {i} ({layer['name']})")
-                print(f"  Path original: {old_path}")
+            # Pega os caminhos dos tilesets
+            tileset_paths = []
 
-                # Se for caminho absoluto, converte para relativo
-                if os.path.isabs(old_path):
-                    try:
-                        # Pega o diretório raiz do projeto (já temos o PROJECT_ROOT)
-                        rel_path = os.path.relpath(old_path, PROJECT_ROOT)
+            # Verifica diferentes formas de armazenar os caminhos
+            if layer.get("tileset_paths"):
+                tileset_paths = layer["tileset_paths"]
+            elif layer.get("tileset_path"):
+                tileset_paths = [layer["tileset_path"]]
 
-                        # Garante que use / e não \
-                        rel_path = rel_path.replace('\\', '/')
+            # Também verifica se o layer tem atributo tileset_paths (quando vem do editor)
+            if not tileset_paths and hasattr(layer, 'tileset_paths') and layer.tileset_paths:
+                tileset_paths = layer.tileset_paths
 
-                        # Remove qualquer referência duplicada ao nome do projeto
-                        if 'pokemon-tower-defense/' in rel_path:
-                            rel_path = rel_path.replace('pokemon-tower-defense/', '')
+            if tileset_paths:
+                converted_paths = []
+                for old_path in tileset_paths:
+                    if old_path:
+                        # Converte para caminho relativo
+                        rel_path = self._make_relative_path(old_path)
+                        converted_paths.append(rel_path)
+                        print(f"Layer {i} ({layer['name']}): {os.path.basename(old_path)} -> {rel_path}")
 
-                        # Garante que comece com res/
-                        if not rel_path.startswith('res/'):
-                            if 'res/' in rel_path:
-                                rel_path = rel_path[rel_path.index('res/'):]
-                            else:
-                                # Se não tem res/, coloca em res/AllTiles/
-                                basename = os.path.basename(rel_path)
-                                rel_path = f"res/AllTiles/{basename}"
-
-                        layer["tileset_path"] = rel_path
-                        print(f"  Convertido para: {rel_path}")
-
-                    except Exception as e:
-                        print(f"  Erro na conversão: {e}")
-                        # Fallback: só o nome do arquivo
-                        basename = os.path.basename(old_path)
-                        layer["tileset_path"] = f"res/AllTiles/{basename}"
-                        print(f"  Fallback para: {layer['tileset_path']}")
-                else:
-                    print(f"  Já é relativo: {old_path}")
+                layer["tileset_paths"] = converted_paths
+                # Remove o antigo tileset_path para evitar duplicação
+                if "tileset_path" in layer:
+                    del layer["tileset_path"]
+            else:
+                print(f"Layer {i} ({layer['name']}): sem tilesets")
 
         # Prepara dados completos
         full_data = {
@@ -106,7 +135,6 @@ class PhaseExporter:
         chapter_path = self.base_path / f"chapter_{chapter:02d}"
         index_file = chapter_path / "index.json"
 
-        # Carrega índice existente ou cria novo
         if index_file.exists():
             with open(index_file, 'r', encoding='utf-8') as f:
                 index = json.load(f)
@@ -116,7 +144,6 @@ class PhaseExporter:
                 "phases": []
             }
 
-        # Adiciona nova fase se não existir
         if new_phase not in index["phases"]:
             index["phases"].append(new_phase)
             index["phases"].sort()
@@ -138,7 +165,6 @@ class PhaseExporter:
 
             # Compatibilidade com versões antigas
             if "path" in data and "paths" not in data:
-                # Converte path único para lista de paths
                 data["paths"] = {
                     "paths": [data["path"]],
                     "current_path_index": 0
@@ -179,7 +205,6 @@ class PhaseExporter:
             filepath.unlink()
             print(f"✓ Fase {chapter}-{phase_number} removida: {filepath}")
 
-            # Atualiza índice do capítulo
             self._remove_from_chapter_index(chapter, phase_number)
             return True
         else:
@@ -201,10 +226,8 @@ class PhaseExporter:
                 with open(index_file, 'w', encoding='utf-8') as f:
                     json.dump(index, f, indent=4)
 
-                # Se não tiver mais fases, remove o índice
                 if not index["phases"]:
                     index_file.unlink()
-                    # Se a pasta estiver vazia, remove também
                     if not any(chapter_path.iterdir()):
                         chapter_path.rmdir()
 

@@ -13,11 +13,16 @@ class PhaseLoader:
     """Carrega e prepara os dados da fase para o jogo"""
 
     def __init__(self):
-        # Use o PROJECT_ROOT para construir o caminho absoluto
         self.base_path = Path(PROJECT_ROOT) / "src" / "data" / "phases"
-        print(f"[PhaseLoader] Base path: {self.base_path}")
-        print(f"[PhaseLoader] Base path existe? {self.base_path.exists()}")
         self.current_phase_data = None
+        self.tile_size = 24
+
+    def get_tile_size(self) -> int:
+        """Retorna o tile_size da fase atual"""
+        if self.current_phase_data:
+            map_data = self.current_phase_data.get("map", {})
+            return map_data.get("tile_size", 24)
+        return 24
 
     def load_phase(self, chapter: int, phase_number: int) -> dict:
         """

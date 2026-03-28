@@ -34,15 +34,17 @@ class EditorInputHandler:
         """Processa eventos dos painéis UI"""
         ui_handled = False
 
-        # Processa tile palette primeiro (tem prioridade no scroll)
         if self.editor.tile_palette and self.editor.tile_palette.visible:
             if self.editor.tile_palette.handle_event(event):
                 ui_handled = True
                 if event.type == pygame.MOUSEWHEEL:
-                    # Scroll na tile palette - NÃO PROPAGA para o zoom
                     return True
                 if self.editor.tile_palette.selected_tile is not None:
                     self.editor.current_tile = self.editor.tile_palette.selected_tile + 1
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self._handle_tile_selector_buttons(pygame.mouse.get_pos()):
+                    ui_handled = True
 
         # Processa layer selector
         if self.editor.layer_selector and self.editor.layer_selector.handle_event(event):
@@ -50,7 +52,9 @@ class EditorInputHandler:
             self.editor.layer_manager.current_layer = self.editor.layer_selector.selected_layer
             current_layer = self.editor.layer_manager.get_current_layer()
             if current_layer and current_layer.tileset:
-                self.editor.tile_palette.set_tileset(current_layer.tileset)
+                # CORRIGIDO: usa get_all_tiles_with_boundaries
+                all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
+                self.editor.tile_palette.set_tileset(all_tiles, boundaries)
 
         return ui_handled
 
@@ -317,3 +321,12 @@ class EditorInputHandler:
                         # Garante que está dentro dos limites
                         self.editor.camera._clamp_position()
         return True
+
+    def _handle_tile_selector_buttons(self, mouse_pos):
+        """Processa cliques nos botões do seletor de tile atual"""
+        if self.editor.tile_palette and self.editor.tile_palette.visible:
+            if self.editor.tile_palette.handle_current_tile_buttons(mouse_pos):
+                # Atualiza o current_tile do editor
+                self.editor.current_tile = self.editor.tile_palette.selected_tile + 1
+                return True
+        return False
