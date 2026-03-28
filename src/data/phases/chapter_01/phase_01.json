@@ -241,8 +241,6 @@
                 "height": 15,
                 "tile_size": 24,
                 "tileset_paths": [
-                    "res/AllTiles/TileDtef/AppleWoods/tileset_0.png",
-                    "res/AllTiles/TileDtef/AppleWoods/tileset_0.png",
                     "res/AllTiles/TileDtef/AppleWoods/tileset_0.png"
                 ]
             },
@@ -815,17 +813,27 @@
         "items": [
             {
                 "x": 144,
-                "y": 288,
+                "y": 264,
                 "item_id": 1
             },
             {
-                "x": 144,
-                "y": 288,
+                "x": 120,
+                "y": 240,
                 "item_id": 1
             },
             {
-                "x": 144,
-                "y": 288,
+                "x": 168,
+                "y": 240,
+                "item_id": 1
+            },
+            {
+                "x": 96,
+                "y": 216,
+                "item_id": 1
+            },
+            {
+                "x": 192,
+                "y": 216,
                 "item_id": 1
             }
         ]

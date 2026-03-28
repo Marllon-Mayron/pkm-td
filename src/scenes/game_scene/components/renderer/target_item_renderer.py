@@ -19,7 +19,7 @@ class TargetItemRenderer:
             self.render_item(screen, camera, screen_manager, item)
 
     def render_item(self, screen, camera, screen_manager, item):
-        """Renderiza um único item - USANDO MESMO CÁLCULO"""
+        """Renderiza um único item - CORRIGIDO para centralizar no tile"""
         # Determina posição no mundo
         if item.carried_by:
             world_x = item.current_x
@@ -29,8 +29,10 @@ class TargetItemRenderer:
                 world_x = item.current_x
                 world_y = item.current_y
             else:
-                world_x = item.base_x + item.visual_offset_x
-                world_y = item.base_y + item.visual_offset_y
+                # Centraliza o item no tile de 24x24
+                # O item.base_x está no canto superior esquerdo do tile
+                world_x = item.base_x + 12  # 12 = tile_size/2
+                world_y = item.base_y + 12  # 12 = tile_size/2
 
         # Usa o mesmo método world_to_screen
         screen_x, screen_y = render_context.world_to_screen(world_x, world_y, camera, screen_manager)

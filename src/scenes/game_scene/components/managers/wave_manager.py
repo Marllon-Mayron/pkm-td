@@ -341,15 +341,31 @@ class GameWaveManager:
                 enemy.current_direction = "down" if dy > 0 else "up"
 
     def _check_item_capture(self, enemy: Pokemon):
-        """Verifica se o inimigo capturou um item"""
+        """Verifica se o inimigo capturou um item - CORRIGIDO"""
         if enemy.is_carrying or not self.target_items:
             return
 
         for item in self.target_items:
             if hasattr(item, 'is_protected') and item.is_protected and not item.carried_by:
-                dx = enemy.x - item.x
-                dy = enemy.y - item.y
-                if dx * dx + dy * dy < enemy.capture_range * enemy.capture_range:
+                # Calcula a posição real do item no mundo
+                if item.carried_by:
+                    item_x = item.current_x
+                    item_y = item.current_y
+                else:
+                    if item.was_carried:
+                        item_x = item.current_x
+                        item_y = item.current_y
+                    else:
+                        # Centraliza a posição do item para detecção de colisão
+                        item_x = item.base_x + 12  # 12 = tile_size/2
+                        item_y = item.base_y + 12  # 12 = tile_size/2
+
+                dx = enemy.x - item_x
+                dy = enemy.y - item_y
+                distance_sq = dx * dx + dy * dy
+                capture_range_sq = enemy.capture_range * enemy.capture_range
+
+                if distance_sq < capture_range_sq:
                     # Captura o item
                     item.start_capture(enemy)
                     enemy.is_carrying = item
