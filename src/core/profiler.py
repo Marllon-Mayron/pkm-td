@@ -93,8 +93,17 @@ class Profiler:
         print("=" * 70)
 
         results = []
+        frame_avg = 0
+
+        # Primeiro, encontra o frame total
         for name, times in self.timings.items():
-            if times:
+            if name == "FRAME_TOTAL" and times:
+                frame_avg = sum(times) / len(times)
+                break
+
+        # Coleta todos os outros resultados
+        for name, times in self.timings.items():
+            if times and name != "FRAME_TOTAL":
                 avg = sum(times) / len(times)
                 max_t = max(times)
                 min_t = min(times)
@@ -103,28 +112,24 @@ class Profiler:
         # Ordena por média decrescente
         results.sort(key=lambda x: x[1], reverse=True)
 
-        # Calcula total do frame
-        frame_total = 0
-        frame_avg = 0
-        for name, avg, max_t, min_t, samples in results:
-            if name == "FRAME_TOTAL":
-                frame_avg = avg
-                frame_total = avg
-                break
-
         print(f"\n{'Seção':<40} {'Média(ms)':<12} {'Máx(ms)':<12} {'Mín(ms)':<12} {'% do Frame':<12}")
         print("-" * 88)
 
         for name, avg, max_t, min_t, samples in results:
-            if name == "FRAME_TOTAL":
-                continue
-            percent = (avg / frame_total * 100) if frame_total > 0 else 0
-            # Limita nome para 40 caracteres
+            percent = (avg / frame_avg * 100) if frame_avg > 0 else 0
+            # CORREÇÃO: Limita percentual a no máximo 100% para seções individuais
+            percent = min(percent, 100.0)
             short_name = name[:40]
-            print(f"{short_name:<40} {avg:>8.2f}ms  {max_t:>8.2f}ms  {min_t:>8.2f}ms  {percent:>8.1f}%")
+            print(f"{short_name:<40} {avg:>8.2f}ms  {max_t:>8.2f}ms  {min_t:>8.2f}ms  {percent:>7.1f}%")
 
         print("-" * 88)
         print(f"{'FRAME_TOTAL':<40} {frame_avg:>8.2f}ms")
+
+        # Soma das seções para verificar cobertura
+        total_measured = sum(avg for _, avg, _, _, _ in results)
+        print(f"\n{'Soma das seções medidas':<40} {total_measured:>8.2f}ms")
+        print(f"{'Cobertura do frame':<40} {(total_measured / frame_avg * 100) if frame_avg > 0 else 0:>7.1f}%")
+
         print(f"\nFPS médio: {1000 / frame_avg:.1f}" if frame_avg > 0 else "N/A")
         print("=" * 70 + "\n")
 

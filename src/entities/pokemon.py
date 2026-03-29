@@ -148,7 +148,7 @@ class Pokemon(Entity):
         self.is_returning_with_item = False
 
         # ===== 17. ATRIBUTOS DE COMBATE =====
-        self.attack_range = 60
+        self.attack_range = 90
         self.combat_state = "idle"
         self.original_spot_x = x
         self.original_spot_y = y

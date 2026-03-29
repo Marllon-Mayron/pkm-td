@@ -261,32 +261,137 @@ class WaveConfigDialog:
         # Settings tab - atualiza todas as posições
         self._init_settings_ui(content_x, content_y, w - (margin * 2))
 
-    def _get_pokemon_sprite(self, pokemon_id, size=32):
-        """Obtém sprite do Pokémon"""
+    def _get_pokemon_sprite(self, pokemon_id, size=32, expression="normal"):
+        """
+        Obtém o sprite/retrato do Pokémon.
+        Prioriza o retrato (portrait), fallback para InMap, depois frontal.
+
+        Args:
+            pokemon_id: ID do Pokémon
+            size: Tamanho desejado (largura e altura)
+            expression: "normal", "happy", "angry" (usado apenas para retratos)
+        """
         try:
             pokemon_id = int(pokemon_id)
         except (ValueError, TypeError):
             pokemon_id = 1
 
-        cache_key = (pokemon_id, size)
+        cache_key = (pokemon_id, size, expression, "portrait")  # Inclui expression no cache
 
         if cache_key in self.sprite_cache:
             return self.sprite_cache[cache_key]
 
-        sprite = self.pokedex.get_sprite(pokemon_id, "inmap", direction="down", frame=0)
+        sprite = None
 
-        if sprite and sprite.get_width() > 0:
-            if sprite.get_width() != size:
-                sprite = pygame.transform.scale(sprite, (size, size))
+        # ===== TENTA PRIMEIRO CARREGAR RETRATO (PORTRAIT) =====
+        try:
+            # Tenta carregar o retrato com a expressão solicitada
+            portrait = self.pokedex.get_portrait(pokemon_id, expression, shiny=False)
+            if portrait:
+                sprite = portrait
+                print(f"[WAVE_CONFIG] Retrato carregado: #{pokemon_id} ({expression})")
+        except Exception as e:
+            print(f"[WAVE_CONFIG] Erro ao carregar retrato: {e}")
+
+        # ===== SE NÃO TEM RETRATO, TENTA INMAP =====
+        if sprite is None:
+            try:
+                inmap_frames = self.pokedex.get_inmap_animation(pokemon_id, shiny=False)
+                if inmap_frames and "down" in inmap_frames and inmap_frames["down"]:
+                    sprite = inmap_frames["down"][0]
+                    print(f"[WAVE_CONFIG] Fallback InMap: #{pokemon_id}")
+            except Exception as e:
+                print(f"[WAVE_CONFIG] Erro ao carregar InMap: {e}")
+
+        # ===== SE NÃO TEM INMAP, TENTA FRONTAL =====
+        if sprite is None:
+            try:
+                sprite = self.pokedex.get_sprite(pokemon_id, "front", shiny=False)
+                if sprite:
+                    print(f"[WAVE_CONFIG] Fallback front: #{pokemon_id}")
+            except Exception as e:
+                print(f"[WAVE_CONFIG] Erro ao carregar front: {e}")
+
+        # ===== SE NADA FUNCIONOU, CRIA PLACEHOLDER =====
+        if sprite is None:
+            print(f"[WAVE_CONFIG] Criando placeholder para #{pokemon_id}")
+            sprite = self._create_pokemon_placeholder(pokemon_id, size)
+
+        # Escala mantendo proporção
+        orig_width = sprite.get_width()
+        orig_height = sprite.get_height()
+
+        # Calcula a escala mantendo a proporção
+        if orig_width > orig_height:
+            target_width = size
+            target_height = int(orig_height * (size / orig_width))
         else:
-            sprite = pygame.Surface((size, size))
-            types = self.pokedex.get_types(pokemon_id)
-            color = self.pokedex.get_type_color(types[0]) if types else (100, 100, 100)
-            sprite.fill(color)
-            pygame.draw.rect(sprite, (80, 80, 80), sprite.get_rect(), 1)
+            target_height = size
+            target_width = int(orig_width * (size / orig_height))
+
+        # Escala suavemente
+        if target_width > 0 and target_height > 0:
+            scaled_sprite = pygame.transform.smoothscale(sprite, (target_width, target_height))
+
+            # Centraliza em uma superfície quadrada
+            final_surface = pygame.Surface((size, size), pygame.SRCALPHA)
+            final_surface.fill((0, 0, 0, 0))
+            offset_x = (size - target_width) // 2
+            offset_y = (size - target_height) // 2
+            final_surface.blit(scaled_sprite, (offset_x, offset_y))
+            sprite = final_surface
 
         self.sprite_cache[cache_key] = sprite
         return sprite
+
+    def _create_pokemon_placeholder(self, pokemon_id, size):
+        """Cria um placeholder para Pokémon sem sprite"""
+        placeholder = pygame.Surface((size, size), pygame.SRCALPHA)
+
+        # Cores baseadas no ID
+        colors = [
+            (255, 99, 71),  # Tomato
+            (135, 206, 235),  # Sky Blue
+            (144, 238, 144),  # Light Green
+            (255, 215, 0),  # Gold
+            (221, 160, 221),  # Plum
+            (255, 182, 193),  # Light Pink
+            (176, 224, 230),  # Powder Blue
+            (255, 228, 181),  # Moccasin
+        ]
+        color = colors[pokemon_id % len(colors)]
+
+        # Fundo
+        pygame.draw.rect(placeholder, color, (0, 0, size, size), border_radius=8)
+        pygame.draw.rect(placeholder, (100, 100, 100), (0, 0, size, size), 2, border_radius=8)
+
+        # Primeira letra do nome
+        try:
+            pokemon_name = self.pokedex.get_name(pokemon_id)
+            first_letter = pokemon_name[0].upper() if pokemon_name else "?"
+        except:
+            first_letter = "?"
+
+        font_size = max(12, size // 2)
+        font = pygame.font.Font(None, font_size)
+        text = font.render(first_letter, True, (255, 255, 255))
+        text_rect = text.get_rect(center=(size // 2, size // 2))
+        placeholder.blit(text, text_rect)
+
+        # ID pequeno no canto
+        small_font = pygame.font.Font(None, max(8, size // 4))
+        id_text = small_font.render(f"#{pokemon_id}", True, (200, 200, 200))
+        id_rect = id_text.get_rect(bottomright=(size - 3, size - 3))
+        placeholder.blit(id_text, id_rect)
+
+        return placeholder
+
+    def _get_pokemon_sprite_with_expression(self, pokemon_id, size=32, expression="normal"):
+        """
+        Obtém sprite do Pokémon com expressão específica.
+        Útil para mostrar diferentes emoções no diálogo.
+        """
+        return self._get_pokemon_sprite(pokemon_id, size, expression)
 
     def handle_event(self, event):
         """Processa eventos do diálogo"""
@@ -924,8 +1029,9 @@ class WaveConfigDialog:
             pygame.draw.rect(screen, bg_color, item_rect)
             pygame.draw.rect(screen, self.COLORS['border_light'], item_rect, 1)
 
-            # Sprite do Pokémon
-            sprite = self._get_pokemon_sprite(enemy.pokemon_id, 32)
+            # ===== SPRITE DO POKÉMON (USANDO RETRATO) =====
+            # Usa o retrato com expressão normal (pode ser "normal", "happy", "angry")
+            sprite = self._get_pokemon_sprite(enemy.pokemon_id, 32, "normal")
             screen.blit(sprite, (item_rect.x + 5, item_rect.y + 5))
 
             # Nome
@@ -949,7 +1055,7 @@ class WaveConfigDialog:
                              (remove_rect.right - 5, remove_rect.y + 5),
                              (remove_rect.x + 5, remove_rect.bottom - 5), 1)
 
-            # Campo de porcentagem - CORRIGIDO
+            # Campo de porcentagem
             percent_rect = pygame.Rect(self.enemies_list_area.right - 90, item_y + 10, 45, 22)
 
             if self.active_input == f"percent_{i}":
