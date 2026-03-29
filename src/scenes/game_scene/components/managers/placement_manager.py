@@ -240,29 +240,3 @@ class PlacementManager:
         """Renderiza todos os Pokémon colocados"""
         for pokemon in self.placed_pokemon:
             pokemon.render(screen, camera, show_hp=False)
-
-            # DEBUG: Mostra estado de combate na tela
-            if hasattr(self.game, 'show_debug') and self.game.show_debug:
-                font = pygame.font.Font(None, 16)
-                # Mostra estado e cooldown
-                state_text = f"{pokemon.combat_state}"
-                if pokemon.attack_cooldown > 0:
-                    state_text += f" CD:{pokemon.attack_cooldown:.1f}"
-
-                # Posição do texto (acima do Pokémon)
-                screen_x, screen_y = screen_manager.world_to_screen(
-                    pokemon.x, pokemon.y - 50, camera
-                )
-
-                # Cor baseada no estado
-                if pokemon.combat_state == "attacking":
-                    color = (255, 0, 0)  # Vermelho
-                elif pokemon.combat_state == "moving_to_target":
-                    color = (255, 255, 0)  # Amarelo
-                elif pokemon.combat_state == "returning":
-                    color = (0, 255, 255)  # Ciano
-                else:  # idle
-                    color = (0, 255, 0)  # Verde
-
-                text_surf = font.render(state_text, True, color)
-                screen.blit(text_surf, (screen_x - text_surf.get_width() // 2, screen_y))
