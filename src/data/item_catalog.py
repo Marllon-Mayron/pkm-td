@@ -30,6 +30,13 @@ class ItemCatalog:
                 "sprite": os.path.join(self.base_path, "medicine", "rare-candy.png"),
                 "description": "Raro doce que sobe o nível",
                 "category": "medicine"
+            },
+            2: {
+                "id": 2,
+                "name": "Insignia de pedra",
+                "sprite": os.path.join(self.base_path, "badge", "rock-badge.png"),
+                "description": "Insignia 1",
+                "category": "badge"
             }
         }
 

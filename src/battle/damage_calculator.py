@@ -9,47 +9,164 @@ import random
 class DamageCalculator:
     """Calcula dano com base em tipos, stats e moves"""
 
-    # Tabela de eficácia de tipos (Gen 1)
+    # Tabela de eficácia de tipos COMPLETA (Gen 1-6)
+    # Formato: (move_type, defender_type) -> multiplier
     TYPE_CHART = {
-        ("normal", "rock"): 0.5, ("normal", "ghost"): 0, ("normal", "steel"): 0.5,
-        ("fire", "fire"): 0.5, ("fire", "water"): 0.5, ("fire", "grass"): 2.0,
-        ("fire", "ice"): 2.0, ("fire", "bug"): 2.0, ("fire", "rock"): 0.5,
-        ("fire", "dragon"): 0.5, ("fire", "steel"): 2.0,
-        ("water", "fire"): 2.0, ("water", "water"): 0.5, ("water", "grass"): 0.5,
-        ("water", "ground"): 2.0, ("water", "rock"): 2.0, ("water", "dragon"): 0.5,
-        ("electric", "water"): 2.0, ("electric", "electric"): 0.5, ("electric", "grass"): 0.5,
-        ("electric", "ground"): 0, ("electric", "flying"): 2.0, ("electric", "dragon"): 0.5,
-        ("grass", "fire"): 0.5, ("grass", "water"): 2.0, ("grass", "grass"): 0.5,
-        ("grass", "poison"): 0.5, ("grass", "ground"): 2.0, ("grass", "flying"): 0.5,
-        ("grass", "bug"): 0.5, ("grass", "rock"): 2.0, ("grass", "dragon"): 0.5,
+        # NORMAL
+        ("normal", "rock"): 0.5,
+        ("normal", "ghost"): 0,
+        ("normal", "steel"): 0.5,
+
+        # FIRE
+        ("fire", "fire"): 0.5,
+        ("fire", "water"): 0.5,
+        ("fire", "grass"): 2.0,
+        ("fire", "ice"): 2.0,
+        ("fire", "bug"): 2.0,
+        ("fire", "rock"): 0.5,
+        ("fire", "dragon"): 0.5,
+        ("fire", "steel"): 2.0,
+
+        # WATER
+        ("water", "fire"): 2.0,
+        ("water", "water"): 0.5,
+        ("water", "grass"): 0.5,
+        ("water", "ground"): 2.0,
+        ("water", "rock"): 2.0,
+        ("water", "dragon"): 0.5,
+
+        # ELECTRIC
+        ("electric", "water"): 2.0,
+        ("electric", "electric"): 0.5,
+        ("electric", "grass"): 0.5,
+        ("electric", "ground"): 0,  # IMUNE
+        ("electric", "flying"): 2.0,
+        ("electric", "dragon"): 0.5,
+        ("electric", "rock"): 0.5,  # Rock NÃO é imune a elétrico, só resiste
+
+        # GRASS
+        ("grass", "fire"): 0.5,
+        ("grass", "water"): 2.0,
+        ("grass", "grass"): 0.5,
+        ("grass", "poison"): 0.5,
+        ("grass", "ground"): 2.0,
+        ("grass", "flying"): 0.5,
+        ("grass", "bug"): 0.5,
+        ("grass", "rock"): 2.0,
+        ("grass", "dragon"): 0.5,
         ("grass", "steel"): 0.5,
-        ("ice", "fire"): 0.5, ("ice", "water"): 0.5, ("ice", "grass"): 2.0,
-        ("ice", "ice"): 0.5, ("ice", "ground"): 2.0, ("ice", "flying"): 2.0,
-        ("ice", "dragon"): 2.0, ("ice", "steel"): 0.5,
-        ("fighting", "normal"): 2.0, ("fighting", "ice"): 2.0, ("fighting", "poison"): 0.5,
-        ("fighting", "flying"): 0.5, ("fighting", "psychic"): 0.5, ("fighting", "bug"): 0.5,
-        ("fighting", "rock"): 2.0, ("fighting", "ghost"): 0, ("fighting", "dark"): 2.0,
+
+        # ICE
+        ("ice", "fire"): 0.5,
+        ("ice", "water"): 0.5,
+        ("ice", "grass"): 2.0,
+        ("ice", "ice"): 0.5,
+        ("ice", "ground"): 2.0,
+        ("ice", "flying"): 2.0,
+        ("ice", "dragon"): 2.0,
+        ("ice", "steel"): 0.5,
+
+        # FIGHTING
+        ("fighting", "normal"): 2.0,
+        ("fighting", "ice"): 2.0,
+        ("fighting", "poison"): 0.5,
+        ("fighting", "flying"): 0.5,
+        ("fighting", "psychic"): 0.5,
+        ("fighting", "bug"): 0.5,
+        ("fighting", "rock"): 2.0,
+        ("fighting", "ghost"): 0,
+        ("fighting", "dark"): 2.0,
         ("fighting", "steel"): 2.0,
-        ("poison", "grass"): 2.0, ("poison", "poison"): 0.5, ("poison", "ground"): 0.5,
-        ("poison", "rock"): 0.5, ("poison", "ghost"): 0.5, ("poison", "steel"): 0,
-        ("ground", "fire"): 2.0, ("ground", "electric"): 2.0, ("ground", "grass"): 0.5,
-        ("ground", "poison"): 2.0, ("ground", "flying"): 0, ("ground", "bug"): 0.5,
-        ("ground", "rock"): 2.0, ("ground", "steel"): 2.0,
-        ("flying", "grass"): 2.0, ("flying", "fighting"): 2.0, ("flying", "bug"): 2.0,
-        ("flying", "rock"): 0.5, ("flying", "steel"): 0.5, ("flying", "electric"): 0.5,
-        ("psychic", "fighting"): 2.0, ("psychic", "poison"): 2.0, ("psychic", "psychic"): 0.5,
-        ("psychic", "dark"): 0, ("psychic", "steel"): 0.5,
-        ("bug", "grass"): 2.0, ("bug", "fighting"): 0.5, ("bug", "poison"): 0.5,
-        ("bug", "flying"): 0.5, ("bug", "psychic"): 2.0, ("bug", "ghost"): 0.5,
-        ("bug", "dark"): 2.0, ("bug", "steel"): 0.5,
-        ("rock", "fire"): 2.0, ("rock", "ice"): 2.0, ("rock", "fighting"): 0.5,
-        ("rock", "ground"): 0.5, ("rock", "flying"): 2.0, ("rock", "bug"): 2.0,
+
+        # POISON
+        ("poison", "grass"): 2.0,
+        ("poison", "poison"): 0.5,
+        ("poison", "ground"): 0.5,
+        ("poison", "rock"): 0.5,
+        ("poison", "ghost"): 0.5,
+        ("poison", "steel"): 0,
+
+        # GROUND
+        ("ground", "fire"): 2.0,
+        ("ground", "electric"): 2.0,
+        ("ground", "grass"): 0.5,
+        ("ground", "poison"): 2.0,
+        ("ground", "flying"): 0,
+        ("ground", "bug"): 0.5,
+        ("ground", "rock"): 2.0,
+        ("ground", "steel"): 2.0,
+
+        # FLYING
+        ("flying", "grass"): 2.0,
+        ("flying", "fighting"): 2.0,
+        ("flying", "bug"): 2.0,
+        ("flying", "rock"): 0.5,
+        ("flying", "steel"): 0.5,
+        ("flying", "electric"): 0.5,
+
+        # PSYCHIC
+        ("psychic", "fighting"): 2.0,
+        ("psychic", "poison"): 2.0,
+        ("psychic", "psychic"): 0.5,
+        ("psychic", "dark"): 0,
+        ("psychic", "steel"): 0.5,
+
+        # BUG
+        ("bug", "grass"): 2.0,
+        ("bug", "fighting"): 0.5,
+        ("bug", "poison"): 0.5,
+        ("bug", "flying"): 0.5,
+        ("bug", "psychic"): 2.0,
+        ("bug", "ghost"): 0.5,
+        ("bug", "dark"): 2.0,
+        ("bug", "steel"): 0.5,
+
+        # ROCK
+        ("rock", "fire"): 2.0,
+        ("rock", "ice"): 2.0,
+        ("rock", "fighting"): 0.5,
+        ("rock", "ground"): 0.5,
+        ("rock", "flying"): 2.0,
+        ("rock", "bug"): 2.0,
         ("rock", "steel"): 0.5,
-        ("ghost", "normal"): 0, ("ghost", "psychic"): 2.0, ("ghost", "ghost"): 2.0,
+
+        # GHOST
+        ("ghost", "normal"): 0,
+        ("ghost", "psychic"): 2.0,
+        ("ghost", "ghost"): 2.0,
         ("ghost", "dark"): 0.5,
-        ("dragon", "dragon"): 2.0, ("dragon", "steel"): 0.5,
-        ("dark", "psychic"): 2.0, ("dark", "dark"): 0.5, ("dark", "fighting"): 0.5,
-        ("steel", "ice"): 2.0, ("steel", "rock"): 2.0, ("steel", "steel"): 0.5,
+
+        # DRAGON
+        ("dragon", "dragon"): 2.0,
+        ("dragon", "steel"): 0.5,
+
+        # DARK
+        ("dark", "psychic"): 2.0,
+        ("dark", "dark"): 0.5,
+        ("dark", "fighting"): 0.5,
+
+        # STEEL
+        ("steel", "ice"): 2.0,
+        ("steel", "rock"): 2.0,
+        ("steel", "steel"): 0.5,
+        ("steel", "fire"): 0.5,
+        ("steel", "water"): 0.5,
+        ("steel", "electric"): 0.5,
+
+        # FAIRY (Gen 6+)
+        ("fairy", "fighting"): 2.0,
+        ("fairy", "dragon"): 2.0,
+        ("fairy", "dark"): 2.0,
+        ("fairy", "fire"): 0.5,
+        ("fairy", "poison"): 0.5,
+        ("fairy", "steel"): 0.5,
+
+        # FIRE vs FAIRY
+        ("fire", "fairy"): 0.5,
+        # POISON vs FAIRY
+        ("poison", "fairy"): 2.0,
+        # STEEL vs FAIRY
+        ("steel", "fairy"): 2.0,
     }
 
     @classmethod
@@ -62,6 +179,7 @@ class DamageCalculator:
         - effectiveness: multiplicador de tipo (0, 0.25, 0.5, 1, 2, 4)
         - hit: True se acertou, False se errou
         - message: mensagem para exibir
+        - stab: True se teve STAB
         """
         # 1. Verificar acerto (accuracy)
         hit_chance = move.accuracy / 100
@@ -70,7 +188,8 @@ class DamageCalculator:
                 "damage": 0,
                 "effectiveness": 1.0,
                 "hit": False,
-                "message": f"O ataque errou!"
+                "message": f"O ataque errou!",
+                "stab": False
             }
 
         # 2. Moves de status não causam dano
@@ -79,7 +198,8 @@ class DamageCalculator:
                 "damage": 0,
                 "effectiveness": 1.0,
                 "hit": True,
-                "message": f"Usou {move.name}! (Efeito de status)"
+                "message": f"Usou {move.name}! (Efeito de status)",
+                "stab": False
             }
 
         # 3. Power 0 = não causa dano
@@ -88,11 +208,22 @@ class DamageCalculator:
                 "damage": 0,
                 "effectiveness": 1.0,
                 "hit": True,
-                "message": f"Usou {move.name}!"
+                "message": f"Usou {move.name}!",
+                "stab": False
             }
 
-        # 4. Calcular multiplicador de tipo
+        # 4. Calcular multiplicador de tipo (inclui 4x e 0.25x)
         effectiveness = cls._get_type_effectiveness(move.type, defender.types)
+
+        # Se for imune (effectiveness = 0), retorna sem dano
+        if effectiveness == 0:
+            return {
+                "damage": 0,
+                "effectiveness": 0,
+                "hit": True,
+                "message": f"Não afeta {defender.name}!",
+                "stab": False
+            }
 
         # 5. STAB (Same Type Attack Bonus)
         stab = 1.5 if move.type in attacker.types else 1.0
@@ -139,18 +270,23 @@ class DamageCalculator:
 
     @classmethod
     def _get_type_effectiveness(cls, move_type: str, defender_types: list) -> float:
-        """Calcula multiplicador de eficácia baseado nos tipos"""
+        """
+        Calcula multiplicador de eficácia baseado nos tipos
+        Suporta multiplicadores combinados (ex: 2x * 2x = 4x)
+        """
         multiplier = 1.0
+        move_type_lower = move_type.lower()
 
         for def_type in defender_types:
-            # Verifica super efetivo
-            key = (move_type.lower(), def_type.lower())
-            if key in cls.TYPE_CHART:
-                multiplier *= cls.TYPE_CHART[key]
+            def_type_lower = def_type.lower()
+            key = (move_type_lower, def_type_lower)
 
-            # Verifica imune (0x)
-            if cls.TYPE_CHART.get(key) == 0:
-                return 0.0
+            # Verifica na tabela
+            if key in cls.TYPE_CHART:
+                mult = cls.TYPE_CHART[key]
+                multiplier *= mult
+            # Se não tem entrada, é neutro (1.0)
+            # else: multiplier *= 1.0
 
         return multiplier
 
@@ -159,12 +295,22 @@ class DamageCalculator:
         """Retorna mensagem baseada na eficácia"""
         if effectiveness == 0:
             return "Não afeta..."
+        elif effectiveness >= 4.0:
+            return "É super efetivo! (4x)"
         elif effectiveness > 1.0:
-            if effectiveness >= 4.0:
-                return "É super efetivo! (4x)"
-            return "É super efetivo!"
+            if effectiveness >= 2.0:
+                return "É super efetivo!"
+            return "É um pouco efetivo..."
         elif effectiveness < 1.0:
             if effectiveness <= 0.25:
                 return "Não é muito efetivo... (1/4x)"
             return "Não é muito efetivo..."
         return ""
+
+    @classmethod
+    def get_type_interaction(cls, move_type: str, defender_type: str) -> float:
+        """
+        Método auxiliar para debug - retorna o multiplicador entre um tipo de ataque e um tipo de defesa
+        """
+        key = (move_type.lower(), defender_type.lower())
+        return cls.TYPE_CHART.get(key, 1.0)
