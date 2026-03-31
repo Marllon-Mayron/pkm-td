@@ -146,12 +146,12 @@ class SpriteLoader:
             # Se não tem informação de duração, calcula baseado na largura
             if num_frames == 0:
                 num_frames = sheet_width // frame_width
-                print(f"[SPRITE] Inferindo {num_frames} frames para {anim_name} (baseado na largura)")
+                #print(f"[SPRITE] Inferindo {num_frames} frames para {anim_name} (baseado na largura)")
 
             # Calcula quantas direções baseado na altura
             num_directions = sheet_height // frame_height
-            print(f"[SPRITE] Spritesheet: {sheet_width}x{sheet_height}, frame={frame_width}x{frame_height}")
-            print(f"[SPRITE] Direções (linhas): {num_directions}, Frames por direção (colunas): {num_frames}")
+            #print(f"[SPRITE] Spritesheet: {sheet_width}x{sheet_height}, frame={frame_width}x{frame_height}")
+            #print(f"[SPRITE] Direções (linhas): {num_directions}, Frames por direção (colunas): {num_frames}")
 
             frames_by_direction = {}
 

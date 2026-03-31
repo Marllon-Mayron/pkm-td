@@ -122,22 +122,30 @@ class StatStage:
 class StatModifier:
     """Modificador temporário de stats (para efeitos com duração limitada)"""
 
-    def __init__(self, stat_type: StatType, stages: int, duration: float = 8.0):
+    def __init__(self, stat_type: StatType, stages: int, duration: float = None):
         """
         Args:
             stat_type: Stat a ser modificado
             stages: Quantidade de estágios (-6 a +6)
-            duration: Duração em SEGUNDOS
+            duration: Duração em SEGUNDOS (None = permanente)
         """
         self.stat_type = stat_type
         self.stages = stages
         self.duration = duration
-        self.time_left = duration  # Tempo restante em segundos
+        self.time_left = duration if duration is not None else None
+        self.is_permanent = duration is None
 
     def update(self, dt: float) -> bool:
         """
         Atualiza o modificador, retorna False se acabou
         dt: tempo decorrido desde o último update (em segundos)
         """
-        self.time_left -= dt
-        return self.time_left > 0
+        # Modificadores permanentes nunca expiram
+        if self.is_permanent:
+            return True
+
+        if self.time_left is not None:
+            self.time_left -= dt
+            return self.time_left > 0
+
+        return True

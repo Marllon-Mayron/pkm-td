@@ -88,7 +88,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "paralysis",
-                "duration": 4.0
+                "duration": None
             },
             "description": "Paralisa o oponente"
         },

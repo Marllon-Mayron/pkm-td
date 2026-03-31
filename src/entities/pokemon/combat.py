@@ -3,12 +3,30 @@ import math
 import random
 from typing import List, Optional
 
+from src.battle.effects import StatusType  # Adicione esta importação
+
 
 class PokemonCombat:
     """Gerencia combate do Pokémon"""
 
     def __init__(self, pokemon):
         self.pokemon = pokemon
+
+    def is_stunned(self) -> bool:
+        """Verifica se o Pokémon está atordoado pela paralisia"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.PARALYSIS:
+                return status.is_stunned()
+        return False
+
+    def update_stun(self, dt: float) -> bool:
+        """Atualiza o estado de stun e retorna True se está atordoado"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.PARALYSIS:
+                return status.update_paralysis(dt)
+        return False
 
     def find_nearest_enemy(self, enemies: List) -> Optional['Pokemon']:
         """Encontra o inimigo mais próximo"""
@@ -33,6 +51,11 @@ class PokemonCombat:
 
     def handle_idle_state(self, dt, enemies):
         """Estado parado - procura inimigo"""
+
+        # ===== VERIFICA STUN =====
+        if self.update_stun(dt):
+            return  # Atordoado, não faz nada
+
         nearest = self.find_nearest_enemy(enemies)
 
         if nearest and self.pokemon.charge_cooldown <= 0:
@@ -42,6 +65,14 @@ class PokemonCombat:
 
     def handle_charging_state(self, dt):
         """Estado indo em direção ao alvo - com suporte para ataques de status e especiais"""
+
+        # ===== VERIFICA STUN =====
+        if self.update_stun(dt):
+            # Se estava carregando e foi atordoado, volta para idle
+            self.pokemon.combat_state = "idle"
+            self.pokemon.target = None
+            return
+
         if not self.pokemon.target or not self.pokemon.target.is_alive():
             self.pokemon.combat_state = "returning"
             self.pokemon.target = None
@@ -138,6 +169,11 @@ class PokemonCombat:
 
     def handle_returning_state(self, dt):
         """Estado voltando para posição original"""
+
+        # ===== VERIFICA STUN =====
+        if self.update_stun(dt):
+            return  # Atordoado, não se move
+
         dx = self.pokemon.original_spot_x - self.pokemon.x
         dy = self.pokemon.original_spot_y - self.pokemon.y
         distance = math.sqrt(dx * dx + dy * dy)
@@ -200,15 +236,13 @@ class PokemonCombat:
         self.pokemon.miss_timer = 0.6
 
     def take_damage(self, damage, attacker=None):
-        """Recebe dano e processa efeitos - SEM registrar contribuição (já registrado no pokemon.py)"""
+        """Recebe dano"""
         old_hp = self.pokemon.current_hp
         self.pokemon.current_hp = max(0, self.pokemon.current_hp - damage)
 
         if self.pokemon.current_hp > 0 and self.pokemon.current_hp <= self.pokemon.max_hp * 0.2:
             from src.managers.move_sound_manager import move_sound_manager
             move_sound_manager.play_attack_sound("low_hp")
-
-        # REMOVIDO: registro de contribuição (já feito no pokemon.py)
 
         if self.pokemon.current_hp <= 0:
             from src.managers.move_sound_manager import move_sound_manager

@@ -15,6 +15,7 @@ from .combat import PokemonCombat
 from .moves import PokemonMoves
 from .evolution import PokemonEvolution
 from .rendering import PokemonRendering
+from ...battle.effects import StatusType
 
 # Cache global de sprites e fontes para reduzir recriação
 _SPRITE_CACHE = {}
@@ -676,6 +677,21 @@ class Pokemon(Entity):
 
     def update_combat(self, dt, enemies):
         """Atualiza lógica de combate com efeitos de status"""
+
+        # ===== VERIFICA STUN DA PARALISIA =====
+        if hasattr(self, 'effect_manager') and self.effect_manager:
+            status = self.effect_manager.get_status(self)
+            if status and status.type == StatusType.PARALYSIS:
+                # Atualiza o estado de paralisia
+                is_stunned = status.update_paralysis(dt)
+                if is_stunned:
+                    # Está atordoado - não pode atacar
+                    if self.combat_state == "charging":
+                        self.combat_state = "idle"
+                        self.target = None
+                    return
+
+        # ===== LÓGICA DE COMBATE NORMAL =====
         if hasattr(self, 'battle_system') and self.battle_system and self.battle_system.effect_manager:
             pass
 
@@ -723,6 +739,10 @@ class Pokemon(Entity):
                 screen, self, sprite_rect, zoom_scale, _FONT_CACHE
             )
             self.battle_system.effect_manager.render_stat_modifiers(
+                screen, self, sprite_rect, zoom_scale, _FONT_CACHE
+            )
+
+            self.battle_system.effect_manager.render_status_indicators(
                 screen, self, sprite_rect, zoom_scale, _FONT_CACHE
             )
 

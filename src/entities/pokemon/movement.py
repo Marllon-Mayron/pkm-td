@@ -2,6 +2,8 @@
 import math
 from typing import Tuple, List, Optional
 
+from src.battle.effects import StatusType  # Adicione esta importação
+
 
 class PokemonMovement:
     """Gerencia movimento e path do Pokémon"""
@@ -18,8 +20,32 @@ class PokemonMovement:
         self.pokemon.move_speed = new_speed
         print(f"[SPEED] {self.pokemon.name} velocidade atualizada: {self.pokemon.move_speed:.2f}")
 
+    def is_stunned(self) -> bool:
+        """Verifica se o Pokémon está atordoado pela paralisia"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.PARALYSIS:
+                return status.is_stunned()
+        return False
+
+    def update_stun(self, dt: float) -> bool:
+        """Atualiza o estado de stun e retorna True se está atordoado"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.PARALYSIS:
+                return status.update_paralysis(dt)
+        return False
+
     def update_movement(self, dt, items=None):
         """Movimento via path (para aliados ou inimigos sem wave control)"""
+
+        # ===== VERIFICA STUN DA PARALISIA =====
+        is_stunned = self.update_stun(dt)
+        if is_stunned:
+            # Está atordoado - não se move neste frame
+            return
+
+        # ===== MOVIMENTO NORMAL =====
         if not self.pokemon.path or len(self.pokemon.path) == 0 or self.pokemon.path_index >= len(self.pokemon.path):
             return
 

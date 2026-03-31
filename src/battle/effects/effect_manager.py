@@ -32,14 +32,22 @@ class EffectManager:
         """Aplica um efeito de status a um Pokémon"""
         pokemon_id = id(pokemon)
 
-        # Verifica se já tem um status
         if pokemon_id in self.status_effects:
             existing = self.status_effects[pokemon_id]
             if existing.type != StatusType.NONE:
-                return False
+                conflicting = [StatusType.PARALYSIS, StatusType.BURN, StatusType.POISON]
+                if existing.type in conflicting and status.type in conflicting:
+                    return False
+                if existing.type in [StatusType.SLEEP, StatusType.FREEZE]:
+                    self.remove_status(pokemon)
+                else:
+                    return False
 
         self.status_effects[pokemon_id] = status
         status.apply(pokemon, self)
+
+        # REMOVIDO: add_status_text - não mostra texto temporário
+        # Apenas o indicador permanente será mostrado
 
         return True
 
@@ -51,6 +59,14 @@ class EffectManager:
             status = self.status_effects[pokemon_id]
             status.remove(pokemon, self)
             del self.status_effects[pokemon_id]
+
+            # Remove modificador de velocidade da paralisia
+            if status.type == StatusType.PARALYSIS:
+                from .stat_modifier import StatType
+                # Remove o modificador de speed (aplica +2 para compensar)
+                if pokemon_id in self.stat_stages:
+                    self.stat_stages[pokemon_id].modify(StatType.SPEED, 2)
+
             return True
 
         return False
@@ -149,27 +165,35 @@ class EffectManager:
 
         for pokemon_id, modifiers in self.stat_modifiers.items():
             for modifier in modifiers[:]:
-                if not modifier.update(dt):  # Passa dt para o modificador
-                    expired_modifiers.append((pokemon_id, modifier))
-                    modifiers.remove(modifier)
-                    print(f"[EFFECT] Modificador {modifier.stat_type} expirou para Pokémon {pokemon_id}")
+                if not modifier.is_permanent:
+                    if not modifier.update(dt):
+                        expired_modifiers.append((pokemon_id, modifier))
+                        modifiers.remove(modifier)
+                        print(f"[EFFECT] Modificador {modifier.stat_type} expirou para Pokémon {pokemon_id}")
 
-        # Aplica a remoção de estágios
         for pokemon_id, modifier in expired_modifiers:
             if pokemon_id in self.stat_stages:
-                # Remove o modificador (inverte os estágios)
                 self.stat_stages[pokemon_id].modify(modifier.stat_type, -modifier.stages)
                 print(f"[EFFECT] Modificador removido: {modifier.stat_type} {modifier.stages:+d}")
+
+        # Atualiza status effects (especialmente paralisia)
+        for pokemon_id, status in list(self.status_effects.items()):
+            # Encontra o Pokémon (isso é ineficiente, mas funciona)
+            pokemon = None
+            # TODO: melhorar isso
+            if not status.update(None, self, dt):
+                # Status expirou
+                del self.status_effects[pokemon_id]
+                print(f"[EFFECT] Status {status.name} expirou")
 
         # Atualiza timer de ticks de status
         self.status_timer += dt
 
         if self.status_timer >= self.STATUS_TICK_INTERVAL:
             self.status_timer = 0
-            # Aplica ticks de status
             for pokemon_id, status in self.status_effects.items():
                 if status.on_tick_callback:
-                    # Encontra o Pokémon pelo ID (opcional)
+                    # Encontra o Pokémon (ineficiente)
                     pass
 
         # Limpa textos temporários
@@ -322,6 +346,93 @@ class EffectManager:
         bg_surf.set_alpha(180)
         bg_surf.fill((0, 0, 0))
         screen.blit(bg_surf, (text_rect.x - 4, text_rect.y - 2))
+
+        screen.blit(text_surf, text_rect)
+
+    def render_status_indicators(self, screen, pokemon, sprite_rect, zoom_scale, font_cache):
+        """
+        Renderiza indicadores de status permanentes (PAR, BRN, PSN, etc) acima dos modificadores
+        """
+        status = self.get_status(pokemon)
+        if not status or status.type == StatusType.NONE:
+            return
+
+        # Fonte para o indicador de status
+        base_font_size = 12
+        if hasattr(pokemon, 'screen_manager') and hasattr(pokemon, 'camera'):
+            render_scale = pokemon.screen_manager.render_scale
+            camera_zoom = pokemon.camera.zoom if pokemon.camera else 1.0
+            total_scale = render_scale * camera_zoom
+            font_size = max(10, int(base_font_size * total_scale))
+        else:
+            font_size = max(10, int(base_font_size * zoom_scale))
+
+        if font_size not in font_cache:
+            try:
+                font_cache[font_size] = pygame.font.Font(None, font_size)
+            except:
+                font_cache[font_size] = pygame.font.SysFont('Arial', font_size)
+
+        font = font_cache[font_size]
+
+        # Texto do status (ex: "PAR", "BRN", "PSN")
+        status_text = status.display_name
+        color = status.color
+
+        text_surf = font.render(status_text, True, color)
+        text_rect = text_surf.get_rect()
+
+        # Posiciona acima dos modificadores de stat
+        sprite_height = sprite_rect.height
+
+        # Modificadores estão em -45% do topo
+        # Status fica em -55% do topo (acima)
+        relative_offset = -sprite_height * 0.55
+
+        text_rect.y = int(sprite_rect.top + relative_offset - text_rect.height)
+        text_rect.centerx = sprite_rect.centerx
+
+        # Fundo semi-transparente
+        bg_width = text_rect.width + 8
+        bg_height = text_rect.height + 4
+        bg_surf = pygame.Surface((bg_width, bg_height))
+        bg_surf.set_alpha(180)
+        bg_surf.fill((0, 0, 0))
+        screen.blit(bg_surf, (text_rect.x - 4, text_rect.y - 2))
+
+        screen.blit(text_surf, text_rect)
+
+        # Se estiver paralisado e atordoado, mostra ícone de stun
+        if status.type == StatusType.PARALYSIS and status.is_stunned():
+            self._render_stun_icon(screen, pokemon, sprite_rect, zoom_scale, font_cache, status)
+
+    def _render_stun_icon(self, screen, pokemon, sprite_rect, zoom_scale, font_cache, status):
+        """Renderiza ícone de stun quando o Pokémon está paralisado"""
+        base_font_size = 14
+        if hasattr(pokemon, 'screen_manager') and hasattr(pokemon, 'camera'):
+            render_scale = pokemon.screen_manager.render_scale
+            camera_zoom = pokemon.camera.zoom if pokemon.camera else 1.0
+            total_scale = render_scale * camera_zoom
+            font_size = max(12, int(base_font_size * total_scale))
+        else:
+            font_size = max(12, int(base_font_size * zoom_scale))
+
+        if font_size not in font_cache:
+            try:
+                font_cache[font_size] = pygame.font.Font(None, font_size)
+            except:
+                font_cache[font_size] = pygame.font.SysFont('Arial', font_size)
+
+        font = font_cache[font_size]
+
+        # Ícone de stun (relâmpago com círculo)
+        stun_text = "⚡ !"
+        text_surf = font.render(stun_text, True, (255, 255, 100))
+        text_rect = text_surf.get_rect()
+
+        # Posiciona à direita do indicador de status
+        text_rect.left = sprite_rect.centerx + 15
+        text_rect.centery = sprite_rect.top - int(sprite_rect.height * 0.55)
 
         screen.blit(text_surf, text_rect)
 

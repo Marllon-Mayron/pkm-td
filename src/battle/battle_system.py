@@ -43,14 +43,25 @@ class BattleSystem:
             attacker.has_no_pp = True
             return False
 
-        # Limpa flag
         attacker.has_no_pp = False
 
-        # Verifica se o atacante pode atacar (status effects)
+        # Verifica status do atacante
         status = self.effect_manager.get_status(attacker)
+
+        # Atualiza o estado de paralisia antes de verificar
+        if status and status.type == StatusType.PARALYSIS:
+            status.update_paralysis(0)  # Apenas verifica estado atual
+
+        # Verifica se pode atacar (stun da paralisia)
         if status and not status.can_attack():
-            self.effect_manager.add_status_text(attacker, f"{attacker.name} não pode atacar!")
-            print(f"[BATTLE] {attacker.name} está {status.name.lower()} e não pode atacar!")
+            if status.type == StatusType.PARALYSIS:
+                # Mensagem temporária de stun
+                self.effect_manager.add_status_text(attacker,
+                                                    f"{attacker.name} está paralisado e não consegue se mover!")
+                print(f"[BATTLE] {attacker.name} está paralisado e não consegue se mover!")
+            else:
+                self.effect_manager.add_status_text(attacker, f"{attacker.name} não pode atacar!")
+                print(f"[BATTLE] {attacker.name} está {status.name.lower()} e não pode atacar!")
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
 

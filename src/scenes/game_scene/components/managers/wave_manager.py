@@ -5,6 +5,7 @@ from typing import List, Dict, Optional, Tuple, Set
 from enum import Enum
 from dataclasses import dataclass, field
 
+from src.battle.effects import StatusType
 from src.entities.pokemon import Pokemon
 from src.managers.sound_manager import sound_manager, SoundEffect
 
@@ -302,11 +303,22 @@ class GameWaveManager:
                     enemy.sprite = frames_list[enemy.current_frame]
 
     def _update_enemy_movement(self, enemy: Pokemon, dt: float):
-        """Atualiza o movimento do inimigo ao longo do path"""
+        """Atualiza o movimento do inimigo ao longo do path - com verificação de stun"""
+
+        # ===== VERIFICA STUN DA PARALISIA =====
+        if hasattr(enemy, 'effect_manager') and enemy.effect_manager:
+            status = enemy.effect_manager.get_status(enemy)
+            if status and status.type == StatusType.PARALYSIS:
+                # Atualiza o estado de paralisia
+                is_stunned = status.update_paralysis(dt)
+                if is_stunned:
+                    # Está atordoado - não se move neste frame
+                    return  # Não move
+
+        # ===== MOVIMENTO NORMAL =====
         if not enemy.path or len(enemy.path) == 0:
             return
 
-        # Se o índice está fora do path, chegou ao fim
         if enemy.path_index >= len(enemy.path):
             return
 
@@ -317,24 +329,20 @@ class GameWaveManager:
         move_distance = enemy.move_speed * dt * 60
 
         if distance <= move_distance:
-            # Chegou ao ponto - avança para o próximo
             enemy.x, enemy.y = target_x, target_y
             enemy.path_index += 1
             enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
 
-            # Log para debug
             if enemy.is_boss:
                 print(
                     f"[BOSS] {enemy.name} chegou ao ponto {enemy.path_index - 1}, indo para {enemy.path_index}/{len(enemy.path)}")
         else:
-            # Move em direção ao ponto
             move_x = (dx / distance) * move_distance
             move_y = (dy / distance) * move_distance
             enemy.x += move_x
             enemy.y += move_y
             enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
 
-            # Atualiza direção para animação
             if abs(dx) > abs(dy):
                 enemy.current_direction = "right" if dx > 0 else "left"
             else:
@@ -917,7 +925,7 @@ class GameWaveManager:
                     if attacker_id in defeated_enemy.status_contributions:
                         contribution_type.append(f"status:{defeated_enemy.status_contributions[attacker_id]:.1f}")
                     if attacker_id in defeated_enemy.buff_contributions:
-                        contribution_type.append(f"buff:{defeaten_enemy.buff_contributions[attacker_id]:.1f}")
+                        contribution_type.append(f"buff:{defeated_enemy.buff_contributions[attacker_id]:.1f}")
 
                     print(f"[XP] {pokemon.name} ganhou {xp_gained} XP ({', '.join(contribution_type)})")
 
