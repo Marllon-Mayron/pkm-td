@@ -158,6 +158,43 @@ class ItemBagCatalog:
                 "effect_value": 0,
                 "price": 1200
             },
+            # TMs/HMs
+            "tm_normal_tackle": {
+                "id": "tm_normal_tackle",
+                "name": "TM01 - Tackle",
+                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
+                "description": "Ensina Tackle a um Pokémon. Um ataque físico básico.",
+                "category": "tm",
+                "usable_in_battle": False,
+                "usable_on_map": True,
+                "effect": "teach_move",
+                "effect_value": "tackle",
+                "price": 500  # Preço reduzido para TM básica
+            },
+            "tm_bug_stringshot": {
+                "id": "tm_bug_stringshot",
+                "name": "TM02 - String Shot",
+                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_BUG.png"),
+                "description": "Ensina String Shot a um Pokémon. Reduz a velocidade do oponente.",
+                "category": "tm",
+                "usable_in_battle": False,
+                "usable_on_map": True,
+                "effect": "teach_move",
+                "effect_value": "string-shot",
+                "price": 500
+            },
+            "tm_mega_punch": {
+                "id": "tm_mega_punch",
+                "name": "TM03 - Mega Punch",
+                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
+                "description": "A powerful punch thrown very hard.",
+                "category": "tm",
+                "usable_in_battle": False,
+                "usable_on_map": True,
+                "effect": "teach_move",
+                "effect_value": "mega-punch",
+                "price": 1000
+            },
         }
 
         # Placeholders serão criados sob demanda

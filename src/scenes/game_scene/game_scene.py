@@ -363,6 +363,11 @@ class GameScene(BaseScene):
             if target_type == "ally":
                 return self._use_evolution_stone(target, item_data)
 
+        elif effect == "teach_move":
+            if target_type == "ally":
+                move_to_teach = item_data.get("effect_value")
+                return self._teach_move_to_pokemon(target, move_to_teach, item_data)
+
         # POKEBALLS
         elif target_type == "enemy" and category == "pokeball":
             return self._attempt_capture(target, item_data)
@@ -372,6 +377,30 @@ class GameScene(BaseScene):
             return self.use_medicine(target, item_data)
 
         return False
+
+    def _teach_move_to_pokemon(self, pokemon, move_name, item_data):
+        """Ensina um move a um Pokémon usando TM (as validações já foram feitas no drag)"""
+        from src.entities.move import Move
+        from src.data.move_data import MoveData
+
+        move_data = MoveData()
+        move_info = move_data.get_move_info(move_name)
+
+        if not move_info:
+            print(f"[TM] Move {move_name} não encontrado!")
+            self.player.bag.add_item(item_data["id"], 1)
+            return False
+
+        # Se tem menos de 4 moves, adiciona diretamente
+        if len(pokemon.moves) < 4:
+            pokemon.moves.append(Move(move_name, move_info))
+            print(f"[TM] {pokemon.name} aprendeu {move_name} via TM!")
+            return True
+
+        # Se já tem 4 moves, abre overlay para escolher qual esquecer
+        self._open_forget_move_overlay(pokemon, move_name, move_info, item_data)
+        return True
+
 
     def _use_evolution_stone(self, pokemon, item_data):
         """Usa pedra de evolução em um Pokémon"""

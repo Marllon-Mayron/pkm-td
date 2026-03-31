@@ -1,4 +1,5 @@
 # src/data/move_data.py
+
 import json
 import os
 from pathlib import Path
@@ -11,6 +12,7 @@ class MoveData:
     _instance = None
     _moves_data: Dict[int, Dict] = {}  # Dados detalhados dos moves (por ID)
     _pokemon_learnset: Dict[int, List[Dict]] = {}  # ID -> lista de moves aprendidos por nível
+    _pokemon_tm_hm: Dict[int, List[str]] = {}  # ID -> lista de TMs/HMs que o Pokémon pode aprender
 
     def __new__(cls):
         if cls._instance is None:
@@ -24,6 +26,7 @@ class MoveData:
         self._initialized = True
         self._load_moves_data()
         self._load_pokemon_learnset()
+        self._load_pokemon_tm_hm()  # NOVO
 
     def _find_data_path(self, filename: str) -> Optional[Path]:
         """Encontra o caminho do arquivo de dados de forma robusta"""
@@ -51,7 +54,6 @@ class MoveData:
             if moves_path:
                 with open(moves_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    # Converte de ID para dados do move
                     for move_id, move_info in data.get("moves", {}).items():
                         self._moves_data[int(move_id)] = {
                             "name": move_info["name"],
@@ -62,7 +64,7 @@ class MoveData:
                             "category": move_info["damage_class"],
                             "description": move_info["description"],
                             "effect": move_info["effect"],
-                            "effect_chance": move_info.get("effect_chance"),  # NOVO: mapeia effect_chance
+                            "effect_chance": move_info.get("effect_chance"),
                             "is_status": move_info["is_status"],
                             "sound_name": move_info["name"].lower()
                         }
@@ -74,7 +76,7 @@ class MoveData:
             print(f"[MoveData] Erro ao carregar dados de moves: {e}")
 
     def _load_pokemon_learnset(self):
-        """Carrega os learnsets dos Pokémon do JSON"""
+        """Carrega os learnsets (level-up) dos Pokémon do JSON"""
         try:
             learnset_path = self._find_data_path("pokemon_gen1_learnset.json")
             if learnset_path:
@@ -85,7 +87,6 @@ class MoveData:
                         pokemon_id = int(pokemon_id_str)
                         self._pokemon_learnset[pokemon_id] = []
 
-                        # Extrai moves de level up
                         level_up_moves = pokemon_info.get("moves", {}).get("level_up", [])
                         for move in level_up_moves:
                             self._pokemon_learnset[pokemon_id].append({
@@ -94,7 +95,6 @@ class MoveData:
                                 "id": move.get("id", 0)
                             })
 
-                        # Ordena por nível
                         self._pokemon_learnset[pokemon_id].sort(key=lambda x: x["level"])
 
                 print(f"[MoveData] Carregados learnsets para {len(self._pokemon_learnset)} Pokémon")
@@ -104,9 +104,64 @@ class MoveData:
         except Exception as e:
             print(f"[MoveData] Erro ao carregar learnsets: {e}")
 
+    def _load_pokemon_tm_hm(self):
+        """Carrega os TMs/HMs que cada Pokémon pode aprender do JSON"""
+        try:
+            learnset_path = self._find_data_path("pokemon_gen1_learnset.json")
+            if learnset_path:
+                with open(learnset_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                    for pokemon_id_str, pokemon_info in data.get("pokemon", {}).items():
+                        pokemon_id = int(pokemon_id_str)
+                        self._pokemon_tm_hm[pokemon_id] = []
+
+                        tm_hm_moves = pokemon_info.get("moves", {}).get("tm_hm", [])
+                        for move in tm_hm_moves:
+                            move_name = move.get("name", "")
+                            if move_name:
+                                self._pokemon_tm_hm[pokemon_id].append(move_name)
+
+                print(f"[MoveData] Carregados TMs/HMs para {len(self._pokemon_tm_hm)} Pokémon")
+            else:
+                print("[MoveData] AVISO: Arquivo pokemon_gen1_learnset.json não encontrado")
+
+        except Exception as e:
+            print(f"[MoveData] Erro ao carregar TMs/HMs: {e}")
+
     def get_pokemon_learnset(self, pokemon_id: int) -> List[Dict]:
         """Retorna a lista de moves que o Pokémon aprende por level up"""
         return self._pokemon_learnset.get(pokemon_id, [])
+
+    def get_pokemon_tm_hm_moves(self, pokemon_id: int) -> List[str]:
+        """Retorna a lista de TMs/HMs que o Pokémon pode aprender"""
+        return self._pokemon_tm_hm.get(pokemon_id, [])
+
+    def can_learn_move(self, pokemon_id: int, move_name: str) -> bool:
+        """
+        Verifica se um Pokémon pode aprender um move específico
+        (via level up OU via TM/HM)
+
+        Args:
+            pokemon_id: ID do Pokémon
+            move_name: Nome do move a ser verificado
+
+        Returns:
+            bool: True se o Pokémon pode aprender o move
+        """
+        move_name_lower = move_name.lower()
+
+        # Verifica no learnset por level up
+        for move_info in self._pokemon_learnset.get(pokemon_id, []):
+            if move_info.get("move", "").lower() == move_name_lower:
+                return True
+
+        # Verifica nos TMs/HMs
+        for tm_move in self._pokemon_tm_hm.get(pokemon_id, []):
+            if tm_move.lower() == move_name_lower:
+                return True
+
+        return False
 
     def get_moves_at_level(self, pokemon_id: int, level: int) -> List[str]:
         """
@@ -134,7 +189,6 @@ class MoveData:
 
     def get_move_info(self, move_name: str) -> Optional[Dict]:
         """Retorna informações detalhadas de um move"""
-        # Procura pelo nome (case insensitive)
         move_name_lower = move_name.lower()
         for move_id, move_info in self._moves_data.items():
             if move_info["name"].lower() == move_name_lower:
@@ -152,7 +206,6 @@ class MoveData:
                     "sound_name": move_info.get("sound_name", move_name_lower)
                 }
 
-        # Fallback: move não encontrado
         print(f"[MoveData] AVISO: Move '{move_name}' não encontrado, usando dados padrão")
         return {
             "name": move_name,
@@ -192,30 +245,23 @@ class MoveData:
         move_info = self._moves_data.get(move_id)
         return move_info["name"] if move_info else f"move_{move_id}"
 
-    # NOVO: Método para obter o nome do som de um move
     def get_move_sound_name(self, move_name: str) -> str:
-        """
-        Retorna o nome do arquivo de som para um move específico
-
-        Args:
-            move_name: Nome do move
-
-        Returns:
-            str: Nome do arquivo de som (em minúsculo, sem espaços)
-        """
+        """Retorna o nome do arquivo de som para um move específico"""
         move_info = self.get_move_info(move_name)
         if move_info:
             sound_name = move_info.get("sound_name", move_name.lower())
-            # Remove espaços e caracteres especiais para nome de arquivo
             sound_name = sound_name.replace(" ", "").replace("-", "").replace("'", "")
             return sound_name
         return move_name.lower().replace(" ", "").replace("-", "").replace("'", "")
 
     def get_all_move_names(self) -> List[str]:
-        """
-        Retorna uma lista com todos os nomes de moves disponíveis no jogo
-
-        Returns:
-            List[str]: Lista de nomes de moves
-        """
+        """Retorna uma lista com todos os nomes de moves disponíveis"""
         return [move_info["name"] for move_info in self._moves_data.values()]
+
+    def get_all_tm_hm_moves(self) -> List[str]:
+        """Retorna uma lista com todos os nomes de moves que são TMs/HMs"""
+        all_tm_moves = set()
+        for tm_moves in self._pokemon_tm_hm.values():
+            for move in tm_moves:
+                all_tm_moves.add(move)
+        return sorted(list(all_tm_moves))

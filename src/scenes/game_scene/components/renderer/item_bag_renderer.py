@@ -43,6 +43,7 @@ class ItemBagRenderer:
             ("all", "Todos", (150, 150, 150)),
             ("pokeball", "Pokébolas", (255, 100, 100)),
             ("medicine", "Poções", (100, 255, 100)),
+            ("tm", "TMs/HMs", (100, 150, 255)),
             ("items", "Itens", (255, 215, 0))
         ]
         self.categories_per_page = 3

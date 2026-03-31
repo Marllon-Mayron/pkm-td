@@ -286,6 +286,7 @@ class CategorySelector:
             ("all", "Todos"),
             ("pokeball", "Pokeballs"),
             ("medicine", "Medicina"),
+            ("tm", "TMs/HMs"),
             ("items", "Itens"),
         ]
         self.selected = "all"
