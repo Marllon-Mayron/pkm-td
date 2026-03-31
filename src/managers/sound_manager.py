@@ -64,7 +64,6 @@ class SoundManager:
         if shiny_path.exists():
             try:
                 self.effects[SoundEffect.SHINY] = pygame.mixer.Sound(str(shiny_path))
-                print(f"[SOUND] Efeito carregado: Shiny")
             except Exception as e:
                 print(f"[SOUND] Erro ao carregar Shiny.mp3: {e}")
         else:
@@ -75,7 +74,6 @@ class SoundManager:
         if caught_path.exists():
             try:
                 self.effects[SoundEffect.CAUGHT] = pygame.mixer.Sound(str(caught_path))
-                print(f"[SOUND] Efeito carregado: Caught")
             except Exception as e:
                 print(f"[SOUND] Erro ao carregar Caught.mp3: {e}")
         else:
@@ -85,7 +83,6 @@ class SoundManager:
         if click_path.exists():
             try:
                 self.effects[SoundEffect.CLICK] = pygame.mixer.Sound(str(click_path))
-                print(f"[SOUND] Efeito carregado: Click")
             except Exception as e:
                 print(f"[SOUND] Erro ao carregar Click.mp3: {e}")
         else:
@@ -95,7 +92,6 @@ class SoundManager:
         if evolution_path.exists():
             try:
                 self.effects[SoundEffect.EVOLUTION] = pygame.mixer.Sound(str(evolution_path))
-                print(f"[SOUND] Efeito carregado: Evolution")
             except Exception as e:
                 print(f"[SOUND] Erro ao carregar Evolution.mp3: {e}")
         else:

@@ -159,16 +159,22 @@ class Projectile:
                 })
 
     def _apply_damage(self):
-        """Aplica dano ao alvo"""
-        # Aplicar dano ao alvo
+        """Aplica dano ao alvo com efeitos de status"""
+        # Aplica dano
         self.target.take_damage(self.damage, attacker=self.attacker)
 
-        # Registrar contribuição de dano
+        # Aplica efeitos do move após o dano
+        if hasattr(self.attacker, 'battle_system') and self.attacker.battle_system:
+            self.attacker.battle_system._apply_move_effect(self.attacker, self.target,
+                                                           self.attacker.get_current_move(),
+                                                           self.damage)
+
+        # Registra contribuição
         attacker_id = id(self.attacker)
         self.target.damage_contributions[attacker_id] = \
             self.target.damage_contributions.get(attacker_id, 0) + self.damage
 
-        # Toca o som de impacto (do alvo)
+        # Toca som de impacto
         from src.managers.move_sound_manager import move_sound_manager
         move_sound_manager.play_hit_sound(self.move_name)
 
@@ -177,8 +183,6 @@ class Projectile:
             print(f"[BATTLE] {self.move_name} é super efetivo!")
         elif self.effectiveness < 1.0 and self.effectiveness > 0:
             print(f"[BATTLE] {self.move_name} não é muito efetivo...")
-        elif self.effectiveness == 0:
-            print(f"[BATTLE] {self.move_name} não afeta {self.target.name}!")
 
         print(f"[BATTLE] {self.move_name} causou {self.damage} de dano a {self.target.name}!")
 

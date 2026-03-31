@@ -4,10 +4,10 @@ Cena principal do jogo - OTIMIZADA
 """
 import pygame
 
-from core.profiler import profiler
 from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
 from src.config.settings import settings
+from src.core.profiler import profiler
 from src.managers.sound_manager import SoundEffect, sound_manager
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
@@ -139,15 +139,18 @@ class GameScene(BaseScene):
         # Configura battle_system para Pokémon já colocados
         for pokemon in self.placement_manager.placed_pokemon:
             pokemon.set_battle_system(self.battle_system)
+            self.battle_system.set_effect_manager_for_pokemon(pokemon)
 
-        # Configura para inimigos que já possam existir
+            # Configura para inimigos que já possam existir
         for enemy in self.wave_manager.active_enemies:
             enemy.set_battle_system(self.battle_system)
+            self.battle_system.set_effect_manager_for_pokemon(enemy)
 
-        # Configura para Pokémon no time (por precaução)
+            # Configura para Pokémon no time (por precaução)
         for pokemon in self.player.team:
             pokemon.set_battle_system(self.battle_system)
             pokemon.reset_pp()
+            self.battle_system.set_effect_manager_for_pokemon(pokemon)
         if self.wave_manager.has_more_waves():
             self.game_state = "in_wave"
             self.wave_manager.start_all_waves()
@@ -959,6 +962,11 @@ class GameScene(BaseScene):
         profiler.begin_section("TARGET_ITEMS_UPDATE")
         target_mgr.update(dt)
         profiler.end_section()
+
+        if hasattr(self, 'battle_system') and self.battle_system:
+            profiler.begin_section("EFFECT_MANAGER")
+            self.battle_system.effect_manager.update(dt)
+            profiler.end_section()
 
         # Game Over Check
         if target_mgr.game_over:

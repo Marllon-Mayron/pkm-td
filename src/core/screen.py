@@ -87,6 +87,7 @@ class ScreenManager:
 
         return (final_x, final_y), scale
 
+
     def get_render_position(self, world_x, world_y, camera=None):
         """
         Retorna posição para renderização SEM escala

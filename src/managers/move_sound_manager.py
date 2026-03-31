@@ -52,7 +52,7 @@ class MoveSoundManager:
             try:
                 sound = pygame.mixer.Sound(str(sound_file))
                 self._sounds[sound_name] = sound
-                print(f"[MOVE_SOUND] Carregado: {sound_name} -> {sound_file.name}")
+                #print(f"[MOVE_SOUND] Carregado: {sound_name} -> {sound_file.name}")
             except Exception as e:
                 print(f"[MOVE_SOUND] Erro ao carregar {sound_file}: {e}")
 

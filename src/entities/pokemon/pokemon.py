@@ -1,0 +1,778 @@
+# src/entities/pokemon/pokemon.py
+import pygame
+import uuid
+import random
+from typing import List, Dict, Optional
+
+from src.entities.base import Entity
+from src.data.pokedex import Pokedex
+from src.data.move_data import MoveData
+from .animation import PokemonAnimation
+
+from .stats import PokemonStats
+from .movement import PokemonMovement
+from .combat import PokemonCombat
+from .moves import PokemonMoves
+from .evolution import PokemonEvolution
+from .rendering import PokemonRendering
+
+# Cache global de sprites e fontes para reduzir recriação
+_SPRITE_CACHE = {}
+_FONT_CACHE = {}
+
+
+class Pokemon(Entity):
+    # Constantes de classe
+    _MIN_MOVE_SPEED = 0.2
+    _MAX_MOVE_SPEED = 4.5
+    _speed_cache = {}
+
+    def __init__(self, x, y, pokemon_id, level=5, is_wild=False, shiny=False, is_boss=False):
+        # ===== 1. DADOS BÁSICOS =====
+        self.game_scene = None
+        self.battle_system = None
+        self.pokedex = Pokedex()
+        self.unique_id = str(uuid.uuid4())
+        self.pokemon_data = self.pokedex.get_pokemon(pokemon_id)
+
+        if not self.pokemon_data:
+            raise ValueError(f"Pokémon ID {pokemon_id} não encontrado")
+
+        self.id = pokemon_id
+        self.name = self.pokemon_data["name"].capitalize()
+        self.base_level = level
+        self.level = level
+        self.is_shiny = shiny
+        self.is_boss = is_boss
+
+        # ===== 2. STATUS E ATRIBUTOS BASE =====
+        self.is_placed = False
+        self.spot_id = None
+        self.types = self.pokemon_data["types"]
+        self.base_stats = self.pokemon_data["base_stats"]
+
+        # ===== 3. IVs E EVs =====
+        self.ivs = {
+            "hp": random.randint(0, 31),
+            "attack": random.randint(0, 31),
+            "defense": random.randint(0, 31),
+            "special_attack": random.randint(0, 31),
+            "special_defense": random.randint(0, 31),
+            "speed": random.randint(0, 31)
+        }
+
+        self.evs = {
+            "hp": 0, "attack": 0, "defense": 0,
+            "special_attack": 0, "special_defense": 0, "speed": 0
+        }
+
+        # ===== 4. ATRIBUTOS DE STATS (serão preenchidos pelo stats manager) =====
+        self.max_hp = 0
+        self.attack = 0
+        self.defense = 0
+        self.sp_attack = 0
+        self.sp_defense = 0
+        self.speed_stat = 0
+
+        # ===== 5. CRIAR GERENCIADORES (ANTES DE USAR) =====
+        self.stats = PokemonStats(self)
+        self.movement = PokemonMovement(self)
+        self.combat = PokemonCombat(self)
+        self.animation = PokemonAnimation(self)
+        self.moves_manager = PokemonMoves(self)
+        self.evolution = PokemonEvolution(self)
+        self.rendering = PokemonRendering(self)
+        self.camera = None
+
+        # ===== 6. NATUREZA (AGORA COM STATS JÁ CRIADO) =====
+        self.nature_multipliers = self.stats.generate_nature()
+        self.nature = self.nature_multipliers["name"]
+
+        # ===== 7. CALCULAR STATS =====
+        self.stats.calculate_stats()
+
+        # ===== 8. BOSS: AUMENTA LEVEL E RECALCULA =====
+        if is_boss:
+            self.level = self.base_level + 3
+            self.stats.calculate_stats()
+            self.max_hp = int(self.max_hp * 2)
+            self.current_hp = self.max_hp
+            self.defense = int(self.defense * 2)
+            self.sp_defense = int(self.sp_defense * 2)
+            self.defense_value = self._calculate_defense()
+
+        # ===== 9. ESTADO ATUAL =====
+        self.current_hp = self.max_hp
+        self.xp = 0
+        self.xp_to_next = self.stats.calculate_xp_needed()
+
+        # ===== 10. TAMANHO DO SPRITE =====
+        self.map_sprite_size = self.pokedex.get_map_sprite_size(pokemon_id, shiny)
+        width = self.map_sprite_size
+        height = self.map_sprite_size
+
+        # ===== 11. ATRIBUTOS DE ANIMAÇÃO =====
+        self.raw_animations = None
+        self.inmap_animations = {}
+        self.current_animation = "idle"
+        self.is_moving = False
+        self.walk_frame_durations = []
+        self.idle_frame_durations = []
+        self.frame_durations = []
+
+        # ===== 12. CARREGAR SPRITES =====
+        self.animation.load_sprites(pokemon_id, shiny)
+
+        # Pega o primeiro sprite da animação idle como inicial
+        sprite = None
+        if self.inmap_frames and "down" in self.inmap_frames and self.inmap_frames["down"]:
+            sprite = self.inmap_frames["down"][0]
+
+        super().__init__(x, y, width, height, sprite)
+
+        # ===== 13. ATRIBUTOS DE JOGO =====
+        self.is_wild = is_wild
+        self.is_in_team = False
+        self.is_selected = False
+
+        # ===== 14. MOVIMENTO =====
+        self.path = []
+        self.path_index = 0
+        self.move_speed = 2.0
+        self.original_path = None
+        self.path_index_origin = 0
+        self.is_returning_with_item = False
+        if is_wild:
+            self.base_move_speed = self._get_cached_move_speed()
+            self.move_speed = self.base_move_speed
+        else:
+            self.base_move_speed = 2.0
+            self.move_speed = 2.0
+
+        # ===== 15. COMBATE =====
+        self.can_attack = True
+        self.attack_cooldown = 0
+        self.attack_cooldown_max = 60
+        self.target = None
+        self.has_no_pp = False
+
+        # ===== SISTEMA DE CONTRIBUIÇÃO =====
+        self.damage_contributions = {}  # id do atacante -> dano causado
+        self.status_contributions = {}  # id do atacante -> status aplicados
+        self.buff_contributions = {}  # id do atacante -> buffs aplicados em aliados
+        self.last_attacker = None
+        self._contribution_multiplier = 1.0  # Multiplicador para status/buffs
+
+        # Atributos para efeitos
+        self.effect_manager = None
+        self.status_effect = None
+        self.stat_stages = None
+
+        # ===== 16. EFEITOS VISUAIS =====
+        self.hp_bar_width = 48
+        self.hp_bar_height = 5
+        self.miss_timer = 0.0
+
+        # ===== 17. POSIÇÃO E MOVIMENTAÇÃO =====
+        self.last_x = x
+        self.last_y = y
+
+        # ===== 18. ITENS =====
+        self.is_carrying = None
+        self.capture_range = 10
+
+        # ===== 19. ATRIBUTOS DE COMBATE =====
+        self.attack_range = 90
+        self.combat_state = "idle"
+        self.original_spot_x = x
+        self.original_spot_y = y
+
+        # ===== 20. COOLDOWNS =====
+        self.charge_cooldown = 0.0
+        self.charge_cooldown_max = 1.2
+
+        # ===== 21. STATS DE COMBATE =====
+        self.attack_damage = self._calculate_attack_damage()
+        self.defense_value = self._calculate_defense()
+
+        # ===== 22. RASTREAMENTO DE DANO =====
+        self.damage_contributions = {}
+        self.last_attacker = None
+
+        # ===== 23. SCREEN MANAGER =====
+        self.screen_manager = None
+
+        # ===== 24. DEBUG =====
+        self.show_debug = False
+
+        # ===== 25. MOVES =====
+        self.move_data = MoveData()
+        self.moves: List = []
+        self.current_move_index = 0
+        self.moves_manager.initialize_moves()
+
+    # ===== MÉTODOS DE DELEGAÇÃO (mantém compatibilidade) =====
+
+    def _calculate_stats(self):
+        self.stats.calculate_stats()
+
+    def _calculate_xp_needed(self) -> int:
+        return self.stats.calculate_xp_needed()
+
+    def _generate_nature(self):
+        return self.stats.generate_nature()
+
+    def _calculate_attack_damage(self) -> float:
+        return self.stats.calculate_attack_damage()
+
+    def _calculate_defense(self) -> float:
+        return self.stats.calculate_defense()
+
+    def _calculate_wild_move_speed(self) -> float:
+        return self.stats.calculate_wild_move_speed()
+
+    def _get_cached_move_speed(self):
+        return self.stats.get_cached_move_speed()
+
+    def update_move_speed_from_effects(self):
+        self.movement.update_move_speed_from_effects()
+
+    def _update_movement(self, dt, items=None):
+        self.movement.update_movement(dt, items)
+
+    def _check_item_capture(self, items):
+        self.movement.check_item_capture(items)
+
+    def find_nearest_enemy(self, enemies):
+        return self.combat.find_nearest_enemy(enemies)
+
+    def _handle_idle_state(self, dt, enemies):
+        self.combat.handle_idle_state(dt, enemies)
+
+    def _handle_charging_state(self, dt):
+        self.combat.handle_charging_state(dt)
+
+    def _handle_returning_state(self, dt):
+        self.combat.handle_returning_state(dt)
+
+    def _perform_charge_attack(self, target):
+        self.combat.perform_charge_attack(target)
+
+    def _show_miss_on_self(self):
+        self.combat.show_miss_on_self()
+
+    def take_damage(self, damage, attacker=None):
+        """Recebe dano e registra contribuição - delega para combat"""
+        # Registra a contribuição ANTES de delegar
+        if attacker and self.is_wild:
+            self.register_damage(attacker, min(damage, self.current_hp))
+            self.last_attacker = attacker
+
+        # Delega o processamento do dano para o combat
+        return self.combat.take_damage(damage, attacker)
+
+    def register_damage(self, attacker, damage):
+        """Registra dano causado por um atacante"""
+        attacker_id = id(attacker)
+        self.damage_contributions[attacker_id] = self.damage_contributions.get(attacker_id, 0) + damage
+
+    def register_status_application(self, attacker, status_name):
+        """Registra aplicação de um status (veneno, queimadura, etc)"""
+        attacker_id = id(attacker)
+        self.status_contributions[attacker_id] = self.status_contributions.get(attacker_id, 0) + 1
+        print(f"[XP] {attacker.name} aplicou {status_name} em {self.name}")
+
+    def register_stat_modifier(self, attacker, stat_name, stages):
+        """Registra aplicação de modificador de stat (buff/debuff)"""
+        attacker_id = id(attacker)
+        # Quanto maior o estágio, maior a contribuição
+        contribution_value = abs(stages) * 0.5
+        self.status_contributions[attacker_id] = self.status_contributions.get(attacker_id, 0) + contribution_value
+        print(
+            f"[XP] {attacker.name} aplicou {stat_name} {stages:+d} em {self.name} (contribuição: {contribution_value})")
+
+    def register_buff_on_ally(self, attacker, ally, stat_name, stages):
+        """Registra buff aplicado em aliado"""
+        # Os buffs são registrados no alvo? Ou no atacante?
+        # Vamos registrar no atacante para que ele ganhe XP por ajudar aliados
+        attacker_id = id(attacker)
+        contribution_value = abs(stages) * 0.3  # Buffs valem um pouco menos que debuffs
+        self.buff_contributions[attacker_id] = self.buff_contributions.get(attacker_id, 0) + contribution_value
+        print(
+            f"[XP] {attacker.name} buffou {ally.name} com {stat_name} {stages:+d} (contribuição: {contribution_value})")
+
+    def get_total_contribution(self) -> float:
+        """Retorna o total de contribuição (dano + status + buffs)"""
+        total_damage = sum(self.damage_contributions.values())
+        total_status = sum(self.status_contributions.values())
+        total_buffs = sum(self.buff_contributions.values())
+        return total_damage + total_status + total_buffs
+
+    def get_xp_contributors(self):
+        """Retorna lista de contribuidores com pontuação combinada"""
+        contributors = {}
+
+        # Soma dano, status e buffs para cada atacante
+        for attacker_id, damage in self.damage_contributions.items():
+            contributors[attacker_id] = contributors.get(attacker_id, 0) + damage
+
+        for attacker_id, status_value in self.status_contributions.items():
+            # Status vale como se fosse dano (convertido)
+            contributors[attacker_id] = contributors.get(attacker_id,
+                                                         0) + status_value * 15  # Cada status vale ~15 de dano
+
+        for attacker_id, buff_value in self.buff_contributions.items():
+            # Buffs valem como se fosse dano
+            contributors[attacker_id] = contributors.get(attacker_id, 0) + buff_value * 20  # Cada buff vale ~20 de dano
+
+        # Se não houver contribuições, mas tem last_attacker, dá crédito mínimo
+        if not contributors and self.last_attacker:
+            return [(id(self.last_attacker), 1)]
+
+        return [(attacker_id, contribution) for attacker_id, contribution in contributors.items()]
+
+    def clear_damage_tracking(self):
+        """Limpa todo o rastreamento de contribuições"""
+        self.damage_contributions.clear()
+        self.status_contributions.clear()
+        self.buff_contributions.clear()
+        self.last_attacker = None
+
+    def _load_sprites(self, pokemon_id, shiny):
+        self.animation.load_sprites(pokemon_id, shiny)
+
+    def _load_animation_timings(self):
+        self.animation._load_animation_timings()
+
+    def _update_current_durations(self):
+        self.animation._update_current_durations()
+
+    def set_animation(self, animation_name: str):
+        self.animation.set_animation(animation_name)
+
+    def _update_sprite_from_current_animation(self):
+        self.animation._update_sprite_from_current_animation()
+
+    def _get_current_animation_frame_count(self) -> int:
+        return self.animation._get_current_animation_frame_count()
+
+    def _is_moving(self) -> bool:
+        return self.animation._is_moving()
+
+    def _update_animation(self, dt):
+        self.animation.update_animation(dt)
+
+    def get_current_move(self):
+        return self.moves_manager.get_current_move()
+
+    def _initialize_moves(self):
+        self.moves_manager.initialize_moves()
+
+    def learn_move(self, move_name: str) -> bool:
+        return self.moves_manager.learn_move(move_name)
+
+    def forget_move(self, index: int) -> bool:
+        return self.moves_manager.forget_move(index)
+
+    def replace_move(self, index: int, new_move_name: str) -> bool:
+        return self.moves_manager.replace_move(index, new_move_name)
+
+    def get_available_moves(self) -> List[str]:
+        return self.moves_manager.get_available_moves()
+
+    def get_new_moves_at_level(self, level: int) -> List[str]:
+        return self.moves_manager.get_new_moves_at_level(level)
+
+    def check_new_moves_on_level_up(self, old_level: int):
+        return self.moves_manager.check_new_moves_on_level_up(old_level)
+
+    def _learn_move_without_replacement(self, move_name: str) -> bool:
+        return self.moves_manager._learn_move_without_replacement(move_name)
+
+    def learn_move_with_selection(self, move_name: str, slot_index: int) -> bool:
+        return self.moves_manager.learn_move_with_selection(move_name, slot_index)
+
+    def check_and_evolve(self):
+        return self.evolution.check_and_evolve()
+
+    def _perform_evolution(self, new_id):
+        self.evolution._perform_evolution(new_id)
+
+    def gain_xp(self, amount):
+        return self.evolution.gain_xp(amount)
+
+    def level_up(self):
+        return self.evolution.level_up()
+
+    def _get_font(self, size):
+        return self.rendering.get_font(size)
+
+    def _prepare_sprite(self, zoom_scale):
+        return self.rendering.prepare_sprite(zoom_scale)
+
+    def _render_sprite(self, screen, sprite, screen_x, screen_y, zoom_scale):
+        return self.rendering.render_sprite(screen, sprite, screen_x, screen_y, zoom_scale)
+
+    def _render_hp_bar(self, screen, sprite_rect, zoom_scale):
+        """Renderiza barra de HP - offset relativo ao tamanho do sprite"""
+        hp_percent = self.current_hp / self.max_hp
+
+        # Tamanho da barra em pixels do mundo
+        bar_width = self.hp_bar_width
+        bar_height = self.hp_bar_height
+
+        # ===== POSICIONAMENTO RELATIVO AO TAMANHO DO SPRITE =====
+        # Calcula a altura do sprite na tela
+        sprite_height = sprite_rect.height
+
+        # Offset relativo: 10% da altura do sprite acima do topo
+        # Isso mantém a proporção independente do zoom
+        relative_offset = -sprite_height * 0.35  # 15% da altura do sprite acima
+
+        # Escala para a tela
+        if hasattr(self, 'screen_manager') and hasattr(self, 'camera'):
+            render_scale = self.screen_manager.render_scale
+            camera_zoom = self.camera.zoom if self.camera else 1.0
+            total_scale = render_scale * camera_zoom
+
+            # Tamanho da barra na tela
+            screen_bar_width = int(bar_width * total_scale)
+            screen_bar_height = max(3, int(bar_height * total_scale))
+
+            # Posição da barra (centralizada horizontalmente, com offset relativo)
+            bar_x = sprite_rect.centerx - screen_bar_width // 2
+            bar_y = sprite_rect.top + relative_offset
+
+        else:
+            screen_bar_width = int(bar_width * zoom_scale)
+            screen_bar_height = max(3, int(bar_height * zoom_scale))
+            bar_x = sprite_rect.centerx - screen_bar_width // 2
+            bar_y = sprite_rect.top + relative_offset
+
+        # Fundo da barra
+        pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, screen_bar_width, screen_bar_height))
+
+        # Cor da barra
+        if self.is_boss:
+            color = (0, 0, 255)
+        else:
+            if not self.is_shiny:
+                if hp_percent > 0.5:
+                    color = (0, 200, 0)
+                elif hp_percent > 0.25:
+                    color = (255, 255, 0)
+                else:
+                    color = (255, 0, 0)
+            else:
+                color = (255, 0, 0)
+
+        progress_width = int(screen_bar_width * hp_percent)
+        if progress_width > 0:
+            pygame.draw.rect(screen, color, (bar_x, bar_y, progress_width, screen_bar_height))
+
+        # Borda da barra
+        pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, screen_bar_width, screen_bar_height), 1)
+
+    def _render_wild_text(self, screen, sprite_rect, zoom_scale):
+        """Renderiza nome e nível do Pokémon - offset relativo ao tamanho do sprite"""
+        # Tamanhos de fonte base
+        base_name_font_size = 12
+        base_level_font_size = 11
+
+        # Calcula escala total
+        if hasattr(self, 'screen_manager') and hasattr(self, 'camera'):
+            render_scale = self.screen_manager.render_scale
+            camera_zoom = self.camera.zoom if self.camera else 1.0
+            total_scale = render_scale * camera_zoom
+
+            name_font_size = max(10, int(base_name_font_size * total_scale))
+            level_font_size = max(9, int(base_level_font_size * total_scale))
+        else:
+            name_font_size = max(10, int(base_name_font_size * zoom_scale))
+            level_font_size = max(9, int(base_level_font_size * zoom_scale))
+
+        name_font = self._get_font(name_font_size)
+        level_font = self._get_font(level_font_size)
+
+        name_text = f"{self.name} - "
+        level_text = f"lv. {self.level:02d}"
+
+        text_color = (255, 255, 255)
+        outline_color = (0, 0, 0)
+
+        if self.is_shiny:
+            level_color = (255, 215, 0)
+        elif self.is_boss:
+            level_color = (255, 100, 100)
+            text_color = (255, 100, 100)
+        else:
+            level_color = (255, 255, 255)
+
+        name_surface = name_font.render(name_text, True, text_color)
+        level_surface = level_font.render(level_text, True, level_color)
+        name_outline = name_font.render(name_text, True, outline_color)
+        level_outline = level_font.render(level_text, True, outline_color)
+
+        name_width = name_surface.get_width()
+        level_width = level_surface.get_width()
+        total_width = name_width + 2 + level_width
+
+        # ===== POSICIONAMENTO RELATIVO AO TAMANHO DO SPRITE =====
+        sprite_height = sprite_rect.height
+
+        # Offset relativo: 30% da altura do sprite acima do topo (abaixo da barra)
+        # A barra está em -15% do topo, então o nome fica em -30%
+        relative_offset = -sprite_height * 0.65 # 80% da altura do sprite acima
+
+        # Posição na tela
+        screen_x = sprite_rect.centerx
+        screen_y = sprite_rect.top + relative_offset
+
+        start_x = int(screen_x - total_width // 2)
+        text_y = int(screen_y)
+
+        name_x, name_y = start_x, text_y
+        level_x = start_x + name_width + 2
+        level_y = text_y + (name_font_size - level_font_size)
+
+        # Desenha contorno
+        for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+            screen.blit(name_outline, (name_x + dx, name_y + dy))
+            screen.blit(level_outline, (level_x + dx, level_y + dy))
+
+        # Desenha texto principal
+        screen.blit(name_surface, (name_x, name_y))
+        screen.blit(level_surface, (level_x, level_y))
+
+    def _render_miss_text(self, screen, sprite_rect, zoom_scale):
+        self.rendering.render_miss_text(screen, sprite_rect, zoom_scale)
+
+    def _render_placeholder(self, screen, screen_x, screen_y, zoom_scale):
+        return self.rendering.render_placeholder(screen, screen_x, screen_y, zoom_scale)
+
+    # ===== MÉTODOS QUE PERMANECEM NA CLASSE PRINCIPAL =====
+
+    def set_battle_system(self, battle_system):
+        """Define o sistema de combate para este Pokémon"""
+        self.battle_system = battle_system
+
+    def heal(self, amount=None):
+        if amount is None:
+            self.current_hp = self.max_hp
+        else:
+            self.current_hp = min(self.max_hp, self.current_hp + amount)
+
+    def is_boss_type(self):
+        return hasattr(self, 'is_boss') and self.is_boss
+
+    def is_alive(self):
+        return self.current_hp > 0
+
+    def get_hp_percentage(self):
+        return self.current_hp / self.max_hp
+
+    def drop_item(self):
+        if self.is_carrying:
+            self.is_carrying.reset_capture()
+            self.is_carrying = None
+
+    def calculate_damage(self, target):
+        damage = max(1, int((self.attack * self.level) / (target.defense * 2) + 2))
+        return int(damage * random.uniform(0.85, 1.0))
+
+    def clear_carrying(self):
+        if self.is_carrying:
+            self.is_carrying = None
+
+    def get_info_string(self):
+        return (f"{self.name} Lv.{self.level}\n"
+                f"HP: {self.current_hp}/{self.max_hp}\n"
+                f"Tipos: {'/'.join(self.types)}\n"
+                f"Natureza: {self.nature}")
+
+    def restore_pp(self, percentage: float = 1.0) -> int:
+        """Restaura PP de TODOS os moves do Pokémon."""
+        restored_count = 0
+        for move in self.moves:
+            pp_to_restore = int(move.max_pp * percentage)
+            old_pp = move.current_pp
+            move.current_pp = min(move.max_pp, move.current_pp + pp_to_restore)
+            restored_count += move.current_pp - old_pp
+
+        if restored_count > 0:
+            print(f"[PP_RESTORE] {self.name}: {restored_count} PP restaurados "
+                  f"({int(percentage * 100)}% de cada move)")
+
+        return restored_count
+
+    def reset_pp(self) -> int:
+        """Reseta os PP de todos os moves para o máximo (100%)"""
+        return self.restore_pp(percentage=1.0)
+
+    def restore_moves(self, moves_data: list):
+        """Restaura moves a partir de dados serializados"""
+        from src.data.move_data import MoveData
+        from src.entities.move import Move
+
+        move_data = MoveData()
+        self.moves = []
+
+        for move_dict in moves_data:
+            move_info = move_data.get_move_info(move_dict["name"])
+            if move_info is None:
+                move_info = {
+                    "type": "normal",
+                    "power": 40,
+                    "accuracy": 100,
+                    "pp": move_dict.get("max_pp", 35),
+                    "category": "physical",
+                    "description": f"Usa {move_dict['name']}."
+                }
+
+            move = Move(move_dict["name"], move_info)
+            move.current_pp = move_dict.get("current_pp", move.max_pp)
+            move.max_pp = move_dict.get("max_pp", move.max_pp)
+            self.moves.append(move)
+
+        print(f"[LOAD] {self.name} restaurado com {len(self.moves)} moves")
+
+    def update(self, dt, player=None, enemies=None, items=None):
+        """Update do Pokémon - versão compatível com WaveManager"""
+        # Atualiza velocidade baseada nos efeitos
+        if hasattr(self, 'effect_manager') and self.effect_manager and self.is_wild:
+            # Log antes de atualizar
+            old_speed = self.move_speed
+            self.update_move_speed_from_effects()
+            if old_speed != self.move_speed:
+                print(f"[POKEMON_UPDATE] {self.name} velocidade mudou: {old_speed:.2f} -> {self.move_speed:.2f}")
+
+        self.last_x = self.x
+        self.last_y = self.y
+
+        if hasattr(self, 'miss_timer') and self.miss_timer > 0:
+            self.miss_timer -= dt
+            if self.miss_timer < 0:
+                self.miss_timer = 0
+
+        if not self.can_attack:
+            self.attack_cooldown -= 1
+            if self.attack_cooldown <= 0:
+                self.can_attack = True
+
+        is_wave_controlled = hasattr(self, 'path_index_origin') and self.is_wild
+        if self.is_boss:
+            is_wave_controlled = True
+
+        if not is_wave_controlled:
+            self._update_movement(dt, items)
+
+        if self.is_wild and not is_wave_controlled and items is not None and not self.is_carrying:
+            self._check_item_capture(items)
+
+        if self.is_carrying:
+            self.is_carrying.update_capture(dt)
+
+        self._update_animation(dt)
+
+    def update_combat(self, dt, enemies):
+        """Atualiza lógica de combate com efeitos de status"""
+        if hasattr(self, 'battle_system') and self.battle_system and self.battle_system.effect_manager:
+            pass
+
+        if self.charge_cooldown > 0:
+            self.charge_cooldown -= dt
+
+        if self.target and not self.target.is_alive():
+            self.target = None
+            self.combat_state = "returning"
+            return
+
+        if self.combat_state == "idle":
+            self._handle_idle_state(dt, enemies)
+        elif self.combat_state == "charging":
+            self._handle_charging_state(dt)
+        elif self.combat_state == "returning":
+            self._handle_returning_state(dt)
+
+    def get_distance_to(self, entity):
+        return self.movement.get_distance_to(entity)
+
+    def render(self, screen, camera=None, show_hp=True):
+        """Renderiza o Pokémon com todos os elementos visuais ajustados"""
+
+        self.camera = camera
+
+        if camera and hasattr(self, 'screen_manager') and self.screen_manager:
+            screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
+            zoom_scale = camera.zoom * self.screen_manager.render_scale
+        else:
+            screen_x = self.x
+            screen_y = self.y
+            zoom_scale = 1.0
+
+        sprite_to_render = self._prepare_sprite(zoom_scale)
+
+        sprite_rect = None
+        if sprite_to_render:
+            sprite_rect = self._render_sprite(screen, sprite_to_render, screen_x, screen_y, zoom_scale)
+        else:
+            sprite_rect = self._render_placeholder(screen, screen_x, screen_y, zoom_scale)
+
+        if hasattr(self, 'battle_system') and self.battle_system and self.battle_system.effect_manager:
+            self.battle_system.effect_manager.render_status_texts(
+                screen, self, sprite_rect, zoom_scale, _FONT_CACHE
+            )
+            self.battle_system.effect_manager.render_stat_modifiers(
+                screen, self, sprite_rect, zoom_scale, _FONT_CACHE
+            )
+
+        if sprite_rect:
+            if self.is_wild:
+                self._render_wild_text(screen, sprite_rect, zoom_scale)
+            if show_hp:
+                self._render_hp_bar(screen, sprite_rect, zoom_scale)
+            if hasattr(self, 'miss_timer') and self.miss_timer > 0:
+                self._render_miss_text(screen, sprite_rect, zoom_scale)
+
+        if hasattr(self, 'show_debug') and self.show_debug and sprite_rect:
+            self._render_debug(screen, screen_x, screen_y, zoom_scale, sprite_rect)
+
+    def render_hp_enemy(self, screen, camera=None):
+        """Método de compatibilidade para chamar o _render_hp_bar"""
+        if camera and hasattr(self, 'screen_manager') and self.screen_manager:
+            screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
+            zoom_scale = camera.zoom * self.screen_manager.render_scale
+
+            sprite_to_render = self._prepare_sprite(zoom_scale)
+            if sprite_to_render:
+                current_width, current_height = sprite_to_render.get_width(), sprite_to_render.get_height()
+                final_width = max(1, int(current_width * zoom_scale))
+                final_height = max(1, int(current_height * zoom_scale))
+
+                if final_width != current_width or final_height != current_height:
+                    scaled_sprite = pygame.transform.scale(sprite_to_render, (final_width, final_height))
+                else:
+                    scaled_sprite = sprite_to_render
+
+                sprite_rect = scaled_sprite.get_rect()
+                sprite_rect.center = (int(screen_x), int(screen_y))
+
+                self._render_hp_bar(screen, sprite_rect, zoom_scale)
+        else:
+            temp_rect = pygame.Rect(0, 0, self.map_sprite_size, self.map_sprite_size)
+            temp_rect.center = (int(self.x), int(self.y))
+            self._render_hp_bar(screen, temp_rect, 1.0)
+
+    def _render_debug(self, screen, screen_x, screen_y, zoom_scale, sprite_rect):
+        """Renderiza informações de debug"""
+        pygame.draw.circle(screen, (255, 0, 0), (sprite_rect.centerx, sprite_rect.centery), 6, 2)
+        pygame.draw.rect(screen, (255, 0, 255), sprite_rect, 1)
+
+        font = self._get_font(10)
+        debug_text = f"{self.current_animation} f{self.current_frame} dir:{self.current_direction}"
+        text_surf = font.render(debug_text, True, (255, 255, 255))
+        screen.blit(text_surf, (sprite_rect.left, sprite_rect.top - 25))
+
+        coord_text = f"({self.x:.0f}, {self.y:.0f})"
+        coord_surf = font.render(coord_text, True, (200, 200, 200))
+        screen.blit(coord_surf, (sprite_rect.left, sprite_rect.bottom + 5))

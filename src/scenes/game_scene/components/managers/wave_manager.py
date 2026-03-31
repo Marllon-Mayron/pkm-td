@@ -746,7 +746,8 @@ class GameWaveManager:
         pokemon.screen_manager = self.game_scene.screen_manager if self.game_scene else None
         if self.game_scene and hasattr(self.game_scene, 'battle_system'):
             pokemon.set_battle_system(self.game_scene.battle_system)
-
+            self.game_scene.battle_system.set_effect_manager_for_pokemon(pokemon)
+            print(f"[WAVE] {pokemon.name} vinculado ao effect_manager: {pokemon.effect_manager is not None}")
         # Configura velocidade
         pokemon.move_speed = pokemon.base_move_speed * wave_data.speed_multiplier
 
@@ -865,7 +866,7 @@ class GameWaveManager:
             enemy.clear_damage_tracking()
 
     def _distribute_xp(self, defeated_enemy: Pokemon):
-        """Distribui XP quando um inimigo é derrotado"""
+        """Distribui XP quando um inimigo é derrotado - com suporte para status e buffs"""
         contributors = defeated_enemy.get_xp_contributors()
         if not contributors:
             print(f"[XP] Nenhum contribuidor registrado para {defeated_enemy.name}")
@@ -878,9 +879,10 @@ class GameWaveManager:
             base_xp = int(base_xp * 1.5)
             print(f"[XP] Bônus shiny! +50% XP")
 
-        total_damage = sum(damage for _, damage in contributors)
-        if total_damage <= 0:
-            return
+        total_contribution = defeated_enemy.get_total_contribution()
+        if total_contribution <= 0:
+            # Se não houver contribuição (algo errado), dá XP igual para todos os atacantes registrados
+            total_contribution = len(contributors)
 
         placement_manager = None
         if self.game_scene and hasattr(self.game_scene, 'placement_manager'):
@@ -889,15 +891,17 @@ class GameWaveManager:
         if not placement_manager:
             return
 
-        print(f"[XP] {defeated_enemy.name} Lv.{defeated_enemy.level} derrotado! XP base: {base_xp}")
-        print(f"[XP] Contribuidores: {[(id(p), d) for p, d in contributors]}")
+        print(f"[XP] {defeated_enemy.name} Lv.{defeated_enemy.level} derrotado!")
+        print(f"[XP] XP base: {base_xp}")
+        print(f"[XP] Contribuição total: {total_contribution:.1f}")
+        print(f"[XP] Contribuidores: {[(id(p), c) for p, c in contributors]}")
 
-        for attacker_id, damage in contributors:
-            proportion = damage / total_damage
+        for attacker_id, contribution in contributors:
+            proportion = contribution / total_contribution
             xp_gained = int(base_xp * proportion)
 
             # Garante XP mínimo de 1 para quem contribuiu
-            if xp_gained < 1 and damage > 0:
+            if xp_gained < 1 and contribution > 0:
                 xp_gained = 1
 
             # Encontra o Pokémon pelo ID
@@ -905,9 +909,18 @@ class GameWaveManager:
                 if id(pokemon) == attacker_id and pokemon.is_alive():
                     old_level = pokemon.level
                     pokemon.gain_xp(xp_gained)
-                    print(f"[XP] {pokemon.name} ganhou {xp_gained} XP (dano: {damage}/{total_damage})")
 
-                    # Log de level up
+                    # Log detalhado
+                    contribution_type = []
+                    if attacker_id in defeated_enemy.damage_contributions:
+                        contribution_type.append(f"dano:{defeated_enemy.damage_contributions[attacker_id]}")
+                    if attacker_id in defeated_enemy.status_contributions:
+                        contribution_type.append(f"status:{defeated_enemy.status_contributions[attacker_id]:.1f}")
+                    if attacker_id in defeated_enemy.buff_contributions:
+                        contribution_type.append(f"buff:{defeaten_enemy.buff_contributions[attacker_id]:.1f}")
+
+                    print(f"[XP] {pokemon.name} ganhou {xp_gained} XP ({', '.join(contribution_type)})")
+
                     if pokemon.level > old_level:
                         print(f"[XP] {pokemon.name} subiu para Lv.{pokemon.level}!")
 

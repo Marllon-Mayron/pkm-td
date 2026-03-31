@@ -33,8 +33,7 @@ class RenderContext:
 
     def world_to_screen(self, world_x, world_y, camera, screen_manager):
         """
-        Converte coordenadas do mundo para tela - SEM GAPS
-        Usa precisão de ponto flutuante até o final
+        Converte coordenadas do mundo para tela - COM PRECISÃO
         """
         if camera:
             zoom = camera.zoom
@@ -58,7 +57,6 @@ class RenderContext:
         screen_x = render_x * screen_manager.render_scale + screen_manager.viewport_x
         screen_y = render_y * screen_manager.render_scale + screen_manager.viewport_y
 
-        # Retorna como float para uso em blit (pygame aceita float)
         return (screen_x, screen_y)
 
     def world_to_screen_int(self, world_x, world_y, camera, screen_manager):

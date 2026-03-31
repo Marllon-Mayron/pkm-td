@@ -1,0 +1,66 @@
+# src/entities/pokemon/movement.py
+import math
+from typing import Tuple, List, Optional
+
+
+class PokemonMovement:
+    """Gerencia movimento e path do Pokémon"""
+
+    def __init__(self, pokemon):
+        self.pokemon = pokemon
+
+    def update_move_speed_from_effects(self):
+        """Atualiza a velocidade de movimento baseada nos efeitos atuais"""
+        if not self.pokemon.is_wild:
+            return
+
+        new_speed = self.pokemon.stats.calculate_wild_move_speed()
+        self.pokemon.move_speed = new_speed
+        print(f"[SPEED] {self.pokemon.name} velocidade atualizada: {self.pokemon.move_speed:.2f}")
+
+    def update_movement(self, dt, items=None):
+        """Movimento via path (para aliados ou inimigos sem wave control)"""
+        if not self.pokemon.path or len(self.pokemon.path) == 0 or self.pokemon.path_index >= len(self.pokemon.path):
+            return
+
+        target_x, target_y = self.pokemon.path[self.pokemon.path_index]
+        dx = target_x - self.pokemon.x
+        dy = target_y - self.pokemon.y
+        distance_sq = dx * dx + dy * dy
+        move_distance = self.pokemon.move_speed * dt * 60
+
+        if distance_sq <= move_distance * move_distance:
+            self.pokemon.x, self.pokemon.y = target_x, target_y
+            self.pokemon.path_index += 1
+            if self.pokemon.path_index >= len(self.pokemon.path):
+                self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
+                return
+        else:
+            distance = math.sqrt(distance_sq)
+            move_x = (dx / distance) * move_distance
+            move_y = (dy / distance) * move_distance
+            self.pokemon.x += move_x
+            self.pokemon.y += move_y
+
+            # Atualiza direção baseado no movimento
+            if abs(dx) > abs(dy):
+                self.pokemon.current_direction = "right" if dx > 0 else "left"
+            else:
+                self.pokemon.current_direction = "down" if dy > 0 else "up"
+
+        self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
+
+    def check_item_capture(self, items):
+        """Verifica captura de item (apenas para Pokémon sem wave control)"""
+        for item in items:
+            if hasattr(item, 'is_protected') and item.is_protected and not item.carried_by:
+                dx = self.pokemon.x - item.x
+                dy = self.pokemon.y - item.y
+                if dx * dx + dy * dy < self.pokemon.capture_range * self.pokemon.capture_range:
+                    item.start_capture(self.pokemon)
+                    break
+
+    def get_distance_to(self, entity) -> float:
+        dx = self.pokemon.x - entity.x
+        dy = self.pokemon.y - entity.y
+        return math.sqrt(dx * dx + dy * dy)
