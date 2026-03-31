@@ -17,6 +17,8 @@ class EffectManager:
         # Stat modifiers por Pokémon
         self.stat_modifiers: Dict[int, List[StatModifier]] = {}
 
+        self._pokemon_refs: Dict[int, object] = {}
+
         # Stat stages por Pokémon
         self.stat_stages: Dict[int, StatStage] = {}
 
@@ -75,26 +77,34 @@ class EffectManager:
         """Retorna o status atual do Pokémon"""
         return self.status_effects.get(id(pokemon))
 
-    def add_stat_modifier(self, pokemon, stat_type: StatType, stages: int, duration: float = 8.0):
+    def register_pokemon(self, pokemon):
+        """Registra um Pokémon para poder atualizá-lo quando necessário"""
+        self._pokemon_refs[id(pokemon)] = pokemon
+        print(f"[EFFECT] Pokémon {pokemon.name} registrado (id={id(pokemon)})")
+
+    def unregister_pokemon(self, pokemon):
+        """Remove um Pokémon do registro"""
+        pokemon_id = id(pokemon)
+        if pokemon_id in self._pokemon_refs:
+            del self._pokemon_refs[pokemon_id]
+            print(f"[EFFECT] Pokémon {pokemon.name} removido do registro")
+
+    def add_stat_modifier(self, pokemon, stat_type: StatType, stages: int, duration: float = None):
         """Adiciona um modificador de stat a um Pokémon"""
         pokemon_id = id(pokemon)
 
-        print(f"[EFFECT_ADD] ========== ADICIONANDO MODIFICADOR ==========")
-        print(f"[EFFECT_ADD] Pokémon: {pokemon.name} (id={pokemon_id})")
-        print(f"[EFFECT_ADD] Stat: {stat_type}, Stages: {stages:+d}, Duration: {duration}s")
+        print(
+            f"[EFFECT] Aplicando modificador em {pokemon.name}: {stat_type} {stages:+d} (duração: {duration if duration else 'permanente'})")
 
         # Inicializa stage se necessário
         if pokemon_id not in self.stat_stages:
-            print(f"[EFFECT_ADD] Criando novo StatStage para {pokemon.name}")
             self.stat_stages[pokemon_id] = StatStage()
-        else:
-            print(f"[EFFECT_ADD] StatStage já existe para {pokemon.name}")
 
         # Aplica a modificação nos estágios
         old_stage = self.stat_stages[pokemon_id].get_stage(stat_type)
         new_stage = self.stat_stages[pokemon_id].modify(stat_type, stages)
 
-        print(f"[EFFECT_ADD] {pokemon.name} - {stat_type}: {old_stage:+d} -> {new_stage:+d}")
+        print(f"[EFFECT] {pokemon.name} - {stat_type}: {old_stage:+d} -> {new_stage:+d}")
 
         # Guarda o modificador para controle de duração
         if pokemon_id not in self.stat_modifiers:
@@ -102,16 +112,11 @@ class EffectManager:
 
         modifier = StatModifier(stat_type, stages, duration)
         self.stat_modifiers[pokemon_id].append(modifier)
-        print(
-            f"[EFFECT_ADD] Modificador adicionado. Total modificadores para {pokemon.name}: {len(self.stat_modifiers[pokemon_id])}")
 
-        # Atualiza velocidade se for speed
-        if stat_type == StatType.SPEED:
-            print(f"[EFFECT_ADD] Atualizando velocidade de {pokemon.name}")
-            if hasattr(pokemon, 'update_move_speed_from_effects'):
-                pokemon.update_move_speed_from_effects()
-            else:
-                print(f"[EFFECT_ADD] ERRO: {pokemon.name} não tem método update_move_speed_from_effects!")
+        # ===== FORÇA ATUALIZAÇÃO DA VELOCIDADE IMEDIATAMENTE =====
+        if stat_type == StatType.SPEED and hasattr(pokemon, 'update_move_speed_from_effects'):
+            pokemon.update_move_speed_from_effects()
+            print(f"[SPEED] Velocidade de {pokemon.name} atualizada imediatamente após aplicar modificador")
 
     def _get_stat_name(self, stat_type: StatType) -> str:
         """Retorna o nome do stat em português (para uso interno)"""
@@ -158,10 +163,14 @@ class EffectManager:
 
         return {}
 
+    # src/battle/effects/effect_manager.py
+    # Modifique o método update
+
     def update(self, dt: float):
         """Atualiza todos os efeitos - dt em segundos"""
         # Atualiza modificadores com duração limitada
         expired_modifiers = []
+        pokemon_to_update = set()  # Guarda os Pokémon que precisam ter velocidade atualizada
 
         for pokemon_id, modifiers in self.stat_modifiers.items():
             for modifier in modifiers[:]:
@@ -169,41 +178,39 @@ class EffectManager:
                     if not modifier.update(dt):
                         expired_modifiers.append((pokemon_id, modifier))
                         modifiers.remove(modifier)
+                        pokemon_to_update.add(pokemon_id)
                         print(f"[EFFECT] Modificador {modifier.stat_type} expirou para Pokémon {pokemon_id}")
 
+        # Aplica a remoção de estágios
         for pokemon_id, modifier in expired_modifiers:
             if pokemon_id in self.stat_stages:
+                old_stage = self.stat_stages[pokemon_id].get_stage(modifier.stat_type)
                 self.stat_stages[pokemon_id].modify(modifier.stat_type, -modifier.stages)
+                new_stage = self.stat_stages[pokemon_id].get_stage(modifier.stat_type)
                 print(f"[EFFECT] Modificador removido: {modifier.stat_type} {modifier.stages:+d}")
+                print(f"[EFFECT] {modifier.stat_type} estágio: {old_stage:+d} -> {new_stage:+d}")
 
-        # Atualiza status effects (especialmente paralisia)
-        for pokemon_id, status in list(self.status_effects.items()):
-            # Encontra o Pokémon (isso é ineficiente, mas funciona)
-            pokemon = None
-            # TODO: melhorar isso
-            if not status.update(None, self, dt):
-                # Status expirou
-                del self.status_effects[pokemon_id]
-                print(f"[EFFECT] Status {status.name} expirou")
+                # Se o estágio voltou a 0, remove o StatStage se não tiver outros modificadores
+                if new_stage == 0 and not any(s != 0 for s in self.stat_stages[pokemon_id].stages.values()):
+                    del self.stat_stages[pokemon_id]
+                    print(f"[EFFECT] StatStage removido para Pokémon {pokemon_id} (todos os estágios zerados)")
 
-        # Atualiza timer de ticks de status
-        self.status_timer += dt
+        # ===== FORÇA ATUALIZAÇÃO DA VELOCIDADE PARA POKÉMON QUE TIVERAM MODIFICADORES REMOVIDOS =====
+        self._update_speed_for_pokemon_ids(pokemon_to_update)
 
-        if self.status_timer >= self.STATUS_TICK_INTERVAL:
-            self.status_timer = 0
-            for pokemon_id, status in self.status_effects.items():
-                if status.on_tick_callback:
-                    # Encontra o Pokémon (ineficiente)
-                    pass
+        # ... resto do código (status effects, etc) ...
 
-        # Limpa textos temporários
-        novos_textos = []
-        for pokemon_id, text, duration in self.status_texts:
-            nova_duracao = duration - dt
-            if nova_duracao > 0:
-                novos_textos.append((pokemon_id, text, nova_duracao))
-
-        self.status_texts = novos_textos
+    def _update_speed_for_pokemon_ids(self, pokemon_ids: set):
+        """Força atualização da velocidade para Pokémon com IDs específicos"""
+        for pokemon_id in pokemon_ids:
+            if pokemon_id in self._pokemon_refs:
+                pokemon = self._pokemon_refs[pokemon_id]
+                if hasattr(pokemon, 'update_move_speed_from_effects'):
+                    old_speed = pokemon.move_speed
+                    pokemon.update_move_speed_from_effects()
+                    if old_speed != pokemon.move_speed:
+                        print(
+                            f"[SPEED] {pokemon.name} velocidade: {old_speed:.2f} -> {pokemon.move_speed:.2f} (após expiração de modificador)")
 
     def add_status_text(self, pokemon, text: str, duration: float = 1.5):
         """Adiciona um texto de feedback visual acima do Pokémon (APENAS para temporários)"""

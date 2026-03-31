@@ -846,6 +846,11 @@ class GameWaveManager:
             path_idx = getattr(enemy, 'path_index_origin', 0)
             self.active_enemies.remove(enemy)
 
+            # ===== LIMPA REFERÊNCIA DO EFFECT_MANAGER =====
+            if hasattr(enemy, 'effect_manager') and enemy.effect_manager:
+                enemy.effect_manager.unregister_pokemon(enemy)
+                print(f"[WAVE] {enemy.name} removido do registro do effect_manager")
+
             # Atualiza contagem de vivos
             if path_idx in self.alive_count:
                 self.alive_count[path_idx] = max(0, self.alive_count[path_idx] - 1)

@@ -35,7 +35,6 @@ class Pokemon(Entity):
         self.pokedex = Pokedex()
         self.unique_id = str(uuid.uuid4())
         self.pokemon_data = self.pokedex.get_pokemon(pokemon_id)
-
         if not self.pokemon_data:
             raise ValueError(f"Pokémon ID {pokemon_id} não encontrado")
 
@@ -556,6 +555,8 @@ class Pokemon(Entity):
     def set_battle_system(self, battle_system):
         """Define o sistema de combate para este Pokémon"""
         self.battle_system = battle_system
+        if battle_system and battle_system.effect_manager:
+            battle_system.effect_manager.register_pokemon(self)
 
     def heal(self, amount=None):
         if amount is None:

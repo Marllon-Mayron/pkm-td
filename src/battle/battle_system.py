@@ -19,8 +19,10 @@ class BattleSystem:
         self.effect_manager = EffectManager()
 
     def set_effect_manager_for_pokemon(self, pokemon):
-        """Vincula o effect_manager a um Pokémon"""
+        """Vincula o effect_manager a um Pokémon e registra"""
         pokemon.effect_manager = self.effect_manager
+        self.effect_manager.register_pokemon(pokemon)  # Adicione esta linha
+        print(f"[BATTLE] EffectManager vinculado a {pokemon.name} (id={id(pokemon)})")
 
     def update(self, dt: float):
         """Atualiza projéteis ativos"""
