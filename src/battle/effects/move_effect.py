@@ -114,13 +114,17 @@ class MoveEffect:
         from .status_effect import StatusEffect, StatusType
 
         status_type_str = self.params.get('status', 'NONE').upper()
-        chance = self.params.get('chance', 0.30)  # 30% padrão
+        chance = self.params.get('chance', 0.30)
 
         # Mapeia para StatusType
         if status_type_str == 'POISON':
             status_type = StatusType.POISON
         elif status_type_str == 'TOXIC_POISON':
             status_type = StatusType.TOXIC_POISON
+        elif status_type_str == 'BURN':
+            status_type = StatusType.BURN
+        elif status_type_str == 'PARALYSIS':
+            status_type = StatusType.PARALYSIS
         else:
             status_type = StatusType.NONE
 
@@ -129,15 +133,22 @@ class MoveEffect:
         # Verifica se já tem status
         existing_status = effect_manager.get_status(target)
         if existing_status and existing_status.type != StatusType.NONE:
-            # Já tem status, não aplica novo
+            print(f"[STATUS] {target.name} já está com {existing_status.name}, não pode aplicar novo status!")
             return False
 
         # Tenta aplicar com a chance
         if status_type != StatusType.NONE and random.random() < chance:
             status = StatusEffect(status_type, duration)
             effect_manager.apply_status(target, status, attacker)
-            effect_manager.add_status_text(target, f"{target.name} foi envenenado!")
-            print(f"[STATUS] {attacker.name} envenenou {target.name}!")
+
+            # Mensagem específica para queimadura
+            if status_type == StatusType.BURN:
+                effect_manager.add_status_text(target, f"{target.name} foi queimado!")
+                print(f"[BURN] {attacker.name} queimou {target.name}!")
+            elif status_type == StatusType.POISON:
+                effect_manager.add_status_text(target, f"{target.name} foi envenenado!")
+                print(f"[POISON] {attacker.name} envenenou {target.name}!")
+
             return True
 
         return False

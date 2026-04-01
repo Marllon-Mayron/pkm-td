@@ -5,6 +5,8 @@ Calculadora de dano baseada nos jogos Pokémon originais
 from typing import Dict, Tuple, Optional
 import random
 
+from src.battle.effects import StatusType
+
 
 class DamageCalculator:
     """Calcula dano com base em tipos, stats e moves"""
@@ -229,9 +231,18 @@ class DamageCalculator:
         stab = 1.5 if move.type in attacker.types else 1.0
 
         # 6. Calcular stats de ataque/defesa
+        # 6. Calcular stats de ataque/defesa
         if move.category == "physical":
             attack_stat = attacker.attack
             defense_stat = defender.defense
+
+            # ===== APLICA EFEITO DA QUEIMADURA NO ATACANTE =====
+            # Se o atacante está queimado, reduz o dano físico pela metade
+            if hasattr(attacker, 'effect_manager') and attacker.effect_manager:
+                status = attacker.effect_manager.get_status(attacker)
+                if status and status.type == StatusType.BURN:
+                    attack_stat = attack_stat * 0.5
+                    print(f"[BURN] Ataque de {attacker.name} reduzido pela metade devido à queimadura!")
         else:  # special
             attack_stat = attacker.sp_attack
             defense_stat = defender.sp_defense

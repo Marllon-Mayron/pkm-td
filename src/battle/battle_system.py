@@ -66,25 +66,23 @@ class BattleSystem:
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
 
-        # ===== VERIFICAÇÃO PARA ATAQUES DE STATUS =====
-        # Se for um ataque de status, verifica se o alvo já tem um status
+        # Verificação para ataques de status
         if move.category == "status":
             target_status = self.effect_manager.get_status(target)
 
-            # Se o alvo já tem algum status (exceto NONE), o ataque sempre erra
             if target_status and target_status.type != StatusType.NONE:
-                # Consome PP mesmo errando
+                print(
+                    f"[BATTLE] {attacker.name} usou {move.name} em {target.name}, mas {target.name} já está com {target_status.name}!")
+                self.effect_manager.add_status_text(attacker,
+                                                    f"Falhou! {target.name} já está com {target_status.name}!")
+
                 move.current_pp -= 1
                 attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
-
-                # MOSTRA MISS NO ATACANTE (quem usou o golpe)
                 self._show_miss_on_attacker(attacker)
                 return True
 
-        # ===== CALCULAR ACERTO PRIMEIRO =====
+        # Calcular acerto
         hit_chance = move.accuracy / 100
-
-        # Modificadores de acerto (evasão, etc)
         accuracy_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)
         evasion_mult = self.effect_manager.get_stat_multiplier(target, StatType.EVASION)
         hit_chance = hit_chance * accuracy_mult / evasion_mult
@@ -92,15 +90,13 @@ class BattleSystem:
 
         will_hit = random.random() <= hit_chance
 
-        # ===== ATAQUES DE STATUS =====
+        # Ataques de status
         if move.category == "status":
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")
 
-            # Toca o som do atacante
             from src.managers.move_sound_manager import move_sound_manager
             move_sound_manager.play_attack_sound(move.sound_name)
 
-            # Consome PP
             move.current_pp -= 1
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
@@ -108,11 +104,10 @@ class BattleSystem:
                 self._apply_status_effect(attacker, target, move)
             else:
                 print(f"[BATTLE] {move.name} errou!")
-                self._show_miss_on_attacker(attacker)  # MISS no atacante
+                self._show_miss_on_attacker(attacker)
             return True
 
-        # ===== ATAQUES QUE CAUSAM DANO =====
-        # Calcular dano base (já com modificadores de stat)
+        # Calcular dano
         if will_hit:
             damage_result = self._calculate_move_damage(attacker, target, move)
         else:
@@ -124,20 +119,18 @@ class BattleSystem:
                 "stab": False
             }
 
-        # ===== ATAQUES ESPECIAIS =====
+        # Ataques especiais (usam projétil)
         if move.category == "special" and move.power > 0:
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Ataque especial)")
             move.current_pp -= 1
+
+            # Cria o projétil e passa o efeito para ser aplicado no impacto
             self._create_projectile(attacker, target, move, damage_result, will_hit)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
-            # Aplica efeitos do move (se houver)
-            if will_hit and damage_result["damage"] > 0:
-                self._apply_move_effect(attacker, target, move, damage_result["damage"])
-
             return True
 
-        # ===== ATAQUES FÍSICOS =====
+        # Ataques físicos
         elif move.category == "physical" and move.power > 0:
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Ataque físico)")
 
@@ -147,11 +140,11 @@ class BattleSystem:
             move.current_pp -= 1
             if will_hit:
                 self._apply_damage(attacker, target, damage_result, move)
-                # Aplica efeitos do move
+                # Aplica efeitos do move APÓS o dano
                 self._apply_move_effect(attacker, target, move, damage_result["damage"])
             else:
                 print(f"[BATTLE] {move.name} errou!")
-                self._show_miss_on_attacker(attacker)  # MISS no atacante
+                self._show_miss_on_attacker(attacker)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
 

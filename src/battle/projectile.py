@@ -163,11 +163,19 @@ class Projectile:
         # Aplica dano
         self.target.take_damage(self.damage, attacker=self.attacker)
 
-        # Aplica efeitos do move após o dano
+        # ===== APLICA EFEITOS DO MOVE APÓS O DANO =====
+        # Isso é crucial para ataques especiais como ember, flamethrower, etc
         if hasattr(self.attacker, 'battle_system') and self.attacker.battle_system:
-            self.attacker.battle_system._apply_move_effect(self.attacker, self.target,
-                                                           self.attacker.get_current_move(),
-                                                           self.damage)
+            current_move = self.attacker.get_current_move()
+            if current_move:
+                print(f"[PROJECTILE] Aplicando efeito do move {current_move.name} em {self.target.name}")
+                # Aplica o efeito do move APÓS o dano
+                self.attacker.battle_system._apply_move_effect(
+                    self.attacker,
+                    self.target,
+                    current_move,
+                    self.damage
+                )
 
         # Registra contribuição
         attacker_id = id(self.attacker)

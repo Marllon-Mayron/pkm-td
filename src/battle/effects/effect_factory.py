@@ -20,7 +20,6 @@ class EffectFactory:
             },
             "description": "Reduz a Velocidade do oponente"
         },
-
         "growl": {
             "effect_type": "stat_mod",
             "target": EffectTarget.TARGET,
@@ -32,7 +31,6 @@ class EffectFactory:
             },
             "description": "Reduz o Ataque do oponente"
         },
-
         "growth": {
             "effect_type": "stat_mod",
             "target": EffectTarget.SELF,
@@ -44,7 +42,6 @@ class EffectFactory:
             },
             "description": "Aumenta o Ataque Especial"
         },
-
         "swords-dance": {
             "effect_type": "stat_mod",
             "target": EffectTarget.SELF,
@@ -56,7 +53,6 @@ class EffectFactory:
             },
             "description": "Aumenta muito o Ataque"
         },
-
         "agility": {
             "effect_type": "stat_mod",
             "target": EffectTarget.SELF,
@@ -68,7 +64,6 @@ class EffectFactory:
             },
             "description": "Aumenta muito a Velocidade"
         },
-
         # ===== VENENO (POISON) =====
         "poison-sting": {
             "effect_type": "status_chance",
@@ -82,7 +77,6 @@ class EffectFactory:
             },
             "description": "Pode envenenar o oponente (30% de chance)"
         },
-
         "poison-powder": {
             "effect_type": "status",
             "target": EffectTarget.TARGET,
@@ -94,7 +88,6 @@ class EffectFactory:
             },
             "description": "Envenena o oponente"
         },
-
         "toxic": {
             "effect_type": "status",
             "target": EffectTarget.TARGET,
@@ -106,6 +99,7 @@ class EffectFactory:
             },
             "description": "Envenena gravemente o oponente"
         },
+        # ===== PARALIZIA (PARALYZED) =====
         "thunder-wave": {
             "effect_type": "status",
             "target": EffectTarget.TARGET,
@@ -126,114 +120,7 @@ class EffectFactory:
             },
             "description": "Paralisa o oponente"
         },
-
-        "will-o-wisp": {
-            "effect_type": "status",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.ON_HIT,
-            "params": {
-                "status": "burn",
-                "duration": 4.0
-            },
-            "description": "Queima o oponente"
-        },
-
-        # Multi-hit moves
-        "double-slap": {
-            "effect_type": "multi_hit",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.ON_HIT,
-            "params": {
-                "min_hits": 2,
-                "max_hits": 5
-            },
-            "description": "Ataque que acerta 2-5 vezes"
-        },
-
-        "fury-swipes": {
-            "effect_type": "multi_hit",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.ON_HIT,
-            "params": {
-                "min_hits": 2,
-                "max_hits": 5
-            },
-            "description": "Ataque que acerta 2-5 vezes"
-        },
-
-        # Flinch moves
-        "bite": {
-            "effect_type": "flinch",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.ON_HIT,
-            "params": {
-                "chance": 0.3
-            },
-            "description": "Pode fazer o oponente hesitar"
-        },
-
-        "headbutt": {
-            "effect_type": "flinch",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.ON_HIT,
-            "params": {
-                "chance": 0.3
-            },
-            "description": "Pode fazer o oponente hesitar"
-        },
-
-        # Recoil moves
-        "take-down": {
-            "effect_type": "recoil",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.AFTER_DAMAGE,
-            "params": {
-                "percentage": 0.25
-            },
-            "description": "Causa dano de retorno"
-        },
-
-        "double-edge": {
-            "effect_type": "recoil",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.AFTER_DAMAGE,
-            "params": {
-                "percentage": 0.33
-            },
-            "description": "Causa dano de retorno"
-        },
-
-        # Drain moves
-        "mega-drain": {
-            "effect_type": "drain",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.AFTER_DAMAGE,
-            "params": {
-                "percentage": 0.5
-            },
-            "description": "Cura metade do dano causado"
-        },
-
-        "giga-drain": {
-            "effect_type": "drain",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.AFTER_DAMAGE,
-            "params": {
-                "percentage": 0.5
-            },
-            "description": "Cura metade do dano causado"
-        },
-
-        "leech-life": {
-            "effect_type": "drain",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.AFTER_DAMAGE,
-            "params": {
-                "percentage": 0.5
-            },
-            "description": "Cura metade do dano causado"
-        },
-
+        # ===== ADORMECER (SLEEP) =====
         "sleep-powder": {
             "effect_type": "status",
             "target": EffectTarget.TARGET,
@@ -245,7 +132,6 @@ class EffectFactory:
             },
             "description": "Coloca o oponente para dormir"
         },
-
         "hypnosis": {
             "effect_type": "status",
             "target": EffectTarget.TARGET,
@@ -257,6 +143,154 @@ class EffectFactory:
             },
             "description": "Coloca o oponente para dormir"
         },
+        # ===== QUEIMADURA (BURN) =====
+        "will-o-wisp": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "burn",
+                "duration": None,  # Queimadura é permanente
+                "overwrite": False
+            },
+            "description": "Queima o oponente"
+        },
+        "ember": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "burn",
+                "chance": 0.10,
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Pode queimar o oponente (10% de chance)"
+        },
+        "flamethrower": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "burn",
+                "chance": 0.10,  # 10% de chance
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Pode queimar o oponente (10% de chance)"
+        },
+        "fire-blast": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "burn",
+                "chance": 0.10,  # 10% de chance
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Pode queimar o oponente (10% de chance)"
+        },
+        "fire-punch": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "burn",
+                "chance": 0.10,  # 10% de chance
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Pode queimar o oponente (10% de chance)"
+        },
+        # Multi-hit moves
+        "double-slap": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "min_hits": 2,
+                "max_hits": 5
+            },
+            "description": "Ataque que acerta 2-5 vezes"
+        },
+        "fury-swipes": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "min_hits": 2,
+                "max_hits": 5
+            },
+            "description": "Ataque que acerta 2-5 vezes"
+        },
+        # Flinch moves
+        "bite": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "chance": 0.3
+            },
+            "description": "Pode fazer o oponente hesitar"
+        },
+        "headbutt": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "chance": 0.3
+            },
+            "description": "Pode fazer o oponente hesitar"
+        },
+        # Recoil moves
+        "take-down": {
+            "effect_type": "recoil",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "percentage": 0.25
+            },
+            "description": "Causa dano de retorno"
+        },
+        "double-edge": {
+            "effect_type": "recoil",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "percentage": 0.33
+            },
+            "description": "Causa dano de retorno"
+        },
+        # Drain moves
+        "mega-drain": {
+            "effect_type": "drain",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "percentage": 0.5
+            },
+            "description": "Cura metade do dano causado"
+        },
+        "giga-drain": {
+            "effect_type": "drain",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "percentage": 0.5
+            },
+            "description": "Cura metade do dano causado"
+        },
+        "leech-life": {
+            "effect_type": "drain",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "percentage": 0.5
+            },
+            "description": "Cura metade do dano causado"
+        },
+
     }
 
     @classmethod
