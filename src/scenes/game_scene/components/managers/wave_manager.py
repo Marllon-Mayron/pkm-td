@@ -308,12 +308,15 @@ class GameWaveManager:
         # ===== VERIFICA STUN DA PARALISIA =====
         if hasattr(enemy, 'effect_manager') and enemy.effect_manager:
             status = enemy.effect_manager.get_status(enemy)
-            if status and status.type == StatusType.PARALYSIS:
-                # Atualiza o estado de paralisia
-                is_stunned = status.update_paralysis(dt)
-                if is_stunned:
-                    # Está atordoado - não se move neste frame
-                    return  # Não move
+            if status:
+                if status.type == StatusType.PARALYSIS:
+                    is_stunned = status.update_paralysis(dt)
+                    if is_stunned:
+                        return  # Está atordoado
+                elif status.type == StatusType.SLEEP:
+                    is_asleep = status.update_sleep(dt)
+                    if is_asleep:
+                        return  # Está dormindo
 
         # ===== MOVIMENTO NORMAL =====
         if not enemy.path or len(enemy.path) == 0:
@@ -533,8 +536,6 @@ class GameWaveManager:
         """
         # ===== BOSS =====
         if enemy.is_boss:
-            print(f"[BOSS] {enemy.name} chegou ao {'FIM' if is_end else 'INÍCIO'} do path")
-
             # Se está carregando item, processa o roubo (apenas quando chega ao FIM)
             if enemy.is_carrying and is_end:
                 carried_item = enemy.is_carrying

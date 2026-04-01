@@ -168,9 +168,10 @@ class EffectManager:
 
     def update(self, dt: float):
         """Atualiza todos os efeitos - dt em segundos"""
+
         # Atualiza modificadores com duração limitada
         expired_modifiers = []
-        pokemon_to_update = set()  # Guarda os Pokémon que precisam ter velocidade atualizada
+        pokemon_to_update = set()
 
         for pokemon_id, modifiers in self.stat_modifiers.items():
             for modifier in modifiers[:]:
@@ -179,7 +180,6 @@ class EffectManager:
                         expired_modifiers.append((pokemon_id, modifier))
                         modifiers.remove(modifier)
                         pokemon_to_update.add(pokemon_id)
-                        print(f"[EFFECT] Modificador {modifier.stat_type} expirou para Pokémon {pokemon_id}")
 
         # Aplica a remoção de estágios
         for pokemon_id, modifier in expired_modifiers:
@@ -187,18 +187,39 @@ class EffectManager:
                 old_stage = self.stat_stages[pokemon_id].get_stage(modifier.stat_type)
                 self.stat_stages[pokemon_id].modify(modifier.stat_type, -modifier.stages)
                 new_stage = self.stat_stages[pokemon_id].get_stage(modifier.stat_type)
-                print(f"[EFFECT] Modificador removido: {modifier.stat_type} {modifier.stages:+d}")
-                print(f"[EFFECT] {modifier.stat_type} estágio: {old_stage:+d} -> {new_stage:+d}")
 
                 # Se o estágio voltou a 0, remove o StatStage se não tiver outros modificadores
                 if new_stage == 0 and not any(s != 0 for s in self.stat_stages[pokemon_id].stages.values()):
                     del self.stat_stages[pokemon_id]
-                    print(f"[EFFECT] StatStage removido para Pokémon {pokemon_id} (todos os estágios zerados)")
 
-        # ===== FORÇA ATUALIZAÇÃO DA VELOCIDADE PARA POKÉMON QUE TIVERAM MODIFICADORES REMOVIDOS =====
+        # Atualiza velocidade
         self._update_speed_for_pokemon_ids(pokemon_to_update)
 
-        # ... resto do código (status effects, etc) ...
+        # ===== ATUALIZA STATUS EFFECTS =====
+        status_to_remove = []
+
+        for pokemon_id, status in self.status_effects.items():
+            if pokemon_id in self._pokemon_refs:
+                pokemon = self._pokemon_refs[pokemon_id]
+
+                # update retorna False se o status acabou
+                if not status.update(pokemon, self, dt):
+                    status_to_remove.append(pokemon_id)
+
+        # Remove status que acabaram
+        for pokemon_id in status_to_remove:
+            if pokemon_id in self._pokemon_refs:
+                pokemon = self._pokemon_refs[pokemon_id]
+                self.remove_status(pokemon)
+
+        # Limpa textos temporários
+        novos_textos = []
+        for pokemon_id, text, duration in self.status_texts:
+            nova_duracao = duration - dt
+            if nova_duracao > 0:
+                novos_textos.append((pokemon_id, text, nova_duracao))
+
+        self.status_texts = novos_textos
 
     def _update_speed_for_pokemon_ids(self, pokemon_ids: set):
         """Força atualização da velocidade para Pokémon com IDs específicos"""
@@ -358,7 +379,7 @@ class EffectManager:
 
     def render_status_indicators(self, screen, pokemon, sprite_rect, zoom_scale, font_cache):
         """
-        Renderiza indicadores de status permanentes (PAR, BRN, PSN, etc) acima dos modificadores
+        Renderiza indicadores de status permanentes (PAR, BRN, PSN, SLP, etc) acima dos modificadores
         """
         status = self.get_status(pokemon)
         if not status or status.type == StatusType.NONE:
@@ -382,14 +403,14 @@ class EffectManager:
 
         font = font_cache[font_size]
 
-        # Texto do status (ex: "PAR", "BRN", "PSN")
+        # Texto do status (ex: "PAR", "BRN", "PSN", "SLP")
         status_text = status.display_name
         color = status.color
 
         text_surf = font.render(status_text, True, color)
         text_rect = text_surf.get_rect()
 
-        # Posiciona acima dos modificadores de stat
+        # Posicionamento relativo ao tamanho do sprite
         sprite_height = sprite_rect.height
 
         # Modificadores estão em -45% do topo
@@ -409,7 +430,11 @@ class EffectManager:
 
         screen.blit(text_surf, text_rect)
 
-        # Se estiver paralisado e atordoado, mostra ícone de stun
+        # Ícone de sono adicional se estiver dormindo
+        if status.type == StatusType.SLEEP and status.is_asleep():
+            self._render_sleep_icon(screen, pokemon, sprite_rect, zoom_scale, font_cache, status)
+
+        # Ícone de stun para paralisia
         if status.type == StatusType.PARALYSIS and status.is_stunned():
             self._render_stun_icon(screen, pokemon, sprite_rect, zoom_scale, font_cache, status)
 
@@ -442,6 +467,46 @@ class EffectManager:
         text_rect.centery = sprite_rect.top - int(sprite_rect.height * 0.55)
 
         screen.blit(text_surf, text_rect)
+
+    def _render_sleep_icon(self, screen, pokemon, sprite_rect, zoom_scale, font_cache, status):
+        """Renderiza ícone de sono quando o Pokémon está dormindo"""
+        base_font_size = 14
+        if hasattr(pokemon, 'screen_manager') and hasattr(pokemon, 'camera'):
+            render_scale = pokemon.screen_manager.render_scale
+            camera_zoom = pokemon.camera.zoom if pokemon.camera else 1.0
+            total_scale = render_scale * camera_zoom
+            font_size = max(12, int(base_font_size * total_scale))
+        else:
+            font_size = max(12, int(base_font_size * zoom_scale))
+
+        if font_size not in font_cache:
+            try:
+                font_cache[font_size] = pygame.font.Font(None, font_size)
+            except:
+                font_cache[font_size] = pygame.font.SysFont('Arial', font_size)
+
+        font = font_cache[font_size]
+
+        # Ícone de sono (ZzZ)
+        sleep_text = "💤"
+        text_surf = font.render(sleep_text, True, (200, 200, 255))
+        text_rect = text_surf.get_rect()
+
+        # Posiciona à direita do indicador de status
+        text_rect.left = sprite_rect.centerx + 15
+        text_rect.centery = sprite_rect.top - int(sprite_rect.height * 0.55)
+
+        screen.blit(text_surf, text_rect)
+
+        # Mostra timer de sono (opcional, para debug)
+        if hasattr(self, 'show_debug') and self.show_debug:
+            remaining = status.get_sleep_remaining()
+            if remaining > 0:
+                timer_text = font.render(f"{remaining:.1f}s", True, (200, 200, 200))
+                timer_rect = timer_text.get_rect()
+                timer_rect.left = text_rect.right + 5
+                timer_rect.centery = text_rect.centery
+                screen.blit(timer_text, timer_rect)
 
     def clear_all(self):
         """Limpa todos os efeitos"""

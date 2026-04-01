@@ -36,6 +36,22 @@ class PokemonMovement:
                 return status.update_paralysis(dt)
         return False
 
+    def is_asleep(self) -> bool:
+        """Verifica se o Pokémon está dormindo"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.SLEEP:
+                return status.is_asleep()
+        return False
+
+    def update_sleep(self, dt: float) -> bool:
+        """Atualiza o estado de sono e retorna True se ainda está dormindo"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.SLEEP:
+                return status.update_sleep(dt)
+        return False
+
     def update_movement(self, dt, items=None):
         """Movimento via path (para aliados ou inimigos sem wave control)"""
 
@@ -45,6 +61,11 @@ class PokemonMovement:
             # Está atordoado - não se move neste frame
             return
 
+        # ===== VERIFICA SONO =====
+        is_asleep = self.update_sleep(dt)
+        if is_asleep:
+            # Está dormindo - não se move
+            return
         # ===== MOVIMENTO NORMAL =====
         if not self.pokemon.path or len(self.pokemon.path) == 0 or self.pokemon.path_index >= len(self.pokemon.path):
             return

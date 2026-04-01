@@ -52,12 +52,11 @@ class BattleSystem:
 
         # Atualiza o estado de paralisia antes de verificar
         if status and status.type == StatusType.PARALYSIS:
-            status.update_paralysis(0)  # Apenas verifica estado atual
+            status.update_paralysis(0)
 
         # Verifica se pode atacar (stun da paralisia)
         if status and not status.can_attack():
             if status.type == StatusType.PARALYSIS:
-                # Mensagem temporária de stun
                 self.effect_manager.add_status_text(attacker,
                                                     f"{attacker.name} está paralisado e não consegue se mover!")
                 print(f"[BATTLE] {attacker.name} está paralisado e não consegue se mover!")
@@ -66,6 +65,21 @@ class BattleSystem:
                 print(f"[BATTLE] {attacker.name} está {status.name.lower()} e não pode atacar!")
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
+
+        # ===== VERIFICAÇÃO PARA ATAQUES DE STATUS =====
+        # Se for um ataque de status, verifica se o alvo já tem um status
+        if move.category == "status":
+            target_status = self.effect_manager.get_status(target)
+
+            # Se o alvo já tem algum status (exceto NONE), o ataque sempre erra
+            if target_status and target_status.type != StatusType.NONE:
+                # Consome PP mesmo errando
+                move.current_pp -= 1
+                attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+                # MOSTRA MISS NO ATACANTE (quem usou o golpe)
+                self._show_miss_on_attacker(attacker)
+                return True
 
         # ===== CALCULAR ACERTO PRIMEIRO =====
         hit_chance = move.accuracy / 100
@@ -94,7 +108,7 @@ class BattleSystem:
                 self._apply_status_effect(attacker, target, move)
             else:
                 print(f"[BATTLE] {move.name} errou!")
-                self._show_miss_on_attacker(attacker)
+                self._show_miss_on_attacker(attacker)  # MISS no atacante
             return True
 
         # ===== ATAQUES QUE CAUSAM DANO =====
@@ -137,7 +151,7 @@ class BattleSystem:
                 self._apply_move_effect(attacker, target, move, damage_result["damage"])
             else:
                 print(f"[BATTLE] {move.name} errou!")
-                self._show_miss_on_attacker(attacker)
+                self._show_miss_on_attacker(attacker)  # MISS no atacante
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
 

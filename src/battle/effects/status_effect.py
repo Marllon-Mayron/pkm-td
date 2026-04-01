@@ -34,10 +34,15 @@ class StatusEffect:
         self._stun_timer = 0.0  # Tempo restante de stun
         self._last_stun_check = 0.0  # Último tempo de verificação
 
+        # Para sono - controle de duração
+        self._sleep_timer = 0.0  # Tempo restante de sono
+        self._sleep_check_timer = 0.0  # Timer para verificar extensão
+
         # Callbacks
         self.on_apply_callback = None
         self.on_tick_callback = None
         self.on_remove_callback = None
+
 
         self._setup_effects()
 
@@ -64,11 +69,19 @@ class StatusEffect:
             self.icon = "⚡"
             # Paralisia não tem tick de dano
 
+
         elif self.type == StatusType.SLEEP:
+
             self.name = "Sono"
+
             self.display_name = "SLP"
+
             self.color = (104, 144, 240)
+
             self.icon = "💤"
+
+            self.on_apply_callback = self._sleep_apply
+
 
         elif self.type == StatusType.FREEZE:
             self.name = "Congelado"
@@ -144,16 +157,55 @@ class StatusEffect:
 
         return False
 
-    def is_stunned(self) -> bool:
-        """Verifica se o Pokémon está atordoado neste momento"""
-        if self.type == StatusType.PARALYSIS:
-            return self._stun_timer > 0
-        return False
-
     def get_stun_remaining(self) -> float:
         """Retorna o tempo restante de stun (0 se não estiver atordoado)"""
         if self.type == StatusType.PARALYSIS:
             return max(0, self._stun_timer)
+        return 0
+
+    def update_sleep(self, dt: float) -> bool:
+        """
+        Atualiza o estado de sono
+        Retorna True se está dormindo, False se acordou
+        """
+        if self.type != StatusType.SLEEP:
+            return False
+
+        # Se o timer é zero ou negativo, pode tentar acordar
+        if self._sleep_timer <= 0:
+            self._sleep_check_timer += dt
+
+            # Verifica a cada 0.5 segundos
+            if self._sleep_check_timer >= 1:
+                self._sleep_check_timer = 0
+                if random.random() < 0.25:  # 25% de chance de continuar dormindo
+                    self._sleep_timer = 2.0  # Dorme mais 1 segundo
+                    return True
+                else:
+                    # Acordou
+                    print(f"[SLEEP] {self._pokemon_name} acordou! (timer estava em {self._sleep_timer:.2f})")
+                    return False
+
+        # Ainda tem tempo de sono - decrementa
+        old_timer = self._sleep_timer
+        self._sleep_timer -= dt
+
+        # Verifica se acabou de zerar
+        if self._sleep_timer <= 0 and old_timer > 0:
+            print(f"[SLEEP] {self._pokemon_name}: timer zerou! Pronto para acordar.")
+
+        return self._sleep_timer > 0
+
+    def is_asleep(self) -> bool:
+        """Verifica se o Pokémon está dormindo"""
+        if self.type == StatusType.SLEEP:
+            return self._sleep_timer > 0
+        return False
+
+    def get_sleep_remaining(self) -> float:
+        """Retorna o tempo restante de sono (0 se não está dormindo)"""
+        if self.type == StatusType.SLEEP:
+            return max(0, self._sleep_timer)
         return 0
 
     def update(self, pokemon, effect_manager, dt: float):
@@ -161,10 +213,21 @@ class StatusEffect:
         Atualiza o efeito de status
         Retorna False se o efeito acabou
         """
+        self._pokemon_name = pokemon.name  # Guarda nome para logs
+
         # Atualiza paralisia (gerencia stun)
         if self.type == StatusType.PARALYSIS:
             self.update_paralysis(dt)
             return True  # Paralisia não expira naturalmente
+
+        # Atualiza sono
+        if self.type == StatusType.SLEEP:
+            is_still_asleep = self.update_sleep(dt)
+            if not is_still_asleep:
+                # Acordou - remove o status
+                print(f"[SLEEP] {pokemon.name} acordou! Removendo status.")
+                return False
+            return True  # Continua dormindo
 
         # Para outros status com duração
         if self.duration:
@@ -179,10 +242,16 @@ class StatusEffect:
         return True
 
     def is_stunned(self) -> bool:
-        """Verifica se o Pokémon está atordoado neste momento"""
+        """Verifica se o Pokémon está atordoado (paralisia)"""
         if self.type == StatusType.PARALYSIS:
             return self._stun_timer > 0
         return False
+
+    def _sleep_apply(self, pokemon, effect_manager):
+        """Aplica o sono - garante 2 segundos iniciais"""
+        self._pokemon_name = pokemon.name
+        self._sleep_timer = 6  # 3 segundos garantidos (BUG CONTANDO METADE DO TEMPO DEFINIDO NO GAME)
+        self._sleep_check_timer = 0.0
 
     def apply(self, pokemon, effect_manager):
         """Aplica o efeito de status"""

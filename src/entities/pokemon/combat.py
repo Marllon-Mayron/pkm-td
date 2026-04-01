@@ -28,6 +28,23 @@ class PokemonCombat:
                 return status.update_paralysis(dt)
         return False
 
+    def is_asleep(self) -> bool:
+        """Verifica se o Pokémon está dormindo"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.SLEEP:
+                return status.is_asleep()
+        return False
+
+    def update_sleep(self, dt: float) -> bool:
+        """Atualiza o estado de sono e retorna True se ainda está dormindo"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.SLEEP:
+                # O update já gerencia o timer e retorno
+                return status.update_sleep(dt)
+        return False
+
     def find_nearest_enemy(self, enemies: List) -> Optional['Pokemon']:
         """Encontra o inimigo mais próximo"""
         if not enemies:
@@ -54,7 +71,12 @@ class PokemonCombat:
 
         # ===== VERIFICA STUN =====
         if self.update_stun(dt):
-            return  # Atordoado, não faz nada
+            return
+
+        # ===== VERIFICA SONO =====
+        if self.update_sleep(dt):
+            # Está dormindo - não faz nada
+            return
 
         nearest = self.find_nearest_enemy(enemies)
 
@@ -69,6 +91,12 @@ class PokemonCombat:
         # ===== VERIFICA STUN =====
         if self.update_stun(dt):
             # Se estava carregando e foi atordoado, volta para idle
+            self.pokemon.combat_state = "idle"
+            self.pokemon.target = None
+            return
+
+        # ===== VERIFICA SONO =====
+        if self.update_sleep(dt):
             self.pokemon.combat_state = "idle"
             self.pokemon.target = None
             return
@@ -173,6 +201,10 @@ class PokemonCombat:
         # ===== VERIFICA STUN =====
         if self.update_stun(dt):
             return  # Atordoado, não se move
+
+        # ===== VERIFICA SONO =====
+        if self.update_sleep(dt):
+            return
 
         dx = self.pokemon.original_spot_x - self.pokemon.x
         dy = self.pokemon.original_spot_y - self.pokemon.y

@@ -16,7 +16,7 @@ class EffectFactory:
             "params": {
                 "stat": "speed",
                 "stages": -1,
-                "duration": 3.0  # 8 segundos
+                "duration": 4.0  # 8 segundos
             },
             "description": "Reduz a Velocidade do oponente"
         },
@@ -92,6 +92,16 @@ class EffectFactory:
             },
             "description": "Paralisa o oponente"
         },
+        "stun-spore": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "paralysis",
+                "duration": None
+            },
+            "description": "Paralisa o oponente"
+        },
 
         "will-o-wisp": {
             "effect_type": "status",
@@ -126,18 +136,6 @@ class EffectFactory:
             },
             "description": "Ataque que acerta 2-5 vezes"
         },
-
-        "pin-missile": {
-            "effect_type": "multi_hit",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.ON_HIT,
-            "params": {
-                "min_hits": 2,
-                "max_hits": 5
-            },
-            "description": "Ataque que acerta 2-5 vezes"
-        },
-
         # Flinch moves
         "bite": {
             "effect_type": "flinch",
@@ -209,7 +207,31 @@ class EffectFactory:
                 "percentage": 0.5
             },
             "description": "Cura metade do dano causado"
-        }
+        },
+
+        "sleep-powder": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "sleep",
+                "duration": None,  # Duração gerenciada pelo próprio status
+                "overwrite": True
+            },
+            "description": "Coloca o oponente para dormir"
+        },
+
+        "hypnosis": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "sleep",
+                "duration": None,
+                "overwrite": True
+            },
+            "description": "Coloca o oponente para dormir"
+        },
     }
 
     @classmethod
