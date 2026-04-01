@@ -1983,9 +1983,30 @@
                     ]
                 ],
                 "closed": false
+            },
+            {
+                "nodes": [
+                    [
+                        540,
+                        60
+                    ],
+                    [
+                        540,
+                        348
+                    ],
+                    [
+                        180,
+                        348
+                    ],
+                    [
+                        180,
+                        60
+                    ]
+                ],
+                "closed": false
             }
         ],
-        "current_path_index": 0
+        "current_path_index": 1
     },
     "waves": {
         "waves": [
@@ -1994,14 +2015,78 @@
                 "path_index": 0,
                 "name": "Wave 1",
                 "enabled": true,
-                "enemies": [],
-                "min_level": 1,
-                "max_level": 5,
-                "wave_size": 10,
-                "spawn_interval": 3.0,
-                "initial_delay": 2.0,
-                "repeat_wave": false,
-                "repeat_count": 1
+                "enemies": [
+                    {
+                        "pokemon_id": 12,
+                        "percentage": 20
+                    },
+                    {
+                        "pokemon_id": 15,
+                        "percentage": 20
+                    },
+                    {
+                        "pokemon_id": 29,
+                        "percentage": 15
+                    },
+                    {
+                        "pokemon_id": 32,
+                        "percentage": 15
+                    },
+                    {
+                        "pokemon_id": 43,
+                        "percentage": 15
+                    },
+                    {
+                        "pokemon_id": 46,
+                        "percentage": 15
+                    }
+                ],
+                "min_level": 12,
+                "max_level": 15,
+                "wave_size": 15,
+                "spawn_interval": 1.5,
+                "initial_delay": 6.0,
+                "repeat_wave": true,
+                "repeat_count": 2
+            },
+            {
+                "wave_index": 1,
+                "path_index": 1,
+                "name": "Wave 2",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 12,
+                        "percentage": 20
+                    },
+                    {
+                        "pokemon_id": 15,
+                        "percentage": 20
+                    },
+                    {
+                        "pokemon_id": 43,
+                        "percentage": 15
+                    },
+                    {
+                        "pokemon_id": 46,
+                        "percentage": 15
+                    },
+                    {
+                        "pokemon_id": 29,
+                        "percentage": 15
+                    },
+                    {
+                        "pokemon_id": 32,
+                        "percentage": 15
+                    }
+                ],
+                "min_level": 12,
+                "max_level": 15,
+                "wave_size": 15,
+                "spawn_interval": 1.5,
+                "initial_delay": 6.0,
+                "repeat_wave": true,
+                "repeat_count": 2
             }
         ],
         "selected_wave": 0
@@ -2083,6 +2168,16 @@
                 "item_id": 1
             },
             {
+                "x": 312,
+                "y": 336,
+                "item_id": 1
+            },
+            {
+                "x": 312,
+                "y": 336,
+                "item_id": 1
+            },
+            {
                 "x": 384,
                 "y": 336,
                 "item_id": 1
@@ -2094,41 +2189,6 @@
             },
             {
                 "x": 384,
-                "y": 336,
-                "item_id": 1
-            },
-            {
-                "x": 384,
-                "y": 336,
-                "item_id": 1
-            },
-            {
-                "x": 384,
-                "y": 336,
-                "item_id": 1
-            },
-            {
-                "x": 312,
-                "y": 336,
-                "item_id": 1
-            },
-            {
-                "x": 312,
-                "y": 336,
-                "item_id": 1
-            },
-            {
-                "x": 312,
-                "y": 336,
-                "item_id": 1
-            },
-            {
-                "x": 312,
-                "y": 336,
-                "item_id": 1
-            },
-            {
-                "x": 312,
                 "y": 336,
                 "item_id": 1
             }
