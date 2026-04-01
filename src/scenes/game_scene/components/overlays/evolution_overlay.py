@@ -236,7 +236,7 @@ class EvolutionOverlay(BaseOverlay):
 
         # Nome evoluído
         font_evolved = self._get_font(20, True)
-        evolved_surf = font_evolved.render(f"-> {self.evolved_name}", True, self.colors['accent'])
+        evolved_surf = font_evolved.render(f" {self.evolved_name}", True, self.colors['accent'])
         evolved_x = center_x - evolved_surf.get_width() // 2
         screen.blit(evolved_surf, (evolved_x, sprite_y + sprite_size + 90))
 

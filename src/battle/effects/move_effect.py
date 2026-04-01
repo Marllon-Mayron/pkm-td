@@ -143,10 +143,8 @@ class MoveEffect:
 
             # Mensagem específica para queimadura
             if status_type == StatusType.BURN:
-                effect_manager.add_status_text(target, f"{target.name} foi queimado!")
                 print(f"[BURN] {attacker.name} queimou {target.name}!")
             elif status_type == StatusType.POISON:
-                effect_manager.add_status_text(target, f"{target.name} foi envenenado!")
                 print(f"[POISON] {attacker.name} envenenou {target.name}!")
 
             return True

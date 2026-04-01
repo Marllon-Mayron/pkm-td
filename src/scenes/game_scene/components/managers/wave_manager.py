@@ -235,7 +235,6 @@ class GameWaveManager:
     def update(self, dt: float, path_points_by_index: dict, screen_manager) -> List[Pokemon]:
         """
         Atualiza o sistema de waves
-        Retorna lista de inimigos que chegaram ao fim (para processamento)
         """
         if self.paused:
             return []
@@ -245,16 +244,31 @@ class GameWaveManager:
 
         # ===== 1. ATUALIZAR INIMIGOS EXISTENTES =====
         for enemy in self.active_enemies[:]:
-            # IMPORTANTE: NÃO chamar enemy.update() aqui!
-            # O movimento é gerenciado inteiramente pelo WaveManager
+            # Atualiza flags de spawn (apenas para comuns)
+            if hasattr(enemy, '_just_spawned'):
+                if not hasattr(enemy, '_spawn_timer'):
+                    enemy._spawn_timer = 0.5
+                enemy._spawn_timer -= dt
+                if enemy._spawn_timer <= 0:
+                    enemy._just_spawned = False
+                    delattr(enemy, '_spawn_timer')
 
-            # Atualiza posição e estado
+            # Atualiza flags de reverse (apenas para boss)
+            if hasattr(enemy, '_just_reversed'):
+                if not hasattr(enemy, '_reverse_timer'):
+                    enemy._reverse_timer = 0.5
+                enemy._reverse_timer -= dt
+                if enemy._reverse_timer <= 0:
+                    enemy._just_reversed = False
+                    delattr(enemy, '_reverse_timer')
+
+            # Atualiza movimento
             self._update_enemy_movement(enemy, dt)
 
-            # Atualiza animação (não chama update completo)
+            # Atualiza animação
             self._update_enemy_animation(enemy, dt)
 
-            # Verifica captura de item (mas não chama enemy.update)
+            # Verifica captura de item
             self._check_item_capture(enemy)
 
             # Atualiza o item carregado se houver
@@ -273,9 +287,6 @@ class GameWaveManager:
                 result = self._handle_enemy_arrival(enemy, is_end)
                 if result == "remove":
                     enemies_to_remove.append(enemy)
-                elif result == "return":
-                    # Já está retornando, não adiciona
-                    pass
                 elif result == "end":
                     enemies_at_end.append(enemy)
 
@@ -303,26 +314,36 @@ class GameWaveManager:
                     enemy.sprite = frames_list[enemy.current_frame]
 
     def _update_enemy_movement(self, enemy: Pokemon, dt: float):
-        """Atualiza o movimento do inimigo ao longo do path - com verificação de stun"""
+        """Atualiza o movimento do inimigo ao longo do path"""
 
-        # ===== VERIFICA STUN DA PARALISIA =====
+        # ===== VERIFICA STUN =====
         if hasattr(enemy, 'effect_manager') and enemy.effect_manager:
             status = enemy.effect_manager.get_status(enemy)
             if status:
                 if status.type == StatusType.PARALYSIS:
-                    is_stunned = status.update_paralysis(dt)
-                    if is_stunned:
-                        return  # Está atordoado
+                    if status.update_paralysis(dt):
+                        return
                 elif status.type == StatusType.SLEEP:
-                    is_asleep = status.update_sleep(dt)
-                    if is_asleep:
-                        return  # Está dormindo
+                    if status.update_sleep(dt):
+                        return
 
-        # ===== MOVIMENTO NORMAL =====
+        # ===== VERIFICA SE TEM PATH =====
         if not enemy.path or len(enemy.path) == 0:
-            return
+            path_idx = getattr(enemy, 'path_index_origin', 0)
+            path_data = self.paths.get(path_idx)
+            if path_data and len(path_data.points) >= 2:
+                print(f"[WAVE] Recuperando path para {enemy.name}")
+                enemy.path = path_data.points.copy()
+                enemy.path_index = 0
+                if enemy.is_boss:
+                    enemy.original_path = path_data.points.copy()
+            else:
+                return
 
+        # ===== MOVIMENTO =====
         if enemy.path_index >= len(enemy.path):
+            # Se chegou ao fim do path, não pode se mover - isso não deve acontecer
+            print(f"[BOSS_MOVE] {enemy.name} - path_index {enemy.path_index} >= {len(enemy.path)}")
             return
 
         target_x, target_y = enemy.path[enemy.path_index]
@@ -331,25 +352,44 @@ class GameWaveManager:
         distance = math.sqrt(dx * dx + dy * dy)
         move_distance = enemy.move_speed * dt * 60
 
-        if distance <= move_distance:
-            enemy.x, enemy.y = target_x, target_y
-            enemy.path_index += 1
-            enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+        # Log para debug do boss
+        if enemy.is_boss and enemy.path_index < len(enemy.path):
+            print(f"[BOSS_MOVE] {enemy.name} - Path[{enemy.path_index}/{len(enemy.path) - 1}]: "
+                  f"dist={distance:.1f}, move_dist={move_distance:.2f}, pos=({enemy.x:.0f},{enemy.y:.0f})")
 
+        if distance <= move_distance:
+            # Chegou ao ponto
+            enemy.x, enemy.y = target_x, target_y
+            enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+            enemy.path_index += 1
+
+            # Log para boss
             if enemy.is_boss:
                 print(
-                    f"[BOSS] {enemy.name} chegou ao ponto {enemy.path_index - 1}, indo para {enemy.path_index}/{len(enemy.path)}")
+                    f"[BOSS_MOVE] {enemy.name} chegou ao ponto {enemy.path_index - 1}, indo para {enemy.path_index}/{len(enemy.path)}")
+
+            # Se chegou ao fim do path, a inversão será tratada pelo _check_arrival
+            if enemy.is_boss and enemy.path_index >= len(enemy.path):
+                print(f"[BOSS_MOVE] {enemy.name} chegou ao FIM do path, aguardando inversão...")
         else:
+            # Move em direção ao ponto
             move_x = (dx / distance) * move_distance
             move_y = (dy / distance) * move_distance
             enemy.x += move_x
             enemy.y += move_y
             enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
 
+            # Atualiza direção
             if abs(dx) > abs(dy):
                 enemy.current_direction = "right" if dx > 0 else "left"
             else:
                 enemy.current_direction = "down" if dy > 0 else "up"
+
+            # Atualiza distância percorrida
+            if hasattr(enemy, '_distance_traveled'):
+                enemy._distance_traveled += move_distance
+            if hasattr(enemy, '_last_pos'):
+                enemy._last_pos = (enemy.x, enemy.y)
 
     def _check_item_capture(self, enemy: Pokemon):
         """Verifica se o inimigo capturou um item - CORRIGIDO"""
@@ -388,7 +428,7 @@ class GameWaveManager:
     def _decide_direction_after_capture(self, enemy: Pokemon):
         """
         Decide a direção após capturar um item:
-        - Comuns: voltam ao início se estiverem mais perto do início
+        - Comuns: sempre voltam ao início
         - Boss: calcula distância até início e fim
         """
         if not enemy.path:
@@ -400,26 +440,24 @@ class GameWaveManager:
         if not path_data:
             return
 
-        # Calcula distâncias até início e fim
-        start_point = path_data.start_point
-        end_point = path_data.end_point
-
-        dist_to_start = math.hypot(enemy.x - start_point[0], enemy.y - start_point[1])
-        dist_to_end = math.hypot(enemy.x - end_point[0], enemy.y - end_point[1])
-
         if enemy.is_boss:
             # Boss: decide baseado na distância
+            dist_to_start = math.hypot(enemy.x - path_data.start_point[0],
+                                       enemy.y - path_data.start_point[1])
+            dist_to_end = math.hypot(enemy.x - path_data.end_point[0],
+                                     enemy.y - path_data.end_point[1])
+
             # Se estiver mais perto do fim, continua; senão, volta
             if dist_to_end <= dist_to_start:
                 # Continua para o fim
-                if enemy.path_index < len(enemy.path) - 1:
-                    # Mantém direção atual
-                    pass
+                print(f"[BOSS] {enemy.name} capturou item, continuando para o fim")
             else:
                 # Volta para o início
+                print(f"[BOSS] {enemy.name} capturou item, voltando para o início")
                 self._reverse_path(enemy)
         else:
-            # Comum: sempre volta ao início
+            # Comum: SEMPRE volta ao início
+            print(f"[WAVE] {enemy.name} capturou item, voltando para o início")
             self._reverse_path(enemy)
 
     def _reverse_path(self, enemy: Pokemon):
@@ -449,11 +487,18 @@ class GameWaveManager:
         # avança para o próximo ponto para não ficar preso
         if min_dist < 0.1 and closest_idx < len(enemy.path) - 1:
             enemy.path_index = closest_idx + 1
-            print(f"[BOSS] {enemy.name} estava exatamente no ponto {closest_idx}, avançando para {enemy.path_index}")
+            print(f"[REVERSE] {enemy.name} estava exatamente no ponto {closest_idx}, avançando para {enemy.path_index}")
 
         # Marca estado
         enemy.is_returning_with_item = True
-        print(f"[BOSS] {enemy.name} invertido - novo path_index={enemy.path_index}, path_length={len(enemy.path)}")
+
+        # Reseta o controle de distância percorrida
+        if hasattr(enemy, '_distance_traveled'):
+            enemy._distance_traveled = 0.0
+        if hasattr(enemy, '_last_pos'):
+            enemy._last_pos = (enemy.x, enemy.y)
+
+        print(f"[REVERSE] {enemy.name} invertido - novo path_index={enemy.path_index}/{len(enemy.path)}")
 
     # Adicione esta constante
     MIN_TRAVEL_DISTANCE = 15.0  # Distância mínima para considerar que realmente andou
@@ -463,7 +508,7 @@ class GameWaveManager:
         Verifica se o inimigo chegou ao início ou fim do path
         Retorna: (chegou, é_fim)
         """
-        if not enemy.path:
+        if not enemy.path or len(enemy.path) == 0:
             return False, False
 
         threshold = self.PROXIMITY_THRESHOLD
@@ -473,56 +518,81 @@ class GameWaveManager:
         if not path_data:
             return False, False
 
-        # Para BOSS: sempre verifica início E fim
-        if enemy.is_boss:
-            # Verifica se acabou de inverter e está no ponto exato
-            # Se o path_index for 0, ele está no início do path atual
-            if enemy.path_index == 0:
-                # Está no início do path atual (pode ser início original ou fim original)
-                return False, False
-
-            # Verifica chegada ao FIM do path ATUAL
-            if enemy.path_index >= len(enemy.path) - 1:
-                # Chegou ao último ponto
-                dist_to_end = math.hypot(enemy.x - enemy.path[-1][0],
-                                         enemy.y - enemy.path[-1][1])
-                if dist_to_end < threshold:
-                    return True, True  # Chegou ao FIM do path atual
-
-            # Verifica chegada ao INÍCIO do path ATUAL (apenas se não for o primeiro ponto)
-            if enemy.path_index > 0:
-                dist_to_start = math.hypot(enemy.x - enemy.path[0][0],
-                                           enemy.y - enemy.path[0][1])
-                if dist_to_start < threshold:
-                    return True, False  # Chegou ao INÍCIO do path atual
-
-            return False, False
-
-        # ===== PARA INIMIGOS NORMAIS (NÃO BOSS) =====
-
-        # Se acabou de nascer (índice 0), NÃO considera chegada
-        if enemy.path_index == 0:
-            return False, False
-
-        # Calcula distância percorrida desde o nascimento
+        # ===== CONTROLE DE DISTÂNCIA PERCORRIDA =====
         if not hasattr(enemy, '_distance_traveled'):
             enemy._distance_traveled = 0.0
             enemy._last_pos = (enemy.x, enemy.y)
-        else:
-            dx = enemy.x - enemy._last_pos[0]
-            dy = enemy.y - enemy._last_pos[1]
-            enemy._distance_traveled += math.sqrt(dx * dx + dy * dy)
-            enemy._last_pos = (enemy.x, enemy.y)
+            return False, False
 
-        # Só considera chegada ao fim se percorreu distância mínima
+        # Só considera chegada se percorreu distância mínima
         if enemy._distance_traveled < self.MIN_TRAVEL_DISTANCE:
             return False, False
+
+        # ===== PARA BOSS =====
+        if enemy.is_boss:
+            # Verifica chegada ao FIM (quando path_index está no último ponto OU além)
+            if enemy.path_index >= len(enemy.path) - 1:
+                # Calcula distância até o último ponto
+                dist_to_end = math.hypot(enemy.x - enemy.path[-1][0],
+                                         enemy.y - enemy.path[-1][1])
+
+                print(f"[BOSS_ARRIVAL] {enemy.name} - Verificando FIM: "
+                      f"path_index={enemy.path_index}/{len(enemy.path)}, "
+                      f"dist_to_end={dist_to_end:.1f}, threshold={threshold}")
+
+                if dist_to_end < threshold:
+                    print(f"[BOSS_ARRIVAL] {enemy.name} chegou ao FIM!")
+                    enemy._distance_traveled = 0.0
+                    enemy._last_pos = (enemy.x, enemy.y)
+                    return True, True
+
+            # Verifica chegada ao INÍCIO
+            if enemy.path_index == 0 or enemy.path_index < 2:
+                dist_to_start = math.hypot(enemy.x - enemy.path[0][0],
+                                           enemy.y - enemy.path[0][1])
+
+                print(f"[BOSS_ARRIVAL] {enemy.name} - Verificando INÍCIO: "
+                      f"path_index={enemy.path_index}, dist_to_start={dist_to_start:.1f}")
+
+                if dist_to_start < threshold:
+                    # Não considera se acabou de nascer ou inverter
+                    if hasattr(enemy, '_just_spawned') and enemy._just_spawned:
+                        print(f"[BOSS_ARRIVAL] {enemy.name} - Ignorando início (just spawned)")
+                        return False, False
+                    if hasattr(enemy, '_just_reversed') and enemy._just_reversed:
+                        print(f"[BOSS_ARRIVAL] {enemy.name} - Ignorando início (just reversed)")
+                        return False, False
+
+                    print(f"[BOSS_ARRIVAL] {enemy.name} chegou ao INÍCIO!")
+                    enemy._distance_traveled = 0.0
+                    enemy._last_pos = (enemy.x, enemy.y)
+                    return True, False
+
+            return False, False
+
+        # ===== PARA INIMIGOS NORMAIS =====
+        # IMPORTANTE: Só verifica chegada ao FIM
+        # Inimigos comuns NUNCA devem ser considerados "chegados" ao início
+        # a menos que estejam retornando com item
 
         # Verifica chegada ao FIM
         dist_to_end = math.hypot(enemy.x - path_data.end_point[0],
                                  enemy.y - path_data.end_point[1])
         if dist_to_end < threshold:
-            return True, True  # Chegou ao fim, vai ser removido
+            print(f"[WAVE_ARRIVAL] {enemy.name} chegou ao FIM!")
+            enemy._distance_traveled = 0.0
+            enemy._last_pos = (enemy.x, enemy.y)
+            return True, True
+
+        # Verifica chegada ao INÍCIO (apenas para inimigos que estão retornando com item)
+        if hasattr(enemy, 'is_returning_with_item') and enemy.is_returning_with_item:
+            dist_to_start = math.hypot(enemy.x - path_data.start_point[0],
+                                       enemy.y - path_data.start_point[1])
+            if dist_to_start < threshold:
+                print(f"[WAVE_ARRIVAL] {enemy.name} voltou ao INÍCIO com item!")
+                enemy._distance_traveled = 0.0
+                enemy._last_pos = (enemy.x, enemy.y)
+                return True, False
 
         return False, False
 
@@ -536,10 +606,16 @@ class GameWaveManager:
         """
         # ===== BOSS =====
         if enemy.is_boss:
-            # Se está carregando item, processa o roubo (apenas quando chega ao FIM)
-            if enemy.is_carrying and is_end:
+            print(
+                f"[BOSS_ARRIVAL] {enemy.name} - Processando, is_end={is_end}, has_item={enemy.is_carrying is not None}")
+
+            # Se está carregando item
+            if enemy.is_carrying:
                 carried_item = enemy.is_carrying
-                print(f"[BOSS] {enemy.name} roubou {carried_item.item_name}!")
+                if is_end:
+                    print(f"[BOSS] {enemy.name} roubou {carried_item.item_name} no FIM!")
+                else:
+                    print(f"[BOSS] {enemy.name} roubou {carried_item.item_name} no INÍCIO!")
 
                 # Marca item como roubado
                 carried_item.is_protected = False
@@ -551,78 +627,150 @@ class GameWaveManager:
 
                 enemy.is_carrying = None
 
-            # INVERTE A DIREÇÃO DO BOSS (continua andando)
-            # Só inverte se NÃO for o primeiro ponto após inversão
-            if enemy.path_index >= len(enemy.path) - 1 or enemy.path_index == 0:
-                self._reverse_boss_direction(enemy)
-
+            # INVERTE A DIREÇÃO DO BOSS
+            self._reverse_boss_direction(enemy)
             return "return"
 
         # ===== INIMIGO COMUM =====
-        if enemy.is_carrying:
-            # Carregando item -> item é roubado (chegou ao fim)
-            carried_item = enemy.is_carrying
-            print(f"[WAVE] {enemy.name} chegou ao fim com {carried_item.item_name} - item será roubado!")
-            carried_item.is_protected = False
-            carried_item.is_stolen = True
-            carried_item.carried_by = None
 
-            if hasattr(self.game_scene, 'target_item_manager'):
-                self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
+        # Caso 1: Chegou ao FIM
+        if is_end:
+            if enemy.is_carrying:
+                # Estava carregando item -> item é roubado
+                carried_item = enemy.is_carrying
+                print(f"[WAVE] {enemy.name} chegou ao FIM com {carried_item.item_name} - item roubado!")
+                carried_item.is_protected = False
+                carried_item.is_stolen = True
+                carried_item.carried_by = None
 
-            enemy.is_carrying = None
-            enemy.is_returning_with_item = False
+                if hasattr(self.game_scene, 'target_item_manager'):
+                    self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
+
+                enemy.is_carrying = None
+
+            # Inimigo comum SEMPRE some ao chegar no fim
+            print(f"[WAVE] {enemy.name} chegou ao FIM e desapareceu")
             return "remove"
 
-        # Inimigo comum sem item sempre some ao chegar
-        return "remove"
+        # Caso 2: Chegou ao INÍCIO (estava retornando com item)
+        else:
+            if enemy.is_carrying:
+                # Chegou ao início com item - item roubado com sucesso
+                carried_item = enemy.is_carrying
+                print(f"[WAVE] {enemy.name} voltou ao INÍCIO com {carried_item.item_name} - item roubado!")
+
+                carried_item.is_protected = False
+                carried_item.is_stolen = True
+                carried_item.carried_by = None
+
+                if hasattr(self.game_scene, 'target_item_manager'):
+                    self.game_scene.target_item_manager.mark_item_as_stolen(carried_item)
+
+                enemy.is_carrying = None
+
+            # Remove o inimigo comum ao chegar no início (conseguiu roubar o item)
+            print(f"[WAVE] {enemy.name} voltou ao INÍCIO e desapareceu (item roubado)")
+            return "remove"
 
     def _reverse_boss_direction(self, enemy: Pokemon):
-        """
-        Inverte a direção do boss no path
-        Mantém o boss andando continuamente
-        """
+        """Inverte a direção do boss no path"""
         if not enemy.path or len(enemy.path) < 2:
+            print(f"[BOSS_REVERSE] {enemy.name} não tem path suficiente para inverter")
             return
+
+        # Marca que acabou de inverter (para evitar loop)
+        enemy._just_reversed = True
+
+        # Adiciona timer para remover a flag
+        if not hasattr(enemy, '_reverse_timer'):
+            enemy._reverse_timer = 0.5
 
         # Salva o path original se necessário
         if not hasattr(enemy, 'original_path') or enemy.original_path is None:
             enemy.original_path = enemy.path.copy()
+            print(f"[BOSS_REVERSE] {enemy.name} salvou original_path com {len(enemy.original_path)} pontos")
 
         # Cria o novo path invertido
+        old_path_length = len(enemy.path)
+        old_path_index = enemy.path_index
+
+        # Inverte o path
         enemy.path = list(reversed(enemy.original_path.copy()))
 
-        # IMPORTANTE: Não encontrar o ponto mais próximo!
-        # Em vez disso, define o índice baseado na direção
+        print(f"[BOSS_REVERSE] {enemy.name} - Path invertido: {old_path_length} -> {len(enemy.path)} pontos")
+        print(f"[BOSS_REVERSE] {enemy.name} - Old index: {old_path_index}")
 
-        # Se está no fim do path atual, deve começar do início do path invertido
-        if enemy.is_returning_with_item:
-            # Já está invertido, começa do início
-            enemy.path_index = 0
-            # Ajusta posição para o primeiro ponto
-            if len(enemy.path) > 0:
-                enemy.x, enemy.y = enemy.path[0]
-                enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+        # ===== CRUCIAL: Define o índice baseado na posição atual =====
+        # Encontra o ponto mais próximo no NOVO path
+        min_dist = float('inf')
+        closest_idx = 0
+        for i, point in enumerate(enemy.path):
+            dist = math.hypot(enemy.x - point[0], enemy.y - point[1])
+            if dist < min_dist:
+                min_dist = dist
+                closest_idx = i
+
+        # Se está muito próximo do ponto, avança para o próximo para não ficar parado
+        if min_dist < 1.0:
+            if closest_idx < len(enemy.path) - 1:
+                enemy.path_index = closest_idx + 1
+                print(f"[BOSS_REVERSE] {enemy.name} - Estava no ponto {closest_idx}, avançando para {enemy.path_index}")
+            else:
+                # Se está no último ponto, vai para o primeiro (mas isso não deve acontecer)
+                enemy.path_index = 0
+                print(f"[BOSS_REVERSE] {enemy.name} - Estava no último ponto, indo para o início")
         else:
-            # Primeira inversão (chegou ao fim)
-            # Vai para o início do path invertido (que é o fim original)
-            enemy.path_index = 0
-            # Ajusta posição para o primeiro ponto do path invertido
-            if len(enemy.path) > 0:
-                enemy.x, enemy.y = enemy.path[0]
-                enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+            enemy.path_index = closest_idx
+            print(f"[BOSS_REVERSE] {enemy.name} - Ponto mais próximo: {closest_idx}, dist={min_dist:.1f}")
 
-        # Marca que está retornando com item (ou invertido)
+        # GARANTE que o path_index não exceda o tamanho
+        if enemy.path_index >= len(enemy.path):
+            enemy.path_index = len(enemy.path) - 1
+            print(f"[BOSS_REVERSE] {enemy.name} - Ajustando path_index para {enemy.path_index}")
+
+        # Força uma pequena movimentação para quebrar a inércia
+        # Isso evita que o boss fique preso no ponto exato
+        if min_dist < 2.0 and enemy.path_index < len(enemy.path):
+            target_x, target_y = enemy.path[enemy.path_index]
+            dx = target_x - enemy.x
+            dy = target_y - enemy.y
+            dist_to_target = math.hypot(dx, dy)
+
+            if dist_to_target > 0:
+                # Move um pouquinho em direção ao alvo
+                move_x = (dx / dist_to_target) * 0.5
+                move_y = (dy / dist_to_target) * 0.5
+                enemy.x += move_x
+                enemy.y += move_y
+                enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+                print(
+                    f"[BOSS_REVERSE] {enemy.name} - Pequeno movimento para quebrar inércia: ({move_x:.1f}, {move_y:.1f})")
+
+        # Atualiza direção baseada no próximo ponto
+        if enemy.path_index < len(enemy.path):
+            if enemy.path_index < len(enemy.path) - 1:
+                dx = enemy.path[enemy.path_index + 1][0] - enemy.x
+                dy = enemy.path[enemy.path_index + 1][1] - enemy.y
+            else:
+                dx = enemy.path[enemy.path_index][0] - enemy.x
+                dy = enemy.path[enemy.path_index][1] - enemy.y
+
+            if abs(dx) > abs(dy):
+                enemy.current_direction = "right" if dx > 0 else "left"
+            else:
+                enemy.current_direction = "down" if dy > 0 else "up"
+
+        # Marca estado
         enemy.is_returning_with_item = True
 
         # Reseta o controle de distância percorrida
-        if hasattr(enemy, '_distance_traveled'):
-            enemy._distance_traveled = 0.0
-        if hasattr(enemy, '_last_pos'):
-            enemy._last_pos = (enemy.x, enemy.y)
+        enemy._distance_traveled = 0.0
+        enemy._last_pos = (enemy.x, enemy.y)
 
-        print(f"[BOSS] {enemy.name} inverteu direção - novo path_index={enemy.path_index}/{len(enemy.path)}")
-        print(f"[BOSS] Nova posição: ({enemy.x:.1f}, {enemy.y:.1f})")
+        print(f"[BOSS_REVERSE] {enemy.name} - INVERTIDO! path_index={enemy.path_index}/{len(enemy.path)}")
+        print(f"[BOSS_REVERSE] {enemy.name} - Posição atual: ({enemy.x:.1f}, {enemy.y:.1f})")
+        print(
+            f"[BOSS_REVERSE] {enemy.name} - Próximo ponto: {enemy.path[enemy.path_index] if enemy.path_index < len(enemy.path) else 'FIM'}")
 
     def _remove_enemy(self, enemy: Pokemon):
         """Remove um inimigo da lista ativa (por morte ou captura)"""
@@ -734,44 +882,58 @@ class GameWaveManager:
             shiny=random.random() < 0.001,
             is_boss=is_boss
         )
+
         if pokemon.is_shiny:
             sound_manager.play_effect(SoundEffect.SHINY)
 
-        # Configura path - IMPORTANTE: cópia completa da lista
+        # ===== CONFIGURAÇÃO DO PATH =====
+        if len(path_data.points) < 2:
+            print(f"[ERRO] Path {path_idx} tem menos de 2 pontos! Não pode criar inimigo.")
+            return None
+
+        # Configura path
         pokemon.path = path_data.points.copy()
         pokemon.path_index = 0
         pokemon.path_index_origin = path_idx
+
+        # IMPORTANTE: Marca que acabou de nascer
+        pokemon._just_spawned = True
+        pokemon._spawn_timer = 0.5  # Timer de 0.5 segundos
 
         # Inicializa controle de distância percorrida
         pokemon._distance_traveled = 0.0
         pokemon._last_pos = (pokemon.x, pokemon.y)
 
-        # IMPORTANTE: Não configurar original_path aqui para comuns
-        # Apenas boss precisa guardar original_path
+        # Para boss, guarda o path original
         if is_boss:
             pokemon.original_path = path_data.points.copy()
+            pokemon.is_returning_with_item = False
+            pokemon._just_reversed = False
+            print(f"[BOSS] {pokemon.name} configurado com path de {len(pokemon.path)} pontos")
+        else:
+            # Para comuns, não tem flag de retorno inicialmente
+            pokemon.is_returning_with_item = False
+
+        # ===== CONFIGURA VELOCIDADE E DIREÇÃO =====
+        pokemon.move_speed = pokemon.base_move_speed * wave_data.speed_multiplier
+
+        # Configura direção inicial baseada no próximo ponto
+        if len(pokemon.path) > 1:
+            dx = pokemon.path[1][0] - pokemon.path[0][0]
+            dy = pokemon.path[1][1] - pokemon.path[0][1]
+
+            if abs(dx) > abs(dy):
+                pokemon.current_direction = "right" if dx > 0 else "left"
+            else:
+                pokemon.current_direction = "down" if dy > 0 else "up"
 
         # Configura screen manager e batalha
         pokemon.screen_manager = self.game_scene.screen_manager if self.game_scene else None
         if self.game_scene and hasattr(self.game_scene, 'battle_system'):
             pokemon.set_battle_system(self.game_scene.battle_system)
             self.game_scene.battle_system.set_effect_manager_for_pokemon(pokemon)
-            print(f"[WAVE] {pokemon.name} vinculado ao effect_manager: {pokemon.effect_manager is not None}")
-        # Configura velocidade
-        pokemon.move_speed = pokemon.base_move_speed * wave_data.speed_multiplier
 
-        # Configura direção inicial
-        if len(path_data.points) > 1:
-            dx = path_data.points[1][0] - path_data.points[0][0]
-            dy = path_data.points[1][1] - path_data.points[0][1]
-            if abs(dx) > abs(dy):
-                pokemon.current_direction = "right" if dx > 0 else "left"
-            else:
-                pokemon.current_direction = "down" if dy > 0 else "up"
-
-        # Debug
         print(f"[WAVE] Criado {pokemon.name} Lv.{pokemon.level} {'(BOSS)' if is_boss else ''} no path {path_idx}")
-        print(f"[WAVE] Path points: {len(path_data.points)} pontos")
         print(f"[WAVE] Posição inicial: ({pokemon.x:.0f}, {pokemon.y:.0f})")
         print(f"[WAVE] Velocidade: {pokemon.move_speed:.2f}")
 
