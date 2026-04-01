@@ -8,7 +8,7 @@ class EffectFactory:
 
     # Configurações pré-definidas para moves comuns
     MOVE_EFFECTS = {
-        # Status moves - Stat Modifiers (8 segundos de duração)
+        # Status moves - Stat Modifiers (4 segundos de duração)
         "string-shot": {
             "effect_type": "stat_mod",
             "target": EffectTarget.TARGET,
@@ -16,7 +16,7 @@ class EffectFactory:
             "params": {
                 "stat": "speed",
                 "stages": -1,
-                "duration": 4.0  # 8 segundos
+                "duration": 4.0
             },
             "description": "Reduz a Velocidade do oponente"
         },
@@ -69,19 +69,43 @@ class EffectFactory:
             "description": "Aumenta muito a Velocidade"
         },
 
-        # Status effects (4 segundos de duração)
-        "toxic": {
+        # ===== VENENO (POISON) =====
+        "poison-sting": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "poison",
+                "chance": 0.30,  # 30% de chance de envenenar
+                "duration": None,  # Veneno é permanente até cura
+                "overwrite": False  # Não sobrescreve outros status
+            },
+            "description": "Pode envenenar o oponente (30% de chance)"
+        },
+
+        "poison-powder": {
             "effect_type": "status",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "poison",
-                "overwrite": True,
-                "duration": 4.0
+                "duration": None,  # Veneno permanente
+                "overwrite": False
+            },
+            "description": "Envenena o oponente"
+        },
+
+        "toxic": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "toxic_poison",  # Veneno tóxico (dano aumenta)
+                "duration": None,
+                "overwrite": True
             },
             "description": "Envenena gravemente o oponente"
         },
-
         "thunder-wave": {
             "effect_type": "status",
             "target": EffectTarget.TARGET,
@@ -136,6 +160,7 @@ class EffectFactory:
             },
             "description": "Ataque que acerta 2-5 vezes"
         },
+
         # Flinch moves
         "bite": {
             "effect_type": "flinch",
@@ -215,7 +240,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "sleep",
-                "duration": None,  # Duração gerenciada pelo próprio status
+                "duration": None,
                 "overwrite": True
             },
             "description": "Coloca o oponente para dormir"

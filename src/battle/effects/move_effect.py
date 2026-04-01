@@ -4,6 +4,7 @@ from typing import Optional, List, Any, Callable
 from dataclasses import dataclass, field
 import random
 
+
 class EffectTarget(Enum):
     """Alvo do efeito"""
     SELF = "self"
@@ -26,7 +27,7 @@ class MoveEffect:
     """
     # Identificação
     name: str
-    effect_type: str  # status, stat_mod, multi_hit, flinch, etc
+    effect_type: str  # status, stat_mod, multi_hit, flinch, status_chance, etc
 
     # Alvo e timing
     target: EffectTarget = EffectTarget.TARGET
@@ -58,6 +59,8 @@ class MoveEffect:
         # Executa efeito padrão baseado no tipo
         if self.effect_type == "status":
             return self._apply_status(attacker, target, effect_manager)
+        elif self.effect_type == "status_chance":
+            return self._apply_status_with_chance(attacker, target, effect_manager)
         elif self.effect_type == "stat_mod":
             return self._apply_stat_mod(attacker, target, effect_manager)
         elif self.effect_type == "multi_hit":
@@ -75,7 +78,24 @@ class MoveEffect:
         """Aplica efeito de status"""
         from .status_effect import StatusEffect, StatusType
 
-        status_type = StatusType[self.params.get('status', 'NONE').upper()]
+        status_type_str = self.params.get('status', 'NONE').upper()
+
+        # Mapeia para StatusType
+        if status_type_str == 'POISON':
+            status_type = StatusType.POISON
+        elif status_type_str == 'TOXIC_POISON':
+            status_type = StatusType.TOXIC_POISON
+        elif status_type_str == 'BURN':
+            status_type = StatusType.BURN
+        elif status_type_str == 'PARALYSIS':
+            status_type = StatusType.PARALYSIS
+        elif status_type_str == 'SLEEP':
+            status_type = StatusType.SLEEP
+        elif status_type_str == 'FREEZE':
+            status_type = StatusType.FREEZE
+        else:
+            status_type = StatusType.NONE
+
         duration = self.params.get('duration')
 
         if status_type != StatusType.NONE:
@@ -85,6 +105,39 @@ class MoveEffect:
 
             status = StatusEffect(status_type, duration)
             effect_manager.apply_status(target, status, attacker)
+            return True
+
+        return False
+
+    def _apply_status_with_chance(self, attacker, target, effect_manager):
+        """Aplica efeito de status com chance de sucesso"""
+        from .status_effect import StatusEffect, StatusType
+
+        status_type_str = self.params.get('status', 'NONE').upper()
+        chance = self.params.get('chance', 0.30)  # 30% padrão
+
+        # Mapeia para StatusType
+        if status_type_str == 'POISON':
+            status_type = StatusType.POISON
+        elif status_type_str == 'TOXIC_POISON':
+            status_type = StatusType.TOXIC_POISON
+        else:
+            status_type = StatusType.NONE
+
+        duration = self.params.get('duration')
+
+        # Verifica se já tem status
+        existing_status = effect_manager.get_status(target)
+        if existing_status and existing_status.type != StatusType.NONE:
+            # Já tem status, não aplica novo
+            return False
+
+        # Tenta aplicar com a chance
+        if status_type != StatusType.NONE and random.random() < chance:
+            status = StatusEffect(status_type, duration)
+            effect_manager.apply_status(target, status, attacker)
+            effect_manager.add_status_text(target, f"{target.name} foi envenenado!")
+            print(f"[STATUS] {attacker.name} envenenou {target.name}!")
             return True
 
         return False

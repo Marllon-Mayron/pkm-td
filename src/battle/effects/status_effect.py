@@ -8,6 +8,7 @@ class StatusType(Enum):
     """Tipos de status"""
     NONE = "none"
     POISON = "poison"
+    TOXIC_POISON = "toxic_poison"  # Veneno tóxico (dano aumenta com o tempo)
     BURN = "burn"
     PARALYSIS = "paralysis"
     SLEEP = "sleep"
@@ -30,19 +31,26 @@ class StatusEffect:
         self.duration = duration
         self.time_left = duration if duration else 0
 
+        # Para veneno tóxico - contador de ticks
+        self._toxic_tick_count = 0
+        self._last_tick_time = 0.0
+        self._tick_interval = 2.0  # Tick a cada 2 segundos
+
         # Para paralisia - controle de stun
-        self._stun_timer = 0.0  # Tempo restante de stun
-        self._last_stun_check = 0.0  # Último tempo de verificação
+        self._stun_timer = 0.0
+        self._last_stun_check = 0.0
 
         # Para sono - controle de duração
-        self._sleep_timer = 0.0  # Tempo restante de sono
-        self._sleep_check_timer = 0.0  # Timer para verificar extensão
+        self._sleep_timer = 0.0
+        self._sleep_check_timer = 0.0
+
+        # Para queimadura e veneno - controle de tick
+        self._damage_timer = 0.0
 
         # Callbacks
         self.on_apply_callback = None
         self.on_tick_callback = None
         self.on_remove_callback = None
-
 
         self._setup_effects()
 
@@ -54,6 +62,16 @@ class StatusEffect:
             self.color = (160, 64, 160)
             self.icon = "☠️"
             self.on_tick_callback = self._poison_tick
+            self._damage_timer = 0.0
+
+        elif self.type == StatusType.TOXIC_POISON:
+            self.name = "Veneno Tóxico"
+            self.display_name = "TOX"
+            self.color = (180, 80, 180)
+            self.icon = "☠️☠️"
+            self.on_tick_callback = self._toxic_poison_tick
+            self._toxic_tick_count = 0
+            self._damage_timer = 0.0
 
         elif self.type == StatusType.BURN:
             self.name = "Queimadura"
@@ -61,6 +79,7 @@ class StatusEffect:
             self.color = (240, 128, 48)
             self.icon = "🔥"
             self.on_tick_callback = self._burn_tick
+            self._damage_timer = 0.0
 
         elif self.type == StatusType.PARALYSIS:
             self.name = "Paralisia"
@@ -69,19 +88,12 @@ class StatusEffect:
             self.icon = "⚡"
             # Paralisia não tem tick de dano
 
-
         elif self.type == StatusType.SLEEP:
-
             self.name = "Sono"
-
             self.display_name = "SLP"
-
             self.color = (104, 144, 240)
-
             self.icon = "💤"
-
             self.on_apply_callback = self._sleep_apply
-
 
         elif self.type == StatusType.FREEZE:
             self.name = "Congelado"
@@ -99,18 +111,32 @@ class StatusEffect:
             self.on_tick_callback = self._confusion_tick
 
     def _poison_tick(self, pokemon, effect_manager):
-        """Efeito do veneno a cada tick"""
+        """
+        Efeito do veneno a cada tick - dano fixo de 1/8 do HP máximo
+        """
         damage = max(1, pokemon.max_hp // 8)
         pokemon.current_hp = max(0, pokemon.current_hp - damage)
-        # Texto temporário apenas para dano
-        effect_manager.add_status_text(pokemon, f"-{damage} HP")
+        return damage
+
+    def _toxic_poison_tick(self, pokemon, effect_manager):
+        """
+        Efeito do veneno tóxico - dano aumenta a cada tick
+        Primeiro tick: 1/16 do HP
+        Segundo tick: 2/16 (1/8)
+        Terceiro tick: 3/16
+        E assim por diante...
+        """
+        self._toxic_tick_count += 1
+        # Dano = (tick_count / 16) do HP máximo
+        damage = max(1, (pokemon.max_hp * self._toxic_tick_count) // 16)
+        pokemon.current_hp = max(0, pokemon.current_hp - damage)
         return damage
 
     def _burn_tick(self, pokemon, effect_manager):
         """Efeito da queimadura a cada tick"""
         damage = max(1, pokemon.max_hp // 8)
         pokemon.current_hp = max(0, pokemon.current_hp - damage)
-        effect_manager.add_status_text(pokemon, f"-{damage} HP")
+        effect_manager.add_status_text(pokemon, f"-{damage} HP (Queimadura)")
         return damage
 
     def _confusion_tick(self, pokemon, effect_manager):
@@ -118,7 +144,7 @@ class StatusEffect:
         if random.random() < 0.33:
             damage = max(1, pokemon.max_hp // 8)
             pokemon.current_hp = max(0, pokemon.current_hp - damage)
-            effect_manager.add_status_text(pokemon, f"-{damage} HP")
+            effect_manager.add_status_text(pokemon, f"-{damage} HP (Confusão)")
             return damage
         return 0
 
@@ -148,11 +174,11 @@ class StatusEffect:
 
         # Verifica se deve aplicar um novo stun
         self._last_stun_check += dt
-        if self._last_stun_check >= 3.0:  # Verifica a cada 1 segundo
+        if self._last_stun_check >= 3.0:  # Verifica a cada 3 segundos
             self._last_stun_check = 0
-            if random.random() < 0.33:  # 90% de chance
+            if random.random() < 0.33:  # 33% de chance de stun
                 self._stun_timer = 2.0  # Stun de 2 segundos
-                print(f"[PARALYSIS] {self._stun_timer:.1f}s de stun aplicado!")  # Log para debug
+                print(f"[PARALYSIS] Stun aplicado por 2 segundos!")
                 return True
 
         return False
@@ -175,15 +201,15 @@ class StatusEffect:
         if self._sleep_timer <= 0:
             self._sleep_check_timer += dt
 
-            # Verifica a cada 0.5 segundos
-            if self._sleep_check_timer >= 1:
+            # Verifica a cada 1 segundo
+            if self._sleep_check_timer >= 1.0:
                 self._sleep_check_timer = 0
                 if random.random() < 0.25:  # 25% de chance de continuar dormindo
-                    self._sleep_timer = 2.0  # Dorme mais 1 segundo
+                    self._sleep_timer = 2.0  # Dorme mais 2 segundos
                     return True
                 else:
                     # Acordou
-                    print(f"[SLEEP] {self._pokemon_name} acordou! (timer estava em {self._sleep_timer:.2f})")
+                    print(f"[SLEEP] {self._pokemon_name} acordou!")
                     return False
 
         # Ainda tem tempo de sono - decrementa
@@ -213,7 +239,7 @@ class StatusEffect:
         Atualiza o efeito de status
         Retorna False se o efeito acabou
         """
-        self._pokemon_name = pokemon.name  # Guarda nome para logs
+        self._pokemon_name = pokemon.name
 
         # Atualiza paralisia (gerencia stun)
         if self.type == StatusType.PARALYSIS:
@@ -224,10 +250,9 @@ class StatusEffect:
         if self.type == StatusType.SLEEP:
             is_still_asleep = self.update_sleep(dt)
             if not is_still_asleep:
-                # Acordou - remove o status
                 print(f"[SLEEP] {pokemon.name} acordou! Removendo status.")
                 return False
-            return True  # Continua dormindo
+            return True
 
         # Para outros status com duração
         if self.duration:
@@ -235,9 +260,13 @@ class StatusEffect:
             if self.time_left <= 0:
                 return False
 
-        # Aplica tick de dano (para veneno, queimadura, confusão)
+        # ===== TICK DE DANO PARA VENENO, QUEIMADURA, ETC =====
+        # Aplica dano a cada 2 segundos
         if self.on_tick_callback:
-            self.on_tick_callback(pokemon, effect_manager)
+            self._damage_timer += dt
+            if self._damage_timer >= self._tick_interval:
+                self._damage_timer = 0
+                self.on_tick_callback(pokemon, effect_manager)
 
         return True
 
@@ -250,7 +279,7 @@ class StatusEffect:
     def _sleep_apply(self, pokemon, effect_manager):
         """Aplica o sono - garante 2 segundos iniciais"""
         self._pokemon_name = pokemon.name
-        self._sleep_timer = 6  # 3 segundos garantidos (BUG CONTANDO METADE DO TEMPO DEFINIDO NO GAME)
+        self._sleep_timer = 6.0  # 6 segundos garantidos
         self._sleep_check_timer = 0.0
 
     def apply(self, pokemon, effect_manager):
