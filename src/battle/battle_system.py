@@ -47,35 +47,42 @@ class BattleSystem:
 
         attacker.has_no_pp = False
 
-        # Verifica status do atacante
+        # ===== VERIFICA SE O ATAQUE É DE STATUS (PARA BLOQUEAR APENAS STATUS) =====
+        # Só bloqueia o ataque se:
+        # 1. O atacante está com um status que impede ação (sono, freeze, stun da paralisia)
+        # 2. OU o move é de status E o alvo já tem status (para não sobrescrever)
+
+        # Primeiro, verifica se o atacante pode agir (sono, freeze, paralisia)
         status = self.effect_manager.get_status(attacker)
 
         # Atualiza o estado de paralisia antes de verificar
         if status and status.type == StatusType.PARALYSIS:
             status.update_paralysis(0)
 
-        # Verifica se pode atacar (stun da paralisia)
+        # Verifica se o atacante está impossibilitado de agir
         if status and not status.can_attack():
             if status.type == StatusType.PARALYSIS:
                 self.effect_manager.add_status_text(attacker,
                                                     f"{attacker.name} está paralisado e não consegue se mover!")
                 print(f"[BATTLE] {attacker.name} está paralisado e não consegue se mover!")
+            elif status.type == StatusType.SLEEP:
+                self.effect_manager.add_status_text(attacker, f"{attacker.name} está dormindo!")
+                print(f"[BATTLE] {attacker.name} está dormindo e não pode atacar!")
             else:
                 self.effect_manager.add_status_text(attacker, f"{attacker.name} não pode atacar!")
                 print(f"[BATTLE] {attacker.name} está {status.name.lower()} e não pode atacar!")
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
 
-        # Verificação para ataques de status
+        # ===== VERIFICAÇÃO ESPECÍFICA PARA STATUS MOVES =====
+        # Só bloqueia se for um move que APLICA STATUS no alvo E o alvo já tem status
         if move.category == "status":
             target_status = self.effect_manager.get_status(target)
 
-            if target_status and target_status.type != StatusType.NONE:
-                print(
-                    f"[BATTLE] {attacker.name} usou {move.name} em {target.name}, mas {target.name} já está com {target_status.name}!")
-                self.effect_manager.add_status_text(attacker,
-                                                    f"Falhou! {target.name} já está com {target_status.name}!")
+            # Verifica se o move realmente aplica um status (e não é só stat mod)
+            is_status_applying_move = self._is_status_applying_move(move.name)
 
+            if is_status_applying_move and target_status and target_status.type != StatusType.NONE:
                 move.current_pp -= 1
                 attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
                 self._show_miss_on_attacker(attacker)
@@ -90,7 +97,7 @@ class BattleSystem:
 
         will_hit = random.random() <= hit_chance
 
-        # Ataques de status
+        # Ataques de status (que aplicam efeitos como veneno, queimadura, etc)
         if move.category == "status":
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")
 
@@ -266,22 +273,8 @@ class BattleSystem:
             status = self.effect_manager.get_status(attacker)
             if status and status.type == StatusType.BURN:
                 damage_result["damage"] = int(damage_result["damage"] * 0.5)
-                self.effect_manager.add_status_text(attacker, "Ataque reduzido pela queimadura!")
 
         return damage_result
-
-    def _apply_status_effect(self, attacker, target, move):
-        """Aplica efeito de status do move"""
-        from src.battle.effects import EffectFactory
-
-        effect = EffectFactory.create_effect(move.name)
-        if effect:
-            effect.execute(attacker, target, self, self.effect_manager)
-            # REGISTRA CONTRIBUIÇÃO DE STATUS
-            target.register_status_application(attacker, move.name)
-        else:
-            print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")
-            self.effect_manager.add_status_text(target, f"{move.name} usado!")
 
     def _apply_move_effect(self, attacker, target, move, damage):
         """Aplica efeitos especiais do move (multi-hit, flinch, etc)"""
@@ -295,6 +288,45 @@ class BattleSystem:
             elif effect.timing == EffectTiming.ON_HIT:
                 effect.execute(attacker, target, self, self.effect_manager, damage)
 
+    def _is_status_applying_move(self, move_name: str) -> bool:
+        """Verifica se um move realmente aplica um status (veneno, queimadura, paralisia, sono)"""
+        from src.battle.effects.effect_factory import EffectFactory
+
+        effect = EffectFactory.create_effect(move_name)
+        if not effect:
+            return False
+
+        # Moves que aplicam status (não inclui stat_mod)
+        status_moves = ["status", "status_chance"]
+
+        # Moves que NÃO devem ser bloqueados (stat_mod)
+        stat_mod_moves = ["stat_mod"]
+
+        if effect.effect_type in stat_mod_moves:
+            return False
+
+        if effect.effect_type in status_moves:
+            return True
+
+        return False
+
+    def _apply_status_effect(self, attacker, target, move):
+        """Aplica efeito de status do move"""
+        from src.battle.effects import EffectFactory
+
+        effect = EffectFactory.create_effect(move.name)
+        if effect:
+            # Só aplica se for um efeito de status (não stat_mod)
+            if effect.effect_type in ["status", "status_chance"]:
+                effect.execute(attacker, target, self, self.effect_manager)
+                # REGISTRA CONTRIBUIÇÃO DE STATUS
+                target.register_status_application(attacker, move.name)
+            else:
+                # Para outros efeitos (como stat_mod), executa normalmente
+                effect.execute(attacker, target, self, self.effect_manager)
+        else:
+            print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")
+            self.effect_manager.add_status_text(target, f"{move.name} usado!")
 
     def render_projectiles(self, screen, camera, screen_manager):
         """Renderiza projéteis"""

@@ -117,8 +117,6 @@ class StatusEffect:
         """
         damage = max(1, pokemon.max_hp // 8)
         pokemon.current_hp = max(0, pokemon.current_hp - damage)
-        effect_manager.add_status_text(pokemon, f"-{damage} HP (Veneno)")
-        print(f"[POISON] {pokemon.name} perdeu {damage} HP por veneno!")
         return damage
 
     def _toxic_poison_tick(self, pokemon, effect_manager):
