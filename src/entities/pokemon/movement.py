@@ -52,6 +52,22 @@ class PokemonMovement:
                 return status.update_sleep(dt)
         return False
 
+    def is_frozen(self) -> bool:
+        """Verifica se o Pokémon está congelado"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.FREEZE:
+                return status.is_frozen()
+        return False
+
+    def update_freeze(self, dt: float) -> bool:
+        """Atualiza o estado de congelamento e retorna True se ainda está congelado"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.FREEZE:
+                return status.update_freeze(dt)
+        return False
+
     def update_movement(self, dt, items=None):
         """Movimento via path (para aliados ou inimigos sem wave control)"""
 
@@ -69,6 +85,15 @@ class PokemonMovement:
         # ===== MOVIMENTO NORMAL =====
         if not self.pokemon.path or len(self.pokemon.path) == 0 or self.pokemon.path_index >= len(self.pokemon.path):
             return
+
+        # ===== VERIFICA CONGELAMENTO =====
+        if self.is_frozen():
+            # Atualiza o estado de congelamento
+            is_still_frozen = self.update_freeze(dt)
+            if is_still_frozen:
+                # Está congelado - não se move
+                return
+                # Se descongelou, continua o movimento normalmente
 
         target_x, target_y = self.pokemon.path[self.pokemon.path_index]
         dx = target_x - self.pokemon.x

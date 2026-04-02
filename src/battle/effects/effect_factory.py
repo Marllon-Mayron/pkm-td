@@ -203,6 +203,55 @@ class EffectFactory:
             },
             "description": "Pode queimar o oponente (10% de chance)"
         },
+        # ===== CONGELAMENTO (FREEZE) =====
+        "ice-beam": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "freeze",
+                "chance": 0.10,  # 10% de chance de congelar
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Pode congelar o oponente (10% de chance)"
+        },
+        "blizzard": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "freeze",
+                "chance": 0.10,
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Pode congelar o oponente (10% de chance)"
+        },
+        "ice-punch": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "freeze",
+                "chance": 0.10,
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Pode congelar o oponente (10% de chance)"
+        },
+        "powder-snow": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "freeze",
+                "chance": 0.10,
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Pode congelar o oponente (10% de chance)"
+        },
         # Multi-hit moves
         "double-slap": {
             "effect_type": "multi_hit",

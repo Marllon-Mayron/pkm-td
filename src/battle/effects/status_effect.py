@@ -44,6 +44,11 @@ class StatusEffect:
         self._sleep_timer = 0.0
         self._sleep_check_timer = 0.0
 
+        # Para congelamento
+        self._freeze_timer = 0.0
+        self._freeze_check_timer = 0.0
+        self._freeze_chance = 0.20
+
         # Para dano por tick (veneno, queimadura)
         self._damage_timer = 0.0
 
@@ -277,6 +282,52 @@ class StatusEffect:
         self._pokemon_name = pokemon.name
         self._sleep_timer = 6.0
         self._sleep_check_timer = 0.0
+
+    def update_freeze(self, dt: float) -> bool:
+        """
+        Atualiza o estado de congelamento
+        Retorna True se o Pokémon ainda está congelado
+        """
+        if self.type != StatusType.FREEZE:
+            return False
+
+        # O congelamento persiste até ser descongelado por:
+        # - Ataque de fogo que atinge o Pokémon
+        # - Chance aleatória a cada turno
+        # - Scald (movimento de água quente)
+
+        self._freeze_check_timer += dt
+
+        # Verifica chance de descongelar a cada ~3 segundos
+        if self._freeze_check_timer >= 3.0:
+            self._freeze_check_timer = 0
+            if random.random() < self._freeze_chance:
+                print(f"[FREEZE] {self._pokemon_name} descongelou!")
+                return False
+
+        return True
+
+    def _freeze_apply(self, pokemon, effect_manager):
+        """Aplica o efeito de congelamento"""
+        self._pokemon_name = pokemon.name
+        self._freeze_timer = 0.0
+        self._freeze_check_timer = 0.0
+        self._freeze_chance = 0.20  # 20% de chance de descongelar por turno
+        print(f"[FREEZE] {pokemon.name} foi congelado! Não pode se mover!")
+
+    def is_frozen(self) -> bool:
+        """Verifica se o Pokémon está congelado"""
+        if self.type == StatusType.FREEZE:
+            return True
+        return False
+
+    def thaw(self):
+        """Descongela o Pokémon (usado por ataques de fogo)"""
+        if self.type == StatusType.FREEZE:
+            self._freeze_timer = 0
+            print(f"[FREEZE] {self._pokemon_name} descongelou devido ao calor!")
+            return True
+        return False
 
     def apply(self, pokemon, effect_manager):
         """Aplica o efeito de status"""

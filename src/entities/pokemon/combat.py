@@ -45,6 +45,30 @@ class PokemonCombat:
                 return status.update_sleep(dt)
         return False
 
+    def is_frozen(self) -> bool:
+        """Verifica se o Pokémon está congelado"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.FREEZE:
+                return status.is_frozen()
+        return False
+
+    def update_freeze(self, dt: float) -> bool:
+        """Atualiza o estado de congelamento e retorna True se ainda está congelado"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.FREEZE:
+                return status.update_freeze(dt)
+        return False
+
+    def thaw(self):
+        """Descongela o Pokémon (usado por ataques de fogo)"""
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            status = self.pokemon.effect_manager.get_status(self.pokemon)
+            if status and status.type == StatusType.FREEZE:
+                return status.thaw()
+        return False
+
     def find_nearest_enemy(self, enemies: List) -> Optional['Pokemon']:
         """Encontra o inimigo mais próximo"""
         if not enemies:
@@ -100,6 +124,11 @@ class PokemonCombat:
             self.pokemon.combat_state = "idle"
             self.pokemon.target = None
             return
+
+        # ===== VERIFICA CONGELAMENTO =====
+        if self.is_frozen():
+            if self.update_freeze(dt):
+                return
 
         if not self.pokemon.target or not self.pokemon.target.is_alive():
             self.pokemon.combat_state = "returning"

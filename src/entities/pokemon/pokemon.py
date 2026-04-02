@@ -237,12 +237,6 @@ class Pokemon(Entity):
     def update_move_speed_from_effects(self):
         self.movement.update_move_speed_from_effects()
 
-    #def _update_movement(self, dt, items=None):
-        #self.movement.update_movement(dt, items)
-
-    #def _check_item_capture(self, items):
-        #self.movement.check_item_capture(items)
-
     def find_nearest_enemy(self, enemies):
         return self.combat.find_nearest_enemy(enemies)
 
