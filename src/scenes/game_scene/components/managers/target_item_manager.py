@@ -146,11 +146,13 @@ class TargetItemManager:
     def render_in_ground(self, screen, camera):
         """Renderiza todos os itens no chão usando o renderer"""
         ground_items = [item for item in self.items if item.carried_by is None]
+        # ===== CORREÇÃO: Passa os itens para o renderer =====
         self.renderer.render(screen, camera, self.game.screen_manager, ground_items)
 
     def render_in_pokemon(self, screen, camera):
         """Renderiza todos os itens sendo carregados usando o renderer"""
         carried_items = [item for item in self.items if item.carried_by]
+        # ===== CORREÇÃO: Passa os itens para o renderer =====
         self.renderer.render(screen, camera, self.game.screen_manager, carried_items)
 
     def get_item_at(self, x, y, tolerance=20):

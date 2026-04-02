@@ -179,7 +179,7 @@ class Pokemon(Entity):
 
         # ===== 18. ITENS =====
         self.is_carrying = None
-        self.capture_range = 10
+        self.capture_range = 15
 
         # ===== 19. ATRIBUTOS DE COMBATE =====
         self.attack_range = 90
@@ -237,11 +237,11 @@ class Pokemon(Entity):
     def update_move_speed_from_effects(self):
         self.movement.update_move_speed_from_effects()
 
-    def _update_movement(self, dt, items=None):
-        self.movement.update_movement(dt, items)
+    #def _update_movement(self, dt, items=None):
+        #self.movement.update_movement(dt, items)
 
-    def _check_item_capture(self, items):
-        self.movement.check_item_capture(items)
+    #def _check_item_capture(self, items):
+        #self.movement.check_item_capture(items)
 
     def find_nearest_enemy(self, enemies):
         return self.combat.find_nearest_enemy(enemies)
@@ -474,55 +474,69 @@ class Pokemon(Entity):
         pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, screen_bar_width, screen_bar_height), 1)
 
     def _render_wild_text(self, screen, sprite_rect, zoom_scale):
-        """Renderiza nome e nível do Pokémon - offset relativo ao tamanho do sprite"""
-        # Tamanhos de fonte base
-        base_name_font_size = 12
-        base_level_font_size = 11
+        """
+        Renderiza nome e nível do Pokémon selvagem.
+        Offset relativo ao tamanho do sprite.
+        """
+        # ===== VERIFICAÇÃO DE SEGURANÇA =====
+        has_screen_manager = hasattr(self, 'screen_manager') and self.screen_manager is not None
+        has_camera = hasattr(self, 'camera') and self.camera is not None
 
-        # Calcula escala total
-        if hasattr(self, 'screen_manager') and hasattr(self, 'camera'):
-            render_scale = self.screen_manager.render_scale
-            camera_zoom = self.camera.zoom if self.camera else 1.0
-            total_scale = render_scale * camera_zoom
-
-            name_font_size = max(10, int(base_name_font_size * total_scale))
-            level_font_size = max(9, int(base_level_font_size * total_scale))
-        else:
-            name_font_size = max(10, int(base_name_font_size * zoom_scale))
-            level_font_size = max(9, int(base_level_font_size * zoom_scale))
-
-        name_font = self._get_font(name_font_size)
-        level_font = self._get_font(level_font_size)
-
+        # ===== DADOS DO TEXTO =====
         name_text = f"{self.name} - "
         level_text = f"lv. {self.level:02d}"
 
+        # ===== CORES =====
         text_color = (255, 255, 255)
         outline_color = (0, 0, 0)
 
         if self.is_shiny:
-            level_color = (255, 215, 0)
+            level_color = (255, 215, 0)  # Dourado para shiny
         elif self.is_boss:
-            level_color = (255, 100, 100)
+            level_color = (255, 100, 100)  # Vermelho claro para boss
             text_color = (255, 100, 100)
         else:
             level_color = (255, 255, 255)
 
+        # ===== CALCULA ESCALA E TAMANHOS DE FONTE =====
+        if has_screen_manager and has_camera:
+            # Usa screen_manager e camera para escala precisa
+            render_scale = self.screen_manager.render_scale
+            camera_zoom = self.camera.zoom
+            total_scale = render_scale * camera_zoom
+
+            base_name_font_size = 12
+            base_level_font_size = 11
+
+            name_font_size = max(10, int(base_name_font_size * total_scale))
+            level_font_size = max(9, int(base_level_font_size * total_scale))
+        else:
+            # Fallback: usa zoom_scale passado como parâmetro
+            total_scale = zoom_scale
+            name_font_size = max(10, int(12 * zoom_scale))
+            level_font_size = max(9, int(11 * zoom_scale))
+
+        # ===== CRIA FONTES =====
+        name_font = self._get_font(name_font_size)
+        level_font = self._get_font(level_font_size)
+
+        # ===== RENDERIZA TEXTOS COM CONTORNO =====
         name_surface = name_font.render(name_text, True, text_color)
         level_surface = level_font.render(level_text, True, level_color)
         name_outline = name_font.render(name_text, True, outline_color)
         level_outline = level_font.render(level_text, True, outline_color)
 
+        # ===== DIMENSÕES DOS TEXTOS =====
         name_width = name_surface.get_width()
         level_width = level_surface.get_width()
         total_width = name_width + 2 + level_width
 
-        # ===== POSICIONAMENTO RELATIVO AO TAMANHO DO SPRITE =====
+        # ===== POSICIONAMENTO RELATIVO AO SPRITE =====
         sprite_height = sprite_rect.height
 
-        # Offset relativo: 30% da altura do sprite acima do topo (abaixo da barra)
-        # A barra está em -15% do topo, então o nome fica em -30%
-        relative_offset = -sprite_height * 0.65 # 80% da altura do sprite acima
+        # Offset relativo: 65% da altura do sprite acima do topo
+        # Ajustado para ficar acima da barra de HP (que está em -35%)
+        relative_offset = -sprite_height * 0.65
 
         # Posição na tela
         screen_x = sprite_rect.centerx
@@ -535,14 +549,23 @@ class Pokemon(Entity):
         level_x = start_x + name_width + 2
         level_y = text_y + (name_font_size - level_font_size)
 
-        # Desenha contorno
+        # ===== DESENHA CONTORNO (4 direções) =====
         for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
             screen.blit(name_outline, (name_x + dx, name_y + dy))
             screen.blit(level_outline, (level_x + dx, level_y + dy))
 
-        # Desenha texto principal
+        # ===== DESENHA TEXTO PRINCIPAL =====
         screen.blit(name_surface, (name_x, name_y))
         screen.blit(level_surface, (level_x, level_y))
+
+        # ===== DEBUG: Mostra offset e escala se necessário =====
+        if hasattr(self, 'show_debug') and self.show_debug:
+            debug_font = self._get_font(10)
+            offset_info = debug_font.render(f"offset:{relative_offset:.0f}", True, (255, 255, 0))
+            screen.blit(offset_info, (screen_x - 40, sprite_rect.top - 50))
+
+            scale_info = debug_font.render(f"scale:{total_scale:.2f}", True, (255, 255, 0))
+            screen.blit(scale_info, (screen_x - 40, sprite_rect.top - 65))
 
     def _render_miss_text(self, screen, sprite_rect, zoom_scale):
         self.rendering.render_miss_text(screen, sprite_rect, zoom_scale)
@@ -664,12 +687,6 @@ class Pokemon(Entity):
         is_wave_controlled = hasattr(self, 'path_index_origin') and self.is_wild
         if self.is_boss:
             is_wave_controlled = True
-
-        if not is_wave_controlled:
-            self._update_movement(dt, items)
-
-        if self.is_wild and not is_wave_controlled and items is not None and not self.is_carrying:
-            self._check_item_capture(items)
 
         if self.is_carrying:
             self.is_carrying.update_capture(dt)

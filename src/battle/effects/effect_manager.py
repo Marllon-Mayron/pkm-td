@@ -134,15 +134,14 @@ class EffectManager:
     def get_stat_multiplier(self, pokemon, stat_type: StatType) -> float:
         """Retorna o multiplicador total para um stat"""
         pokemon_id = id(pokemon)
-        print(f"[EFFECT_DEBUG] get_stat_multiplier para {pokemon.name}, stat={stat_type}")
+        #print(f"[EFFECT_DEBUG] get_stat_multiplier para {pokemon.name}, stat={stat_type}")
 
         if pokemon_id in self.stat_stages:
             stage = self.stat_stages[pokemon_id].get_stage(stat_type)
             multiplier = self.stat_stages[pokemon_id].get_multiplier(stat_type)
-            print(f"[EFFECT_DEBUG] {pokemon.name}: stage={stage}, multiplier={multiplier:.2f}")
+            #print(f"[EFFECT_DEBUG] {pokemon.name}: stage={stage}, multiplier={multiplier:.2f}")
             return multiplier
         else:
-            print(f"[EFFECT_DEBUG] {pokemon.name}: Nenhum stat_stage encontrado para id={pokemon_id}")
             return 1.0
 
     def get_stat_stage(self, pokemon, stat_type: StatType) -> int:

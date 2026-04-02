@@ -7,7 +7,6 @@ import math
 from src.entities.base import Entity
 from src.data.item_catalog import item_catalog
 
-
 class TargetItem(Entity):
     """Item que precisa ser protegido durante a wave"""
 
@@ -30,58 +29,61 @@ class TargetItem(Entity):
         # Variação visual (não afeta hitbox)
         self.visual_offset_x = random.uniform(-offset_range, offset_range)
         self.visual_offset_y = random.uniform(-offset_range, offset_range)
-        self.rotation = random.uniform(-30, 30)  # Rotação entre -30 e 30 graus
+        self.rotation = random.uniform(-30, 30)
 
-        # Posição base (usada quando o item está no chão sem ter sido pego)
+        # Posição base (posição original no mapa)
         self.base_x = x
         self.base_y = y
 
-        # Posição atual (pode ser diferente quando é dropado)
+        # Posição atual (pode mudar quando dropado)
         self.current_x = x
         self.current_y = y
 
-        # Flag para indicar se o item foi dropado (já foi carregado antes)
+        # Flag para indicar se o item foi dropado
         self.was_carried = False
 
-        # Carrega sprite (mantém tamanho original)
+        # Carrega sprite
         self.sprite = None
-        self.original_sprite_size = 32  # Tamanho original do sprite
+        self.original_sprite_size = 32
         self.load_sprite()
 
-        # Referência ao screen_manager (será setado pelo jogo)
+        # Referência ao screen_manager
         self.screen_manager = None
 
     def load_sprite(self):
-        """Carrega o sprite do item mantendo tamanho original"""
+        """Carrega o sprite do item"""
         if self.sprite_path and os.path.exists(self.sprite_path):
             try:
-                # Carrega o sprite no tamanho original
                 self.sprite = pygame.image.load(self.sprite_path).convert_alpha()
-                print(
-                    f"✓ Sprite do item {self.item_name} carregado ({self.sprite.get_width()}x{self.sprite.get_height()})")
             except Exception as e:
                 print(f"✗ Erro ao carregar sprite do item {self.sprite_path}: {e}")
                 self.sprite = None
+
+    def get_capture_position(self) -> tuple:
+        """
+        Retorna a posição atual do item para detecção de captura.
+        Se está sendo carregado, retorna a posição do Pokémon que carrega.
+        Se não, retorna a posição atual onde está no chão.
+        """
+        if self.carried_by:
+            return (self.carried_by.x, self.carried_by.y)
         else:
-            print(f"✗ Sprite do item {self.item_name} não encontrado: {self.sprite_path}")
-            self.sprite = None
+            return (self.current_x, self.current_y)
 
     def update(self, dt):
         """Atualiza lógica do item"""
         if self.carried_by:
             # Item sendo carregado - segue o Pokémon
-            self.current_x = self.carried_by.x - self.height / 2
-            self.current_y = self.carried_by.y - self.width / 2
+            self.current_x = self.carried_by.x
+            self.current_y = self.carried_by.y
             self.x = self.current_x
             self.y = self.current_y
-            self.rect.x = self.x
-            self.rect.y = self.y
+            self.rect.center = (int(self.x), int(self.y))
         else:
-            # Quando não está sendo carregado, usa a posição atual (que pode ser onde foi dropado)
+            # Quando não está sendo carregado, usa a posição atual
             self.x = self.current_x
             self.y = self.current_y
-            self.rect.x = self.x
-            self.rect.y = self.y
+            self.rect.center = (int(self.x), int(self.y))
 
     def start_capture(self, pokemon):
         """Inicia o processo de captura por um Pokémon"""
@@ -95,30 +97,29 @@ class TargetItem(Entity):
         if self.carried_by:
             print(f"[ITEM] Resetando captura de {self.item_name} - {self.carried_by.name} foi derrotado/capturado")
 
-            # Salva a posição atual onde o Pokémon morreu
-            drop_x = self.current_x
-            drop_y = self.current_y
+            # ===== CORREÇÃO: Salva a posição atual onde o Pokémon morreu =====
+            drop_x = self.carried_by.x
+            drop_y = self.carried_by.y
 
             # Limpa a referência no Pokémon
             if hasattr(self.carried_by, 'is_carrying'):
                 self.carried_by.is_carrying = None
 
-            # Reseta o estado do item (volta ao chão, NÃO roubado)
+            # Reseta o estado do item
             self.carried_by = None
             self.capture_progress = 0
-            self.is_protected = True  # Volta a ser protegido
-            self.is_stolen = False  # NÃO está roubado
+            self.is_protected = True
+            self.is_stolen = False
             self.was_carried = True
 
-            # Mantém o item na posição onde o Pokémon foi derrotado
+            # ===== CRUCIAL: Atualiza a posição atual para onde o Pokémon morreu =====
             self.current_x = drop_x
             self.current_y = drop_y
             self.x = drop_x
             self.y = drop_y
-            self.rect.x = drop_x
-            self.rect.y = drop_y
+            self.rect.center = (int(drop_x), int(drop_y))
 
-            print(f"[ITEM] {self.item_name} dropado em ({drop_x:.1f}, {drop_y:.1f}) - ainda pode ser capturado")
+            print(f"[ITEM] {self.item_name} dropado em ({drop_x:.1f}, {drop_y:.1f})")
 
     def update_capture(self, dt):
         """Atualiza o progresso de captura"""
@@ -126,6 +127,17 @@ class TargetItem(Entity):
             self.capture_progress += self.capture_rate * dt
             if self.capture_progress >= 100:
                 self.complete_capture()
+
+    def get_capture_position(self) -> tuple:
+        """
+        Retorna a posição atual do item para detecção de captura.
+        Se está sendo carregado, retorna a posição do Pokémon que carrega.
+        Se não, retorna a posição atual onde está no chão.
+        """
+        if self.carried_by:
+            return (self.carried_by.x, self.carried_by.y)
+        else:
+            return (self.current_x, self.current_y)
 
     def complete_capture(self):
         """Completa a captura do item"""

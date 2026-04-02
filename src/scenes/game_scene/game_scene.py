@@ -1,6 +1,6 @@
 # src/scenes/game_scene.py
 """
-Cena principal do jogo - OTIMIZADA
+Cena principal do jogo - COM NOVA ARQUITETURA DE WAVES
 """
 import pygame
 
@@ -16,13 +16,13 @@ from src.scenes.game_scene.components.managers.placement_manager import Placemen
 from src.scenes.game_scene.components.managers.item_drag_manager import ItemDragManager
 from src.scenes.game_scene.components.managers.target_item_manager import TargetItemManager
 from src.scenes.game_scene.components.managers.team_manager import GameTeamManager
+from src.scenes.game_scene.components.managers.wave_manager import WaveManager
 from src.scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
 from src.scenes.game_scene.components.phase_loader import phase_loader
 from src.scenes.game_scene.components.renderer.item_bag_renderer import ItemBagRenderer
 from src.scenes.game_scene.components.renderer.map_renderer import MapRenderer
 from src.scenes.game_scene.components.renderer.path_renderer import PathRenderer
-from src.scenes.game_scene.components.renderer.pokemon_spot_renderer import PokemonSpotRenderer
-from src.scenes.game_scene.components.managers.wave_manager import GameWaveManager
+from src.scenes.game_scene.components.renderer.pokemon_spot_renderer import PokemonSpotRenderer # NOVO
 from src.scenes.game_scene.components.renderer.target_item_renderer import TargetItemRenderer
 
 
@@ -34,8 +34,7 @@ class GameScene(BaseScene):
         self.debug_in_game = False
         self.move_select_overlay = None
         self.move_learn_overlay = None
-        self.game_paused = False  # Flag para pausar o jogo
-
+        self.game_paused = False
 
         self.chapter_id = chapter_id
         self.phase_number = phase_number
@@ -62,15 +61,15 @@ class GameScene(BaseScene):
         # Cria o overlay_manager
         self.overlay_manager = OverlayManager(self)
 
-        # Cria o wave_manager
-        self.wave_manager = GameWaveManager(phase_loader)
-        self.wave_manager.set_paths_data(self.path_renderer)
-
-        self.battle_system = BattleSystem(self)
+        # ===== NOVO: Wave Manager refatorado =====
+        self.wave_manager = WaveManager(phase_loader, self)
+        self.wave_manager.set_paths(self.path_renderer.paths)  # Define os paths
 
         # Vincula os itens alvo
         self.wave_manager.set_target_items(self.target_item_manager.items)
-        self.wave_manager.game_scene = self
+
+        # Battle System
+        self.battle_system = BattleSystem(self)
 
         # Configurações de mundo
         self._setup_world_dimensions()
@@ -140,17 +139,28 @@ class GameScene(BaseScene):
         for pokemon in self.placement_manager.placed_pokemon:
             pokemon.set_battle_system(self.battle_system)
             self.battle_system.set_effect_manager_for_pokemon(pokemon)
+            # ===== CONFIGURA screen_manager =====
+            pokemon.screen_manager = self.screen_manager
+            pokemon.camera = self.camera
 
-            # Configura para inimigos que já possam existir
+        # ===== CONFIGURA screen_manager PARA INIMIGOS QUE JÁ EXISTAM =====
         for enemy in self.wave_manager.active_enemies:
             enemy.set_battle_system(self.battle_system)
             self.battle_system.set_effect_manager_for_pokemon(enemy)
+            # ===== CONFIGURA screen_manager =====
+            enemy.screen_manager = self.screen_manager
+            enemy.camera = self.camera
 
-            # Configura para Pokémon no time (por precaução)
+        # Configura battle_system para Pokémon no time
         for pokemon in self.player.team:
             pokemon.set_battle_system(self.battle_system)
             pokemon.reset_pp()
             self.battle_system.set_effect_manager_for_pokemon(pokemon)
+            # ===== CONFIGURA screen_manager =====
+            pokemon.screen_manager = self.screen_manager
+            pokemon.camera = self.camera
+
+        # Inicia as waves
         if self.wave_manager.has_more_waves():
             self.game_state = "in_wave"
             self.wave_manager.start_all_waves()
@@ -188,142 +198,6 @@ class GameScene(BaseScene):
             "experience": rewards.get("experience", 0)
         }
 
-    def open_move_select_overlay(self, pokemon):
-        """Abre o overlay de seleção de moves para um Pokémon"""
-        if not pokemon or not pokemon.moves:
-            return
-
-        self.move_select_overlay = MoveSelectOverlay(self, pokemon)
-        self.move_select_overlay.active = True
-
-        # Pausa o jogo
-        self.game_paused = True
-        self.paused = True  # Usa o pause existente
-
-        # Trava as waves
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = True
-
-    def close_move_select_overlay(self):
-        """Fecha o overlay de seleção de moves"""
-        # Se ainda existe overlay, marca como inativo
-        if self.move_select_overlay:
-            self.move_select_overlay.active = False
-            self.move_select_overlay = None
-
-        # Despausa o jogo
-        self.game_paused = False
-        self.paused = False
-
-        # Destrava as waves
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = False
-
-        # Garante que a câmera está restaurada (caso o overlay não tenha feito)
-        if hasattr(self, 'camera'):
-            # A câmera já foi restaurada pelo overlay, mas garantimos
-            pass
-
-        print("[MOVE_SELECT] Overlay fechado, jogo despausado")
-
-    def open_move_learn_overlay(self, pokemon, new_move_name):
-        """Abre o overlay de aprendizado de novo move"""
-        from src.scenes.game_scene.components.overlays.move_learn_overlay import MoveLearnOverlay
-
-        self.move_learn_overlay = MoveLearnOverlay(self, pokemon, new_move_name)
-        self.move_learn_overlay.active = True
-
-        # Pausa o jogo
-        self.game_paused = True
-        self.paused = True
-
-        # Trava as waves
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = True
-
-        print(f"[MOVE_LEARN] Abrindo overlay para {pokemon.name} aprender {new_move_name}")
-
-    def close_move_learn_overlay(self, cancel=False):
-        """Fecha o overlay de aprendizado de moves"""
-        if self.move_learn_overlay:
-            self.move_learn_overlay.active = False
-            self.move_learn_overlay = None
-
-        # Despausa o jogo
-        self.game_paused = False
-        self.paused = False
-
-        # Destrava as waves
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = False
-
-        print("[MOVE_LEARN] Overlay fechado, jogo despausado")
-
-    def show_capture_overlay(self, pokemon, is_to_team=True):
-        """Mostra o overlay de captura de Pokémon"""
-        # Pausa o jogo
-        self.game_paused = True
-        self.paused = True
-
-        # Trava as waves
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = True
-
-        sound_manager.play_effect(SoundEffect.CAUGHT)
-        # Mostra o overlay de captura
-        self.overlay_manager.show(OverlayType.CAPTURE, pokemon=pokemon, is_to_team=is_to_team)
-
-        print(f"[CAPTURE] Overlay de captura aberto para {pokemon.name}")
-
-    def close_capture_overlay(self):
-        """Fecha o overlay de captura"""
-        # Despausa o jogo
-        self.game_paused = False
-        self.paused = False
-
-        # Destrava as waves
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = False
-
-        # Esconde o overlay
-        self.overlay_manager.hide()
-
-        print("[CAPTURE] Overlay de captura fechado, jogo despausado")
-
-    def open_evolution_overlay(self, pokemon, evolution_data):
-        """Abre o overlay de evolução para um Pokémon"""
-        from src.scenes.game_scene.components.overlays.evolution_overlay import EvolutionOverlay
-
-        # Toca o efeito sonoro de evolução
-        sound_manager.play_effect(SoundEffect.EVOLUTION)
-
-        self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data)
-        self.evolution_overlay.active = True
-
-        # Trava as waves para não spawnar novos inimigos durante a evolução
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = True
-
-        print(f"[EVOLUTION] Abrindo overlay para evolução de {pokemon.name}")
-
-    def close_evolution_overlay(self, cancel=False):
-        """Fecha o overlay de evolução"""
-
-        sound_manager.stop_effect(SoundEffect.EVOLUTION)
-
-        if cancel:
-            print(f"[EVOLUTION] Evolução cancelada")
-        else:
-            print(f"[EVOLUTION] Evolução concluída")
-
-        # Limpa a referência do overlay
-        if hasattr(self, 'evolution_overlay'):
-            self.evolution_overlay = None
-
-        # Destrava as waves
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = False
-
     def _setup_world_dimensions(self):
         """Configura dimensões do mundo baseado no mapa"""
         map_width, map_height = self.map_renderer.get_dimensions()
@@ -334,31 +208,108 @@ class GameScene(BaseScene):
             self.world_width = 2000
             self.world_height = 2000
 
+    # ===== MÉTODOS DE OVERLAY (mantidos) =====
+
+    def open_move_select_overlay(self, pokemon):
+        """Abre o overlay de seleção de moves para um Pokémon"""
+        if not pokemon or not pokemon.moves:
+            return
+
+        self.move_select_overlay = MoveSelectOverlay(self, pokemon)
+        self.move_select_overlay.active = True
+        self.game_paused = True
+        self.paused = True
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = True
+
+    def close_move_select_overlay(self):
+        """Fecha o overlay de seleção de moves"""
+        if self.move_select_overlay:
+            self.move_select_overlay.active = False
+            self.move_select_overlay = None
+
+        self.game_paused = False
+        self.paused = False
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = False
+
+    def open_move_learn_overlay(self, pokemon, new_move_name):
+        """Abre o overlay de aprendizado de novo move"""
+        from src.scenes.game_scene.components.overlays.move_learn_overlay import MoveLearnOverlay
+
+        self.move_learn_overlay = MoveLearnOverlay(self, pokemon, new_move_name)
+        self.move_learn_overlay.active = True
+        self.game_paused = True
+        self.paused = True
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = True
+
+    def close_move_learn_overlay(self, cancel=False):
+        """Fecha o overlay de aprendizado de moves"""
+        if self.move_learn_overlay:
+            self.move_learn_overlay.active = False
+            self.move_learn_overlay = None
+
+        self.game_paused = False
+        self.paused = False
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = False
+
+    def show_capture_overlay(self, pokemon, is_to_team=True):
+        """Mostra o overlay de captura de Pokémon"""
+        self.game_paused = True
+        self.paused = True
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = True
+
+        sound_manager.play_effect(SoundEffect.CAUGHT)
+        self.overlay_manager.show(OverlayType.CAPTURE, pokemon=pokemon, is_to_team=is_to_team)
+
+    def close_capture_overlay(self):
+        """Fecha o overlay de captura"""
+        self.game_paused = False
+        self.paused = False
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = False
+        self.overlay_manager.hide()
+
+    def open_evolution_overlay(self, pokemon, evolution_data):
+        """Abre o overlay de evolução para um Pokémon"""
+        from src.scenes.game_scene.components.overlays.evolution_overlay import EvolutionOverlay
+
+        sound_manager.play_effect(SoundEffect.EVOLUTION)
+        self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data)
+        self.evolution_overlay.active = True
+
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = True
+
+    def close_evolution_overlay(self, cancel=False):
+        """Fecha o overlay de evolução"""
+        sound_manager.stop_effect(SoundEffect.EVOLUTION)
+
+        if hasattr(self, 'evolution_overlay'):
+            self.evolution_overlay = None
+
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = False
+
+    # ===== MÉTODOS DE ITEM E CAPTURA =====
+
     def _on_item_use(self, target, item_data, target_type):
         """Callback quando um item é usado em um alvo"""
         effect = item_data.get("effect", "")
         category = item_data.get("category", "")
 
-        # PP RESTORE ITEMS (restaura TODOS os moves)
         if effect == "pp_restore":
             if target_type == "ally" and hasattr(target, 'restore_pp'):
                 percentage = item_data.get("effect_value", 1.0)
-
-                # Restaura TODOS os moves com a porcentagem
                 restored = target.restore_pp(percentage=percentage)
-
                 if restored > 0:
-                    item_name = item_data["name"]
-                    print(f"[ITEM] {item_name} usado em {target.name}! "
-                          f"{restored} PP restaurados!")
+                    print(f"[ITEM] {item_data['name']} usado em {target.name}! {restored} PP restaurados!")
                     return True
-                else:
-                    print(f"[ITEM] {target.name} já está com PP máximo!")
-                    return False
+                return False
 
-            return False
-
-        # EVOLUTION STONES
         elif effect == "evolution":
             if target_type == "ally":
                 return self._use_evolution_stone(target, item_data)
@@ -368,39 +319,13 @@ class GameScene(BaseScene):
                 move_to_teach = item_data.get("effect_value")
                 return self._teach_move_to_pokemon(target, move_to_teach, item_data)
 
-        # POKEBALLS
         elif target_type == "enemy" and category == "pokeball":
             return self._attempt_capture(target, item_data)
 
-        # MEDICINE (HP)
         elif target_type == "ally" and category == "medicine":
             return self.use_medicine(target, item_data)
 
         return False
-
-    def _teach_move_to_pokemon(self, pokemon, move_name, item_data):
-        """Ensina um move a um Pokémon usando TM (as validações já foram feitas no drag)"""
-        from src.entities.move import Move
-        from src.data.move_data import MoveData
-
-        move_data = MoveData()
-        move_info = move_data.get_move_info(move_name)
-
-        if not move_info:
-            print(f"[TM] Move {move_name} não encontrado!")
-            self.player.bag.add_item(item_data["id"], 1)
-            return False
-
-        # Se tem menos de 4 moves, adiciona diretamente
-        if len(pokemon.moves) < 4:
-            pokemon.moves.append(Move(move_name, move_info))
-            print(f"[TM] {pokemon.name} aprendeu {move_name} via TM!")
-            return True
-
-        # Se já tem 4 moves, abre overlay para escolher qual esquecer
-        self._open_forget_move_overlay(pokemon, move_name, move_info, item_data)
-        return True
-
 
     def _use_evolution_stone(self, pokemon, item_data):
         """Usa pedra de evolução em um Pokémon"""
@@ -419,7 +344,27 @@ class GameScene(BaseScene):
         self.player.caught_pokemon.add(evolve_to_id)
         self.player.register_seen(evolve_to_id)
         self.player.auto_save()
+        return True
 
+    def _teach_move_to_pokemon(self, pokemon, move_name, item_data):
+        """Ensina um move a um Pokémon usando TM"""
+        from src.entities.move import Move
+        from src.data.move_data import MoveData
+
+        move_data = MoveData()
+        move_info = move_data.get_move_info(move_name)
+
+        if not move_info:
+            print(f"[TM] Move {move_name} não encontrado!")
+            self.player.bag.add_item(item_data["id"], 1)
+            return False
+
+        if len(pokemon.moves) < 4:
+            pokemon.moves.append(Move(move_name, move_info))
+            print(f"[TM] {pokemon.name} aprendeu {move_name} via TM!")
+            return True
+
+        self._open_forget_move_overlay(pokemon, move_name, move_info, item_data)
         return True
 
     def _attempt_capture(self, enemy, item_data):
@@ -443,18 +388,15 @@ class GameScene(BaseScene):
         roll = random.random()
 
         if roll < chance or item_data["id"] == "masterball":
-            # Guarda o item que o inimigo carregava
             carried_item = enemy.is_carrying
             if carried_item:
                 enemy.drop_item()
 
-            # Remove o inimigo do jogo
-            self.wave_manager._remove_enemy(enemy)
+            self.wave_manager.remove_enemy(enemy)
 
-            # Cria o Pokémon capturado
             from src.entities.pokemon import Pokemon
             caught = Pokemon(
-                enemy.x, enemy.y,  # Mantém a posição do inimigo para o zoom do overlay
+                enemy.x, enemy.y,
                 enemy.id,
                 level=enemy.level,
                 is_wild=False,
@@ -467,21 +409,17 @@ class GameScene(BaseScene):
             caught.xp = enemy.xp
             caught.nature = enemy.nature
 
-            # Verifica se vai para o time ou para a box
             is_to_team = self.player.has_team_space()
             if is_to_team:
                 self.player.add_to_team(caught)
             else:
                 self.player.add_to_box(caught)
 
-            # Registra na Pokédex
             self.player.caught_pokemon.add(enemy.id)
             self.player.register_seen(enemy.id)
             self.player.auto_save()
 
-            # Mostra o overlay de captura
             self.show_capture_overlay(caught, is_to_team)
-
             return True
 
         return False
@@ -508,7 +446,22 @@ class GameScene(BaseScene):
 
         return True
 
-    def _swap_pokemon_positions(self, swap_data):
+    # ===== MÉTODOS DE POSICIONAMENTO =====
+
+    def _on_pokemon_placed(self, placement_data):
+        """Callback quando um Pokémon é colocado no mapa OU movido"""
+        action = placement_data.get('action', 'place')
+
+        if action == 'swap':
+            self._on_pokemon_swap(placement_data)
+        elif action == 'move':
+            self._move_pokemon_to_spot(placement_data)
+        else:
+            pokemon = placement_data['pokemon']
+            spot = placement_data['spot']
+            self.placement_manager.add_pokemon(spot, pokemon)
+
+    def _on_pokemon_swap(self, swap_data):
         """Troca as posições de dois Pokémon"""
         pokemon_a = swap_data['pokemon_a']
         pokemon_b = swap_data['pokemon_b']
@@ -547,25 +500,46 @@ class GameScene(BaseScene):
         pokemon_b.placed_tile_x = tile_center_x_a // self.placement_manager.tile_size
         pokemon_b.placed_tile_y = tile_center_y_a // self.placement_manager.tile_size
 
-        # Atualiza os spots (não precisa marcar occupied porque já estão)
-        # Os spots já estão ocupados, apenas os Pokémon trocaram de lugar
-
         print(f"[SWAP] {pokemon_a.name} ↔ {pokemon_b.name} trocaram de posição!")
+
+    def _move_pokemon_to_spot(self, move_data):
+        """Move um Pokémon para um novo spot vazio"""
+        pokemon = move_data['pokemon']
+        from_spot = move_data.get('from_spot')
+        to_spot = move_data['to_spot']
+
+        if from_spot:
+            from_spot.occupied = False
+
+        tile_center_x = (
+                                    to_spot.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+        tile_center_y = (
+                                    to_spot.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+
+        pokemon.x = tile_center_x
+        pokemon.y = tile_center_y
+        pokemon.original_spot_x = tile_center_x
+        pokemon.original_spot_y = tile_center_y
+        pokemon.placed_tile_x = tile_center_x // self.placement_manager.tile_size
+        pokemon.placed_tile_y = tile_center_y // self.placement_manager.tile_size
+
+        to_spot.occupied = True
+        print(f"[MOVE] {pokemon.name} movido para novo spot ({to_spot.x}, {to_spot.y})")
 
     def _reset_team_pp(self):
         """Reseta os PP de todos os moves do time do jogador"""
         if not self.player or not self.player.team:
             return
 
-        total_reset = 0
         for pokemon in self.player.team:
-            total_reset += pokemon.reset_pp()
+            pokemon.reset_pp()
 
         self.game.player.auto_save()
 
+    # ===== MÉTODOS DE LIMPEZA =====
+
     def cleanup(self):
         """Limpa o estado da fase antes de sair"""
-        # Para a música ao sair da fase
         self._stop_battle_music(fade_ms=500)
 
         for spot in self.spot_renderer.get_spots():
@@ -579,8 +553,26 @@ class GameScene(BaseScene):
 
         self.wave_manager.active_enemies.clear()
 
+    # ===== MÉTODOS DE MÚSICA =====
+
+    def _start_battle_music(self):
+        """Inicia a música de batalha aleatória"""
+        if not self.music_playing:
+            if hasattr(settings, 'music_enabled') and settings.music_enabled:
+                success = sound_manager.play_random_battle_music()
+                if success:
+                    self.music_playing = True
+
+    def _stop_battle_music(self, fade_ms=1000):
+        """Para a música de batalha"""
+        if self.music_playing:
+            sound_manager.stop_music(fade_ms)
+            self.music_playing = False
+
+    # ===== MÉTODO HANDLE_EVENT (SIMPLIFICADO) =====
+
     def handle_event(self, event):
-        """Processa eventos do jogo - OTIMIZADO com suporte a drag de Pokémon colocados"""
+        """Processa eventos do jogo"""
         # Cache de referências
         overlay_active = self.overlay_manager.is_active
         drag_manager = self.item_drag_manager
@@ -592,17 +584,15 @@ class GameScene(BaseScene):
         camera = self.camera
         screen_mgr = self.screen_manager
 
-        # ===== Processa overlay de evolução primeiro =====
+        # ===== OVERLAYS PRIORITÁRIOS =====
         if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
             self.evolution_overlay.handle_event(event)
             return None
 
-        # ===== Processa overlay de aprendizado de moves primeiro =====
         if self.move_learn_overlay and self.move_learn_overlay.active:
             self.move_learn_overlay.handle_event(event)
             return None
 
-        # ===== Processa overlay de seleção de moves =====
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.handle_event(event)
             return None
@@ -612,7 +602,7 @@ class GameScene(BaseScene):
                 return None
             return None
 
-        # Drag manager de itens
+        # ===== DRAG DE ITENS =====
         if drag_manager.is_dragging:
             if event.type == pygame.MOUSEMOTION:
                 world_pos = screen_mgr.get_mouse_world_position(event.pos, camera)
@@ -631,18 +621,17 @@ class GameScene(BaseScene):
                 drag_manager.cancel_drag()
                 return None
 
-        # Item bag
+        # ===== ITEM BAG =====
         if bag_renderer and bag_renderer.handle_event(event):
             return None
 
-        # Teclado
+        # ===== TECLADO =====
         if event.type == pygame.KEYDOWN:
-
             if event.key == pygame.K_TAB:
                 if hasattr(player, 'bag'):
                     player.bag.cycle_category()
                 return None
-            elif event.key == pygame.K_F2:  # Use F2 para ativar/desativar profiling
+            elif event.key == pygame.K_F2:
                 if not profiler.enabled:
                     profiler.start()
                 else:
@@ -658,13 +647,8 @@ class GameScene(BaseScene):
             elif event.key == pygame.K_F1:
                 self.show_debug = not self.show_debug
                 return None
-            elif event.key == pygame.K_SPACE:
-                if self.game_state == "between_waves":
-                    self.game_state = "in_wave"
-                    self.wave_manager.start_next_wave()
-                return None
 
-        # Mouse wheel
+        # ===== MOUSE WHEEL =====
         if event.type == pygame.MOUSEWHEEL:
             if bag_renderer and hasattr(bag_renderer, 'mouse_over_ui') and bag_renderer.mouse_over_ui:
                 if event.y > 0:
@@ -689,11 +673,11 @@ class GameScene(BaseScene):
                             camera._clamp_position()
                 return None
 
-        # ===== Mouse button down =====
+        # ===== MOUSE BUTTON DOWN =====
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = pygame.mouse.get_pos()
 
-            # Verifica se clicou na bag
+            # Verifica clique na bag
             if bag_renderer and hasattr(bag_renderer, 'mouse_over_ui') and bag_renderer.mouse_over_ui:
                 hovered_index = bag_renderer.hovered_index
                 if hovered_index >= 0:
@@ -706,12 +690,11 @@ class GameScene(BaseScene):
                             drag_manager.start_drag(item["id"], mouse_pos, world_pos)
                 return None
 
-            # Verifica se clicou em um Pokémon colocado
+            # Verifica clique em Pokémon colocado
             if not self.item_drag_manager.is_dragging and not team_manager.is_dragging():
                 if self.screen_manager.is_mouse_in_viewport(mouse_pos):
                     world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
                     if world_pos:
-                        # Verifica se clicou em algum Pokémon colocado
                         clicked_pokemon = placement_mgr.get_pokemon_at_world_pos(
                             world_pos[0], world_pos[1], tolerance=30
                         )
@@ -726,7 +709,6 @@ class GameScene(BaseScene):
                                     break
 
                             if clicked_spot:
-                                # Inicia drag do Pokémon colocado
                                 team_manager.drag_manager.start_drag_placed(
                                     clicked_pokemon,
                                     clicked_spot,
@@ -735,33 +717,32 @@ class GameScene(BaseScene):
                                 )
                                 return None
                             else:
-                                # Fallback: abre overlay de moves se não encontrou spot
                                 if clicked_pokemon.moves:
-                                    self.open_move_select_overlay(clicked_pokemon)  # <--- ISSO DEVE ABRIR
+                                    self.open_move_select_overlay(clicked_pokemon)
                                     return None
 
-        # Team manager (processa eventos dos slots e drag)
+        # ===== TEAM MANAGER =====
         if team_manager:
             result = team_manager.handle_event(
                 event, spot_renderer.get_spots(), camera,
-                self._on_pokemon_placed,  # callback para place/move
-                self._on_pokemon_swap  # callback para swap
+                self._on_pokemon_placed,
+                self._on_pokemon_swap
             )
             if result:
                 return None
 
-        # ===== Mouse buttons para câmera e remoção =====
+        # ===== CÂMERA E REMOÇÃO =====
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_pos = pygame.mouse.get_pos()
             in_viewport = screen_mgr.is_mouse_in_viewport(mouse_pos)
 
-            if event.button == 2:  # Middle click para arrastar câmera
+            if event.button == 2:
                 if in_viewport:
                     self.dragging_camera = True
                     self.last_mouse_pos = mouse_pos
                     pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_SIZEALL)
                 return None
-            elif event.button == 3:  # Right click para remover Pokémon
+            elif event.button == 3:
                 if not (bag_renderer and hasattr(bag_renderer, 'mouse_over_ui') and bag_renderer.mouse_over_ui):
                     world_pos = screen_mgr.get_mouse_world_position(event.pos, camera)
                     if world_pos:
@@ -798,149 +779,48 @@ class GameScene(BaseScene):
 
         return None
 
-    def _on_pokemon_swap(self, swap_data):
-        """Callback quando dois Pokémon trocam de posição"""
-        pokemon_a = swap_data['pokemon_a']
-        pokemon_b = swap_data['pokemon_b']
-        spot_a = swap_data['spot_a']
-        spot_b = swap_data['spot_b']
-
-        # Guarda as posições originais
-        pos_a_x = pokemon_a.x
-        pos_a_y = pokemon_a.y
-        tile_a_x = pokemon_a.placed_tile_x
-        tile_a_y = pokemon_a.placed_tile_y
-
-        # Move Pokémon A para o spot B
-        tile_center_x_b = (
-                                      spot_b.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
-        tile_center_y_b = (
-                                      spot_b.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
-
-        pokemon_a.x = tile_center_x_b
-        pokemon_a.y = tile_center_y_b
-        pokemon_a.original_spot_x = tile_center_x_b
-        pokemon_a.original_spot_y = tile_center_y_b
-        pokemon_a.placed_tile_x = tile_center_x_b // self.placement_manager.tile_size
-        pokemon_a.placed_tile_y = tile_center_y_b // self.placement_manager.tile_size
-
-        # Move Pokémon B para o spot A
-        tile_center_x_a = (
-                                      spot_a.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
-        tile_center_y_a = (
-                                      spot_a.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
-
-        pokemon_b.x = tile_center_x_a
-        pokemon_b.y = tile_center_y_a
-        pokemon_b.original_spot_x = tile_center_x_a
-        pokemon_b.original_spot_y = tile_center_y_a
-        pokemon_b.placed_tile_x = tile_center_x_a // self.placement_manager.tile_size
-        pokemon_b.placed_tile_y = tile_center_y_a // self.placement_manager.tile_size
-
-        # Atualiza os spots (já estão ocupados, não precisa alterar)
-        print(f"[SWAP] {pokemon_a.name} ↔ {pokemon_b.name} trocaram de posição!")
-
-        # Toca som de troca
-        #from src.managers.sound_manager import SoundEffect, sound_manager
-        #sound_manager.play_effect(SoundEffect.SWITCH)
-
-    def _on_pokemon_placed(self, placement_data):
-        """Callback quando um Pokémon é colocado no mapa OU movido"""
-        action = placement_data.get('action', 'place')
-
-        if action == 'swap':
-            # Troca entre dois Pokémon
-            self._on_pokemon_swap(placement_data)
-        elif action == 'move':
-            # Move Pokémon para novo spot vazio
-            self._move_pokemon_to_spot(placement_data)
-        else:
-            # Coloca Pokémon do time no mapa
-            pokemon = placement_data['pokemon']
-            spot = placement_data['spot']
-            self.placement_manager.add_pokemon(spot, pokemon)
-
-    def _move_pokemon_to_spot(self, move_data):
-        """Move um Pokémon para um novo spot vazio"""
-        pokemon = move_data['pokemon']
-        from_spot = move_data.get('from_spot')
-        to_spot = move_data['to_spot']
-
-        # Desocupa o spot antigo
-        if from_spot:
-            from_spot.occupied = False
-            print(f"[MOVE] Spot antigo ({from_spot.x}, {from_spot.y}) desocupado")
-
-        # Move o Pokémon para o novo spot
-        tile_center_x = (
-                                    to_spot.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
-        tile_center_y = (
-                                    to_spot.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
-
-        pokemon.x = tile_center_x
-        pokemon.y = tile_center_y
-        pokemon.original_spot_x = tile_center_x
-        pokemon.original_spot_y = tile_center_y
-        pokemon.placed_tile_x = tile_center_x // self.placement_manager.tile_size
-        pokemon.placed_tile_y = tile_center_y // self.placement_manager.tile_size
-
-        # Marca o novo spot como ocupado
-        to_spot.occupied = True
-
-        print(
-            f"[MOVE] {pokemon.name} movido para novo spot ({to_spot.x}, {to_spot.y}) - Tile ({pokemon.placed_tile_x}, {pokemon.placed_tile_y})")
-
-        # Toca som de movimento
-        #from src.managers.sound_manager import SoundEffect, sound_manager
-        #sound_manager.play_effect(SoundEffect.SWITCH)
+    # ===== MÉTODO FIXED_UPDATE (SIMPLIFICADO) =====
 
     def fixed_update(self, dt):
-        """Update da lógica do jogo - COM PROFILING"""
+        """Update da lógica do jogo"""
 
-        # Inicia medição do frame
         profiler.begin_frame()
 
-        # ===== PROCESSAMENTO DE OVERLAYS (NÃO VERIFICAM PAUSA) =====
+        # ===== OVERLAYS =====
         profiler.begin_section("OVERLAYS")
 
-        # Overlay de evolução - prioridade máxima
         if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
             self.evolution_overlay.update(dt)
             profiler.end_section()
             profiler.end_frame()
             return
 
-        # Overlay de aprendizado de moves
         if self.move_learn_overlay and self.move_learn_overlay.active:
             self.move_learn_overlay.update(dt)
             profiler.end_section()
             profiler.end_frame()
             return
 
-        # Overlay de seleção de moves
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.update(dt)
             profiler.end_section()
             profiler.end_frame()
             return
 
-        # Overlay manager (capture, game over, etc)
         if self.overlay_manager.is_active:
             self.overlay_manager.update(dt)
             profiler.end_section()
             profiler.end_frame()
             return
 
-        profiler.end_section()  # OVERLAYS
+        profiler.end_section()
 
-        # ===== SE CHEGOU AQUI, NÃO HÁ OVERLAYS ATIVOS =====
-        # Verifica se o jogo está pausado
+        # ===== PAUSA =====
         if self.game_paused or self.paused:
             profiler.end_frame()
             return
 
-        # ===== ATUALIZAÇÃO NORMAL DO JOGO =====
-        # Cache de referências locais para acesso mais rápido
+        # ===== ATUALIZAÇÃO NORMAL =====
         wave_mgr = self.wave_manager
         target_mgr = self.target_item_manager
         placement_mgr = self.placement_manager
@@ -951,37 +831,37 @@ class GameScene(BaseScene):
         screen_mgr = self.screen_manager
         path_renderer = self.path_renderer
 
-        # Battle System Update
+        # Battle System
         profiler.begin_section("BATTLE_SYSTEM")
         if hasattr(self, 'battle_system'):
             self.battle_system.update(dt)
         profiler.end_section()
 
-        # Bag Renderer Update
+        # Bag Renderer
         profiler.begin_section("BAG_RENDERER_UPDATE")
         if bag_renderer:
             bag_renderer.update(dt)
         profiler.end_section()
 
-        # Team Manager Update
+        # Team Manager
         profiler.begin_section("TEAM_MANAGER_UPDATE")
         if team_mgr:
             team_mgr.update(dt)
         profiler.end_section()
 
-        # Placement Manager Update
+        # Placement Manager
         profiler.begin_section("PLACEMENT_MANAGER_UPDATE")
         if placement_mgr:
             placement_mgr.update(dt, wave_mgr.active_enemies)
         profiler.end_section()
 
-        # Spot Renderer Update
+        # Spot Renderer
         profiler.begin_section("SPOT_RENDERER_UPDATE")
         if spot_renderer:
             spot_renderer.update(dt)
         profiler.end_section()
 
-        # Pokemon Updates
+        # Pokémon Updates
         profiler.begin_section("POKEMON_UPDATES")
         for pokemon in placed_pokemon:
             pokemon.update(dt)
@@ -992,6 +872,7 @@ class GameScene(BaseScene):
         target_mgr.update(dt)
         profiler.end_section()
 
+        # Effect Manager
         if hasattr(self, 'battle_system') and self.battle_system:
             profiler.begin_section("EFFECT_MANAGER")
             self.battle_system.effect_manager.update(dt)
@@ -1006,87 +887,87 @@ class GameScene(BaseScene):
             profiler.end_frame()
             return
 
-        # Build path points cache
-        profiler.begin_section("PATH_POINTS_CACHE")
-        path_points_by_index = {}
-        for i, path in enumerate(path_renderer.paths):
-            path_points = path_renderer.get_path_points(i)
-            if path_points:
-                path_points_by_index[i] = path_points
-        profiler.end_section()
-
-        # Wave Manager Update
+        # ===== NOVO: Wave Manager Update (simplificado) =====
         profiler.begin_section("WAVE_MANAGER_UPDATE")
-        enemies_at_end = wave_mgr.update(dt, path_points_by_index, screen_mgr)
+        enemies_at_end = wave_mgr.update(dt)
         profiler.end_section()
 
-        # Clean up enemies at end
-        profiler.begin_section("ENEMY_CLEANUP")
+        # Processa inimigos que chegaram ao fim (item roubado)
+        profiler.begin_section("ENEMY_ARRIVAL_PROCESS")
         for enemy in enemies_at_end:
             if enemy.is_carrying:
                 enemy.is_carrying.is_protected = False
                 enemy.clear_carrying()
         profiler.end_section()
 
-        # State transitions
+        # ===== TRANSIÇÕES DE ESTADO =====
         if self.game_state == "in_wave":
             wave_finished = wave_mgr.is_wave_completely_finished()
             if wave_finished:
-                print(f"[DEBUG] Wave finished! items_protected={target_mgr.items_protected}")
                 if target_mgr.items_protected > 0:
-                    print("[DEBUG] Transitioning to completed...")
                     self.game_state = "completed"
                     self._complete_phase()
                 else:
-                    print("[DEBUG] No items protected, game over!")
                     self.game_state = "game_over"
                     self.overlay_manager.show(OverlayType.GAME_OVER)
 
-        elif self.game_state == "between_waves":
-            self.between_waves_timer -= dt
-            if self.between_waves_timer <= 0:
-                any_wave_started = False
-                for path_idx in wave_mgr.path_waves.keys():
-                    if wave_mgr.current_wave_index_by_path.get(path_idx, 0) < len(wave_mgr.path_waves[path_idx]):
-                        wave_mgr._start_wave_for_path(path_idx)
-                        any_wave_started = True
-
-                if any_wave_started:
-                    self.game_state = "in_wave"
-
         profiler.end_frame()
 
-    def _start_battle_music(self):
-        """Inicia a música de batalha aleatória"""
-        if not self.music_playing:
-            from src.managers.sound_manager import sound_manager
-            # Verifica se o som está habilitado
-            if hasattr(settings, 'music_enabled') and settings.music_enabled:
-                success = sound_manager.play_random_battle_music()
-                if success:
-                    self.music_playing = True
-                    print(f"[MUSIC] Música de batalha iniciada para fase {self.phase_id}")
-                else:
-                    print(f"[MUSIC] Falha ao iniciar música de batalha")
-            else:
-                print(f"[MUSIC] Música desabilitada nas configurações")
+    def _complete_phase(self):
+        """Marca a fase como completada e dá as recompensas"""
+        from src.config.progress import progress_manager
 
-    def _stop_battle_music(self, fade_ms=1000):
-        """Para a música de batalha"""
-        if self.music_playing:
-            from src.managers.sound_manager import sound_manager
-            sound_manager.stop_music(fade_ms)
-            self.music_playing = False
-            print(f"[MUSIC] Música de batalha parada")
+        self._stop_battle_music(fade_ms=1000)
+
+        base_reward = self.phase_rewards['money']
+        gold_from_defeats = self.wave_manager.get_total_gold_earned()
+
+        total_items = len(self.target_item_manager.items)
+        stolen_items = self.target_item_manager.items_stolen
+
+        bonus_amount = 0
+        if stolen_items == 0 and total_items > 0:
+            bonus_amount = int(gold_from_defeats * 0.3)
+
+        gold_total = base_reward + gold_from_defeats + bonus_amount
+
+        self.player.money += gold_total
+        print(f"[REWARD] Ouro adicionado: {gold_total}")
+
+        for pokemon in self.player.team:
+            pokemon.gain_xp(self.phase_rewards['experience'])
+        self.player.score += self.phase_rewards['experience']
+
+        if total_items > 0:
+            protected_items = self.target_item_manager.items_protected
+            stars = int((protected_items / total_items) * 3)
+            stars = max(1, min(3, stars))
+        else:
+            stars = 3
+
+        self.phase_complete_data = {
+            "base_reward": base_reward,
+            "gold_from_defeats": gold_from_defeats,
+            "bonus_amount": bonus_amount,
+            "gold_total": gold_total,
+            "total_xp": self.phase_rewards['experience'],
+            "perfect_run": stolen_items == 0 and total_items > 0,
+            "stars": stars
+        }
+
+        progress_manager.complete_phase(self.phase_id, stars=stars)
+        self.player.auto_save()
+        self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
+        self._reset_team_pp()
+
+    # ===== MÉTODOS DE RENDER =====
 
     def render(self, screen):
-        """Renderiza o jogo - COM PROFILING"""
-
+        """Renderiza o jogo"""
         profiler.begin_section("RENDER_CLEAR")
         screen.fill((0, 0, 0))
         profiler.end_section()
 
-        # Cache de referências
         camera = self.camera
         screen_mgr = self.screen_manager
         map_renderer = self.map_renderer
@@ -1228,67 +1109,8 @@ class GameScene(BaseScene):
             self._render_debug_info(screen)
             profiler.end_section()
 
-    def _complete_phase(self):
-        """Marca a fase como completada e dá as recompensas"""
-        from src.config.progress import progress_manager
-
-        # Para a música ao completar a fase
-        self._stop_battle_music(fade_ms=1000)
-
-        # ===== CALCULAR RECOMPENSAS =====
-        base_reward = self.phase_rewards['money']  # Ex: 100
-        gold_from_defeats = self.wave_manager.get_total_gold_earned()  # Ouro já acumulado
-
-        # Verificar se nenhum item foi roubado
-        total_items = len(self.target_item_manager.items)
-        stolen_items = self.target_item_manager.items_stolen
-
-        bonus_amount = 0
-
-        if stolen_items == 0 and total_items > 0:
-            bonus_amount = int(gold_from_defeats * 0.3)  # Bônus de 30% sobre ouro ganho
-            print(f"[BONUS] Nenhum item roubado! +30% de bônus em ouro! +{bonus_amount}")
-
-        # Calcular ouro total (já tem o gold_from_defeats acumulado)
-        gold_total = base_reward + gold_from_defeats + bonus_amount
-
-        # ===== APLICAR RECOMPENSAS =====
-        self.player.money += gold_total
-        print(
-            f"[REWARD] Ouro adicionado: {gold_total} (Fase: {base_reward} + Derrotas: {gold_from_defeats} + Bônus: {bonus_amount})")
-        print(f"[REWARD] Total de ouro do jogador agora: {self.player.money}")
-
-        # Distribuir XP (recompensa de fase, além do XP por derrota)
-        for pokemon in self.player.team:
-            pokemon.gain_xp(self.phase_rewards['experience'])
-        self.player.score += self.phase_rewards['experience']
-
-        # Calcular estrelas
-        if total_items > 0:
-            protected_items = self.target_item_manager.items_protected
-            stars = int((protected_items / total_items) * 3)
-            stars = max(1, min(3, stars))
-        else:
-            stars = 3
-
-        # Salvar dados para o overlay
-        self.phase_complete_data = {
-            "base_reward": base_reward,
-            "gold_from_defeats": gold_from_defeats,
-            "bonus_amount": bonus_amount,
-            "gold_total": gold_total,
-            "total_xp": self.phase_rewards['experience'],
-            "perfect_run": stolen_items == 0 and total_items > 0,
-            "stars": stars
-        }
-
-        progress_manager.complete_phase(self.phase_id, stars=stars)
-        self.player.auto_save()
-        self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
-        self._reset_team_pp()
-
     def _render_game_ui(self, screen):
-        """Renderiza a UI do jogo - OTIMIZADO"""
+        """Renderiza a UI do jogo"""
         font = self._get_ui_font(24)
         font_small = self._get_ui_font(18)
 
@@ -1300,7 +1122,6 @@ class GameScene(BaseScene):
         viewport_x = screen_mgr.viewport_x
         viewport_y = screen_mgr.viewport_y
 
-        # Fundo semi-transparente
         ui_bg = pygame.Surface((400, 150))
         ui_bg.set_alpha(180)
         ui_bg.fill((20, 20, 30))
@@ -1308,12 +1129,10 @@ class GameScene(BaseScene):
 
         y_offset = viewport_y + 15
 
-        # Título da fase
         phase_text = font.render(self.phase_info.get("name", f"Fase {self.phase_number}"), True, (255, 215, 0))
         screen.blit(phase_text, (viewport_x + 15, y_offset))
         y_offset += 25
 
-        # Itens alvo
         items_color = (100, 255, 100) if target_mgr.items_protected > 0 else (255, 100, 100)
         items_text = font_small.render(
             f"Itens: {target_mgr.items_protected} protegidos | {target_mgr.items_stolen} levados",
@@ -1322,7 +1141,6 @@ class GameScene(BaseScene):
         screen.blit(items_text, (viewport_x + 15, y_offset))
         y_offset += 20
 
-        # Wave info
         if self.game_state == "waiting":
             state_text = font_small.render("Aguardando início...", True, (200, 200, 200))
             screen.blit(state_text, (viewport_x + 15, y_offset))
@@ -1340,7 +1158,6 @@ class GameScene(BaseScene):
             screen.blit(wave_text, (viewport_x + 15, y_offset))
             y_offset += 20
 
-            # Barra de progresso
             bar_x = viewport_x + 15
             bar_y = y_offset
             bar_width = 370
@@ -1364,12 +1181,6 @@ class GameScene(BaseScene):
                 f"Inimigos vivos: {len(wave_mgr.active_enemies)}",
                 True, enemies_color)
             screen.blit(enemies_text, (viewport_x + 15, y_offset))
-
-        elif self.game_state == "between_waves":
-            wave_text = font_small.render(
-                f"Wave concluída! Próxima em {self.between_waves_timer:.1f}s",
-                True, (255, 255, 0))
-            screen.blit(wave_text, (viewport_x + 15, y_offset))
 
         elif self.game_state == "completed":
             complete_text = font.render("FASE COMPLETA!", True, (255, 215, 0))
@@ -1398,7 +1209,7 @@ class GameScene(BaseScene):
         screen.blit(phase_text, (phase_x, phase_y))
 
     def _render_debug_info(self, screen):
-        """Informações de debug - CORRIGIDO"""
+        """Informações de debug"""
         mouse_pos = pygame.mouse.get_pos()
         screen_mgr = self.screen_manager
         camera = self.camera
@@ -1424,12 +1235,10 @@ class GameScene(BaseScene):
             else:
                 world_text = "World: invalid position"
                 tile_info = "Tile: N/A"
-                tile_value = "Tile ID: N/A"
                 path_info = "N/A"
         else:
             world_text = "World: outside viewport"
             tile_info = "Tile: outside"
-            tile_value = "Tile ID: N/A"
             path_info = "N/A"
 
         wave_info = self.wave_manager.get_current_wave_info()

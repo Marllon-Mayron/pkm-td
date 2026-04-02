@@ -19,27 +19,15 @@ class TargetItemRenderer:
             self.render_item(screen, camera, screen_manager, item)
 
     def render_item(self, screen, camera, screen_manager, item):
-        """Renderiza um único item - COM VARIAÇÃO VISUAL"""
-        # Determina posição no mundo
-        if item.carried_by:
-            world_x = item.current_x
-            world_y = item.current_y
-        else:
-            if item.was_carried:
-                world_x = item.current_x
-                world_y = item.current_y
-            else:
-                # Base centralizada no tile
-                center_x = item.base_x + 12  # tile_size/2
-                center_y = item.base_y + 12  # tile_size/2
+        """Renderiza um único item"""
+        # ===== CORREÇÃO: Usa get_capture_position para obter a posição correta =====
+        world_x, world_y = item.get_capture_position()
 
-                # APLICA A VARIAÇÃO VISUAL AQUI!
-                world_x = center_x + item.visual_offset_x
-                world_y = center_y + item.visual_offset_y
+        # Converte para coordenadas de tela
+        screen_x, screen_y = screen_manager.world_to_screen(world_x, world_y, camera)
 
-        # Usa o mesmo método world_to_screen
-        screen_x, screen_y = render_context.world_to_screen(world_x, world_y, camera, screen_manager)
-        scale = render_context.get_scale(camera, screen_manager)
+        # Escala do sprite baseada no zoom
+        scale = camera.zoom * screen_manager.render_scale if camera else screen_manager.render_scale
         sprite_size = max(8, int(16 * scale))
         half_size = sprite_size // 2
 
@@ -50,9 +38,16 @@ class TargetItemRenderer:
             # Aplica rotação se houver
             if hasattr(item, 'rotation') and item.rotation != 0:
                 scaled = pygame.transform.rotate(scaled, item.rotation)
-                # Ajusta posição após rotação
                 rotated_rect = scaled.get_rect()
                 rotated_rect.center = (screen_x, screen_y)
                 screen.blit(scaled, rotated_rect)
             else:
                 screen.blit(scaled, (screen_x - half_size, screen_y - half_size))
+
+        # Debug: mostra hitbox
+        if self.show_debug:
+            # Desenha um círculo no centro do item
+            pygame.draw.circle(screen, (255, 0, 0), (screen_x, screen_y), 5, 1)
+            # Desenha o range de captura
+            capture_range_px = item.capture_rate * scale if hasattr(item, 'capture_rate') else 20
+            pygame.draw.circle(screen, (255, 255, 0), (screen_x, screen_y), int(capture_range_px), 1)
