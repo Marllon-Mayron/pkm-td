@@ -887,27 +887,22 @@ class GameScene(BaseScene):
             profiler.end_frame()
             return
 
-        # ===== NOVO: Wave Manager Update (simplificado) =====
+        # ===== Wave Manager Update =====
         profiler.begin_section("WAVE_MANAGER_UPDATE")
         enemies_at_end = wave_mgr.update(dt)
         profiler.end_section()
 
-        # Processa inimigos que chegaram ao fim (item roubado)
-        profiler.begin_section("ENEMY_ARRIVAL_PROCESS")
-        for enemy in enemies_at_end:
-            if enemy.is_carrying:
-                enemy.is_carrying.is_protected = False
-                enemy.clear_carrying()
-        profiler.end_section()
-
         # ===== TRANSIÇÕES DE ESTADO =====
         if self.game_state == "in_wave":
-            wave_finished = wave_mgr.is_wave_completely_finished()
-            if wave_finished:
+            # Verifica se a wave está completamente finalizada
+            # (sem inimigos vivos E sem waves pendentes)
+            if wave_mgr.is_wave_completely_finished():
                 if target_mgr.items_protected > 0:
+                    print(f"[GAME] Fase COMPLETA! Todos os inimigos foram derrotados!")
                     self.game_state = "completed"
                     self._complete_phase()
                 else:
+                    print(f"[GAME] GAME OVER! Todos os itens foram roubados!")
                     self.game_state = "game_over"
                     self.overlay_manager.show(OverlayType.GAME_OVER)
 

@@ -93,6 +93,9 @@ class EnemySpawner:
                 self.waves[path_idx] = []
             self.waves[path_idx].append(wave)
 
+            print(
+                f"[Spawner] Carregada wave {idx} para path {path_idx}: {wave.wave_size} inimigos, boss={wave.has_boss}")
+
     def start_all_waves(self) -> bool:
         """Inicia todas as waves de todos os paths"""
         started = False
@@ -116,7 +119,7 @@ class EnemySpawner:
         self.spawn_timer[path_idx] = 0
         self.spawned_count[path_idx] = 0
 
-        print(f"[WaveSpawner] Path {path_idx}: Iniciando wave {wave_idx + 1}")
+        print(f"[WaveSpawner] Path {path_idx}: Iniciando wave {wave_idx + 1} com {wave_data.wave_size} inimigos")
         return True
 
     def has_more_waves(self) -> bool:
@@ -128,7 +131,7 @@ class EnemySpawner:
         return False
 
     def has_active_waves(self) -> bool:
-        """Verifica se alguma wave ainda está ativa"""
+        """Verifica se alguma wave ainda está ativa (spawnando)"""
         for path_idx, active in self.wave_active.items():
             if active:
                 return True
@@ -184,7 +187,6 @@ class EnemySpawner:
         Atualiza spawn de inimigos.
         Retorna lista de novos inimigos criados.
         """
-        # ===== VERIFICA PAUSA =====
         if self.paused:
             return []
 
@@ -205,6 +207,7 @@ class EnemySpawner:
             path = self.wave_manager.path_tracker.get_path_by_index(path_idx)
 
             if not path:
+                print(f"[Spawner] ERRO: Path {path_idx} não encontrado!")
                 continue
 
             # Delay inicial da wave
@@ -226,9 +229,13 @@ class EnemySpawner:
                     enemy = self._create_enemy(wave, path, path_idx, is_boss)
 
                     if enemy:
+                        print(f"[Spawner] Spawnado {enemy.name} Lv.{enemy.level} (BOSS={is_boss}) no path {path_idx}")
                         new_enemies.append(enemy)
                         self.spawned_count[path_idx] = spawned + 1
                         self.spawn_timer[path_idx] = wave.spawn_interval
+                    else:
+                        print(f"[Spawner] ERRO: Falha ao criar inimigo!")
+                        self.spawn_timer[path_idx] = 0.5  # Tenta novamente em 0.5s
             else:
                 # Wave terminou de spawnar
                 self._advance_to_next_wave(path_idx)
@@ -273,6 +280,7 @@ class EnemySpawner:
         # Escolhe inimigo baseado em porcentagem
         enemy_config = self._choose_enemy(wave.enemies)
         if not enemy_config:
+            print(f"[Spawner] ERRO: Nenhum inimigo configurado!")
             return None
 
         level = random.randint(
@@ -280,8 +288,16 @@ class EnemySpawner:
             enemy_config.get("level_max", wave.max_level)
         )
 
+        # Garante que o ponto de início existe
+        if not path.start_point:
+            print(f"[Spawner] ERRO: Path {path_idx} não tem start_point!")
+            return None
+
+        start_x, start_y = path.start_point
+        print(f"[Spawner] Criando inimigo em ({start_x}, {start_y})")
+
         pokemon = Pokemon(
-            path.start_point[0], path.start_point[1],
+            start_x, start_y,
             enemy_config.get("pokemon_id", 1),
             level=level,
             is_wild=True,
@@ -289,13 +305,17 @@ class EnemySpawner:
             is_boss=is_boss
         )
 
-        # ===== CONFIGURA screen_manager =====
+        # Configura screen_manager e camera
         if self.wave_manager.game_scene and hasattr(self.wave_manager.game_scene, 'screen_manager'):
             pokemon.screen_manager = self.wave_manager.game_scene.screen_manager
             pokemon.camera = self.wave_manager.game_scene.camera
 
         # Configura path
-        self.wave_manager.path_tracker.assign_path(pokemon, path_idx)
+        success = self.wave_manager.path_tracker.assign_path(pokemon, path_idx, start_at_begin=True)
+        if not success:
+            print(f"[Spawner] ERRO: Falha ao atribuir path para {pokemon.name}")
+            return None
+
         pokemon.move_speed = pokemon.base_move_speed * wave.speed_multiplier
 
         # Marca que acabou de nascer (evita detecção de chegada imediata)
@@ -306,7 +326,11 @@ class EnemySpawner:
         pokemon._distance_traveled = 0.0
         pokemon._last_pos = (pokemon.x, pokemon.y)
 
-        print(f"[WaveSpawner] Criado {pokemon.name} Lv.{pokemon.level} {'(BOSS)' if is_boss else ''}")
+        # Garante que o inimigo está vivo
+        pokemon.current_hp = pokemon.max_hp
+
+        print(
+            f"[Spawner] Criado {pokemon.name} Lv.{pokemon.level} {'(BOSS)' if is_boss else ''} em ({pokemon.x}, {pokemon.y})")
         return pokemon
 
     def _choose_enemy(self, enemies: List[dict]) -> Optional[dict]:

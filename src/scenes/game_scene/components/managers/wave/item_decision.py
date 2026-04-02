@@ -8,7 +8,7 @@ from enum import Enum
 class DirectionDecision(Enum):
     """Decisão de direção após capturar item"""
     CONTINUE = "continue"  # Continua na mesma direção
-    REVERSE = "reverse"  # Volta para o início
+    REVERSE = "reverse"    # Volta para o início
 
 
 class ItemDecision:
@@ -25,39 +25,43 @@ class ItemDecision:
         Decide se o Pokémon deve continuar ou voltar após capturar o item.
 
         Regras:
-        - Boss: sempre continua (vai até o fim e depois volta)
-        - Comum: calcula qual direção é mais vantajosa baseado na posição atual
+        - TODOS os inimigos calculam o caminho mais curto
+        - A diferença é que o boss nunca para - ele sempre continua andando
+          mesmo após decidir voltar, ele vai até o início e depois volta para o fim
         """
         if not path:
             return DirectionDecision.CONTINUE
 
-        if enemy.is_boss:
-            return DirectionDecision.CONTINUE
-
-        # ===== CORREÇÃO: Calcula distâncias considerando o path =====
         # Encontra o ponto mais próximo no path
         current_point_idx = self._find_closest_path_point(enemy, path)
 
-        # Calcula distância percorrida até o fim (seguindo o path)
+        # Calcula distância até o fim e início
         dist_to_end = self._calculate_distance_along_path(path, current_point_idx, len(path.points) - 1)
-
-        # Calcula distância percorrida até o início (seguindo o path)
         dist_to_start = self._calculate_distance_along_path(path, current_point_idx, 0)
 
-        # Se está mais perto do fim, continua; senão, volta
-        if dist_to_end <= dist_to_start:
+        # Margem para evitar decisões instáveis
+        margin = 5.0
+
+        if dist_to_end + margin < dist_to_start:
             print(
-                f"[ItemDecision] {enemy.name}: dist_to_end={dist_to_end:.1f}, dist_to_start={dist_to_start:.1f} -> CONTINUE")
+                f"[ItemDecision] {enemy.name}: dist_fim={dist_to_end:.1f} < dist_inicio={dist_to_start:.1f} -> CONTINUE")
             return DirectionDecision.CONTINUE
-        else:
+        elif dist_to_start + margin < dist_to_end:
             print(
-                f"[ItemDecision] {enemy.name}: dist_to_end={dist_to_end:.1f}, dist_to_start={dist_to_start:.1f} -> REVERSE")
+                f"[ItemDecision] {enemy.name}: dist_inicio={dist_to_start:.1f} < dist_fim={dist_to_end:.1f} -> REVERSE")
             return DirectionDecision.REVERSE
+        else:
+            # Empate - mantém a direção atual
+            current_direction = getattr(enemy, 'current_direction', 'right')
+            print(
+                f"[ItemDecision] {enemy.name}: empate, mantendo direção atual -> {'CONTINUE' if not getattr(enemy, 'is_returning_with_item', False) else 'REVERSE'}")
+            if getattr(enemy, 'is_returning_with_item', False):
+                return DirectionDecision.REVERSE
+            else:
+                return DirectionDecision.CONTINUE
 
     def _find_closest_path_point(self, enemy: 'Pokemon', path) -> int:
-        """
-        Encontra o índice do ponto do path mais próximo do Pokémon.
-        """
+        """Encontra o índice do ponto do path mais próximo do Pokémon."""
         min_dist = float('inf')
         closest_idx = 0
 
@@ -70,13 +74,10 @@ class ItemDecision:
         return closest_idx
 
     def _calculate_distance_along_path(self, path, from_idx: int, to_idx: int) -> float:
-        """
-        Calcula a distância percorrida ao longo do path do índice from_idx até to_idx.
-        """
+        """Calcula a distância percorrida ao longo do path do índice from_idx até to_idx."""
         if from_idx == to_idx:
             return 0.0
 
-        # Determina direção do percurso
         step = 1 if to_idx > from_idx else -1
 
         distance = 0.0
@@ -100,13 +101,8 @@ class ItemDecision:
             return False
 
         t = threshold if threshold is not None else self.threshold
-
-        # Encontra o ponto mais próximo
         closest_idx = self._find_closest_path_point(enemy, path)
-
-        # Calcula distância até o início seguindo o path
         dist = self._calculate_distance_along_path(path, closest_idx, 0)
-
         return dist < t
 
     def is_close_to_end(self, enemy: 'Pokemon', path, threshold: float = None) -> bool:
@@ -115,11 +111,6 @@ class ItemDecision:
             return False
 
         t = threshold if threshold is not None else self.threshold
-
-        # Encontra o ponto mais próximo
         closest_idx = self._find_closest_path_point(enemy, path)
-
-        # Calcula distância até o fim seguindo o path
         dist = self._calculate_distance_along_path(path, closest_idx, len(path.points) - 1)
-
         return dist < t
