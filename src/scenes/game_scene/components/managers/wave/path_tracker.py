@@ -81,6 +81,28 @@ class PathTracker:
         Atualiza movimento do inimigo.
         Retorna True se chegou ao FIM do path.
         """
+        # ===== VERIFICA STATUS QUE IMPEDEM MOVIMENTO =====
+        # 1. CONGELAMENTO (prioridade máxima)
+        if hasattr(enemy, 'combat') and enemy.combat.is_frozen():
+            if enemy.combat.update_freeze(dt):
+                # Ainda congelado - NÃO SE MOVE
+                return False
+            # Descongelou, continua
+
+        # 2. SONO
+        if hasattr(enemy, 'combat') and enemy.combat.is_asleep():
+            if enemy.combat.update_sleep(dt):
+                # Ainda dormindo - NÃO SE MOVE
+                return False
+            # Acordou, continua
+
+        # 3. PARALISIA (stun)
+        if hasattr(enemy, 'combat') and enemy.combat.is_stunned():
+            if enemy.combat.update_stun(dt):
+                # Atordoado - NÃO SE MOVE
+                return False
+            # Recuperou, continua
+
         if not enemy.path or enemy.path_index >= len(enemy.path):
             return False
 

@@ -101,11 +101,18 @@ class StatusEffect:
             self.icon = "💤"
             self.on_apply_callback = self._sleep_apply
 
+
         elif self.type == StatusType.FREEZE:
+
             self.name = "Congelado"
+
             self.display_name = "FRZ"
+
             self.color = (152, 216, 216)
+
             self.icon = "❄️"
+
+            self.on_apply_callback = self._freeze_apply
 
         elif self.type == StatusType.CONFUSION:
             self.name = "Confusão"

@@ -222,7 +222,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "freeze",
-                "chance": 0.10,
+                "chance": 0.90,
                 "duration": None,
                 "overwrite": False
             },

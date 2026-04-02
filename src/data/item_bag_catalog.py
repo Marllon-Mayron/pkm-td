@@ -195,6 +195,18 @@ class ItemBagCatalog:
                 "effect_value": "mega-punch",
                 "price": 1000
             },
+            "tm_blizzard": {
+                "id": "tm_blizzard",
+                "name": "TM04 - Blizzard",
+                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_ICE.png"),
+                "description": "Nevasca que da 10% de chance de dar congelamento",
+                "category": "tm",
+                "usable_in_battle": False,
+                "usable_on_map": True,
+                "effect": "teach_move",
+                "effect_value": "blizzard",
+                "price": 10
+            },
         }
 
         # Placeholders serão criados sob demanda

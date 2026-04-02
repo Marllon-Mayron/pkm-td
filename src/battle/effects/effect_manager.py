@@ -201,6 +201,13 @@ class EffectManager:
             if pokemon_id in self._pokemon_refs:
                 pokemon = self._pokemon_refs[pokemon_id]
 
+                # Para congelamento, o update retorna False se descongelou
+                if status.type == StatusType.FREEZE:
+                    is_still_frozen = status.update_freeze(dt)
+                    if not is_still_frozen:
+                        status_to_remove.append(pokemon_id)
+                    continue
+
                 # update retorna False se o status acabou
                 if not status.update(pokemon, self, dt):
                     status_to_remove.append(pokemon_id)
@@ -437,6 +444,9 @@ class EffectManager:
         if status.type == StatusType.PARALYSIS and status.is_stunned():
             self._render_stun_icon(screen, pokemon, sprite_rect, zoom_scale, font_cache, status)
 
+        if status.type == StatusType.FREEZE:
+            self._render_freeze_icon(screen, pokemon, sprite_rect, zoom_scale, font_cache, status)
+
     def _render_stun_icon(self, screen, pokemon, sprite_rect, zoom_scale, font_cache, status):
         """Renderiza ícone de stun quando o Pokémon está paralisado"""
         base_font_size = 14
@@ -506,6 +516,36 @@ class EffectManager:
                 timer_rect.left = text_rect.right + 5
                 timer_rect.centery = text_rect.centery
                 screen.blit(timer_text, timer_rect)
+
+    def _render_freeze_icon(self, screen, pokemon, sprite_rect, zoom_scale, font_cache, status):
+        """Renderiza ícone de congelamento quando o Pokémon está congelado"""
+        base_font_size = 14
+        if hasattr(pokemon, 'screen_manager') and hasattr(pokemon, 'camera'):
+            render_scale = pokemon.screen_manager.render_scale
+            camera_zoom = pokemon.camera.zoom if pokemon.camera else 1.0
+            total_scale = render_scale * camera_zoom
+            font_size = max(12, int(base_font_size * total_scale))
+        else:
+            font_size = max(12, int(base_font_size * zoom_scale))
+
+        if font_size not in font_cache:
+            try:
+                font_cache[font_size] = pygame.font.Font(None, font_size)
+            except:
+                font_cache[font_size] = pygame.font.SysFont('Arial', font_size)
+
+        font = font_cache[font_size]
+
+        # Ícone de congelamento (cristal de gelo)
+        freeze_text = "❄️"
+        text_surf = font.render(freeze_text, True, (152, 216, 216))
+        text_rect = text_surf.get_rect()
+
+        # Posiciona à direita do indicador de status
+        text_rect.left = sprite_rect.centerx + 15
+        text_rect.centery = sprite_rect.top - int(sprite_rect.height * 0.55)
+
+        screen.blit(text_surf, text_rect)
 
     def clear_all(self):
         """Limpa todos os efeitos"""

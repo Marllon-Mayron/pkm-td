@@ -125,6 +125,8 @@ class MoveEffect:
             status_type = StatusType.BURN
         elif status_type_str == 'PARALYSIS':
             status_type = StatusType.PARALYSIS
+        elif status_type_str == 'FREEZE':
+            status_type = StatusType.FREEZE
         else:
             status_type = StatusType.NONE
 

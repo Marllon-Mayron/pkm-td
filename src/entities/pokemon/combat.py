@@ -102,6 +102,12 @@ class PokemonCombat:
             # Está dormindo - não faz nada
             return
 
+        # ===== VERIFICA CONGELAMENTO =====
+        if self.is_frozen():
+            if self.update_freeze(dt):
+                # Congelado - não procura inimigo
+                return
+
         nearest = self.find_nearest_enemy(enemies)
 
         if nearest and self.pokemon.charge_cooldown <= 0:

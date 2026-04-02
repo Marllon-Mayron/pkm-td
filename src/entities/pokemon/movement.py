@@ -71,29 +71,29 @@ class PokemonMovement:
     def update_movement(self, dt, items=None):
         """Movimento via path (para aliados ou inimigos sem wave control)"""
 
-        # ===== VERIFICA STUN DA PARALISIA =====
-        is_stunned = self.update_stun(dt)
-        if is_stunned:
-            # Está atordoado - não se move neste frame
-            return
-
-        # ===== VERIFICA SONO =====
-        is_asleep = self.update_sleep(dt)
-        if is_asleep:
-            # Está dormindo - não se move
-            return
-        # ===== MOVIMENTO NORMAL =====
-        if not self.pokemon.path or len(self.pokemon.path) == 0 or self.pokemon.path_index >= len(self.pokemon.path):
-            return
-
-        # ===== VERIFICA CONGELAMENTO =====
+        # ===== VERIFICA CONGELAMENTO (MAIS PRIORITÁRIO) =====
         if self.is_frozen():
-            # Atualiza o estado de congelamento
             is_still_frozen = self.update_freeze(dt)
             if is_still_frozen:
-                # Está congelado - não se move
                 return
-                # Se descongelou, continua o movimento normalmente
+            # Se descongelou, continua
+
+        # ===== VERIFICA SONO =====
+        if self.is_asleep():
+            is_still_asleep = self.update_sleep(dt)
+            if is_still_asleep:
+                return
+            # Se acordou, continua
+
+        # ===== VERIFICA STUN DA PARALISIA =====
+        if self.is_stunned():
+            is_still_stunned = self.update_stun(dt)
+            if is_still_stunned:
+                return
+            # Se recuperou, continua
+
+        if not self.pokemon.path or len(self.pokemon.path) == 0 or self.pokemon.path_index >= len(self.pokemon.path):
+            return
 
         target_x, target_y = self.pokemon.path[self.pokemon.path_index]
         dx = target_x - self.pokemon.x

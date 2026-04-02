@@ -47,12 +47,17 @@ class BattleSystem:
 
         attacker.has_no_pp = False
 
-        # ===== VERIFICA SE O ATAQUE É DE STATUS (PARA BLOQUEAR APENAS STATUS) =====
-        # Só bloqueia o ataque se:
-        # 1. O atacante está com um status que impede ação (sono, freeze, stun da paralisia)
-        # 2. OU o move é de status E o alvo já tem status (para não sobrescrever)
+        # ===== DESCONGELAMENTO POR ATAQUES DE FOGO =====
+        # Isso deve ser verificado ANTES de qualquer outra coisa
+        target_status = self.effect_manager.get_status(target)
+        if target_status and target_status.type == StatusType.FREEZE:
+            if move.type.lower() == "fire":
+                # Ataque de fogo descongela o alvo
+                target_status.thaw()
+                self.effect_manager.add_status_text(target, f"{target.name} descongelou com o calor!")
+                print(f"[FREEZE] {target.name} descongelou devido ao ataque de fogo {move.name}!")
 
-        # Primeiro, verifica se o atacante pode agir (sono, freeze, paralisia)
+        # ===== VERIFICA SE O ATACANTE PODE AGIR =====
         status = self.effect_manager.get_status(attacker)
 
         # Atualiza o estado de paralisia antes de verificar
@@ -68,6 +73,9 @@ class BattleSystem:
             elif status.type == StatusType.SLEEP:
                 self.effect_manager.add_status_text(attacker, f"{attacker.name} está dormindo!")
                 print(f"[BATTLE] {attacker.name} está dormindo e não pode atacar!")
+            elif status.type == StatusType.FREEZE:
+                self.effect_manager.add_status_text(attacker, f"{attacker.name} está congelado!")
+                print(f"[BATTLE] {attacker.name} está congelado e não pode atacar!")
             else:
                 self.effect_manager.add_status_text(attacker, f"{attacker.name} não pode atacar!")
                 print(f"[BATTLE] {attacker.name} está {status.name.lower()} e não pode atacar!")
