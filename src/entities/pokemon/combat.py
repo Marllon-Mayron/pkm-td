@@ -25,7 +25,9 @@ class PokemonCombat:
         if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
             status = self.pokemon.effect_manager.get_status(self.pokemon)
             if status and status.type == StatusType.PARALYSIS:
-                return status.update_paralysis(dt)
+                # Chama o update passando o pokemon
+                result = status.update_paralysis(dt, self.pokemon)
+                return result
         return False
 
     def is_asleep(self) -> bool:
@@ -156,6 +158,9 @@ class PokemonCombat:
             attack_type = "status" if is_status_move else "especial"
             print(f"[COMBAT] {self.pokemon.name} usou {current_move.name} ({attack_type}) à distância!")
 
+            # ===== TOCAR ANIMAÇÃO DE ATAQUE =====
+            self._play_attack_animation(current_move.name)
+
             if self.pokemon.battle_system:
                 self.pokemon.battle_system.attempt_attack(self.pokemon, self.pokemon.target)
             else:
@@ -178,6 +183,9 @@ class PokemonCombat:
         distance = math.sqrt(dx * dx + dy * dy)
 
         if distance < 8:
+            # ===== TOCAR ANIMAÇÃO DE ATAQUE FÍSICO =====
+            self._play_attack_animation(current_move.name)
+
             if self.pokemon.battle_system:
                 self.pokemon.battle_system.attempt_attack(self.pokemon, self.pokemon.target)
             else:
@@ -209,6 +217,33 @@ class PokemonCombat:
             self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
 
             self._update_direction_for_angle(dx, dy)
+
+    def _play_attack_animation(self, move_name: str):
+        """Toca a animação de ataque uma única vez"""
+        from src.battle.effects.effect_factory import EffectFactory
+
+        effect = EffectFactory.create_effect(move_name)
+        if effect and effect.attacker_animation:
+            # Verifica distância mínima
+            if effect.min_distance > 0:
+                if self.pokemon.target:
+                    dx = self.pokemon.target.x - self.pokemon.x
+                    dy = self.pokemon.target.y - self.pokemon.y
+                    distance = math.sqrt(dx * dx + dy * dy)
+                    if distance > effect.min_distance:
+                        return
+
+            if self.pokemon.has_animation(effect.attacker_animation):
+                # Salva animação atual
+                self.pokemon._saved_animation_before_attack = self.pokemon.current_animation
+                # Toca animação de ataque
+                self.pokemon.set_animation_direct(effect.attacker_animation)
+                # Reseta para o início
+                self.pokemon.current_frame = 0
+                self.pokemon.animation_timer = 0
+                # Marca que está em animação de ataque
+                self.pokemon._attack_animation_active = True
+                print(f"[ANIM] {self.pokemon.name} usou animação {effect.attacker_animation} para {move_name}")
 
     def _update_direction_for_angle(self, dx, dy):
         """Atualiza direção baseada no ângulo (8 direções)"""

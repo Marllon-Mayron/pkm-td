@@ -114,42 +114,33 @@ class SpriteLoader:
         str, List[pygame.Surface]]:
         """
         Carrega animação de um spritesheet PNG
-
-        LAYOUT HORIZONTAL:
-        - CADA LINHA = uma DIREÇÃO (8 direções no total)
-        - CADA COLUNA = um FRAME da animação para aquela direção
         """
         try:
             spritesheet = pygame.image.load(str(spritesheet_path)).convert_alpha()
             sheet_width, sheet_height = spritesheet.get_size()
 
-            # Obtém informações do frame do AnimData
             frame_width = anim_info.get("frame_width", 32)
             frame_height = anim_info.get("frame_height", 32)
             durations = anim_info.get("durations", [])
             num_frames = len(durations)
 
-            # Se não tem informação de duração, calcula baseado na largura
             if num_frames == 0:
                 num_frames = sheet_width // frame_width
 
-            # Calcula quantas direções baseado na altura
             num_directions = sheet_height // frame_height
+            is_single_direction = num_directions == 1
 
             frames_by_direction = {}
 
-            # Para cada direção (linha)
+            # Carrega os frames reais do spritesheet
             for dir_idx in range(min(num_directions, len(self.DIRECTIONS))):
                 direction = self.DIRECTIONS[dir_idx]
                 frames = []
 
-                # Para cada frame da animação (coluna)
                 for frame_idx in range(num_frames):
-                    # Posição: x = frame * frame_width, y = direção * frame_height
                     x = frame_idx * frame_width
                     y = dir_idx * frame_height
 
-                    # Verifica se o frame está dentro da spritesheet
                     if x + frame_width <= sheet_width and y + frame_height <= sheet_height:
                         rect = pygame.Rect(x, y, frame_width, frame_height)
                         frame_surface = spritesheet.subsurface(rect)
@@ -157,6 +148,26 @@ class SpriteLoader:
 
                 if frames:
                     frames_by_direction[direction] = frames
+
+            # Guarda informação sobre direção original
+            original_directions = list(frames_by_direction.keys())
+
+            # Se é direção única, duplica para todas as direções (para uso interno)
+            if is_single_direction and frames_by_direction:
+                single_frames = list(frames_by_direction.values())[0]
+                frames_by_direction = {}
+                for direction in self.DIRECTIONS:
+                    frames_by_direction[direction] = single_frames.copy()
+
+            # Adiciona metadados
+            frames_by_direction['_metadata'] = {
+                'is_single_direction': is_single_direction,
+                'original_directions': original_directions,
+                'num_original_directions': len(original_directions),
+                'num_frames': num_frames,
+                'frame_width': frame_width,
+                'frame_height': frame_height
+            }
 
             return frames_by_direction
 

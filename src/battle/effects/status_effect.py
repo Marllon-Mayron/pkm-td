@@ -184,7 +184,7 @@ class StatusEffect:
             return self._stun_timer <= 0
         return True
 
-    def update_paralysis(self, dt: float) -> bool:
+    def update_paralysis(self, dt: float, pokemon=None) -> bool:
         """
         Atualiza o estado de paralisia
         Retorna True se o Pokémon está atordoado
@@ -192,19 +192,36 @@ class StatusEffect:
         if self.type != StatusType.PARALYSIS:
             return False
 
+        old_stun_state = self._stun_timer > 0
+
         if self._stun_timer > 0:
             self._stun_timer -= dt
-            return True
+            new_stun_state = self._stun_timer > 0
+
+            # Se mudou de atordoado para não atordoado, notifica
+            if old_stun_state and not new_stun_state and pokemon:
+                print(f"[PARALYSIS] {pokemon.name} não está mais atordoado!")
+                self._notify_stun_change(pokemon, False)
+            return self._stun_timer > 0
 
         self._last_stun_check += dt
         if self._last_stun_check >= 3.0:
             self._last_stun_check = 0
             if random.random() < 0.33:
                 self._stun_timer = 2.0
-                print(f"[PARALYSIS] Stun aplicado por 2 segundos!")
+                print(f"[PARALYSIS] {getattr(pokemon, 'name', '?')} está atordoado por 2 segundos!")
+                # Notifica que entrou em stun
+                if pokemon:
+                    self._notify_stun_change(pokemon, True)
                 return True
 
         return False
+
+    def _notify_stun_change(self, pokemon, is_stunned: bool):
+        """Notifica o Pokémon sobre mudança no estado de stun"""
+        print(f"[STUN_NOTIFY] {pokemon.name} is_stunned={is_stunned}")
+        if hasattr(pokemon, 'on_stun_state_changed'):
+            pokemon.on_stun_state_changed(is_stunned)
 
     def get_stun_remaining(self) -> float:
         if self.type == StatusType.PARALYSIS:
@@ -251,9 +268,9 @@ class StatusEffect:
         """
         self._pokemon_name = pokemon.name
 
-        # Atualiza paralisia
+        # Atualiza paralisia (passa o pokemon)
         if self.type == StatusType.PARALYSIS:
-            self.update_paralysis(dt)
+            self.update_paralysis(dt, pokemon)
             return True
 
         # Atualiza sono
@@ -337,11 +354,19 @@ class StatusEffect:
         return False
 
     def apply(self, pokemon, effect_manager):
-        """Aplica o efeito de status"""
+        """Aplica o efeito de status - com callback de animação"""
         if self.on_apply_callback:
             self.on_apply_callback(pokemon, effect_manager)
 
+        # ===== FORÇA ATUALIZAÇÃO DA ANIMAÇÃO =====
+        if hasattr(pokemon, 'update_status_animation'):
+            pokemon.update_status_animation()
+
     def remove(self, pokemon, effect_manager):
-        """Remove o efeito de status"""
+        """Remove o efeito de status - com callback de animação"""
         if self.on_remove_callback:
             self.on_remove_callback(pokemon, effect_manager)
+
+        # ===== FORÇA ATUALIZAÇÃO DA ANIMAÇÃO DE VOLTA AO NORMAL =====
+        if hasattr(pokemon, 'update_status_animation'):
+            pokemon.update_status_animation()

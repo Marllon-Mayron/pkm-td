@@ -357,6 +357,28 @@ class Pokemon(Entity):
     def _update_animation(self, dt):
         self.animation.update_animation(dt)
 
+    def update_status_animation(self):
+        """Atualiza a animação baseada no status atual"""
+        if not hasattr(self, 'effect_manager') or not self.effect_manager:
+            return
+
+        status = self.effect_manager.get_status(self)
+
+        if status and status.type.value != "none":
+            # Tem status ativo
+            status_name = status.type.value
+            # Para paralisia, NÃO trocamos animação aqui (será pelo stun)
+            if status_name == "paralysis":
+                # Só reseta se não estiver em stun
+                if not (hasattr(self, 'animation') and hasattr(self.animation, '_is_stunned')):
+                    # Se não está em stun, mantém animação normal
+                    pass
+                return
+            self.animation.set_status_animation(status_name)
+        else:
+            # Sem status, volta ao normal
+            self.animation.set_status_animation(None)
+
     def get_current_move(self):
         return self.moves_manager.get_current_move()
 
@@ -574,6 +596,13 @@ class Pokemon(Entity):
         """Retorna lista de todas as animações disponíveis para este Pokémon"""
         return self.animation.get_available_animations()
 
+    def on_stun_state_changed(self, is_stunned: bool):
+        """
+        Chamado quando o estado de stun da paralisia muda
+        """
+        if hasattr(self, 'animation'):
+            self.animation.set_stun_animation(is_stunned)
+
     def has_animation(self, animation_name: str) -> bool:
         """Verifica se este Pokémon tem uma animação específica"""
         return self.animation.has_animation(animation_name)
@@ -581,6 +610,29 @@ class Pokemon(Entity):
     def set_animation_direct(self, animation_name: str):
         """Define a animação diretamente (ignora movimento)"""
         self.animation.set_animation(animation_name)
+
+    def set_animation_by_status(self):
+        """
+        Define a animação baseada no status atual.
+        Deve ser chamado quando o status muda.
+        """
+        if not hasattr(self, 'effect_manager') or not self.effect_manager:
+            return
+
+        status = self.effect_manager.get_status(self)
+
+        if status and status.type.value != "none":
+            status_name = status.type.value
+            status_animation_map = {
+                "sleep": "sleep",
+                "paralysis": "charge",
+                "freeze": "charge",
+            }
+            anim_name = status_animation_map.get(status_name)
+            if anim_name and self.has_animation(anim_name):
+                self.set_animation_direct(anim_name)
+                return True
+        return False
 
     def get_animation_info(self) -> Dict:
         """Retorna informações completas sobre as animações deste Pokémon"""
@@ -673,10 +725,9 @@ class Pokemon(Entity):
         print(f"[LOAD] {self.name} restaurado com {len(self.moves)} moves")
 
     def update(self, dt, player=None, enemies=None, items=None):
-        """Update do Pokémon - versão compatível com WaveManager"""
+        """Update do Pokémon"""
         # Atualiza velocidade baseada nos efeitos
         if hasattr(self, 'effect_manager') and self.effect_manager and self.is_wild:
-            # Log antes de atualizar
             old_speed = self.move_speed
             self.update_move_speed_from_effects()
             if old_speed != self.move_speed:
@@ -695,13 +746,35 @@ class Pokemon(Entity):
             if self.attack_cooldown <= 0:
                 self.can_attack = True
 
-        is_wave_controlled = hasattr(self, 'path_index_origin') and self.is_wild
-        if self.is_boss:
-            is_wave_controlled = True
-
         if self.is_carrying:
             self.is_carrying.update_capture(dt)
 
+        # ===== RESTAURA ANIMAÇÃO APÓS ATAQUE (APENAS 1 CICLO) =====
+        if hasattr(self, '_attack_animation_active') and self._attack_animation_active:
+            # Incrementa timer
+            if not hasattr(self, '_attack_animation_timer'):
+                self._attack_animation_timer = 0
+            self._attack_animation_timer += dt
+
+            # Calcula duração total da animação atual
+            total_duration = 0
+            if hasattr(self, 'frame_durations') and self.frame_durations:
+                total_duration = sum(self.frame_durations) / 60.0
+            else:
+                total_duration = 0.5  # Fallback
+
+            # Se a animação já completou um ciclo
+            if self._attack_animation_timer >= total_duration:
+                # Restaura animação anterior
+                if hasattr(self, '_saved_animation_before_attack'):
+                    self.set_animation_direct(self._saved_animation_before_attack)
+                    delattr(self, '_saved_animation_before_attack')
+                # Limpa flags
+                delattr(self, '_attack_animation_active')
+                delattr(self, '_attack_animation_timer')
+                print(f"[ANIM] {self.name} restaurou animação após ataque")
+
+        # ===== ATUALIZA ANIMAÇÃO =====
         self._update_animation(dt)
 
     def update_combat(self, dt, enemies):
@@ -841,29 +914,32 @@ class Pokemon(Entity):
                 # Mostra detalhes de cada animação
                 for anim_name in available:
                     try:
-                        # Tenta pegar informações detalhadas
                         frames_info = self.pokedex.get_animation_frames(self.id, anim_name, "down", self.is_shiny)
                         durations = self.pokedex.get_animation_durations(self.id, anim_name, self.is_shiny)
+
+                        # Tenta pegar metadados para saber se é direção única
+                        raw_data = self.pokedex.get_raw_inmap_data(self.id, self.is_shiny)
+                        animations = raw_data.get("animations", {})
+                        anim_data = animations.get(anim_name.lower(), {})
+                        metadata = anim_data.get('_metadata', {})
+
+                        is_single = metadata.get('is_single_direction', False)
+                        num_original_dirs = metadata.get('num_original_directions', 8)
+
+                        if is_single:
+                            dir_info = f" (originalmente 1 direção, replicado para 8)"
+                        else:
+                            dir_info = f" ({num_original_dirs} direções)"
 
                         if frames_info:
                             num_frames = len(frames_info)
                             if durations:
-                                print(f"  └─ {anim_name}: {num_frames} frames, durações: {durations}")
+                                print(f"  └─ {anim_name}: {num_frames} frames, durações: {durations}{dir_info}")
                             else:
-                                print(f"  └─ {anim_name}: {num_frames} frames")
+                                print(f"  └─ {anim_name}: {num_frames} frames{dir_info}")
                         else:
-                            print(f"  └─ {anim_name}: [sem frames ou direção não encontrada]")
+                            print(f"  └─ {anim_name}: [sem frames]{dir_info}")
                     except Exception as e:
-                        print(f"  └─ {anim_name}: [erro ao obter info - {e}]")
-
-                # Mostra também as direções disponíveis (se tiver pelo menos uma animação)
-                if available and hasattr(self, 'inmap_animations') and self.inmap_animations:
-                    first_anim = available[0].lower()
-                    if first_anim in self.inmap_animations:
-                        directions = list(self.inmap_animations[first_anim].keys())
-                        print(f"\nDireções disponíveis na animação '{first_anim}': {', '.join(directions)}")
+                        print(f"  └─ {anim_name}: [erro - {e}]")
 
                 print(f"{'=' * 50}\n")
-            else:
-                print(f"\n[AVISO] Nenhuma animação InMap encontrada para {self.name} (ID: {self.id})")
-                print(f"  Verifique se a pasta res/PokemonSprites/InMaps/{self.id:04d}/ existe\n")

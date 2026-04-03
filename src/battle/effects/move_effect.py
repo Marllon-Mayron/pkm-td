@@ -20,6 +20,8 @@ class EffectTiming(Enum):
     ON_MISS = "on_miss"
 
 
+# src/battle/effects/move_effect.py - ADICIONAR ATRIBUTOS
+
 @dataclass
 class MoveEffect:
     """
@@ -36,11 +38,38 @@ class MoveEffect:
     # Parâmetros do efeito
     params: dict = field(default_factory=dict)
 
+    # ===== NOVOS ATRIBUTOS PARA ANIMAÇÃO =====
+    attacker_animation: Optional[str] = None  # Nome da animação que o atacante deve fazer
+    min_distance: float = 0  # Distância mínima para usar a animação (0 = sempre usa)
+
     # Callback opcional
     callback: Optional[Callable] = None
 
     # Descrição para UI
     description: str = ""
+
+    @classmethod
+    def from_config(cls, name: str, config: dict) -> 'MoveEffect':
+        """Cria um MoveEffect a partir de configuração"""
+        # Converte target para enum se for string
+        target = config.get("target", EffectTarget.TARGET)
+        if isinstance(target, str):
+            target = EffectTarget[target.upper()]
+
+        timing = config.get("timing", EffectTiming.AFTER_DAMAGE)
+        if isinstance(timing, str):
+            timing = EffectTiming[timing.upper()]
+
+        return cls(
+            name=name,
+            effect_type=config["effect_type"],
+            target=target,
+            timing=timing,
+            params=config.get("params", {}),
+            attacker_animation=config.get("attacker_animation"),
+            min_distance=config.get("min_distance", 0),
+            description=config.get("description", "")
+        )
 
     def execute(self, attacker, target, battle_system, effect_manager, damage: int = 0):
         """

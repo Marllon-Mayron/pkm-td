@@ -48,8 +48,9 @@ class EffectManager:
         self.status_effects[pokemon_id] = status
         status.apply(pokemon, self)
 
-        # REMOVIDO: add_status_text - não mostra texto temporário
-        # Apenas o indicador permanente será mostrado
+        # ===== FORÇA ATUALIZAÇÃO DA ANIMAÇÃO =====
+        if hasattr(pokemon, 'update_status_animation'):
+            pokemon.update_status_animation()
 
         return True
 
@@ -68,6 +69,10 @@ class EffectManager:
                 # Remove o modificador de speed (aplica +2 para compensar)
                 if pokemon_id in self.stat_stages:
                     self.stat_stages[pokemon_id].modify(StatType.SPEED, 2)
+
+            # ===== FORÇA ATUALIZAÇÃO DA ANIMAÇÃO =====
+            if hasattr(pokemon, 'update_status_animation'):
+                pokemon.update_status_animation()
 
             return True
 
@@ -250,7 +255,7 @@ class EffectManager:
         return [(text, duration) for pid, text, duration in self.status_texts if pid == pokemon_id]
 
     def render_status_texts(self, screen, pokemon, sprite_rect, zoom_scale, font_cache):
-        """Renderiza os textos de status temporários (MISS, Drenou, etc)"""
+        """Renderiza os textos de status temporários (MISS, Drenou, etc) - MAIS ACIMA AINDA"""
         texts = self.get_status_texts(pokemon)
 
         if not texts:
@@ -265,8 +270,10 @@ class EffectManager:
                 font_cache[font_size] = pygame.font.SysFont('Arial', font_size)
 
         font = font_cache[font_size]
+        sprite_height = sprite_rect.height
 
-        y_offset = sprite_rect.top - 25
+        # Textos temporários ficam BEM no topo (offset -100%)
+        base_offset = -sprite_height * 1.2
 
         for i, (text, duration) in enumerate(texts):
             # Cor baseada no tipo de mensagem
@@ -280,14 +287,14 @@ class EffectManager:
             text_surf = font.render(text, True, color)
             text_rect = text_surf.get_rect()
             text_rect.centerx = sprite_rect.centerx
-            text_rect.y = y_offset - (i * (font_size + 2))
+            text_rect.bottom = sprite_rect.top + base_offset - (i * (font_size + 4))
 
             screen.blit(text_surf, text_rect)
 
     def render_stat_modifiers(self, screen, pokemon, sprite_rect, zoom_scale, font_cache):
         """
-        Renderiza os modificadores de stat (como Atk -3, Spd -2) acima do nome do Pokémon.
-        Posicionamento relativo ao tamanho do sprite.
+        Renderiza os modificadores de stat (como Atk -3, Spd -2)
+        Posicionados ABAIXO do status e ACIMA do nome
         """
         pokemon_id = id(pokemon)
 
@@ -302,15 +309,15 @@ class EffectManager:
             return
 
         # ===== ESCALA DA FONTE =====
-        base_font_size = 12
+        base_font_size = 11
 
         if hasattr(pokemon, 'screen_manager') and hasattr(pokemon, 'camera'):
             render_scale = pokemon.screen_manager.render_scale
             camera_zoom = pokemon.camera.zoom if pokemon.camera else 1.0
             total_scale = render_scale * camera_zoom
-            font_size = max(10, int(base_font_size * total_scale))
+            font_size = max(9, int(base_font_size * total_scale))
         else:
-            font_size = max(10, int(base_font_size * zoom_scale))
+            font_size = max(9, int(base_font_size * zoom_scale))
 
         # Usar cache de fontes
         if font_size not in font_cache:
@@ -328,16 +335,16 @@ class EffectManager:
 
         for stat_name, stage in ordered_modifiers:
             if stage > 0:
-                modifier_parts.append(f"{stat_name} +{stage}")
+                modifier_parts.append(f"{stat_name}+{stage}")
                 has_buff = True
             elif stage < 0:
-                modifier_parts.append(f"{stat_name} {stage}")
+                modifier_parts.append(f"{stat_name}{stage}")
                 has_debuff = True
 
         if not modifier_parts:
             return
 
-        combined_text = " | ".join(modifier_parts)
+        combined_text = " ".join(modifier_parts)
 
         # Define a cor
         if has_debuff and has_buff:
@@ -353,25 +360,15 @@ class EffectManager:
         text_surf = font.render(combined_text, True, color)
         text_rect = text_surf.get_rect()
 
-        # ===== POSICIONAMENTO RELATIVO AO TAMANHO DO SPRITE =====
+        # ===== POSICIONAMENTO: ABAIXO DO STATUS, ACIMA DO NOME =====
         sprite_height = sprite_rect.height
 
-        # A barra está em -15% do topo
-        # O nome está em -30% do topo
-        # Modificadores ficam em -45% do topo (acima do nome)
-        relative_offset = -sprite_height * 0.95  # 80% da altura do sprite acima
+        # Status está em -100% (mais acima)
+        # Modificadores ficam em -80% (abaixo do status)
+        relative_offset = -sprite_height * 0.7
 
-        # Calcula a posição base
-        base_y = sprite_rect.top + relative_offset
-
-        # Ajusta para que o texto fique completamente acima
-        text_rect.y = int(base_y - text_rect.height)
         text_rect.centerx = sprite_rect.centerx
-
-        # Garante que não fique muito acima (limite de 80% da altura do sprite)
-        min_y = sprite_rect.top - sprite_height * 0.8
-        if text_rect.y < min_y:
-            text_rect.y = min_y
+        text_rect.bottom = sprite_rect.top + relative_offset
 
         # Fundo semi-transparente
         bg_width = text_rect.width + 8
@@ -385,7 +382,8 @@ class EffectManager:
 
     def render_status_indicators(self, screen, pokemon, sprite_rect, zoom_scale, font_cache):
         """
-        Renderiza indicadores de status permanentes (PAR, BRN, PSN, SLP, etc) acima dos modificadores
+        Renderiza indicadores de status permanentes (PAR, BRN, PSN, SLP, etc)
+        Posicionados MAIS ACIMA de todos
         """
         status = self.get_status(pokemon)
         if not status or status.type == StatusType.NONE:
@@ -416,15 +414,14 @@ class EffectManager:
         text_surf = font.render(status_text, True, color)
         text_rect = text_surf.get_rect()
 
-        # Posicionamento relativo ao tamanho do sprite
+        # ===== POSICIONAMENTO: MAIS ACIMA DE TODOS =====
         sprite_height = sprite_rect.height
 
-        # Modificadores estão em -45% do topo
-        # Status fica em -55% do topo (acima)
-        relative_offset = -sprite_height * 0.55
+        # Status fica em -110% (mais acima que modificadores)
+        relative_offset = -sprite_height * 1.1
 
-        text_rect.y = int(sprite_rect.top + relative_offset - text_rect.height)
         text_rect.centerx = sprite_rect.centerx
+        text_rect.bottom = sprite_rect.top + relative_offset
 
         # Fundo semi-transparente
         bg_width = text_rect.width + 8
@@ -433,117 +430,6 @@ class EffectManager:
         bg_surf.set_alpha(180)
         bg_surf.fill((0, 0, 0))
         screen.blit(bg_surf, (text_rect.x - 4, text_rect.y - 2))
-
-        screen.blit(text_surf, text_rect)
-
-        # Ícone de sono adicional se estiver dormindo
-        if status.type == StatusType.SLEEP and status.is_asleep():
-            self._render_sleep_icon(screen, pokemon, sprite_rect, zoom_scale, font_cache, status)
-
-        # Ícone de stun para paralisia
-        if status.type == StatusType.PARALYSIS and status.is_stunned():
-            self._render_stun_icon(screen, pokemon, sprite_rect, zoom_scale, font_cache, status)
-
-        if status.type == StatusType.FREEZE:
-            self._render_freeze_icon(screen, pokemon, sprite_rect, zoom_scale, font_cache, status)
-
-    def _render_stun_icon(self, screen, pokemon, sprite_rect, zoom_scale, font_cache, status):
-        """Renderiza ícone de stun quando o Pokémon está paralisado"""
-        base_font_size = 14
-        if hasattr(pokemon, 'screen_manager') and hasattr(pokemon, 'camera'):
-            render_scale = pokemon.screen_manager.render_scale
-            camera_zoom = pokemon.camera.zoom if pokemon.camera else 1.0
-            total_scale = render_scale * camera_zoom
-            font_size = max(12, int(base_font_size * total_scale))
-        else:
-            font_size = max(12, int(base_font_size * zoom_scale))
-
-        if font_size not in font_cache:
-            try:
-                font_cache[font_size] = pygame.font.Font(None, font_size)
-            except:
-                font_cache[font_size] = pygame.font.SysFont('Arial', font_size)
-
-        font = font_cache[font_size]
-
-        # Ícone de stun (relâmpago com círculo)
-        stun_text = "⚡ !"
-        text_surf = font.render(stun_text, True, (255, 255, 100))
-        text_rect = text_surf.get_rect()
-
-        # Posiciona à direita do indicador de status
-        text_rect.left = sprite_rect.centerx + 15
-        text_rect.centery = sprite_rect.top - int(sprite_rect.height * 0.55)
-
-        screen.blit(text_surf, text_rect)
-
-    def _render_sleep_icon(self, screen, pokemon, sprite_rect, zoom_scale, font_cache, status):
-        """Renderiza ícone de sono quando o Pokémon está dormindo"""
-        base_font_size = 14
-        if hasattr(pokemon, 'screen_manager') and hasattr(pokemon, 'camera'):
-            render_scale = pokemon.screen_manager.render_scale
-            camera_zoom = pokemon.camera.zoom if pokemon.camera else 1.0
-            total_scale = render_scale * camera_zoom
-            font_size = max(12, int(base_font_size * total_scale))
-        else:
-            font_size = max(12, int(base_font_size * zoom_scale))
-
-        if font_size not in font_cache:
-            try:
-                font_cache[font_size] = pygame.font.Font(None, font_size)
-            except:
-                font_cache[font_size] = pygame.font.SysFont('Arial', font_size)
-
-        font = font_cache[font_size]
-
-        # Ícone de sono (ZzZ)
-        sleep_text = "💤"
-        text_surf = font.render(sleep_text, True, (200, 200, 255))
-        text_rect = text_surf.get_rect()
-
-        # Posiciona à direita do indicador de status
-        text_rect.left = sprite_rect.centerx + 15
-        text_rect.centery = sprite_rect.top - int(sprite_rect.height * 0.55)
-
-        screen.blit(text_surf, text_rect)
-
-        # Mostra timer de sono (opcional, para debug)
-        if hasattr(self, 'show_debug') and self.show_debug:
-            remaining = status.get_sleep_remaining()
-            if remaining > 0:
-                timer_text = font.render(f"{remaining:.1f}s", True, (200, 200, 200))
-                timer_rect = timer_text.get_rect()
-                timer_rect.left = text_rect.right + 5
-                timer_rect.centery = text_rect.centery
-                screen.blit(timer_text, timer_rect)
-
-    def _render_freeze_icon(self, screen, pokemon, sprite_rect, zoom_scale, font_cache, status):
-        """Renderiza ícone de congelamento quando o Pokémon está congelado"""
-        base_font_size = 14
-        if hasattr(pokemon, 'screen_manager') and hasattr(pokemon, 'camera'):
-            render_scale = pokemon.screen_manager.render_scale
-            camera_zoom = pokemon.camera.zoom if pokemon.camera else 1.0
-            total_scale = render_scale * camera_zoom
-            font_size = max(12, int(base_font_size * total_scale))
-        else:
-            font_size = max(12, int(base_font_size * zoom_scale))
-
-        if font_size not in font_cache:
-            try:
-                font_cache[font_size] = pygame.font.Font(None, font_size)
-            except:
-                font_cache[font_size] = pygame.font.SysFont('Arial', font_size)
-
-        font = font_cache[font_size]
-
-        # Ícone de congelamento (cristal de gelo)
-        freeze_text = "❄️"
-        text_surf = font.render(freeze_text, True, (152, 216, 216))
-        text_rect = text_surf.get_rect()
-
-        # Posiciona à direita do indicador de status
-        text_rect.left = sprite_rect.centerx + 15
-        text_rect.centery = sprite_rect.top - int(sprite_rect.height * 0.55)
 
         screen.blit(text_surf, text_rect)
 

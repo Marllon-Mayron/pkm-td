@@ -539,3 +539,26 @@ class Pokedex:
             result[expr] = path.exists()
 
         return result
+
+    def get_animation_directions(self, pokemon_id: int, animation_name: str, shiny: bool = False) -> List[str]:
+        """
+        Retorna lista de direções disponíveis para uma animação específica
+
+        Returns:
+            Lista de direções (ex: ['down', 'up', 'left', 'right'] ou ['down'] para direção única)
+        """
+        raw_data = self.get_raw_inmap_data(pokemon_id, shiny)
+        animations = raw_data.get("animations", {})
+
+        anim_frames = animations.get(animation_name.lower(), {})
+        if anim_frames:
+            return list(anim_frames.keys())
+
+        return []
+
+    def is_single_direction_animation(self, pokemon_id: int, animation_name: str, shiny: bool = False) -> bool:
+        """
+        Verifica se uma animação tem apenas uma direção disponível
+        """
+        directions = self.get_animation_directions(pokemon_id, animation_name, shiny)
+        return len(directions) == 1

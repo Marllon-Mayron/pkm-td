@@ -86,7 +86,9 @@ class EffectFactory:
                 "duration": None,  # Veneno permanente
                 "overwrite": False
             },
-            "description": "Envenena o oponente"
+            "description": "Envenena o oponente",
+            "attacker_animation": "rotate",  # Animação do atacante
+            "min_distance": 0  # Distância mínima para usar animação
         },
         "toxic": {
             "effect_type": "status",
@@ -118,7 +120,9 @@ class EffectFactory:
                 "status": "paralysis",
                 "duration": None
             },
-            "description": "Paralisa o oponente"
+            "description": "Paralisa o oponente",
+            "attacker_animation": "rotate",  # Animação do atacante
+            "min_distance": 0  # Distância mínima para usar animação
         },
         # ===== ADORMECER (SLEEP) =====
         "sleep-powder": {
@@ -130,7 +134,9 @@ class EffectFactory:
                 "duration": None,
                 "overwrite": True
             },
-            "description": "Coloca o oponente para dormir"
+            "description": "Coloca o oponente para dormir",
+            "attacker_animation": "rotate",  # Animação do atacante
+            "min_distance": 0  # Distância mínima para usar animação
         },
         "hypnosis": {
             "effect_type": "status",
@@ -352,20 +358,5 @@ class EffectFactory:
         if not config:
             return None
 
-        # Converte target para enum se for string
-        target = config.get("target", EffectTarget.TARGET)
-        if isinstance(target, str):
-            target = EffectTarget[target.upper()]
-
-        timing = config.get("timing", EffectTiming.AFTER_DAMAGE)
-        if isinstance(timing, str):
-            timing = EffectTiming[timing.upper()]
-
-        return MoveEffect(
-            name=move_name,
-            effect_type=config["effect_type"],
-            target=target,
-            timing=timing,
-            params=config.get("params", {}),
-            description=config.get("description", "")
-        )
+        # Usa o novo método from_config
+        return MoveEffect.from_config(move_name, config)
