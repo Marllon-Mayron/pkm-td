@@ -223,27 +223,67 @@ class PokemonCombat:
         from src.battle.effects.effect_factory import EffectFactory
 
         effect = EffectFactory.create_effect(move_name)
-        if effect and effect.attacker_animation:
-            # Verifica distância mínima
-            if effect.min_distance > 0:
-                if self.pokemon.target:
-                    dx = self.pokemon.target.x - self.pokemon.x
-                    dy = self.pokemon.target.y - self.pokemon.y
-                    distance = math.sqrt(dx * dx + dy * dy)
-                    if distance > effect.min_distance:
-                        return
+        current_move = self.pokemon.get_current_move()
 
-            if self.pokemon.has_animation(effect.attacker_animation):
-                # Salva animação atual
-                self.pokemon._saved_animation_before_attack = self.pokemon.current_animation
-                # Toca animação de ataque
-                self.pokemon.set_animation_direct(effect.attacker_animation)
-                # Reseta para o início
-                self.pokemon.current_frame = 0
-                self.pokemon.animation_timer = 0
-                # Marca que está em animação de ataque
-                self.pokemon._attack_animation_active = True
-                print(f"[ANIM] {self.pokemon.name} usou animação {effect.attacker_animation} para {move_name}")
+        # Determina qual animação usar
+        animation_to_use = None
+
+        # Prioridade 1: Animação específica do move no effect_factory
+        if effect and effect.attacker_animation:
+            animation_to_use = effect.attacker_animation
+            print(f"[ANIM] Usando animação específica do move: {animation_to_use}")
+
+        # Prioridade 2: Animação padrão baseada na categoria do move
+        if not animation_to_use and current_move:
+            if current_move.category == "special":
+                animation_to_use = "shoot"
+                print(f"[ANIM] Move especial sem animação específica, usando padrão: shoot")
+            elif current_move.category == "physical":
+                # Tenta animações físicas comuns
+                if self.pokemon.has_animation("punch"):
+                    animation_to_use = "punch"
+                elif self.pokemon.has_animation("strike"):
+                    animation_to_use = "strike"
+                elif self.pokemon.has_animation("attack"):
+                    animation_to_use = "attack"
+                print(f"[ANIM] Move físico sem animação específica, usando padrão: {animation_to_use}")
+            elif current_move.category == "status":
+                if self.pokemon.has_animation("swing"):
+                    animation_to_use = "swing"
+                elif self.pokemon.has_animation("attack"):
+                    animation_to_use = "attack"
+                print(f"[ANIM] Move de status sem animação específica, usando padrão: {animation_to_use}")
+
+        # Prioridade 3: Fallback genérico
+        if not animation_to_use:
+            if self.pokemon.has_animation("attack"):
+                animation_to_use = "attack"
+                print(f"[ANIM] Usando animação fallback: attack")
+
+        # Verifica distância mínima (se aplicável)
+        if effect and effect.min_distance > 0 and self.pokemon.target:
+            dx = self.pokemon.target.x - self.pokemon.x
+            dy = self.pokemon.target.y - self.pokemon.y
+            distance = math.sqrt(dx * dx + dy * dy)
+            if distance > effect.min_distance:
+                print(f"[ANIM] Distância muito grande ({distance:.0f} > {effect.min_distance}), ignorando animação")
+                return
+
+        # Toca a animação
+        if animation_to_use and self.pokemon.has_animation(animation_to_use):
+            # Salva animação atual
+            self.pokemon._saved_animation_before_attack = self.pokemon.current_animation
+            # Toca animação de ataque
+            self.pokemon.set_animation_direct(animation_to_use)
+            # Reseta para o início
+            self.pokemon.current_frame = 0
+            self.pokemon.animation_timer = 0
+            # Marca que está em animação de ataque
+            self.pokemon._attack_animation_active = True
+            print(
+                f"[ANIM] {self.pokemon.name} usou animação {animation_to_use} para {move_name} (categoria: {current_move.category if current_move else 'unknown'})")
+        elif animation_to_use:
+            print(f"[ANIM] {self.pokemon.name} não tem animação {animation_to_use} disponível")
 
     def _update_direction_for_angle(self, dx, dy):
         """Atualiza direção baseada no ângulo (8 direções)"""

@@ -18,7 +18,9 @@ class EffectFactory:
                 "stages": -1,
                 "duration": 4.0
             },
-            "description": "Reduz a Velocidade do oponente"
+            "description": "Reduz a Velocidade do oponente",
+            "attacker_animation": "shoot",  # Animação do atacante
+            "min_distance": 0  # Distância mínima para usar animação
         },
         "growl": {
             "effect_type": "stat_mod",
@@ -87,8 +89,8 @@ class EffectFactory:
                 "overwrite": False
             },
             "description": "Envenena o oponente",
-            "attacker_animation": "rotate",  # Animação do atacante
-            "min_distance": 0  # Distância mínima para usar animação
+            "attacker_animation": "rotate",
+            "min_distance": 0
         },
         "toxic": {
             "effect_type": "status",
@@ -121,8 +123,8 @@ class EffectFactory:
                 "duration": None
             },
             "description": "Paralisa o oponente",
-            "attacker_animation": "rotate",  # Animação do atacante
-            "min_distance": 0  # Distância mínima para usar animação
+            "attacker_animation": "rotate",
+            "min_distance": 0
         },
         # ===== ADORMECER (SLEEP) =====
         "sleep-powder": {
@@ -135,8 +137,8 @@ class EffectFactory:
                 "overwrite": True
             },
             "description": "Coloca o oponente para dormir",
-            "attacker_animation": "rotate",  # Animação do atacante
-            "min_distance": 0  # Distância mínima para usar animação
+            "attacker_animation": "rotate",
+            "min_distance": 0
         },
         "hypnosis": {
             "effect_type": "status",
