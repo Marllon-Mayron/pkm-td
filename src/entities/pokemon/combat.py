@@ -122,7 +122,6 @@ class PokemonCombat:
 
         # ===== VERIFICA STUN =====
         if self.update_stun(dt):
-            # Se estava carregando e foi atordoado, volta para idle
             self.pokemon.combat_state = "idle"
             self.pokemon.target = None
             return
@@ -143,6 +142,16 @@ class PokemonCombat:
             self.pokemon.target = None
             return
 
+        # ===== SE ESTÁ EM ANIMAÇÃO DE ATAQUE, NÃO FAZ NADA ATÉ TERMINAR =====
+        is_attacking = hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active
+        if is_attacking:
+            return
+
+        # ===== ATUALIZA DIREÇÃO PARA OLHAR PARA O ALVO =====
+        dx = self.pokemon.target.x - self.pokemon.x
+        dy = self.pokemon.target.y - self.pokemon.y
+        self._update_direction_to_target(dx, dy)
+
         current_move = self.pokemon.get_current_move()
         if not current_move or current_move.current_pp <= 0:
             print(f"[COMBAT] {self.pokemon.name} está sem PP!")
@@ -154,55 +163,24 @@ class PokemonCombat:
         is_status_move = current_move.category == "status"
         is_special_move = current_move.category == "special"
 
+        # Calcula distância até o alvo
+        distance = math.sqrt(dx * dx + dy * dy)
+        attack_distance = 12
+
+        # ===== ATAQUES À DISTÂNCIA (STATUS E ESPECIAIS) =====
         if is_status_move or is_special_move:
             attack_type = "status" if is_status_move else "especial"
-            print(f"[COMBAT] {self.pokemon.name} usou {current_move.name} ({attack_type}) à distância!")
-
-            # ===== TOCAR ANIMAÇÃO DE ATAQUE =====
+            print(f"[COMBAT] {self.pokemon.name} usou {current_move.name} ({attack_type}) à distância! Distância: {distance:.1f}")
             self._play_attack_animation(current_move.name)
-
-            if self.pokemon.battle_system:
-                self.pokemon.battle_system.attempt_attack(self.pokemon, self.pokemon.target)
-            else:
-                hit_chance = current_move.accuracy / 100
-                will_hit = random.random() <= hit_chance
-                if will_hit:
-                    self.perform_charge_attack(self.pokemon.target)
-                else:
-                    print(f"[COMBAT] {current_move.name} errou!")
-                    self.show_miss_on_self()
-                current_move.current_pp -= 1
-
-            self.pokemon.combat_state = "returning"
-            self.pokemon.charge_cooldown = self.pokemon.charge_cooldown_max
             return
 
-        # Para ataques físicos, move em direção ao alvo
-        dx = self.pokemon.target.x - self.pokemon.x
-        dy = self.pokemon.target.y - self.pokemon.y
-        distance = math.sqrt(dx * dx + dy * dy)
+        # ===== ATAQUES FÍSICOS =====
+        # Se está longe, move em direção ao alvo
+        if distance > attack_distance:
+            # Garante animação de walk enquanto persegue
+            if self.pokemon.current_animation != "walk" and not is_attacking:
+                self.pokemon.set_animation("walk")
 
-        if distance < 8:
-            # ===== TOCAR ANIMAÇÃO DE ATAQUE FÍSICO =====
-            self._play_attack_animation(current_move.name)
-
-            if self.pokemon.battle_system:
-                self.pokemon.battle_system.attempt_attack(self.pokemon, self.pokemon.target)
-            else:
-                hit_chance = current_move.accuracy / 100
-                will_hit = random.random() <= hit_chance
-                if will_hit:
-                    self.perform_charge_attack(self.pokemon.target)
-                else:
-                    print(f"[COMBAT] {current_move.name} errou!")
-                    self.show_miss_on_self()
-                current_move.current_pp -= 1
-
-            self.pokemon.combat_state = "returning"
-            self.pokemon.charge_cooldown = self.pokemon.charge_cooldown_max
-            return
-
-        if distance > 0:
             move_distance = self.pokemon.move_speed * dt * 60
             move_x = (dx / distance) * move_distance
             move_y = (dy / distance) * move_distance
@@ -215,8 +193,47 @@ class PokemonCombat:
             self.pokemon.x += move_x
             self.pokemon.y += move_y
             self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
+            return
 
-            self._update_direction_for_angle(dx, dy)
+        # Está perto o suficiente para atacar
+        print(f"[COMBAT] {self.pokemon.name} usou {current_move.name} (físico) corpo a corpo! Distância: {distance:.1f}")
+        self._play_attack_animation(current_move.name)
+
+    def _execute_attack(self):
+        """Executa o ataque após a animação terminar"""
+        if not self.pokemon.target or not self.pokemon.target.is_alive():
+            self.pokemon.combat_state = "returning"
+            self.pokemon.target = None
+            return
+
+        current_move = self.pokemon.get_current_move()
+        if not current_move or current_move.current_pp <= 0:
+            print(f"[COMBAT] {self.pokemon.name} está sem PP!")
+            self.pokemon.combat_state = "returning"
+            self.pokemon.target = None
+            self.pokemon.has_no_pp = True
+            return
+
+        is_status_move = current_move.category == "status"
+        is_special_move = current_move.category == "special"
+
+        # Executa o ataque (não verifica mais distância para ataques físicos)
+        if self.pokemon.battle_system:
+            success = self.pokemon.battle_system.attempt_attack(self.pokemon, self.pokemon.target)
+            if success:
+                print(f"[ATTACK] {self.pokemon.name} usou {current_move.name} em {self.pokemon.target.name}!")
+        else:
+            hit_chance = current_move.accuracy / 100
+            will_hit = random.random() <= hit_chance
+            if will_hit:
+                self.perform_charge_attack(self.pokemon.target)
+            else:
+                print(f"[COMBAT] {current_move.name} errou!")
+                self.show_miss_on_self()
+            current_move.current_pp -= 1
+
+        self.pokemon.combat_state = "returning"
+        self.pokemon.charge_cooldown = self.pokemon.charge_cooldown_max
 
     def _play_attack_animation(self, move_name: str):
         """Toca a animação de ataque uma única vez"""
@@ -225,51 +242,50 @@ class PokemonCombat:
         effect = EffectFactory.create_effect(move_name)
         current_move = self.pokemon.get_current_move()
 
-        # Determina qual animação usar
         animation_to_use = None
 
-        # Prioridade 1: Animação específica do move no effect_factory
+        # Prioridade 1: Animação específica do move
         if effect and effect.attacker_animation:
             animation_to_use = effect.attacker_animation
-            print(f"[ANIM] Usando animação específica do move: {animation_to_use}")
+            print(f"[ANIM] Usando animação específica: {animation_to_use}")
 
-        # Prioridade 2: Animação padrão baseada na categoria do move
+        # Prioridade 2: Animação padrão baseada na categoria
         if not animation_to_use and current_move:
             if current_move.category == "special":
                 animation_to_use = "shoot"
-                print(f"[ANIM] Move especial sem animação específica, usando padrão: shoot")
+                print(f"[ANIM] Move special, usando padrão: shoot")
             elif current_move.category == "physical":
-                # Tenta animações físicas comuns
                 if self.pokemon.has_animation("punch"):
                     animation_to_use = "punch"
                 elif self.pokemon.has_animation("strike"):
                     animation_to_use = "strike"
                 elif self.pokemon.has_animation("attack"):
                     animation_to_use = "attack"
-                print(f"[ANIM] Move físico sem animação específica, usando padrão: {animation_to_use}")
+                print(f"[ANIM] Move physical, usando padrão: {animation_to_use}")
             elif current_move.category == "status":
                 if self.pokemon.has_animation("swing"):
                     animation_to_use = "swing"
                 elif self.pokemon.has_animation("attack"):
                     animation_to_use = "attack"
-                print(f"[ANIM] Move de status sem animação específica, usando padrão: {animation_to_use}")
+                print(f"[ANIM] Move status, usando padrão: {animation_to_use}")
 
-        # Prioridade 3: Fallback genérico
+        # Prioridade 3: Fallback
         if not animation_to_use:
             if self.pokemon.has_animation("attack"):
                 animation_to_use = "attack"
-                print(f"[ANIM] Usando animação fallback: attack")
+                print(f"[ANIM] Usando fallback: attack")
 
-        # Verifica distância mínima (se aplicável)
+        # Verifica distância mínima (apenas para moves que têm essa restrição)
         if effect and effect.min_distance > 0 and self.pokemon.target:
             dx = self.pokemon.target.x - self.pokemon.x
             dy = self.pokemon.target.y - self.pokemon.y
             distance = math.sqrt(dx * dx + dy * dy)
             if distance > effect.min_distance:
                 print(f"[ANIM] Distância muito grande ({distance:.0f} > {effect.min_distance}), ignorando animação")
+                # Executa ataque imediatamente
+                self._execute_attack()
                 return
 
-        # Toca a animação
         if animation_to_use and self.pokemon.has_animation(animation_to_use):
             # Salva animação atual
             self.pokemon._saved_animation_before_attack = self.pokemon.current_animation
@@ -280,14 +296,42 @@ class PokemonCombat:
             self.pokemon.animation_timer = 0
             # Marca que está em animação de ataque
             self.pokemon._attack_animation_active = True
-            print(
-                f"[ANIM] {self.pokemon.name} usou animação {animation_to_use} para {move_name} (categoria: {current_move.category if current_move else 'unknown'})")
-        elif animation_to_use:
-            print(f"[ANIM] {self.pokemon.name} não tem animação {animation_to_use} disponível")
+            self.pokemon._pending_attack_move = move_name
+            print(f"[ANIM] {self.pokemon.name} usou animação {animation_to_use} para {move_name} - aguardando término")
+        else:
+            print(f"[ANIM] Sem animação disponível para {move_name}, executando ataque imediatamente")
+            # Sem animação, executa ataque imediatamente
+            self._execute_attack()
 
     def _update_direction_for_angle(self, dx, dy):
         """Atualiza direção baseada no ângulo (8 direções)"""
         angle = math.atan2(dy, dx)
+        if angle >= -math.pi / 8 and angle < math.pi / 8:
+            self.pokemon.current_direction = "right"
+        elif angle >= math.pi / 8 and angle < 3 * math.pi / 8:
+            self.pokemon.current_direction = "down-right"
+        elif angle >= 3 * math.pi / 8 and angle < 5 * math.pi / 8:
+            self.pokemon.current_direction = "down"
+        elif angle >= 5 * math.pi / 8 and angle < 7 * math.pi / 8:
+            self.pokemon.current_direction = "down-left"
+        elif angle >= 7 * math.pi / 8 or angle < -7 * math.pi / 8:
+            self.pokemon.current_direction = "left"
+        elif angle >= -7 * math.pi / 8 and angle < -5 * math.pi / 8:
+            self.pokemon.current_direction = "up-left"
+        elif angle >= -5 * math.pi / 8 and angle < -3 * math.pi / 8:
+            self.pokemon.current_direction = "up"
+        else:
+            self.pokemon.current_direction = "up-right"
+
+    def _update_direction_to_target(self, dx, dy):
+        """Atualiza direção baseada no alvo (8 direções)"""
+        if dx == 0 and dy == 0:
+            return
+
+        angle = math.atan2(dy, dx)
+
+        # 8 direções baseadas no ângulo (em radianos)
+        # -pi a pi, dividido em 8 partes iguais (cada parte = pi/4 = 0.785)
         if angle >= -math.pi / 8 and angle < math.pi / 8:
             self.pokemon.current_direction = "right"
         elif angle >= math.pi / 8 and angle < 3 * math.pi / 8:
@@ -310,7 +354,7 @@ class PokemonCombat:
 
         # ===== VERIFICA STUN =====
         if self.update_stun(dt):
-            return  # Atordoado, não se move
+            return
 
         # ===== VERIFICA SONO =====
         if self.update_sleep(dt):
@@ -325,9 +369,17 @@ class PokemonCombat:
             self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
             self.pokemon.combat_state = "idle"
             self.pokemon.target = None
+            # Volta para animação idle
+            if self.pokemon.has_animation("idle"):
+                self.pokemon.set_animation("idle")
             return
 
         if distance > 0:
+            # Garante que está com animação de walk enquanto volta
+            is_attacking = hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active
+            if self.pokemon.current_animation != "walk" and not is_attacking:
+                self.pokemon.set_animation("walk")
+
             move_distance = self.pokemon.move_speed * dt * 60
             move_x = (dx / distance) * move_distance
             move_y = (dy / distance) * move_distance
@@ -341,6 +393,7 @@ class PokemonCombat:
             self.pokemon.y += move_y
             self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
 
+            # Atualiza direção baseada no movimento
             if abs(dx) > abs(dy):
                 self.pokemon.current_direction = "right" if dx > 0 else "left"
             else:

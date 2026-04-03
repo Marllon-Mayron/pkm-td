@@ -749,7 +749,7 @@ class Pokemon(Entity):
         if self.is_carrying:
             self.is_carrying.update_capture(dt)
 
-        # ===== RESTAURA ANIMAÇÃO APÓS ATAQUE (APENAS 1 CICLO) =====
+        # ===== RESTAURA ANIMAÇÃO APÓS ATAQUE E EXECUTA O ATAQUE =====
         if hasattr(self, '_attack_animation_active') and self._attack_animation_active:
             # Incrementa timer
             if not hasattr(self, '_attack_animation_timer'):
@@ -769,10 +769,16 @@ class Pokemon(Entity):
                 if hasattr(self, '_saved_animation_before_attack'):
                     self.set_animation_direct(self._saved_animation_before_attack)
                     delattr(self, '_saved_animation_before_attack')
+
+                # EXECUTA O ATAQUE AGORA
+                if hasattr(self, 'combat') and hasattr(self, '_pending_attack_move'):
+                    print(f"[ANIM] Animação terminada, executando ataque {self._pending_attack_move}")
+                    self.combat._execute_attack()
+                    delattr(self, '_pending_attack_move')
+
                 # Limpa flags
                 delattr(self, '_attack_animation_active')
                 delattr(self, '_attack_animation_timer')
-                print(f"[ANIM] {self.name} restaurou animação após ataque")
 
         # ===== ATUALIZA ANIMAÇÃO =====
         self._update_animation(dt)

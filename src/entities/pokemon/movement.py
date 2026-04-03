@@ -114,13 +114,35 @@ class PokemonMovement:
             self.pokemon.x += move_x
             self.pokemon.y += move_y
 
-            # Atualiza direção baseado no movimento
-            if abs(dx) > abs(dy):
-                self.pokemon.current_direction = "right" if dx > 0 else "left"
-            else:
-                self.pokemon.current_direction = "down" if dy > 0 else "up"
+            # ===== ATUALIZA DIREÇÃO BASEADA NO MOVIMENTO (8 DIREÇÕES) =====
+            self._update_direction_from_movement(dx, dy)
 
         self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
+
+    def _update_direction_from_movement(self, dx, dy):
+        """Atualiza direção baseada no movimento (8 direções)"""
+        if dx == 0 and dy == 0:
+            return
+
+        angle = math.atan2(dy, dx)
+
+        # 8 direções baseadas no ângulo
+        if angle >= -math.pi / 8 and angle < math.pi / 8:
+            self.pokemon.current_direction = "right"
+        elif angle >= math.pi / 8 and angle < 3 * math.pi / 8:
+            self.pokemon.current_direction = "down-right"
+        elif angle >= 3 * math.pi / 8 and angle < 5 * math.pi / 8:
+            self.pokemon.current_direction = "down"
+        elif angle >= 5 * math.pi / 8 and angle < 7 * math.pi / 8:
+            self.pokemon.current_direction = "down-left"
+        elif angle >= 7 * math.pi / 8 or angle < -7 * math.pi / 8:
+            self.pokemon.current_direction = "left"
+        elif angle >= -7 * math.pi / 8 and angle < -5 * math.pi / 8:
+            self.pokemon.current_direction = "up-left"
+        elif angle >= -5 * math.pi / 8 and angle < -3 * math.pi / 8:
+            self.pokemon.current_direction = "up"
+        else:
+            self.pokemon.current_direction = "up-right"
 
     def check_item_capture(self, items):
         """Verifica captura de item (apenas para Pokémon sem wave control)"""

@@ -176,9 +176,36 @@ class PathTracker:
 
             state['distance_traveled'] += move_distance
             state['last_pos'] = (enemy.x, enemy.y)
-            self._update_direction(enemy, dx, dy)
+
+            # ===== ATUALIZA DIREÇÃO BASEADA NO MOVIMENTO (8 DIREÇÕES) =====
+            self._update_direction_from_movement(enemy, dx, dy)
 
         return False, False
+
+    def _update_direction_from_movement(self, enemy: 'Pokemon', dx: float, dy: float):
+        """Atualiza direção baseada no movimento (8 direções)"""
+        if dx == 0 and dy == 0:
+            return
+
+        angle = math.atan2(dy, dx)
+
+        # 8 direções baseadas no ângulo
+        if angle >= -math.pi / 8 and angle < math.pi / 8:
+            enemy.current_direction = "right"
+        elif angle >= math.pi / 8 and angle < 3 * math.pi / 8:
+            enemy.current_direction = "down-right"
+        elif angle >= 3 * math.pi / 8 and angle < 5 * math.pi / 8:
+            enemy.current_direction = "down"
+        elif angle >= 5 * math.pi / 8 and angle < 7 * math.pi / 8:
+            enemy.current_direction = "down-left"
+        elif angle >= 7 * math.pi / 8 or angle < -7 * math.pi / 8:
+            enemy.current_direction = "left"
+        elif angle >= -7 * math.pi / 8 and angle < -5 * math.pi / 8:
+            enemy.current_direction = "up-left"
+        elif angle >= -5 * math.pi / 8 and angle < -3 * math.pi / 8:
+            enemy.current_direction = "up"
+        else:
+            enemy.current_direction = "up-right"
 
     def reverse_direction_simple(self, enemy: 'Pokemon'):
         """
