@@ -638,6 +638,11 @@ class Pokemon(Entity):
         """Retorna informações completas sobre as animações deste Pokémon"""
         return self.pokedex.get_pokemon_animations_info(self.id, self.is_shiny)
 
+    def play_hurt_animation(self):
+        """Toca a animação de dano (hurt)"""
+        if hasattr(self, 'animation') and self.animation:
+            return self.animation.play_hurt_animation()
+        return False
     def set_battle_system(self, battle_system):
         """Define o sistema de combate para este Pokémon"""
         self.battle_system = battle_system

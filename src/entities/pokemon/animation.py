@@ -311,9 +311,40 @@ class PokemonAnimation:
     def update_animation(self, dt):
         """Atualiza animação do sprite baseado no movimento"""
 
-        # ===== PRIMEIRO: VERIFICA SE ESTÁ EM ANIMAÇÃO DE STATUS =====
+        # ===== PRIORIDADE MÁXIMA: ANIMAÇÃO DE HURT =====
+        if hasattr(self.pokemon, '_hurt_animation_active') and self.pokemon._hurt_animation_active:
+            # Atualiza o frame da animação hurt
+            self.pokemon.animation_timer += dt * 60
+
+            frame_time = self.pokemon.animation_speed
+            if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
+                current_frame = getattr(self.pokemon, 'current_frame', 0)
+                if current_frame < len(self.pokemon.frame_durations):
+                    frame_time = self.pokemon.frame_durations[current_frame]
+
+            if self.pokemon.animation_timer >= frame_time:
+                self.pokemon.animation_timer = 0
+                max_frames = self._get_current_animation_frame_count()
+
+                if max_frames > 0:
+                    next_frame = self.pokemon.current_frame + 1
+                    if next_frame >= max_frames:
+                        # Último frame atingido, marca para terminar
+                        self.pokemon.current_frame = max_frames - 1
+                        if not getattr(self.pokemon, '_hurt_animation_played_once', False):
+                            self.pokemon._hurt_animation_played_once = True
+                    else:
+                        self.pokemon.current_frame = next_frame
+
+                    self._update_sprite_from_current_animation()
+
+            # Verifica se deve terminar a animação hurt
+            self.update_hurt_animation()
+            return
+
+        # ===== VERIFICA SE ESTÁ EM ANIMAÇÃO DE STATUS =====
         current_anim = getattr(self.pokemon, 'current_animation', 'idle')
-        status_animations = ['sleep','charge']
+        status_animations = ['sleep', 'charge']
 
         if current_anim in status_animations:
             # Está em animação de status - só atualiza o frame, não troca animação
@@ -341,7 +372,7 @@ class PokemonAnimation:
                         self.pokemon.current_frame = next_frame
 
                     self._update_sprite_from_current_animation()
-                return
+                    return
 
         # ===== ANIMAÇÃO NORMAL (IDLE/WALK) - DETECTA MOVIMENTO =====
         is_moving_now = self._is_moving()
@@ -394,3 +425,74 @@ class PokemonAnimation:
                     self.pokemon.current_frame = next_frame
 
                 self._update_sprite_from_current_animation()
+
+    def play_hurt_animation(self):
+        """
+        Toca a animação de dano (hurt) e retorna à animação normal após terminar.
+        A animação hurt é curta (2 frames) e não deve loopar.
+        """
+        if not self.has_animation("hurt"):
+            # Se não tem animação de hurt, não faz nada
+            return False
+
+        # Se já está tocando hurt, não interrompe
+        if hasattr(self.pokemon, '_hurt_animation_active') and self.pokemon._hurt_animation_active:
+            return False
+
+        # Guarda a animação atual para restaurar depois
+        self.pokemon._saved_animation_before_hurt = self.pokemon.current_animation
+
+        # Salva também a direção atual se precisar restaurar depois
+        self.pokemon._saved_direction_before_hurt = self.pokemon.current_direction
+
+        # Toca a animação hurt
+        self.set_animation("hurt")
+        self.pokemon.current_frame = 0
+        self.pokemon.animation_timer = 0
+        self.pokemon._hurt_animation_active = True
+        self.pokemon._hurt_animation_played_once = False
+
+        print(f"[HURT] {self.pokemon.name} tocando animação de dano")
+        return True
+
+    def update_hurt_animation(self):
+        """
+        Atualiza a animação de hurt - deve ser chamada no update_animation.
+        Retorna True se a animação terminou.
+        """
+        if not hasattr(self.pokemon, '_hurt_animation_active') or not self.pokemon._hurt_animation_active:
+            return True
+
+        # Verifica se a animação já completou (chegou ao último frame)
+        max_frames = self._get_current_animation_frame_count()
+
+        if max_frames > 0 and self.pokemon.current_frame >= max_frames - 1:
+            # Já está no último frame, marca que já passou
+            if not getattr(self.pokemon, '_hurt_animation_played_once', False):
+                self.pokemon._hurt_animation_played_once = True
+
+        # Se já passou pelo último frame, termina a animação
+        if getattr(self.pokemon, '_hurt_animation_played_once', False) and self.pokemon.current_frame >= max_frames - 1:
+            # Restaura a animação anterior
+            saved_anim = getattr(self.pokemon, '_saved_animation_before_hurt', 'idle')
+
+            # Restaura a direção anterior
+            if hasattr(self.pokemon, '_saved_direction_before_hurt'):
+                self.pokemon.current_direction = self.pokemon._saved_direction_before_hurt
+                delattr(self.pokemon, '_saved_direction_before_hurt')
+
+            self.set_animation(saved_anim)
+            self.pokemon.current_frame = 0
+            self.pokemon.animation_timer = 0
+
+            # Limpa flags
+            delattr(self.pokemon, '_hurt_animation_active')
+            if hasattr(self.pokemon, '_hurt_animation_played_once'):
+                delattr(self.pokemon, '_hurt_animation_played_once')
+            if hasattr(self.pokemon, '_saved_animation_before_hurt'):
+                delattr(self.pokemon, '_saved_animation_before_hurt')
+
+            print(f"[HURT] {self.pokemon.name} terminou animação de dano, voltando para {saved_anim}")
+            return True
+
+        return False

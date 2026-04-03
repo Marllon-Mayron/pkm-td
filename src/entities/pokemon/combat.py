@@ -459,6 +459,10 @@ class PokemonCombat:
         old_hp = self.pokemon.current_hp
         self.pokemon.current_hp = max(0, self.pokemon.current_hp - damage)
 
+        # ===== TOCA ANIMAÇÃO DE HURT SE TOMOU DANO =====
+        if damage > 0 and self.pokemon.current_hp > 0:
+            self.pokemon.play_hurt_animation()
+
         if self.pokemon.current_hp > 0 and self.pokemon.current_hp <= self.pokemon.max_hp * 0.2:
             from src.managers.move_sound_manager import move_sound_manager
             move_sound_manager.play_attack_sound("low_hp")
