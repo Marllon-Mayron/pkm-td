@@ -313,7 +313,7 @@ class PokemonAnimation:
 
         # ===== PRIMEIRO: VERIFICA SE ESTÁ EM ANIMAÇÃO DE STATUS =====
         current_anim = getattr(self.pokemon, 'current_animation', 'idle')
-        status_animations = ['sleep', 'hurt', 'paralysis', 'freeze', 'charge']
+        status_animations = ['sleep','charge']
 
         if current_anim in status_animations:
             # Está em animação de status - só atualiza o frame, não troca animação
@@ -328,18 +328,20 @@ class PokemonAnimation:
             if self.pokemon.animation_timer >= frame_time:
                 self.pokemon.animation_timer = 0
                 max_frames = self._get_current_animation_frame_count()
+
                 if max_frames > 0:
-                    # Para animações de status, NÃO reinicia automaticamente quando termina
-                    # Deixa no último frame até o status mudar
                     next_frame = self.pokemon.current_frame + 1
+
+                    # ===== TODAS AS ANIMAÇÕES DE STATUS REPETEM EM LOOP =====
+                    # sleep, freeze, charge, hurt, paralysis - todas devem repetir
                     if next_frame >= max_frames:
-                        # Fim da animação de status - mantém no último frame
-                        # Não reinicia o loop
-                        self.pokemon.current_frame = max_frames - 1
+                        # Reinicia o loop para todas as animações de status
+                        self.pokemon.current_frame = 0
                     else:
                         self.pokemon.current_frame = next_frame
+
                     self._update_sprite_from_current_animation()
-            return
+                return
 
         # ===== ANIMAÇÃO NORMAL (IDLE/WALK) - DETECTA MOVIMENTO =====
         is_moving_now = self._is_moving()
