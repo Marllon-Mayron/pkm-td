@@ -72,19 +72,15 @@ class WaveManager:
         """
         # Se ainda tem inimigos vivos (qualquer tipo), a wave não acabou
         if self.active_enemies:
-            print(f"[WAVE] Ainda há {len(self.active_enemies)} inimigos vivos (incluindo bosses)")
             return False
 
         # Verifica se o spawner ainda tem waves para spawnar ou ativas
         if self.spawner.has_more_waves():
-            print(f"[WAVE] Ainda há waves pendentes para spawnar")
             return False
 
         if self.spawner.has_active_waves():
-            print(f"[WAVE] Ainda há waves ativas spawnando")
             return False
 
-        print(f"[WAVE] Todas as waves concluídas e NENHUM inimigo vivo!")
         return True
 
     def get_current_wave_info(self) -> dict:

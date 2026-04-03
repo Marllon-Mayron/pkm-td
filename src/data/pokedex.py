@@ -1,4 +1,4 @@
-# src/data/pokedex.py
+# src/data/pokedex.py - ATUALIZADO COM TODAS AS ANIMAÇÕES
 import json
 import os
 import pygame
@@ -24,7 +24,7 @@ class Pokedex:
         self.pokemon_data = {}
         self.max_id = 151
 
-        # NOVO: Usa o gerenciador de sprites APENAS para InMap
+        # Usa o gerenciador de sprites APENAS para InMap
         self.sprite_manager = PokemonSpriteManager()
 
         # Cache de sprites front/back (mantém o sistema antigo)
@@ -35,6 +35,7 @@ class Pokedex:
 
         # Cache para sprites InMap (novo sistema)
         self.inmap_animations_cache = {}  # Cache para animações carregadas
+        self.pokemon_animations_info = {}  # Cache para informações de animações disponíveis
 
         # Tipos
         self.type_colors = {
@@ -188,6 +189,95 @@ class Pokedex:
         animation = self.sprite_manager.get_inmap_animation(pokemon_id, shiny)
         self.inmap_animations_cache[cache_key] = animation
         return animation
+
+    def get_pokemon_animations_info(self, pokemon_id: int, shiny: bool = False) -> Dict:
+        """
+        Retorna informações completas sobre todas as animações disponíveis para um Pokémon
+
+        Returns:
+            Dict com:
+            - available_animations: Lista de nomes das animações disponíveis
+            - animation_details: Detalhes de cada animação (frames, direções, durações)
+            - raw_data: Dados brutos do XML
+        """
+        cache_key = f"{pokemon_id}_{shiny}_info"
+        if cache_key in self.pokemon_animations_info:
+            return self.pokemon_animations_info[cache_key]
+
+        raw_data = self.sprite_manager.loader.load_pokemon_sprites(pokemon_id, shiny)
+
+        # Coleta informações detalhadas de cada animação
+        animation_details = {}
+
+        for anim_name, anim_frames in raw_data.get("animations", {}).items():
+            # Para cada animação, conta frames por direção
+            directions_info = {}
+            total_frames = 0
+
+            for direction, frames in anim_frames.items():
+                directions_info[direction] = len(frames)
+                total_frames += len(frames)
+
+            # Pega dados do XML se disponíveis
+            xml_info = raw_data.get("anim_data", {}).get(anim_name.capitalize(), {})
+
+            animation_details[anim_name] = {
+                "directions": directions_info,
+                "total_frames": total_frames,
+                "num_directions": len(anim_frames),
+                "frame_width": xml_info.get("frame_width", 32),
+                "frame_height": xml_info.get("frame_height", 32),
+                "durations": xml_info.get("durations", []),
+                "has_animation": total_frames > 0
+            }
+
+        result = {
+            "available_animations": raw_data.get("available_animations", []),
+            "animation_details": animation_details,
+            "raw_data": raw_data,
+            "has_animations": len(animation_details) > 0
+        }
+
+        self.pokemon_animations_info[cache_key] = result
+        return result
+
+    def get_all_animations(self, pokemon_id: int, shiny: bool = False) -> List[str]:
+        """
+        Retorna lista de todas as animações disponíveis para um Pokémon
+        """
+        info = self.get_pokemon_animations_info(pokemon_id, shiny)
+        return info.get("available_animations", [])
+
+    def has_animation(self, pokemon_id: int, animation_name: str, shiny: bool = False) -> bool:
+        """
+        Verifica se um Pokémon tem uma animação específica disponível
+        """
+        animations = self.get_all_animations(pokemon_id, shiny)
+        return animation_name.lower() in [a.lower() for a in animations]
+
+    def get_animation_frames(self, pokemon_id: int, animation_name: str,
+                             direction: str = "down", shiny: bool = False) -> List[pygame.Surface]:
+        """
+        Retorna os frames de uma animação específica
+
+        Args:
+            pokemon_id: ID do Pokémon
+            animation_name: Nome da animação (ex: "walk", "idle", "run", "attack")
+            direction: Direção desejada
+            shiny: Versão shiny
+
+        Returns:
+            Lista de frames da animação
+        """
+        return self.sprite_manager.get_animation_frames(pokemon_id, shiny, animation_name, direction)
+
+    def get_animation_durations(self, pokemon_id: int, animation_name: str, shiny: bool = False) -> List[int]:
+        """
+        Retorna as durações dos frames de uma animação (do XML)
+        """
+        info = self.get_pokemon_animations_info(pokemon_id, shiny)
+        anim_details = info.get("animation_details", {}).get(animation_name.lower(), {})
+        return anim_details.get("durations", [])
 
     def get_map_sprite_size(self, pokemon_id: int, shiny: bool = False) -> int:
         """Retorna o tamanho do sprite InMap"""

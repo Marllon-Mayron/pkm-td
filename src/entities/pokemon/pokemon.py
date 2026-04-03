@@ -130,6 +130,7 @@ class Pokemon(Entity):
 
         super().__init__(x, y, width, height, sprite)
 
+        self._print_available_animations()
         # ===== 13. ATRIBUTOS DE JOGO =====
         self.is_wild = is_wild
         self.is_in_team = False
@@ -569,6 +570,22 @@ class Pokemon(Entity):
 
     # ===== MÉTODOS QUE PERMANECEM NA CLASSE PRINCIPAL =====
 
+    def get_available_animations(self) -> List[str]:
+        """Retorna lista de todas as animações disponíveis para este Pokémon"""
+        return self.animation.get_available_animations()
+
+    def has_animation(self, animation_name: str) -> bool:
+        """Verifica se este Pokémon tem uma animação específica"""
+        return self.animation.has_animation(animation_name)
+
+    def set_animation_direct(self, animation_name: str):
+        """Define a animação diretamente (ignora movimento)"""
+        self.animation.set_animation(animation_name)
+
+    def get_animation_info(self) -> Dict:
+        """Retorna informações completas sobre as animações deste Pokémon"""
+        return self.pokedex.get_pokemon_animations_info(self.id, self.is_shiny)
+
     def set_battle_system(self, battle_system):
         """Define o sistema de combate para este Pokémon"""
         self.battle_system = battle_system
@@ -808,3 +825,45 @@ class Pokemon(Entity):
         coord_text = f"({self.x:.0f}, {self.y:.0f})"
         coord_surf = font.render(coord_text, True, (200, 200, 200))
         screen.blit(coord_surf, (sprite_rect.left, sprite_rect.bottom + 5))
+
+    def _print_available_animations(self):
+        """Printa todas as animações disponíveis para este Pokémon"""
+        if hasattr(self, 'animation') and self.animation:
+            available = self.animation.get_available_animations()
+
+            if available:
+                print(f"\n{'=' * 50}")
+                print(f"[ANIMAÇÕES] {self.name} (ID: {self.id}) - Shiny: {self.is_shiny}")
+                print(f"{'=' * 50}")
+                print(f"Total de animações disponíveis: {len(available)}")
+                print(f"Animações: {', '.join(available)}")
+
+                # Mostra detalhes de cada animação
+                for anim_name in available:
+                    try:
+                        # Tenta pegar informações detalhadas
+                        frames_info = self.pokedex.get_animation_frames(self.id, anim_name, "down", self.is_shiny)
+                        durations = self.pokedex.get_animation_durations(self.id, anim_name, self.is_shiny)
+
+                        if frames_info:
+                            num_frames = len(frames_info)
+                            if durations:
+                                print(f"  └─ {anim_name}: {num_frames} frames, durações: {durations}")
+                            else:
+                                print(f"  └─ {anim_name}: {num_frames} frames")
+                        else:
+                            print(f"  └─ {anim_name}: [sem frames ou direção não encontrada]")
+                    except Exception as e:
+                        print(f"  └─ {anim_name}: [erro ao obter info - {e}]")
+
+                # Mostra também as direções disponíveis (se tiver pelo menos uma animação)
+                if available and hasattr(self, 'inmap_animations') and self.inmap_animations:
+                    first_anim = available[0].lower()
+                    if first_anim in self.inmap_animations:
+                        directions = list(self.inmap_animations[first_anim].keys())
+                        print(f"\nDireções disponíveis na animação '{first_anim}': {', '.join(directions)}")
+
+                print(f"{'=' * 50}\n")
+            else:
+                print(f"\n[AVISO] Nenhuma animação InMap encontrada para {self.name} (ID: {self.id})")
+                print(f"  Verifique se a pasta res/PokemonSprites/InMaps/{self.id:04d}/ existe\n")

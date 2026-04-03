@@ -1,4 +1,4 @@
-# src/data/sprite_loader.py - CORREÇÃO FINAL - LAYOUT HORIZONTAL CORRETO
+# src/data/sprite_loader.py - VERSÃO COMPLETA - CARREGA TODAS AS ANIMAÇÕES
 """
 Sistema de carregamento de sprites para a nova estrutura InMap
 Suporta 8 direções e animações baseadas em AnimData.xml
@@ -7,10 +7,6 @@ Os sprites são PNGs individuais como Walk-Anim.png, Idle-Anim.png
 LAYOUT DO SPRITESHEET (HORIZONTAL):
 - CADA LINHA = uma DIREÇÃO (8 direções)
 - CADA COLUNA = um FRAME da animação para aquela direção
-
-Exemplo para animação com 5 frames e 8 direções:
-- Largura total = 5 * frame_width
-- Altura total = 8 * frame_height
 """
 
 import os
@@ -49,8 +45,8 @@ class SpriteLoader:
 
     def load_pokemon_sprites(self, pokemon_id: int, shiny: bool = False) -> Dict:
         """
-        Carrega todos os sprites de um Pokémon
-        Retorna dicionário com animações e direções
+        Carrega TODOS os sprites de um Pokémon disponíveis
+        Retorna dicionário com todas as animações e direções encontradas
         """
         cache_key = f"{pokemon_id}_{shiny}"
         if cache_key in self.cache:
@@ -77,38 +73,37 @@ class SpriteLoader:
         anim_data = self._load_anim_data(pokemon_path)
         print(f"[SPRITE] AnimData carregado: {list(anim_data.keys())}")
 
-        # Carrega os sprites para cada animação
+        # Carrega TODOS os sprites disponíveis
         animations = {}
+        available_animations = set()
 
-        # Por enquanto só carregamos Idle e Walk
-        for anim_name in ["Idle", "Walk"]:
-            # Tenta carregar o PNG com sufixo -Anim
-            png_path = pokemon_path / f"{anim_name}-Anim.png"
+        # Lista todos os arquivos PNG na pasta
+        png_files = list(pokemon_path.glob("*-Anim.png"))
 
-            if png_path.exists():
-                print(f"[SPRITE] Carregando {anim_name}-Anim.png")
-                anim_frames = self._load_animation_from_spritesheet(
-                    png_path,
-                    anim_name,
-                    anim_data.get(anim_name, {})
-                )
-                if anim_frames:
-                    animations[anim_name.lower()] = anim_frames
-                    print(f"[SPRITE] ✓ {anim_name} carregado com {len(anim_frames)} direções")
-                    # Mostra quantos frames por direção
-                    for dir_name, frames in anim_frames.items():
-                        print(f"[SPRITE]   {dir_name}: {len(frames)} frames")
-            else:
-                print(f"[SPRITE] {anim_name}-Anim.png não encontrado em {pokemon_path}")
+        for png_path in png_files:
+            # Extrai o nome da animação (ex: "Walk" de "Walk-Anim.png")
+            anim_name = png_path.stem.replace("-Anim", "")
+
+            anim_frames = self._load_animation_from_spritesheet(
+                png_path,
+                anim_name,
+                anim_data.get(anim_name, {})
+            )
+
+            if anim_frames:
+                animations[anim_name.lower()] = anim_frames
+                available_animations.add(anim_name.lower())
 
         # Se não encontrou nenhuma animação, cria placeholder
         if not animations:
             print(f"[SPRITE] Nenhuma animação encontrada para {pokemon_path}")
             animations = self._create_empty_animation()
+            available_animations = {"idle", "walk"}
 
         result = {
             "animations": animations,
             "anim_data": anim_data,
+            "available_animations": list(available_animations),
             "path": pokemon_path
         }
 
@@ -123,15 +118,6 @@ class SpriteLoader:
         LAYOUT HORIZONTAL:
         - CADA LINHA = uma DIREÇÃO (8 direções no total)
         - CADA COLUNA = um FRAME da animação para aquela direção
-
-        Exemplo para animação com 5 frames:
-        - Linha 0: frames da direção "down": [frame0, frame1, frame2, frame3, frame4]
-        - Linha 1: frames da direção "down-right": [frame0, frame1, frame2, frame3, frame4]
-        - Linha 2: frames da direção "right": [frame0, frame1, frame2, frame3, frame4]
-        - etc...
-
-        Para obter os frames de uma direção, pegamos a linha correspondente
-        e percorremos todas as colunas (frames)
         """
         try:
             spritesheet = pygame.image.load(str(spritesheet_path)).convert_alpha()
@@ -146,12 +132,9 @@ class SpriteLoader:
             # Se não tem informação de duração, calcula baseado na largura
             if num_frames == 0:
                 num_frames = sheet_width // frame_width
-                #print(f"[SPRITE] Inferindo {num_frames} frames para {anim_name} (baseado na largura)")
 
             # Calcula quantas direções baseado na altura
             num_directions = sheet_height // frame_height
-            #print(f"[SPRITE] Spritesheet: {sheet_width}x{sheet_height}, frame={frame_width}x{frame_height}")
-            #print(f"[SPRITE] Direções (linhas): {num_directions}, Frames por direção (colunas): {num_frames}")
 
             frames_by_direction = {}
 
@@ -262,7 +245,7 @@ class SpriteLoader:
         Args:
             pokemon_id: ID do Pokémon
             shiny: Se é shiny
-            animation: "idle" ou "walk"
+            animation: Nome da animação (ex: "idle", "walk", "run", etc)
             direction: Direção (down, down-right, right, etc)
             frame: Índice do frame
         """
@@ -311,9 +294,10 @@ class PokemonSpriteManager:
             "left": [frame0, frame1, ...],
             "right": [frame0, frame1, ...],
             "up": [frame0, frame1, ...],
-            "_raw": {  # Dados brutos com 8 direções
+            "_raw": {  # Dados brutos com 8 direções e todas animações
                 "animations": {...},
-                "anim_data": {...}
+                "anim_data": {...},
+                "available_animations": [...]
             }
         }
         """
@@ -329,11 +313,20 @@ class PokemonSpriteManager:
             "left": [],
             "right": [],
             "up": [],
-            "_raw": sprites_data
+            "_raw": sprites_data  # Dados completos disponíveis
         }
 
-        # Obtém frames de Walk (usado para movimento)
+        # Tenta usar Walk primeiro (animação de movimento)
         walk_frames = sprites_data.get("animations", {}).get("walk", {})
+
+        # Se não tem Walk, tenta Run
+        if not walk_frames:
+            walk_frames = sprites_data.get("animations", {}).get("run", {})
+
+        # Se ainda não tem, tenta a primeira animação que encontrar
+        if not walk_frames and sprites_data.get("animations"):
+            first_anim = next(iter(sprites_data["animations"].values()))
+            walk_frames = first_anim
 
         # Mapeia direções de 8 para 4 - usa apenas as direções principais
         direction_mapping = {
@@ -351,7 +344,7 @@ class PokemonSpriteManager:
                 frames.extend(src_frames)
             result[legacy_dir] = frames
 
-        # Se não tem Walk, tenta Idle
+        # Se não tem animação de movimento, tenta Idle
         if not any(result.values()):
             idle_frames = sprites_data.get("animations", {}).get("idle", {})
             for legacy_dir, source_dirs in direction_mapping.items():
@@ -363,6 +356,33 @@ class PokemonSpriteManager:
 
         self._animation_cache[cache_key] = result
         return result
+
+    def get_all_animations(self, pokemon_id: int, shiny: bool = False) -> List[str]:
+        """
+        Retorna lista de todas as animações disponíveis para um Pokémon
+        """
+        sprites_data = self.loader.load_pokemon_sprites(pokemon_id, shiny)
+        return sprites_data.get("available_animations", [])
+
+    def get_animation_frames(self, pokemon_id: int, shiny: bool,
+                             animation: str, direction: str) -> List[pygame.Surface]:
+        """
+        Retorna os frames de uma animação específica para uma direção
+
+        Args:
+            pokemon_id: ID do Pokémon
+            shiny: Se é shiny
+            animation: Nome da animação (ex: "idle", "walk", "run", "attack", etc)
+            direction: Direção (down, left, right, up, ou diagonais)
+
+        Returns:
+            Lista de frames da animação
+        """
+        sprites_data = self.loader.load_pokemon_sprites(pokemon_id, shiny)
+        animations = sprites_data.get("animations", {})
+
+        anim_frames = animations.get(animation.lower(), {})
+        return anim_frames.get(direction, [])
 
     def get_sprite_size(self, pokemon_id: int, shiny: bool = False) -> int:
         """Retorna o tamanho do sprite no mapa"""
