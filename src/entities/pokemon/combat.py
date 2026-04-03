@@ -304,50 +304,86 @@ class PokemonCombat:
             self._execute_attack()
 
     def _update_direction_for_angle(self, dx, dy):
-        """Atualiza direção baseada no ângulo (8 direções)"""
-        angle = math.atan2(dy, dx)
-        if angle >= -math.pi / 8 and angle < math.pi / 8:
-            self.pokemon.current_direction = "right"
-        elif angle >= math.pi / 8 and angle < 3 * math.pi / 8:
-            self.pokemon.current_direction = "down-right"
-        elif angle >= 3 * math.pi / 8 and angle < 5 * math.pi / 8:
-            self.pokemon.current_direction = "down"
-        elif angle >= 5 * math.pi / 8 and angle < 7 * math.pi / 8:
-            self.pokemon.current_direction = "down-left"
-        elif angle >= 7 * math.pi / 8 or angle < -7 * math.pi / 8:
-            self.pokemon.current_direction = "left"
-        elif angle >= -7 * math.pi / 8 and angle < -5 * math.pi / 8:
-            self.pokemon.current_direction = "up-left"
-        elif angle >= -5 * math.pi / 8 and angle < -3 * math.pi / 8:
-            self.pokemon.current_direction = "up"
-        else:
-            self.pokemon.current_direction = "up-right"
-
-    def _update_direction_to_target(self, dx, dy):
-        """Atualiza direção baseada no alvo (8 direções)"""
+        """Atualiza direção baseada no ângulo (8 direções) - OTIMIZADO"""
         if dx == 0 and dy == 0:
             return
 
-        angle = math.atan2(dy, dx)
+        abs_dx = abs(dx)
+        abs_dy = abs(dy)
 
-        # 8 direções baseadas no ângulo (em radianos)
-        # -pi a pi, dividido em 8 partes iguais (cada parte = pi/4 = 0.785)
-        if angle >= -math.pi / 8 and angle < math.pi / 8:
-            self.pokemon.current_direction = "right"
-        elif angle >= math.pi / 8 and angle < 3 * math.pi / 8:
-            self.pokemon.current_direction = "down-right"
-        elif angle >= 3 * math.pi / 8 and angle < 5 * math.pi / 8:
-            self.pokemon.current_direction = "down"
-        elif angle >= 5 * math.pi / 8 and angle < 7 * math.pi / 8:
-            self.pokemon.current_direction = "down-left"
-        elif angle >= 7 * math.pi / 8 or angle < -7 * math.pi / 8:
-            self.pokemon.current_direction = "left"
-        elif angle >= -7 * math.pi / 8 and angle < -5 * math.pi / 8:
-            self.pokemon.current_direction = "up-left"
-        elif angle >= -5 * math.pi / 8 and angle < -3 * math.pi / 8:
-            self.pokemon.current_direction = "up"
+        THRESHOLD = 0.41421356
+
+        if abs_dx >= abs_dy:
+            if dx > 0:
+                if dy > 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "down-right"
+                elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "up-right"
+                else:
+                    self.pokemon.current_direction = "right"
+            else:
+                if dy > 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "down-left"
+                elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "up-left"
+                else:
+                    self.pokemon.current_direction = "left"
         else:
-            self.pokemon.current_direction = "up-right"
+            if dy > 0:
+                if dx > 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "down-right"
+                elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "down-left"
+                else:
+                    self.pokemon.current_direction = "down"
+            else:
+                if dx > 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "up-right"
+                elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "up-left"
+                else:
+                    self.pokemon.current_direction = "up"
+
+    def _update_direction_to_target(self, dx, dy):
+        """Atualiza direção baseada no alvo (8 direções) - OTIMIZADO"""
+        if dx == 0 and dy == 0:
+            return
+
+        abs_dx = abs(dx)
+        abs_dy = abs(dy)
+
+        THRESHOLD = 0.41421356
+
+        if abs_dx >= abs_dy:
+            if dx > 0:
+                if dy > 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "down-right"
+                elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "up-right"
+                else:
+                    self.pokemon.current_direction = "right"
+            else:
+                if dy > 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "down-left"
+                elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "up-left"
+                else:
+                    self.pokemon.current_direction = "left"
+        else:
+            if dy > 0:
+                if dx > 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "down-right"
+                elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "down-left"
+                else:
+                    self.pokemon.current_direction = "down"
+            else:
+                if dx > 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "up-right"
+                elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "up-left"
+                else:
+                    self.pokemon.current_direction = "up"
 
     def handle_returning_state(self, dt):
         """Estado voltando para posição original"""

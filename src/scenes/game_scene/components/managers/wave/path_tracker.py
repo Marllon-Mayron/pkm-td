@@ -182,30 +182,45 @@ class PathTracker:
 
         return False, False
 
+    _DIRECTION_THRESHOLD = 0.414
+
     def _update_direction_from_movement(self, enemy: 'Pokemon', dx: float, dy: float):
-        """Atualiza direção baseada no movimento (8 direções)"""
+        """Atualiza direção baseada no movimento (8 direções) - LOOKUP TABLE"""
         if dx == 0 and dy == 0:
             return
 
-        angle = math.atan2(dy, dx)
+        abs_dx = abs(dx)
+        abs_dy = abs(dy)
 
-        # 8 direções baseadas no ângulo
-        if angle >= -math.pi / 8 and angle < math.pi / 8:
-            enemy.current_direction = "right"
-        elif angle >= math.pi / 8 and angle < 3 * math.pi / 8:
-            enemy.current_direction = "down-right"
-        elif angle >= 3 * math.pi / 8 and angle < 5 * math.pi / 8:
-            enemy.current_direction = "down"
-        elif angle >= 5 * math.pi / 8 and angle < 7 * math.pi / 8:
-            enemy.current_direction = "down-left"
-        elif angle >= 7 * math.pi / 8 or angle < -7 * math.pi / 8:
-            enemy.current_direction = "left"
-        elif angle >= -7 * math.pi / 8 and angle < -5 * math.pi / 8:
-            enemy.current_direction = "up-left"
-        elif angle >= -5 * math.pi / 8 and angle < -3 * math.pi / 8:
-            enemy.current_direction = "up"
+        # Calcula o quadrante e diagonal em um único passo
+        # Usa um código de 3 bits: [horizontal_sign][vertical_sign][is_diagonal]
+
+        h_sign = 1 if dx > 0 else -1  # direita=1, esquerda=-1
+        v_sign = 1 if dy > 0 else -1  # baixo=1, cima=-1
+
+        # Verifica se é diagonal (proporção próxima de 1:1)
+        # Uma direção é diagonal se a diferença entre os eixos for pequena
+        # |dx| e |dy| são próximos: |abs_dx - abs_dy| < min(abs_dx, abs_dy) * 0.3
+
+        ratio = abs_dy / abs_dx if abs_dx > abs_dy else abs_dx / abs_dy
+        is_diagonal = ratio > self._DIRECTION_THRESHOLD
+
+        if not is_diagonal:
+            # Direção cardinal
+            if abs_dx >= abs_dy:
+                enemy.current_direction = "right" if dx > 0 else "left"
+            else:
+                enemy.current_direction = "down" if dy > 0 else "up"
         else:
-            enemy.current_direction = "up-right"
+            # Direção diagonal
+            if dx > 0 and dy > 0:
+                enemy.current_direction = "down-right"
+            elif dx > 0 and dy < 0:
+                enemy.current_direction = "up-right"
+            elif dx < 0 and dy > 0:
+                enemy.current_direction = "down-left"
+            else:  # dx < 0 and dy < 0
+                enemy.current_direction = "up-left"
 
     def reverse_direction_simple(self, enemy: 'Pokemon'):
         """

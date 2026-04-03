@@ -120,29 +120,52 @@ class PokemonMovement:
         self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
 
     def _update_direction_from_movement(self, dx, dy):
-        """Atualiza direção baseada no movimento (8 direções)"""
+        """Atualiza direção baseada no movimento (8 direções) - OTIMIZADO"""
         if dx == 0 and dy == 0:
             return
 
-        angle = math.atan2(dy, dx)
+        abs_dx = abs(dx)
+        abs_dy = abs(dy)
 
-        # 8 direções baseadas no ângulo
-        if angle >= -math.pi / 8 and angle < math.pi / 8:
-            self.pokemon.current_direction = "right"
-        elif angle >= math.pi / 8 and angle < 3 * math.pi / 8:
-            self.pokemon.current_direction = "down-right"
-        elif angle >= 3 * math.pi / 8 and angle < 5 * math.pi / 8:
-            self.pokemon.current_direction = "down"
-        elif angle >= 5 * math.pi / 8 and angle < 7 * math.pi / 8:
-            self.pokemon.current_direction = "down-left"
-        elif angle >= 7 * math.pi / 8 or angle < -7 * math.pi / 8:
-            self.pokemon.current_direction = "left"
-        elif angle >= -7 * math.pi / 8 and angle < -5 * math.pi / 8:
-            self.pokemon.current_direction = "up-left"
-        elif angle >= -5 * math.pi / 8 and angle < -3 * math.pi / 8:
-            self.pokemon.current_direction = "up"
+        # Constante tan(22.5°)
+        THRESHOLD = 0.41421356
+
+        if abs_dx >= abs_dy:
+            # Movimento predominantemente horizontal
+            if dx > 0:
+                # Direita
+                if dy > 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "down-right"
+                elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "up-right"
+                else:
+                    self.pokemon.current_direction = "right"
+            else:
+                # Esquerda
+                if dy > 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "down-left"
+                elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
+                    self.pokemon.current_direction = "up-left"
+                else:
+                    self.pokemon.current_direction = "left"
         else:
-            self.pokemon.current_direction = "up-right"
+            # Movimento predominantemente vertical
+            if dy > 0:
+                # Baixo
+                if dx > 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "down-right"
+                elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "down-left"
+                else:
+                    self.pokemon.current_direction = "down"
+            else:
+                # Cima
+                if dx > 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "up-right"
+                elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
+                    self.pokemon.current_direction = "up-left"
+                else:
+                    self.pokemon.current_direction = "up"
 
     def check_item_capture(self, items):
         """Verifica captura de item (apenas para Pokémon sem wave control)"""
