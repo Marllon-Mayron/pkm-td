@@ -317,27 +317,31 @@ class PokemonAnimation:
 
         if current_anim in status_animations:
             # Está em animação de status - só atualiza o frame, não troca animação
-            self.pokemon.animation_timer += dt
+            self.pokemon.animation_timer += dt * 60
 
             frame_time = self.pokemon.animation_speed
             if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
                 current_frame = getattr(self.pokemon, 'current_frame', 0)
                 if current_frame < len(self.pokemon.frame_durations):
-                    frame_time = self.pokemon.frame_durations[current_frame] / 60.0
+                    frame_time = self.pokemon.frame_durations[current_frame]
 
             if self.pokemon.animation_timer >= frame_time:
                 self.pokemon.animation_timer = 0
                 max_frames = self._get_current_animation_frame_count()
                 if max_frames > 0:
-                    self.pokemon.current_frame = (self.pokemon.current_frame + 1) % max_frames
+                    # Para animações de status, NÃO reinicia automaticamente quando termina
+                    # Deixa no último frame até o status mudar
+                    next_frame = self.pokemon.current_frame + 1
+                    if next_frame >= max_frames:
+                        # Fim da animação de status - mantém no último frame
+                        # Não reinicia o loop
+                        self.pokemon.current_frame = max_frames - 1
+                    else:
+                        self.pokemon.current_frame = next_frame
                     self._update_sprite_from_current_animation()
-                    # Debug para ver se está avançando
-                    if hasattr(self.pokemon, 'show_debug') and self.pokemon.show_debug:
-                        print(
-                            f"[ANIM] {self.pokemon.name}: {current_anim} frame {self.pokemon.current_frame}/{max_frames}")
             return
 
-        # ===== ANIMAÇÃO NORMAL (IDLE/WALK) =====
+        # ===== ANIMAÇÃO NORMAL (IDLE/WALK) - DETECTA MOVIMENTO =====
         is_moving_now = self._is_moving()
 
         if is_moving_now and not self.pokemon.is_moving:
@@ -356,18 +360,35 @@ class PokemonAnimation:
             elif self._available_animations:
                 self.set_animation(self._available_animations[0])
 
-        # Atualiza o frame da animação
-        self.pokemon.animation_timer += dt
+        # ===== ATUALIZA O FRAME DA ANIMAÇÃO ATUAL =====
+        self.pokemon.animation_timer += dt * 60
 
         frame_time = self.pokemon.animation_speed
         if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
             current_frame = getattr(self.pokemon, 'current_frame', 0)
             if current_frame < len(self.pokemon.frame_durations):
-                frame_time = self.pokemon.frame_durations[current_frame] / 60.0
+                frame_time = self.pokemon.frame_durations[current_frame]
 
         if self.pokemon.animation_timer >= frame_time:
             self.pokemon.animation_timer = 0
             max_frames = self._get_current_animation_frame_count()
+
             if max_frames > 0:
-                self.pokemon.current_frame = (self.pokemon.current_frame + 1) % max_frames
+                next_frame = self.pokemon.current_frame + 1
+
+                # ===== VERIFICA SE É ANIMAÇÃO DE ATAQUE =====
+                is_attack_anim = hasattr(self.pokemon,
+                                         '_attack_animation_active') and self.pokemon._attack_animation_active
+
+                if next_frame >= max_frames:
+                    if is_attack_anim:
+                        # Ataque terminou - NÃO reinicia, mantém no último frame
+                        # O update do pokemon vai lidar com o fim da animação
+                        self.pokemon.current_frame = max_frames - 1
+                    else:
+                        # Animações normais (idle, walk) reiniciam em loop
+                        self.pokemon.current_frame = 0
+                else:
+                    self.pokemon.current_frame = next_frame
+
                 self._update_sprite_from_current_animation()
