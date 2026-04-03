@@ -89,8 +89,6 @@ class EffectFactory:
                 "overwrite": False
             },
             "description": "Envenena o oponente",
-            "attacker_animation": "rotate",
-            "min_distance": 0
         },
         "toxic": {
             "effect_type": "status",
@@ -123,8 +121,6 @@ class EffectFactory:
                 "duration": None
             },
             "description": "Paralisa o oponente",
-            "attacker_animation": "rotate",
-            "min_distance": 0
         },
         # ===== ADORMECER (SLEEP) =====
         "sleep-powder": {
@@ -137,8 +133,6 @@ class EffectFactory:
                 "overwrite": True
             },
             "description": "Coloca o oponente para dormir",
-            "attacker_animation": "rotate",
-            "min_distance": 0
         },
         "hypnosis": {
             "effect_type": "status",

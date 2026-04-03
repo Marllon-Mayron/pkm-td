@@ -237,43 +237,38 @@ class PokemonCombat:
 
     def _play_attack_animation(self, move_name: str, damage_frame_percent: float = 0.5):
         """Toca a animação de ataque, com dano aplicado em % da animação"""
-        from src.battle.effects.effect_factory import EffectFactory
+        from src.battle.effects.animation_mapper import AnimationMapper
 
-        effect = EffectFactory.create_effect(move_name)
         current_move = self.pokemon.get_current_move()
 
-        animation_to_use = None
+        # ===== USA O ANIMATION_MAPPER PARA DECIDIR A ANIMAÇÃO =====
+        move_category = current_move.category if current_move else "physical"
+        animation_to_use = AnimationMapper.get_animation_for_move(move_name, move_category)
 
-        # Prioridade 1: Animação específica do move
-        if effect and effect.attacker_animation:
-            animation_to_use = effect.attacker_animation
-            print(f"[ANIM] Usando animação específica: {animation_to_use}")
-
-        # Prioridade 2: Animação padrão baseada na categoria
-        if not animation_to_use and current_move:
-            if current_move.category == "special":
-                animation_to_use = "shoot"
-                print(f"[ANIM] Move special, usando padrão: shoot")
-            elif current_move.category == "physical":
+        # ===== VERIFICA SE O POKÉMON TEM A ANIMAÇÃO =====
+        if not self.pokemon.has_animation(animation_to_use):
+            # Tenta fallback alternativo
+            if animation_to_use == "attack" and self.pokemon.has_animation("strike"):
+                animation_to_use = "strike"
+            elif animation_to_use == "shoot" and self.pokemon.has_animation("attack"):
+                animation_to_use = "attack"
+            elif not self.pokemon.has_animation(animation_to_use):
+                # Fallback final
                 if self.pokemon.has_animation("attack"):
                     animation_to_use = "attack"
-                elif self.pokemon.has_animation("strike"):
-                    animation_to_use = "strike"
-                print(f"[ANIM] Move physical, usando padrão: {animation_to_use}")
-            elif current_move.category == "status":
-                if self.pokemon.has_animation("swing"):
-                    animation_to_use = "swing"
-                elif self.pokemon.has_animation("attack"):
-                    animation_to_use = "attack"
-                print(f"[ANIM] Move status, usando padrão: {animation_to_use}")
+                elif self.pokemon._available_animations:
+                    animation_to_use = self.pokemon._available_animations[0]
+                else:
+                    print(f"[ANIM] {self.pokemon.name} não tem nenhuma animação disponível para {move_name}")
+                    self._execute_attack()
+                    return
 
-        # Prioridade 3: Fallback
-        if not animation_to_use:
-            if self.pokemon.has_animation("attack"):
-                animation_to_use = "attack"
-                print(f"[ANIM] Usando fallback: attack")
+        print(f"[ANIM] {self.pokemon.name} usará animação '{animation_to_use}' para {move_name}")
 
-        # Verifica distância mínima
+        # Verifica distância mínima (se aplicável)
+        from src.battle.effects.effect_factory import EffectFactory
+        effect = EffectFactory.create_effect(move_name)
+
         if effect and effect.min_distance > 0 and self.pokemon.target:
             dx = self.pokemon.target.x - self.pokemon.x
             dy = self.pokemon.target.y - self.pokemon.y
@@ -283,21 +278,18 @@ class PokemonCombat:
                 self._execute_attack()
                 return
 
-        if animation_to_use and self.pokemon.has_animation(animation_to_use):
-            self.pokemon._saved_animation_before_attack = self.pokemon.current_animation
-            self.pokemon.set_animation_direct(animation_to_use)
-            self.pokemon.current_frame = 0
-            self.pokemon.animation_timer = 0
-            self.pokemon._attack_animation_active = True
-            self.pokemon._pending_attack_move = move_name
-            # NOVO: guarda quando o dano deve ser aplicado (60% da animação)
-            self.pokemon._damage_frame_percent = damage_frame_percent
-            self.pokemon._damage_applied = False  # Flag para evitar aplicar dano múltiplas vezes
-            print(
-                f"[ANIM] {self.pokemon.name} usou animação {animation_to_use} para {move_name} - dano em {damage_frame_percent * 100}% da animação")
-        else:
-            print(f"[ANIM] Sem animação disponível para {move_name}, executando ataque imediatamente")
-            self._execute_attack()
+        # Executa a animação
+        self.pokemon._saved_animation_before_attack = self.pokemon.current_animation
+        self.pokemon.set_animation_direct(animation_to_use)
+        self.pokemon.current_frame = 0
+        self.pokemon.animation_timer = 0
+        self.pokemon._attack_animation_active = True
+        self.pokemon._pending_attack_move = move_name
+        self.pokemon._damage_frame_percent = damage_frame_percent
+        self.pokemon._damage_applied = False
+
+        print(
+            f"[ANIM] {self.pokemon.name} usou animação {animation_to_use} para {move_name} - dano em {damage_frame_percent * 100}%")
 
     def _update_direction_for_angle(self, dx, dy):
         """Atualiza direção baseada no ângulo (8 direções) - OTIMIZADO"""
