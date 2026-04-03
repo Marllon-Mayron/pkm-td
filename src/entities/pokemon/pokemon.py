@@ -763,22 +763,35 @@ class Pokemon(Entity):
             else:
                 total_duration = 0.5  # Fallback
 
-            # Se a animação já completou um ciclo
+            # ===== APLICA DANO EM % DA ANIMAÇÃO =====
+            damage_percent = getattr(self, '_damage_frame_percent', 0.6)
+            damage_trigger_time = total_duration * damage_percent
+
+            if not getattr(self, '_damage_applied', False) and self._attack_animation_timer >= damage_trigger_time:
+                # Aplica o dano AGORA (no meio da animação)
+                self._damage_applied = True
+                if hasattr(self, 'combat') and hasattr(self, '_pending_attack_move'):
+                    print(
+                        f"[ANIM] Aplicando dano em {damage_percent * 100}% da animação (timer: {self._attack_animation_timer:.2f}/{total_duration:.2f})")
+                    self.combat._execute_attack()
+
+            # Se a animação já completou um ciclo, restaura e finaliza
             if self._attack_animation_timer >= total_duration:
                 # Restaura animação anterior
                 if hasattr(self, '_saved_animation_before_attack'):
                     self.set_animation_direct(self._saved_animation_before_attack)
                     delattr(self, '_saved_animation_before_attack')
 
-                # EXECUTA O ATAQUE AGORA
-                if hasattr(self, 'combat') and hasattr(self, '_pending_attack_move'):
-                    print(f"[ANIM] Animação terminada, executando ataque {self._pending_attack_move}")
-                    self.combat._execute_attack()
-                    delattr(self, '_pending_attack_move')
-
                 # Limpa flags
                 delattr(self, '_attack_animation_active')
-                delattr(self, '_attack_animation_timer')
+                if hasattr(self, '_attack_animation_timer'):
+                    delattr(self, '_attack_animation_timer')
+                if hasattr(self, '_damage_applied'):
+                    delattr(self, '_damage_applied')
+                if hasattr(self, '_damage_frame_percent'):
+                    delattr(self, '_damage_frame_percent')
+                if hasattr(self, '_pending_attack_move'):
+                    delattr(self, '_pending_attack_move')
 
         # ===== ATUALIZA ANIMAÇÃO =====
         self._update_animation(dt)

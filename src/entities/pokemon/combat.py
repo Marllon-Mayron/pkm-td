@@ -235,8 +235,8 @@ class PokemonCombat:
         self.pokemon.combat_state = "returning"
         self.pokemon.charge_cooldown = self.pokemon.charge_cooldown_max
 
-    def _play_attack_animation(self, move_name: str):
-        """Toca a animação de ataque uma única vez"""
+    def _play_attack_animation(self, move_name: str, damage_frame_percent: float = 0.5):
+        """Toca a animação de ataque, com dano aplicado em % da animação"""
         from src.battle.effects.effect_factory import EffectFactory
 
         effect = EffectFactory.create_effect(move_name)
@@ -255,12 +255,10 @@ class PokemonCombat:
                 animation_to_use = "shoot"
                 print(f"[ANIM] Move special, usando padrão: shoot")
             elif current_move.category == "physical":
-                if self.pokemon.has_animation("punch"):
-                    animation_to_use = "punch"
+                if self.pokemon.has_animation("attack"):
+                    animation_to_use = "attack"
                 elif self.pokemon.has_animation("strike"):
                     animation_to_use = "strike"
-                elif self.pokemon.has_animation("attack"):
-                    animation_to_use = "attack"
                 print(f"[ANIM] Move physical, usando padrão: {animation_to_use}")
             elif current_move.category == "status":
                 if self.pokemon.has_animation("swing"):
@@ -275,32 +273,30 @@ class PokemonCombat:
                 animation_to_use = "attack"
                 print(f"[ANIM] Usando fallback: attack")
 
-        # Verifica distância mínima (apenas para moves que têm essa restrição)
+        # Verifica distância mínima
         if effect and effect.min_distance > 0 and self.pokemon.target:
             dx = self.pokemon.target.x - self.pokemon.x
             dy = self.pokemon.target.y - self.pokemon.y
             distance = math.sqrt(dx * dx + dy * dy)
             if distance > effect.min_distance:
-                print(f"[ANIM] Distância muito grande ({distance:.0f} > {effect.min_distance}), ignorando animação")
-                # Executa ataque imediatamente
+                print(f"[ANIM] Distância muito grande, ignorando animação")
                 self._execute_attack()
                 return
 
         if animation_to_use and self.pokemon.has_animation(animation_to_use):
-            # Salva animação atual
             self.pokemon._saved_animation_before_attack = self.pokemon.current_animation
-            # Toca animação de ataque
             self.pokemon.set_animation_direct(animation_to_use)
-            # Reseta para o início
             self.pokemon.current_frame = 0
             self.pokemon.animation_timer = 0
-            # Marca que está em animação de ataque
             self.pokemon._attack_animation_active = True
             self.pokemon._pending_attack_move = move_name
-            print(f"[ANIM] {self.pokemon.name} usou animação {animation_to_use} para {move_name} - aguardando término")
+            # NOVO: guarda quando o dano deve ser aplicado (60% da animação)
+            self.pokemon._damage_frame_percent = damage_frame_percent
+            self.pokemon._damage_applied = False  # Flag para evitar aplicar dano múltiplas vezes
+            print(
+                f"[ANIM] {self.pokemon.name} usou animação {animation_to_use} para {move_name} - dano em {damage_frame_percent * 100}% da animação")
         else:
             print(f"[ANIM] Sem animação disponível para {move_name}, executando ataque imediatamente")
-            # Sem animação, executa ataque imediatamente
             self._execute_attack()
 
     def _update_direction_for_angle(self, dx, dy):
