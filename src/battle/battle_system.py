@@ -9,7 +9,6 @@ from typing import List
 from src.entities.pokemon import Pokemon
 
 
-
 class BattleSystem:
     """Gerencia combate entre Pokémon usando moves"""
 
@@ -17,22 +16,35 @@ class BattleSystem:
         self.game_scene = game_scene
         self.projectiles: List[Projectile] = []
         self.effect_manager = EffectManager()
+        self.active_multi_hit = None  # Estado do multi-hit ativo
 
     def set_effect_manager_for_pokemon(self, pokemon):
         """Vincula o effect_manager a um Pokémon e registra"""
         pokemon.effect_manager = self.effect_manager
-        self.effect_manager.register_pokemon(pokemon)  # Adicione esta linha
+        self.effect_manager.register_pokemon(pokemon)
         print(f"[BATTLE] EffectManager vinculado a {pokemon.name} (id={id(pokemon)})")
 
     def update(self, dt: float):
-        """Atualiza projéteis ativos"""
+        """Atualiza projéteis e multi-hits ativos"""
+        # Atualiza projéteis
         for projectile in self.projectiles[:]:
             projectile.update(dt)
             if projectile.is_finished:
                 self.projectiles.remove(projectile)
 
+        # Atualiza multi-hit ativo
+        if self.active_multi_hit:
+            still_active = self.active_multi_hit.update(dt)
+            if not still_active:
+                self.active_multi_hit = None
+
     def attempt_attack(self, attacker: 'Pokemon', target: 'Pokemon') -> bool:
         """Tenta realizar um ataque com o move atual do atacante"""
+        # Se já tem um multi-hit ativo, não permite novo ataque
+        if self.active_multi_hit:
+            print(f"[BATTLE] Aguardando término do multi-hit...")
+            return False
+
         move = attacker.get_current_move()
 
         if not move:
@@ -48,7 +60,6 @@ class BattleSystem:
         attacker.has_no_pp = False
 
         # ===== DESCONGELAMENTO POR ATAQUES DE FOGO =====
-        # Isso deve ser verificado ANTES de qualquer outra coisa
         target_status = self.effect_manager.get_status(target)
         if target_status and target_status.type == StatusType.FREEZE:
             if move.type.lower() == "fire":
@@ -83,11 +94,9 @@ class BattleSystem:
             return True
 
         # ===== VERIFICAÇÃO ESPECÍFICA PARA STATUS MOVES =====
-        # Só bloqueia se for um move que APLICA STATUS no alvo E o alvo já tem status
         if move.category == "status":
             target_status = self.effect_manager.get_status(target)
 
-            # Verifica se o move realmente aplica um status (e não é só stat mod)
             is_status_applying_move = self._is_status_applying_move(move.name)
 
             if is_status_applying_move and target_status and target_status.type != StatusType.NONE:
@@ -172,10 +181,9 @@ class BattleSystem:
 
     def _show_miss_on_attacker(self, attacker):
         """Mostra o texto MISS no ATACANTE (quem usou o golpe)"""
-        # Inicia o timer para mostrar o texto MISS
         if not hasattr(attacker, 'miss_timer'):
             attacker.miss_timer = 0.0
-        attacker.miss_timer = 0.6  # 0.6 segundos de duração
+        attacker.miss_timer = 0.6
 
     def _show_miss_on_target(self, target):
         """Mostra o texto MISS no alvo (mantido para compatibilidade, mas não usado)"""
@@ -219,15 +227,12 @@ class BattleSystem:
             effectiveness=damage_result["effectiveness"],
             color=color,
             speed=projectile_speed,
-            will_hit=will_hit  # Passa se o ataque acertou ou não
+            will_hit=will_hit
         )
         self.projectiles.append(projectile)
 
         from src.managers.move_sound_manager import move_sound_manager
 
-        # Toca os sons do move (atacante e alvo)
-        # Para ataques especiais, o som do impacto será quando o projétil atingir
-        # Então aqui só tocamos o som do atacante
         move_sound_manager.play_attack_sound(move.sound_name)
         print(f"[SOM] {move.name} - som do atacante: {move.sound_name}")
 
@@ -241,27 +246,22 @@ class BattleSystem:
 
         from src.managers.move_sound_manager import move_sound_manager
 
-        # Para ataques físicos: toca som do atacante E do impacto
         if move.category == "physical":
             move_sound_manager.play_attack_sound(move.sound_name)
             print(f"[SOM] {move.name} (físico) - som do atacante: {move.sound_name}")
 
-        # Toca som de impacto (do alvo)
         move_sound_manager.play_hit_sound(move.sound_name)
         print(f"[SOM] {move.name} - som de impacto: {move.sound_name}_target")
 
-        # Aplica dano
         target.take_damage(damage, attacker=attacker)
 
     def _calculate_move_damage(self, attacker, target, move):
-        """Calcula dano do move com modificadores de stat - VERSÃO COM LOGS"""
-        # Calcula dano base
+        """Calcula dano do move com modificadores de stat"""
         damage_result = DamageCalculator.calculate_damage(attacker, target, move)
 
         if not damage_result["hit"]:
             return damage_result
 
-        # Aplica modificadores de stat
         from src.battle.effects import StatType
 
         if move.category == "physical":
@@ -269,14 +269,13 @@ class BattleSystem:
             def_mult = self.effect_manager.get_stat_multiplier(target, StatType.DEFENSE)
             print(f"[DAMAGE] {attacker.name} atk_mult={atk_mult:.2f}, {target.name} def_mult={def_mult:.2f}")
             damage_result["damage"] = int(damage_result["damage"] * atk_mult / def_mult)
-        else:  # special
+        else:
             sp_atk_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.SP_ATTACK)
             sp_def_mult = self.effect_manager.get_stat_multiplier(target, StatType.SP_DEFENSE)
             print(
                 f"[DAMAGE] {attacker.name} sp_atk_mult={sp_atk_mult:.2f}, {target.name} sp_def_mult={sp_def_mult:.2f}")
             damage_result["damage"] = int(damage_result["damage"] * sp_atk_mult / sp_def_mult)
 
-        # Aplica efeito de queimadura (reduz ataque físico)
         if move.category == "physical":
             status = self.effect_manager.get_status(attacker)
             if status and status.type == StatusType.BURN:
@@ -290,7 +289,6 @@ class BattleSystem:
 
         effect = EffectFactory.create_effect(move.name)
         if effect:
-            # Executa o efeito no timing apropriado
             if effect.timing == EffectTiming.AFTER_DAMAGE:
                 effect.execute(attacker, target, self, self.effect_manager, damage)
             elif effect.timing == EffectTiming.ON_HIT:
@@ -304,10 +302,7 @@ class BattleSystem:
         if not effect:
             return False
 
-        # Moves que aplicam status (não inclui stat_mod)
         status_moves = ["status", "status_chance"]
-
-        # Moves que NÃO devem ser bloqueados (stat_mod)
         stat_mod_moves = ["stat_mod"]
 
         if effect.effect_type in stat_mod_moves:
@@ -324,13 +319,10 @@ class BattleSystem:
 
         effect = EffectFactory.create_effect(move.name)
         if effect:
-            # Só aplica se for um efeito de status (não stat_mod)
             if effect.effect_type in ["status", "status_chance"]:
                 effect.execute(attacker, target, self, self.effect_manager)
-                # REGISTRA CONTRIBUIÇÃO DE STATUS
                 target.register_status_application(attacker, move.name)
             else:
-                # Para outros efeitos (como stat_mod), executa normalmente
                 effect.execute(attacker, target, self, self.effect_manager)
         else:
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")

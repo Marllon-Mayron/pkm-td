@@ -33,6 +33,39 @@ class EffectFactory:
             },
             "description": "Reduz o Ataque do oponente"
         },
+        "tail-whip": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": -1,
+                "duration": 4.0
+            },
+            "description": "Reduz a defesa do oponente"
+        },
+        "leer": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": -1,
+                "duration": 4.0
+            },
+            "description": "Reduz a defesa do oponente"
+        },
+        "harden": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": 1,
+                "duration": 4.0
+            },
+            "description": "Aumenta sua defesa em um nivel"
+        },
         "growth": {
             "effect_type": "stat_mod",
             "target": EffectTarget.SELF,
@@ -66,6 +99,7 @@ class EffectFactory:
             },
             "description": "Aumenta muito a Velocidade"
         },
+
         # ===== VENENO (POISON) =====
         "poison-sting": {
             "effect_type": "status_chance",
@@ -265,6 +299,16 @@ class EffectFactory:
             },
             "description": "Ataque que acerta 2-5 vezes"
         },
+        "fury-attack": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "min_hits": 2,
+                "max_hits": 5
+            },
+            "description": "Ataque que acerta 2-5 vezes"
+        },
         "fury-swipes": {
             "effect_type": "multi_hit",
             "target": EffectTarget.TARGET,
@@ -313,7 +357,16 @@ class EffectFactory:
             },
             "description": "Causa dano de retorno"
         },
-        # Drain moves
+        # ===== DRENAGEM DE VIDA (DRAIN) =====
+        "absorb": {
+            "effect_type": "drain",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "percentage": 0.5
+            },
+            "description": "Cura metade do dano causado"
+        },
         "mega-drain": {
             "effect_type": "drain",
             "target": EffectTarget.TARGET,

@@ -20,7 +20,62 @@ class EffectTiming(Enum):
     ON_MISS = "on_miss"
 
 
-# src/battle/effects/move_effect.py - ADICIONAR ATRIBUTOS
+class MultiHitState:
+    """Estado de um ataque multi-hit em andamento"""
+
+    def __init__(self, attacker, target, hits, move_name, battle_system):
+        self.attacker = attacker
+        self.target = target
+        self.remaining_hits = hits
+        self.total_hits = hits
+        self.current_hit = 1
+        self.move_name = move_name
+        self.battle_system = battle_system
+        self.hit_timer = 0.0
+        self.hit_interval = 0.15  # 0.15 segundos entre hits (rápido!)
+        self.total_damage = 0
+
+    def update(self, dt):
+        """Atualiza o multi-hit, retorna True se ainda ativo"""
+        self.hit_timer += dt
+
+        if self.hit_timer >= self.hit_interval and self.remaining_hits > 0:
+            self.hit_timer = 0
+            self._execute_next_hit()
+
+        return self.remaining_hits > 0
+
+    def _execute_next_hit(self):
+        """Executa o próximo hit"""
+        from src.managers.move_sound_manager import move_sound_manager
+
+        # Pega o move atual
+        move = self.attacker.get_current_move()
+
+        # Toca o som do ataque
+        move_sound_manager.play_attack_sound(move.sound_name)
+
+        # Calcula dano para este hit
+        damage_result = self.battle_system._calculate_move_damage(
+            self.attacker, self.target, move
+        )
+
+        if damage_result["hit"]:
+            damage = damage_result["damage"]
+            self.total_damage += damage
+            self.target.take_damage(damage, attacker=self.attacker)
+
+            # Toca som de impacto
+            move_sound_manager.play_hit_sound(move.sound_name)
+
+            # Toca animação de hurt rapidamente no alvo
+            if hasattr(self.target, 'play_hurt_animation'):
+                self.target.play_hurt_animation()
+
+
+        self.current_hit += 1
+        self.remaining_hits -= 1
+
 
 @dataclass
 class MoveEffect:
@@ -38,7 +93,7 @@ class MoveEffect:
     # Parâmetros do efeito
     params: dict = field(default_factory=dict)
 
-    # ===== NOVOS ATRIBUTOS PARA ANIMAÇÃO =====
+    # ===== ATRIBUTOS PARA ANIMAÇÃO =====
     attacker_animation: Optional[str] = None  # Nome da animação que o atacante deve fazer
     min_distance: float = 0  # Distância mínima para usar a animação (0 = sempre usa)
 
@@ -213,7 +268,6 @@ class MoveEffect:
                 target_entity.register_stat_modifier(attacker, stat_name, stages)
             else:
                 # É um buff em si mesmo ou aliado
-                # Para buffs, registramos como contribuição positiva
                 target_entity.register_buff_on_ally(attacker, target_entity, stat_name, stages)
 
             effect_manager.add_stat_modifier(target_entity, stat_type, stages, duration)
@@ -222,28 +276,19 @@ class MoveEffect:
         return False
 
     def _apply_multi_hit(self, attacker, target, battle_system, effect_manager):
-        """Aplica efeito de múltiplos hits"""
+        """Inicia um ataque multi-hit (será processado ao longo do tempo)"""
         min_hits = self.params.get('min_hits', 2)
         max_hits = self.params.get('max_hits', 5)
 
         hits = random.randint(min_hits, max_hits)
-        total_damage = 0
 
-        effect_manager.add_status_text(attacker, f"Acertou {hits} vezes!")
+        # Cria o estado do multi-hit
+        multi_hit_state = MultiHitState(attacker, target, hits, self.name, battle_system)
 
-        for i in range(hits):
-            # Calcula dano para cada hit
-            damage_result = battle_system._calculate_move_damage(attacker, target, attacker.get_current_move())
+        # Armazena no battle_system para processamento contínuo
+        battle_system.active_multi_hit = multi_hit_state
 
-            if damage_result["hit"]:
-                damage = damage_result["damage"]
-                total_damage += damage
-                target.take_damage(damage, attacker=attacker)
-
-                # Feedback visual
-                effect_manager.add_status_text(target, f"Hit {i + 1}: -{damage} HP", duration=0.3)
-
-        return total_damage > 0
+        return True
 
     def _apply_flinch(self, attacker, target, effect_manager):
         """Aplica flinch (hesitação)"""
@@ -275,7 +320,5 @@ class MoveEffect:
 
         drain_amount = max(1, int(damage * percentage))
         attacker.current_hp = min(attacker.max_hp, attacker.current_hp + drain_amount)
-
-        effect_manager.add_status_text(attacker, f"Drenou {drain_amount} HP")
 
         return True
