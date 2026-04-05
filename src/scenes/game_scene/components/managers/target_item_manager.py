@@ -21,6 +21,7 @@ class TargetItemManager:
         self.game_over = False
         self.victory = False
         self.visual_variation_range = 5
+        self.tile_size = 24  # Tamanho do tile
         self.renderer = TargetItemRenderer()
 
     def load_from_data(self, items_data: dict):
@@ -55,7 +56,7 @@ class TargetItemManager:
 
             # Cria itens com variação visual baseada no grupo
             for pos_key, group_items in position_groups.items():
-                base_x, base_y = pos_key
+                tile_x, tile_y = pos_key
                 variation_range = self.visual_variation_range
                 if len(group_items) > 1:
                     variation_range = self.visual_variation_range * 1.5
@@ -63,22 +64,19 @@ class TargetItemManager:
                 for i, item_data in enumerate(group_items):
                     item_id = item_data.get("item_id", 1)
 
+                    # Cria o item passando o tile_size para centralização
+                    item = TargetItem(
+                        tile_x,  # Posição X do tile (canto superior esquerdo)
+                        tile_y,  # Posição Y do tile (canto superior esquerdo)
+                        item_id,
+                        offset_range=variation_range,
+                        tile_size=self.tile_size  # Passa o tamanho do tile
+                    )
+
                     if len(group_items) > 1:
                         angle = (i / len(group_items)) * 360
                         extra_offset_x = math.cos(math.radians(angle)) * variation_range * 0.7
                         extra_offset_y = math.sin(math.radians(angle)) * variation_range * 0.7
-                    else:
-                        extra_offset_x = 0
-                        extra_offset_y = 0
-
-                    item = TargetItem(
-                        base_x,
-                        base_y,
-                        item_id,
-                        offset_range=variation_range
-                    )
-
-                    if len(group_items) > 1:
                         item.visual_offset_x = extra_offset_x
                         item.visual_offset_y = extra_offset_y
                         item.rotation = random.uniform(-45, 45)
@@ -89,7 +87,7 @@ class TargetItemManager:
             # IMPORTANTE: Total inicial de itens
             self.total_items = len(self.items)
             self.items_protected = len(self.items)
-            self.items_stolen = 0
+            self.items_stored = 0
             self.game_over = False
 
             print(f"Itens alvo carregados: {self.total_items}")
@@ -146,19 +144,18 @@ class TargetItemManager:
     def render_in_ground(self, screen, camera):
         """Renderiza todos os itens no chão usando o renderer"""
         ground_items = [item for item in self.items if item.carried_by is None]
-        # ===== CORREÇÃO: Passa os itens para o renderer =====
         self.renderer.render(screen, camera, self.game.screen_manager, ground_items)
 
     def render_in_pokemon(self, screen, camera):
         """Renderiza todos os itens sendo carregados usando o renderer"""
         carried_items = [item for item in self.items if item.carried_by]
-        # ===== CORREÇÃO: Passa os itens para o renderer =====
         self.renderer.render(screen, camera, self.game.screen_manager, carried_items)
 
     def get_item_at(self, x, y, tolerance=20):
         """Retorna o item na posição (para debug)"""
         for item in self.items:
-            dist = ((item.base_x - x) ** 2 + (item.base_y - y) ** 2) ** 0.5
+            # Usa a posição atual do item (centro) para detecção
+            dist = ((item.current_x - x) ** 2 + (item.current_y - y) ** 2) ** 0.5
             if dist < tolerance:
                 return item
         return None
