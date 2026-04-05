@@ -2018,11 +2018,11 @@
                 "enemies": [
                     {
                         "pokemon_id": 12,
-                        "percentage": 20
+                        "percentage": 21
                     },
                     {
                         "pokemon_id": 15,
-                        "percentage": 20
+                        "percentage": 21
                     },
                     {
                         "pokemon_id": 29,
@@ -2030,15 +2030,15 @@
                     },
                     {
                         "pokemon_id": 32,
-                        "percentage": 15
+                        "percentage": 3
                     },
                     {
                         "pokemon_id": 43,
-                        "percentage": 15
+                        "percentage": 20
                     },
                     {
                         "pokemon_id": 46,
-                        "percentage": 15
+                        "percentage": 20
                     }
                 ],
                 "min_level": 12,
@@ -2057,19 +2057,19 @@
                 "enemies": [
                     {
                         "pokemon_id": 12,
-                        "percentage": 20
+                        "percentage": 21
                     },
                     {
                         "pokemon_id": 15,
-                        "percentage": 20
+                        "percentage": 21
                     },
                     {
                         "pokemon_id": 43,
-                        "percentage": 15
+                        "percentage": 20
                     },
                     {
                         "pokemon_id": 46,
-                        "percentage": 15
+                        "percentage": 20
                     },
                     {
                         "pokemon_id": 29,
@@ -2077,7 +2077,7 @@
                     },
                     {
                         "pokemon_id": 32,
-                        "percentage": 15
+                        "percentage": 3
                     }
                 ],
                 "min_level": 12,
@@ -2089,7 +2089,7 @@
                 "repeat_count": 2
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 1
     },
     "tower_spots": {
         "spot_size": 24,

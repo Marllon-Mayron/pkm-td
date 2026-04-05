@@ -49,7 +49,9 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "capture",
                 "effect_value": 1.0,
-                "price": 200
+                "price": 200,
+                "unlock_phase": None,  # None = sempre disponível
+                "unlock_chapter": None  # compatibilidade com TMs
             },
             "greatball": {
                 "id": "greatball",
@@ -61,7 +63,9 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "capture",
                 "effect_value": 1.5,
-                "price": 600
+                "price": 600,
+                "unlock_phase": None,
+                "unlock_chapter": None
             },
             # Poções
             "potion": {
@@ -74,7 +78,9 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "heal",
                 "effect_value": 20,
-                "price": 200
+                "price": 200,
+                "unlock_phase": None,
+                "unlock_chapter": None
             },
             # PP Items
             "pp_up": {
@@ -87,7 +93,9 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "pp_restore",
                 "effect_value": 0.2,  # 20% do max_pp
-                "price": 100
+                "price": 100,
+                "unlock_phase": "1-3",  # Desbloqueia após completar fase 1-3
+                "unlock_chapter": None
             },
             "pp_max": {
                 "id": "pp_max",
@@ -99,7 +107,9 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "pp_restore",
                 "effect_value": 1.0,  # 100% do max_pp
-                "price": 450
+                "price": 450,
+                "unlock_phase": "2-1",  # Desbloqueia após completar fase 2-1
+                "unlock_chapter": None
             },
             # Pedras de evolição
             "firestone": {
@@ -112,8 +122,11 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "evolution",
                 "effect_value": 0,
-                "price": 1200
-            },"leafstone": {
+                "price": 1200,
+                "unlock_phase": "1-5",  # Desbloqueia após fase 1-5
+                "unlock_chapter": None
+            },
+            "leafstone": {
                 "id": "leafstone",
                 "name": "LEAFSTONE",
                 "sprite_path": os.path.join(self.base_path, "evo-stones", "LEAFSTONE.png"),
@@ -123,8 +136,11 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "evolution",
                 "effect_value": 0,
-                "price": 1200
-            },"moonstone": {
+                "price": 1200,
+                "unlock_phase": "1-5",
+                "unlock_chapter": None
+            },
+            "moonstone": {
                 "id": "moonstone",
                 "name": "MOONSTONE",
                 "sprite_path": os.path.join(self.base_path, "evo-stones", "MOONSTONE.png"),
@@ -134,8 +150,11 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "evolution",
                 "effect_value": 0,
-                "price": 1200
-            },"thunderstone": {
+                "price": 1200,
+                "unlock_phase": "1-5",
+                "unlock_chapter": None
+            },
+            "thunderstone": {
                 "id": "thunderstone",
                 "name": "THUNDERSTONE",
                 "sprite_path": os.path.join(self.base_path, "evo-stones", "THUNDERSTONE.png"),
@@ -145,8 +164,11 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "evolution",
                 "effect_value": 0,
-                "price": 1200
-            },"waterstone": {
+                "price": 1200,
+                "unlock_phase": "1-5",
+                "unlock_chapter": None
+            },
+            "waterstone": {
                 "id": "waterstone",
                 "name": "WATERSTONE",
                 "sprite_path": os.path.join(self.base_path, "evo-stones", "WATERSTONE.png"),
@@ -156,36 +178,14 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "evolution",
                 "effect_value": 0,
-                "price": 1200
+                "price": 1200,
+                "unlock_phase": "1-5",
+                "unlock_chapter": None
             },
             # TMs/HMs
-            "tm_normal_tackle": {
-                "id": "tm_normal_tackle",
-                "name": "TM01 - Tackle",
-                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
-                "description": "Ensina Tackle a um Pokémon. Um ataque físico básico.",
-                "category": "tm",
-                "usable_in_battle": False,
-                "usable_on_map": True,
-                "effect": "teach_move",
-                "effect_value": "tackle",
-                "price": 500  # Preço reduzido para TM básica
-            },
-            "tm_bug_stringshot": {
-                "id": "tm_bug_stringshot",
-                "name": "TM02 - String Shot",
-                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_BUG.png"),
-                "description": "Ensina String Shot a um Pokémon. Reduz a velocidade do oponente.",
-                "category": "tm",
-                "usable_in_battle": False,
-                "usable_on_map": True,
-                "effect": "teach_move",
-                "effect_value": "string-shot",
-                "price": 500
-            },
             "tm_mega_punch": {
                 "id": "tm_mega_punch",
-                "name": "TM03 - Mega Punch",
+                "name": "TM01 - Mega Punch",
                 "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
                 "description": "A powerful punch thrown very hard.",
                 "category": "tm",
@@ -193,19 +193,79 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "teach_move",
                 "effect_value": "mega-punch",
-                "price": 1000
+                "price": 2000,
+                "unlock_phase": "1-3",
+                "unlock_chapter": None,
             },
-            "tm_blizzard": {
-                "id": "tm_blizzard",
-                "name": "TM04 - Blizzard",
-                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_ICE.png"),
-                "description": "Nevasca que da 10% de chance de dar congelamento",
+            "tm_razor_wind": {
+                "id": "tm_razor_wind",
+                "name": "TM02 - Razor Wind",
+                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
+                "description": "1st turn: Prepare 2nd turn: Attack",
                 "category": "tm",
                 "usable_in_battle": False,
                 "usable_on_map": True,
                 "effect": "teach_move",
-                "effect_value": "blizzard",
-                "price": 10
+                "effect_value": "razor-wind",
+                "price": 1500,
+                "unlock_phase": "1-4",
+                "unlock_chapter": None,
+            },
+            "tm_swords_dance": {
+                "id": "tm_swords_dance",
+                "name": "TM03 - Swords Dance",
+                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
+                "description": "A dance that in creases ATTACK.",
+                "category": "tm",
+                "usable_in_battle": False,
+                "usable_on_map": True,
+                "effect": "teach_move",
+                "effect_value": "swords-dance",
+                "price": 1500,
+                "unlock_phase": "1-5",
+                "unlock_chapter": None,
+            },
+            "tm_whirlwind": {
+                "id": "tm_whirlwind",
+                "name": "TM04 - Whirlwind",
+                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
+                "description": "Blows away the foe & ends battle.",
+                "category": "tm",
+                "usable_in_battle": False,
+                "usable_on_map": True,
+                "effect": "teach_move",
+                "effect_value": "whirlwind",
+                "price": 1500,
+                "unlock_phase": "1-4",
+                "unlock_chapter": None,
+            },
+            "tm_mega_kick": {
+                "id": "tm_mega_kick",
+                "name": "TM05 - Mega Kick",
+                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
+                "description": "The target is attacked by a kick launched with muscle-packed power.",
+                "category": "tm",
+                "usable_in_battle": False,
+                "usable_on_map": True,
+                "effect": "teach_move",
+                "effect_value": "mega-kick",
+                "price": 2000,
+                "unlock_phase": "2-1",
+                "unlock_chapter": None,
+            },
+            "tm_bubble_beam": {
+                "id": "tm_bubble_beam",
+                "name": "TM11 - Bubble Beam",
+                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_WATER.png"),
+                "description": "An attack that may lower SPEED.",
+                "category": "tm",
+                "usable_in_battle": False,
+                "usable_on_map": True,
+                "effect": "teach_move",
+                "effect_value": "bubble-beam",
+                "price": 2000,
+                "unlock_phase": "2-8",
+                "unlock_chapter": None,
             },
         }
 
@@ -313,6 +373,23 @@ class ItemBagCatalog:
     def get_medicines(self):
         """Retorna apenas poções/remédios"""
         return self.get_items_by_category("medicine")
+
+    def get_unlock_phase(self, item_id):
+        """Retorna a fase necessária para desbloquear o item"""
+        item = self.items.get(item_id, {})
+        # Suporta tanto unlock_phase quanto unlock_chapter (para compatibilidade)
+        return item.get("unlock_phase") or item.get("unlock_chapter")
+
+    def is_item_unlocked(self, item_id, progress_manager):
+        """Verifica se o item está desbloqueado baseado no progresso do jogador"""
+        unlock_phase = self.get_unlock_phase(item_id)
+
+        # Se não tem requisito de desbloqueio, sempre disponível
+        if unlock_phase is None:
+            return True
+
+        # Verifica se a fase foi completada
+        return progress_manager.is_phase_completed(unlock_phase)
 
 
 # Instância global

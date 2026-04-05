@@ -4,9 +4,9 @@
 Tela da loja - UI profissional com responsividade
 """
 import pygame
-import math
 from src.scenes.base_scene import BaseScene
 from src.data.item_bag_catalog import item_bag_catalog
+from src.config.progress import progress_manager
 
 
 class ShopItemCard:
@@ -20,6 +20,8 @@ class ShopItemCard:
         self.description = item_data["description"]
         self.price = item_data.get("price", 100)
         self.index = index
+        self.is_locked = False  # Novo: indica se o item está bloqueado
+        self.unlock_phase = item_data.get("unlock_phase") or item_data.get("unlock_chapter")  # Fase necessária
 
         self.rect = pygame.Rect(0, 0, 0, 0)
         self.is_hovered = False
@@ -45,6 +47,10 @@ class ShopItemCard:
             self.hover_alpha = max(0, self.hover_alpha - dt * 100)
 
     def handle_event(self, event):
+        # Se o item está bloqueado, não interage
+        if self.is_locked:
+            return None
+
         if event.type == pygame.MOUSEMOTION:
             was_hovered = self.is_hovered
             self.is_hovered = self.rect.collidepoint(event.pos)
@@ -86,26 +92,47 @@ class ShopItemCard:
         colors = {
             'bg': (30, 30, 35, 240),
             'bg_hover': (40, 45, 55, 250),
+            'bg_locked': (25, 25, 30, 200),  # Fundo mais escuro para itens bloqueados
             'border': (60, 65, 75, 255),
             'border_selected': (80, 160, 255, 255),
             'border_hover': (100, 140, 200, 255),
+            'border_locked': (50, 45, 40, 255),  # Borda escura para bloqueados
             'text': (255, 255, 255, 255),
             'text_dim': (180, 190, 210, 255),
+            'text_locked': (100, 100, 110, 255),  # Texto escurecido
             'price': (120, 255, 120, 255),
+            'price_locked': (80, 100, 80, 255),  # Preço escurecido
             'description': (150, 160, 180, 255),
-            'owned_bg': (45, 45, 55, 230)
+            'description_locked': (90, 95, 105, 255),  # Descrição escurecida
+            'owned_bg': (45, 45, 55, 230),
+            'lock_overlay': (0, 0, 0, 180)  # Overlay de bloqueio
         }
 
         # Determina cores baseadas no estado
-        if selected:
+        if self.is_locked:
+            border_color = colors['border_locked']
+            bg_color = colors['bg_locked']
+            text_color = colors['text_locked']
+            price_color = colors['price_locked']
+            desc_color = colors['description_locked']
+        elif selected:
             border_color = colors['border_selected']
             bg_color = (45, 55, 75, 250)
+            text_color = colors['text'][:3]
+            price_color = colors['price'][:3]
+            desc_color = colors['description'][:3]
         elif self.is_hovered:
             border_color = colors['border_hover']
             bg_color = colors['bg_hover']
+            text_color = colors['text'][:3]
+            price_color = colors['price'][:3]
+            desc_color = colors['description'][:3]
         else:
             border_color = colors['border']
             bg_color = colors['bg']
+            text_color = colors['text'][:3]
+            price_color = colors['price'][:3]
+            desc_color = colors['description'][:3]
 
         # Sombra suave
         shadow_rect = self.rect.copy()
@@ -119,14 +146,30 @@ class ShopItemCard:
         # Borda
         pygame.draw.rect(screen, border_color, self.rect, 1, border_radius=6)
 
-        # Sprite do item
+        # Sprite do item (com opacidade reduzida se bloqueado)
         sprite = item_bag_catalog.get_sprite(self.item_id, scaled=True)
         if sprite:
-            screen.blit(sprite, (self.rect.x + 6, self.rect.y + 16))
+            if self.is_locked:
+                # Cria uma versão escurecida do sprite
+                locked_sprite = sprite.copy()
+                locked_sprite.fill((50, 50, 60, 180), special_flags=pygame.BLEND_RGBA_MULT)
+                screen.blit(locked_sprite, (self.rect.x + 6, self.rect.y + 16))
+                # Desenha um cadeado sobre o sprite
+                lock_font = pygame.font.Font(None, 24)
+                lock_text = lock_font.render("🔒", True, (200, 180, 100))
+                screen.blit(lock_text, (self.rect.x + 6, self.rect.y + 16))
+            else:
+                screen.blit(sprite, (self.rect.x + 6, self.rect.y + 16))
 
         # Nome do item
-        name_text = fonts['medium'].render(self.name, True, colors['text'][:3])
+        name_text = fonts['medium'].render(self.name, True, text_color)
         screen.blit(name_text, (self.rect.x + 60, self.rect.y + 10))
+
+        # Se está bloqueado, mostra a fase necessária
+        if self.is_locked and self.unlock_phase:
+            lock_text = fonts['small'].render(f"🔒 Desbloqueia na fase {self.unlock_phase}", True, (200, 180, 100))
+            screen.blit(lock_text, (self.rect.x + 60, self.rect.y + 52))
+
         # DESCRIÇÃO
         max_desc_width = self.rect.width - 70
         desc_font = fonts['medium']
@@ -138,24 +181,25 @@ class ShopItemCard:
         current_y = self.rect.y + 32
         line_height = desc_font.get_height() + 2
 
-        # Limita a 3 linhas para não ocupar muito espaço (opcional, ajuste conforme necessário)
+        # Limita a 3 linhas para não ocupar muito espaço
         max_lines = 3
         for i, line in enumerate(desc_lines[:max_lines]):
-            desc_text = desc_font.render(line, True, colors['description'][:3])
+            desc_text = desc_font.render(line, True, desc_color)
             screen.blit(desc_text, (self.rect.x + 60, current_y))
             current_y += line_height
 
-        # Se houver mais linhas, indica com um pequeno ícone (opcional)
+        # Se houver mais linhas, indica com um pequeno ícone
         if len(desc_lines) > max_lines:
-            more_text = desc_font.render("...", True, colors['description'][:3])
+            more_text = desc_font.render("...", True, desc_color)
             screen.blit(more_text, (self.rect.x + 60, current_y))
 
-        # PREÇO - TAMANHO AUMENTADO (agora usa fonte 'medium' em vez de 'small')
-        price_text = fonts['large'].render(f"${self.price}", True, colors['price'][:3])
-        screen.blit(price_text, (self.rect.x + 60, self.rect.y + 52))
+        # PREÇO (apenas se não estiver bloqueado, ou mostra "???")
+        if not self.is_locked:
+            price_text = fonts['large'].render(f"${self.price}", True, price_color)
+            screen.blit(price_text, (self.rect.x + 60, self.rect.y + 52))
 
         # Quantidade possuída
-        if self.owned_quantity > 0:
+        if self.owned_quantity > 0 and not self.is_locked:
             qty_text = fonts['medium'].render(f"possui: x{self.owned_quantity}", True, (180, 180, 200))
             screen.blit(qty_text, (self.rect.right - 60, self.rect.y + 10))
 
@@ -217,7 +261,7 @@ class InventoryItemCard:
             'text': (255, 240, 230, 255),
             'text_dim': (200, 180, 170, 255),
             'sell_price': (255, 160, 160, 255),
-            'description': (200, 180, 170, 255)  # Cor para descrição
+            'description': (200, 180, 170, 255)
         }
 
         # Determina cores baseadas no estado
@@ -252,15 +296,13 @@ class InventoryItemCard:
         name_text = fonts['medium'].render(self.name, True, colors['text'][:3])
         screen.blit(name_text, (self.rect.x + 60, self.rect.y + 10))
 
-        # DESCRIÇÃO - ADICIONADO
-        # Truncar descrição se for muito longa
+        # DESCRIÇÃO
         max_desc_width = self.rect.width - 70
         description = self.description
-        if len(description) > 35:  # Se muito longa, trunca
+        if len(description) > 35:
             description = description[:32] + "..."
 
         desc_text = fonts['small'].render(description, True, colors['description'][:3])
-        # Limitar largura da descrição
         if desc_text.get_width() > max_desc_width:
             while len(description) > 3 and desc_text.get_width() > max_desc_width:
                 description = description[:-1]
@@ -268,7 +310,7 @@ class InventoryItemCard:
 
         screen.blit(desc_text, (self.rect.x + 60, self.rect.y + 32))
 
-        # PREÇO DE VENDA - TAMANHO AUMENTADO
+        # PREÇO DE VENDA
         sell_text = fonts['medium'].render(f"${self.sell_price}", True, colors['sell_price'][:3])
         screen.blit(sell_text, (self.rect.x + 60, self.rect.y + 52))
 
@@ -434,7 +476,6 @@ class QuantitySelector:
                 self.hide()
                 return "cancel"
 
-
         return None
 
     def render(self, screen, fonts):
@@ -510,6 +551,7 @@ class ShopScene(BaseScene):
 
         self.player = game.player
         self.catalog = item_bag_catalog
+        self.progress = progress_manager  # Referência ao progresso
         self.on_close_callback = None
         # Dados da loja
         self.shop_items = []
@@ -578,9 +620,22 @@ class ShopScene(BaseScene):
         }
 
     def _load_shop_items(self):
+        """Carrega todos os itens do catálogo"""
         all_items = self.catalog.get_all_items()
         self.shop_items = [item for item in all_items if "price" in item]
         self.shop_items.sort(key=lambda x: (x["category"], x["price"]))
+
+    def _is_item_available(self, item_data):
+        """Verifica se um item está disponível para compra baseado no progresso"""
+        # Verifica se tem requisito de desbloqueio
+        unlock_phase = item_data.get("unlock_phase") or item_data.get("unlock_chapter")
+
+        # Se não tem requisito, sempre disponível
+        if unlock_phase is None:
+            return True
+
+        # Verifica se a fase foi completada
+        return self.progress.is_phase_completed(unlock_phase)
 
     def refresh_inventory(self):
         self.inventory_cards = []
@@ -599,13 +654,26 @@ class ShopScene(BaseScene):
             card.update_owned(self.player.bag.items)
 
     def filter_shop(self):
+        """Filtra itens da loja por categoria e disponibilidade"""
+        # Primeiro filtra por categoria
         if self.shop_category == "all":
-            self.filtered_shop_items = self.shop_items
+            category_filtered = self.shop_items
         else:
-            self.filtered_shop_items = [
+            category_filtered = [
                 item for item in self.shop_items
                 if item["category"] == self.shop_category
             ]
+
+        # Depois filtra por disponibilidade (baseado no progresso)
+        self.filtered_shop_items = [
+            item for item in category_filtered
+            if self._is_item_available(item)
+        ]
+
+        # Atualiza o flag de bloqueio nos cards
+        for card in self.shop_cards:
+            if hasattr(card, 'is_locked'):
+                card.is_locked = not self._is_item_available(card.item_data)
 
     def filter_inventory(self):
         if self.inventory_category == "all":
@@ -693,8 +761,8 @@ class ShopScene(BaseScene):
 
         card_height = 80
         card_margin = 8
-        start_y = self.shop_panel_rect.y + 50 + self.category_offset  # Cards descem
-        visible_height = self.shop_panel_rect.height - 60 - self.category_offset  # Altura ajustada
+        start_y = self.shop_panel_rect.y + 50 + self.category_offset
+        visible_height = self.shop_panel_rect.height - 60 - self.category_offset
 
         self.max_shop_scroll = max(0, len(self.filtered_shop_items) * (card_height + card_margin) - visible_height)
 
@@ -702,6 +770,10 @@ class ShopScene(BaseScene):
             card_y = start_y + i * (card_height + card_margin) - self.shop_scroll_y
 
             card = ShopItemCard(item_data, i)
+
+            # Verifica se o item está desbloqueado
+            card.is_locked = not self._is_item_available(item_data)
+
             card.update_position(
                 self.shop_panel_rect.x + 10,
                 card_y,
@@ -717,8 +789,8 @@ class ShopScene(BaseScene):
 
         card_height = 80
         card_margin = 8
-        start_y = self.inventory_panel_rect.y + 50 + self.category_offset  # Cards descem
-        visible_height = self.inventory_panel_rect.height - 60 - self.category_offset  # Altura ajustada
+        start_y = self.inventory_panel_rect.y + 50 + self.category_offset
+        visible_height = self.inventory_panel_rect.height - 60 - self.category_offset
 
         self.max_inventory_scroll = max(0, len(self.filtered_inventory_items) * (
                 card_height + card_margin) - visible_height)
@@ -795,11 +867,13 @@ class ShopScene(BaseScene):
 
             if self.shop_panel_rect and self.shop_panel_rect.collidepoint(event.pos):
                 for card in self.shop_cards:
-                    result = card.handle_event(event)
-                    if result:
-                        self.selected_shop_index = card.index
-                        self._open_quantity_selector_for_card(card)
-                        return
+                    # Só permite interagir se não estiver bloqueado
+                    if not card.is_locked:
+                        result = card.handle_event(event)
+                        if result:
+                            self.selected_shop_index = card.index
+                            self._open_quantity_selector_for_card(card)
+                            return
 
             if self.inventory_panel_rect and self.inventory_panel_rect.collidepoint(event.pos):
                 for card in self.filtered_inventory_items:
@@ -816,7 +890,12 @@ class ShopScene(BaseScene):
             card.handle_event(event)
 
     def _open_quantity_selector_for_card(self, card):
-        self.quantity_selector.show("buy", card.item_data, self.player.money)
+        # Verifica novamente se o item está disponível antes de abrir o seletor
+        if self._is_item_available(card.item_data):
+            self.quantity_selector.show("buy", card.item_data, self.player.money)
+        else:
+            self.feedback_message = f"Item bloqueado! Complete a fase {card.unlock_phase} primeiro."
+            self.feedback_timer = 2.0
 
     def _open_quantity_selector_for_inventory(self, card):
         self.quantity_selector.show("sell", card, self.player.money)
@@ -833,6 +912,13 @@ class ShopScene(BaseScene):
             item_data = selector.item
             item_id = item_data["id"]
             item_name = item_data["name"]
+
+            # Verifica novamente se o item está disponível antes de comprar
+            if not self._is_item_available(item_data):
+                self.feedback_message = f"Item bloqueado! Complete a fase necessária primeiro."
+                self.feedback_timer = 2.0
+                selector.hide()
+                return
 
             if self.player.money >= total:
                 self.player.money -= total
@@ -994,11 +1080,11 @@ class ShopScene(BaseScene):
         pygame.draw.rect(screen, (25, 28, 32, 240), rect, border_radius=8)
         pygame.draw.rect(screen, color, rect, 1, border_radius=8)
 
-        # Título do painel (MANTIDO NO LUGAR)
+        # Título do painel
         title_text = self.fonts['large'].render(title, True, color)
-        screen.blit(title_text, (category_selector.rect.x + (category_selector.rect.width/2 - 16), rect.y + 12))
+        screen.blit(title_text, (category_selector.rect.x + (category_selector.rect.width / 2 - 16), rect.y + 12))
 
-        # Categorias (DESCEM)
+        # Categorias
         if category_selector:
             # Move o seletor inteiro para baixo
             category_selector.rect.y = rect.y + 8 + self.category_offset
@@ -1013,9 +1099,9 @@ class ShopScene(BaseScene):
         old_clip = screen.get_clip()
         clip_rect = pygame.Rect(
             rect.x,
-            rect.y + 40 + self.category_offset,  # Cards descem
+            rect.y + 40 + self.category_offset,
             rect.width,
-            rect.height - 50 - self.category_offset  # Altura ajustada
+            rect.height - 50 - self.category_offset
         )
         screen.set_clip(clip_rect)
 
@@ -1041,8 +1127,8 @@ class ShopScene(BaseScene):
 
     def _render_scroll_bar(self, screen, panel_rect, scroll_y, max_scroll, color):
         bar_x = panel_rect.right - 8
-        bar_y = panel_rect.y + 45 + self.category_offset  # Barra desce
-        bar_height = panel_rect.height - 50 - self.category_offset  # Altura ajustada
+        bar_y = panel_rect.y + 45 + self.category_offset
+        bar_height = panel_rect.height - 50 - self.category_offset
 
         if max_scroll <= 0:
             return

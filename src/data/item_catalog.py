@@ -37,6 +37,13 @@ class ItemCatalog:
                 "sprite": os.path.join(self.base_path, "badge", "rock-badge.png"),
                 "description": "Insignia 1",
                 "category": "badge"
+            },
+            3: {
+                "id": 3,
+                "name": "Insignia de água",
+                "sprite": os.path.join(self.base_path, "badge", "water-badge.png"),
+                "description": "Insignia 2",
+                "category": "badge"
             }
         }
 
