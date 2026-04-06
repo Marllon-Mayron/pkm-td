@@ -1,3 +1,5 @@
+# src/scenes/team_select_scene/team_select_scene.py
+
 import pygame
 from src.scenes.base_scene import BaseScene
 from src.scenes.game_scene.game_scene import GameScene
@@ -27,6 +29,7 @@ class TeamSelectScene(BaseScene):
         # Components
         self.background = GradientBackground(game.screen_manager)
         self.navigation = None
+        self.filters = None
 
         # State
         self.current_page = 0
@@ -41,7 +44,7 @@ class TeamSelectScene(BaseScene):
 
     def _initialize_layout(self):
         """Inicializa o layout da cena"""
-        # PEGA OS POKÉMONS DA PÁGINA ATUAL DIRETO DA BOX
+        # PEGA OS POKÉMONS DA PÁGINA ATUAL COM FILTROS APLICADOS
         available_pokemon = self.pokemon_manager.get_available_pokemon(
             self.current_page,
             self.layout_manager.items_per_page
@@ -50,11 +53,14 @@ class TeamSelectScene(BaseScene):
         layout = self.layout_manager.create_layout(
             self.game.player.team,
             available_pokemon,
-            self.current_page
+            self.current_page,
+            self.pokemon_manager.current_sort,
+            self.pokemon_manager.current_search
         )
 
         self.team_slots = layout['team_slots']
         self.grid_items = layout['grid_items']
+        self.filters = layout.get('filters')
         buttons = layout['buttons']
 
         self.navigation = NavigationButtons(
@@ -69,13 +75,61 @@ class TeamSelectScene(BaseScene):
         )
         self.layout_initialized = True
 
+    def _refresh_grid(self):
+        """Atualiza apenas o grid sem recriar todo o layout"""
+        if not self.layout_initialized:
+            return
+
+        # Pega os pokémons atualizados com os filtros
+        available_pokemon = self.pokemon_manager.get_available_pokemon(
+            self.current_page,
+            self.layout_manager.items_per_page
+        )
+
+        # Recria apenas os grid items
+        screen_width = self.game.screen_manager.window_width
+        screen_height = self.game.screen_manager.window_height
+
+        margin = 30
+        top_margin = 80
+        slot_height = 110
+
+        grid_label_y = top_margin + slot_height + 20
+        filters_height = 100
+        grid_y = grid_label_y + 35 + filters_height + 10
+
+        card_height = 90
+        card_spacing = 10
+
+        card_width = min(140,
+                         (screen_width - 2 * margin - (6 - 1) * card_spacing) // 6)
+
+        grid_width = (6 * card_width + (6 - 1) * card_spacing)
+        grid_start_x = (screen_width - grid_width) // 2
+
+        # Recria os grid items
+        self.layout_manager.grid_items = []
+        for i, pokemon in enumerate(available_pokemon):
+            row = i // 6
+            col = i % 6
+
+            card_x = grid_start_x + col * (card_width + card_spacing)
+            card_y = grid_y + row * (card_height + card_spacing)
+
+            from src.scenes.team_select_scene.components.pokemon_grid_item import PokemonGridItem
+            item = PokemonGridItem(pokemon, card_x, card_y, card_width, card_height)
+            self.layout_manager.grid_items.append(item)
+
+        self.grid_items = self.layout_manager.grid_items
+        self.total_pages = self.pokemon_manager.get_page_count(self.layout_manager.items_per_page)
+
     def handle_event(self, event):
         # Verifica se precisa recriar layout
         if not self.layout_initialized:
             self._initialize_layout()
 
         result = self.event_handler.handle_event(
-            event, self.team_slots, self.grid_items,
+            event, self.team_slots, self.grid_items, self.filters,
             self.navigation.back_button if self.navigation else None,
             self.navigation.start_button if self.navigation else None,
             self.navigation.prev_page_button if self.navigation else None,
@@ -109,7 +163,24 @@ class TeamSelectScene(BaseScene):
     def _handle_action(self, action):
         action_type = action.get('type')
 
-        if action_type == 'GO_BACK':
+        if action_type == 'SORT_CHANGED':
+            sort_type = action['sort']
+            self.pokemon_manager.set_sort(sort_type)
+            if self.filters:
+                self.filters.update_sort_state(sort_type)
+            self.current_page = 0
+            self.layout_initialized = False
+
+        elif action_type == 'SEARCH_CHANGED':
+            search_text = action['search']
+            self.pokemon_manager.set_search(search_text)
+            if self.filters:
+                self.filters.update_search_state(search_text)
+            self.current_page = 0
+            # Não recria o layout, apenas atualiza o grid
+            self._refresh_grid()
+
+        elif action_type == 'GO_BACK':
             from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
             self.game.phase_select_scene = PhaseSelectScene(self.game)
             self.game.current_scene = self.game.phase_select_scene
@@ -117,8 +188,7 @@ class TeamSelectScene(BaseScene):
         elif action_type == 'START_GAME':
             print("Iniciando batalha com time:",
                   [p.name for p in self.game.player.team])
-
-            self.game.game_scene = GameScene(self.game, self.chapter,self.phase)
+            self.game.game_scene = GameScene(self.game, self.chapter, self.phase)
             self.game.current_scene = self.game.game_scene
 
         elif action_type == 'PREV_PAGE':
@@ -131,18 +201,14 @@ class TeamSelectScene(BaseScene):
 
         elif action_type == 'SLOT_CLICK':
             slot = action['slot']
-            # Atualiza seleção dos slots
             for s in self.team_slots:
                 s.is_selected = (s.slot_index == action['slot_index'])
-            # Abre modal se tiver Pokémon
             if slot.pokemon:
-                print(f"Abrindo modal do Pokémon: {slot.pokemon.name}")  # Debug
                 modal = PokemonModal(self.game, slot.pokemon)
                 self.event_handler.set_modal(modal)
 
         elif action_type == 'GRID_CLICK':
             pokemon = action['pokemon']
-            print(f"Abrindo modal do Pokémon: {pokemon.name}")  # Debug
             modal = PokemonModal(self.game, pokemon)
             self.event_handler.set_modal(modal)
 
@@ -153,7 +219,7 @@ class TeamSelectScene(BaseScene):
             self.event_handler.set_modal(None)
 
         elif action_type == 'RESIZE':
-            pass  # Layout será recriado no próximo frame
+            pass
 
     def fixed_update(self, dt):
         if not self.layout_initialized:
@@ -185,6 +251,10 @@ class TeamSelectScene(BaseScene):
         label_y = self.team_slots[0].rect.bottom + 20
         screen.blit(grid_label, (label_x, label_y))
 
+        # Renderiza filtros
+        if self.filters:
+            self.filters.render(screen, self.slot_font)
+
         # Grid items
         for item in self.grid_items:
             item.render(screen, self.grid_font, self.pokedex)
@@ -208,6 +278,33 @@ class TeamSelectScene(BaseScene):
                 len(self.game.player.team),
                 self.current_page, self.total_pages
             )
+
+        # Mostra contagem de resultados dos filtros
+        if self.filters and (self.pokemon_manager.current_search or self.pokemon_manager.current_sort != "capture"):
+            total_filtered = self.pokemon_manager.get_total_filtered_count()
+            total_pc = len(self.game.player.pc_box)
+
+            if total_filtered > 0:
+                filter_info = f"Mostrando {total_filtered} de {total_pc} Pokémon"
+            else:
+                filter_info = "Nenhum Pokémon encontrado"
+
+            info_font = pygame.font.Font(None, 14)
+            info_text = info_font.render(filter_info, True, (150, 150, 160))
+
+            if self.filters:
+                info_y = self.filters.rect.bottom + 5
+            else:
+                info_y = label_y + 35
+
+            screen.blit(info_text, (20, info_y))
+
+            if total_filtered == 0:
+                empty_font = pygame.font.Font(None, 24)
+                empty_text = empty_font.render("Nenhum Pokémon encontrado com esses filtros", True, (150, 150, 160))
+                empty_x = (self.game.screen_manager.window_width - empty_text.get_width()) // 2
+                empty_y = label_y + 100
+                screen.blit(empty_text, (empty_x, empty_y))
 
         # Status do time
         team_status = f"Time: {len(self.game.player.team)}/6"

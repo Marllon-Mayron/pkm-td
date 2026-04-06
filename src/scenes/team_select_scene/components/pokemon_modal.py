@@ -244,7 +244,7 @@ class PokemonModal:
 
         self._draw_rounded_rect(screen, (40, 42, 48), self.close_button, radius=8)
         close_font = pygame.font.Font(None, 26)
-        close_text = close_font.render("✕", True, self.colors['text_secondary'])
+        close_text = close_font.render("x", True, self.colors['text_secondary'])
         close_rect = close_text.get_rect(center=self.close_button.center)
         screen.blit(close_text, close_rect)
 
@@ -280,13 +280,6 @@ class PokemonModal:
         name_x = self.x + (self.width - name_text.get_width()) // 2
         screen.blit(name_text, (name_x, sprite_y + sprite_size))
 
-        if self.pokemon.is_shiny:
-            shiny_badge = pygame.Rect(self.x + self.width - 85, self.y + 15, 70, 24)
-            self._draw_rounded_rect(screen, (80, 70, 30), shiny_badge, radius=6)
-            shiny_text = pygame.font.Font(None, 12).render("✨ SHINY", True, (255, 215, 0))
-            screen.blit(shiny_text, (shiny_badge.centerx - shiny_text.get_width() // 2,
-                                     shiny_badge.centery - shiny_text.get_height() // 2))
-
         separator = pygame.Rect(self.x + 20, self.y + header_height, self.width - 40, 1)
         pygame.draw.line(screen, self.colors['border'], (separator.x, separator.y),
                          (separator.x + separator.width, separator.y))
@@ -316,21 +309,21 @@ class PokemonModal:
             self._draw_rounded_rect(screen, (80, 85, 95), self.next_page_button, radius=8, border=1)
 
         page_font = pygame.font.Font(None, 22)
-        prev_text = page_font.render("◀", True, self.colors['text_primary'] if prev_active else (60, 65, 75))
-        next_text = page_font.render("▶", True, self.colors['text_primary'] if next_active else (60, 65, 75))
+        prev_text = page_font.render("<", True, self.colors['text_primary'] if prev_active else (60, 65, 75))
+        next_text = page_font.render(">", True, self.colors['text_primary'] if next_active else (60, 65, 75))
         screen.blit(prev_text, (self.prev_page_button.centerx - 8, self.prev_page_button.centery - 11))
         screen.blit(next_text, (self.next_page_button.centerx - 8, self.next_page_button.centery - 11))
 
         if self.pokemon.is_in_team:
             button_color = (120, 60, 60)
-            button_text = "✖ REMOVER DO TIME"
+            button_text = "REMOVER DO TIME"
         else:
             if len(self.game.player.team) < 6:
                 button_color = (60, 120, 60)
-                button_text = "✓ ADICIONAR AO TIME"
+                button_text = "ADICIONAR AO TIME"
             else:
                 button_color = (55, 58, 65)
-                button_text = "⚠ TIME CHEIO"
+                button_text = "TIME CHEIO"
 
         self._draw_rounded_rect(screen, button_color, self.action_button, radius=10)
         self._draw_rounded_rect(screen, (100, 105, 115), self.action_button, radius=10, border=1)

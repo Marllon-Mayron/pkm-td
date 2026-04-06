@@ -1,7 +1,9 @@
+# src/scenes/team_select_scene/managers/layout_manager.py
+
 import pygame
-import math
 from src.scenes.team_select_scene.components.team_slot import TeamSlot
 from src.scenes.team_select_scene.components.pokemon_grid_item import PokemonGridItem
+from src.scenes.team_select_scene.components.pokemon_filters import PokemonFilters
 from src.scenes.team_select_scene.utils.constants import LAYOUT
 
 
@@ -14,24 +16,27 @@ class LayoutManager:
         self.start_button = None
         self.prev_page_button = None
         self.next_page_button = None
+        self.filters = None
 
         self.current_page = 0
-        self.items_per_page = LAYOUT['GRID']['COLS'] * 3  # 3 linhas padrão
+        self.items_per_page = LAYOUT['GRID']['COLS'] * 3
         self.rows_per_page = 3
 
-    def create_layout(self, team, page_pokemon, page=0):
+    def create_layout(self, team, page_pokemon, page=0, current_sort="capture", current_search=""):
         """create_layout agora recebe apenas os pokémons da página atual"""
         screen_width = self.game.screen_manager.window_width
         screen_height = self.game.screen_manager.window_height
 
         self.current_page = page
         self._create_team_slots(screen_width, screen_height, team)
-        self._create_grid(screen_width, screen_height, page_pokemon, page)  # AGORA usa page_pokemon
+        self._create_filters(screen_width, screen_height, current_sort, current_search)
+        self._create_grid(screen_width, screen_height, page_pokemon, page)
         self._create_buttons(screen_width, screen_height)
 
         return {
             'team_slots': self.team_slots,
             'grid_items': self.grid_items,
+            'filters': self.filters,
             'buttons': {
                 'back': self.back_button,
                 'start': self.start_button,
@@ -40,23 +45,40 @@ class LayoutManager:
             }
         }
 
+    def _create_filters(self, screen_width, screen_height, current_sort, current_search):
+        """Cria a área de filtros abaixo do grid label"""
+        margin = LAYOUT['MARGIN']
+        top_margin = LAYOUT['TOP_MARGIN']
+        slot_height = LAYOUT['SLOT']['HEIGHT']
+
+        grid_label_y = top_margin + slot_height + 20
+        filters_y = grid_label_y + 35
+
+        filter_width = screen_width - 2 * margin
+
+        # Cria novos filtros
+        self.filters = PokemonFilters(margin, filters_y, filter_width)
+        self.filters.update_sort_state(current_sort)
+        self.filters.update_search_state(current_search)
+
     def _create_grid(self, screen_width, screen_height, page_pokemon, page):
         """Cria grid APENAS com os pokémons da página atual"""
         margin = LAYOUT['MARGIN']
         top_margin = LAYOUT['TOP_MARGIN']
         slot_height = LAYOUT['SLOT']['HEIGHT']
 
-        grid_y = top_margin + slot_height + 40
+        grid_label_y = top_margin + slot_height + 20
+        filters_height = 100
+        grid_y = grid_label_y + 35 + filters_height + 10
+
         grid_height = screen_height - grid_y - 100
 
-        # Calcula linhas por página baseado na altura disponível
         card_height = LAYOUT['GRID']['CARD_HEIGHT']
         card_spacing = LAYOUT['GRID']['SPACING']
 
         self.rows_per_page = max(1, grid_height // (card_height + card_spacing))
         self.items_per_page = LAYOUT['GRID']['COLS'] * self.rows_per_page
 
-        # Cálculo do grid
         card_width = min(LAYOUT['GRID']['CARD_WIDTH'],
                          (screen_width - 2 * margin - (LAYOUT['GRID']['COLS'] - 1) * card_spacing)
                          // LAYOUT['GRID']['COLS'])
@@ -65,7 +87,6 @@ class LayoutManager:
                       (LAYOUT['GRID']['COLS'] - 1) * card_spacing)
         grid_start_x = (screen_width - grid_width) // 2
 
-        # Cria grid items DIRETO da lista page_pokemon
         self.grid_items = []
         for i, pokemon in enumerate(page_pokemon):
             row = i // LAYOUT['GRID']['COLS']
@@ -74,11 +95,7 @@ class LayoutManager:
             card_x = grid_start_x + col * (card_width + card_spacing)
             card_y = grid_y + row * (card_height + card_spacing)
 
-            item = PokemonGridItem(
-                pokemon,
-                card_x, card_y,
-                card_width, card_height
-            )
+            item = PokemonGridItem(pokemon, card_x, card_y, card_width, card_height)
             self.grid_items.append(item)
 
     def _create_team_slots(self, screen_width, screen_height, team):

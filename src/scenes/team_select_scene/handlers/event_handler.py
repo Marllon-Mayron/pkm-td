@@ -1,3 +1,5 @@
+# src/scenes/team_select_scene/handlers/event_handler.py
+
 import pygame
 
 
@@ -8,10 +10,22 @@ class EventHandler:
         self.layout_manager = layout_manager
         self.modal = None
 
-    def handle_event(self, event, team_slots, grid_items,
+    def handle_event(self, event, team_slots, grid_items, filters,
                      back_button, start_button, prev_button, next_button,
                      current_page, total_pages):
 
+        # DEBUG: Verificar eventos de teclado
+        if event.type == pygame.KEYDOWN:
+            print(f"EventHandler recebeu tecla: {event.unicode}, active: {filters.search_active if filters else False}")
+
+        # Processa eventos dos filtros PRIMEIRO (inclui teclado)
+        if filters:
+            filter_result = filters.handle_event(event)
+            if filter_result:
+                print(f"Filtro retornou: {filter_result}")  # Debug
+                return filter_result
+
+        # Processa outros eventos
         if event.type == pygame.KEYDOWN:
             return self._handle_keyboard(event)
 
@@ -19,11 +33,10 @@ class EventHandler:
             return self._handle_resize(event)
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            return self._handle_click(event, team_slots, grid_items,
+            return self._handle_click(event, team_slots, grid_items, filters,
                                       back_button, start_button, prev_button, next_button,
                                       current_page, total_pages)
 
-        # IMPORTANTE: Processar mouse motion para hover effects
         elif event.type == pygame.MOUSEMOTION:
             self._handle_hover(event, team_slots, grid_items)
 
@@ -54,9 +67,15 @@ class EventHandler:
             self.layout_manager.update_modal_position(self.modal)
         return {'type': 'RESIZE'}
 
-    def _handle_click(self, event, team_slots, grid_items,
+    def _handle_click(self, event, team_slots, grid_items, filters,
                       back_button, start_button, prev_button, next_button,
                       current_page, total_pages):
+
+        # Processa eventos dos filtros primeiro
+        if filters:
+            filter_result = filters.handle_event(event)
+            if filter_result:
+                return filter_result
 
         # Modal tem prioridade
         if self.modal and self.modal.visible:

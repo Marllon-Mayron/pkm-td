@@ -43,7 +43,6 @@ class PokemonGridItem:
         self._draw_card_background(screen)
         self._draw_portrait(screen, pokedex)
         self._draw_info(screen, font)
-        self._draw_shiny_indicator(screen)
 
         if self.pokemon.is_in_team:
             self._draw_team_overlay(screen, font)
@@ -120,12 +119,6 @@ class PokemonGridItem:
             color = type_colors.get(type_name.lower(), (128, 128, 128))
             type_text = type_font.render(type_name.upper(), True, color)
             screen.blit(type_text, (name_x + (i * 45), self.rect.y + 50))
-
-    def _draw_shiny_indicator(self, screen):
-        if self.pokemon.is_shiny:
-            star_font = pygame.font.Font(None, 20)
-            star = star_font.render("★", True, COLORS['TEXT']['YELLOW'])  # Mudado para estrela
-            screen.blit(star, (self.rect.right - 25, self.rect.y + 5))
 
     def _draw_team_overlay(self, screen, font):
         overlay = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)

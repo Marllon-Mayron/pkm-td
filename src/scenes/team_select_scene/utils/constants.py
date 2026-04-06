@@ -35,6 +35,17 @@ COLORS = {
         'MODAL_ACTION_REMOVE': (150, 80, 80),
         'MODAL_ACTION_DISABLED': (80, 80, 80)
     },
+    'FILTERS': {
+        'BACKGROUND': (25, 27, 32),
+        'BORDER': (55, 58, 65),
+        'SEARCH_DEFAULT': (35, 38, 45),
+        'SEARCH_ACTIVE': (40, 45, 55),
+        'SEARCH_BORDER': (70, 75, 85),
+        'SEARCH_BORDER_ACTIVE': (100, 150, 200),
+        'SORT_DEFAULT': (45, 48, 55),
+        'SORT_ACTIVE': (70, 120, 70),
+        'SORT_BORDER': (80, 85, 95),
+    },
     'TEXT': {
         'WHITE': (255, 255, 255),
         'GRAY': (200, 200, 200),
@@ -52,7 +63,13 @@ COLORS = {
         'CLOSE_BORDER': (150, 150, 150)
     }
 }
-
+FILTER_BUTTONS = {
+    'CAPTURE': {'label': 'CAPTURA', 'sort_type': 'capture'},
+    'NAME_ASC': {'label': 'A-Z', 'sort_type': 'name_asc'},
+    'NAME_DESC': {'label': 'Z-A', 'sort_type': 'name_desc'},
+    'ID_ASC': {'label': 'ID ↑', 'sort_type': 'id_asc'},
+    'ID_DESC': {'label': 'ID ↓', 'sort_type': 'id_desc'},
+}
 # Configurações de layout
 LAYOUT = {
     'MARGIN': 30,
