@@ -1,113 +1,158 @@
 # src/data/item_catalog.py
 
 """Catálogo de itens disponíveis no jogo"""
-import os
 import sys
+from pathlib import Path
+
+# Importa o caminho centralizado
+from src.config.paths import PROJECT_ROOT, ITEMS_PATH
 
 
 class ItemCatalog:
     """Catálogo central de itens - similar ao Pokedex"""
 
     def __init__(self):
-        # Obtém o diretório raiz do projeto (onde o main.py está)
-        if getattr(sys, 'frozen', False):
-            # Se for executável
-            self.root_dir = os.path.dirname(sys.executable)
-        else:
-            # Em desenvolvimento, sobe um nível de src/
-            self.root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        # Usa o PROJECT_ROOT centralizado do paths.py
+        self.root_dir = PROJECT_ROOT
+        self.base_path = ITEMS_PATH
 
-        # Constrói o caminho base absoluto
-        self.base_path = os.path.join(self.root_dir, "res", "PokemonSprites", "items")
+        print(f"[ItemCatalog] Root dir: {self.root_dir}")
+        print(f"[ItemCatalog] Base path: {self.base_path}")
+        print(f"[ItemCatalog] Base path existe: {self.base_path.exists()}")
 
-        print(f"Root dir: {self.root_dir}")
-        print(f"Base path: {self.base_path}")
+        # Constrói o catálogo de itens
+        self.items = self._build_catalog()
 
-        self.items = {
-            1: {
-                "id": 1,
-                "name": "Rare Candy",
-                "sprite": os.path.join(self.base_path, "medicine", "rare-candy.png"),
-                "description": "Raro doce que sobe o nível",
-                "category": "medicine"
-            },
-            2: {
-                "id": 2,
-                "name": "Insignia de pedra",
-                "sprite": os.path.join(self.base_path, "badge", "rock-badge.png"),
-                "description": "Insignia 1",
-                "category": "badge"
-            },
-            3: {
-                "id": 3,
-                "name": "Insignia de água",
-                "sprite": os.path.join(self.base_path, "badge", "water-badge.png"),
-                "description": "Insignia 2",
-                "category": "badge"
-            }
+        # Verifica se os sprites existem (debug)
+        self._check_sprites()
+
+    def _build_catalog(self):
+        """Constrói o catálogo de itens com caminhos usando Path"""
+        items = {}
+
+        # Rare Candy
+        medicine_path = self.base_path / "medicine"
+        rare_candy_path = medicine_path / "rare-candy.png"
+
+        # Se não encontrar rare-candy.png, tenta variações
+        if not rare_candy_path.exists():
+            # Tenta outras variações do nome
+            alternatives = [
+                medicine_path / "Rare Candy.png",
+                medicine_path / "RareCandy.png",
+                medicine_path / "rare_candy.png",
+                self.base_path / "rare-candy.png",
+            ]
+            for alt in alternatives:
+                if alt.exists():
+                    rare_candy_path = alt
+                    break
+
+        items[1] = {
+            "id": 1,
+            "name": "Rare Candy",
+            "sprite": rare_candy_path,
+            "description": "Raro doce que sobe o nível",
+            "category": "medicine"
         }
 
-        # Verifica se os sprites existem
-        self._check_sprites()
+        # Badges
+        badge_path = self.base_path / "badge"
+        items[2] = {
+            "id": 2,
+            "name": "Insignia de pedra",
+            "sprite": badge_path / "rock-badge.png",
+            "description": "Insignia 1",
+            "category": "badge"
+        }
+
+        items[3] = {
+            "id": 3,
+            "name": "Insignia de água",
+            "sprite": badge_path / "water-badge.png",
+            "description": "Insignia 2",
+            "category": "badge"
+        }
+
+        return items
 
     def _check_sprites(self):
         """Verifica se os sprites existem (debug)"""
-        print("\n=== VERIFICANDO SPRITES DE ITENS ===")
+        print("\n=== VERIFICANDO SPRITES DE ITENS (ItemCatalog) ===")
         for item_id, item in self.items.items():
-            if item["sprite"]:
-                # Normaliza o caminho
-                normalized_path = os.path.normpath(item["sprite"])
-                exists = os.path.exists(normalized_path)
-                if exists:
-                    print(f"✓ {item['name']}: {normalized_path}")
-                else:
-                    print(f"✗ {item['name']}: {normalized_path} (NÃO ENCONTRADO!)")
+            sprite_path = item["sprite"]
+            sprite_path_str = str(sprite_path)
 
-                    # Tenta encontrar em locais alternativos
-                    self._try_find_sprite(item)
-        print("=====================================\n")
+            if sprite_path and sprite_path.exists():
+                print(f"✓ {item['name']}: {sprite_path_str}")
+            else:
+                print(f"✗ {item['name']}: {sprite_path_str} (NÃO ENCONTRADO!)")
+
+                # Tenta encontrar em locais alternativos
+                self._try_find_sprite(item)
+        print("================================================\n")
 
     def _try_find_sprite(self, item):
         """Tenta encontrar o sprite em locais alternativos"""
-        nome_arquivo = item['name'].lower().replace(' ', '-')
+        item_name = item['name'].lower()
 
-        # Possíveis localizações
-        locations = [
-            os.path.join(self.base_path, "medicine", f"{nome_arquivo}.png"),
-            os.path.join(self.base_path, "medicine", f"{nome_arquivo}.PNG"),
-            os.path.join(self.base_path, "medicine", f"{item['name']}.png"),
-            os.path.join(self.base_path, "medicine", "rare-candy.png"),  # Força rare-candy.png
-            os.path.join(self.base_path, "rare-candy.png"),
-            os.path.join(self.base_path, "medicine", "Rare Candy.png"),
-        ]
+        # Possíveis localizações baseadas no nome
+        medicine_path = self.base_path / "medicine"
+        badge_path = self.base_path / "badge"
+
+        locations = []
+
+        if item["category"] == "medicine":
+            locations = [
+                medicine_path / "rare-candy.png",
+                medicine_path / "Rare Candy.png",
+                medicine_path / "RareCandy.png",
+                medicine_path / "rare_candy.png",
+                self.base_path / "rare-candy.png",
+            ]
+        elif item["category"] == "badge":
+            locations = [
+                badge_path / "rock-badge.png",
+                badge_path / "water-badge.png",
+                badge_path / "Rock Badge.png",
+                badge_path / "Water Badge.png",
+            ]
 
         for loc in locations:
-            if os.path.exists(loc):
+            if loc.exists():
                 print(f"  → ENCONTRADO em: {loc}")
                 item["sprite"] = loc
                 return True
 
-        # Se não encontrou, lista o que tem na pasta medicine
-        medicine_path = os.path.join(self.base_path, "medicine")
-        if os.path.exists(medicine_path):
-            print(f"  Arquivos em {medicine_path}:")
+        # Se não encontrou, lista o que tem na pasta
+        search_path = medicine_path if item["category"] == "medicine" else badge_path
+        if search_path.exists():
+            print(f"  Arquivos em {search_path}:")
             try:
-                for f in os.listdir(medicine_path):
-                    print(f"    - {f}")
-            except:
-                pass
+                for f in search_path.iterdir():
+                    if f.suffix.lower() == '.png':
+                        print(f"    - {f.name}")
+            except Exception as e:
+                print(f"    Erro ao listar: {e}")
 
         return False
 
     def get_item(self, item_id):
         """Retorna informações de um item pelo ID"""
-        return self.items.get(item_id, {
+        item = self.items.get(item_id)
+        if item:
+            # Converte Path para string se necessário para compatibilidade
+            if isinstance(item.get("sprite"), Path):
+                item["sprite_str"] = str(item["sprite"])
+            return item
+
+        return {
             "id": item_id,
             "name": f"Item {item_id}",
             "sprite": None,
             "description": "Item desconhecido",
             "category": "unknown"
-        })
+        }
 
     def get_all_items(self):
         """Retorna todos os itens"""

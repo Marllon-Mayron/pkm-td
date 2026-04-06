@@ -5,17 +5,17 @@ Cena do Editor de Fases
 import pygame, os
 from tkinter import filedialog, Tk
 
-from editor.event_system import EventManager
-from scenes.editor.components.event_config_dialog import EventConfigDialog
-from scenes.editor.components.tileset_manager_dialog import TilesetManagerDialog
 from src.editor.target_item_editor import TargetItemManager
+from src.editor.event_system import EventManager
 from src.editor.wave_config import WaveManager
-from src.scenes.base_scene import BaseScene
 from src.editor.layer_manager import LayerManager, LayerType
 from src.editor.path_editor import Path
 from src.editor.tower_spot_editor import TowerSpotManager
 from src.editor.phase_exporter import PhaseExporter
+from src.scenes.base_scene import BaseScene
 from src.scenes.editor import WaveConfigDialog
+from src.scenes.editor.components.event_config_dialog import EventConfigDialog
+from src.scenes.editor.components.tileset_manager_dialog import TilesetManagerDialog
 from src.scenes.editor.components.brush_buttons import BrushButtons
 from src.scenes.editor.components.layer_selector import LayerSelector
 from src.scenes.editor.components.managers.path_manager import PathManager

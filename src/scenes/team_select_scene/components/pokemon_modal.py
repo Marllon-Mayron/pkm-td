@@ -54,26 +54,29 @@ class PokemonModal:
             'type_steel': (184, 184, 208),
             'type_fairy': (238, 153, 172),
             'iv_perfect': (255, 215, 0),
-            'iv_great': (100, 200, 100),
-            'iv_good': (100, 150, 200),
-            'iv_bad': (200, 100, 100),
+            'iv_great': (80, 200, 80),
+            'iv_good': (80, 150, 220),
+            'iv_median': (100, 130, 200),
+            'iv_bad': (220, 100, 80),
+            'iv_very_bad': (180, 60, 60),
+            'iv_horrible': (160, 80, 200)
         }
 
     def _get_iv_rank(self, value):
         if value == 31:
             return "PERFEITO", self.colors['iv_perfect']
-        elif value >= 28:
+        elif value >= 27:
             return "MUITO BOM", self.colors['iv_great']
-        elif value >= 24:
+        elif value >= 22:
             return "BOM", self.colors['iv_good']
-        elif value >= 18:
-            return "MEDIANO", (150, 150, 180)
-        elif value >= 10:
+        elif value >= 16:
+            return "MEDIANO", self.colors['iv_median']
+        elif value >= 9:
             return "RUIM", self.colors['iv_bad']
         elif value >= 1:
-            return "MUITO RUIM", (180, 80, 80)
+            return "MUITO RUIM", self.colors['iv_very_bad']
         else:
-            return "HORRIVEL", (120, 40, 40)
+            return "HORRIVEL", self.colors['iv_horrible']
 
     def _setup_dimensions(self):
         self.width = int(self.game.screen_manager.window_width * 0.8)
@@ -436,14 +439,20 @@ class PokemonModal:
                 bar_x = card_rect.x + 120
                 bar_y = card_rect.y + 18
 
-                if value >= 28:
-                    bar_color = self.colors['iv_perfect']
-                elif value >= 24:
-                    bar_color = self.colors['iv_great']
-                elif value >= 18:
-                    bar_color = self.colors['iv_good']
+                if value == 31:
+                    bar_color = self.colors['iv_perfect']  # Dourado
+                elif value >= 27:
+                    bar_color = self.colors['iv_great']  # Verde
+                elif value >= 22:
+                    bar_color = self.colors['iv_good']  # Azul claro
+                elif value >= 16:
+                    bar_color = self.colors['iv_median']  # Azul médio
+                elif value >= 9:
+                    bar_color = self.colors['iv_bad']  # Vermelho alaranjado
+                elif value >= 1:
+                    bar_color = self.colors['iv_very_bad']  # Vermelho escuro
                 else:
-                    bar_color = self.colors['iv_bad']
+                    bar_color = self.colors['iv_horrible']  # Roxo
 
                 pygame.draw.rect(screen, (45, 48, 55), (bar_x, bar_y, bar_width, bar_height), border_radius=4)
                 if value > 0:
@@ -452,7 +461,7 @@ class PokemonModal:
 
                 rank_text, rank_color = self._get_iv_rank(value)
                 rank_surf = rank_font.render(rank_text, True, rank_color)
-                screen.blit(rank_surf, (card_rect.x + card_rect.width - rank_surf.get_width() - 12, card_rect.y + 15))
+                screen.blit(rank_surf, (card_rect.x + card_rect.width - rank_surf.get_width() - 12, card_rect.y + 18))
 
     def _render_moves_page(self, screen, content_rect):
         section_font = pygame.font.Font(None, 18)

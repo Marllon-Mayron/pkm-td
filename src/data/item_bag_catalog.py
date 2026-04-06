@@ -1,9 +1,12 @@
 # src/data/item_bag_catalog.py
 
 import os
-import pygame
 import sys
+import pygame
 from pathlib import Path
+
+# Importa os paths centralizados
+from src.config.paths import PROJECT_ROOT, ITEMS_PATH
 
 
 class ItemBagCatalog:
@@ -27,252 +30,162 @@ class ItemBagCatalog:
         self.sprites = {}  # Sprites normais 32x32
         self.sprites_scaled = {}  # Sprites escalados para UI
         self._sprites_loaded = False  # Flag para controle
+        self.placeholders = {}  # Placeholders criados
 
-        # Define o caminho base dos sprites
-        if getattr(sys, 'frozen', False):
-            self.root_dir = os.path.dirname(sys.executable)
-        else:
-            self.root_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        # Usa o PROJECT_ROOT e ITEMS_PATH do paths.py
+        self.root_dir = PROJECT_ROOT
+        self.base_path = ITEMS_PATH
 
-        self.base_path = os.path.join(self.root_dir, "res", "PokemonSprites", "items")
+        # Debug dos caminhos
+        print(f"[ItemBagCatalog] Root dir: {self.root_dir}")
+        print(f"[ItemBagCatalog] Base path: {self.base_path}")
+        print(f"[ItemBagCatalog] Base path existe: {self.base_path.exists()}")
 
-        # Catálogo de itens (apenas metadados, sem carregar sprites)
-        self.items = {
-            # Pokébolas
-            "pokeball": {
-                "id": "pokeball",
-                "name": "POKEBALL",
-                "sprite_path": os.path.join(self.base_path, "pokeballs", "POKEBALL.png"),
-                "description": "Uma bola para capturar Pokémon selvagens",
-                "category": "pokeball",
-                "usable_in_battle": True,
-                "usable_on_map": True,
-                "effect": "capture",
-                "effect_value": 1.0,
-                "price": 200,
-                "unlock_phase": None,  # None = sempre disponível
-                "unlock_chapter": None  # compatibilidade com TMs
-            },
-            "greatball": {
-                "id": "greatball",
-                "name": "GREATBALL",
-                "sprite_path": os.path.join(self.base_path, "pokeballs", "GREATBALL.png"),
-                "description": "Captura Pokémon selvagens com 1,5 vezes a taxa de captura de uma Poké Bola.",
-                "category": "pokeball",
-                "usable_in_battle": True,
-                "usable_on_map": True,
-                "effect": "capture",
-                "effect_value": 1.5,
-                "price": 600,
-                "unlock_phase": None,
-                "unlock_chapter": None
-            },
-            # Poções
-            "potion": {
-                "id": "potion",
-                "name": "POTION",
-                "sprite_path": os.path.join(self.base_path, "medicine", "potion.png"),
-                "description": "Recupera 20 HP de um Pokémon",
-                "category": "medicine",
-                "usable_in_battle": True,
-                "usable_on_map": True,
-                "effect": "heal",
-                "effect_value": 20,
-                "price": 200,
-                "unlock_phase": None,
-                "unlock_chapter": None
-            },
-            # PP Items
-            "pp_up": {
-                "id": "pp_up",
-                "name": "PP UP",
-                "sprite_path": os.path.join(self.base_path, "medicine", "PPUP.png"),
-                "description": "Aumenta o PP de todos movimento em 20% do máximo.",
-                "category": "medicine",
-                "usable_in_battle": True,
-                "usable_on_map": True,
-                "effect": "pp_restore",
-                "effect_value": 0.2,  # 20% do max_pp
-                "price": 100,
-                "unlock_phase": "1-3",  # Desbloqueia após completar fase 1-3
-                "unlock_chapter": None
-            },
-            "pp_max": {
-                "id": "pp_max",
-                "name": "PP MAX",
-                "sprite_path": os.path.join(self.base_path, "medicine", "PPMAX.png"),
-                "description": "Aumenta o PP de todos movimento ao seu valor máximo.",
-                "category": "medicine",
-                "usable_in_battle": True,
-                "usable_on_map": True,
-                "effect": "pp_restore",
-                "effect_value": 1.0,  # 100% do max_pp
-                "price": 450,
-                "unlock_phase": "2-1",  # Desbloqueia após completar fase 2-1
-                "unlock_chapter": None
-            },
-            # Pedras de evolição
-            "firestone": {
-                "id": "firestone",
-                "name": "FIRESTONE",
-                "sprite_path": os.path.join(self.base_path, "evo-stones", "FIRESTONE.png"),
-                "description": "Evolui certas espécies de Pokémon.",
-                "category": "items",
-                "usable_in_battle": True,
-                "usable_on_map": True,
-                "effect": "evolution",
-                "effect_value": 0,
-                "price": 1200,
-                "unlock_phase": "1-5",  # Desbloqueia após fase 1-5
-                "unlock_chapter": None
-            },
-            "leafstone": {
-                "id": "leafstone",
-                "name": "LEAFSTONE",
-                "sprite_path": os.path.join(self.base_path, "evo-stones", "LEAFSTONE.png"),
-                "description": "Evolui certas espécies de Pokémon.",
-                "category": "items",
-                "usable_in_battle": True,
-                "usable_on_map": True,
-                "effect": "evolution",
-                "effect_value": 0,
-                "price": 1200,
-                "unlock_phase": "1-5",
-                "unlock_chapter": None
-            },
-            "moonstone": {
-                "id": "moonstone",
-                "name": "MOONSTONE",
-                "sprite_path": os.path.join(self.base_path, "evo-stones", "MOONSTONE.png"),
-                "description": "Evolui certas espécies de Pokémon.",
-                "category": "items",
-                "usable_in_battle": True,
-                "usable_on_map": True,
-                "effect": "evolution",
-                "effect_value": 0,
-                "price": 1200,
-                "unlock_phase": "1-5",
-                "unlock_chapter": None
-            },
-            "thunderstone": {
-                "id": "thunderstone",
-                "name": "THUNDERSTONE",
-                "sprite_path": os.path.join(self.base_path, "evo-stones", "THUNDERSTONE.png"),
-                "description": "Evolui certas espécies de Pokémon.",
-                "category": "items",
-                "usable_in_battle": True,
-                "usable_on_map": True,
-                "effect": "evolution",
-                "effect_value": 0,
-                "price": 1200,
-                "unlock_phase": "1-5",
-                "unlock_chapter": None
-            },
-            "waterstone": {
-                "id": "waterstone",
-                "name": "WATERSTONE",
-                "sprite_path": os.path.join(self.base_path, "evo-stones", "WATERSTONE.png"),
-                "description": "Evolui certas espécies de Pokémon.",
-                "category": "items",
-                "usable_in_battle": True,
-                "usable_on_map": True,
-                "effect": "evolution",
-                "effect_value": 0,
-                "price": 1200,
-                "unlock_phase": "1-5",
-                "unlock_chapter": None
-            },
-            # TMs/HMs
-            "tm_mega_punch": {
-                "id": "tm_mega_punch",
-                "name": "TM01 - Mega Punch",
-                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
-                "description": "A powerful punch thrown very hard.",
-                "category": "tm",
-                "usable_in_battle": False,
-                "usable_on_map": True,
-                "effect": "teach_move",
-                "effect_value": "mega-punch",
-                "price": 2000,
-                "unlock_phase": "1-3",
-                "unlock_chapter": None,
-            },
-            "tm_razor_wind": {
-                "id": "tm_razor_wind",
-                "name": "TM02 - Razor Wind",
-                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
-                "description": "1st turn: Prepare 2nd turn: Attack",
-                "category": "tm",
-                "usable_in_battle": False,
-                "usable_on_map": True,
-                "effect": "teach_move",
-                "effect_value": "razor-wind",
-                "price": 1500,
-                "unlock_phase": "1-4",
-                "unlock_chapter": None,
-            },
-            "tm_swords_dance": {
-                "id": "tm_swords_dance",
-                "name": "TM03 - Swords Dance",
-                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
-                "description": "A dance that in creases ATTACK.",
-                "category": "tm",
-                "usable_in_battle": False,
-                "usable_on_map": True,
-                "effect": "teach_move",
-                "effect_value": "swords-dance",
-                "price": 1500,
-                "unlock_phase": "1-5",
-                "unlock_chapter": None,
-            },
-            "tm_whirlwind": {
-                "id": "tm_whirlwind",
-                "name": "TM04 - Whirlwind",
-                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
-                "description": "Blows away the foe & ends battle.",
-                "category": "tm",
-                "usable_in_battle": False,
-                "usable_on_map": True,
-                "effect": "teach_move",
-                "effect_value": "whirlwind",
-                "price": 1500,
-                "unlock_phase": "1-4",
-                "unlock_chapter": None,
-            },
-            "tm_mega_kick": {
-                "id": "tm_mega_kick",
-                "name": "TM05 - Mega Kick",
-                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_NORMAL.png"),
-                "description": "The target is attacked by a kick launched with muscle-packed power.",
-                "category": "tm",
-                "usable_in_battle": False,
-                "usable_on_map": True,
-                "effect": "teach_move",
-                "effect_value": "mega-kick",
-                "price": 2000,
-                "unlock_phase": "2-1",
-                "unlock_chapter": None,
-            },
-            "tm_bubble_beam": {
-                "id": "tm_bubble_beam",
-                "name": "TM11 - Bubble Beam",
-                "sprite_path": os.path.join(self.base_path, "tm-hm", "machine_WATER.png"),
-                "description": "An attack that may lower SPEED.",
-                "category": "tm",
-                "usable_in_battle": False,
-                "usable_on_map": True,
-                "effect": "teach_move",
-                "effect_value": "bubble-beam",
-                "price": 2000,
-                "unlock_phase": "2-8",
-                "unlock_chapter": None,
-            },
-        }
-
-        # Placeholders serão criados sob demanda
-        self.placeholders = {}
+        # Constrói o catálogo de itens com os paths corrigidos
+        self.items = self._build_item_catalog()
 
         # Não carrega sprites aqui - será feito sob demanda
+
+    def _build_item_catalog(self):
+        """Constrói o catálogo de itens usando Path objects"""
+        items = {}
+
+        # Define subpastas
+        pokeballs_path = self.base_path / "pokeballs"
+        medicine_path = self.base_path / "medicine"
+        evo_stones_path = self.base_path / "evo-stones"
+        tm_hm_path = self.base_path / "tm-hm"
+
+        # ===== POKÉBOLAS =====
+        items["pokeball"] = {
+            "id": "pokeball",
+            "name": "POKEBALL",
+            "sprite_path": pokeballs_path / "POKEBALL.png",
+            "description": "Uma bola para capturar Pokémon selvagens",
+            "category": "pokeball",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "capture",
+            "effect_value": 1.0,
+            "price": 200,
+            "unlock_phase": None,
+            "unlock_chapter": None
+        }
+
+        items["greatball"] = {
+            "id": "greatball",
+            "name": "GREATBALL",
+            "sprite_path": pokeballs_path / "GREATBALL.png",
+            "description": "Captura Pokémon selvagens com 1,5 vezes a taxa de captura.",
+            "category": "pokeball",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "capture",
+            "effect_value": 1.5,
+            "price": 600,
+            "unlock_phase": None,
+            "unlock_chapter": None
+        }
+
+        # ===== POÇÕES =====
+        items["potion"] = {
+            "id": "potion",
+            "name": "POTION",
+            "sprite_path": medicine_path / "potion.png",
+            "description": "Recupera 20 HP de um Pokémon",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "heal",
+            "effect_value": 20,
+            "price": 200,
+            "unlock_phase": None,
+            "unlock_chapter": None
+        }
+
+        # ===== PP ITEMS =====
+        items["pp_up"] = {
+            "id": "pp_up",
+            "name": "PP UP",
+            "sprite_path": medicine_path / "PPUP.png",
+            "description": "Aumenta o PP de todos movimento em 20% do máximo.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "pp_restore",
+            "effect_value": 0.2,
+            "price": 100,
+            "unlock_phase": "1-3",
+            "unlock_chapter": None
+        }
+
+        items["pp_max"] = {
+            "id": "pp_max",
+            "name": "PP MAX",
+            "sprite_path": medicine_path / "PPMAX.png",
+            "description": "Aumenta o PP de todos movimento ao seu valor máximo.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "pp_restore",
+            "effect_value": 1.0,
+            "price": 450,
+            "unlock_phase": "2-1",
+            "unlock_chapter": None
+        }
+
+        # ===== PEDRAS DE EVOLUÇÃO =====
+        stones = [
+            ("firestone", "FIRESTONE"),
+            ("leafstone", "LEAFSTONE"),
+            ("moonstone", "MOONSTONE"),
+            ("thunderstone", "THUNDERSTONE"),
+            ("waterstone", "WATERSTONE")
+        ]
+
+        for stone_id, stone_name in stones:
+            items[stone_id] = {
+                "id": stone_id,
+                "name": stone_name,
+                "sprite_path": evo_stones_path / f"{stone_name}.png",
+                "description": "Evolui certas espécies de Pokémon.",
+                "category": "items",
+                "usable_in_battle": True,
+                "usable_on_map": True,
+                "effect": "evolution",
+                "effect_value": 0,
+                "price": 1200,
+                "unlock_phase": "1-5",
+                "unlock_chapter": None
+            }
+
+        # ===== TMs/HMs =====
+        tms = [
+            ("tm_mega_punch", "TM01 - Mega Punch", "machine_NORMAL.png", "mega-punch", "1-3", 2000),
+            ("tm_razor_wind", "TM02 - Razor Wind", "machine_NORMAL.png", "razor-wind", "1-4", 1500),
+            ("tm_swords_dance", "TM03 - Swords Dance", "machine_NORMAL.png", "swords-dance", "1-5", 1500),
+            ("tm_whirlwind", "TM04 - Whirlwind", "machine_NORMAL.png", "whirlwind", "1-4", 1500),
+            ("tm_mega_kick", "TM05 - Mega Kick", "machine_NORMAL.png", "mega-kick", "2-1", 2000),
+            ("tm_bubble_beam", "TM11 - Bubble Beam", "machine_WATER.png", "bubble-beam", "2-8", 2000),
+        ]
+
+        for tm_id, tm_name, sprite_file, move_name, unlock_phase, price in tms:
+            items[tm_id] = {
+                "id": tm_id,
+                "name": tm_name,
+                "sprite_path": tm_hm_path / sprite_file,
+                "description": f"Ensina o movimento {tm_name} a um Pokémon.",
+                "category": "tm",
+                "usable_in_battle": False,
+                "usable_on_map": True,
+                "effect": "teach_move",
+                "effect_value": move_name,
+                "price": price,
+                "unlock_phase": unlock_phase,
+                "unlock_chapter": None,
+            }
+
+        return items
 
     def _ensure_pygame_ready(self):
         """Garante que o pygame está inicializado antes de criar superfícies"""
@@ -290,36 +203,68 @@ class ItemBagCatalog:
 
         item_data = self.items.get(item_id)
         if not item_data:
+            print(f"[ItemBagCatalog] Item não encontrado: {item_id}")
             return
 
         sprite_path = item_data["sprite_path"]
+        sprite_path_str = str(sprite_path)
 
-        if os.path.exists(sprite_path):
+        # Verifica se o arquivo existe
+        if sprite_path.exists():
             try:
-                # Carrega o sprite
-                sprite = pygame.image.load(sprite_path).convert_alpha()
+                sprite = pygame.image.load(sprite_path_str).convert_alpha()
                 self.sprites[item_id] = sprite
-
-                # Cria versão escalada
-                scaled = pygame.transform.scale(sprite, (48, 48))
-                self.sprites_scaled[item_id] = scaled
-
-                print(f"✓ {item_data['name']}: Carregado sob demanda")
+                self.sprites_scaled[item_id] = pygame.transform.scale(sprite, (48, 48))
+                print(f"✓ {item_data['name']}: Carregado de {sprite_path_str}")
             except Exception as e:
                 print(f"✗ Erro ao carregar {item_data['name']}: {e}")
                 self._create_placeholder(item_id)
         else:
-            print(f"✗ {item_data['name']}: Arquivo não encontrado - {sprite_path}")
-            self._create_placeholder(item_id)
+            print(f"✗ {item_data['name']}: Arquivo não encontrado - {sprite_path_str}")
+            # Tenta encontrar em locais alternativos
+            self._try_find_sprite_alternative(item_id, item_data)
+
+    def _try_find_sprite_alternative(self, item_id, item_data):
+        """Tenta encontrar o sprite em locais alternativos"""
+        sprite_path = item_data["sprite_path"]
+        base_name = sprite_path.name
+        parent_dir = sprite_path.parent
+
+        # Lista de possíveis nomes alternativos
+        alternatives = [
+            parent_dir / base_name.lower(),
+            parent_dir / base_name.upper(),
+            parent_dir / base_name.replace(".png", ".PNG"),
+            parent_dir / base_name.replace("-", "_"),
+            parent_dir / base_name.replace("_", "-"),
+            parent_dir / base_name.replace(" ", ""),
+        ]
+
+        # Busca recursiva por arquivos .png na pasta
+        if parent_dir.exists():
+            for png_file in parent_dir.glob("*.png"):
+                if png_file.stem.lower() == sprite_path.stem.lower():
+                    alternatives.append(png_file)
+                    break
+
+        for alt_path in alternatives:
+            if alt_path.exists():
+                print(f"  → Encontrado em: {alt_path}")
+                item_data["sprite_path"] = alt_path
+                self._load_sprite(item_id)  # Tenta carregar novamente
+                return
+
+        # Se ainda não encontrou, cria placeholder
+        print(f"  → Criando placeholder para {item_data['name']}")
+        self._create_placeholder(item_id)
 
     def _create_placeholder(self, item_id):
-        """Cria um placeholder para o item (agora com pygame inicializado)"""
+        """Cria um placeholder para o item"""
         self._ensure_pygame_ready()
 
         size = 32
         sprite = pygame.Surface((size, size), pygame.SRCALPHA)
 
-        # Cor baseada na categoria
         item_data = self.items.get(item_id, {})
         category = item_data.get("category", "")
 
@@ -327,6 +272,8 @@ class ItemBagCatalog:
             color = (255, 0, 0)  # Vermelho para pokebolas
         elif category == "medicine":
             color = (0, 255, 0)  # Verde para poções
+        elif category == "tm":
+            color = (0, 0, 255)  # Azul para TMs
         else:
             color = (128, 128, 128)  # Cinza para outros
 
@@ -335,11 +282,14 @@ class ItemBagCatalog:
         pygame.draw.circle(sprite, (255, 255, 255), (size // 2, size // 2), size // 2 - 2, 2)
 
         # Letra do item
-        font = pygame.font.Font(None, 20)
-        letter = item_id[0].upper()
-        text = font.render(letter, True, (255, 255, 255))
-        text_rect = text.get_rect(center=(size // 2, size // 2))
-        sprite.blit(text, text_rect)
+        try:
+            font = pygame.font.Font(None, 20)
+            letter = item_id[0].upper() if item_id else "?"
+            text = font.render(letter, True, (255, 255, 255))
+            text_rect = text.get_rect(center=(size // 2, size // 2))
+            sprite.blit(text, text_rect)
+        except:
+            pass
 
         self.sprites[item_id] = sprite
         self.sprites_scaled[item_id] = pygame.transform.scale(sprite, (48, 48))
@@ -351,12 +301,25 @@ class ItemBagCatalog:
             self._load_sprite(item_id)
 
         if scaled:
-            return self.sprites_scaled.get(item_id, self.sprites_scaled.get("pokeball"))
-        return self.sprites.get(item_id, self.sprites.get("pokeball"))
+            # Tenta retornar o sprite escalado, ou um fallback
+            if item_id in self.sprites_scaled:
+                return self.sprites_scaled[item_id]
+            # Fallback para pokeball
+            return self.sprites_scaled.get("pokeball")
+
+        # Sprite normal
+        if item_id in self.sprites:
+            return self.sprites[item_id]
+        return self.sprites.get("pokeball")
 
     def get_item(self, item_id):
         """Retorna dados do item"""
-        return self.items.get(item_id, self.items.get("pokeball"))
+        item = self.items.get(item_id)
+        if item is None:
+            # Fallback para pokeball se não encontrar
+            print(f"[ItemBagCatalog] Aviso: Item '{item_id}' não encontrado, usando pokeball como fallback")
+            return self.items.get("pokeball")
+        return item
 
     def get_all_items(self):
         """Retorna todos os itens"""
@@ -364,7 +327,7 @@ class ItemBagCatalog:
 
     def get_items_by_category(self, category):
         """Retorna itens de uma categoria"""
-        return [item for item in self.items.values() if item["category"] == category]
+        return [item for item in self.items.values() if item.get("category") == category]
 
     def get_pokeballs(self):
         """Retorna apenas pokebolas"""
@@ -374,21 +337,22 @@ class ItemBagCatalog:
         """Retorna apenas poções/remédios"""
         return self.get_items_by_category("medicine")
 
+    def get_tms(self):
+        """Retorna apenas TMs"""
+        return self.get_items_by_category("tm")
+
     def get_unlock_phase(self, item_id):
         """Retorna a fase necessária para desbloquear o item"""
         item = self.items.get(item_id, {})
-        # Suporta tanto unlock_phase quanto unlock_chapter (para compatibilidade)
         return item.get("unlock_phase") or item.get("unlock_chapter")
 
     def is_item_unlocked(self, item_id, progress_manager):
         """Verifica se o item está desbloqueado baseado no progresso do jogador"""
         unlock_phase = self.get_unlock_phase(item_id)
 
-        # Se não tem requisito de desbloqueio, sempre disponível
         if unlock_phase is None:
             return True
 
-        # Verifica se a fase foi completada
         return progress_manager.is_phase_completed(unlock_phase)
 
 

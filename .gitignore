@@ -13,3 +13,9 @@ src/saves/*.json
 
 # IntelliJ IDEA
 .idea/
+
+
+build
+dist
+saves
+*.spec
