@@ -41,7 +41,7 @@ class PokemonGridItem:
     def render(self, screen, font, pokedex):
         self._draw_shadow(screen)
         self._draw_card_background(screen)
-        self._draw_portrait(screen, pokedex)  # ALTERADO: agora usa portrait
+        self._draw_portrait(screen, pokedex)
         self._draw_info(screen, font)
         self._draw_shiny_indicator(screen)
 
@@ -78,12 +78,18 @@ class PokemonGridItem:
             screen.blit(portrait, (portrait_x, portrait_y))
 
     def _draw_info(self, screen, font):
+        # Define a cor do nome baseado se é shiny ou não
+        if self.pokemon.is_shiny:
+            name_color = COLORS['TEXT']['YELLOW']  # Amarelo para shiny
+        else:
+            name_color = COLORS['TEXT']['WHITE']  # Branco para normal
+
         # Nome - ajustado para começar depois do retrato (40px + 10px margem)
         name_x = self.rect.x + 55
-        name_text = font.render(self.pokemon.name, True, COLORS['TEXT']['WHITE'])
+        name_text = font.render(self.pokemon.name, True, name_color)
         screen.blit(name_text, (name_x, self.rect.y + 10))
 
-        # Nível
+        # Nível (também pode ser amarelo para shiny? Mantive amarelo padrão)
         lvl_text = font.render(f"Lv.{self.pokemon.level}", True, COLORS['TEXT']['YELLOW'])
         screen.blit(lvl_text, (name_x, self.rect.y + 30))
 
@@ -118,7 +124,7 @@ class PokemonGridItem:
     def _draw_shiny_indicator(self, screen):
         if self.pokemon.is_shiny:
             star_font = pygame.font.Font(None, 20)
-            star = star_font.render("⭐", True, COLORS['TEXT']['YELLOW'])
+            star = star_font.render("★", True, COLORS['TEXT']['YELLOW'])  # Mudado para estrela
             screen.blit(star, (self.rect.right - 25, self.rect.y + 5))
 
     def _draw_team_overlay(self, screen, font):
