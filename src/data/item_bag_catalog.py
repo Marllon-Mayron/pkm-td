@@ -102,6 +102,91 @@ class ItemBagCatalog:
             "unlock_phase": None,
             "unlock_chapter": None
         }
+        # ===== ITENS DE CURA DE STATUS =====
+        items["antidote"] = {
+            "id": "antidote",
+            "name": "ANTIDOTE",
+            "sprite_path": medicine_path / "antidote.png",
+            "description": "Cura veneno.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "cure_status",
+            "effect_value": "poison",
+            "price": 100,
+            "unlock_phase": None,
+            "unlock_chapter": None
+        }
+        items["paralyze_heal"] = {
+            "id": "paralyze_heal",
+            "name": "PARALYZEHEAL",
+            "sprite_path": medicine_path / "paralyzeheal.png",
+            "description": "Cura paralisia.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "cure_status",
+            "effect_value": "paralysis",
+            "price": 200,
+            "unlock_phase": None,
+            "unlock_chapter": None
+        }
+        items["awakening"] = {
+            "id": "awakening",
+            "name": "AWAKENING",
+            "sprite_path": medicine_path / "awakening.png",
+            "description": "Cura sono.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "cure_status",
+            "effect_value": "sleep",
+            "price": 250,
+            "unlock_phase": None,
+            "unlock_chapter": None
+        }
+        items["burn_heal"] = {
+            "id": "burn_heal",
+            "name": "BURNHEAL",
+            "sprite_path": medicine_path / "burnheal.png",
+            "description": "Cura queimadura.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "cure_status",
+            "effect_value": "burn",
+            "price": 250,
+            "unlock_phase": None,
+            "unlock_chapter": None
+        }
+        items["ice_heal"] = {
+            "id": "ice_heal",
+            "name": "ICEHEAL",
+            "sprite_path": medicine_path / "iceheal.png",
+            "description": "Cura congelamento.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "cure_status",
+            "effect_value": "freeze",
+            "price": 250,
+            "unlock_phase": None,
+            "unlock_chapter": None
+        }
+        items["full_heal"] = {
+            "id": "full_heal",
+            "name": "FULLHEAL",
+            "sprite_path": medicine_path / "fullheal.png",
+            "description": "Cura todos os problemas de status.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "cure_all_status",
+            "effect_value": None,
+            "price": 600,
+            "unlock_phase": None,
+            "unlock_chapter": None
+        }
 
         # ===== PP ITEMS =====
         items["pp_up"] = {

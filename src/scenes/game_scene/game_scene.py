@@ -300,7 +300,39 @@ class GameScene(BaseScene):
         effect = item_data.get("effect", "")
         category = item_data.get("category", "")
 
-        if effect == "pp_restore":
+        if effect == "cure_status":
+            if target_type == "ally":
+                from src.battle.effects.status_effect import StatusType
+                status_to_cure = item_data.get("effect_value")
+
+                status_map = {
+                    "paralysis": StatusType.PARALYSIS,
+                    "sleep": StatusType.SLEEP,
+                    "poison": StatusType.POISON,
+                    "burn": StatusType.BURN,
+                    "freeze": StatusType.FREEZE,
+                }
+
+                status_type = status_map.get(status_to_cure)
+                if status_type:
+                    current_status = self.battle_system.effect_manager.get_status(target)
+                    if current_status and current_status.type == status_type:
+                        self.battle_system.effect_manager.remove_status(target)
+                        self.battle_system.effect_manager.add_status_text(target, f"curou {status_to_cure}!")
+                        return True
+                return False
+
+        elif effect == "cure_all_status":
+            if target_type == "ally":
+                current_status = self.battle_system.effect_manager.get_status(target)
+                if current_status and current_status.type.value != "none":
+                    self.battle_system.effect_manager.remove_status(target)
+                    self.battle_system.effect_manager.add_status_text(target, "todos os status curados!")
+                    print(f"[ITEM] {item_data['name']} usado em {target.name}!")
+                    return True
+                return False
+
+        elif effect == "pp_restore":
             if target_type == "ally" and hasattr(target, 'restore_pp'):
                 percentage = item_data.get("effect_value", 1.0)
                 restored = target.restore_pp(percentage=percentage)
