@@ -134,15 +134,9 @@ class GameScene(BaseScene):
         """Inicia o jogo"""
         # ===== RESTAURA COMPLETAMENTE TODOS OS POKÉMON =====
         # Revive e restaura Pokémon no time do jogador
-        for pokemon in self.player.team:
-            pokemon.full_restore()
-            pokemon.set_battle_system(self.battle_system)
-            self.battle_system.set_effect_manager_for_pokemon(pokemon)
-            pokemon.screen_manager = self.screen_manager
-            pokemon.camera = self.camera
+        self._reset_team_pp()
 
-        # Revive e restaura Pokémon já colocados no campo
-        for pokemon in self.placement_manager.placed_pokemon:
+        for pokemon in self.player.team:
             pokemon.full_restore()
             pokemon.set_battle_system(self.battle_system)
             self.battle_system.set_effect_manager_for_pokemon(pokemon)
@@ -914,7 +908,15 @@ class GameScene(BaseScene):
             self._stop_battle_music(fade_ms=1000)
             self.game_state = "game_over"
             self.overlay_manager.show(OverlayType.GAME_OVER)
+
             self._reset_team_pp()
+            for pokemon in self.player.team:
+                pokemon.full_restore()
+                pokemon.set_battle_system(self.battle_system)
+                self.battle_system.set_effect_manager_for_pokemon(pokemon)
+                pokemon.screen_manager = self.screen_manager
+                pokemon.camera = self.camera
+
             profiler.end_frame()
             return
 
@@ -960,8 +962,15 @@ class GameScene(BaseScene):
         self.player.money += gold_total
         print(f"[REWARD] Ouro adicionado: {gold_total}")
 
+        self._reset_team_pp()
+
         for pokemon in self.player.team:
-            pokemon.gain_xp(self.phase_rewards['experience'])
+            pokemon.full_restore()
+            pokemon.set_battle_system(self.battle_system)
+            self.battle_system.set_effect_manager_for_pokemon(pokemon)
+            pokemon.screen_manager = self.screen_manager
+            pokemon.camera = self.camera
+
         self.player.score += self.phase_rewards['experience']
 
         if total_items > 0:

@@ -23,7 +23,7 @@ class AttackTypeCategory(Enum):
 class AttackPatternManager:
     """Gerencia os padrões de ataque dos inimigos"""
 
-    AGGRESSIVE_CHANCE = 0.30  # 30% de chance de ser agressivo
+    AGGRESSIVE_CHANCE = 0.25
     BOSS_ALWAYS_AGGRESSIVE = True
 
     @classmethod

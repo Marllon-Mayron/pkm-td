@@ -191,7 +191,7 @@ class Pokemon(Entity):
 
         # ===== 20. COOLDOWNS =====
         self.charge_cooldown = 0.0
-        self.charge_cooldown_max = 1.2
+        self.charge_cooldown_max = 1.5
 
         # ===== 21. STATS DE COMBATE =====
         self.attack_damage = self._calculate_attack_damage()
