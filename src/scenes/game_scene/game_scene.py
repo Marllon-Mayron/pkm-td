@@ -132,33 +132,32 @@ class GameScene(BaseScene):
 
     def _start_game(self):
         """Inicia o jogo"""
+        # ===== RESTAURA COMPLETAMENTE TODOS OS POKÉMON =====
+        # Revive e restaura Pokémon no time do jogador
+        for pokemon in self.player.team:
+            pokemon.full_restore()
+            pokemon.set_battle_system(self.battle_system)
+            self.battle_system.set_effect_manager_for_pokemon(pokemon)
+            pokemon.screen_manager = self.screen_manager
+            pokemon.camera = self.camera
+
+        # Revive e restaura Pokémon já colocados no campo
+        for pokemon in self.placement_manager.placed_pokemon:
+            pokemon.full_restore()
+            pokemon.set_battle_system(self.battle_system)
+            self.battle_system.set_effect_manager_for_pokemon(pokemon)
+            pokemon.screen_manager = self.screen_manager
+            pokemon.camera = self.camera
+
         # Reseta ouro acumulado
         self.wave_manager.reset_gold()
 
-        # Configura battle_system para Pokémon já colocados
-        for pokemon in self.placement_manager.placed_pokemon:
-            pokemon.set_battle_system(self.battle_system)
-            self.battle_system.set_effect_manager_for_pokemon(pokemon)
-            # ===== CONFIGURA screen_manager =====
-            pokemon.screen_manager = self.screen_manager
-            pokemon.camera = self.camera
-
-        # ===== CONFIGURA screen_manager PARA INIMIGOS QUE JÁ EXISTAM =====
+        # Configura screen_manager para inimigos que já existam
         for enemy in self.wave_manager.active_enemies:
             enemy.set_battle_system(self.battle_system)
             self.battle_system.set_effect_manager_for_pokemon(enemy)
-            # ===== CONFIGURA screen_manager =====
             enemy.screen_manager = self.screen_manager
             enemy.camera = self.camera
-
-        # Configura battle_system para Pokémon no time
-        for pokemon in self.player.team:
-            pokemon.set_battle_system(self.battle_system)
-            pokemon.reset_pp()
-            self.battle_system.set_effect_manager_for_pokemon(pokemon)
-            # ===== CONFIGURA screen_manager =====
-            pokemon.screen_manager = self.screen_manager
-            pokemon.camera = self.camera
 
         # Inicia as waves
         if self.wave_manager.has_more_waves():

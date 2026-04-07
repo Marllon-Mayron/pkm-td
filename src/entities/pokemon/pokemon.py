@@ -15,6 +15,7 @@ from .combat import PokemonCombat
 from .moves import PokemonMoves
 from .evolution import PokemonEvolution
 from .rendering import PokemonRendering
+from ...battle.attack_pattern import AttackTypeCategory, AttackPattern, AttackPatternManager
 from ...battle.effects import StatusType
 
 # Cache global de sprites e fontes para reduzir recriação
@@ -211,6 +212,17 @@ class Pokemon(Entity):
         self.moves: List = []
         self.current_move_index = 0
         self.moves_manager.initialize_moves()
+
+        # ===== 26. PADRÃO DE ATAQUE PARA INIMIGOS =====
+        self.attack_pattern: Optional[AttackPattern] = None
+        self.selected_category: Optional[AttackTypeCategory] = None  # Para VICIOUS_SELECTIVE
+        self.vicious_move_name: Optional[str] = None  # Para VICIOUS
+        self.is_defeated = False  # Estado de "derrotado"
+
+        # Configura padrão de ataque se for wild
+        if is_wild:
+            self.attack_pattern = AttackPatternManager.get_pattern_for_enemy(is_boss, shiny)
+            self._setup_attack_pattern()
 
     # ===== MÉTODOS DE DELEGAÇÃO (mantém compatibilidade) =====
 
@@ -659,7 +671,8 @@ class Pokemon(Entity):
         return hasattr(self, 'is_boss') and self.is_boss
 
     def is_alive(self):
-        return self.current_hp > 0
+        """Verifica se o Pokémon está vivo (não derrotado e com HP > 0)"""
+        return not self.is_defeated and self.current_hp > 0
 
     def get_hp_percentage(self):
         return self.current_hp / self.max_hp
@@ -731,6 +744,14 @@ class Pokemon(Entity):
 
     def update(self, dt, player=None, enemies=None, items=None):
         """Update do Pokémon"""
+        # Se está derrotado, só atualiza animação de sono
+        if self.is_defeated:
+            # Mantém animação de sono
+            if self.current_animation != "sleep":
+                self.set_animation_direct("sleep")
+            self._update_animation(dt)
+            return
+
         # Atualiza velocidade baseada nos efeitos
         if hasattr(self, 'effect_manager') and self.effect_manager and self.is_wild:
             old_speed = self.move_speed
@@ -967,3 +988,166 @@ class Pokemon(Entity):
                         print(f"  └─ {anim_name}: [erro - {e}]")
 
                 print(f"{'=' * 50}\n")
+
+    def _setup_attack_pattern(self):
+        """Configura o padrão de ataque específico"""
+        if self.attack_pattern == AttackPattern.VICIOUS:
+            # Escolhe um golpe específico para usar até acabar PP
+            if self.moves:
+                self.vicious_move_name = random.choice(self.moves).name
+                print(f"[ATTACK_PATTERN] {self.name} é VICIADO em {self.vicious_move_name}!")
+
+        elif self.attack_pattern == AttackPattern.VICIOUS_SELECTIVE:
+            # Escolhe uma categoria de ataque para usar
+            self.selected_category = AttackPatternManager.get_attack_category_for_vicious_selective(self)
+            print(f"[ATTACK_PATTERN] {self.name} é VICIADO_SELETIVO em {self.selected_category.value}!")
+
+        elif self.attack_pattern == AttackPattern.AGGRESSIVE:
+            print(f"[ATTACK_PATTERN] {self.name} é AGRESSIVO!")
+
+        elif self.attack_pattern == AttackPattern.PASSIVE:
+            print(f"[ATTACK_PATTERN] {self.name} é PASSIVO (não ataca)!")
+
+    def get_current_move_for_pattern(self):
+        """Retorna o move atual baseado no padrão de ataque"""
+        if not self.moves:
+            return None
+
+        # Se está derrotado, não ataca
+        if self.is_defeated:
+            return None
+
+        # Se tem padrão passivo, não ataca
+        if self.attack_pattern == AttackPattern.PASSIVE:
+            return None
+
+        # Se tem um move específico para VICIOUS
+        if self.attack_pattern == AttackPattern.VICIOUS and self.vicious_move_name:
+            for move in self.moves:
+                if move.name == self.vicious_move_name and move.current_pp > 0:
+                    return move
+
+            # Se acabou PP do golpe vicioso, tenta qualquer outro
+            for move in self.moves:
+                if move.current_pp > 0:
+                    return move
+            return None
+
+        # Para VICIOUS_SELECTIVE
+        if self.attack_pattern == AttackPattern.VICIOUS_SELECTIVE and self.selected_category:
+            available_moves = [m for m in self.moves
+                               if m.category == self.selected_category.value and m.current_pp > 0]
+            if available_moves:
+                return random.choice(available_moves)
+
+            # Se não tem mais moves da categoria, tenta qualquer outro
+            for move in self.moves:
+                if move.current_pp > 0:
+                    return move
+            return None
+
+        # Para RANDOM (padrão)
+        if self.attack_pattern == AttackPattern.RANDOM:
+            available_moves = [m for m in self.moves if m.current_pp > 0]
+            if available_moves:
+                return random.choice(available_moves)
+            return None
+
+        # Fallback: usa o sistema normal
+        return self.get_current_move()
+
+    def set_defeated(self, defeated: bool):
+        """Define se o Pokémon está derrotado"""
+        self.is_defeated = defeated
+        if defeated:
+            # Força animação de sono
+            self.set_animation_direct("sleep")
+            # Reseta estado de combate
+            self.combat_state = "idle"
+            self.target = None
+            self.charge_cooldown = 0
+            print(f"[DEFEATED] {self.name} foi derrotado! Animação de sono ativada.")
+        else:
+            # Restaura animação normal
+            self.update_status_animation()
+            if self.current_animation == "sleep" and not self.is_defeated:
+                self.set_animation_direct("idle")
+            print(f"[DEFEATED] {self.name} foi revivido! Animação restaurada.")
+
+    def revive(self, heal_percentage: float = 0.5):
+        """
+        Revive o Pokémon (usado por itens Revive)
+
+        Args:
+            heal_percentage: Percentual de HP para curar (0.5 = 50%)
+        """
+        if not self.is_defeated and self.current_hp > 0:
+            print(f"[REVIVE] {self.name} já está vivo! Item não usado.")
+            return False
+
+        # Revive
+        self.is_defeated = False
+
+        # Cura HP
+        heal_amount = int(self.max_hp * heal_percentage)
+        self.current_hp = min(self.max_hp, heal_amount)
+        if self.current_hp <= 0:
+            self.current_hp = self.max_hp // 2  # Fallback: revive com 50%
+
+        # Reseta PP de todos os moves
+        self.reset_pp()
+
+        # Remove efeitos de status
+        if hasattr(self, 'effect_manager') and self.effect_manager:
+            self.effect_manager.remove_status(self)
+
+        # Reseta estado de combate
+        self.combat_state = "idle"
+        self.target = None
+        self.charge_cooldown = 0
+
+        # Restaura animação normal
+        self.update_status_animation()
+        if self.current_animation == "sleep":
+            self.set_animation_direct("idle")
+
+        print(f"[REVIVE] {self.name} revivido com {self.current_hp}/{self.max_hp} HP e PP restaurados!")
+        return True
+
+    def full_restore(self):
+        """
+        Restaura completamente o Pokémon (HP, PP, remove status, revive se derrotado)
+        Usado no início de cada partida
+        """
+        # Revive se estiver derrotado
+        if self.is_defeated:
+            self.is_defeated = False
+
+        # Cura HP completo
+        self.current_hp = self.max_hp
+
+        # Reseta PP de todos os moves
+        self.reset_pp()
+
+        # Remove efeitos de status
+        if hasattr(self, 'effect_manager') and self.effect_manager:
+            self.effect_manager.remove_status(self)
+
+        # Reseta estágios de stat
+        if hasattr(self, 'effect_manager') and self.effect_manager:
+            pokemon_id = id(self)
+            if pokemon_id in self.effect_manager.stat_stages:
+                del self.effect_manager.stat_stages[pokemon_id]
+
+        # Reseta estado de combate
+        self.combat_state = "idle"
+        self.target = None
+        self.charge_cooldown = 0
+
+        # Restaura animação normal
+        self.update_status_animation()
+        if self.current_animation == "sleep":
+            self.set_animation_direct("idle")
+
+        print(f"[FULL_RESTORE] {self.name} completamente restaurado! HP: {self.current_hp}/{self.max_hp}")
+        return True

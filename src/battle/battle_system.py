@@ -45,7 +45,21 @@ class BattleSystem:
             print(f"[BATTLE] Aguardando término do multi-hit...")
             return False
 
-        move = attacker.get_current_move()
+        # Se o atacante está derrotado, não ataca
+        if attacker.is_defeated:
+            print(f"[BATTLE] {attacker.name} está derrotado e não pode atacar!")
+            return False
+
+        # Se o alvo está derrotado, não pode ser atacado
+        if target.is_defeated:
+            print(f"[BATTLE] {target.name} está derrotado e não pode ser atacado!")
+            return False
+
+        # Usa o padrão de ataque do Pokémon (se existir)
+        if hasattr(attacker, 'get_current_move_for_pattern'):
+            move = attacker.get_current_move_for_pattern()
+        else:
+            move = attacker.get_current_move()
 
         if not move:
             print(f"[BATTLE] {attacker.name} não tem move selecionado!")

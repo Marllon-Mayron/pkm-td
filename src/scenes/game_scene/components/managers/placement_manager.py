@@ -158,7 +158,8 @@ class PlacementManager:
                 # Atualiza animação normal
                 pokemon.update(dt)
             else:
-                defeated.append(pokemon)
+                pass
+                #defeated.append(pokemon)
 
         # Remove derrotados
         for pokemon in defeated:

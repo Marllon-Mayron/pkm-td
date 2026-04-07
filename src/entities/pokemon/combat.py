@@ -120,6 +120,48 @@ class PokemonCombat:
     def handle_charging_state(self, dt):
         """Estado indo em direção ao alvo - com suporte para ataques de status e especiais"""
 
+        # Para inimigos (wild), eles NÃO devem se mover em direção ao alvo
+        # Eles atacam de onde estão
+        if self.pokemon.is_wild:
+            # ===== VERIFICA STUN =====
+            if self.update_stun(dt):
+                self.pokemon.combat_state = "idle"
+                self.pokemon.target = None
+                return
+
+            # ===== VERIFICA SONO =====
+            if self.update_sleep(dt):
+                self.pokemon.combat_state = "idle"
+                self.pokemon.target = None
+                return
+
+            # ===== VERIFICA CONGELAMENTO =====
+            if self.is_frozen():
+                if self.update_freeze(dt):
+                    return
+
+            if not self.pokemon.target or not self.pokemon.target.is_alive():
+                self.pokemon.combat_state = "idle"
+                self.pokemon.target = None
+                return
+
+            # ===== INIMIGOS ATACAM SEM SE MOVER =====
+            # Verifica se o alvo está no range
+            dx = self.pokemon.target.x - self.pokemon.x
+            dy = self.pokemon.target.y - self.pokemon.y
+            distance = math.sqrt(dx * dx + dy * dy)
+
+            if distance <= self.pokemon.attack_range:
+                # Executa o ataque imediatamente
+                self._execute_attack()
+            else:
+                # Fora do range, volta para idle
+                self.pokemon.combat_state = "idle"
+                self.pokemon.target = None
+
+            return
+
+        # ===== CÓDIGO EXISTENTE PARA POKÉMON ALIADOS =====
         # ===== VERIFICA STUN =====
         if self.update_stun(dt):
             self.pokemon.combat_state = "idle"
@@ -170,7 +212,8 @@ class PokemonCombat:
         # ===== ATAQUES À DISTÂNCIA (STATUS E ESPECIAIS) =====
         if is_status_move or is_special_move:
             attack_type = "status" if is_status_move else "especial"
-            print(f"[COMBAT] {self.pokemon.name} usou {current_move.name} ({attack_type}) à distância! Distância: {distance:.1f}")
+            print(
+                f"[COMBAT] {self.pokemon.name} usou {current_move.name} ({attack_type}) à distância! Distância: {distance:.1f}")
             self._play_attack_animation(current_move.name)
             return
 
@@ -196,7 +239,8 @@ class PokemonCombat:
             return
 
         # Está perto o suficiente para atacar
-        print(f"[COMBAT] {self.pokemon.name} usou {current_move.name} (físico) corpo a corpo! Distância: {distance:.1f}")
+        print(
+            f"[COMBAT] {self.pokemon.name} usou {current_move.name} (físico) corpo a corpo! Distância: {distance:.1f}")
         self._play_attack_animation(current_move.name)
 
     def _execute_attack(self):
@@ -456,6 +500,10 @@ class PokemonCombat:
 
     def take_damage(self, damage, attacker=None):
         """Recebe dano"""
+        # Se já está derrotado, não toma dano
+        if self.pokemon.is_defeated:
+            return self.pokemon.current_hp <= 0
+
         old_hp = self.pokemon.current_hp
         self.pokemon.current_hp = max(0, self.pokemon.current_hp - damage)
 
@@ -472,7 +520,11 @@ class PokemonCombat:
             move_sound_manager.play_attack_sound("faint")
             print(f"[BATTLE] {self.pokemon.name} foi derrotado!")
 
-            if self.pokemon.is_carrying:
+            # Marca como derrotado
+            self.pokemon.set_defeated(True)
+
+            # Se estava carregando item (apenas para inimigos selvagens)
+            if self.pokemon.is_wild and self.pokemon.is_carrying:
                 carried_item = self.pokemon.is_carrying
                 print(f"[ITEM] {carried_item.item_name} será liberado com a morte de {self.pokemon.name}")
                 carried_item.reset_capture()

@@ -4,6 +4,7 @@ import random
 from typing import List, Optional, Dict, Tuple
 from dataclasses import dataclass
 
+from src.battle.attack_pattern import AttackPattern
 from src.entities.pokemon import Pokemon
 from src.scenes.game_scene.components.managers.wave.enemy_spawner import EnemySpawner
 from src.scenes.game_scene.components.managers.wave.item_decision import ItemDecision, DirectionDecision
@@ -91,6 +92,42 @@ class WaveManager:
         """Retorna o total de ouro acumulado"""
         return self.total_gold_earned
 
+    def _update_enemy_combat(self, enemy: 'Pokemon', dt: float):
+        """Atualiza combate do inimigo SEM interferir no movimento"""
+        if not enemy.is_alive():
+            return
+
+        # Se o inimigo está derrotado, não ataca
+        if enemy.is_defeated:
+            return
+
+        # Se o inimigo é passivo, não ataca
+        if hasattr(enemy, 'attack_pattern') and enemy.attack_pattern == AttackPattern.PASSIVE:
+            return
+
+        # Encontra o alvo mais próximo (aliados)
+        if hasattr(self.game_scene, 'placement_manager'):
+            allies = self.game_scene.placement_manager.placed_pokemon
+            alive_allies = [a for a in allies if a.is_alive() and not a.is_defeated]
+
+            if alive_allies:
+                # Encontra o aliado mais próximo
+                nearest = min(alive_allies,
+                              key=lambda a: enemy.get_distance_to(a))
+
+                # Verifica se está no range de ataque
+                distance = enemy.get_distance_to(nearest)
+                if distance <= enemy.attack_range:
+                    # Atualiza cooldown
+                    if enemy.charge_cooldown <= 0:
+                        # Tenta atacar
+                        if hasattr(self.game_scene, 'battle_system'):
+                            success = self.game_scene.battle_system.attempt_attack(enemy, nearest)
+                            if success:
+                                enemy.charge_cooldown = enemy.charge_cooldown_max
+                    else:
+                        enemy.charge_cooldown -= dt
+
     def update(self, dt: float) -> List['Pokemon']:
         """
         Atualiza o sistema de waves
@@ -123,27 +160,28 @@ class WaveManager:
         # 2. Atualizar movimento de cada inimigo
         for enemy in self.active_enemies[:]:
             # ===== VERIFICA SE O INIMIGO ACABOU DE SPAWNAR =====
-            # Apenas atualiza o timer, mas NÃO impede o movimento
             if hasattr(enemy, '_just_spawned') and enemy._just_spawned:
                 enemy._spawn_timer -= dt
                 if enemy._spawn_timer <= 0:
                     enemy._just_spawned = False
                     print(f"[WaveManager] {enemy.name} terminou período de spawn invulnerável")
 
-            # Garante que screen_manager está configurado para inimigos existentes
+            # Garante que screen_manager está configurado
             if self.game_scene and hasattr(self.game_scene, 'screen_manager'):
                 if not hasattr(enemy, 'screen_manager') or enemy.screen_manager is None:
                     enemy.screen_manager = self.game_scene.screen_manager
                 if not hasattr(enemy, 'camera') or enemy.camera is None:
                     enemy.camera = self.game_scene.camera
 
-            # Pula se o inimigo não tem path (não deveria acontecer)
+            # Pula se o inimigo não tem path
             if not hasattr(enemy, 'path') or not enemy.path:
-                print(f"[WaveManager] ERRO: {enemy.name} não tem path atribuído!")
                 continue
 
-            # Atualiza movimento via path_tracker - retorna (arrived_at_end, arrived_at_start)
+            # Atualiza movimento (NÃO interfere no combate)
             arrived_at_end, arrived_at_start = self.path_tracker.update_movement(enemy, dt)
+
+            # ===== ATUALIZA COMBATE ENQUANTO MOVE =====
+            self._update_enemy_combat(enemy, dt)
 
             if arrived_at_end:
                 print(f"[WaveManager] DETECTADO: {enemy.name} (BOSS={enemy.is_boss}) chegou ao FIM!")
