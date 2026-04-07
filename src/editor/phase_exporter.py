@@ -102,7 +102,7 @@ class PhaseExporter:
             else:
                 print(f"Layer {i} ({layer['name']}): sem tilesets")
 
-        # Prepara dados completos
+        # Prepara dados completos (INCLUINDO REWARDS)
         full_data = {
             "chapter": chapter,
             "phase": phase_number,
@@ -113,8 +113,8 @@ class PhaseExporter:
             "tower_spots": phase_data["tower_spots"],
             "target_items": phase_data.get("target_items", {"items": []}),
             "rewards": phase_data.get("rewards", {
-                "money": 100,
-                "experience": 50
+                "money": 100,  # Gold padrão
+                "experience": 50  # XP padrão
             })
         }
 
@@ -123,6 +123,7 @@ class PhaseExporter:
             json.dump(full_data, f, indent=4, ensure_ascii=False)
 
         print(f"\n✓ Fase {chapter}-{phase_number} exportada: {filepath}")
+        print(f"  Recompensas: {full_data['rewards']['money']} gold, {full_data['rewards']['experience']} XP")
         print("=====================================\n")
 
         # Atualiza índice do capítulo
@@ -168,6 +169,13 @@ class PhaseExporter:
                 data["paths"] = {
                     "paths": [data["path"]],
                     "current_path_index": 0
+                }
+
+            # Compatibilidade com versões antigas (rewards)
+            if "rewards" not in data:
+                data["rewards"] = {
+                    "money": 100,
+                    "experience": 50
                 }
 
             return data

@@ -1,3 +1,5 @@
+# src/scenes/editor/components/mode_buttons.py
+
 import pygame
 
 
@@ -14,7 +16,8 @@ class ModeButtons:
             ("TOWERS", "towers"),
             ("ITEMS", "items"),
             ("EVENTS", "events"),
-            ("TILESETS", "tilesets"),  # NOVO
+            ("TILESETS", "tilesets"),
+            ("REWARDS", "rewards"),  # NOVO: Botão de recompensas
         ]
 
         for i, (text, mode) in enumerate(modes):
@@ -44,6 +47,15 @@ class ModeButtons:
         )
         self.buttons.append((load_rect, "CARREGAR", "load_phase"))
 
+        # Botão de salvar fase
+        save_rect = pygame.Rect(
+            viewport_x + 10,
+            viewport_y + 70 + (len(modes) + 2) * 40,
+            90,
+            30
+        )
+        self.buttons.append((save_rect, "SALVAR", "save_phase"))
+
     def get_buttons(self):
         """Retorna a lista de botões"""
         return self.buttons
@@ -68,6 +80,12 @@ class ModeButtons:
             elif mode == "load_phase":
                 color = (70, 70, 150)
                 border = (100, 100, 200)
+            elif mode == "save_phase":
+                color = (70, 150, 70)
+                border = (100, 200, 100)
+            elif mode == "rewards":
+                color = (200, 150, 50)  # Dourado para recompensas
+                border = (255, 200, 100)
             else:
                 color = (60, 60, 80)
                 border = (100, 100, 100)

@@ -1620,7 +1620,7 @@
         ]
     },
     "rewards": {
-        "money": 100,
+        "money": 250,
         "experience": 50
     }
 }

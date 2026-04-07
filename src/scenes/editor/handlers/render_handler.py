@@ -67,6 +67,9 @@ class EditorRenderHandler:
         if self.editor.target_item_dialog and self.editor.target_item_dialog.visible:
             self.editor.target_item_dialog.render(screen)
 
+        if self.editor.rewards_config_dialog and self.editor.rewards_config_dialog.visible:
+            self.editor.rewards_config_dialog.render(screen, self.editor.font, self.editor.font_small)
+
         # Diálogo de eventos
         if hasattr(self.editor, 'event_config_dialog') and self.editor.event_config_dialog and self.editor.event_config_dialog.visible:
             self.editor.event_config_dialog.render(screen)

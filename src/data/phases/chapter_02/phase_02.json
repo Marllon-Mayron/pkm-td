@@ -2203,7 +2203,7 @@
         ]
     },
     "rewards": {
-        "money": 100,
-        "experience": 50
+        "money": 200,
+        "experience": 30
     }
 }

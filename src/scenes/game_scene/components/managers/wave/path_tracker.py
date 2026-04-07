@@ -124,7 +124,22 @@ class PathTracker:
         if enemy.path_index >= len(enemy.path):
             enemy.path_index = len(enemy.path) - 1
 
-        # CORREÇÃO: Se estiver no último ponto, verifica se já chegou ao fim
+        # CORREÇÃO: Verifica se está no primeiro ponto (INÍCIO)
+        if enemy.path_index == 0:
+            target_x, target_y = enemy.path[enemy.path_index]
+            dx = target_x - enemy.x
+            dy = target_y - enemy.y
+            dist_to_start = math.hypot(dx, dy)
+
+            if dist_to_start < self.ARRIVAL_THRESHOLD:
+                if state['spawn_cooldown'] <= 0 and state['just_reversed_cooldown'] <= 0:
+                    if not state['has_reached_start'] and state['arrival_cooldown'] <= 0:
+                        state['has_reached_start'] = True
+                        state['arrival_cooldown'] = 0.1
+                        print(f"[PathTracker] {enemy.name} chegou ao INÍCIO!")
+                        return False, True
+
+        # CORREÇÃO: Verifica se está no último ponto (FIM)
         if enemy.path_index == len(enemy.path) - 1:
             target_x, target_y = enemy.path[enemy.path_index]
             dx = target_x - enemy.x
@@ -166,6 +181,15 @@ class PathTracker:
                         print(f"[PathTracker] {enemy.name} chegou ao FIM!")
                         return True, False
 
+            # CORREÇÃO: Verifica chegada ao INÍCIO (depois de passar do primeiro ponto para trás)
+            elif enemy.path_index < 0:
+                if state['spawn_cooldown'] <= 0 and state['just_reversed_cooldown'] <= 0:
+                    if not state['has_reached_start'] and state['arrival_cooldown'] <= 0:
+                        state['has_reached_start'] = True
+                        state['arrival_cooldown'] = 0.1
+                        print(f"[PathTracker] {enemy.name} chegou ao INÍCIO!")
+                        return False, True
+
         else:
             # Move em direção ao ponto
             move_x = (dx / distance) * move_distance
@@ -177,7 +201,7 @@ class PathTracker:
             state['distance_traveled'] += move_distance
             state['last_pos'] = (enemy.x, enemy.y)
 
-            # ===== ATUALIZA DIREÇÃO BASEADA NO MOVIMENTO (8 DIREÇÕES) =====
+            # Atualiza direção baseada no movimento (8 direções)
             self._update_direction_from_movement(enemy, dx, dy)
 
         return False, False
@@ -250,7 +274,7 @@ class PathTracker:
         else:
             enemy.path_index = 0
 
-        # NÃO mexe na posição x,y - mantém onde está (no ponto 3/fim)
+        # NÃO mexe na posição x,y - mantém onde está
 
         # Reseta flags
         state['has_reached_start'] = False
@@ -266,8 +290,6 @@ class PathTracker:
 
         direction = "FIM → INÍCIO" if not state['is_reversed'] else "INÍCIO → FIM"
         print(f"[PathTracker] {enemy.name} inverteu direção. Agora: {direction}")
-        print(f"[PathTracker] Path original: {original}")
-        print(f"[PathTracker] Path invertido: {enemy.path}")
         print(
             f"[PathTracker] Pos atual: ({enemy.x:.0f}, {enemy.y:.0f}), path_index: {enemy.path_index}/{len(enemy.path)}")
         print(f"[PathTracker] Próximo ponto: {enemy.path[enemy.path_index]}")

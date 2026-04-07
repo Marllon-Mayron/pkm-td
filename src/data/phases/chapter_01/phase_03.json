@@ -2902,7 +2902,7 @@
                 ],
                 "min_level": 6,
                 "max_level": 8,
-                "wave_size": 20,
+                "wave_size": 15,
                 "spawn_interval": 3.5,
                 "initial_delay": 5.0,
                 "repeat_wave": false,
@@ -2945,7 +2945,7 @@
                 ],
                 "min_level": 6,
                 "max_level": 8,
-                "wave_size": 20,
+                "wave_size": 15,
                 "spawn_interval": 3.5,
                 "initial_delay": 6.5,
                 "repeat_wave": false,
@@ -3090,7 +3090,7 @@
         ]
     },
     "rewards": {
-        "money": 100,
-        "experience": 50
+        "money": 150,
+        "experience": 15
     }
 }

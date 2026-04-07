@@ -752,8 +752,6 @@
                 "tile_size": 24,
                 "tileset_paths": [
                     "res/AllTiles/TileDtef/FarAmpPlains/tileset_0.png",
-                    "res/AllTiles/TileDtef/FarAmpPlains/tileset_0.png",
-                    "res/AllTiles/TileDtef/FarAmpPlains/tileset_0.png",
                     "res/AllTiles/TileDtef/FarAmpPlains/tileset_1.png",
                     "res/AllTiles/TileDtef/FarAmpPlains/tileset_2.png",
                     "res/AllTiles/TileDtef/FarAmpPlains/tileset_more.png"
@@ -2455,7 +2453,7 @@
         ]
     },
     "rewards": {
-        "money": 100,
-        "experience": 50
+        "money": 200,
+        "experience": 30
     }
 }

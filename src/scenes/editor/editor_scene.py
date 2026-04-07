@@ -1,3 +1,5 @@
+# src/scenes/editor/editor_scene.py
+
 """
 Cena do Editor de Fases
 
@@ -25,6 +27,7 @@ from src.scenes.editor.components.mode_buttons import ModeButtons
 from src.scenes.editor.components.target_item_dialog import TargetItemDialog
 from src.scenes.editor.components.tile_palette import TilePalette
 from src.scenes.editor.components.load_phase_dialog import LoadPhaseDialog
+from src.scenes.editor.components.rewards_config_dialog import RewardsConfigDialog  # NOVO
 from src.scenes.editor.handlers.input_handler import EditorInputHandler
 from src.scenes.editor.handlers.map_handler import MapHandler
 from src.scenes.editor.handlers.render_handler import EditorRenderHandler
@@ -72,6 +75,12 @@ class EditorScene(BaseScene):
         self.wave_manager = WaveManager()
         self.path_manager.set_wave_manager(self.wave_manager)
 
+        # Recompensas da fase (NOVO)
+        self.phase_rewards = {
+            "money": 100,
+            "experience": 50
+        }
+
         # UI Panels
         self.tile_palette = None
         self.layer_selector = None
@@ -88,6 +97,7 @@ class EditorScene(BaseScene):
         self.target_item_dialog = None
         self.event_config_dialog = None
         self.tileset_manager_dialog = None
+        self.rewards_config_dialog = None
 
         self.selected_item_id = None
 
@@ -175,6 +185,21 @@ class EditorScene(BaseScene):
         elif mode == "tilesets":
             print("DEBUG: Abrindo gerenciador de tilesets")
             self._open_tileset_manager_dialog()
+
+        elif mode == "rewards":  # NOVO
+            print("DEBUG: Abrindo configuração de recompensas")
+            self._open_rewards_config_dialog()
+
+    def _open_rewards_config_dialog(self):
+        """Abre o diálogo de configuração de recompensas (gold e XP)"""
+        dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
+        dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 300) // 2
+
+        self.rewards_config_dialog = RewardsConfigDialog(
+            dialog_x, dialog_y, 400, 300,
+            self.phase_rewards.get("money", 100),
+            self.phase_rewards.get("experience", 50)
+        )
 
     def _import_tileset(self):
         """Importa um tileset (suporta múltiplos tilesets na mesma imagem)"""
@@ -440,6 +465,18 @@ class EditorScene(BaseScene):
                 self.tileset_manager_dialog = None
             return True
 
+        # Diálogo de recompensas (NOVO)
+        if self.rewards_config_dialog and self.rewards_config_dialog.visible:
+            result = self.rewards_config_dialog.handle_event(event)
+            if result is not None:
+                # Atualiza as recompensas
+                self.phase_rewards.update(result)
+                print(f"Recompensas atualizadas: Gold={self.phase_rewards['money']}, XP={self.phase_rewards['experience']}")
+                self.rewards_config_dialog = None
+            elif not self.rewards_config_dialog.visible:
+                self.rewards_config_dialog = None
+            return True
+
         # Diálogo de Items - processa e pode retornar "selected"
         if self.target_item_dialog and self.target_item_dialog.visible:
             result = self.target_item_dialog.handle_event(event)
@@ -513,7 +550,7 @@ class EditorScene(BaseScene):
         self.render_handler.render(screen)
 
     def save_phase(self):
-        """Salva a fase atual - AGORA COM EVENTOS"""
+        """Salva a fase atual - INCLUINDO RECOMPENSAS"""
         phase_data = {
             "name": self.phase_name,
             "map": self.layer_manager.to_dict(),
@@ -521,21 +558,19 @@ class EditorScene(BaseScene):
             "waves": self.wave_manager.to_dict(),
             "tower_spots": self.tower_spots.to_dict(),
             "target_items": self.target_items.to_dict(),
-            "events": self.event_manager.to_dict(),  # NOVO: Salva eventos
-            "rewards": {
-                "money": 100,
-                "experience": 50
-            }
+            "events": self.event_manager.to_dict(),
+            "rewards": self.phase_rewards  # INCLUI AS RECOMPENSAS
         }
 
         self.exporter.export_phase(phase_data, self.current_chapter, self.current_phase)
         print(f"Fase salva com {len(self.wave_manager.waves)} waves, "
               f"{len(self.tower_spots.spots)} spots, "
-              f"{len(self.target_items.items)} itens alvo e "
-              f"{len(self.event_manager.triggers)} gatilhos de evento!")
+              f"{len(self.target_items.items)} itens alvo, "
+              f"{len(self.event_manager.triggers)} gatilhos de evento, e "
+              f"recompensas: {self.phase_rewards['money']} gold, {self.phase_rewards['experience']} XP!")
 
     def load_phase(self, chapter, phase_number):
-        """Carrega uma fase existente"""
+        """Carrega uma fase existente - INCLUINDO RECOMPENSAS"""
         print(f"\n=== CARREGANDO FASE {chapter}-{phase_number} ===")
 
         phase_data = self.exporter.load_phase(chapter, phase_number)
@@ -607,6 +642,15 @@ class EditorScene(BaseScene):
                 self.event_manager = EventManager()
                 print("Nenhum evento encontrado, criado gerenciador vazio")
 
+            # Carrega as recompensas (NOVO)
+            if "rewards" in phase_data:
+                self.phase_rewards = phase_data["rewards"]
+                print(f"Recompensas carregadas: Gold={self.phase_rewards.get('money', 100)}, XP={self.phase_rewards.get('experience', 50)}")
+            else:
+                # Valores padrão para fases antigas
+                self.phase_rewards = {"money": 100, "experience": 50}
+                print("Nenhuma recompensa encontrada, usando valores padrão (100 gold, 50 XP)")
+
             # Atualiza nome da fase
             self.phase_name = phase_data.get("name", f"Fase {chapter}-{phase_number}")
             self.current_chapter = chapter
@@ -626,6 +670,7 @@ class EditorScene(BaseScene):
             print(f"  Paths: {len(self.path_manager.paths)}")
             print(f"  Spots: {len(self.tower_spots.spots)}")
             print(f"  Itens: {len(self.target_items.items)}")
+            print(f"  Recompensas: {self.phase_rewards['money']} gold, {self.phase_rewards['experience']} XP")
             return True
 
         except Exception as e:
