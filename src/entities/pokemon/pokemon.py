@@ -367,7 +367,7 @@ class Pokemon(Entity):
         return self.animation._is_moving()
 
     def _update_animation(self, dt):
-        self.animation.update_animation(dt)
+        self.animation.update(dt)
 
     def update_status_animation(self):
         """Atualiza a animação baseada no status atual"""
@@ -377,14 +377,9 @@ class Pokemon(Entity):
         status = self.effect_manager.get_status(self)
 
         if status and status.type.value != "none":
-            # Tem status ativo
             status_name = status.type.value
-            # Para paralisia, NÃO trocamos animação aqui (será pelo stun)
+            # Para paralisia, não troca animação aqui (será pelo stun)
             if status_name == "paralysis":
-                # Só reseta se não estiver em stun
-                if not (hasattr(self, 'animation') and hasattr(self.animation, '_is_stunned')):
-                    # Se não está em stun, mantém animação normal
-                    pass
                 return
             self.animation.set_status_animation(status_name)
         else:
@@ -609,11 +604,9 @@ class Pokemon(Entity):
         return self.animation.get_available_animations()
 
     def on_stun_state_changed(self, is_stunned: bool):
-        """
-        Chamado quando o estado de stun da paralisia muda
-        """
+        """Chamado quando o estado de stun da paralisia muda"""
         if hasattr(self, 'animation'):
-            self.animation.set_stun_animation(is_stunned)
+            self.animation.on_stun_state_changed(is_stunned)
 
     def has_animation(self, animation_name: str) -> bool:
         """Verifica se este Pokémon tem uma animação específica"""
@@ -743,84 +736,39 @@ class Pokemon(Entity):
         print(f"[LOAD] {self.name} restaurado com {len(self.moves)} moves")
 
     def update(self, dt, player=None, enemies=None, items=None):
-        """Update do Pokémon"""
-        # Se está derrotado, só atualiza animação de sono
-        if self.is_defeated:
-            # Mantém animação de sono
-            if self.current_animation != "sleep":
-                self.set_animation_direct("sleep")
-            self._update_animation(dt)
-            return
+        """Update do Pokémon - DELEGA ANIMAÇÃO PARA animation.py"""
 
-        # Atualiza velocidade baseada nos efeitos
-        if hasattr(self, 'effect_manager') and self.effect_manager and self.is_wild:
-            old_speed = self.move_speed
-            self.update_move_speed_from_effects()
-            if old_speed != self.move_speed:
-                print(f"[POKEMON_UPDATE] {self.name} velocidade mudou: {old_speed:.2f} -> {self.move_speed:.2f}")
-
+        # ===== 1. SEMPRE ATUALIZA ANIMAÇÃO (centralizado em animation.py) =====
         self.last_x = self.x
         self.last_y = self.y
 
+        # Atualiza timer de MISS
         if hasattr(self, 'miss_timer') and self.miss_timer > 0:
             self.miss_timer -= dt
             if self.miss_timer < 0:
                 self.miss_timer = 0
 
+        # ===== 2. DELEGA TODA LÓGICA DE ANIMAÇÃO =====
+        self.animation.update(dt)
+
+        # ===== 3. SE ESTÁ DERROTADO, NÃO PROCESSA MAIS NADA =====
+        if self.is_defeated:
+            return
+
+        # ===== 4. POKÉMON VIVO - ATUALIZA RESTO =====
+        # Atualiza velocidade baseada nos efeitos
+        if hasattr(self, 'effect_manager') and self.effect_manager and self.is_wild:
+            self.update_move_speed_from_effects()
+
+        # Atualiza item sendo carregado
+        if self.is_carrying:
+            self.is_carrying.update_capture(dt)
+
+        # Atualiza cooldown de ataque
         if not self.can_attack:
             self.attack_cooldown -= 1
             if self.attack_cooldown <= 0:
                 self.can_attack = True
-
-        if self.is_carrying:
-            self.is_carrying.update_capture(dt)
-
-        # ===== RESTAURA ANIMAÇÃO APÓS ATAQUE E EXECUTA O ATAQUE =====
-        if hasattr(self, '_attack_animation_active') and self._attack_animation_active:
-            # Incrementa timer
-            if not hasattr(self, '_attack_animation_timer'):
-                self._attack_animation_timer = 0
-            self._attack_animation_timer += dt
-
-            # Calcula duração total da animação atual
-            total_duration = 0
-            if hasattr(self, 'frame_durations') and self.frame_durations:
-                total_duration = sum(self.frame_durations) / 60.0
-            else:
-                total_duration = 0.5  # Fallback
-
-            # ===== APLICA DANO EM % DA ANIMAÇÃO =====
-            damage_percent = getattr(self, '_damage_frame_percent', 0.6)
-            damage_trigger_time = total_duration * damage_percent
-
-            if not getattr(self, '_damage_applied', False) and self._attack_animation_timer >= damage_trigger_time:
-                # Aplica o dano AGORA (no meio da animação)
-                self._damage_applied = True
-                if hasattr(self, 'combat') and hasattr(self, '_pending_attack_move'):
-                    print(
-                        f"[ANIM] Aplicando dano em {damage_percent * 100}% da animação (timer: {self._attack_animation_timer:.2f}/{total_duration:.2f})")
-                    self.combat._execute_attack()
-
-            # Se a animação já completou um ciclo, restaura e finaliza
-            if self._attack_animation_timer >= total_duration:
-                # Restaura animação anterior
-                if hasattr(self, '_saved_animation_before_attack'):
-                    self.set_animation_direct(self._saved_animation_before_attack)
-                    delattr(self, '_saved_animation_before_attack')
-
-                # Limpa flags
-                delattr(self, '_attack_animation_active')
-                if hasattr(self, '_attack_animation_timer'):
-                    delattr(self, '_attack_animation_timer')
-                if hasattr(self, '_damage_applied'):
-                    delattr(self, '_damage_applied')
-                if hasattr(self, '_damage_frame_percent'):
-                    delattr(self, '_damage_frame_percent')
-                if hasattr(self, '_pending_attack_move'):
-                    delattr(self, '_pending_attack_move')
-
-        # ===== ATUALIZA ANIMAÇÃO =====
-        self._update_animation(dt)
 
     def update_combat(self, dt, enemies):
         """Atualiza lógica de combate com efeitos de status"""

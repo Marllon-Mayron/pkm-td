@@ -423,34 +423,9 @@ class WaveManager:
                     pokemon.gain_xp(xp_gained)
                     break
 
-    def _update_animation(self, enemy: 'Pokemon', dt: float):
-        """
-        Atualiza animação do inimigo - DELEGA PARA O MÉTODO DO POKÉMON
-        """
-        # Simplesmente chama o método de update de animação do Pokémon
-        # Ele já lida com status, movimento, durações, etc.
-        if hasattr(enemy, '_update_animation'):
-            enemy._update_animation(dt)
-
-    def _update_normal_animation_fallback(self, enemy: 'Pokemon', dt: float):
-        """Fallback: atualiza animação normal manualmente"""
-        if hasattr(enemy, 'animation_timer'):
-            enemy.animation_timer += dt
-            frame_time = enemy.animation_speed
-
-            # Tenta usar durações do frame atual
-            if hasattr(enemy, 'frame_durations') and enemy.frame_durations:
-                current_frame = getattr(enemy, 'current_frame', 0)
-                if current_frame < len(enemy.frame_durations):
-                    frame_time = enemy.frame_durations[current_frame] / 60.0
-
-            if enemy.animation_timer >= frame_time:
-                enemy.animation_timer = 0
-                if enemy.inmap_frames and enemy.current_direction in enemy.inmap_frames:
-                    frames_list = enemy.inmap_frames[enemy.current_direction]
-                    if frames_list:
-                        enemy.current_frame = (enemy.current_frame + 1) % len(frames_list)
-                        enemy.sprite = frames_list[enemy.current_frame]
+    def _update_animation(self, enemy, dt):
+        """Atualiza animação do inimigo"""
+        enemy.animation.update(dt)
 
     def remove_enemy(self, enemy: 'Pokemon'):
         """Remove um inimigo (para captura)"""

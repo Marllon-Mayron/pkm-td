@@ -1,9 +1,9 @@
-# src/entities/pokemon/animation.py - VERSÃO COMPLETA COM TODAS AS ANIMAÇÕES
+# src/entities/pokemon/animation.py
 import pygame
 
 
 class PokemonAnimation:
-    """Gerencia animações e sprites do Pokémon"""
+    """Gerencia animações e sprites do Pokémon - CENTRALIZADO"""
 
     def __init__(self, pokemon):
         self.pokemon = pokemon
@@ -27,7 +27,6 @@ class PokemonAnimation:
             self.pokemon.battle_sprite = self.pokemon.pokedex.get_sprite(pokemon_id, "back", shiny)
             self.pokemon.inmap_frames = self.pokemon.pokedex.get_inmap_animation(pokemon_id, shiny)
 
-            # Carrega informações completas de animações
             animations_info = self.pokemon.pokedex.get_pokemon_animations_info(pokemon_id, shiny)
             self._available_animations = animations_info.get("available_animations", [])
 
@@ -37,10 +36,6 @@ class PokemonAnimation:
                     raw_data = self.pokemon.pokedex.get_raw_inmap_data(pokemon_id, shiny)
                     self.pokemon.inmap_animations = raw_data.get("animations", {})
                     self.pokemon.raw_animations = raw_data
-
-                    # Imprime todas as animações disponíveis para debug
-                    if self._available_animations:
-                        print(f"[ANIMATION] {self.pokemon.name} possui animações: {self._available_animations}")
                 except Exception as e:
                     print(f"[ERRO] Falha ao carregar dados brutos: {e}")
 
@@ -59,13 +54,288 @@ class PokemonAnimation:
 
         self._load_all_animation_timings()
 
+    # ===== MÉTODOS PÚBLICOS PRINCIPAIS =====
+    def get_current_frame(self) -> int:
+        """Retorna o frame atual"""
+        return self.pokemon.current_frame
+
+    def get_current_animation(self) -> str:
+        """Retorna a animação atual"""
+        return self.pokemon.current_animation
+
+    def get_current_direction(self) -> str:
+        """Retorna a direção atual"""
+        return self.pokemon.current_direction
+
+    def is_moving(self) -> bool:
+        """Verifica se está em movimento"""
+        return self.pokemon.is_moving
+
+    def update(self, dt):
+        """
+        MÉTODO PRINCIPAL - Atualiza animação baseada no estado do Pokémon.
+        Deve ser chamado TODO FRAME, independente do estado (vivo/morto).
+        """
+        # ===== PRIORIDADE 0: HURT ANIMATION (MAIOR PRIORIDADE) =====
+        if hasattr(self.pokemon, '_hurt_animation_active') and self.pokemon._hurt_animation_active:
+            self._update_hurt_animation_frame(dt)
+            return
+
+        # ===== PRIORIDADE 1: DERROTADO =====
+        if self.pokemon.is_defeated:
+            self._update_defeated_animation(dt)
+            return
+
+        # ===== PRIORIDADE 2: ANIMAÇÃO DE ATAQUE =====
+        if hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active:
+            self._update_attack_animation(dt)
+            return
+
+        # ===== PRIORIDADE 3: STATUS EFFECTS =====
+        status_anim = self._get_status_animation()
+        if status_anim:
+            self._update_status_animation(status_anim, dt)
+            return
+
+        # ===== PRIORIDADE 4: ANIMAÇÃO NORMAL (IDLE/WALK) =====
+        self._update_normal_animation(dt)
+
+    # ===== MÉTODOS PRIVADOS DE ATUALIZAÇÃO =====
+
+    def _update_defeated_animation(self, dt):
+        """Atualiza animação de Pokémon derrotado (sleep ou idle)"""
+        target_anim = "sleep" if self.has_animation("sleep") else "idle"
+
+        if self.pokemon.current_animation != target_anim:
+            self.set_animation(target_anim)
+
+        self._advance_frame(dt)
+
+    def _update_attack_animation(self, dt):
+        """Atualiza animação de ataque e aplica dano no momento certo"""
+        if not hasattr(self.pokemon, '_attack_animation_timer'):
+            self.pokemon._attack_animation_timer = 0
+        self.pokemon._attack_animation_timer += dt
+
+        # Calcula duração total
+        total_duration = self._get_current_animation_duration()
+
+        # Aplica dano em % da animação
+        damage_percent = getattr(self.pokemon, '_damage_frame_percent', 0.6)
+        damage_trigger_time = total_duration * damage_percent
+
+        if not getattr(self.pokemon, '_damage_applied',
+                       False) and self.pokemon._attack_animation_timer >= damage_trigger_time:
+            self.pokemon._damage_applied = True
+            if hasattr(self.pokemon, 'combat') and hasattr(self.pokemon, '_pending_attack_move'):
+                self.pokemon.combat._execute_attack()
+
+        # Avança ou termina animação
+        if self.pokemon._attack_animation_timer >= total_duration:
+            self._finish_attack_animation()
+        else:
+            self._advance_frame(dt)
+
+    def _update_status_animation(self, status_anim: str, dt):
+        """Atualiza animação de status (sleep, charge, etc)"""
+        if self.pokemon.current_animation != status_anim:
+            # Salva animação anterior para restaurar depois
+            if not hasattr(self.pokemon, '_saved_animation'):
+                self.pokemon._saved_animation = self.pokemon.current_animation
+            self.set_animation(status_anim)
+
+        self._advance_frame(dt)
+
+    def _update_normal_animation(self, dt):
+        """Atualiza animação normal baseada em movimento (idle/walk)"""
+        is_moving = self._is_moving()
+
+        # Troca animação se necessário
+        if is_moving and not self.pokemon.is_moving:
+            self.pokemon.is_moving = True
+            if self.has_animation("walk"):
+                self.set_animation("walk")
+            elif self.has_animation("run"):
+                self.set_animation("run")
+        elif not is_moving and self.pokemon.is_moving:
+            self.pokemon.is_moving = False
+            if self.has_animation("idle"):
+                self.set_animation("idle")
+
+        # Se está em stun por paralisia, usa charge
+        if self._is_stunned_by_paralysis():
+            if self.pokemon.current_animation != "charge" and self.has_animation("charge"):
+                self.set_animation("charge")
+
+        self._advance_frame(dt)
+
+    # ===== MÉTODOS AUXILIARES =====
+
+    def _get_status_animation(self) -> str:
+        """Retorna nome da animação de status ativo, ou None"""
+        if not hasattr(self.pokemon, 'effect_manager') or not self.pokemon.effect_manager:
+            return None
+
+        status = self.pokemon.effect_manager.get_status(self.pokemon)
+        if not status or status.type.value == "none":
+            # Restaura animação normal se tinha salva
+            if hasattr(self.pokemon, '_saved_animation'):
+                saved = self.pokemon._saved_animation
+                delattr(self.pokemon, '_saved_animation')
+                self.set_animation(saved)
+            return None
+
+        status_map = {
+            "sleep": "sleep",
+            "paralysis": "charge",
+            "freeze": "charge",
+        }
+        return status_map.get(status.type.value)
+
+    def _is_stunned_by_paralysis(self) -> bool:
+        """Verifica se está atordoado pela paralisia"""
+        if not hasattr(self.pokemon, 'effect_manager') or not self.pokemon.effect_manager:
+            return False
+        status = self.pokemon.effect_manager.get_status(self.pokemon)
+        if status and status.type.value == "paralysis":
+            return status.is_stunned()
+        return False
+
+    def _get_current_animation_duration(self) -> float:
+        """Retorna duração total da animação atual em segundos"""
+        if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
+            return sum(self.pokemon.frame_durations) / 60.0
+        return 0.5  # Fallback
+
+    def _advance_frame(self, dt):
+        """Avança para o próximo frame da animação atual"""
+        self.pokemon.animation_timer += dt * 60
+
+        frame_time = self.pokemon.animation_speed
+        if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
+            current_frame = getattr(self.pokemon, 'current_frame', 0)
+            if current_frame < len(self.pokemon.frame_durations):
+                frame_time = self.pokemon.frame_durations[current_frame]
+
+        if self.pokemon.animation_timer >= frame_time:
+            self.pokemon.animation_timer = 0
+            max_frames = self._get_current_animation_frame_count()
+
+            if max_frames > 0:
+                next_frame = self.pokemon.current_frame + 1
+
+                # Verifica se deve loopar ou parar
+                is_attack = hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active
+
+                if next_frame >= max_frames:
+                    if is_attack:
+                        self.pokemon.current_frame = max_frames - 1  # Mantém último frame
+                    else:
+                        self.pokemon.current_frame = 0  # Loop
+                else:
+                    self.pokemon.current_frame = next_frame
+
+                self._update_sprite_from_current_animation()
+
+    def _finish_attack_animation(self):
+        """Finaliza animação de ataque e restaura animação anterior"""
+        if hasattr(self.pokemon, '_saved_animation_before_attack'):
+            self.set_animation(self.pokemon._saved_animation_before_attack)
+            delattr(self.pokemon, '_saved_animation_before_attack')
+
+        delattr(self.pokemon, '_attack_animation_active')
+        if hasattr(self.pokemon, '_attack_animation_timer'):
+            delattr(self.pokemon, '_attack_animation_timer')
+        if hasattr(self.pokemon, '_damage_applied'):
+            delattr(self.pokemon, '_damage_applied')
+        if hasattr(self.pokemon, '_damage_frame_percent'):
+            delattr(self.pokemon, '_damage_frame_percent')
+        if hasattr(self.pokemon, '_pending_attack_move'):
+            delattr(self.pokemon, '_pending_attack_move')
+
+    # ===== MÉTODOS EXISTENTES (mantidos) =====
+
     def get_available_animations(self) -> list:
-        """Retorna lista de todas as animações disponíveis para este Pokémon"""
         return self._available_animations.copy()
 
     def has_animation(self, animation_name: str) -> bool:
-        """Verifica se uma animação específica está disponível"""
         return animation_name.lower() in [a.lower() for a in self._available_animations]
+
+    def set_animation(self, animation_name: str):
+        """Troca a animação atual se disponível"""
+        if not hasattr(self.pokemon, 'current_animation'):
+            return
+
+        if not self.has_animation(animation_name):
+            if animation_name != "idle" and self.has_animation("idle"):
+                animation_name = "idle"
+            elif not self.has_animation(animation_name):
+                return
+
+        if animation_name == self.pokemon.current_animation:
+            return
+
+        self.pokemon.current_animation = animation_name
+        self.pokemon.current_frame = 0
+        self.pokemon.animation_timer = 0
+        self._update_current_durations()
+        self._update_sprite_from_current_animation()
+
+    def set_animation_direct(self, animation_name: str):
+        """Alias para set_animation"""
+        self.set_animation(animation_name)
+
+    def play_hurt_animation(self) -> bool:
+        """Toca a animação de dano (hurt)"""
+        if not self.has_animation("hurt"):
+            return False
+
+        if hasattr(self.pokemon, '_hurt_animation_active') and self.pokemon._hurt_animation_active:
+            return False
+
+        self.pokemon._saved_animation_before_hurt = self.pokemon.current_animation
+        self.pokemon._saved_direction_before_hurt = self.pokemon.current_direction
+
+        self.set_animation("hurt")
+        self.pokemon.current_frame = 0
+        self.pokemon.animation_timer = 0
+        self.pokemon._hurt_animation_active = True
+        self.pokemon._hurt_animation_played_once = False
+
+        return True
+
+    def _finish_hurt_animation(self):
+        """Finaliza a animação de hurt e restaura a animação anterior"""
+        saved_anim = getattr(self.pokemon, '_saved_animation_before_hurt', 'idle')
+
+        if hasattr(self.pokemon, '_saved_direction_before_hurt'):
+            self.pokemon.current_direction = self.pokemon._saved_direction_before_hurt
+            delattr(self.pokemon, '_saved_direction_before_hurt')
+
+        self.set_animation(saved_anim)
+        self.pokemon.current_frame = 0
+        self.pokemon.animation_timer = 0
+
+        # Limpa flags
+        delattr(self.pokemon, '_hurt_animation_active')
+        if hasattr(self.pokemon, '_hurt_animation_played_once'):
+            delattr(self.pokemon, '_hurt_animation_played_once')
+        if hasattr(self.pokemon, '_saved_animation_before_hurt'):
+            delattr(self.pokemon, '_saved_animation_before_hurt')
+
+    def _update_hurt_animation_frame(self, dt):
+        """Atualiza os frames da animação de hurt e finaliza quando terminar"""
+        # Avança o frame
+        self._advance_frame(dt)
+
+        # Verifica se a animação terminou
+        max_frames = self._get_current_animation_frame_count()
+
+        if max_frames > 0 and self.pokemon.current_frame >= max_frames - 1:
+            # Último frame atingido, finaliza a animação
+            self._finish_hurt_animation()
+
+    # ===== MÉTODOS INTERNOS (mantidos) =====
 
     def _load_all_animation_timings(self):
         """Carrega os tempos de duração dos frames para TODAS as animações"""
@@ -78,15 +348,12 @@ class PokemonAnimation:
 
         anim_data = self.pokemon.raw_animations.get("anim_data", {})
 
-        # Armazena durações para todas as animações
         self.pokemon.all_animation_durations = {}
-
         for anim_name, anim_info in anim_data.items():
             durations = anim_info.get("durations", [])
             if durations:
                 self.pokemon.all_animation_durations[anim_name.lower()] = durations
 
-        # Carrega walk e idle específicos
         walk_info = anim_data.get("Walk", {})
         if "durations" in walk_info and walk_info["durations"]:
             self.pokemon.walk_frame_durations = walk_info["durations"]
@@ -104,14 +371,11 @@ class PokemonAnimation:
     def _update_current_durations(self):
         """Atualiza as durações dos frames baseado na animação atual"""
         if hasattr(self.pokemon, 'current_animation'):
-            # Verifica se a animação atual tem durações específicas
             if (hasattr(self.pokemon, 'all_animation_durations') and
                     self.pokemon.current_animation in self.pokemon.all_animation_durations):
                 self.pokemon.frame_durations = self.pokemon.all_animation_durations[self.pokemon.current_animation]
             elif self.pokemon.current_animation == "walk" and hasattr(self.pokemon, 'walk_frame_durations'):
                 self.pokemon.frame_durations = self.pokemon.walk_frame_durations
-            elif self.pokemon.current_animation == "charge" and hasattr(self.pokemon, 'all_animation_durations') and "charge" in self.pokemon.all_animation_durations:
-                self.pokemon.frame_durations = self.pokemon.all_animation_durations["charge"]
             elif hasattr(self.pokemon, 'idle_frame_durations'):
                 self.pokemon.frame_durations = self.pokemon.idle_frame_durations
             else:
@@ -121,67 +385,80 @@ class PokemonAnimation:
                     self.pokemon.frame_durations):
                 self.pokemon.current_frame = 0
 
-    def set_stun_animation(self, is_stunned: bool):
-        """
-        Define animação de stun (paralisia) apenas quando está atordoado
+    def _update_sprite_from_current_animation(self):
+        """Atualiza o sprite baseado na animação atual"""
+        if hasattr(self.pokemon,
+                   'inmap_animations') and self.pokemon.current_animation in self.pokemon.inmap_animations:
+            anim_frames = self.pokemon.inmap_animations[self.pokemon.current_animation]
 
-        Args:
-            is_stunned: True se está atordoado (parado), False se pode se mover
-        """
-        if is_stunned:
-            # Está atordoado - mostra animação de charge
-            if self.has_animation("charge"):
-                # Guarda a animação anterior se ainda não guardou
-                if not hasattr(self.pokemon, '_saved_animation_for_stun'):
-                    self.pokemon._saved_animation_for_stun = self.pokemon.current_animation
-                self.set_animation("charge")
-                print(f"[STUN_ANIM] {self.pokemon.name} entrou em stun -> animação charge")
-        else:
-            # Não está mais atordoado - volta para animação normal
-            if hasattr(self.pokemon, '_saved_animation_for_stun'):
-                saved = self.pokemon._saved_animation_for_stun
-                delattr(self.pokemon, '_saved_animation_for_stun')
-                self.set_animation(saved)
-                print(f"[STUN_ANIM] {self.pokemon.name} saiu do stun -> volta para {saved}")
-            elif self.pokemon.is_moving and self.has_animation("walk"):
-                self.set_animation("walk")
-            elif self.has_animation("idle"):
-                self.set_animation("idle")
+            if len(anim_frames) == 1:
+                single_direction = list(anim_frames.keys())[0]
+                frames = anim_frames[single_direction]
+                if frames and hasattr(self.pokemon, 'current_frame') and self.pokemon.current_frame < len(frames):
+                    self.pokemon.sprite = frames[self.pokemon.current_frame]
+                    return
 
-    def set_animation(self, animation_name: str):
-        """
-        Troca a animação atual se disponível
+            if self.pokemon.current_direction in anim_frames:
+                frames = anim_frames[self.pokemon.current_direction]
+                if frames and hasattr(self.pokemon, 'current_frame') and self.pokemon.current_frame < len(frames):
+                    self.pokemon.sprite = frames[self.pokemon.current_frame]
+                    return
 
-        Args:
-            animation_name: Nome da animação (ex: "idle", "walk", "run", "attack", etc)
-        """
-        if not hasattr(self.pokemon, 'current_animation'):
-            return
+            dir_mapping = {
+                "down": ["down", "down-left", "down-right"],
+                "left": ["left", "down-left", "up-left"],
+                "right": ["right", "down-right", "up-right"],
+                "up": ["up", "up-left", "up-right"]
+            }
 
-        # Verifica se a animação está disponível
-        if not self.has_animation(animation_name):
-            # Se não disponível e não é idle, tenta idle
-            if animation_name != "idle" and self.has_animation("idle"):
-                animation_name = "idle"
-            elif not self.has_animation(animation_name):
-                return
+            for src_dir in dir_mapping.get(self.pokemon.current_direction, [self.pokemon.current_direction]):
+                if src_dir in anim_frames:
+                    frames = anim_frames[src_dir]
+                    if frames and hasattr(self.pokemon, 'current_frame') and self.pokemon.current_frame < len(frames):
+                        self.pokemon.sprite = frames[self.pokemon.current_frame]
+                        return
 
-        if animation_name == self.pokemon.current_animation:
-            return
+        if hasattr(self.pokemon, 'inmap_frames') and self.pokemon.current_direction in self.pokemon.inmap_frames:
+            frames_list = self.pokemon.inmap_frames[self.pokemon.current_direction]
+            if frames_list and hasattr(self.pokemon, 'current_frame') and self.pokemon.current_frame < len(frames_list):
+                self.pokemon.sprite = frames_list[self.pokemon.current_frame]
 
-        self.pokemon.current_animation = animation_name
-        self.pokemon.current_frame = 0
-        self.pokemon.animation_timer = 0
-        self._update_current_durations()
-        self._update_sprite_from_current_animation()
+    def _get_current_animation_frame_count(self) -> int:
+        """Retorna o número de frames da animação atual"""
+        if hasattr(self.pokemon,
+                   'inmap_animations') and self.pokemon.current_animation in self.pokemon.inmap_animations:
+            anim_frames = self.pokemon.inmap_animations[self.pokemon.current_animation]
+
+            if len(anim_frames) == 1:
+                single_direction = list(anim_frames.keys())[0]
+                return len(anim_frames[single_direction])
+
+            if self.pokemon.current_direction in anim_frames:
+                return len(anim_frames[self.pokemon.current_direction])
+
+            dir_mapping = {
+                "down": ["down", "down-left", "down-right"],
+                "left": ["left", "down-left", "up-left"],
+                "right": ["right", "down-right", "up-right"],
+                "up": ["up", "up-left", "up-right"]
+            }
+
+            for src_dir in dir_mapping.get(self.pokemon.current_direction, [self.pokemon.current_direction]):
+                if src_dir in anim_frames:
+                    return len(anim_frames[src_dir])
+
+        if hasattr(self.pokemon, 'inmap_frames') and self.pokemon.current_direction in self.pokemon.inmap_frames:
+            return len(self.pokemon.inmap_frames[self.pokemon.current_direction])
+
+        return 1
 
     def set_status_animation(self, status_type):
         """
         Define a animação apropriada baseada no status do Pokémon
         Retorna True se trocou para uma animação de status, False se voltou para normal
 
-        NOTA: Para paralisia, NÃO trocamos animação aqui - a animação charge é controlada
-        pelo estado de stun separadamente.
+        Args:
+            status_type: String com o tipo do status (sleep, paralysis, freeze) ou None
         """
         if status_type is None:
             # Voltou ao normal - restaura animação normal
@@ -192,6 +469,7 @@ class PokemonAnimation:
         status_animation_map = {
             "sleep": "sleep",
             "freeze": "charge",
+            # Paralysis NÃO troca animação aqui - é controlado pelo stun separadamente
         }
 
         anim_name = status_animation_map.get(status_type.lower())
@@ -222,83 +500,34 @@ class PokemonAnimation:
         elif self.has_animation("idle"):
             self.set_animation("idle")
 
-    def _update_sprite_from_current_animation(self):
-        """Atualiza o sprite baseado na animação atual"""
-        if hasattr(self.pokemon,
-                   'inmap_animations') and self.pokemon.current_animation in self.pokemon.inmap_animations:
-            anim_frames = self.pokemon.inmap_animations[self.pokemon.current_animation]
+    def set_stun_animation(self, is_stunned: bool):
+        """
+        Define animação de stun (paralisia) apenas quando está atordoado
 
-            # ===== VERIFICA SE A ANIMAÇÃO TEM APENAS UMA DIREÇÃO =====
-            # Se tiver apenas uma chave no dicionário, é animação de direção única
-            if len(anim_frames) == 1:
-                # Pega a única direção disponível
-                single_direction = list(anim_frames.keys())[0]
-                frames = anim_frames[single_direction]
-                if frames and hasattr(self.pokemon, 'current_frame') and self.pokemon.current_frame < len(frames):
-                    self.pokemon.sprite = frames[self.pokemon.current_frame]
-                    return
+        Args:
+            is_stunned: True se está atordoado (parado), False se pode se mover
+        """
+        if is_stunned:
+            # Está atordoado - mostra animação de charge
+            if self.has_animation("charge"):
+                # Guarda a animação anterior se ainda não guardou
+                if not hasattr(self.pokemon, '_saved_animation_for_stun'):
+                    self.pokemon._saved_animation_for_stun = self.pokemon.current_animation
+                self.set_animation("charge")
+        else:
+            # Não está mais atordoado - volta para animação normal
+            if hasattr(self.pokemon, '_saved_animation_for_stun'):
+                saved = self.pokemon._saved_animation_for_stun
+                delattr(self.pokemon, '_saved_animation_for_stun')
+                self.set_animation(saved)
+            elif self.pokemon.is_moving and self.has_animation("walk"):
+                self.set_animation("walk")
+            elif self.has_animation("idle"):
+                self.set_animation("idle")
 
-            # ===== ANIMAÇÃO NORMAL COM MÚLTIPLAS DIREÇÕES =====
-            # Tenta a direção atual primeiro
-            if self.pokemon.current_direction in anim_frames:
-                frames = anim_frames[self.pokemon.current_direction]
-                if frames and hasattr(self.pokemon, 'current_frame') and self.pokemon.current_frame < len(frames):
-                    self.pokemon.sprite = frames[self.pokemon.current_frame]
-                    return
-
-            # Tenta encontrar direção alternativa (mapeamento de 8 para 4)
-            dir_mapping = {
-                "down": ["down", "down-left", "down-right"],
-                "left": ["left", "down-left", "up-left"],
-                "right": ["right", "down-right", "up-right"],
-                "up": ["up", "up-left", "up-right"]
-            }
-
-            for src_dir in dir_mapping.get(self.pokemon.current_direction, [self.pokemon.current_direction]):
-                if src_dir in anim_frames:
-                    frames = anim_frames[src_dir]
-                    if frames and hasattr(self.pokemon, 'current_frame') and self.pokemon.current_frame < len(frames):
-                        self.pokemon.sprite = frames[self.pokemon.current_frame]
-                        return
-
-        # Fallback: usa inmap_frames (sistema antigo de 4 direções)
-        if hasattr(self.pokemon, 'inmap_frames') and self.pokemon.current_direction in self.pokemon.inmap_frames:
-            frames_list = self.pokemon.inmap_frames[self.pokemon.current_direction]
-            if frames_list and hasattr(self.pokemon, 'current_frame') and self.pokemon.current_frame < len(frames_list):
-                self.pokemon.sprite = frames_list[self.pokemon.current_frame]
-
-    def _get_current_animation_frame_count(self) -> int:
-        """Retorna o número de frames da animação atual"""
-        if hasattr(self.pokemon,
-                   'inmap_animations') and self.pokemon.current_animation in self.pokemon.inmap_animations:
-            anim_frames = self.pokemon.inmap_animations[self.pokemon.current_animation]
-
-            # ===== SE É DIREÇÃO ÚNICA, PEGA OS FRAMES DA ÚNICA DIREÇÃO =====
-            if len(anim_frames) == 1:
-                single_direction = list(anim_frames.keys())[0]
-                return len(anim_frames[single_direction])
-
-            # Tenta a direção atual primeiro
-            if self.pokemon.current_direction in anim_frames:
-                return len(anim_frames[self.pokemon.current_direction])
-
-            # Tenta encontrar direção alternativa
-            dir_mapping = {
-                "down": ["down", "down-left", "down-right"],
-                "left": ["left", "down-left", "up-left"],
-                "right": ["right", "down-right", "up-right"],
-                "up": ["up", "up-left", "up-right"]
-            }
-
-            for src_dir in dir_mapping.get(self.pokemon.current_direction, [self.pokemon.current_direction]):
-                if src_dir in anim_frames:
-                    return len(anim_frames[src_dir])
-
-        # Fallback: usa inmap_frames
-        if hasattr(self.pokemon, 'inmap_frames') and self.pokemon.current_direction in self.pokemon.inmap_frames:
-            return len(self.pokemon.inmap_frames[self.pokemon.current_direction])
-
-        return 1
+    def on_stun_state_changed(self, is_stunned: bool):
+        """Callback para quando o estado de stun muda - compatibilidade"""
+        self.set_stun_animation(is_stunned)
 
     def _is_moving(self) -> bool:
         """Verifica se o Pokémon está em movimento"""
@@ -306,193 +535,4 @@ class PokemonAnimation:
             dx = abs(self.pokemon.x - self.pokemon.last_x)
             dy = abs(self.pokemon.y - self.pokemon.last_y)
             return (dx + dy) > 0.5
-        return False
-
-    def update_animation(self, dt):
-        """Atualiza animação do sprite baseado no movimento"""
-
-        # ===== PRIORIDADE MÁXIMA: ANIMAÇÃO DE HURT =====
-        if hasattr(self.pokemon, '_hurt_animation_active') and self.pokemon._hurt_animation_active:
-            # Atualiza o frame da animação hurt
-            self.pokemon.animation_timer += dt * 60
-
-            frame_time = self.pokemon.animation_speed
-            if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
-                current_frame = getattr(self.pokemon, 'current_frame', 0)
-                if current_frame < len(self.pokemon.frame_durations):
-                    frame_time = self.pokemon.frame_durations[current_frame]
-
-            if self.pokemon.animation_timer >= frame_time:
-                self.pokemon.animation_timer = 0
-                max_frames = self._get_current_animation_frame_count()
-
-                if max_frames > 0:
-                    next_frame = self.pokemon.current_frame + 1
-                    if next_frame >= max_frames:
-                        # Último frame atingido, marca para terminar
-                        self.pokemon.current_frame = max_frames - 1
-                        if not getattr(self.pokemon, '_hurt_animation_played_once', False):
-                            self.pokemon._hurt_animation_played_once = True
-                    else:
-                        self.pokemon.current_frame = next_frame
-
-                    self._update_sprite_from_current_animation()
-
-            # Verifica se deve terminar a animação hurt
-            self.update_hurt_animation()
-            return
-
-        # ===== VERIFICA SE ESTÁ EM ANIMAÇÃO DE STATUS =====
-        current_anim = getattr(self.pokemon, 'current_animation', 'idle')
-        status_animations = ['sleep', 'charge']
-
-        if current_anim in status_animations:
-            # Está em animação de status - só atualiza o frame, não troca animação
-            self.pokemon.animation_timer += dt * 60
-
-            frame_time = self.pokemon.animation_speed
-            if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
-                current_frame = getattr(self.pokemon, 'current_frame', 0)
-                if current_frame < len(self.pokemon.frame_durations):
-                    frame_time = self.pokemon.frame_durations[current_frame]
-
-            if self.pokemon.animation_timer >= frame_time:
-                self.pokemon.animation_timer = 0
-                max_frames = self._get_current_animation_frame_count()
-
-                if max_frames > 0:
-                    next_frame = self.pokemon.current_frame + 1
-
-                    # ===== TODAS AS ANIMAÇÕES DE STATUS REPETEM EM LOOP =====
-                    # sleep, freeze, charge, hurt, paralysis - todas devem repetir
-                    if next_frame >= max_frames:
-                        # Reinicia o loop para todas as animações de status
-                        self.pokemon.current_frame = 0
-                    else:
-                        self.pokemon.current_frame = next_frame
-
-                    self._update_sprite_from_current_animation()
-                    return
-
-        # ===== ANIMAÇÃO NORMAL (IDLE/WALK) - DETECTA MOVIMENTO =====
-        is_moving_now = self._is_moving()
-
-        if is_moving_now and not self.pokemon.is_moving:
-            self.pokemon.is_moving = True
-            if self.has_animation("walk"):
-                self.set_animation("walk")
-            elif self.has_animation("run"):
-                self.set_animation("run")
-            elif self._available_animations:
-                self.set_animation(self._available_animations[0])
-
-        elif not is_moving_now and self.pokemon.is_moving:
-            self.pokemon.is_moving = False
-            if self.has_animation("idle"):
-                self.set_animation("idle")
-            elif self._available_animations:
-                self.set_animation(self._available_animations[0])
-
-        # ===== ATUALIZA O FRAME DA ANIMAÇÃO ATUAL =====
-        self.pokemon.animation_timer += dt * 60
-
-        frame_time = self.pokemon.animation_speed
-        if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
-            current_frame = getattr(self.pokemon, 'current_frame', 0)
-            if current_frame < len(self.pokemon.frame_durations):
-                frame_time = self.pokemon.frame_durations[current_frame]
-
-        if self.pokemon.animation_timer >= frame_time:
-            self.pokemon.animation_timer = 0
-            max_frames = self._get_current_animation_frame_count()
-
-            if max_frames > 0:
-                next_frame = self.pokemon.current_frame + 1
-
-                # ===== VERIFICA SE É ANIMAÇÃO DE ATAQUE =====
-                is_attack_anim = hasattr(self.pokemon,
-                                         '_attack_animation_active') and self.pokemon._attack_animation_active
-
-                if next_frame >= max_frames:
-                    if is_attack_anim:
-                        # Ataque terminou - NÃO reinicia, mantém no último frame
-                        # O update do pokemon vai lidar com o fim da animação
-                        self.pokemon.current_frame = max_frames - 1
-                    else:
-                        # Animações normais (idle, walk) reiniciam em loop
-                        self.pokemon.current_frame = 0
-                else:
-                    self.pokemon.current_frame = next_frame
-
-                self._update_sprite_from_current_animation()
-
-    def play_hurt_animation(self):
-        """
-        Toca a animação de dano (hurt) e retorna à animação normal após terminar.
-        A animação hurt é curta (2 frames) e não deve loopar.
-        """
-        if not self.has_animation("hurt"):
-            # Se não tem animação de hurt, não faz nada
-            return False
-
-        # Se já está tocando hurt, não interrompe
-        if hasattr(self.pokemon, '_hurt_animation_active') and self.pokemon._hurt_animation_active:
-            return False
-
-        # Guarda a animação atual para restaurar depois
-        self.pokemon._saved_animation_before_hurt = self.pokemon.current_animation
-
-        # Salva também a direção atual se precisar restaurar depois
-        self.pokemon._saved_direction_before_hurt = self.pokemon.current_direction
-
-        # Toca a animação hurt
-        self.set_animation("hurt")
-        self.pokemon.current_frame = 0
-        self.pokemon.animation_timer = 0
-        self.pokemon._hurt_animation_active = True
-        self.pokemon._hurt_animation_played_once = False
-
-        print(f"[HURT] {self.pokemon.name} tocando animação de dano")
-        return True
-
-    def update_hurt_animation(self):
-        """
-        Atualiza a animação de hurt - deve ser chamada no update_animation.
-        Retorna True se a animação terminou.
-        """
-        if not hasattr(self.pokemon, '_hurt_animation_active') or not self.pokemon._hurt_animation_active:
-            return True
-
-        # Verifica se a animação já completou (chegou ao último frame)
-        max_frames = self._get_current_animation_frame_count()
-
-        if max_frames > 0 and self.pokemon.current_frame >= max_frames - 1:
-            # Já está no último frame, marca que já passou
-            if not getattr(self.pokemon, '_hurt_animation_played_once', False):
-                self.pokemon._hurt_animation_played_once = True
-
-        # Se já passou pelo último frame, termina a animação
-        if getattr(self.pokemon, '_hurt_animation_played_once', False) and self.pokemon.current_frame >= max_frames - 1:
-            # Restaura a animação anterior
-            saved_anim = getattr(self.pokemon, '_saved_animation_before_hurt', 'idle')
-
-            # Restaura a direção anterior
-            if hasattr(self.pokemon, '_saved_direction_before_hurt'):
-                self.pokemon.current_direction = self.pokemon._saved_direction_before_hurt
-                delattr(self.pokemon, '_saved_direction_before_hurt')
-
-            self.set_animation(saved_anim)
-            self.pokemon.current_frame = 0
-            self.pokemon.animation_timer = 0
-
-            # Limpa flags
-            delattr(self.pokemon, '_hurt_animation_active')
-            if hasattr(self.pokemon, '_hurt_animation_played_once'):
-                delattr(self.pokemon, '_hurt_animation_played_once')
-            if hasattr(self.pokemon, '_saved_animation_before_hurt'):
-                delattr(self.pokemon, '_saved_animation_before_hurt')
-
-            print(f"[HURT] {self.pokemon.name} terminou animação de dano, voltando para {saved_anim}")
-            return True
-
         return False

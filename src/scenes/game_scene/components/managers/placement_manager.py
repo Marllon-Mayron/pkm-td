@@ -131,53 +131,14 @@ class PlacementManager:
         return None
 
     def update(self, dt, enemies):
-        """Atualiza todos os Pokémon colocados - COM ANIMAÇÕES DE STATUS"""
-
-        defeated = []
-
+        """Atualiza todos os Pokémon colocados"""
         for pokemon in self.placed_pokemon:
+            # SEMPRE atualiza o Pokémon (animação continua mesmo se morto)
+            pokemon.update(dt, enemies=enemies)
+
+            # SISTEMA DE COMBATE SÓ PARA VIVOS
             if pokemon.is_alive():
-                # ===== ATUALIZA ANIMAÇÃO BASEADA EM STATUS =====
-                if hasattr(pokemon, 'effect_manager') and pokemon.effect_manager:
-                    status = pokemon.effect_manager.get_status(pokemon)
-                    if status and status.type.value != "none":
-                        # Tem status - verifica se precisa trocar animação
-                        current_anim = getattr(pokemon, 'current_animation', 'idle')
-                        status_anim = self._get_status_animation_name(status.type.value)
-                        if status_anim and current_anim != status_anim:
-                            pokemon.set_animation_direct(status_anim)
-                    else:
-                        # Sem status - atualiza animação normal
-                        self._update_normal_pokemon_animation(pokemon, dt)
-                else:
-                    self._update_normal_pokemon_animation(pokemon, dt)
-
-                # Sistema de combate baseado em investidas
                 pokemon.update_combat(dt, enemies)
-
-                # Atualiza animação normal
-                pokemon.update(dt)
-            else:
-                pass
-                #defeated.append(pokemon)
-
-        # Remove derrotados
-        for pokemon in defeated:
-            self._remove_pokemon(pokemon)
-
-    def _get_status_animation_name(self, status_type: str) -> str:
-        """Retorna o nome da animação para um status"""
-        status_map = {
-            "sleep": "sleep",
-            "paralysis": "charge",
-            "freeze": "charge",
-        }
-        return status_map.get(status_type)
-
-    def _update_normal_pokemon_animation(self, pokemon, dt):
-        """Atualiza animação normal do Pokémon"""
-        if hasattr(pokemon, '_update_animation'):
-            pokemon._update_animation(dt)
 
     def _remove_pokemon(self, pokemon):
         """Remove um Pokémon do mapa (por derrota) - CORRIGIDO"""
