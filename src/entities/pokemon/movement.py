@@ -13,12 +13,16 @@ class PokemonMovement:
 
     def update_move_speed_from_effects(self):
         """Atualiza a velocidade de movimento baseada nos efeitos atuais"""
-        if not self.pokemon.is_wild:
-            return
 
         new_speed = self.pokemon.stats.calculate_wild_move_speed()
+
+        # Adiciona bônus para Pokémon não selvagens (aliados)
+        if not self.pokemon.is_wild:
+            new_speed += self.pokemon.speed_bonus_not_wild
+
         self.pokemon.move_speed = new_speed
-        print(f"[SPEED] {self.pokemon.name} velocidade atualizada: {self.pokemon.move_speed:.2f}")
+        print(
+            f"[SPEED] {self.pokemon.name} velocidade atualizada: {self.pokemon.move_speed:.2f} (is_wild={self.pokemon.is_wild})")
 
     def is_stunned(self) -> bool:
         """Verifica se o Pokémon está atordoado pela paralisia"""

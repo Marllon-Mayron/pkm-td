@@ -15,6 +15,7 @@ class PokemonEvolution:
         if evolution:
             evolve_to_id = evolution["evolve_to"]
             self._perform_evolution(evolve_to_id)
+            self.pokemon.game_scene.game.player.auto_save()
             return True
         return False
 

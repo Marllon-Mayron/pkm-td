@@ -980,6 +980,8 @@ class ShopScene(BaseScene):
             self.selected_shop_index = max(0, len(self.filtered_shop_items) - 1)
         # ===================================================
 
+        self.game.player.auto_save()
+
         selector.hide()
 
     def fixed_update(self, dt):

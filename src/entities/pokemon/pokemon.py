@@ -144,12 +144,13 @@ class Pokemon(Entity):
         self.original_path = None
         self.path_index_origin = 0
         self.is_returning_with_item = False
+        self.speed_bonus_not_wild = 0.3
         if is_wild:
             self.base_move_speed = self._get_cached_move_speed()
             self.move_speed = self.base_move_speed
         else:
-            self.base_move_speed = 2.0
-            self.move_speed = 2.0
+            self.base_move_speed = self._get_cached_move_speed()
+            self.move_speed = self.base_move_speed + self.speed_bonus_not_wild
 
         # ===== 15. COMBATE =====
         self.can_attack = True

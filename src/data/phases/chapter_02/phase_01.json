@@ -1706,7 +1706,7 @@
                 ],
                 "min_level": 10,
                 "max_level": 14,
-                "wave_size": 20,
+                "wave_size": 15,
                 "spawn_interval": 1.5,
                 "initial_delay": 10.0,
                 "repeat_wave": true,
@@ -1753,14 +1753,14 @@
                 ],
                 "min_level": 10,
                 "max_level": 12,
-                "wave_size": 20,
+                "wave_size": 15,
                 "spawn_interval": 1.5,
                 "initial_delay": 10.0,
                 "repeat_wave": true,
                 "repeat_count": 2
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 1
     },
     "tower_spots": {
         "spot_size": 24,
