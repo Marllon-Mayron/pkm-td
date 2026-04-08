@@ -273,6 +273,11 @@ class Pokemon(Entity):
     def _show_miss_on_self(self):
         self.combat.show_miss_on_self()
 
+    def is_immune_to_status(self, status_type) -> bool:
+        """Verifica se o Pokémon é imune a um tipo específico de status"""
+        from src.battle.effects.status_effect import TypeImmunity
+        return TypeImmunity.is_immune_to_status(self, status_type)
+
     def take_damage(self, damage, attacker=None):
         """Recebe dano e registra contribuição - delega para combat"""
         # Registra a contribuição ANTES de delegar

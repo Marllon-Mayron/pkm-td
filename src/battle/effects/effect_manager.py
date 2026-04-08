@@ -31,14 +31,27 @@ class EffectManager:
         self.font_cache = {}
 
     def apply_status(self, pokemon, status: StatusEffect, source=None):
-        """Aplica um efeito de status a um Pokémon"""
+        """Aplica um efeito de status a um Pokémon (com verificação de imunidade)"""
+        from .status_effect import TypeImmunity
+
         pokemon_id = id(pokemon)
 
+        # ===== VERIFICAÇÃO DE IMUNIDADE =====
+        if TypeImmunity.is_immune_to_status(pokemon, status.type):
+            # Mostra mensagem de imunidade
+            message = TypeImmunity.get_immunity_message(pokemon, status.type)
+            self.add_status_text(pokemon, message, duration=1.5)
+            print(f"[IMMUNITY] {pokemon.name} é imune a {status.type.value}! Não aplicando status.")
+            return False
+
+        # Verifica se já tem status
         if pokemon_id in self.status_effects:
             existing = self.status_effects[pokemon_id]
             if existing.type != StatusType.NONE:
-                conflicting = [StatusType.PARALYSIS, StatusType.BURN, StatusType.POISON]
+                # Verifica conflitos de status
+                conflicting = [StatusType.PARALYSIS, StatusType.BURN, StatusType.POISON, StatusType.TOXIC_POISON]
                 if existing.type in conflicting and status.type in conflicting:
+                    print(f"[STATUS] {pokemon.name} já está com {existing.name}, não pode aplicar {status.name}!")
                     return False
                 if existing.type in [StatusType.SLEEP, StatusType.FREEZE]:
                     self.remove_status(pokemon)
@@ -47,6 +60,20 @@ class EffectManager:
 
         self.status_effects[pokemon_id] = status
         status.apply(pokemon, self)
+
+        # Mostra mensagem de aplicação
+        status_messages = {
+            StatusType.POISON: f"{pokemon.name} foi envenenado!",
+            StatusType.TOXIC_POISON: f"{pokemon.name} foi gravemente envenenado!",
+            StatusType.BURN: f"{pokemon.name} foi queimado!",
+            StatusType.PARALYSIS: f"{pokemon.name} está paralisado!",
+            StatusType.SLEEP: f"{pokemon.name} caiu no sono!",
+            StatusType.FREEZE: f"{pokemon.name} está congelado!",
+            StatusType.CONFUSION: f"{pokemon.name} está confuso!"
+        }
+
+        if status.type in status_messages:
+            self.add_status_text(pokemon, status_messages[status.type], duration=1.5)
 
         # ===== FORÇA ATUALIZAÇÃO DA ANIMAÇÃO =====
         if hasattr(pokemon, 'update_status_animation'):

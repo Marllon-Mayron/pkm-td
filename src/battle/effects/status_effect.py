@@ -1,6 +1,6 @@
 # src/battle/effects/status_effect.py
 from enum import Enum
-from typing import Optional, Callable
+from typing import Optional, Callable, List
 import random
 
 
@@ -14,6 +14,103 @@ class StatusType(Enum):
     SLEEP = "sleep"
     FREEZE = "freeze"
     CONFUSION = "confusion"
+
+
+class TypeImmunity:
+    """Gerencia imunidades de tipos contra status effects"""
+
+    # Imunidades de tipos contra status (baseado nos jogos Pokémon)
+    TYPE_IMMUNITIES = {
+        # Veneno/Paralisia
+        "poison": {
+            StatusType.POISON,
+            StatusType.TOXIC_POISON,
+        },
+        "steel": {
+            StatusType.POISON,
+            StatusType.TOXIC_POISON
+        },
+        "fire": {
+            StatusType.BURN,  # Fogo é imune a queimadura
+            StatusType.FREEZE  # Fogo é imune a congelamento
+        },
+        "ice": {
+            StatusType.FREEZE  # Gelo é imune a congelamento
+        },
+    }
+
+    # Imunidades específicas por espécie (para Pokémon lendários ou especiais)
+    POKEMON_IMMUNITIES = {
+        # "snorlax": {StatusType.SLEEP},  # Snorlax é difícil de dormir
+    }
+
+    @classmethod
+    def is_immune_to_status(cls, pokemon, status_type: StatusType) -> bool:
+        """
+        Verifica se um Pokémon é imune a um tipo específico de status
+
+        Args:
+            pokemon: Pokémon a ser verificado
+            status_type: Tipo de status a ser aplicado
+
+        Returns:
+            True se o Pokémon é imune, False caso contrário
+        """
+        # Verifica por tipo
+        for pokemon_type in pokemon.types:
+            pokemon_type_lower = pokemon_type.lower()
+
+            if pokemon_type_lower in cls.TYPE_IMMUNITIES:
+                if status_type in cls.TYPE_IMMUNITIES[pokemon_type_lower]:
+                    print(f"[IMMUNITY] {pokemon.name} (tipo {pokemon_type}) é imune a {status_type.value}!")
+                    return True
+
+        # Verifica por espécie específica
+        pokemon_name_lower = pokemon.name.lower()
+        if pokemon_name_lower in cls.POKEMON_IMMUNITIES:
+            if status_type in cls.POKEMON_IMMUNITIES[pokemon_name_lower]:
+                print(f"[IMMUNITY] {pokemon.name} é imune a {status_type.value} por habilidade especial!")
+                return True
+
+        return False
+
+    @classmethod
+    def get_immunity_message(cls, pokemon, status_type: StatusType) -> str:
+        """Retorna uma mensagem apropriada para a imunidade"""
+        status_names = {
+            StatusType.POISON: "envenenado",
+            StatusType.TOXIC_POISON: "gravemente envenenado",
+            StatusType.BURN: "queimado",
+            StatusType.PARALYSIS: "paralisado",
+            StatusType.SLEEP: "adormecido",
+            StatusType.FREEZE: "congelado",
+            StatusType.CONFUSION: "confuso"
+        }
+
+        status_name = status_names.get(status_type, status_type.value)
+
+        # Mensagens específicas por tipo
+        for pokemon_type in pokemon.types:
+            pokemon_type_lower = pokemon_type.lower()
+
+            if pokemon_type_lower == "poison" and status_type in [StatusType.POISON, StatusType.TOXIC_POISON]:
+                return f"{pokemon.name} não pode ser envenenado por ser do tipo Veneno!"
+            elif pokemon_type_lower == "steel" and status_type in [StatusType.POISON, StatusType.TOXIC_POISON]:
+                return f"{pokemon.name} não pode ser envenenado por ser do tipo Aço!"
+            elif pokemon_type_lower == "fire" and status_type == StatusType.BURN:
+                return f"{pokemon.name} não pode ser queimado por ser do tipo Fogo!"
+            elif pokemon_type_lower == "fire" and status_type == StatusType.FREEZE:
+                return f"{pokemon.name} não pode ser congelado por ser do tipo Fogo!"
+            elif pokemon_type_lower == "ice" and status_type == StatusType.FREEZE:
+                return f"{pokemon.name} não pode ser congelado por ser do tipo Gelo!"
+            elif pokemon_type_lower == "electric" and status_type == StatusType.PARALYSIS:
+                return f"{pokemon.name} não pode ser paralisado por ser do tipo Elétrico!"
+            elif pokemon_type_lower == "ground" and status_type == StatusType.PARALYSIS:
+                return f"{pokemon.name} não pode ser paralisado por ser do tipo Terra!"
+            elif pokemon_type_lower == "ghost" and status_type == StatusType.PARALYSIS:
+                return f"{pokemon.name} não pode ser paralisado por ser do tipo Fantasma!"
+
+        return f"{pokemon.name} é imune a {status_name}!"
 
 
 class StatusEffect:
@@ -101,17 +198,11 @@ class StatusEffect:
             self.icon = "💤"
             self.on_apply_callback = self._sleep_apply
 
-
         elif self.type == StatusType.FREEZE:
-
             self.name = "Congelado"
-
             self.display_name = "FRZ"
-
             self.color = (152, 216, 216)
-
             self.icon = "❄️"
-
             self.on_apply_callback = self._freeze_apply
 
         elif self.type == StatusType.CONFUSION:
