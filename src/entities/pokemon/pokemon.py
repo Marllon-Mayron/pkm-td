@@ -194,9 +194,9 @@ class Pokemon(Entity):
         self.charge_cooldown = 0.0
         self.charge_cooldown_max = 0
         if is_wild:
-            self.charge_cooldown_max = 4.0  # 3 segundos para selvagens
+            self.charge_cooldown_max = 3.0  # 3 segundos para selvagens
         else:
-            self.charge_cooldown_max = 1.5  # 1.5 segundos para aliados
+            self.charge_cooldown_max = 1.2  # 1.2 segundos para aliados
 
         # ===== 21. STATS DE COMBATE =====
         self.attack_damage = self._calculate_attack_damage()
@@ -281,7 +281,15 @@ class Pokemon(Entity):
             self.last_attacker = attacker
 
         # Delega o processamento do dano para o combat
-        return self.combat.take_damage(damage, attacker)
+        was_defeated = self.is_defeated
+        result = self.combat.take_damage(damage, attacker)
+
+        # FORÇA A VERIFICAÇÃO DE MORTE NO WAVE_MANAGER
+        if not was_defeated and self.is_defeated:
+            # Isso vai garantir que o wave_manager veja a morte no próximo update
+            print(f"[BATTLE] {self.name} foi derrotado! (forçado)")
+
+        return result
 
     def register_damage(self, attacker, damage):
         """Registra dano causado por um atacante"""
