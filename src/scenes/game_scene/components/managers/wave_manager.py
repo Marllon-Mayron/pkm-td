@@ -93,40 +93,23 @@ class WaveManager:
         return self.total_gold_earned
 
     def _update_enemy_combat(self, enemy: 'Pokemon', dt: float):
-        """Atualiza combate do inimigo SEM interferir no movimento"""
-        if not enemy.is_alive():
-            return
-
-        # Se o inimigo está derrotado, não ataca
-        if enemy.is_defeated:
+        """
+        Atualiza combate do inimigo - DELEGA para o sistema unificado.
+        A única diferença é que inimigos NÃO param para atacar.
+        """
+        if not enemy.is_alive() or enemy.is_defeated:
             return
 
         # Se o inimigo é passivo, não ataca
         if hasattr(enemy, 'attack_pattern') and enemy.attack_pattern == AttackPattern.PASSIVE:
             return
 
-        # Encontra o alvo mais próximo (aliados)
+        # DELEGA para o sistema unificado de combate
+        # O combat.update_combat já lida com toda a lógica, incluindo a diferença
+        # entre wild e not wild (inimigos atacam em movimento)
         if hasattr(self.game_scene, 'placement_manager'):
-            allies = self.game_scene.placement_manager.placed_pokemon
-            alive_allies = [a for a in allies if a.is_alive() and not a.is_defeated]
-
-            if alive_allies:
-                # Encontra o aliado mais próximo
-                nearest = min(alive_allies,
-                              key=lambda a: enemy.get_distance_to(a))
-
-                # Verifica se está no range de ataque
-                distance = enemy.get_distance_to(nearest)
-                if distance <= enemy.attack_range:
-                    # Atualiza cooldown
-                    if enemy.charge_cooldown <= 0:
-                        # Tenta atacar
-                        if hasattr(self.game_scene, 'battle_system'):
-                            success = self.game_scene.battle_system.attempt_attack(enemy, nearest)
-                            if success:
-                                enemy.charge_cooldown = enemy.charge_cooldown_max
-                    else:
-                        enemy.charge_cooldown -= dt
+            all_pokemon = self.game_scene.placement_manager.placed_pokemon
+            enemy.combat.update_combat(dt, all_pokemon)
 
     def update(self, dt: float) -> List['Pokemon']:
         """

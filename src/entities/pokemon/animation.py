@@ -102,15 +102,6 @@ class PokemonAnimation:
 
     # ===== MÉTODOS PRIVADOS DE ATUALIZAÇÃO =====
 
-    def _update_defeated_animation(self, dt):
-        """Atualiza animação de Pokémon derrotado (sleep ou idle)"""
-        target_anim = "sleep" if self.has_animation("sleep") else "idle"
-
-        if self.pokemon.current_animation != target_anim:
-            self.set_animation(target_anim)
-
-        self._advance_frame(dt)
-
     def _update_attack_animation(self, dt):
         """Atualiza animação de ataque e aplica dano no momento certo"""
         if not hasattr(self.pokemon, '_attack_animation_timer'):
@@ -127,14 +118,73 @@ class PokemonAnimation:
         if not getattr(self.pokemon, '_damage_applied',
                        False) and self.pokemon._attack_animation_timer >= damage_trigger_time:
             self.pokemon._damage_applied = True
-            if hasattr(self.pokemon, 'combat') and hasattr(self.pokemon, '_pending_attack_move'):
-                self.pokemon.combat._execute_attack()
+            # Executa o ataque
+            if hasattr(self.pokemon, '_pending_attack_target') and hasattr(self.pokemon, '_pending_attack_move'):
+                target = self.pokemon._pending_attack_target
+                move_name = self.pokemon._pending_attack_move
+
+                # Encontra o move pelo nome
+                move = None
+                for m in self.pokemon.moves:
+                    if m.name == move_name:
+                        move = m
+                        break
+
+                if move and target:
+                    self.pokemon.combat._execute_attack(target, move)
 
         # Avança ou termina animação
         if self.pokemon._attack_animation_timer >= total_duration:
             self._finish_attack_animation()
         else:
             self._advance_frame(dt)
+
+    def _update_defeated_animation(self, dt):
+        """Atualiza animação de Pokémon derrotado (sleep ou idle)"""
+        target_anim = "sleep" if self.has_animation("sleep") else "idle"
+
+        if self.pokemon.current_animation != target_anim:
+            self.set_animation(target_anim)
+
+        self._advance_frame(dt)
+
+    def _finish_attack_animation(self):
+        """Finaliza animação de ataque e restaura animação anterior"""
+        # Só executa o ataque se NÃO foi aplicado ainda
+        if not getattr(self.pokemon, '_damage_applied', False):
+            self.pokemon._damage_applied = True
+            if hasattr(self.pokemon, '_pending_attack_target') and hasattr(self.pokemon, '_pending_attack_move'):
+                target = self.pokemon._pending_attack_target
+                move_name = self.pokemon._pending_attack_move
+
+                # Encontra o move pelo nome
+                move = None
+                for m in self.pokemon.moves:
+                    if m.name == move_name:
+                        move = m
+                        break
+
+                if move and target:
+                    self.pokemon.combat._execute_attack(target, move)
+
+        # Restaura animação anterior
+        if hasattr(self.pokemon, '_saved_animation_before_attack'):
+            self.set_animation(self.pokemon._saved_animation_before_attack)
+            delattr(self.pokemon, '_saved_animation_before_attack')
+
+        # Limpa flags
+        if hasattr(self.pokemon, '_attack_animation_active'):
+            delattr(self.pokemon, '_attack_animation_active')
+        if hasattr(self.pokemon, '_attack_animation_timer'):
+            delattr(self.pokemon, '_attack_animation_timer')
+        if hasattr(self.pokemon, '_damage_applied'):
+            delattr(self.pokemon, '_damage_applied')
+        if hasattr(self.pokemon, '_damage_frame_percent'):
+            delattr(self.pokemon, '_damage_frame_percent')
+        if hasattr(self.pokemon, '_pending_attack_move'):
+            delattr(self.pokemon, '_pending_attack_move')
+        if hasattr(self.pokemon, '_pending_attack_target'):
+            delattr(self.pokemon, '_pending_attack_target')
 
     def _update_status_animation(self, status_anim: str, dt):
         """Atualiza animação de status (sleep, charge, etc)"""
@@ -239,11 +289,31 @@ class PokemonAnimation:
 
     def _finish_attack_animation(self):
         """Finaliza animação de ataque e restaura animação anterior"""
+        # Executa o ataque se ainda não foi aplicado
+        if hasattr(self.pokemon, '_pending_attack_target') and not getattr(self.pokemon, '_damage_applied', False):
+            self.pokemon._damage_applied = True
+            if hasattr(self.pokemon, 'combat') and hasattr(self.pokemon, '_pending_attack_target'):
+                move_name = getattr(self.pokemon, '_pending_attack_move', None)
+                target = self.pokemon._pending_attack_target
+
+                # Encontra o move pelo nome
+                move = None
+                for m in self.pokemon.moves:
+                    if m.name == move_name:
+                        move = m
+                        break
+
+                if move and target:
+                    self.pokemon.combat._execute_attack(target, move)
+
+        # Restaura animação anterior
         if hasattr(self.pokemon, '_saved_animation_before_attack'):
             self.set_animation(self.pokemon._saved_animation_before_attack)
             delattr(self.pokemon, '_saved_animation_before_attack')
 
-        delattr(self.pokemon, '_attack_animation_active')
+        # Limpa flags
+        if hasattr(self.pokemon, '_attack_animation_active'):
+            delattr(self.pokemon, '_attack_animation_active')
         if hasattr(self.pokemon, '_attack_animation_timer'):
             delattr(self.pokemon, '_attack_animation_timer')
         if hasattr(self.pokemon, '_damage_applied'):
@@ -252,6 +322,8 @@ class PokemonAnimation:
             delattr(self.pokemon, '_damage_frame_percent')
         if hasattr(self.pokemon, '_pending_attack_move'):
             delattr(self.pokemon, '_pending_attack_move')
+        if hasattr(self.pokemon, '_pending_attack_target'):
+            delattr(self.pokemon, '_pending_attack_target')
 
     # ===== MÉTODOS EXISTENTES (mantidos) =====
 

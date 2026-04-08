@@ -85,17 +85,23 @@ class PathTracker:
     def update_movement(self, enemy: 'Pokemon', dt: float) -> Tuple[bool, bool]:
         """
         Atualiza movimento do inimigo.
+        INIMIGOS: Podem se mover enquanto atacam (diferente dos aliados)
         Retorna (arrived_at_end, arrived_at_start)
         """
         state = self._enemy_state.get(id(enemy))
         if not state:
             return False, False
 
+        # ===== PARA INIMIGOS: Permite movimento mesmo durante animação de ataque =====
+        # (diferente dos aliados que param)
+        is_attacking = hasattr(enemy, '_attack_animation_active') and enemy._attack_animation_active
+        # Não bloqueia movimento para inimigos - eles continuam andando
+
         # Cooldown de spawn
         if state['spawn_cooldown'] > 0:
             state['spawn_cooldown'] -= dt
 
-        # Verifica status que impedem movimento
+        # Verifica status que impedem movimento (paralisia, sono, congelamento)
         if hasattr(enemy, 'combat') and enemy.combat.is_frozen():
             if enemy.combat.update_freeze(dt):
                 return False, False

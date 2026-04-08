@@ -772,39 +772,23 @@ class Pokemon(Entity):
                 self.can_attack = True
 
     def update_combat(self, dt, enemies):
-        """Atualiza lógica de combate com efeitos de status"""
+        """Atualiza lógica de combate - DELEGA para o sistema unificado"""
+        # Se está derrotado, não combate
+        if self.is_defeated:
+            return
 
-        # ===== VERIFICA STUN DA PARALISIA =====
-        if hasattr(self, 'effect_manager') and self.effect_manager:
-            status = self.effect_manager.get_status(self)
-            if status and status.type == StatusType.PARALYSIS:
-                # Atualiza o estado de paralisia
-                is_stunned = status.update_paralysis(dt)
-                if is_stunned:
-                    # Está atordoado - não pode atacar
-                    if self.combat_state == "charging":
-                        self.combat_state = "idle"
-                        self.target = None
-                    return
-
-        # ===== LÓGICA DE COMBATE NORMAL =====
-        if hasattr(self, 'battle_system') and self.battle_system and self.battle_system.effect_manager:
+        # Se tem battle_system, usa ele
+        if hasattr(self, 'battle_system') and self.battle_system:
+            # Apenas garante que o effect_manager está configurado
             pass
 
+        # Atualiza cooldown
         if self.charge_cooldown > 0:
             self.charge_cooldown -= dt
 
-        if self.target and not self.target.is_alive():
-            self.target = None
-            self.combat_state = "returning"
-            return
-
-        if self.combat_state == "idle":
-            self._handle_idle_state(dt, enemies)
-        elif self.combat_state == "charging":
-            self._handle_charging_state(dt)
-        elif self.combat_state == "returning":
-            self._handle_returning_state(dt)
+        # DELEGA para o sistema unificado de combate
+        # Passa a lista de entidades (para wild: aliados; para not wild: inimigos)
+        self.combat.update_combat(dt, enemies)
 
     def get_distance_to(self, entity):
         return self.movement.get_distance_to(entity)
