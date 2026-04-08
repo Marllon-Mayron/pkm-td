@@ -55,6 +55,28 @@ class EffectFactory:
             },
             "description": "Reduz a defesa do oponente"
         },
+        "defense-curl": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": 1,
+                "duration": 4.0
+            },
+            "description": "Aumenta sua defesa em 1 ponto."
+        },
+        "screech": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": -2,
+                "duration": 4.0
+            },
+            "description": "Diminui defesa do inimigo em 2 pontos."
+        },
         "harden": {
             "effect_type": "stat_mod",
             "target": EffectTarget.SELF,
@@ -99,7 +121,29 @@ class EffectFactory:
             },
             "description": "Aumenta muito a Velocidade"
         },
-
+        "sand-attack": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "accuracy",
+                "stages": -1,
+                "duration": 8.0
+            },
+            "description": "Reduz a Precisão do oponente",
+            "attacker_animation": "shoot",
+        },
+        "double-team": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,  # Aplica no próprio usuário
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "evasion",
+                "stages": 1,  # Aumenta evasão em 1 estágio
+                "duration": 8.0
+            },
+            "description": "Aumenta a Evasão do usuário",
+        },
         # ===== VENENO (POISON) =====
         "poison-sting": {
             "effect_type": "status_chance",
@@ -394,7 +438,16 @@ class EffectFactory:
             },
             "description": "Cura metade do dano causado"
         },
-
+        # ===== DANOS COM EFEITOS DE STATS =====
+        "karate-chop": {
+            "effect_type": "high_crit",  # Novo tipo de efeito
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "crit_stage": 1  # Aumenta estágio de crítico em 1
+            },
+            "description": "Alta taxa de acerto crítico"
+        },
     }
 
     @classmethod

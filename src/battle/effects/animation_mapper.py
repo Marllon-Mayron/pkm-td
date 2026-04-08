@@ -47,6 +47,7 @@ class AnimationMapper:
         "stun-spore": "rotate",
         "poison-powder": "rotate",
         "string-shot": "shoot",
+        "double-team": "double",
 
         # Golpes que usam animação padrão de ataque
         "tackle": "attack",

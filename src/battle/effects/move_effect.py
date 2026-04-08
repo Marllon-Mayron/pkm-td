@@ -155,7 +155,9 @@ class MoveEffect:
             return self._apply_recoil(attacker, target, damage, effect_manager)
         elif self.effect_type == "drain":
             return self._apply_drain(attacker, target, damage, effect_manager)
-
+        elif self.effect_type == "high_crit":
+            # Já tratado pelo CriticalHitSystem
+            return True
         return True
 
     def _apply_status(self, attacker, target, effect_manager):

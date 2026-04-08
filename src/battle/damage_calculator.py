@@ -6,6 +6,7 @@ from typing import Dict, Tuple, Optional
 import random
 
 from src.battle.effects import StatusType
+from src.battle.critical_hit import CriticalHitSystem
 
 
 class DamageCalculator:
@@ -182,6 +183,7 @@ class DamageCalculator:
         - hit: True se acertou, False se errou
         - message: mensagem para exibir
         - stab: True se teve STAB
+        - critical: True se foi acerto crítico
         """
         # 1. Verificar acerto (accuracy)
         hit_chance = move.accuracy / 100
@@ -191,7 +193,8 @@ class DamageCalculator:
                 "effectiveness": 1.0,
                 "hit": False,
                 "message": f"O ataque errou!",
-                "stab": False
+                "stab": False,
+                "critical": False
             }
 
         # 2. Moves de status não causam dano
@@ -201,7 +204,8 @@ class DamageCalculator:
                 "effectiveness": 1.0,
                 "hit": True,
                 "message": f"Usou {move.name}! (Efeito de status)",
-                "stab": False
+                "stab": False,
+                "critical": False
             }
 
         # 3. Power 0 = não causa dano
@@ -211,7 +215,8 @@ class DamageCalculator:
                 "effectiveness": 1.0,
                 "hit": True,
                 "message": f"Usou {move.name}!",
-                "stab": False
+                "stab": False,
+                "critical": False
             }
 
         # 4. Calcular multiplicador de tipo (inclui 4x e 0.25x)
@@ -224,13 +229,13 @@ class DamageCalculator:
                 "effectiveness": 0,
                 "hit": True,
                 "message": f"Não afeta {defender.name}!",
-                "stab": False
+                "stab": False,
+                "critical": False
             }
 
         # 5. STAB (Same Type Attack Bonus)
         stab = 1.5 if move.type in attacker.types else 1.0
 
-        # 6. Calcular stats de ataque/defesa
         # 6. Calcular stats de ataque/defesa
         if move.category == "physical":
             attack_stat = attacker.attack
@@ -262,6 +267,15 @@ class DamageCalculator:
         # Aplicar STAB e eficácia
         damage = damage * stab * effectiveness
 
+        # ===== VERIFICAÇÃO DE CRÍTICO =====
+        is_critical = False
+        if move.category != "status" and move.power > 0:
+            is_critical = CriticalHitSystem.is_critical(attacker, move.name)
+            if is_critical:
+                old_damage = damage
+                damage = CriticalHitSystem.calculate_critical_damage(damage, move.category)
+                print(f"[CRITICAL] {move.name} causou um acerto crítico! {old_damage:.0f} -> {damage:.0f} de dano!")
+
         # Random entre 0.85 e 1.0
         damage = damage * random.uniform(0.85, 1.0)
 
@@ -271,12 +285,20 @@ class DamageCalculator:
         # Mensagem baseada na eficácia
         message = cls._get_effectiveness_message(effectiveness)
 
+        # Adiciona mensagem de crítico se aplicável
+        if is_critical:
+            if message:
+                message = f"Acerto crítico! {message}"
+            else:
+                message = "Acerto crítico!"
+
         return {
             "damage": damage,
             "effectiveness": effectiveness,
             "hit": True,
             "message": message,
-            "stab": stab > 1.0
+            "stab": stab > 1.0,
+            "critical": is_critical
         }
 
     @classmethod

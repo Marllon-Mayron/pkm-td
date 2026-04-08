@@ -1,4 +1,5 @@
 # src/managers/wave/path_tracker.py
+
 import math
 from typing import List, Tuple, Optional, Dict
 from dataclasses import dataclass
@@ -79,23 +80,121 @@ class PathTracker:
             'arrival_cooldown': 0.0,
             'just_reversed_cooldown': 0.0,
             'spawn_cooldown': 0.5,
+            'ignore_path_timer': 0.0,
+            'combat_target': None,
         }
         return True
+
+    def set_ignore_path(self, enemy: 'Pokemon', duration: float = 1.0):
+        """
+        Faz o inimigo ignorar o path por um período (para combate).
+        Durante esse tempo, ele pode se mover livremente.
+        """
+        state = self._enemy_state.get(id(enemy))
+        if state:
+            state['ignore_path_timer'] = duration
+            print(f"[PathTracker] {enemy.name} ignorando path por {duration}s")
+
+    def should_ignore_path(self, enemy: 'Pokemon') -> bool:
+        """Verifica se o inimigo deve ignorar o path temporariamente"""
+        state = self._enemy_state.get(id(enemy))
+        if state:
+            return state['ignore_path_timer'] > 0
+        return False
 
     def update_movement(self, enemy: 'Pokemon', dt: float) -> Tuple[bool, bool]:
         """
         Atualiza movimento do inimigo.
-        INIMIGOS: Podem se mover enquanto atacam (diferente dos aliados)
         Retorna (arrived_at_end, arrived_at_start)
         """
         state = self._enemy_state.get(id(enemy))
         if not state:
             return False, False
 
-        # ===== PARA INIMIGOS: Permite movimento mesmo durante animação de ataque =====
-        # (diferente dos aliados que param)
-        is_attacking = hasattr(enemy, '_attack_animation_active') and enemy._attack_animation_active
-        # Não bloqueia movimento para inimigos - eles continuam andando
+        # ===== VERIFICA SE O INIMIGO DEVE PARAR DE SEGUIR O ALVO =====
+        should_abandon_target = False
+
+        if hasattr(enemy, 'target') and enemy.target:
+            # Caso 1: Alvo morreu
+            if not enemy.target.is_alive() or enemy.target.is_defeated:
+                should_abandon_target = True
+                print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} morreu! Abandonando perseguição.")
+
+            # Caso 2: Alvo está muito longe (fora do range de ataque * 2)
+            else:
+                dx = enemy.target.x - enemy.x
+                dy = enemy.target.y - enemy.y
+                distance_to_target = math.hypot(dx, dy)
+
+                # Se o alvo está muito longe (mais que 2x o range de ataque)
+                if distance_to_target > enemy.attack_range * 2:
+                    should_abandon_target = True
+                    print(
+                        f"[PathTracker] {enemy.name}: alvo {enemy.target.name} muito longe ({distance_to_target:.0f} > {enemy.attack_range * 2:.0f})! Abandonando perseguição.")
+
+            # Caso 3: Inimigo está tentando atacar há muito tempo sem sucesso
+            if hasattr(enemy, '_attack_attempts') and enemy._attack_attempts > 3:
+                should_abandon_target = True
+                print(f"[PathTracker] {enemy.name}: muitas tentativas de ataque sem sucesso! Abandonando perseguição.")
+                enemy._attack_attempts = 0
+
+        # Se deve abandonar o alvo, limpa o target e reseta o timer de ignorar path
+        if should_abandon_target:
+            enemy.target = None
+            state['ignore_path_timer'] = 0.0
+            state['combat_target'] = None
+            # Reseta estado de combate
+            enemy.combat_state = "idle"
+            if hasattr(enemy, '_attack_attempts'):
+                enemy._attack_attempts = 0
+            # Força voltar a seguir o path
+            return False, False
+
+        # ===== VERIFICA SE DEVE IGNORAR O PATH (EM COMBATE ATIVO) =====
+        is_in_combat = False
+
+        # Verifica se o inimigo tem um alvo de combate válido
+        if hasattr(enemy, 'target') and enemy.target and enemy.target.is_alive():
+            is_in_combat = True
+
+            # Calcula distância até o alvo
+            dx = enemy.target.x - enemy.x
+            dy = enemy.target.y - enemy.y
+            distance_to_target = math.hypot(dx, dy)
+
+            # Se está perto do alvo (dentro do range) ou em animação de ataque, ignora o path
+            is_attacking = hasattr(enemy, '_attack_animation_active') and enemy._attack_animation_active
+
+            if distance_to_target < enemy.attack_range or is_attacking:
+                # Mantém ou aumenta o tempo de ignorar path
+                state['ignore_path_timer'] = max(state['ignore_path_timer'], 0.5)
+                state['combat_target'] = enemy.target
+            else:
+                # Alvo está longe, não vale a pena perseguir
+                # Reseta o timer e limpa o target
+                state['ignore_path_timer'] = 0.0
+                target_name = enemy.target.name if enemy.target else "None"
+                print(
+                    f"[PathTracker] {enemy.name}: alvo {target_name} está longe ({distance_to_target:.0f}), voltando ao path.")
+                enemy.target = None
+                is_in_combat = False
+
+        # Atualiza o timer de ignorar path
+        if state['ignore_path_timer'] > 0:
+            state['ignore_path_timer'] -= dt
+
+            # Se ainda está ignorando path, NÃO processa movimento do path
+            if state['ignore_path_timer'] > 0:
+                return False, False
+
+        # Se chegou aqui, NÃO está ignorando path
+        # Limpa o alvo se ainda existir (pois não estamos mais em combate)
+        if enemy.target:
+            print(f"[PathTracker] {enemy.name}: saindo do modo combate, limpando alvo {enemy.target.name}")
+            enemy.target = None
+            enemy.combat_state = "idle"
+
+        state['combat_target'] = None
 
         # Cooldown de spawn
         if state['spawn_cooldown'] > 0:
@@ -215,41 +314,32 @@ class PathTracker:
     _DIRECTION_THRESHOLD = 0.414
 
     def _update_direction_from_movement(self, enemy: 'Pokemon', dx: float, dy: float):
-        """Atualiza direção baseada no movimento (8 direções) - LOOKUP TABLE"""
+        """Atualiza direção baseada no movimento (8 direções)"""
         if dx == 0 and dy == 0:
             return
 
         abs_dx = abs(dx)
         abs_dy = abs(dy)
 
-        # Calcula o quadrante e diagonal em um único passo
-        # Usa um código de 3 bits: [horizontal_sign][vertical_sign][is_diagonal]
-
-        h_sign = 1 if dx > 0 else -1  # direita=1, esquerda=-1
-        v_sign = 1 if dy > 0 else -1  # baixo=1, cima=-1
-
-        # Verifica se é diagonal (proporção próxima de 1:1)
-        # Uma direção é diagonal se a diferença entre os eixos for pequena
-        # |dx| e |dy| são próximos: |abs_dx - abs_dy| < min(abs_dx, abs_dy) * 0.3
+        h_sign = 1 if dx > 0 else -1
+        v_sign = 1 if dy > 0 else -1
 
         ratio = abs_dy / abs_dx if abs_dx > abs_dy else abs_dx / abs_dy
         is_diagonal = ratio > self._DIRECTION_THRESHOLD
 
         if not is_diagonal:
-            # Direção cardinal
             if abs_dx >= abs_dy:
                 enemy.current_direction = "right" if dx > 0 else "left"
             else:
                 enemy.current_direction = "down" if dy > 0 else "up"
         else:
-            # Direção diagonal
             if dx > 0 and dy > 0:
                 enemy.current_direction = "down-right"
             elif dx > 0 and dy < 0:
                 enemy.current_direction = "up-right"
             elif dx < 0 and dy > 0:
                 enemy.current_direction = "down-left"
-            else:  # dx < 0 and dy < 0
+            else:
                 enemy.current_direction = "up-left"
 
     def reverse_direction_simple(self, enemy: 'Pokemon'):
@@ -265,24 +355,14 @@ class PathTracker:
         if not state:
             return
 
-        # Guarda o path original
         original = enemy.original_path.copy()
-
-        # INVERTE O PATH (fim → início)
         enemy.path = list(reversed(original))
 
-        # O inimigo acabou de chegar ao fim, então ele está no último ponto do path original
-        # No path invertido, esse é o PRIMEIRO ponto (índice 0)
-        # Ele deve começar a andar para o PRÓXIMO ponto (índice 1)
-
         if len(enemy.path) > 1:
-            enemy.path_index = 1  # Começa do segundo ponto do path invertido
+            enemy.path_index = 1
         else:
             enemy.path_index = 0
 
-        # NÃO mexe na posição x,y - mantém onde está
-
-        # Reseta flags
         state['has_reached_start'] = False
         state['has_reached_end'] = False
         state['arrival_cooldown'] = 0.0
@@ -296,9 +376,6 @@ class PathTracker:
 
         direction = "FIM → INÍCIO" if not state['is_reversed'] else "INÍCIO → FIM"
         print(f"[PathTracker] {enemy.name} inverteu direção. Agora: {direction}")
-        print(
-            f"[PathTracker] Pos atual: ({enemy.x:.0f}, {enemy.y:.0f}), path_index: {enemy.path_index}/{len(enemy.path)}")
-        print(f"[PathTracker] Próximo ponto: {enemy.path[enemy.path_index]}")
 
     def reverse_path(self, enemy: 'Pokemon'):
         """
@@ -314,11 +391,9 @@ class PathTracker:
             print(f"[PathTracker] {enemy.name} não tem estado para reverter!")
             return
 
-        # INVERTE O PATH (fim → início vira início → fim)
         reversed_points = list(reversed(enemy.original_path.copy()))
         enemy.path = reversed_points
 
-        # ENCONTRA O PONTO MAIS PRÓXIMO no NOVO path (baseado na posição atual)
         current_x, current_y = enemy.x, enemy.y
         min_dist = float('inf')
         closest_idx = 0
@@ -329,14 +404,8 @@ class PathTracker:
                 min_dist = dist
                 closest_idx = i
 
-        # DEFINE O ÍNDICE para o ponto MAIS PRÓXIMO (NÃO avança para o próximo)
-        # Isso evita o teleporte - o inimigo continua de onde está
         enemy.path_index = closest_idx
 
-        # NÃO altera a posição do inimigo - mantém onde ele está
-        # Apenas reseta os flags
-
-        # RESETA OS FLAGS (ZERA COOLDOWNS para não travar)
         state['has_reached_start'] = False
         state['has_reached_end'] = False
         state['arrival_cooldown'] = 0.0
@@ -345,12 +414,10 @@ class PathTracker:
         state['last_pos'] = (enemy.x, enemy.y)
         state['is_reversed'] = not state['is_reversed']
 
-        # Flags para controle
         enemy._just_reversed = True
         enemy._reverse_timer = 0.0
         enemy.is_returning_with_item = False
 
-        # Força path_index válido
         if enemy.path_index >= len(enemy.path):
             enemy.path_index = len(enemy.path) - 1
         if enemy.path_index < 0:
@@ -359,12 +426,6 @@ class PathTracker:
         direction = "FIM → INÍCIO" if not state['is_reversed'] else "INÍCIO → FIM"
         print(f"[PathTracker] {enemy.name} (BOSS={enemy.is_boss}) REVERTEU PATH. Agora: {direction}. "
               f"Pos: ({enemy.x:.0f}, {enemy.y:.0f}), path_index: {enemy.path_index}/{len(enemy.path)}")
-
-    def _update_direction(self, enemy: 'Pokemon', dx: float, dy: float):
-        if abs(dx) > abs(dy):
-            enemy.current_direction = "right" if dx > 0 else "left"
-        else:
-            enemy.current_direction = "down" if dy > 0 else "up"
 
     def _calculate_length(self, points: List[Tuple[float, float]]) -> float:
         length = 0.0

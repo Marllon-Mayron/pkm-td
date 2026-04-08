@@ -251,23 +251,52 @@ class BattleSystem:
         print(f"[SOM] {move.name} - som do atacante: {move.sound_name}")
 
     def _apply_damage(self, attacker: 'Pokemon', target: 'Pokemon', damage_result: dict, move):
-        """Aplica dano a um alvo"""
+        """
+        Aplica dano a um alvo
+
+        Args:
+            attacker: Pokémon atacante
+            target: Pokémon alvo
+            damage_result: Resultado do cálculo de dano (contém damage, effectiveness, critical, etc)
+            move: Movimento usado
+        """
         damage = damage_result["damage"]
 
+        # Verifica se o movimento é inefetivo (imune)
         if damage_result["effectiveness"] == 0:
             print(f"[BATTLE] {move.name} não afeta {target.name}!")
+            self.effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
             return
 
         from src.managers.move_sound_manager import move_sound_manager
 
+        # Toca som do ataque (físico)
         if move.category == "physical":
             move_sound_manager.play_attack_sound(move.sound_name)
             print(f"[SOM] {move.name} (físico) - som do atacante: {move.sound_name}")
 
+        # Toca som de impacto
         move_sound_manager.play_hit_sound(move.sound_name)
         print(f"[SOM] {move.name} - som de impacto: {move.sound_name}_target")
 
+        # ===== EXIBE MENSAGEM DE CRÍTICO =====
+        if damage_result.get("critical", False):
+            self.effect_manager.add_status_text(attacker, "Acerto Crítico!", duration=1.0)
+            print(f"[CRITICAL] Ataque crítico de {attacker.name} causou {damage} de dano em {target.name}!")
+
+        # ===== EXIBE MENSAGEM DE SUPER EFETIVO =====
+        if damage_result["effectiveness"] > 1.0:
+            self.effect_manager.add_status_text(attacker, "Super efetivo!", duration=0.8)
+
+        # ===== EXIBE MENSAGEM DE NÃO MUITO EFETIVO =====
+        elif 0 < damage_result["effectiveness"] < 1.0:
+            self.effect_manager.add_status_text(attacker, "Não é muito efetivo...", duration=0.8)
+
+        # Aplica o dano ao alvo
         target.take_damage(damage, attacker=attacker)
+
+        # Log do dano causado
+        print(f"[DAMAGE] {attacker.name} causou {damage} de dano a {target.name} com {move.name}!")
 
     def _calculate_move_damage(self, attacker, target, move):
         """Calcula dano do move com modificadores de stat"""

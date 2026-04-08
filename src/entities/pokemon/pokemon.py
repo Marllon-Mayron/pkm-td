@@ -192,7 +192,11 @@ class Pokemon(Entity):
 
         # ===== 20. COOLDOWNS =====
         self.charge_cooldown = 0.0
-        self.charge_cooldown_max = 1.5
+        self.charge_cooldown_max = 0
+        if is_wild:
+            self.charge_cooldown_max = 4.0  # 3 segundos para selvagens
+        else:
+            self.charge_cooldown_max = 1.5  # 1.5 segundos para aliados
 
         # ===== 21. STATS DE COMBATE =====
         self.attack_damage = self._calculate_attack_damage()

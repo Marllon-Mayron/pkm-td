@@ -756,7 +756,7 @@
                 ],
                 "min_level": 2,
                 "max_level": 5,
-                "wave_size": 1,
+                "wave_size": 6,
                 "spawn_interval": 3.0,
                 "initial_delay": 2.0,
                 "repeat_wave": false,

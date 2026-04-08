@@ -132,6 +132,9 @@ class WaveManager:
                 if not hasattr(enemy, 'camera') or enemy.camera is None:
                     enemy.camera = self.game_scene.camera
 
+            # ===== PASSA O PATH TRACKER PARA O INIMIGO =====
+            enemy._path_tracker = self.path_tracker
+
             self.active_enemies.append(enemy)
             # Configura batalha para o novo inimigo
             if self.game_scene and hasattr(self.game_scene, 'battle_system'):
@@ -158,6 +161,26 @@ class WaveManager:
 
             # Pula se o inimigo não tem path
             if not hasattr(enemy, 'path') or not enemy.path:
+                continue
+
+            # ===== VERIFICA SE DEVE IGNORAR O PATH (EM COMBATE) =====
+            # Se o inimigo está em combate e tem um alvo vivo, NÃO atualiza movimento do path
+            should_skip_path = False
+
+            if hasattr(enemy, 'target') and enemy.target and enemy.target.is_alive():
+                # Verifica se está perto do alvo ou atacando
+                dx = enemy.target.x - enemy.x
+                dy = enemy.target.y - enemy.y
+                distance_to_target = math.hypot(dx, dy)
+                is_attacking = hasattr(enemy, '_attack_animation_active') and enemy._attack_animation_active
+
+                if distance_to_target < enemy.attack_range or is_attacking:
+                    should_skip_path = True
+
+            # Se deve ignorar o path, apenas atualiza combate e continua
+            if should_skip_path:
+                self._update_enemy_combat(enemy, dt)
+                self._update_animation(enemy, dt)
                 continue
 
             # Atualiza movimento (NÃO interfere no combate)
