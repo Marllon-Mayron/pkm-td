@@ -220,6 +220,10 @@ class StatusEffect:
         """
         damage = max(1, pokemon.max_hp // 8)
         pokemon.current_hp = max(0, pokemon.current_hp - damage)
+
+        # VERIFICA SE MORREU PELO DANO DO STATUS
+        if pokemon.current_hp <= 0:
+            pokemon.set_defeated(True)
         return damage
 
     def _toxic_poison_tick(self, pokemon, effect_manager):
@@ -231,6 +235,10 @@ class StatusEffect:
         pokemon.current_hp = max(0, pokemon.current_hp - damage)
         effect_manager.add_status_text(pokemon, f"-{damage} HP (Tóxico!)")
         print(f"[TOXIC] {pokemon.name} perdeu {damage} HP por veneno tóxico (tick {self._toxic_tick_count})!")
+
+        # VERIFICA SE MORREU PELO DANO DO STATUS
+        if pokemon.current_hp <= 0:
+            pokemon.set_defeated(True)
         return damage
 
     def _burn_tick(self, pokemon, effect_manager):
@@ -239,6 +247,10 @@ class StatusEffect:
         """
         damage = max(1, pokemon.max_hp // 16)
         pokemon.current_hp = max(0, pokemon.current_hp - damage)
+
+        # VERIFICA SE MORREU PELO DANO DO STATUS
+        if pokemon.current_hp <= 0:
+            pokemon.set_defeated(True)
         return damage
 
     def _burn_apply(self, pokemon, effect_manager):

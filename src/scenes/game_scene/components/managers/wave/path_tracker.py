@@ -133,7 +133,7 @@ class PathTracker:
                         f"[PathTracker] {enemy.name}: alvo {enemy.target.name} muito longe ({distance_to_target:.0f} > {enemy.attack_range * 2:.0f})! Abandonando perseguição.")
 
             # Caso 3: Inimigo está tentando atacar há muito tempo sem sucesso
-            if hasattr(enemy, '_attack_attempts') and enemy._attack_attempts > 3:
+            if hasattr(enemy, '_attack_attempts') and enemy._attack_attempts > 5:
                 should_abandon_target = True
                 print(f"[PathTracker] {enemy.name}: muitas tentativas de ataque sem sucesso! Abandonando perseguição.")
                 enemy._attack_attempts = 0
@@ -148,6 +148,7 @@ class PathTracker:
             if hasattr(enemy, '_attack_attempts'):
                 enemy._attack_attempts = 0
             # Força voltar a seguir o path
+            print(f"[PathTracker] {enemy.name}: voltando ao path normal!")
             return False, False
 
         # ===== VERIFICA SE DEVE IGNORAR O PATH (EM COMBATE ATIVO) =====
@@ -162,10 +163,23 @@ class PathTracker:
             dy = enemy.target.y - enemy.y
             distance_to_target = math.hypot(dx, dy)
 
+            # Obtém o move atual para saber o range necessário
+            current_move = None
+            if hasattr(enemy, 'get_current_move_for_pattern'):
+                current_move = enemy.get_current_move_for_pattern()
+            elif hasattr(enemy, 'get_current_move'):
+                current_move = enemy.get_current_move()
+
+            # Define o range de ataque baseado no tipo de move
+            if current_move and current_move.category == "physical":
+                required_range = 25  # Distância para ataque físico
+            else:
+                required_range = enemy.attack_range
+
             # Se está perto do alvo (dentro do range) ou em animação de ataque, ignora o path
             is_attacking = hasattr(enemy, '_attack_animation_active') and enemy._attack_animation_active
 
-            if distance_to_target < enemy.attack_range or is_attacking:
+            if distance_to_target < required_range or is_attacking:
                 # Mantém ou aumenta o tempo de ignorar path
                 state['ignore_path_timer'] = max(state['ignore_path_timer'], 0.5)
                 state['combat_target'] = enemy.target
