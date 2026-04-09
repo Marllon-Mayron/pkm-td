@@ -111,8 +111,17 @@ class PathTracker:
         if not state:
             return False, False
 
-        # ===== VERIFICA SE O ALVO AINDA ESTÁ NO MAPA =====
+        # ===== VERIFICA SE O ALVO AINDA ESTÁ VÁLIDO =====
         if hasattr(enemy, 'target') and enemy.target:
+            # Verifica se o alvo ainda está vivo
+            if not enemy.target.is_alive() or enemy.target.is_defeated:
+                print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} morreu! Abandonando.")
+                enemy.target = None
+                state['ignore_path_timer'] = 0.0
+                state['combat_target'] = None
+                enemy.combat_state = "idle"
+                return False, False
+
             # Verifica se o alvo ainda está no mapa (is_placed)
             if not hasattr(enemy.target, 'is_placed') or not enemy.target.is_placed:
                 print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} não está mais no mapa! Abandonando.")
@@ -133,39 +142,44 @@ class PathTracker:
         should_abandon_target = False
 
         if hasattr(enemy, 'target') and enemy.target:
-            # Caso 1: Alvo morreu
-            if not enemy.target.is_alive() or enemy.target.is_defeated or not enemy.is_placed:
-                should_abandon_target = True
-                print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} morreu! Abandonando perseguição.")
+            # Calcula distância até o alvo
+            dx = enemy.target.x - enemy.x
+            dy = enemy.target.y - enemy.y
+            distance_to_target = math.hypot(dx, dy)
 
-            # Caso 2: Alvo está muito longe (fora do range de ataque * 2)
+            # Obtém o move atual para saber o range necessário
+            current_move = None
+            if hasattr(enemy, 'get_current_move_for_pattern'):
+                current_move = enemy.get_current_move_for_pattern()
+            elif hasattr(enemy, 'get_current_move'):
+                current_move = enemy.get_current_move()
+
+            # Define o range máximo para considerar o alvo válido (2x o range de ataque)
+            if current_move and current_move.category == "physical":
+                max_range = 50  # Para físicos, range máximo é 50
             else:
-                dx = enemy.target.x - enemy.x
-                dy = enemy.target.y - enemy.y
-                distance_to_target = math.hypot(dx, dy)
+                max_range = enemy.attack_range * 2  # Para especiais/status, 2x o range
 
-                # Se o alvo está muito longe (mais que 2x o range de ataque)
-                if distance_to_target > enemy.attack_range * 2:
-                    should_abandon_target = True
-                    print(
-                        f"[PathTracker] {enemy.name}: alvo {enemy.target.name} muito longe ({distance_to_target:.0f} > {enemy.attack_range * 2:.0f})! Abandonando perseguição.")
+            # Se o alvo está muito longe, abandona
+            if distance_to_target > max_range:
+                should_abandon_target = True
+                print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} muito longe "
+                      f"({distance_to_target:.0f} > {max_range:.0f})! Abandonando perseguição.")
 
-            # Caso 3: Inimigo está tentando atacar há muito tempo sem sucesso
+            # Se tentou atacar muitas vezes sem sucesso, abandona
             if hasattr(enemy, '_attack_attempts') and enemy._attack_attempts > 5:
                 should_abandon_target = True
-                print(f"[PathTracker] {enemy.name}: muitas tentativas de ataque sem sucesso! Abandonando perseguição.")
+                print(f"[PathTracker] {enemy.name}: muitas tentativas de ataque sem sucesso! Abandonando.")
                 enemy._attack_attempts = 0
 
-        # Se deve abandonar o alvo, limpa o target e reseta o timer de ignorar path
+        # Se deve abandonar o alvo, limpa o target e reseta o timer
         if should_abandon_target:
             enemy.target = None
             state['ignore_path_timer'] = 0.0
             state['combat_target'] = None
-            # Reseta estado de combate
             enemy.combat_state = "idle"
             if hasattr(enemy, '_attack_attempts'):
                 enemy._attack_attempts = 0
-            # Força voltar a seguir o path
             print(f"[PathTracker] {enemy.name}: voltando ao path normal!")
             return False, False
 
@@ -203,7 +217,6 @@ class PathTracker:
                 state['combat_target'] = enemy.target
             else:
                 # Alvo está longe, não vale a pena perseguir
-                # Reseta o timer e limpa o target
                 state['ignore_path_timer'] = 0.0
                 target_name = enemy.target.name if enemy.target else "None"
                 print(
@@ -261,7 +274,7 @@ class PathTracker:
         if enemy.path_index >= len(enemy.path):
             enemy.path_index = len(enemy.path) - 1
 
-        # CORREÇÃO: Verifica se está no primeiro ponto (INÍCIO)
+        # Verifica se está no primeiro ponto (INÍCIO)
         if enemy.path_index == 0:
             target_x, target_y = enemy.path[enemy.path_index]
             dx = target_x - enemy.x
@@ -276,7 +289,7 @@ class PathTracker:
                         print(f"[PathTracker] {enemy.name} chegou ao INÍCIO!")
                         return False, True
 
-        # CORREÇÃO: Verifica se está no último ponto (FIM)
+        # Verifica se está no último ponto (FIM)
         if enemy.path_index == len(enemy.path) - 1:
             target_x, target_y = enemy.path[enemy.path_index]
             dx = target_x - enemy.x
@@ -318,7 +331,7 @@ class PathTracker:
                         print(f"[PathTracker] {enemy.name} chegou ao FIM!")
                         return True, False
 
-            # CORREÇÃO: Verifica chegada ao INÍCIO (depois de passar do primeiro ponto para trás)
+            # Verifica chegada ao INÍCIO (depois de passar do primeiro ponto para trás)
             elif enemy.path_index < 0:
                 if state['spawn_cooldown'] <= 0 and state['just_reversed_cooldown'] <= 0:
                     if not state['has_reached_start'] and state['arrival_cooldown'] <= 0:
