@@ -1115,6 +1115,7 @@ class Pokemon(Entity):
 
         self.current_animation = "idle"
         self.combat_state = "idle"
+        self.spot_id = None
         self.is_moving = False
         self.is_placed = False
 

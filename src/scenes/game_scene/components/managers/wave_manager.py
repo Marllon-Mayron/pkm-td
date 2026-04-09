@@ -391,7 +391,7 @@ class WaveManager:
             enemy.clear_damage_tracking()
 
     def _distribute_xp(self, defeated_enemy: 'Pokemon'):
-        """Distribui XP quando um inimigo é derrotado"""
+        """Distribui XP e EVs quando um inimigo é derrotado"""
         contributors = defeated_enemy.get_xp_contributors()
         if not contributors:
             return
@@ -400,7 +400,7 @@ class WaveManager:
 
         # Bônus para boss
         if defeated_enemy.is_boss:
-            base_xp = int(base_xp * 3)  # Boss dá 3x mais XP
+            base_xp = int(base_xp * 3)
             print(f"[XP] BOSS derrotado! XP base: {base_xp}")
 
         if defeated_enemy.is_shiny:
@@ -417,16 +417,50 @@ class WaveManager:
         if not placement_manager:
             return
 
+        # Obtém os EVs concedidos pelo inimigo derrotado
+        ev_yield = self.game_scene.pokedex.get_ev_yield(defeated_enemy.id)
+
+        # Aplica multiplicadores para boss/shiny
+        ev_multiplier = 1.0
+        if defeated_enemy.is_boss:
+            ev_multiplier *= 3  # Boss dá 3x mais EVs
+        if defeated_enemy.is_shiny:
+            ev_multiplier *= 2  # Shiny dá 2x mais EVs
+
+        if ev_multiplier > 1:
+            print(f"[EVS] Multiplicador de EVs: {ev_multiplier}x (Boss/Shiny)")
+
         for attacker_id, contribution in contributors:
             proportion = contribution / total_contribution
             xp_gained = int(base_xp * proportion)
+
+            # EVs são distribuídos proporcionalmente também
+            evs_gained = {}
+            for stat, value in ev_yield.items():
+                if value > 0:
+                    # Garante no mínimo 1 EV se contribuiu
+                    ev_value = max(1, int(value * proportion * ev_multiplier))
+                    evs_gained[stat] = ev_value
 
             if xp_gained < 1 and contribution > 0:
                 xp_gained = 1
 
             for pokemon in placement_manager.placed_pokemon:
                 if id(pokemon) == attacker_id and pokemon.is_alive():
+                    # Ganha XP
+                    old_level = pokemon.level
                     pokemon.gain_xp(xp_gained)
+
+                    # Ganha EVs (apenas se ainda pode ganhar)
+                    if any(evs_gained.values()):
+                        if pokemon.stats.can_gain_evs(evs_gained):
+                            pokemon.stats.gain_evs(evs_gained)
+                            print(f"[DISTRIBUTE] {pokemon.name} ganhou {xp_gained} XP e EVs: {evs_gained}")
+                        else:
+                            print(
+                                f"[DISTRIBUTE] {pokemon.name} ganhou {xp_gained} XP (EVs bloqueados - limite atingido)")
+                    else:
+                        print(f"[DISTRIBUTE] {pokemon.name} ganhou {xp_gained} XP")
                     break
 
     def _update_animation(self, enemy, dt):

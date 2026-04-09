@@ -133,6 +133,7 @@ class GameScene(BaseScene):
     def _start_game(self):
         """Inicia o jogo"""
         # ===== RESTAURA COMPLETAMENTE TODOS OS POKÉMON =====
+        self.cleanup()
         for pokemon in self.player.team:
             pokemon.reset(self)
 
@@ -568,6 +569,7 @@ class GameScene(BaseScene):
         for spot in self.spot_renderer.get_spots():
             spot.occupied = False
 
+        self.battle_system = BattleSystem(self)
         self.placed_pokemon.clear()
         self.placement_manager.placed_pokemon.clear()
 

@@ -86,7 +86,7 @@ class Pokedex:
                         "special_defense": pokemon["base"]["special-defense"],
                         "speed": pokemon["base"]["speed"]
                     },
-                    "ev_yield": {
+                    "ev_yield": {  # <--- JÁ TEMOS ISSO!
                         "hp": pokemon["ev"]["hp"],
                         "attack": pokemon["ev"]["attack"],
                         "defense": pokemon["ev"]["defense"],
@@ -99,7 +99,6 @@ class Pokedex:
                 }
 
             print(f"Carregados {len(self.pokemon_data)} Pokémon do JSON")
-
             self._cache_base_speed_limits()
 
         except Exception as e:
@@ -370,6 +369,15 @@ class Pokedex:
             "hp": 50, "attack": 50, "defense": 50,
             "special_attack": 50, "special_defense": 50, "speed": 50
         }
+
+    def get_ev_yield(self, pokemon_id: int) -> Dict[str, int]:
+        """Retorna os EVs concedidos por um Pokémon quando derrotado"""
+        pokemon = self.get_pokemon(pokemon_id)
+        if pokemon and "ev_yield" in pokemon:
+            return pokemon["ev_yield"]
+        # Fallback: concede 1 HP EV por padrão
+        return {"hp": 1, "attack": 0, "defense": 0,
+                "special_attack": 0, "special_defense": 0, "speed": 0}
 
     def _get_placeholder_color(self, pokemon_id):
         """Gera cor baseada no ID para placeholder"""
