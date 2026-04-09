@@ -129,6 +129,28 @@ class PathTracker:
                 state['combat_target'] = None
                 return False, False
 
+            # ===== NOVO: VERIFICA SE O ALVO SAIU DO RANGE PARA ATAQUES FÍSICOS =====
+            current_move = None
+            if hasattr(enemy, 'get_current_move_for_pattern'):
+                current_move = enemy.get_current_move_for_pattern()
+            elif hasattr(enemy, 'get_current_move'):
+                current_move = enemy.get_current_move()
+
+            if current_move and current_move.category == "physical":
+                dx = enemy.target.x - enemy.x
+                dy = enemy.target.y - enemy.y
+                distance_to_target = math.hypot(dx, dy)
+                physical_attack_range = 25
+
+                # Se o alvo está muito longe (fora do range * 1.5), abandona
+                if distance_to_target > physical_attack_range * 1.5:
+                    print(
+                        f"[PathTracker] {enemy.name}: alvo {enemy.target.name} saiu do range físico ({distance_to_target:.0f} > {physical_attack_range * 1.5:.0f})! Abandonando.")
+                    enemy.target = None
+                    state['ignore_path_timer'] = 0.0
+                    state['combat_target'] = None
+                    return False, False
+
         # ===== VERIFICA SE O INIMIGO DEVE PARAR DE SEGUIR O ALVO =====
         should_abandon_target = False
 
