@@ -431,10 +431,6 @@ class MoveEffect:
             heal_amount = actual_damage
             source.current_hp = min(source.max_hp, source.current_hp + heal_amount)
 
-            # Feedback visual
-            effect_manager.add_status_text(target, f"-{actual_damage} HP (Semente)")
-            effect_manager.add_status_text(source, f"+{heal_amount} HP (Semente)")
-
             print(f"[LEECH_SEED] {target.name} perdeu {actual_damage} HP, {source.name} recuperou {heal_amount} HP")
 
             # Toca som de dreno
