@@ -48,19 +48,30 @@ class ResidualEffect:
         if effect_type == ResidualEffectType.LEECH_SEED:
             self.seed_source = source
 
-    def update(self, dt: float):
-        """Atualiza todos os efeitos residuais"""
-        to_remove = []
+    def update(self, dt: float) -> bool:
+        """
+        Atualiza o efeito residual.
+        Retorna True se ainda está ativo, False se terminou.
+        """
+        if not self.is_active:
+            return False
 
-        for effect in self.effects:  # Não precisa de cópia
-            still_active = effect.update(dt)
-            if not still_active:
-                to_remove.append(effect)
+        self.timer += dt
 
-        # Remove depois da iteração
-        for effect in to_remove:
-            if effect in self.effects:
-                self.effects.remove(effect)
+        if self.timer >= self.tick_interval:
+            self.timer = 0
+            self.duration -= 1
+
+            # Executa o tick
+            if self.on_tick_callback:
+                self.on_tick_callback(self)
+
+            # Se acabou a duração, remove
+            if self.duration <= 0:
+                self.remove()
+                return False
+
+        return True
 
     def remove(self):
         """Remove o efeito residual"""
@@ -126,9 +137,16 @@ class ResidualEffectManager:
 
     def update(self, dt: float):
         """Atualiza todos os efeitos residuais"""
-        for effect in self.effects[:]:
+        to_remove = []
+
+        for effect in self.effects:  # Não precisa de cópia
             still_active = effect.update(dt)
             if not still_active:
+                to_remove.append(effect)
+
+        # Remove depois da iteração
+        for effect in to_remove:
+            if effect in self.effects:
                 self.effects.remove(effect)
 
     def clear_all(self):
