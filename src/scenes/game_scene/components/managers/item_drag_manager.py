@@ -334,7 +334,7 @@ class ItemDragManager:
 
         # Restaura cursor
         pygame.mouse.set_cursor(self.normal_cursor)
-
+        self.game.player.auto_save()
         return result
 
     def cancel_drag(self):

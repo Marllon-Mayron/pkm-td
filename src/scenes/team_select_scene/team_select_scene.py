@@ -218,6 +218,22 @@ class TeamSelectScene(BaseScene):
         elif action_type == 'CLOSE_MODAL':
             self.event_handler.set_modal(None)
 
+        elif action_type == 'RELEASE_POKEMON':
+            modal = self.event_handler.modal
+            if modal and modal.pokemon:
+                pokemon_to_release = modal.pokemon
+
+                # Liberta o Pokémon
+                self.pokemon_manager.release_pokemon(pokemon_to_release)
+
+                # Fecha o modal
+                self.event_handler.set_modal(None)
+
+                # Recria o layout (atualiza grid e slots)
+                self.layout_initialized = False
+
+                print(f"Pokémon {pokemon_to_release.name} libertado com sucesso!")
+
         elif action_type == 'RESIZE':
             pass
 

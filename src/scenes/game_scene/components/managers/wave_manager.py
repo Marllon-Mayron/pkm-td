@@ -355,6 +355,7 @@ class WaveManager:
                 enemy.is_carrying = None
 
         self._remove_enemy(enemy)
+        self.game_scene.player.auto_save()
 
     def _steal_item(self, enemy: 'Pokemon'):
         """

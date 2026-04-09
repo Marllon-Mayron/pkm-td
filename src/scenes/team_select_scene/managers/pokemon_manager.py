@@ -92,3 +92,25 @@ class PokemonManager:
                     self.player.auto_save()
                     return True
         return False
+
+    def release_pokemon(self, pokemon):
+        """Liberta um Pokémon (remove da box e do time se estiver nele)"""
+        # Remove do time se estiver lá
+        if pokemon.is_in_team:
+            for i, p in enumerate(self.player.team):
+                if p is pokemon:
+                    self.player.remove_from_team(i)
+                    break
+
+        # Remove da PC Box
+        if pokemon in self.player.pc_box:
+            self.player.pc_box.remove(pokemon)
+
+        # Atualiza status
+        pokemon.is_in_team = False
+
+        # Salva
+        self.player.auto_save()
+
+        print(f"[RELEASE] {pokemon.name} foi libertado!")
+        return True

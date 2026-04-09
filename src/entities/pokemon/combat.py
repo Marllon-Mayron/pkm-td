@@ -273,7 +273,13 @@ class PokemonCombat:
 
         # Se tem alvo e pode atacar
         if self.pokemon.target and self.pokemon.charge_cooldown <= 0:
-            self._try_attack(self.pokemon.target, dt)
+            if self.pokemon.is_wild:
+                if not self.pokemon.target.is_placed:
+                    self.pokemon.target = None
+                else:
+                    self._try_attack(self.pokemon.target, dt)
+            else:
+                self._try_attack(self.pokemon.target, dt)
 
     def _try_attack(self, target: 'Pokemon', dt: float):
         """Tenta atacar o alvo - UNIFICADO para aliados e inimigos"""
@@ -765,7 +771,7 @@ class PokemonCombat:
 
     def handle_charging_state(self, dt):
         if self.pokemon.is_wild:
-            if self.pokemon.target and self.pokemon.target.is_alive():
+            if self.pokemon.target and self.pokemon.target.is_alive() and self.pokemon.target.is_placed:
                 self._try_attack(self.pokemon.target, dt)
             else:
                 self.pokemon.combat_state = "idle"

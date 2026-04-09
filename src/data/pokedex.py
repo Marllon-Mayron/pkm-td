@@ -392,26 +392,17 @@ class Pokedex:
         return self.type_colors.get(type_name.lower(), (150, 150, 150))
 
     def calculate_stats(self, pokemon_id, level, ivs=None, evs=None):
-        """Calcula stats reais baseado em level, IVs e EVs"""
         base = self.get_base_stats(pokemon_id)
 
-        if ivs is None:
-            ivs = {"hp": 15, "attack": 15, "defense": 15,
-                   "special_attack": 15, "special_defense": 15, "speed": 15}
-
-        if evs is None:
-            evs = {"hp": 0, "attack": 0, "defense": 0,
-                   "special_attack": 0, "special_defense": 0, "speed": 0}
+        # Use a mesma constante do stats.py
+        EV_DIVISOR = 8  # Mude de 4 para 8
 
         stats = {}
 
-        stats["hp"] = int(((2 * base["hp"] + ivs["hp"] + (evs["hp"] // 4)) * level) / 100) + level + 10
+        stats["hp"] = int(((2 * base["hp"] + ivs["hp"] + (evs["hp"] // EV_DIVISOR)) * level) / 100) + level + 10
 
         for stat in ["attack", "defense", "special_attack", "special_defense", "speed"]:
-            base_val = base[stat]
-            iv_val = ivs[stat]
-            ev_val = evs[stat]
-            stats[stat] = int(((2 * base_val + iv_val + (ev_val // 4)) * level) / 100) + 5
+            stats[stat] = int(((2 * base[stat] + ivs[stat] + (evs[stat] // EV_DIVISOR)) * level) / 100) + 5
 
         return stats
 

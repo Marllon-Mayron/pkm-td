@@ -12,6 +12,7 @@ class PokemonModal:
         self.visible = True
         self.current_page = 0
         self.total_pages = 3
+        self.confirmation_active = False  # Estado da confirmação de libertação
         self._setup_dimensions()
 
         self.particle_timer = 0
@@ -104,13 +105,51 @@ class PokemonModal:
             page_button_height
         )
 
-        button_width = 200
+        # Configuração dos dois botões lado a lado
+        button_width = 165
         button_height = 44
+        button_spacing = 15
+
+        # Calcula posição central para os dois botões
+        total_buttons_width = (button_width * 2) + button_spacing
+        start_x = self.x + (self.width - total_buttons_width) // 2
+
+        # Botão de ação (adicionar/remover) - ESQUERDA
         self.action_button = pygame.Rect(
-            self.x + (self.width - button_width) // 2,
+            start_x,
             self.y + self.height - 60,
             button_width,
             button_height
+        )
+
+        # Botão de libertar - DIREITA
+        self.release_button = pygame.Rect(
+            start_x + button_width + button_spacing,
+            self.y + self.height - 60,
+            button_width,
+            button_height
+        )
+
+        # Botões de confirmação (SIM/NÃO)
+        confirm_width = 110
+        confirm_height = 40
+        confirm_spacing = 20
+        confirm_y = self.y + self.height - 130
+
+        confirm_start_x = self.x + (self.width - (confirm_width * 2 + confirm_spacing)) // 2
+
+        self.confirm_yes_button = pygame.Rect(
+            confirm_start_x,
+            confirm_y,
+            confirm_width,
+            confirm_height
+        )
+
+        self.confirm_no_button = pygame.Rect(
+            confirm_start_x + confirm_width + confirm_spacing,
+            confirm_y,
+            confirm_width,
+            confirm_height
         )
 
     def _create_shiny_particles(self, sprite_x, sprite_y, sprite_size):
@@ -157,25 +196,48 @@ class PokemonModal:
             return None
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Fechar modal
             if self.close_button.collidepoint(event.pos):
                 self.visible = False
+                self.confirmation_active = False
                 return "close"
 
+            # Navegação de páginas
             if self.prev_page_button.collidepoint(event.pos) and self.current_page > 0:
                 self.current_page -= 1
+                self.confirmation_active = False
                 return None
 
             if self.next_page_button.collidepoint(event.pos) and self.current_page < self.total_pages - 1:
                 self.current_page += 1
+                self.confirmation_active = False
                 return None
 
+            # Se confirmação está ativa, processa SIM/NÃO
+            if self.confirmation_active:
+                if self.confirm_yes_button.collidepoint(event.pos):
+                    self.confirmation_active = False
+                    return "release_confirm"
+                elif self.confirm_no_button.collidepoint(event.pos):
+                    self.confirmation_active = False
+                    return None
+                return None
+
+            # Botão de ação (adicionar/remover)
             if self.action_button.collidepoint(event.pos):
                 if not self.pokemon.is_in_team and len(self.game.player.team) >= 6:
                     return None
                 return "action"
 
+            # Botão de libertar - ativa confirmação
+            if self.release_button.collidepoint(event.pos):
+                self.confirmation_active = True
+                return None
+
+            # Fechar ao clicar fora
             if not self.rect.collidepoint(event.pos):
                 self.visible = False
+                self.confirmation_active = False
                 return "close"
 
         return None
@@ -317,6 +379,65 @@ class PokemonModal:
         screen.blit(prev_text, (self.prev_page_button.centerx - 8, self.prev_page_button.centery - 11))
         screen.blit(next_text, (self.next_page_button.centerx - 8, self.next_page_button.centery - 11))
 
+        # Se confirmação está ativa, mostra overlay de confirmação
+        if self.confirmation_active:
+            # Overlay escuro semi-transparente para destacar confirmação
+            confirm_overlay = pygame.Surface((self.width, self.height))
+            confirm_overlay.set_alpha(200)
+            confirm_overlay.fill((0, 0, 0))
+            screen.blit(confirm_overlay, (self.x, self.y))
+
+            # Fundo da caixa de confirmação
+            confirm_box = pygame.Rect(
+                self.x + self.width // 4,
+                self.y + self.height // 3,
+                self.width // 2,
+                110
+            )
+            self._draw_rounded_rect(screen, self.colors['bg_secondary'], confirm_box, radius=12)
+            self._draw_rounded_rect(screen, self.colors['border'], confirm_box, radius=12, border=2)
+
+            # Texto de confirmação
+            confirm_font = pygame.font.Font(None, 20)
+            confirm_text = confirm_font.render("Tem certeza que deseja LIBERTAR este Pokémon?", True, (255, 200, 200))
+            confirm_rect = confirm_text.get_rect(center=(confirm_box.centerx, confirm_box.y + 30))
+            screen.blit(confirm_text, confirm_rect)
+
+            # Aviso de irreversibilidade
+            warning_font = pygame.font.Font(None, 14)
+            warning_text = warning_font.render("Esta ação é IRREVERSÍVEL!", True, (255, 100, 100))
+            warning_rect = warning_text.get_rect(center=(confirm_box.centerx, confirm_box.y + 55))
+            screen.blit(warning_text, warning_rect)
+
+            # Nome do Pokémon sendo libertado
+            pokemon_font = pygame.font.Font(None, 18)
+            pokemon_text = pokemon_font.render(f"{self.pokemon.name} Lv.{self.pokemon.level}", True,
+                                               self.colors['text_accent'])
+            pokemon_rect = pokemon_text.get_rect(center=(confirm_box.centerx, confirm_box.y + 78))
+            screen.blit(pokemon_text, pokemon_rect)
+
+            # Botão SIM
+            self._draw_rounded_rect(screen, (180, 60, 60), self.confirm_yes_button, radius=8)
+            self._draw_rounded_rect(screen, (220, 80, 80), self.confirm_yes_button, radius=8, border=1)
+            sim_font = pygame.font.Font(None, 18)
+            sim_text = sim_font.render("SIM, LIBERTAR", True, (255, 255, 255))
+            sim_rect = sim_text.get_rect(center=self.confirm_yes_button.center)
+            screen.blit(sim_text, sim_rect)
+
+            # Botão NÃO
+            self._draw_rounded_rect(screen, (60, 60, 80), self.confirm_no_button, radius=8)
+            self._draw_rounded_rect(screen, (80, 80, 100), self.confirm_no_button, radius=8, border=1)
+            nao_font = pygame.font.Font(None, 18)
+            nao_text = nao_font.render("NÃO, CANCELAR", True, (255, 255, 255))
+            nao_rect = nao_text.get_rect(center=self.confirm_no_button.center)
+            screen.blit(nao_text, nao_rect)
+
+            # Não renderiza os botões normais em modo confirmação
+            return
+
+        # Renderiza botões normais (quando não está em confirmação)
+
+        # Botão de ação (Adicionar/Remover)
         if self.pokemon.is_in_team:
             button_color = (120, 60, 60)
             button_text = "REMOVER DO TIME"
@@ -331,22 +452,37 @@ class PokemonModal:
         self._draw_rounded_rect(screen, button_color, self.action_button, radius=10)
         self._draw_rounded_rect(screen, (100, 105, 115), self.action_button, radius=10, border=1)
 
-        action_font = pygame.font.Font(None, 18)
+        action_font = pygame.font.Font(None, 15)
         action_surf = action_font.render(button_text, True, (255, 255, 255))
         action_rect = action_surf.get_rect(center=self.action_button.center)
         screen.blit(action_surf, action_rect)
 
+        # Botão de LIBERTAR
+        if self.pokemon.is_in_team:
+            release_color = (150, 40, 40)  # Vermelho escuro
+            release_text = "LIBERTAR"
+        else:
+            release_color = (180, 50, 50)  # Vermelho vivo
+            release_text = "LIBERTAR"
+
+        self._draw_rounded_rect(screen, release_color, self.release_button, radius=10)
+        self._draw_rounded_rect(screen, (200, 70, 70), self.release_button, radius=10, border=1)
+
+        release_font = pygame.font.Font(None, 15)
+        release_surf = release_font.render(release_text, True, (255, 255, 255))
+        release_rect = release_surf.get_rect(center=self.release_button.center)
+        screen.blit(release_surf, release_rect)
+
     def _render_stats_page(self, screen, content_rect):
         section_font = pygame.font.Font(None, 18)
 
-        # Ajuste para acomodar a nova seção de EVs
         left_width = content_rect.width * 0.48
         right_width = content_rect.width * 0.48
         left_col = pygame.Rect(content_rect.x, content_rect.y, left_width, content_rect.height)
         right_col = pygame.Rect(content_rect.x + left_width + 15, content_rect.y, right_width, content_rect.height)
 
-        # ===== STATS BASE (LADO ESQUERDO) =====
-        stats_title = section_font.render("STATS BASE", True, self.colors['text_accent'])
+        # ===== STATS ATUAIS (LADO ESQUERDO) =====
+        stats_title = section_font.render("STATS ATUAIS", True, self.colors['text_accent'])
         stats_title_x = left_col.x + (left_col.width - stats_title.get_width()) // 2
         screen.blit(stats_title, (stats_title_x, left_col.y))
 
@@ -466,11 +602,10 @@ class PokemonModal:
                 rank_surf = rank_font.render(rank_text, True, rank_color)
                 screen.blit(rank_surf, (card_rect.x + card_rect.width - rank_surf.get_width() - 12, card_rect.y + 18))
 
-        # ===== NOVA SEÇÃO: EFFORT VALUES (EVs) =====
+        # ===== EFFORT VALUES (EVs) =====
         ev_section_y = iv_start_y + (len(iv_list) * iv_spacing) + 15
 
         if ev_section_y + 60 < right_col.bottom:
-            # Título da seção EVs
             ev_title = section_font.render("ESFORCO (EVs)", True, self.colors['text_accent'])
             ev_title_x = right_col.x + (right_col.width - ev_title.get_width()) // 2
             screen.blit(ev_title, (ev_title_x, ev_section_y))
@@ -478,7 +613,10 @@ class PokemonModal:
             pygame.draw.line(screen, self.colors['border'], (right_col.x + 10, ev_section_y + 22),
                              (right_col.x + right_col.width - 10, ev_section_y + 22), 1)
 
-            # Lista de EVs - MOSTRA TODAS AS STATS, mesmo com 0
+            ev_font = pygame.font.Font(None, 13)
+            value_font = pygame.font.Font(None, 15)
+            bonus_font = pygame.font.Font(None, 12)
+
             ev_stats = [
                 ("HP", self.pokemon.evs.get('hp', 0), self.pokemon.stats.get_ev_bonus('hp')),
                 ("ATAQUE", self.pokemon.evs.get('attack', 0), self.pokemon.stats.get_ev_bonus('attack')),
@@ -490,11 +628,7 @@ class PokemonModal:
                 ("VELOCIDADE", self.pokemon.evs.get('speed', 0), self.pokemon.stats.get_ev_bonus('speed'))
             ]
 
-            # Mostra os EVs em formato compacto (2 colunas) - TODAS as stats
-            ev_font = pygame.font.Font(None, 12)
-            value_font = pygame.font.Font(None, 13)
-
-            row_height = 28
+            row_height = 35
             cols = 2
             card_width = (right_col.width - 30) // cols
 
@@ -503,90 +637,70 @@ class PokemonModal:
                 col = idx % cols
 
                 card_x = right_col.x + 10 + (col * (card_width + 10))
-                card_y = ev_section_y + 35 + (row * row_height)
+                card_y = ev_section_y + 40 + (row * row_height)
 
                 if card_y + row_height < right_col.bottom:
-                    # Fundo do card
-                    card_rect = pygame.Rect(card_x, card_y, card_width, row_height - 4)
+                    card_rect = pygame.Rect(card_x, card_y, card_width, row_height - 5)
 
-                    # Cor de fundo baseada se tem EVs ou não
                     if ev_value > 0:
                         self._draw_rounded_rect(screen, self.colors['bg_tertiary'], card_rect, radius=6)
                     else:
                         self._draw_rounded_rect(screen, (25, 27, 32), card_rect, radius=6)
 
-                    # Nome da stat (abreviado para caber)
-                    if name == "SP. ATAQUE":
-                        short_name = "Sp.Atk"
-                    elif name == "SP. DEFESA":
-                        short_name = "Sp.Def"
-                    else:
-                        short_name = name[:4] if len(name) > 4 else name
+                    name_text = ev_font.render(name, True, self.colors['text_secondary'])
+                    screen.blit(name_text, (card_rect.x + 12, card_rect.y + 10))
 
-                    name_text = ev_font.render(short_name, True, self.colors['text_secondary'])
-                    screen.blit(name_text, (card_rect.x + 8, card_rect.y + 7))
-
-                    # Valor do EV e bônus (sempre mostra, mesmo se 0)
                     if ev_value > 0:
-                        # Cor do texto baseado na quantidade
-                        if ev_value >= 378:  # Limite máximo novo (504? ajuste conforme)
-                            ev_color = (255, 215, 0)  # Dourado para max
-                        elif ev_value >= 252:
-                            ev_color = (100, 200, 100)  # Verde claro
-                        elif ev_value >= 100:
-                            ev_color = (100, 180, 220)  # Azul
+                        if ev_value >= 252:
+                            ev_color = self.colors['iv_perfect']
+                        elif ev_value >= 200:
+                            ev_color = self.colors['iv_great']
+                        elif ev_value >= 126:
+                            ev_color = self.colors['iv_good']
+                        elif ev_value >= 64:
+                            ev_color = self.colors['iv_median']
                         else:
                             ev_color = self.colors['text_primary']
-
-                        ev_text = value_font.render(f"{ev_value}", True, ev_color)
-                        screen.blit(ev_text, (card_rect.x + card_width - 55, card_rect.y + 6))
                     else:
-                        # Sem EVs - texto cinza
-                        ev_text = ev_font.render("0", True, (60, 65, 75))
-                        screen.blit(ev_text, (card_rect.x + card_width - 45, card_rect.y + 7))
+                        ev_color = (60, 65, 75)
 
-                    # SEMPRE mostra o bônus, mesmo se for 0
-                    if bonus > 0:
-                        bonus_text = ev_font.render(f"(+{bonus})", True, self.colors['text_good'])
-                        screen.blit(bonus_text, (card_rect.x + card_width - 38, card_rect.y + 7))
-                    else:
-                        # Bônus zero - mostra (+0) em cinza
-                        bonus_text = ev_font.render("(+0)", True, (60, 65, 75))
-                        screen.blit(bonus_text, (card_rect.x + card_width - 38, card_rect.y + 7))
+                    value_text = value_font.render(str(ev_value), True, ev_color)
+                    screen.blit(value_text, (card_rect.centerx - 20, card_rect.y + 9))
 
-            # Mostra total de EVs no final
+                    bonus_text = f"(+{bonus})" if bonus > 0 else "(+0)"
+                    bonus_color = self.colors['text_good'] if bonus > 0 else (60, 65, 75)
+                    bonus_surf = bonus_font.render(bonus_text, True, bonus_color)
+                    screen.blit(bonus_surf, (card_rect.x + card_width - bonus_surf.get_width() - 12, card_rect.y + 10))
+
             total_evs = self.pokemon.stats.get_ev_total()
             max_evs = self.pokemon.stats.MAX_TOTAL_EVS
             ev_percent = total_evs / max_evs if max_evs > 0 else 0
 
-            total_font = pygame.font.Font(None, 11)
+            total_font = pygame.font.Font(None, 12)
 
-            # Cor do texto baseado na porcentagem
             if ev_percent >= 0.9:
-                total_color = (255, 215, 0)  # Dourado perto do máximo
+                total_color = self.colors['iv_perfect']
             elif ev_percent >= 0.5:
-                total_color = (100, 200, 100)  # Verde
+                total_color = self.colors['iv_great']
             else:
                 total_color = self.colors['text_accent']
 
             total_text = total_font.render(f"TOTAL: {total_evs}/{max_evs} EVs ({ev_percent * 100:.1f}%)",
                                            True, total_color)
 
-            # Posiciona o total abaixo dos cards
-            total_y = ev_section_y + 35 + ((len(ev_stats) + 1) // 2) * row_height
+            total_y = ev_section_y + 40 + (3 * row_height) + 5
             if total_y + 25 < right_col.bottom:
                 screen.blit(total_text, (right_col.centerx - total_text.get_width() // 2, total_y))
 
-                # Barra de progresso total
                 bar_width = right_col.width - 40
-                bar_height = 6
+                bar_height = 10
                 bar_x = right_col.x + 20
-                bar_y = total_y + 18
+                bar_y = total_y + 20
 
-                pygame.draw.rect(screen, (45, 48, 55), (bar_x, bar_y, bar_width, bar_height), border_radius=3)
+                pygame.draw.rect(screen, (45, 48, 55), (bar_x, bar_y, bar_width, bar_height), border_radius=5)
                 if total_evs > 0:
                     pygame.draw.rect(screen, (100, 180, 200),
-                                     (bar_x, bar_y, int(bar_width * ev_percent), bar_height), border_radius=3)
+                                     (bar_x, bar_y, int(bar_width * ev_percent), bar_height), border_radius=5)
 
     def _render_moves_page(self, screen, content_rect):
         section_font = pygame.font.Font(None, 18)

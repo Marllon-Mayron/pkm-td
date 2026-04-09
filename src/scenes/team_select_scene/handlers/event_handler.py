@@ -131,6 +131,8 @@ class EventHandler:
             return {'type': 'MODAL_ACTION'}
         elif result == "close":
             return {'type': 'CLOSE_MODAL'}
+        elif result == "release_confirm":  # NOVO
+            return {'type': 'RELEASE_POKEMON'}
         return None
 
     def set_modal(self, modal):
