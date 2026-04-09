@@ -75,15 +75,23 @@ class PokemonCombat:
         attack_range_sq = self.pokemon.attack_range * self.pokemon.attack_range
 
         for entity in all_entities:
-            # ===== VERIFICA SE ESTÁ NO MAPA USANDO is_placed =====
-            if not hasattr(entity, 'is_placed') or not entity.is_placed:
+            # ===== VERIFICA SE A ENTIDADE ESTÁ ATIVA NO MAPA =====
+            # Para aliados (not wild): precisa estar placed
+            if not entity.is_wild:
+                if not hasattr(entity, 'is_placed') or not entity.is_placed:
+                    continue
+            # Para inimigos (wild): sempre considerados (se vivos)
+
+            # Pula entidades mortas
+            if not entity.is_alive() or entity.is_defeated:
                 continue
 
+            # Determina se é alvo válido
             is_valid_target = False
             if self.pokemon.is_wild:
-                is_valid_target = not entity.is_wild and entity.is_alive() and not entity.is_defeated
+                is_valid_target = not entity.is_wild  # Inimigo procura aliado
             else:
-                is_valid_target = entity.is_wild and entity.is_alive() and not entity.is_defeated
+                is_valid_target = entity.is_wild  # Aliado procura inimigo
 
             if is_valid_target:
                 dx = self.pokemon.x - entity.x
