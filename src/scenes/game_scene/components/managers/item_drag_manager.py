@@ -228,7 +228,6 @@ class ItemDragManager:
                 if move_name:
                     # Verifica se o Pokémon pode aprender o move
                     if not self.move_data.can_learn_move(ally.id, move_name):
-                        # Define mensagem de erro específica para este alvo
                         self.error_message = f"{ally.name} não pode aprender {move_name}!"
                         self.error_message_timer = 0.5
                         self.error_message_target = ally
@@ -248,7 +247,12 @@ class ItemDragManager:
                             self.target_type = "ally"
                             return
 
-                # Alvo válido
+                    # ===== NOVO: Verifica se tem espaço para aprender =====
+                    # Se tem menos de 4 moves, pode aprender direto
+                    # Se tem 4 moves, ainda é válido (vai abrir overlay de escolha)
+                    # Então NÃO bloqueia aqui!
+
+                # Alvo válido (mesmo com 4 moves, pois vamos abrir overlay)
                 self.hovered_target = ally
                 self.target_type = "ally"
                 self.valid_target = True

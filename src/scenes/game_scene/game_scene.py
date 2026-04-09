@@ -225,10 +225,17 @@ class GameScene(BaseScene):
             self.wave_manager.paused = True
 
     def close_move_learn_overlay(self, cancel=False):
-        """Fecha o overlay de aprendizado de moves"""
+        """Fecha o overlay de aprendizado de moves (MODIFICADO para TMs)"""
         if self.move_learn_overlay:
             self.move_learn_overlay.active = False
             self.move_learn_overlay = None
+
+        # Se NÃO foi cancelado e temos dados pendentes de TM, aplica o aprendizado
+        if not cancel and hasattr(self, 'pending_tm_data') and self.pending_tm_data:
+            # O Pokémon já aprendeu o move via replace_move no overlay
+            # Só precisamos limpar os dados pendentes
+            print(f"[TM] {self.pending_tm_data['move_name']} aprendido com sucesso!")
+            self.pending_tm_data = None
 
         self.game_paused = False
         self.paused = False
@@ -371,12 +378,30 @@ class GameScene(BaseScene):
             self.player.bag.add_item(item_data["id"], 1)
             return False
 
+        # Verifica se já sabe o move
+        for existing_move in pokemon.moves:
+            if existing_move.name.lower() == move_name.lower():
+                print(f"[TM] {pokemon.name} já sabe {move_name}!")
+                self.player.bag.add_item(item_data["id"], 1)
+                return False
+
+        # Se tem menos de 4 moves, aprende direto
         if len(pokemon.moves) < 4:
-            pokemon.moves.append(Move(move_name, move_info))
+            new_move = Move(move_name, move_info)
+            pokemon.moves.append(new_move)
             print(f"[TM] {pokemon.name} aprendeu {move_name} via TM!")
             return True
 
-        self._open_forget_move_overlay(pokemon, move_name, move_info, item_data)
+        # ===== Se tem 4 moves, usa o MoveLearnOverlay existente =====
+        # Salva o item_data para usar depois se o usuário confirmar
+        self.pending_tm_data = {
+            "item_id": item_data["id"],
+            "move_name": move_name,
+            "move_info": move_info
+        }
+
+        # Abre o overlay de aprendizado (já existente!)
+        self.open_move_learn_overlay(pokemon, move_name)
         return True
 
     def _attempt_capture(self, enemy, item_data):

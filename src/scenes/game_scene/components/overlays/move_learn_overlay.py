@@ -218,6 +218,7 @@ class MoveLearnOverlay(BaseOverlay):
         if self.selected_index >= 0:
             # Substitui o move selecionado
             self.pokemon.replace_move(self.selected_index, self.new_move_name)
+            print(f"[MOVES] {self.pokemon.name} aprendeu {self.new_move_name} (substituiu {self.pokemon.moves[self.selected_index].name if self.selected_index < len(self.pokemon.moves) else '?'})")
         else:
             # Não aprende o novo move
             print(f"[MOVES] {self.pokemon.name} decidiu não aprender {self.new_move_name}")
