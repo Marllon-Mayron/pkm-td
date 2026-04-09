@@ -339,11 +339,13 @@ class PokemonModal:
     def _render_stats_page(self, screen, content_rect):
         section_font = pygame.font.Font(None, 18)
 
+        # Ajuste para acomodar a nova seção de EVs
         left_width = content_rect.width * 0.48
         right_width = content_rect.width * 0.48
         left_col = pygame.Rect(content_rect.x, content_rect.y, left_width, content_rect.height)
         right_col = pygame.Rect(content_rect.x + left_width + 15, content_rect.y, right_width, content_rect.height)
 
+        # ===== STATS BASE (LADO ESQUERDO) =====
         stats_title = section_font.render("STATS BASE", True, self.colors['text_accent'])
         stats_title_x = left_col.x + (left_col.width - stats_title.get_width()) // 2
         screen.blit(stats_title, (stats_title_x, left_col.y))
@@ -398,6 +400,7 @@ class PokemonModal:
             screen.blit(nature_text, (nature_card.centerx - nature_text.get_width() // 2,
                                       nature_card.centery - nature_text.get_height() // 2))
 
+        # ===== VALORES INDIVIDUAIS (IVs) - LADO DIREITO =====
         iv_title = section_font.render("VALORES INDIVIDUAIS", True, self.colors['text_accent'])
         iv_title_x = right_col.x + (right_col.width - iv_title.get_width()) // 2
         screen.blit(iv_title, (iv_title_x, right_col.y))
@@ -440,19 +443,19 @@ class PokemonModal:
                 bar_y = card_rect.y + 18
 
                 if value == 31:
-                    bar_color = self.colors['iv_perfect']  # Dourado
+                    bar_color = self.colors['iv_perfect']
                 elif value >= 27:
-                    bar_color = self.colors['iv_great']  # Verde
+                    bar_color = self.colors['iv_great']
                 elif value >= 22:
-                    bar_color = self.colors['iv_good']  # Azul claro
+                    bar_color = self.colors['iv_good']
                 elif value >= 16:
-                    bar_color = self.colors['iv_median']  # Azul médio
+                    bar_color = self.colors['iv_median']
                 elif value >= 9:
-                    bar_color = self.colors['iv_bad']  # Vermelho alaranjado
+                    bar_color = self.colors['iv_bad']
                 elif value >= 1:
-                    bar_color = self.colors['iv_very_bad']  # Vermelho escuro
+                    bar_color = self.colors['iv_very_bad']
                 else:
-                    bar_color = self.colors['iv_horrible']  # Roxo
+                    bar_color = self.colors['iv_horrible']
 
                 pygame.draw.rect(screen, (45, 48, 55), (bar_x, bar_y, bar_width, bar_height), border_radius=4)
                 if value > 0:
@@ -462,6 +465,128 @@ class PokemonModal:
                 rank_text, rank_color = self._get_iv_rank(value)
                 rank_surf = rank_font.render(rank_text, True, rank_color)
                 screen.blit(rank_surf, (card_rect.x + card_rect.width - rank_surf.get_width() - 12, card_rect.y + 18))
+
+        # ===== NOVA SEÇÃO: EFFORT VALUES (EVs) =====
+        ev_section_y = iv_start_y + (len(iv_list) * iv_spacing) + 15
+
+        if ev_section_y + 60 < right_col.bottom:
+            # Título da seção EVs
+            ev_title = section_font.render("ESFORCO (EVs)", True, self.colors['text_accent'])
+            ev_title_x = right_col.x + (right_col.width - ev_title.get_width()) // 2
+            screen.blit(ev_title, (ev_title_x, ev_section_y))
+
+            pygame.draw.line(screen, self.colors['border'], (right_col.x + 10, ev_section_y + 22),
+                             (right_col.x + right_col.width - 10, ev_section_y + 22), 1)
+
+            # Lista de EVs - MOSTRA TODAS AS STATS, mesmo com 0
+            ev_stats = [
+                ("HP", self.pokemon.evs.get('hp', 0), self.pokemon.stats.get_ev_bonus('hp')),
+                ("ATAQUE", self.pokemon.evs.get('attack', 0), self.pokemon.stats.get_ev_bonus('attack')),
+                ("DEFESA", self.pokemon.evs.get('defense', 0), self.pokemon.stats.get_ev_bonus('defense')),
+                ("SP. ATAQUE", self.pokemon.evs.get('special_attack', 0),
+                 self.pokemon.stats.get_ev_bonus('special_attack')),
+                ("SP. DEFESA", self.pokemon.evs.get('special_defense', 0),
+                 self.pokemon.stats.get_ev_bonus('special_defense')),
+                ("VELOCIDADE", self.pokemon.evs.get('speed', 0), self.pokemon.stats.get_ev_bonus('speed'))
+            ]
+
+            # Mostra os EVs em formato compacto (2 colunas) - TODAS as stats
+            ev_font = pygame.font.Font(None, 12)
+            value_font = pygame.font.Font(None, 13)
+
+            row_height = 28
+            cols = 2
+            card_width = (right_col.width - 30) // cols
+
+            for idx, (name, ev_value, bonus) in enumerate(ev_stats):
+                row = idx // cols
+                col = idx % cols
+
+                card_x = right_col.x + 10 + (col * (card_width + 10))
+                card_y = ev_section_y + 35 + (row * row_height)
+
+                if card_y + row_height < right_col.bottom:
+                    # Fundo do card
+                    card_rect = pygame.Rect(card_x, card_y, card_width, row_height - 4)
+
+                    # Cor de fundo baseada se tem EVs ou não
+                    if ev_value > 0:
+                        self._draw_rounded_rect(screen, self.colors['bg_tertiary'], card_rect, radius=6)
+                    else:
+                        self._draw_rounded_rect(screen, (25, 27, 32), card_rect, radius=6)
+
+                    # Nome da stat (abreviado para caber)
+                    if name == "SP. ATAQUE":
+                        short_name = "Sp.Atk"
+                    elif name == "SP. DEFESA":
+                        short_name = "Sp.Def"
+                    else:
+                        short_name = name[:4] if len(name) > 4 else name
+
+                    name_text = ev_font.render(short_name, True, self.colors['text_secondary'])
+                    screen.blit(name_text, (card_rect.x + 8, card_rect.y + 7))
+
+                    # Valor do EV e bônus (sempre mostra, mesmo se 0)
+                    if ev_value > 0:
+                        # Cor do texto baseado na quantidade
+                        if ev_value >= 378:  # Limite máximo novo (504? ajuste conforme)
+                            ev_color = (255, 215, 0)  # Dourado para max
+                        elif ev_value >= 252:
+                            ev_color = (100, 200, 100)  # Verde claro
+                        elif ev_value >= 100:
+                            ev_color = (100, 180, 220)  # Azul
+                        else:
+                            ev_color = self.colors['text_primary']
+
+                        ev_text = value_font.render(f"{ev_value}", True, ev_color)
+                        screen.blit(ev_text, (card_rect.x + card_width - 55, card_rect.y + 6))
+                    else:
+                        # Sem EVs - texto cinza
+                        ev_text = ev_font.render("0", True, (60, 65, 75))
+                        screen.blit(ev_text, (card_rect.x + card_width - 45, card_rect.y + 7))
+
+                    # SEMPRE mostra o bônus, mesmo se for 0
+                    if bonus > 0:
+                        bonus_text = ev_font.render(f"(+{bonus})", True, self.colors['text_good'])
+                        screen.blit(bonus_text, (card_rect.x + card_width - 38, card_rect.y + 7))
+                    else:
+                        # Bônus zero - mostra (+0) em cinza
+                        bonus_text = ev_font.render("(+0)", True, (60, 65, 75))
+                        screen.blit(bonus_text, (card_rect.x + card_width - 38, card_rect.y + 7))
+
+            # Mostra total de EVs no final
+            total_evs = self.pokemon.stats.get_ev_total()
+            max_evs = self.pokemon.stats.MAX_TOTAL_EVS
+            ev_percent = total_evs / max_evs if max_evs > 0 else 0
+
+            total_font = pygame.font.Font(None, 11)
+
+            # Cor do texto baseado na porcentagem
+            if ev_percent >= 0.9:
+                total_color = (255, 215, 0)  # Dourado perto do máximo
+            elif ev_percent >= 0.5:
+                total_color = (100, 200, 100)  # Verde
+            else:
+                total_color = self.colors['text_accent']
+
+            total_text = total_font.render(f"TOTAL: {total_evs}/{max_evs} EVs ({ev_percent * 100:.1f}%)",
+                                           True, total_color)
+
+            # Posiciona o total abaixo dos cards
+            total_y = ev_section_y + 35 + ((len(ev_stats) + 1) // 2) * row_height
+            if total_y + 25 < right_col.bottom:
+                screen.blit(total_text, (right_col.centerx - total_text.get_width() // 2, total_y))
+
+                # Barra de progresso total
+                bar_width = right_col.width - 40
+                bar_height = 6
+                bar_x = right_col.x + 20
+                bar_y = total_y + 18
+
+                pygame.draw.rect(screen, (45, 48, 55), (bar_x, bar_y, bar_width, bar_height), border_radius=3)
+                if total_evs > 0:
+                    pygame.draw.rect(screen, (100, 180, 200),
+                                     (bar_x, bar_y, int(bar_width * ev_percent), bar_height), border_radius=3)
 
     def _render_moves_page(self, screen, content_rect):
         section_font = pygame.font.Font(None, 18)

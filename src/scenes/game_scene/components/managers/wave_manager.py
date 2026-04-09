@@ -418,7 +418,7 @@ class WaveManager:
             return
 
         # Obtém os EVs concedidos pelo inimigo derrotado
-        ev_yield = self.game_scene.pokedex.get_ev_yield(defeated_enemy.id)
+        ev_yield = self.game_scene.player.pokedex.get_ev_yield(defeated_enemy.id)
 
         # Aplica multiplicadores para boss/shiny
         ev_multiplier = 1.0
