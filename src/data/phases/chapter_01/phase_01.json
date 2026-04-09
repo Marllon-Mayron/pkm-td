@@ -805,12 +805,6 @@
                 "y": 240,
                 "size": 24,
                 "allowed_types": []
-            },
-            {
-                "x": 24,
-                "y": 240,
-                "size": 24,
-                "allowed_types": []
             }
         ]
     },

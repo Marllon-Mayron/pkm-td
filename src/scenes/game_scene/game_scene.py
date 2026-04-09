@@ -133,25 +133,11 @@ class GameScene(BaseScene):
     def _start_game(self):
         """Inicia o jogo"""
         # ===== RESTAURA COMPLETAMENTE TODOS OS POKÉMON =====
-        # Revive e restaura Pokémon no time do jogador
-        self._reset_team_pp()
-
         for pokemon in self.player.team:
-            pokemon.full_restore()
-            pokemon.set_battle_system(self.battle_system)
-            self.battle_system.set_effect_manager_for_pokemon(pokemon)
-            pokemon.screen_manager = self.screen_manager
-            pokemon.camera = self.camera
+            pokemon.reset(self)
 
         # Reseta ouro acumulado
         self.wave_manager.reset_gold()
-
-        # Configura screen_manager para inimigos que já existam
-        for enemy in self.wave_manager.active_enemies:
-            enemy.set_battle_system(self.battle_system)
-            self.battle_system.set_effect_manager_for_pokemon(enemy)
-            enemy.screen_manager = self.screen_manager
-            enemy.camera = self.camera
 
         # Inicia as waves
         if self.wave_manager.has_more_waves():
@@ -450,26 +436,48 @@ class GameScene(BaseScene):
         return False
 
     @staticmethod
+    @staticmethod
     def use_medicine(pokemon, item_data):
-        """Usa poção em um Pokémon aliado"""
-        if not pokemon.is_alive() and "revive" not in item_data["id"]:
+        """Usa poção ou revive em um Pokémon aliado"""
+        effect = item_data.get("effect", "heal")
+        item_id = item_data.get("id", "")
+
+        # ===== REVIVE =====
+        if effect == "revive" or "revive" in item_id:
+            # Verifica se o Pokémon está vivo
+            if pokemon.is_alive():
+                print(f"[MEDICINE] {pokemon.name} já está vivo! Revive não pode ser usado.")
+                return False
+
+            # Obtém a porcentagem de cura do effect_value (0.5 para Revive, 1.0 para Max Revive)
+            revive_percentage = item_data.get("effect_value", 0.5)
+
+            # Usa o método revive da classe Pokemon
+            return pokemon.revive(heal_percentage=revive_percentage)
+
+        # ===== POÇÕES E CURAS =====
+        # Verifica se o Pokémon está vivo para usar poções
+        if not pokemon.is_alive():
+            print(f"[MEDICINE] {pokemon.name} está derrotado! Use um Revive primeiro.")
             return False
 
-        heal_amount = item_data["effect_value"]
+        # Cura completa (heal_amount = -1)
+        heal_amount = item_data.get("effect_value", 0)
 
         if heal_amount == -1:
-            pokemon.heal()
-        elif "revive" in item_data["id"]:
-            if pokemon.is_alive():
-                return False
-            if heal_amount == 0.5:
-                pokemon.current_hp = int(pokemon.max_hp * 0.5)
-            else:
-                pokemon.heal()
-        else:
-            pokemon.current_hp = min(pokemon.max_hp, pokemon.current_hp + heal_amount)
+            pokemon.heal()  # Cura completa
+            print(f"[MEDICINE] {pokemon.name} foi completamente curado!")
+            return True
 
-        return True
+        # Cura parcial (potion, super potion, etc)
+        elif heal_amount > 0:
+            old_hp = pokemon.current_hp
+            pokemon.current_hp = min(pokemon.max_hp, pokemon.current_hp + heal_amount)
+            healed = pokemon.current_hp - old_hp
+            print(f"[MEDICINE] {pokemon.name} recuperou {healed} HP! ({pokemon.current_hp}/{pokemon.max_hp})")
+            return True
+
+        return False
 
     # ===== MÉTODOS DE POSICIONAMENTO =====
 
@@ -551,16 +559,6 @@ class GameScene(BaseScene):
         to_spot.occupied = True
         print(f"[MOVE] {pokemon.name} movido para novo spot ({to_spot.x}, {to_spot.y})")
 
-    def _reset_team_pp(self):
-        """Reseta os PP de todos os moves do time do jogador"""
-        if not self.player or not self.player.team:
-            return
-
-        for pokemon in self.player.team:
-            pokemon.reset_pp()
-
-        self.game.player.auto_save()
-
     # ===== MÉTODOS DE LIMPEZA =====
 
     def cleanup(self):
@@ -574,7 +572,7 @@ class GameScene(BaseScene):
         self.placement_manager.placed_pokemon.clear()
 
         for pokemon in self.player.team:
-            pokemon.is_placed = False
+            pokemon.reset(self)
 
         self.wave_manager.active_enemies.clear()
 
@@ -594,7 +592,7 @@ class GameScene(BaseScene):
             sound_manager.stop_music(fade_ms)
             self.music_playing = False
 
-    # ===== MÉTODO HANDLE_EVENT (SIMPLIFICADO) =====
+    # ===== MÉTODO HANDLE_EVENT =====
 
     def handle_event(self, event):
         """Processa eventos do jogo"""
@@ -804,7 +802,7 @@ class GameScene(BaseScene):
 
         return None
 
-    # ===== MÉTODO FIXED_UPDATE (SIMPLIFICADO) =====
+    # ===== MÉTODO FIXED_UPDATE  =====
 
     def fixed_update(self, dt):
         """Update da lógica do jogo"""
@@ -909,13 +907,8 @@ class GameScene(BaseScene):
             self.game_state = "game_over"
             self.overlay_manager.show(OverlayType.GAME_OVER)
 
-            self._reset_team_pp()
             for pokemon in self.player.team:
-                pokemon.full_restore()
-                pokemon.set_battle_system(self.battle_system)
-                self.battle_system.set_effect_manager_for_pokemon(pokemon)
-                pokemon.screen_manager = self.screen_manager
-                pokemon.camera = self.camera
+                pokemon.reset(self)
 
             profiler.end_frame()
             return
@@ -962,14 +955,8 @@ class GameScene(BaseScene):
         self.player.money += gold_total
         print(f"[REWARD] Ouro adicionado: {gold_total}")
 
-        self._reset_team_pp()
-
         for pokemon in self.player.team:
-            pokemon.full_restore()
-            pokemon.set_battle_system(self.battle_system)
-            self.battle_system.set_effect_manager_for_pokemon(pokemon)
-            pokemon.screen_manager = self.screen_manager
-            pokemon.camera = self.camera
+            pokemon.reset(self)
 
         self.player.score += self.phase_rewards['experience']
 
@@ -993,7 +980,6 @@ class GameScene(BaseScene):
         progress_manager.complete_phase(self.phase_id, stars=stars)
         self.player.auto_save()
         self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
-        self._reset_team_pp()
 
     # ===== MÉTODOS DE RENDER =====
 

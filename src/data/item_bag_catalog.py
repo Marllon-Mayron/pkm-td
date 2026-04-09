@@ -83,7 +83,7 @@ class ItemBagCatalog:
             "effect": "capture",
             "effect_value": 1.5,
             "price": 600,
-            "unlock_phase": None,
+            "unlock_phase": "1-5",
             "unlock_chapter": None
         }
 
@@ -128,7 +128,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "paralysis",
             "price": 200,
-            "unlock_phase": None,
+            "unlock_phase": "1-2",
             "unlock_chapter": None
         }
         items["awakening"] = {
@@ -142,7 +142,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "sleep",
             "price": 250,
-            "unlock_phase": None,
+            "unlock_phase": "1-5",
             "unlock_chapter": None
         }
         items["burn_heal"] = {
@@ -156,7 +156,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "burn",
             "price": 250,
-            "unlock_phase": None,
+            "unlock_phase": "1-5",
             "unlock_chapter": None
         }
         items["ice_heal"] = {
@@ -170,7 +170,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "freeze",
             "price": 250,
-            "unlock_phase": None,
+            "unlock_phase": "1-5",
             "unlock_chapter": None
         }
         items["full_heal"] = {
@@ -184,10 +184,38 @@ class ItemBagCatalog:
             "effect": "cure_all_status",
             "effect_value": None,
             "price": 600,
-            "unlock_phase": None,
+            "unlock_phase": "1-5",
             "unlock_chapter": None
         }
-
+        # ===== REVIVES =====
+        items["revive"] = {
+            "id": "revive",
+            "name": "REVIVE",
+            "sprite_path": medicine_path / "REVIVE.png",
+            "description": "Revive um Pokémon derrotado com metade do HP máximo.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "revive",
+            "effect_value": 0.5,  # 50% do HP máximo
+            "price": 1000,
+            "unlock_phase": "1-5",
+            "unlock_chapter": None
+        }
+        items["max_revive"] = {
+            "id": "max_revive",
+            "name": "MAX REVIVE",
+            "sprite_path": medicine_path / "MAXREVIVE.png",
+            "description": "Revive um Pokémon derrotado com 100% do HP máximo.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "revive",
+            "effect_value": 1.0,  # 100% do HP máximo
+            "price": 1900,
+            "unlock_phase": "2-8",
+            "unlock_chapter": None
+        }
         # ===== PP ITEMS =====
         items["pp_up"] = {
             "id": "pp_up",
@@ -203,7 +231,6 @@ class ItemBagCatalog:
             "unlock_phase": "1-3",
             "unlock_chapter": None
         }
-
         items["pp_max"] = {
             "id": "pp_max",
             "name": "PP MAX",
@@ -215,10 +242,9 @@ class ItemBagCatalog:
             "effect": "pp_restore",
             "effect_value": 1.0,
             "price": 450,
-            "unlock_phase": "2-1",
+            "unlock_phase": "2-8",
             "unlock_chapter": None
         }
-
         # ===== PEDRAS DE EVOLUÇÃO =====
         stones = [
             ("firestone", "FIRESTONE"),

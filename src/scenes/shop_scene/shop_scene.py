@@ -201,7 +201,7 @@ class ShopItemCard:
         # Quantidade possuída
         if self.owned_quantity > 0 and not self.is_locked:
             qty_text = fonts['medium'].render(f"possui: x{self.owned_quantity}", True, (180, 180, 200))
-            screen.blit(qty_text, (self.rect.right - 60, self.rect.y + 10))
+            screen.blit(qty_text, (self.rect.right - 80, self.rect.y + 10))
 
     def render_small(self, screen, fonts, x, y, width, height):
         """Renderiza card em tamanho pequeno (para visualização compacta)"""

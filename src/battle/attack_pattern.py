@@ -54,16 +54,12 @@ class AttackPatternManager:
         """Define padrão para bosses (mais desafiadores)"""
         # Boss pode ter padrões mais complexos
         patterns = [
-            AttackPattern.VICIOUS,
+            #AttackPattern.VICIOUS,
             AttackPattern.RANDOM,
-            AttackPattern.VICIOUS_SELECTIVE
+            #AttackPattern.VICIOUS_SELECTIVE
         ]
         # Boss tem chance maior de ser VICIOUS_SELECTIVE
-        return random.choices(
-            patterns,
-            weights=[0.3, 0.3, 0.4],  # 40% chance de ser seletivo
-            k=1
-        )[0]
+        return AttackPattern.RANDOM
 
     @classmethod
     def get_attack_category_for_vicious_selective(cls, pokemon) -> AttackTypeCategory:

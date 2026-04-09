@@ -29,7 +29,7 @@ class EffectFactory:
             "params": {
                 "stat": "attack",
                 "stages": -1,
-                "duration": 4.0
+                "duration": 6.0
             },
             "description": "Reduz o Ataque do oponente"
         },
@@ -40,7 +40,7 @@ class EffectFactory:
             "params": {
                 "stat": "defense",
                 "stages": -1,
-                "duration": 4.0
+                "duration": 6.0
             },
             "description": "Reduz a defesa do oponente"
         },
@@ -51,7 +51,7 @@ class EffectFactory:
             "params": {
                 "stat": "defense",
                 "stages": -1,
-                "duration": 4.0
+                "duration": 6.0
             },
             "description": "Reduz a defesa do oponente"
         },
@@ -62,7 +62,7 @@ class EffectFactory:
             "params": {
                 "stat": "defense",
                 "stages": 1,
-                "duration": 4.0
+                "duration": 6.0
             },
             "description": "Aumenta sua defesa em 1 ponto."
         },
@@ -73,7 +73,7 @@ class EffectFactory:
             "params": {
                 "stat": "defense",
                 "stages": -2,
-                "duration": 4.0
+                "duration": 6.0
             },
             "description": "Diminui defesa do inimigo em 2 pontos."
         },
@@ -84,7 +84,7 @@ class EffectFactory:
             "params": {
                 "stat": "defense",
                 "stages": 1,
-                "duration": 4.0
+                "duration": 6.0
             },
             "description": "Aumenta sua defesa em um nivel"
         },
@@ -95,7 +95,7 @@ class EffectFactory:
             "params": {
                 "stat": "sp_attack",
                 "stages": 1,
-                "duration": 4.0
+                "duration": 6.0
             },
             "description": "Aumenta o Ataque Especial"
         },
@@ -117,7 +117,7 @@ class EffectFactory:
             "params": {
                 "stat": "speed",
                 "stages": 2,
-                "duration": 3.0
+                "duration": 6.0
             },
             "description": "Aumenta muito a Velocidade"
         },

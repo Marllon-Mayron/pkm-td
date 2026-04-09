@@ -182,7 +182,7 @@ class Pokemon(Entity):
 
         # ===== 18. ITENS =====
         self.is_carrying = None
-        self.capture_range = 15
+        self.capture_range = 20
 
         # ===== 19. ATRIBUTOS DE COMBATE =====
         self.attack_range = 90
@@ -194,7 +194,10 @@ class Pokemon(Entity):
         self.charge_cooldown = 0.0
         self.charge_cooldown_max = 0
         if is_wild:
-            self.charge_cooldown_max = 3.0  # 3 segundos para selvagens
+            if is_boss :
+                self.charge_cooldown_max = 1.2
+            else:
+                self.charge_cooldown_max = 3.0
         else:
             self.charge_cooldown_max = 1.2  # 1.2 segundos para aliados
 
@@ -1101,3 +1104,20 @@ class Pokemon(Entity):
 
         print(f"[FULL_RESTORE] {self.name} completamente restaurado! HP: {self.current_hp}/{self.max_hp}")
         return True
+
+    def reset(self, game_scene):
+        """
+        Restaura completamente o Pokémon para seus stats base para começar a partida.
+        """
+        self.full_restore()
+
+        self.target = None
+
+        self.current_animation = "idle"
+        self.combat_state = "idle"
+        self.is_moving = False
+        self.is_placed = False
+
+        self.set_battle_system(game_scene.battle_system)
+        self.screen_manager= game_scene.screen_manager
+        self.camera= game_scene.camera
