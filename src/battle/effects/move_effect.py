@@ -4,8 +4,9 @@ from typing import Optional, List, Any, Callable
 from dataclasses import dataclass, field
 import random
 
-# Importa as classes de efeitos residuais do arquivo separado
-from .residual_effect import ResidualEffect, ResidualEffectType, ResidualEffectManager
+from battle.effects import StatusType
+from battle.effects.residual_effect import ResidualEffect
+from battle.effects.residual_effect import ResidualEffectType, ResidualEffectManager
 
 
 class EffectTarget(Enum):
@@ -86,7 +87,7 @@ class MoveEffect:
     """
     # Identificação
     name: str
-    effect_type: str  # status, stat_mod, multi_hit, flinch, status_chance, residual, etc
+    effect_type: str  # status, stat_mod, multi_hit, flinch, status_chance, residual, confusion, etc
 
     # Alvo e timing
     target: EffectTarget = EffectTarget.TARGET
@@ -164,6 +165,14 @@ class MoveEffect:
             return self._apply_residual(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "remove_residual":
             return self._apply_remove_residual(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "confusion":
+            return self._apply_confusion(attacker, target, effect_manager)
+        elif self.effect_type == "damage_with_confusion_chance":
+            return self._apply_damage_with_confusion_chance(attacker, target, effect_manager, damage)
+        elif self.effect_type == "self_confusion_after":
+            return self._apply_self_confusion_after(attacker, target, effect_manager)
+        elif self.effect_type == "cure_confusion":
+            return self._apply_cure_confusion(attacker, target, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -482,3 +491,67 @@ class MoveEffect:
             print(f"[REMOVE_RESIDUAL] {attacker.name} removeu {removed_count} efeitos residuais")
 
         return True
+
+    # ===== MÉTODOS DE CONFUSÃO =====
+
+    def _apply_confusion(self, attacker, target, effect_manager):
+        """Aplica confusão diretamente no alvo"""
+        duration = self.params.get('duration')  # None = aleatório 1-4 turnos
+
+        # Verifica se o alvo já está com algum status que impede ação
+        status = effect_manager.get_status(target)
+        if status and status.type in [StatusType.SLEEP, StatusType.FREEZE]:
+            effect_manager.add_status_text(target,
+                                           f"{target.name} está {status.name.lower()} e não pode ficar confuso!")
+            print(f"[CONFUSION] {target.name} está {status.name.lower()}, não pode aplicar confusão!")
+            return False
+
+        success = effect_manager.apply_confusion(target, source=attacker, duration=duration)
+        return success
+
+    def _apply_damage_with_confusion_chance(self, attacker, target, effect_manager, damage):
+        """Dano + chance de causar confusão (ex: Psybeam, Confusion)"""
+        chance = self.params.get('chance', 0.10)
+
+        if random.random() < chance:
+            # Verifica se o alvo já está com algum status que impede ação
+            status = effect_manager.get_status(target)
+            if not (status and status.type in [StatusType.SLEEP, StatusType.FREEZE]):
+                effect_manager.apply_confusion(target, source=attacker)
+                effect_manager.add_status_text(target, f"{target.name} ficou confuso!")
+                print(f"[CONFUSION] {attacker.name} causou confusão em {target.name}!")
+
+        return True
+
+    def _apply_self_confusion_after(self, attacker, target, effect_manager):
+        """
+        Para movimentos como Petal Dance, Thrash.
+        Ataca por X turnos, depois causa confusão no usuário.
+        """
+        duration = self.params.get('duration', 3)
+
+        # TODO: Implementar lógica de multi-turn attack
+        # Por enquanto, aplica confusão após o ataque
+
+        # Não aplica confusão se o atacante já está com sono ou congelado
+        status = effect_manager.get_status(attacker)
+        if status and status.type in [StatusType.SLEEP, StatusType.FREEZE]:
+            return True
+
+        effect_manager.apply_confusion(attacker, source=attacker, duration=duration)
+        effect_manager.add_status_text(attacker, f"{attacker.name} ficou confuso devido ao esforço!")
+        print(f"[CONFUSION] {attacker.name} se confundiu após usar {self.name}!")
+
+        return True
+
+    def _apply_cure_confusion(self, attacker, target, effect_manager):
+        """Cura confusão (ex: Persim Berry)"""
+        target_entity = target if self.target == EffectTarget.TARGET else attacker
+
+        if effect_manager.is_confused(target_entity):
+            effect_manager.remove_confusion(target_entity)
+            effect_manager.add_status_text(target_entity, f"{target_entity.name} se recuperou da confusão!")
+            print(f"[CONFUSION] Confusão de {target_entity.name} foi curada!")
+            return True
+
+        return False

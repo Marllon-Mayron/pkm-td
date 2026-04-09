@@ -111,12 +111,30 @@ class PathTracker:
         if not state:
             return False, False
 
+        # ===== VERIFICA SE O ALVO AINDA ESTÁ NO MAPA =====
+        if hasattr(enemy, 'target') and enemy.target:
+            # Verifica se o alvo ainda está no mapa (is_placed)
+            if not hasattr(enemy.target, 'is_placed') or not enemy.target.is_placed:
+                print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} não está mais no mapa! Abandonando.")
+                enemy.target = None
+                state['ignore_path_timer'] = 0.0
+                state['combat_target'] = None
+                return False, False
+
+            # Verifica se o alvo está marcado para remoção
+            if hasattr(enemy.target, '_marked_for_removal') and enemy.target._marked_for_removal:
+                print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} marcado para remoção! Abandonando.")
+                enemy.target = None
+                state['ignore_path_timer'] = 0.0
+                state['combat_target'] = None
+                return False, False
+
         # ===== VERIFICA SE O INIMIGO DEVE PARAR DE SEGUIR O ALVO =====
         should_abandon_target = False
 
         if hasattr(enemy, 'target') and enemy.target:
             # Caso 1: Alvo morreu
-            if not enemy.target.is_alive() or enemy.target.is_defeated:
+            if not enemy.target.is_alive() or enemy.target.is_defeated or not enemy.is_placed:
                 should_abandon_target = True
                 print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} morreu! Abandonando perseguição.")
 

@@ -384,6 +384,28 @@ class WaveManager:
         """Remove inimigo da lista ativa"""
         if enemy in self.active_enemies:
             enemy._marked_for_removal = True
+            enemy.is_placed = False  # Garante que não está mais no mapa
+
+            # ===== LIMPA REFERÊNCIAS DE OUTROS INIMIGOS =====
+            for other in self.active_enemies:
+                if other != enemy and hasattr(other, 'target') and other.target == enemy:
+                    print(f"[WaveManager] {other.name} perdeu o alvo {enemy.name}")
+                    other.target = None
+                    if hasattr(other, '_attack_attempts'):
+                        other._attack_attempts = 0
+                    # Reseta estado de combate do outro inimigo
+                    other.combat_state = "idle"
+
+            # ===== LIMPA REFERÊNCIAS DE POKÉMON ALIADOS =====
+            if hasattr(self.game_scene, 'placement_manager'):
+                for ally in self.game_scene.placement_manager.placed_pokemon:
+                    if hasattr(ally, 'target') and ally.target == enemy:
+                        print(f"[WaveManager] Aliado {ally.name} perdeu o alvo {enemy.name}")
+                        ally.target = None
+                        if hasattr(ally, '_attack_attempts'):
+                            ally._attack_attempts = 0
+                        ally.combat_state = "idle"
+
             print(f"[WaveManager] Marcando {enemy.name} para remoção")
 
             if hasattr(enemy, 'effect_manager') and enemy.effect_manager:

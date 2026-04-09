@@ -11,8 +11,11 @@ class EffectManager:
     """
 
     def __init__(self):
-        # Status effects por Pokémon
+        # Status effects por Pokémon (não-voláteis: poison, burn, paralysis, sleep, freeze)
         self.status_effects: Dict[int, StatusEffect] = {}
+
+        # Confusion effects por Pokémon (status volátil)
+        self.confusion_effects: Dict[int, object] = {}
 
         # Stat modifiers por Pokémon
         self.stat_modifiers: Dict[int, List[StatModifier]] = {}
@@ -92,7 +95,6 @@ class EffectManager:
 
             # Remove modificador de velocidade da paralisia
             if status.type == StatusType.PARALYSIS:
-                from .stat_modifier import StatType
                 # Remove o modificador de speed (aplica +2 para compensar)
                 if pokemon_id in self.stat_stages:
                     self.stat_stages[pokemon_id].modify(StatType.SPEED, 2)
@@ -108,6 +110,51 @@ class EffectManager:
     def get_status(self, pokemon) -> Optional[StatusEffect]:
         """Retorna o status atual do Pokémon"""
         return self.status_effects.get(id(pokemon))
+
+    # ===== MÉTODOS DE CONFUSÃO (STATUS VOLÁTIL) =====
+
+    def apply_confusion(self, pokemon, source=None, duration: int = None):
+        """Aplica confusão a um Pokémon (status volátil)"""
+        from .confusion_effect import ConfusionEffect
+
+        pokemon_id = id(pokemon)
+
+        # Verifica imunidade (Own Tempo / Ritmo Próprio)
+        if hasattr(pokemon, 'has_ability') and pokemon.has_ability("Own Tempo"):
+            self.add_status_text(pokemon, f"{pokemon.name} tem Ritmo Próprio e não ficou confuso!")
+            print(f"[CONFUSION] {pokemon.name} é imune à confusão (Own Tempo)")
+            return False
+
+        # Remove confusão existente (substitui)
+        if pokemon_id in self.confusion_effects:
+            self.remove_confusion(pokemon)
+
+        # Cria novo efeito
+        effect = ConfusionEffect(source=source)
+        if duration:
+            effect.remaining_turns = duration
+
+        self.confusion_effects[pokemon_id] = effect
+        effect.apply(pokemon, self)
+        return True
+
+    def remove_confusion(self, pokemon):
+        """Remove confusão de um Pokémon"""
+        pokemon_id = id(pokemon)
+        if pokemon_id in self.confusion_effects:
+            effect = self.confusion_effects[pokemon_id]
+            effect.remove(pokemon, self)
+            del self.confusion_effects[pokemon_id]
+            return True
+        return False
+
+    def is_confused(self, pokemon) -> bool:
+        """Verifica se o Pokémon está confuso"""
+        return id(pokemon) in self.confusion_effects
+
+    def get_confusion(self, pokemon):
+        """Retorna o efeito de confusão se existir"""
+        return self.confusion_effects.get(id(pokemon))
 
     def register_pokemon(self, pokemon):
         """Registra um Pokémon para poder atualizá-lo quando necessário"""
@@ -166,12 +213,10 @@ class EffectManager:
     def get_stat_multiplier(self, pokemon, stat_type: StatType) -> float:
         """Retorna o multiplicador total para um stat"""
         pokemon_id = id(pokemon)
-        #print(f"[EFFECT_DEBUG] get_stat_multiplier para {pokemon.name}, stat={stat_type}")
 
         if pokemon_id in self.stat_stages:
             stage = self.stat_stages[pokemon_id].get_stage(stat_type)
             multiplier = self.stat_stages[pokemon_id].get_multiplier(stat_type)
-            #print(f"[EFFECT_DEBUG] {pokemon.name}: stage={stage}, multiplier={multiplier:.2f}")
             return multiplier
         else:
             return 1.0
@@ -193,9 +238,6 @@ class EffectManager:
             return self.stat_stages[pokemon_id].get_all_active_modifiers()
 
         return {}
-
-    # src/battle/effects/effect_manager.py
-    # Modifique o método update
 
     def update(self, dt: float):
         """Atualiza todos os efeitos - dt em segundos"""
@@ -226,7 +268,7 @@ class EffectManager:
         # Atualiza velocidade
         self._update_speed_for_pokemon_ids(pokemon_to_update)
 
-        # ===== ATUALIZA STATUS EFFECTS =====
+        # ===== ATUALIZA STATUS EFFECTS (não-voláteis) =====
         status_to_remove = []
 
         for pokemon_id, status in self.status_effects.items():
@@ -304,9 +346,9 @@ class EffectManager:
 
         for i, (text, duration) in enumerate(texts):
             # Cor baseada no tipo de mensagem
-            if "Drenou" in text or "cura" in text:
+            if "Drenou" in text or "cura" in text or "+" in text:
                 color = (100, 255, 100)
-            elif "MISS" in text:
+            elif "MISS" in text or "-" in text:
                 color = (255, 100, 100)
             else:
                 color = (255, 255, 255)
@@ -409,22 +451,23 @@ class EffectManager:
 
     def render_status_indicators(self, screen, pokemon, sprite_rect, zoom_scale, font_cache):
         """
-        Renderiza indicadores de status permanentes (PAR, BRN, PSN, SLP, etc)
+        Renderiza indicadores de status permanentes (PAR, BRN, PSN, SLP, FRZ)
+        E também o indicador de CONFUSÃO (CON)
         Posicionados MAIS ACIMA de todos
         """
-        status = self.get_status(pokemon)
-        if not status or status.type == StatusType.NONE:
-            return
+        sprite_height = sprite_rect.height
+        base_offset = -sprite_height * 1.1
+        status_indicators = []
+        font_size = 12
 
-        # Fonte para o indicador de status
-        base_font_size = 12
+        # Escala da fonte
         if hasattr(pokemon, 'screen_manager') and hasattr(pokemon, 'camera'):
             render_scale = pokemon.screen_manager.render_scale
             camera_zoom = pokemon.camera.zoom if pokemon.camera else 1.0
             total_scale = render_scale * camera_zoom
-            font_size = max(10, int(base_font_size * total_scale))
+            font_size = max(10, int(12 * total_scale))
         else:
-            font_size = max(10, int(base_font_size * zoom_scale))
+            font_size = max(10, int(12 * zoom_scale))
 
         if font_size not in font_cache:
             try:
@@ -434,35 +477,50 @@ class EffectManager:
 
         font = font_cache[font_size]
 
-        # Texto do status (ex: "PAR", "BRN", "PSN", "SLP")
-        status_text = status.display_name
-        color = status.color
+        # ===== STATUS NÃO-VOLÁTEIS (PSN, BRN, PAR, SLP, FRZ) =====
+        status = self.get_status(pokemon)
+        if status and status.type != StatusType.NONE:
+            status_text = status.display_name
+            color = status.color
+            text_surf = font.render(status_text, True, color)
+            text_rect = text_surf.get_rect()
+            text_rect.centerx = sprite_rect.centerx
+            text_rect.bottom = sprite_rect.top + base_offset
+            status_indicators.append((text_surf, text_rect))
 
-        text_surf = font.render(status_text, True, color)
-        text_rect = text_surf.get_rect()
+        # ===== CONFUSÃO (CON) - POSICIONADO À ESQUERDA DO STATUS PRINCIPAL =====
+        if self.is_confused(pokemon):
+            confusion_text = "CON"
+            confusion_color = (248, 88, 136)  # Rosa
+            text_surf = font.render(confusion_text, True, confusion_color)
+            text_rect = text_surf.get_rect()
 
-        # ===== POSICIONAMENTO: MAIS ACIMA DE TODOS =====
-        sprite_height = sprite_rect.height
+            # Posiciona à esquerda do status principal (se houver)
+            if status_indicators:
+                # Ao lado esquerdo do status principal
+                text_rect.right = sprite_rect.centerx - 15
+            else:
+                # Centralizado se não houver status principal
+                text_rect.centerx = sprite_rect.centerx - 20
 
-        # Status fica em -110% (mais acima que modificadores)
-        relative_offset = -sprite_height * 1.1
+            text_rect.bottom = sprite_rect.top + base_offset
+            status_indicators.append((text_surf, text_rect))
 
-        text_rect.centerx = sprite_rect.centerx
-        text_rect.bottom = sprite_rect.top + relative_offset
-
-        # Fundo semi-transparente
-        bg_width = text_rect.width + 8
-        bg_height = text_rect.height + 4
-        bg_surf = pygame.Surface((bg_width, bg_height))
-        bg_surf.set_alpha(180)
-        bg_surf.fill((0, 0, 0))
-        screen.blit(bg_surf, (text_rect.x - 4, text_rect.y - 2))
-
-        screen.blit(text_surf, text_rect)
+        # ===== RENDERIZA TODOS OS INDICADORES COM FUNDO =====
+        for text_surf, text_rect in status_indicators:
+            # Fundo semi-transparente
+            bg_width = text_surf.get_width() + 8
+            bg_height = text_surf.get_height() + 4
+            bg_surf = pygame.Surface((bg_width, bg_height))
+            bg_surf.set_alpha(180)
+            bg_surf.fill((0, 0, 0))
+            screen.blit(bg_surf, (text_rect.x - 4, text_rect.y - 2))
+            screen.blit(text_surf, text_rect)
 
     def clear_all(self):
         """Limpa todos os efeitos"""
         self.status_effects.clear()
+        self.confusion_effects.clear()
         self.stat_modifiers.clear()
         self.stat_stages.clear()
         self.status_texts.clear()

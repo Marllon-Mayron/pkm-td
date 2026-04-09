@@ -75,6 +75,10 @@ class PokemonCombat:
         attack_range_sq = self.pokemon.attack_range * self.pokemon.attack_range
 
         for entity in all_entities:
+            # ===== VERIFICA SE ESTÁ NO MAPA USANDO is_placed =====
+            if not hasattr(entity, 'is_placed') or not entity.is_placed:
+                continue
+
             is_valid_target = False
             if self.pokemon.is_wild:
                 is_valid_target = not entity.is_wild and entity.is_alive() and not entity.is_defeated

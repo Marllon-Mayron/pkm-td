@@ -345,6 +345,45 @@ class EffectFactory:
             },
             "description": "Planta uma semente que drena HP do oponente a cada turno"
         },
+        # ===== CONFUSÕES (CONFUSION) =====
+        "confuse-ray": {
+            "effect_type": "confusion",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "duration": None  # Aleatório 1-4 turnos
+            },
+            "description": "Causa confusão no oponente",
+            "attacker_animation": "shoot"
+        },
+        "supersonic": {
+            "effect_type": "confusion",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "duration": None
+            },
+            "description": "Causa confusão no oponente com ondas sônicas",
+            "attacker_animation": "shoot"
+        },
+        "psybeam": {
+            "effect_type": "damage_with_confusion_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "chance": 0.10  # 10% de chance de confundir
+            },
+            "description": "Pode causar confusão (10% de chance)"
+        },
+        "confusion": {
+            "effect_type": "damage_with_confusion_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "chance": 0.10
+            },
+            "description": "Pode causar confusão (10% de chance)"
+        },
         # Multi-hit moves
         "double-slap": {
             "effect_type": "multi_hit",

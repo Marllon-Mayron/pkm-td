@@ -78,6 +78,22 @@ class BattleSystem:
 
         attacker.has_no_pp = False
 
+        # ===== VERIFICA CONFUSÃO ANTES DE ATACAR =====
+        # A confusão é verificada ANTES de qualquer outra condição
+        if self.effect_manager.is_confused(attacker):
+            confusion = self.effect_manager.get_confusion(attacker)
+            result = confusion.before_attack(attacker, target, self, self.effect_manager)
+
+            if result == "self":
+                # Ataca a si mesmo
+                self._apply_confusion_self_damage(attacker, confusion)
+                attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+                return True
+
+            # Se confusão acabou durante before_attack, remove automaticamente
+            if not confusion.is_active():
+                self.effect_manager.remove_confusion(attacker)
+
         # ===== DESCONGELAMENTO POR ATAQUES DE FOGO =====
         target_status = self.effect_manager.get_status(target)
         if target_status and target_status.type == StatusType.FREEZE:
@@ -302,6 +318,26 @@ class BattleSystem:
 
         # Log do dano causado
         print(f"[DAMAGE] {attacker.name} causou {damage} de dano a {target.name} com {move.name}!")
+
+    def _apply_confusion_self_damage(self, attacker, confusion):
+        """Aplica dano de confusão (atacante se machuca)"""
+        damage = confusion.calculate_self_damage(attacker)
+
+        # Toca som de dano
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("hurt")
+
+        # Aplica dano (atacante é a fonte do dano para si mesmo)
+        attacker.take_damage(damage, attacker=attacker)
+
+        # Mostra texto de dano
+        self.effect_manager.add_status_text(attacker, f"-{damage} HP (Confusão)", duration=1.0)
+
+        print(f"[CONFUSION] {attacker.name} se machucou na confusão e causou {damage} de dano a si mesmo!")
+
+        # Toca animação de hurt
+        if hasattr(attacker, 'play_hurt_animation'):
+            attacker.play_hurt_animation()
 
     def _calculate_move_damage(self, attacker, target, move):
         """Calcula dano do move com modificadores de stat"""
