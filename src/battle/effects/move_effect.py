@@ -4,6 +4,9 @@ from typing import Optional, List, Any, Callable
 from dataclasses import dataclass, field
 import random
 
+# Importa as classes de efeitos residuais do arquivo separado
+from .residual_effect import ResidualEffect, ResidualEffectType, ResidualEffectManager
+
 
 class EffectTarget(Enum):
     """Alvo do efeito"""
@@ -72,7 +75,6 @@ class MultiHitState:
             if hasattr(self.target, 'play_hurt_animation'):
                 self.target.play_hurt_animation()
 
-
         self.current_hit += 1
         self.remaining_hits -= 1
 
@@ -84,7 +86,7 @@ class MoveEffect:
     """
     # Identificação
     name: str
-    effect_type: str  # status, stat_mod, multi_hit, flinch, status_chance, etc
+    effect_type: str  # status, stat_mod, multi_hit, flinch, status_chance, residual, etc
 
     # Alvo e timing
     target: EffectTarget = EffectTarget.TARGET
@@ -158,6 +160,10 @@ class MoveEffect:
         elif self.effect_type == "high_crit":
             # Já tratado pelo CriticalHitSystem
             return True
+        elif self.effect_type == "residual":
+            return self._apply_residual(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "remove_residual":
+            return self._apply_remove_residual(attacker, target, battle_system, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -322,5 +328,157 @@ class MoveEffect:
 
         drain_amount = max(1, int(damage * percentage))
         attacker.current_hp = min(attacker.max_hp, attacker.current_hp + drain_amount)
+
+        return True
+
+    def _apply_residual(self, attacker, target, battle_system, effect_manager):
+        """Aplica efeito residual (Leech Seed, Wrap, etc)"""
+
+        residual_type_str = self.params.get('residual_type', 'leech_seed')
+        duration = self.params.get('duration', 5)
+        tick_interval = self.params.get('tick_interval', 2.0)
+        drain_percentage = self.params.get('drain_percentage', 0.125)
+
+        # Mapeia string para enum
+        residual_type_map = {
+            'leech_seed': ResidualEffectType.LEECH_SEED,
+            'wrap': ResidualEffectType.WRAP,
+            'bind': ResidualEffectType.BIND,
+            'fire_spin': ResidualEffectType.FIRE_SPIN,
+            'whirlpool': ResidualEffectType.WHIRLPOOL,
+            'clamp': ResidualEffectType.CLAMP,
+            'sand_tomb': ResidualEffectType.SAND_TOMB,
+            'infestation': ResidualEffectType.INFESTATION,
+            'magma_storm': ResidualEffectType.MAGMA_STORM,
+            'salt_cure': ResidualEffectType.SALT_CURE,
+        }
+        residual_type = residual_type_map.get(residual_type_str, ResidualEffectType.LEECH_SEED)
+
+        # Verifica imunidade: Grass Pokémon são imunes a Leech Seed
+        if residual_type == ResidualEffectType.LEECH_SEED:
+            if any(t.lower() == "grass" for t in target.types):
+                effect_manager.add_status_text(target, f"Não afeta {target.name}!")
+                print(f"[LEECH_SEED] {target.name} é tipo Grass, imune a Leech Seed!")
+                return False
+
+        # Cria callbacks
+        def on_tick(effect):
+            """Executado a cada tick do efeito"""
+            if effect.effect_type == ResidualEffectType.LEECH_SEED:
+                self._apply_leech_seed_tick(effect, battle_system, effect_manager)
+            else:
+                # Para outros efeitos (Wrap, etc) - dano puro
+                self._apply_trapping_tick(effect, battle_system, effect_manager, drain_percentage)
+
+        def on_remove(effect):
+            """Quando o efeito é removido"""
+            effect_manager.add_status_text(target, f"{target.name} se libertou!", duration=1.0)
+
+        # Cria o efeito residual
+        effect = ResidualEffect(
+            effect_type=residual_type,
+            source=attacker,
+            target=target,
+            duration=duration,
+            tick_interval=tick_interval,
+            on_tick_callback=on_tick,
+            on_remove_callback=on_remove
+        )
+
+        # Adiciona ao gerenciador de efeitos residuais do battle_system
+        if not hasattr(battle_system, 'residual_effects'):
+            battle_system.residual_effects = ResidualEffectManager(battle_system)
+
+        battle_system.residual_effects.add_effect(effect)
+        effect_manager.add_status_text(target, f"{target.name} foi plantado com sementes!")
+
+        return True
+
+    def _apply_leech_seed_tick(self, effect, battle_system, effect_manager):
+        """Aplica o tick do Leech Seed (drena HP)"""
+        target = effect.target
+        source = effect.source
+
+        # Verifica se o alvo ainda está vivo
+        if target.is_defeated or not target.is_alive():
+            effect.remove()
+            return
+
+        # Verifica se a fonte ainda está viva
+        if source.is_defeated or not source.is_alive():
+            effect.remove()
+            return
+
+        # Calcula dano: 1/8 do HP máximo
+        drain_amount = max(1, target.max_hp // 8)
+
+        # Aplica dano ao alvo
+        old_hp = target.current_hp
+        target.take_damage(drain_amount, attacker=source)
+        actual_damage = old_hp - target.current_hp
+
+        if actual_damage > 0:
+            # Cura a fonte
+            heal_amount = actual_damage
+            source.current_hp = min(source.max_hp, source.current_hp + heal_amount)
+
+            # Feedback visual
+            effect_manager.add_status_text(target, f"-{actual_damage} HP (Semente)")
+            effect_manager.add_status_text(source, f"+{heal_amount} HP (Semente)")
+
+            print(f"[LEECH_SEED] {target.name} perdeu {actual_damage} HP, {source.name} recuperou {heal_amount} HP")
+
+            # Toca som de dreno
+            from src.managers.move_sound_manager import move_sound_manager
+            move_sound_manager.play_attack_sound("drain")
+        else:
+            print(f"[LEECH_SEED] {target.name} não sofreu dano (imune?)")
+
+    def _apply_trapping_tick(self, effect, battle_system, effect_manager, damage_percentage):
+        """Aplica tick de dano para efeitos de trapping (Wrap, Bind, etc)"""
+        target = effect.target
+
+        if target.is_defeated or not target.is_alive():
+            effect.remove()
+            return
+
+        # Dano: 1/8 do HP máximo por turno (padrão)
+        damage = max(1, int(target.max_hp * damage_percentage))
+        target.take_damage(damage, attacker=effect.source)
+
+        effect_manager.add_status_text(target, f"-{damage} HP ({effect.effect_type.value})")
+        print(f"[TRAPPING] {target.name} sofreu {damage} HP de {effect.effect_type.value}")
+
+    def _apply_remove_residual(self, attacker, target, battle_system, effect_manager):
+        """Remove efeitos residuais (Rapid Spin, etc)"""
+        removes = self.params.get('removes', [])
+
+        # Mapeia strings para enum
+        residual_type_map = {
+            'leech_seed': ResidualEffectType.LEECH_SEED,
+            'wrap': ResidualEffectType.WRAP,
+            'bind': ResidualEffectType.BIND,
+            'fire_spin': ResidualEffectType.FIRE_SPIN,
+            'whirlpool': ResidualEffectType.WHIRLPOOL,
+            'clamp': ResidualEffectType.CLAMP,
+            'sand_tomb': ResidualEffectType.SAND_TOMB,
+            'infestation': ResidualEffectType.INFESTATION,
+            'magma_storm': ResidualEffectType.MAGMA_STORM,
+            'salt_cure': ResidualEffectType.SALT_CURE,
+        }
+
+        removed_count = 0
+
+        for residual_type_str in removes:
+            residual_type = residual_type_map.get(residual_type_str)
+
+            if residual_type and hasattr(battle_system, 'residual_effects'):
+                if battle_system.residual_effects.has_effect_on_target(attacker, residual_type):
+                    battle_system.residual_effects.remove_effect_on_target(attacker, residual_type)
+                    removed_count += 1
+
+        if removed_count > 0:
+            effect_manager.add_status_text(attacker, f"{attacker.name} se libertou!")
+            print(f"[REMOVE_RESIDUAL] {attacker.name} removeu {removed_count} efeitos residuais")
 
         return True

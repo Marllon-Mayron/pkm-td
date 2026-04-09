@@ -1019,6 +1019,12 @@ class Pokemon(Entity):
             self.combat_state = "idle"
             self.target = None
             self.charge_cooldown = 0
+
+            if defeated and hasattr(self, 'battle_system') and self.battle_system:
+                # Remove efeitos residuais quando derrotado
+                if hasattr(self.battle_system, 'residual_effects'):
+                    self.battle_system.residual_effects.remove_effect_on_target(self)
+
             print(f"[DEFEATED] {self.name} foi derrotado! Animação de sono ativada.")
         else:
             # Restaura animação normal

@@ -332,6 +332,19 @@ class EffectFactory:
             },
             "description": "Pode congelar o oponente (10% de chance)"
         },
+        # ===== RESIDUAIS (TURN) =====
+        "leech-seed": {
+            "effect_type": "residual",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "residual_type": "leech_seed",
+                "duration": 8,  # 8 turnos
+                "tick_interval": 2.0,
+                "drain_percentage": 0.125  # 1/8 do HP máximo por tick
+            },
+            "description": "Planta uma semente que drena HP do oponente a cada turno"
+        },
         # Multi-hit moves
         "double-slap": {
             "effect_type": "multi_hit",

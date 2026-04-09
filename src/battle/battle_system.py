@@ -1,5 +1,7 @@
 # src/battle/battle_system.py
 import random
+
+from battle.effects.residual_effect import ResidualEffectManager
 from src.battle.damage_calculator import DamageCalculator
 from src.battle.effects import EffectManager, EffectTiming, StatType, StatusType
 from src.battle.projectile import Projectile
@@ -17,6 +19,7 @@ class BattleSystem:
         self.projectiles: List[Projectile] = []
         self.effect_manager = EffectManager()
         self.active_multi_hit = None  # Estado do multi-hit ativo
+        self.residual_effects = ResidualEffectManager(self)
 
     def set_effect_manager_for_pokemon(self, pokemon):
         """Vincula o effect_manager a um Pokémon e registra"""
@@ -37,6 +40,8 @@ class BattleSystem:
             still_active = self.active_multi_hit.update(dt)
             if not still_active:
                 self.active_multi_hit = None
+
+        self.residual_effects.update(dt)
 
     def attempt_attack(self, attacker: 'Pokemon', target: 'Pokemon') -> bool:
         """Tenta realizar um ataque com o move atual do atacante"""
@@ -375,3 +380,8 @@ class BattleSystem:
         """Renderiza projéteis"""
         for projectile in self.projectiles:
             projectile.render(screen, camera, screen_manager)
+
+    def clear_all_effects(self):
+        """Limpa todos os efeitos (usado quando batalha termina)"""
+        self.residual_effects.clear_all()
+        self.effect_manager.clear_all()
