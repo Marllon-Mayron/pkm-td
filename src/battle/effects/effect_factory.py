@@ -55,6 +55,7 @@ class EffectFactory:
             },
             "description": "Reduz a defesa do oponente"
         },
+
         "defense-curl": {
             "effect_type": "stat_mod",
             "target": EffectTarget.SELF,
@@ -117,7 +118,7 @@ class EffectFactory:
             "params": {
                 "stat": "speed",
                 "stages": 2,
-                "duration": 6.0
+                "duration": 4.0
             },
             "description": "Aumenta muito a Velocidade"
         },
@@ -156,6 +157,18 @@ class EffectFactory:
                 "overwrite": False  # Não sobrescreve outros status
             },
             "description": "Pode envenenar o oponente (30% de chance)"
+        },
+        "twineedle": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "poison",
+                "chance": 0.20,
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Pode envenenar o oponente (20% de chance)"
         },
         "poison-powder": {
             "effect_type": "status",
@@ -200,6 +213,18 @@ class EffectFactory:
             },
             "description": "Paralisa o oponente",
         },
+        "body-slam": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "paralysis",
+                "chance": 0.3,
+                "duration": None
+
+            },
+            "description": "Paralisa o oponente",
+        },
         # ===== ADORMECER (SLEEP) =====
         "sleep-powder": {
             "effect_type": "status",
@@ -223,6 +248,18 @@ class EffectFactory:
             },
             "description": "Coloca o oponente para dormir"
         },
+        "sing": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "sleep",
+                "duration": None,
+                "overwrite": True
+            },
+            "description": "Coloca o oponente para dormir"
+        },
+
         # ===== QUEIMADURA (BURN) =====
         "will-o-wisp": {
             "effect_type": "status",
@@ -395,6 +432,16 @@ class EffectFactory:
             },
             "description": "Ataque que acerta 2-5 vezes"
         },
+        "comet-punch": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "min_hits": 2,
+                "max_hits": 5
+            },
+            "description": "Ataque que acerta 2-5 vezes"
+        },
         "fury-attack": {
             "effect_type": "multi_hit",
             "target": EffectTarget.TARGET,
@@ -406,6 +453,16 @@ class EffectFactory:
             "description": "Ataque que acerta 2-5 vezes"
         },
         "fury-swipes": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "min_hits": 2,
+                "max_hits": 5
+            },
+            "description": "Ataque que acerta 2-5 vezes"
+        },
+        "pin-missile": {
             "effect_type": "multi_hit",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
@@ -434,6 +491,24 @@ class EffectFactory:
             },
             "description": "Pode fazer o oponente hesitar"
         },
+        "stomp": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "chance": 0.3
+            },
+            "description": "Pode fazer o oponente hesitar"
+        },
+        "rolling-kick": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "chance": 0.3
+            },
+            "description": "Pode fazer o oponente hesitar"
+        },
         # Recoil moves
         "take-down": {
             "effect_type": "recoil",
@@ -453,6 +528,16 @@ class EffectFactory:
             },
             "description": "Causa dano de retorno"
         },
+        "submission": {
+            "effect_type": "recoil",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "percentage": 0.25
+            },
+            "description": "Causa dano de retorno"
+        },
+
         # ===== DRENAGEM DE VIDA (DRAIN) =====
         "absorb": {
             "effect_type": "drain",
@@ -499,6 +584,42 @@ class EffectFactory:
                 "crit_stage": 1  # Aumenta estágio de crítico em 1
             },
             "description": "Alta taxa de acerto crítico"
+        },
+        "acid": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "sp_defense",
+                "stages": -1,
+                "chance": 0.1,
+                "duration": 6.0
+            },
+            "description": "Causa dano e tem chance de 10% de Reduzir a defesa do oponente"
+        },
+        "bubble-beam": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "speed",
+                "stages": -1,
+                "chance": 0.1,
+                "duration": 4.0
+            },
+            "description": "Causa dano e tem chance de 10% de Reduzir a defesa do oponente"
+        },
+        "aurora-beam": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "attack",
+                "stages": -1,
+                "chance": 0.1,
+                "duration": 6.0
+            },
+            "description": "Causa dano e tem chance de 10% de Reduzir a defesa do oponente"
         },
     }
 

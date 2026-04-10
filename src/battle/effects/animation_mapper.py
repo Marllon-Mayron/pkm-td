@@ -56,6 +56,13 @@ class AnimationMapper:
         "headbutt": "attack",
         "bite": "attack",
         "crunch": "attack",
+
+        "double-kick": "kick",
+        "mega-kick": "kick",
+        "jump-kick": "kick",
+        "rolling-kick": "kick",
+        "low-kick": "kick",
+
     }
 
     # ===== FALLBACK POR CATEGORIA =====

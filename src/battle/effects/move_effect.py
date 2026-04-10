@@ -255,14 +255,24 @@ class MoveEffect:
         return False
 
     def _apply_stat_mod(self, attacker, target, effect_manager):
-        """Aplica modificador de stat - com registro de contribuição"""
-        from .stat_modifier import StatType, StatModifier
+        """Aplica modificador de stat - COM SUPORTE A CHANCE"""
+        from .stat_modifier import StatType
 
         stat_name = self.params.get('stat', 'attack')
         stages = self.params.get('stages', 0)
         duration = self.params.get('duration', 8.0)
+        chance = self.params.get('chance', 1.0)  # Pega chance (padrão 100%)
 
-        print(f"[MOVE_EFFECT] Aplicando modificador: {stat_name} {stages:+d} em {target.name} (duração: {duration}s)")
+        # ===== VERIFICA CHANCE =====
+        if random.random() > chance:
+            # Falhou o efeito secundário
+            if chance < 1.0:
+                effect_manager.add_status_text(attacker, f"Mas falhou!", duration=0.8)
+                print(f"[STAT_MOD] {self.name} falhou em reduzir {stat_name} de {target.name}!")
+            return False
+
+        print(
+            f"[MOVE_EFFECT] Aplicando modificador: {stat_name} {stages:+d} em {target.name} (chance: {chance * 100}%)")
 
         # Converte string para StatType
         stat_map = {
@@ -281,16 +291,15 @@ class MoveEffect:
 
             # REGISTRA CONTRIBUIÇÃO
             if self.target == EffectTarget.TARGET:
-                # É um debuff no alvo
                 target_entity.register_stat_modifier(attacker, stat_name, stages)
             else:
-                # É um buff em si mesmo ou aliado
                 target_entity.register_buff_on_ally(attacker, target_entity, stat_name, stages)
 
             effect_manager.add_stat_modifier(target_entity, stat_type, stages, duration)
-            return True
 
-        return False
+            # Mensagem de sucesso
+            effect_manager.add_status_text(target, f"{stat_name} do oponente caiu!", duration=1.0)
+            return True
 
     def _apply_multi_hit(self, attacker, target, battle_system, effect_manager):
         """Inicia um ataque multi-hit (será processado ao longo do tempo)"""
