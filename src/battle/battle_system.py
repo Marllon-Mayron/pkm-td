@@ -70,11 +70,16 @@ class BattleSystem:
             print(f"[BATTLE] {attacker.name} não tem move selecionado!")
             return False
 
-        # Verificar PP
+        # Verificar PP (exceto para Struggle)
         if move.current_pp <= 0:
             print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
             attacker.has_no_pp = True
-            return False
+
+            # Se for Struggle, não bloqueia
+            if move.name.lower() == "struggle":
+                attacker.has_no_pp = False
+            else:
+                return False
 
         attacker.has_no_pp = False
 
@@ -140,6 +145,10 @@ class BattleSystem:
                 self._show_miss_on_attacker(attacker)
                 return True
 
+        # ===== TRATAMENTO ESPECIAL PARA STRUGGLE =====
+        if move.name.lower() == "struggle":
+            return self._attempt_struggle(attacker, target, move)
+
         # Calcular acerto
         hit_chance = move.accuracy / 100
         accuracy_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)
@@ -148,6 +157,11 @@ class BattleSystem:
         hit_chance = max(0.01, min(1.0, hit_chance))
 
         will_hit = random.random() <= hit_chance
+
+        # ===== VERIFICA SE O MOVE TEM EFEITO DE CRASH AO ERRAR =====
+        from src.battle.effects import EffectFactory
+        effect = EffectFactory.create_effect(move.name)
+        has_crash_effect = effect and effect.effect_type == "crash_damage_on_miss"
 
         # Ataques de status (que aplicam efeitos como veneno, queimadura, etc)
         if move.category == "status":
@@ -164,6 +178,11 @@ class BattleSystem:
             else:
                 print(f"[BATTLE] {move.name} errou!")
                 self._show_miss_on_attacker(attacker)
+
+                # ===== APLICA DANO DE COLISÃO SE O MOVE TEM ESSE EFEITO =====
+                if has_crash_effect:
+                    self._apply_crash_damage(attacker, move, effect)
+
             return True
 
         # Calcular dano
@@ -175,8 +194,13 @@ class BattleSystem:
                 "effectiveness": 1.0,
                 "hit": False,
                 "message": f"O ataque errou!",
-                "stab": False
+                "stab": False,
+                "critical": False
             }
+
+            # ===== APLICA DANO DE COLISÃO SE O MOVE TEM ESSE EFEITO =====
+            if has_crash_effect:
+                self._apply_crash_damage(attacker, move, effect)
 
         # Ataques especiais (usam projétil)
         if move.category == "special" and move.power > 0:
@@ -204,6 +228,10 @@ class BattleSystem:
             else:
                 print(f"[BATTLE] {move.name} errou!")
                 self._show_miss_on_attacker(attacker)
+
+                # ===== SE TEM CRASH EFFECT, JÁ APLICAMOS O DANO ACIMA =====
+                # Não precisa fazer nada extra aqui
+
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
 
@@ -213,6 +241,74 @@ class BattleSystem:
             move.current_pp -= 1
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
+
+    def _attempt_struggle(self, attacker: 'Pokemon', target: 'Pokemon', move) -> bool:
+        """
+        Executa o movimento Struggle
+        - Sempre acerta (ignora accuracy/evasion)
+        - Causa dano typeless (não tem resistência/imunidade)
+        - Causa recoil de 1/4 do HP máximo do atacante
+        """
+        print(f"[STRUGGLE] {attacker.name} está sem PP e usou Struggle!")
+
+        # Mostra mensagem
+        self.effect_manager.add_status_text(attacker, f"{attacker.name} usou Struggle!", duration=1.5)
+
+        # ===== CALCULA DANO (ignora modificadores de accuracy/evasion) =====
+        # Struggle sempre acerta
+        damage_result = self._calculate_struggle_damage(attacker, target, move)
+
+        # Aplica dano ao alvo
+        self._apply_damage(attacker, target, damage_result, move)
+
+        # ===== APLICA RECOIL (1/4 do HP máximo) =====
+        recoil_damage = max(1, int(attacker.max_hp * 0.25))
+        attacker.take_damage(recoil_damage, attacker=attacker)
+
+        self.effect_manager.add_status_text(attacker, f"Recoil: -{recoil_damage} HP", duration=1.0)
+        print(f"[STRUGGLE] {attacker.name} sofreu {recoil_damage} de recoil!")
+
+        # Toca animação de hurt no atacante
+        if hasattr(attacker, 'play_hurt_animation'):
+            attacker.play_hurt_animation()
+
+        # Cooldown
+        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+        return True
+
+    def _calculate_struggle_damage(self, attacker, target, move):
+        """
+        Calcula dano do Struggle (typeless, ignora resistências)
+        """
+        # Struggle é typeless - não tem super efetivo ou resistência
+        # Mas ainda usa a fórmula normal de dano físico
+        level = attacker.level
+        power = move.power  # 50
+        attack_stat = attacker.attack
+        defense_stat = target.defense
+
+        # Evita divisão por zero
+        if defense_stat <= 0:
+            defense_stat = 1
+
+        # Fórmula de dano padrão
+        damage = ((2 * level / 5 + 2) * power * attack_stat / defense_stat) / 50 + 2
+
+        # Variação aleatória (85-100%)
+        damage = damage * random.uniform(0.85, 1.0)
+
+        # Dano mínimo de 1
+        damage = max(1, int(damage))
+
+        return {
+            "damage": damage,
+            "effectiveness": 1.0,  # Sempre neutro
+            "hit": True,
+            "message": "",
+            "stab": False,
+            "critical": False
+        }
 
     def _show_miss_on_attacker(self, attacker):
         """Mostra o texto MISS no ATACANTE (quem usou o golpe)"""
@@ -319,6 +415,37 @@ class BattleSystem:
         # Log do dano causado
         print(f"[DAMAGE] {attacker.name} causou {damage} de dano a {target.name} com {move.name}!")
 
+    def _apply_crash_damage(self, attacker, move, effect):
+        """
+        Aplica dano de colisão para movimentos como Jump Kick
+        """
+        crash_percentage = effect.params.get("crash_damage_percentage", 0.5)
+        crash_formula = effect.params.get("crash_damage_formula", "max_hp_percentage")
+
+        if crash_formula == "max_hp_percentage":
+            # Dano = porcentagem do HP máximo (ex: 50%)
+            damage = max(1, int(attacker.max_hp * crash_percentage))
+        elif crash_formula == "current_hp_percentage":
+            # Dano = porcentagem do HP atual
+            damage = max(1, int(attacker.current_hp * crash_percentage))
+        else:
+            damage = max(1, int(attacker.max_hp * 0.5))  # Fallback
+
+        # Aplica dano ao atacante
+        attacker.take_damage(damage, attacker=attacker)
+
+        # Mostra mensagem
+        self.effect_manager.add_status_text(attacker, f"{attacker.name} se machucou!", duration=1.5)
+        print(f"[CRASH] {attacker.name} errou {move.name} e se machucou! Perdeu {damage} HP")
+
+        # Toca animação de hurt
+        if hasattr(attacker, 'play_hurt_animation'):
+            attacker.play_hurt_animation()
+
+        # Toca som de dano
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("hurt")
+
     def _apply_confusion_self_damage(self, attacker, confusion):
         """Aplica dano de confusão (atacante se machuca)"""
         damage = confusion.calculate_self_damage(attacker)
@@ -421,3 +548,7 @@ class BattleSystem:
         """Limpa todos os efeitos (usado quando batalha termina)"""
         self.residual_effects.clear_all()
         self.effect_manager.clear_all()
+
+        # ===== LIMPA MODIFICADORES DE CRÍTICO =====
+        from src.battle.critical_hit import CriticalHitSystem
+        CriticalHitSystem.clear_all_modifiers()

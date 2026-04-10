@@ -485,10 +485,67 @@ class PokemonCombat:
         return True
 
     def _get_current_move(self):
-        """Obtém o move atual"""
+        """
+        Obtém o move atual.
+        Se não houver moves com PP, retorna Struggle.
+        """
+        # Primeiro tenta pegar pelo padrão de ataque
         if hasattr(self.pokemon, 'get_current_move_for_pattern'):
-            return self.pokemon.get_current_move_for_pattern()
-        return self.pokemon.get_current_move()
+            move = self.pokemon.get_current_move_for_pattern()
+            if move and move.current_pp > 0:
+                return move
+
+        # Tenta o move normal
+        move = self.pokemon.get_current_move()
+        if move and move.current_pp > 0:
+            return move
+
+        # Verifica se tem algum move com PP
+        for m in self.pokemon.moves:
+            if m.current_pp > 0:
+                return m
+
+        # ===== SEM PP! MOSTRA MENSAGEM E USA STRUGGLE =====
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            self.pokemon.effect_manager.add_status_text(
+                self.pokemon,
+                f"{self.pokemon.name} não tem PP! Usou Struggle!",
+                duration=2.0
+            )
+
+        print(f"[STRUGGLE] {self.pokemon.name} está sem PP! Usando Struggle!")
+        return self._get_struggle_move()
+
+    def _get_struggle_move(self):
+        """
+        Cria e retorna o movimento Struggle (typeless, sempre acerta, com recoil)
+        """
+        # Verifica se já tem Struggle nos moves
+        for move in self.pokemon.moves:
+            if move.name.lower() == "struggle":
+                return move
+
+        # Cria Struggle dinamicamente
+        from src.entities.move import Move
+
+        struggle_info = {
+            "name": "Struggle",
+            "type": "normal",
+            "power": 50,
+            "accuracy": 100,
+            "pp": 1,
+            "max_pp": 1,
+            "category": "physical",
+            "description": "Usado quando todos os PP acabam. Causa dano e dano de retorno."
+        }
+
+        struggle_move = Move("struggle", struggle_info)
+        struggle_move.current_pp = 1  # Sempre disponível
+
+        # Adiciona aos moves temporariamente (opcional)
+        # self.pokemon.moves.append(struggle_move)
+
+        return struggle_move
 
     def _start_attack_animation(self, target: 'Pokemon', move):
         """Inicia a animação de ataque"""

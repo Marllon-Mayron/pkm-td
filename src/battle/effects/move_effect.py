@@ -173,6 +173,20 @@ class MoveEffect:
             return self._apply_self_confusion_after(attacker, target, effect_manager)
         elif self.effect_type == "cure_confusion":
             return self._apply_cure_confusion(attacker, target, effect_manager)
+        elif self.effect_type == "force_switch":
+            return self._apply_force_switch(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "level_damage":
+            return self._apply_level_damage(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "ohko":
+            return self._apply_ohko(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "fixed_damage":
+            return self._apply_fixed_damage(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "heal":
+            return self._apply_heal(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "critical_stage_mod":
+            return self._apply_critical_stage_mod(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "struggle":
+            return self._apply_struggle(attacker, target, battle_system, effect_manager, damage)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -255,51 +269,135 @@ class MoveEffect:
         return False
 
     def _apply_stat_mod(self, attacker, target, effect_manager):
-        """Aplica modificador de stat - COM SUPORTE A CHANCE"""
+        """
+        Aplica modificador de stat - SUPORTA MÚLTIPLOS STATS
+        """
         from .stat_modifier import StatType
 
-        stat_name = self.params.get('stat', 'attack')
-        stages = self.params.get('stages', 0)
-        duration = self.params.get('duration', 8.0)
-        chance = self.params.get('chance', 1.0)  # Pega chance (padrão 100%)
+        # Verifica se é formato antigo (stat único) ou novo (stats lista)
+        if "stats" in self.params:
+            # Formato novo: lista de stats
+            stats_list = self.params.get("stats", [])
+            duration = self.params.get("duration", 8.0)
 
-        # ===== VERIFICA CHANCE =====
-        if random.random() > chance:
-            # Falhou o efeito secundário
-            if chance < 1.0:
-                effect_manager.add_status_text(attacker, f"Mas falhou!", duration=0.8)
-                print(f"[STAT_MOD] {self.name} falhou em reduzir {stat_name} de {target.name}!")
+            # Verifica condições climáticas (Sunny Day para Growth)
+            #sun_boost = self.params.get("sun_boost", False)
+            #if sun_boost:
+                # Verifica se está com Sunny Day ativo
+                #is_sunny = self._is_sunny_day_active(attacker, effect_manager)
+
+
+            # Aplica cada modificador
+            success_count = 0
+            for stat_config in stats_list:
+                stat_name = stat_config.get("stat", "attack")
+                stages = stat_config.get("stages", 0)
+
+                # Converte string para StatType
+                stat_map = {
+                    'attack': StatType.ATTACK,
+                    'defense': StatType.DEFENSE,
+                    'sp_attack': StatType.SP_ATTACK,
+                    'sp_defense': StatType.SP_DEFENSE,
+                    'speed': StatType.SPEED,
+                    'accuracy': StatType.ACCURACY,
+                    'evasion': StatType.EVASION
+                }
+
+                stat_type = stat_map.get(stat_name.lower())
+                if stat_type:
+                    target_entity = target if self.target == EffectTarget.TARGET else attacker
+
+                    # REGISTRA CONTRIBUIÇÃO
+                    if self.target == EffectTarget.TARGET:
+                        target_entity.register_stat_modifier(attacker, stat_name, stages)
+                    else:
+                        target_entity.register_buff_on_ally(attacker, target_entity, stat_name, stages)
+
+                    effect_manager.add_stat_modifier(target_entity, stat_type, stages, duration)
+                    success_count += 1
+
+                    # Mensagem para cada stat (opcional, pode ser simplificado)
+                    stat_display = {
+                        StatType.ATTACK: "Ataque",
+                        StatType.DEFENSE: "Defesa",
+                        StatType.SP_ATTACK: "Ataque Especial",
+                        StatType.SP_DEFENSE: "Defesa Especial",
+                        StatType.SPEED: "Velocidade",
+                    }
+                    stat_name_pt = stat_display.get(stat_type, stat_name)
+                    if stages > 0:
+                        effect_manager.add_status_text(target_entity, f"{stat_name_pt} aumentou!", duration=0.8)
+                    else:
+                        effect_manager.add_status_text(target_entity, f"{stat_name_pt} diminuiu!", duration=0.8)
+
+            # Mensagem consolidada
+            if success_count > 0:
+                target_name = target.name if self.target == EffectTarget.TARGET else attacker.name
+                effect = "aumentaram" if any(s["stages"] > 0 for s in stats_list) else "diminuíram"
+                print(f"[MOVE_EFFECT] {success_count} stats de {target_name} {effect}!")
+                return True
+
             return False
 
-        print(
-            f"[MOVE_EFFECT] Aplicando modificador: {stat_name} {stages:+d} em {target.name} (chance: {chance * 100}%)")
+        else:
+            # ===== FORMATO ANTIGO (UM ÚNICO STAT) - MANTIDO PARA COMPATIBILIDADE =====
+            stat_name = self.params.get('stat', 'attack')
+            stages = self.params.get('stages', 0)
+            duration = self.params.get('duration', 8.0)
+            chance = self.params.get('chance', 1.0)
 
-        # Converte string para StatType
-        stat_map = {
-            'attack': StatType.ATTACK,
-            'defense': StatType.DEFENSE,
-            'sp_attack': StatType.SP_ATTACK,
-            'sp_defense': StatType.SP_DEFENSE,
-            'speed': StatType.SPEED,
-            'accuracy': StatType.ACCURACY,
-            'evasion': StatType.EVASION
-        }
+            # Verifica chance
+            import random
+            if random.random() > chance:
+                if chance < 1.0:
+                    effect_manager.add_status_text(attacker, f"Mas falhou!", duration=0.8)
+                    print(f"[STAT_MOD] {self.name} falhou em reduzir {stat_name} de {target.name}!")
+                return False
 
-        stat_type = stat_map.get(stat_name.lower())
-        if stat_type:
-            target_entity = target if self.target == EffectTarget.TARGET else attacker
+            print(
+                f"[MOVE_EFFECT] Aplicando modificador: {stat_name} {stages:+d} em {target.name} (duração: {duration}s)")
 
-            # REGISTRA CONTRIBUIÇÃO
-            if self.target == EffectTarget.TARGET:
-                target_entity.register_stat_modifier(attacker, stat_name, stages)
-            else:
-                target_entity.register_buff_on_ally(attacker, target_entity, stat_name, stages)
+            # Converte string para StatType
+            stat_map = {
+                'attack': StatType.ATTACK,
+                'defense': StatType.DEFENSE,
+                'sp_attack': StatType.SP_ATTACK,
+                'sp_defense': StatType.SP_DEFENSE,
+                'speed': StatType.SPEED,
+                'accuracy': StatType.ACCURACY,
+                'evasion': StatType.EVASION
+            }
 
-            effect_manager.add_stat_modifier(target_entity, stat_type, stages, duration)
+            stat_type = stat_map.get(stat_name.lower())
+            if stat_type:
+                target_entity = target if self.target == EffectTarget.TARGET else attacker
 
-            # Mensagem de sucesso
-            effect_manager.add_status_text(target, f"{stat_name} do oponente caiu!", duration=1.0)
-            return True
+                # REGISTRA CONTRIBUIÇÃO
+                if self.target == EffectTarget.TARGET:
+                    target_entity.register_stat_modifier(attacker, stat_name, stages)
+                else:
+                    target_entity.register_buff_on_ally(attacker, target_entity, stat_name, stages)
+
+                effect_manager.add_stat_modifier(target_entity, stat_type, stages, duration)
+
+                # Mensagem
+                stat_display = {
+                    StatType.ATTACK: "Ataque",
+                    StatType.DEFENSE: "Defesa",
+                    StatType.SP_ATTACK: "Ataque Especial",
+                    StatType.SP_DEFENSE: "Defesa Especial",
+                    StatType.SPEED: "Velocidade",
+                }
+                stat_name_pt = stat_display.get(stat_type, stat_name)
+                if stages > 0:
+                    effect_manager.add_status_text(target_entity, f"{stat_name_pt} aumentou!", duration=0.8)
+                else:
+                    effect_manager.add_status_text(target_entity, f"{stat_name_pt} diminuiu!", duration=0.8)
+
+                return True
+
+            return False
 
     def _apply_multi_hit(self, attacker, target, battle_system, effect_manager):
         """Inicia um ataque multi-hit (será processado ao longo do tempo)"""
@@ -346,6 +444,69 @@ class MoveEffect:
 
         drain_amount = max(1, int(damage * percentage))
         attacker.current_hp = min(attacker.max_hp, attacker.current_hp + drain_amount)
+
+        return True
+
+    def _apply_heal(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica efeito de cura (Recover)
+        """
+        heal_percentage = self.params.get("heal_percentage", 0.5)
+        heal_formula = self.params.get("heal_formula", "max_hp_percentage")
+
+        # Determina o alvo (SELF para Recover)
+        target_entity = target if self.target == EffectTarget.TARGET else attacker
+
+        # Verifica se o alvo já está com HP cheio
+        if target_entity.current_hp >= target_entity.max_hp:
+            effect_manager.add_status_text(target_entity, f"O HP de {target_entity.name} já está no máximo!",
+                                           duration=1.0)
+            print(f"[HEAL] {target_entity.name} já está com HP cheio!")
+            return False
+
+        # Calcula quantidade de cura
+        if heal_formula == "max_hp_percentage":
+            heal_amount = int(target_entity.max_hp * heal_percentage)
+        else:
+            heal_amount = int(target_entity.max_hp * 0.5)  # Fallback
+
+        # Garante cura mínima de 1 HP
+        heal_amount = max(1, heal_amount)
+
+        # Calcula cura real (não pode ultrapassar o máximo)
+        old_hp = target_entity.current_hp
+        new_hp = min(target_entity.max_hp, target_entity.current_hp + heal_amount)
+        actual_heal = new_hp - old_hp
+
+        if actual_heal <= 0:
+            effect_manager.add_status_text(target_entity, f"Mas falhou!", duration=0.8)
+            return False
+
+        # Aplica a cura
+        target_entity.current_hp = new_hp
+
+        # Mostra mensagem
+        effect_manager.add_status_text(target_entity, f"{target_entity.name} recuperou {actual_heal} HP!", duration=1.5)
+        print(f"[HEAL] {target_entity.name} recuperou {actual_heal} HP com {self.name}!")
+
+        # Toca som de cura (opcional - pode usar um som existente)
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("heal")  # Se não tiver, pode remover ou usar outro
+
+        return True
+
+    def _apply_struggle(self, attacker, target, battle_system, effect_manager, damage):
+        """
+        Aplica efeitos do Struggle (recoil)
+        O dano já foi aplicado pelo battle_system
+        """
+        recoil_percentage = self.params.get("recoil_percentage", 0.25)
+
+        recoil_damage = max(1, int(attacker.max_hp * recoil_percentage))
+        attacker.take_damage(recoil_damage, attacker=attacker)
+
+        effect_manager.add_status_text(attacker, f"Recoil: -{recoil_damage} HP", duration=1.0)
+        print(f"[STRUGGLE] {attacker.name} sofreu {recoil_damage} de recoil!")
 
         return True
 
@@ -497,6 +658,164 @@ class MoveEffect:
 
         return True
 
+    def _apply_level_damage(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica dano baseado no nível do atacante (Seismic Toss, Night Shade)
+        Dano = level do atacante
+        """
+        damage = attacker.level
+
+        # Verifica imunidade por tipo (Ghost é imune a Fighting)
+        ignore_type = self.params.get("ignore_type_effectiveness", True)
+
+        if not ignore_type:
+            # Calcula eficácia normal de tipo
+            from src.battle.damage_calculator import DamageCalculator
+            effectiveness = DamageCalculator._get_type_effectiveness(
+                self.name, target.types
+            )
+            if effectiveness == 0:
+                effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
+                print(f"[LEVEL_DAMAGE] {target.name} é imune!")
+                return False
+
+        # Aplica dano
+        target.take_damage(damage, attacker=attacker)
+
+        effect_manager.add_status_text(target, f"-{damage} HP", duration=1.0)
+        print(f"[LEVEL_DAMAGE] {attacker.name} causou {damage} de dano (nível) em {target.name}!")
+
+        return True
+
+    def _apply_ohko(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica One-Hit KO (Horn Drill, Fissure, Guillotine)
+
+        Regras:
+        - Só funciona se atacante level >= target level
+        - Accuracy = 30% + (atacante level - target level) * 1%
+        - Máximo 100%
+        - Imunidade: Ghost é imune a Horn Drill, etc
+        """
+
+        # ===== VERIFICA IMUNIDADE DE TIPO =====
+        move_name = self.name.lower()
+
+        # Horn Drill (Normal) não afeta Ghost
+        if move_name == "horn-drill":
+            if any(t.lower() == "ghost" for t in target.types):
+                effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
+                print(f"[OHKO] {target.name} é tipo Fantasma, imune a {self.name}!")
+                return False
+
+        # Fissure (Ground) não afeta Flying ou Levitate
+        if move_name == "fissure":
+            if any(t.lower() == "flying" for t in target.types):
+                effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
+                print(f"[OHKO] {target.name} é tipo Voador, imune a {self.name}!")
+                return False
+            # TODO: Verificar habilidade Levitate
+
+        # ===== VERIFICA NÍVEL =====
+        if attacker.level < target.level:
+            effect_manager.add_status_text(attacker, f"{attacker.name} é muito fraco!", duration=1.0)
+            print(f"[OHKO] {attacker.name} (Lv.{attacker.level}) é mais fraco que {target.name} (Lv.{target.level})!")
+            return False
+
+        # ===== CALCULA ACERTO =====
+        base_accuracy = self.params.get("base_accuracy", 30)
+        level_bonus = self.params.get("level_difference_bonus", 1)
+        max_accuracy = self.params.get("max_accuracy", 100)
+
+        level_diff = attacker.level - target.level
+        accuracy = base_accuracy + (level_diff * level_bonus)
+        accuracy = min(max_accuracy, accuracy)
+
+        # Verifica acerto
+        import random
+        if random.random() * 100 > accuracy:
+            effect_manager.add_status_text(attacker, "Errou!", duration=0.8)
+            print(f"[OHKO] {self.name} errou! (Acerto: {accuracy}%)")
+            return False
+
+        # ===== APLICA OHKO =====
+        # Causa dano igual ao HP máximo do alvo
+        damage = target.current_hp
+
+        target.take_damage(damage, attacker=attacker)
+
+        effect_manager.add_status_text(target, f"{target.name} foi derrubado!", duration=1.5)
+        print(f"[OHKO] {attacker.name} usou {self.name} e derrubou {target.name}!")
+
+        return True
+
+    def _apply_critical_stage_mod(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica modificador de estágio de crítico (Focus Energy)
+        """
+        from src.battle.critical_hit import CriticalHitSystem
+
+        stage_increase = self.params.get("stage_increase", 2)
+        max_stage = self.params.get("max_stage", 4)
+        stackable = self.params.get("stackable", False)
+
+        # Determina o alvo (geralmente SELF)
+        target_entity = target if self.target == EffectTarget.TARGET else attacker
+
+        # Verifica se já tem Focus Energy ativo
+        pokemon_id = id(target_entity)
+        current_stage = CriticalHitSystem._crit_stage_modifiers.get(pokemon_id, 0)
+
+        if not stackable and current_stage > 0:
+            effect_manager.add_status_text(target_entity, f"{target_entity.name} já está com foco energético!",
+                                           duration=1.5)
+            print(f"[CRIT] {target_entity.name} já está com Focus Energy ativo!")
+            return False
+
+        # Verifica se não vai exceder o máximo
+        if current_stage + stage_increase > max_stage:
+            effect_manager.add_status_text(target_entity, f"Mas o efeito não aumentou mais!", duration=1.0)
+            print(f"[CRIT] {target_entity.name} já atingiu o máximo de estágio de crítico!")
+            return False
+
+        # Aplica o modificador
+        success = CriticalHitSystem.add_crit_stage_modifier(target_entity, stage_increase)
+
+        if success:
+            # Mostra mensagem
+            effect_manager.add_status_text(target_entity, f"{target_entity.name} concentrou sua energia!", duration=1.5)
+            print(
+                f"[FOCUS_ENERGY] {target_entity.name} aumentou sua taxa de acerto crítico em {stage_increase} estágios!")
+
+            # Mensagem adicional sobre a taxa
+            from src.battle.critical_hit import CriticalHitSystem
+            new_chance = CriticalHitSystem.calculate_critical_chance(target_entity)
+            effect_manager.add_status_text(target_entity, f"Taxa de crítico aumentada!", duration=1.0)
+
+            return True
+
+        return False
+
+    def _apply_fixed_damage(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica dano fixo (Sonic Boom, Dragon Rage, etc)
+        """
+        fixed_damage = self.params.get("fixed_damage", 20)
+
+        # Verifica imunidade de tipo (se aplicável)
+        if self.name.lower() == "sonic-boom":
+            # Sonic Boom é Normal, não afeta Ghost
+            if any(t.lower() == "ghost" for t in target.types):
+                effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
+                print(f"[FIXED_DAMAGE] {target.name} é tipo Fantasma, imune a {self.name}!")
+                return False
+
+        # Aplica dano fixo
+        target.take_damage(fixed_damage, attacker=attacker)
+
+        print(f"[FIXED_DAMAGE] {attacker.name} causou {fixed_damage} de dano fixo em {target.name}!")
+
+        return True
     # ===== MÉTODOS DE CONFUSÃO =====
 
     def _apply_confusion(self, attacker, target, effect_manager):
@@ -560,3 +879,194 @@ class MoveEffect:
             return True
 
         return False
+
+    # ===== MÉTODOS DE MOVIMENTAÇÕES =====
+
+    def _apply_force_switch(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica efeito de Roar/Whirlwind - força troca/fuga
+
+        - Se target é selvagem (is_wild=True): faz fugir (remove do wave_manager)
+        - Se target é aliado (is_wild=False): volta para o time (is_placed=False)
+        """
+
+        # Verifica se o alvo está vivo
+        if target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, "Mas falhou!", duration=1.0)
+            print(f"[FORCE_SWITCH] {target.name} já está derrotado!")
+            return False
+
+        # Verifica imunidade (Ghost types são imunes? Nos jogos originais sim)
+        # Ghost types são imunes a Roar/Whirlwind
+        if any(t.lower() == "ghost" for t in target.types):
+            effect_manager.add_status_text(target, f"Não afeta {target.name}!", duration=1.0)
+            print(f"[FORCE_SWITCH] {target.name} é tipo Fantasma, imune!")
+            return False
+
+        # Verifica habilidade Suction Cups (ventosas) - impede troca
+        if hasattr(target, 'has_ability') and target.has_ability("Suction Cups"):
+            effect_manager.add_status_text(target, f"{target.name} não pode ser forçado a trocar!", duration=1.0)
+            print(f"[FORCE_SWITCH] {target.name} tem Ventosas, imune!")
+            return False
+
+        # ===== CASO 1: POKÉMON SELVAGEM (INIMIGO) - FAZ FUGIR =====
+        if target.is_wild:
+            return self._force_wild_flee(target, attacker, battle_system, effect_manager)
+
+        # ===== CASO 2: POKÉMON ALIADO - VOLTA PARA O TIME =====
+        else:
+            return self._force_ally_return(target, attacker, battle_system, effect_manager)
+
+    def _force_wild_flee(self, target, attacker, battle_system, effect_manager):
+        """
+        Força um Pokémon selvagem a FUGIR - inverte o path e o torna passivo.
+
+        Args:
+            target: Pokémon selvagem que vai fugir
+            attacker: Pokémon que usou o golpe
+            battle_system: Sistema de batalha
+            effect_manager: Gerenciador de efeitos
+        """
+
+        # Verifica se o wave_manager existe
+        if not battle_system.game_scene or not hasattr(battle_system.game_scene, 'wave_manager'):
+            effect_manager.add_status_text(target, "Mas falhou!", duration=1.0)
+            print(f"[FORCE_SWITCH] Não foi possível fazer {target.name} fugir!")
+            return False
+
+        wave_manager = battle_system.game_scene.wave_manager
+
+        # Verifica se o target está na lista de inimigos ativos
+        if target not in wave_manager.active_enemies:
+            effect_manager.add_status_text(target, "Mas falhou!", duration=1.0)
+            print(f"[FORCE_SWITCH] {target.name} não está na lista de inimigos ativos!")
+            return False
+
+        # ===== BOSS NÃO É ACOVARDADO =====
+        if target.is_boss:
+            effect_manager.add_status_text(target, f"{target.name} não se abalou!", duration=1.5)
+            print(f"[FORCE_SWITCH] {target.name} é um BOSS e não pode ser acovardado!")
+            return False
+
+        # Verifica se o target tem um path para inverter
+        if not hasattr(target, 'path') or not target.path:
+            effect_manager.add_status_text(target, "Mas falhou!", duration=1.0)
+            print(f"[FORCE_SWITCH] {target.name} não tem path para inverter!")
+            return False
+
+        # ===== 1. MUDA O PADRÃO DE ATAQUE PARA PASSIVO =====
+        from src.battle.attack_pattern import AttackPattern
+
+        old_pattern = target.attack_pattern
+        target.attack_pattern = AttackPattern.PASSIVE
+        print(f"[FORCE_SWITCH] {target.name} mudou de {old_pattern} para PASSIVO (acovardado)!")
+
+        # ===== 2. LIMPA O ALVO ATUAL =====
+        if hasattr(target, 'target') and target.target:
+            print(f"[FORCE_SWITCH] {target.name} abandonou o alvo {target.target.name}")
+            target.target = None
+
+        # ===== 3. RESETA ESTADO DE COMBATE =====
+        target.combat_state = "idle"
+        if hasattr(target, '_attack_attempts'):
+            target._attack_attempts = 0
+
+        # ===== 4. INTERROMPE QUALQUER ANIMAÇÃO DE ATAQUE =====
+        if hasattr(target, '_attack_animation_active'):
+            target._attack_animation_active = False
+        if hasattr(target, '_damage_applied'):
+            target._damage_applied = False
+
+        # ===== 5. INVERTE O PATH =====
+        effect_manager.add_status_text(target, f"{target.name} fugiu assustado!", duration=2.0)
+        print(f"[FORCE_SWITCH] {target.name} fugiu e está voltando pelo path devido a {attacker.name}!")
+
+        # Usa o PathTracker para inverter a direção
+        if hasattr(wave_manager, 'path_tracker'):
+            path_tracker = wave_manager.path_tracker
+
+            # Inverte o path do inimigo (faz ele voltar)
+            path_tracker.reverse_path(target)
+
+            # Reseta flags de chegada para evitar detecção imediata
+            state = path_tracker._enemy_state.get(id(target))
+            if state:
+                state['has_reached_start'] = False
+                state['has_reached_end'] = False
+                state['arrival_cooldown'] = 0.0
+                state['just_reversed_cooldown'] = 0.5  # Cooldown para evitar reverse duplo
+                # Limpa ignore_path_timer para garantir que ele volte pelo path
+                state['ignore_path_timer'] = 0.0
+                print(f"[FORCE_SWITCH] Path de {target.name} invertido! Agora voltando passivamente.")
+
+            # ===== 6. FORÇA ANIMAÇÃO DE WALK =====
+            if hasattr(target, 'set_animation') and target.has_animation("walk"):
+                target.set_animation("walk")
+
+            # ===== 7. TOCA ANIMAÇÃO DE HURT (ASSUSTADO) =====
+            if hasattr(target, 'play_hurt_animation'):
+                target.play_hurt_animation()
+
+            return True
+
+        return False
+
+    def _force_ally_return(self, target, attacker, battle_system, effect_manager):
+        """
+        Força um Pokémon aliado a retornar para o time (is_placed = False)
+
+        Args:
+            target: Pokémon aliado que vai retornar
+            attacker: Pokémon que usou o golpe (pode ser aliado ou inimigo)
+            battle_system: Sistema de batalha
+            effect_manager: Gerenciador de efeitos
+        """
+
+        # Verifica se o placement_manager existe
+        if not battle_system.game_scene or not hasattr(battle_system.game_scene, 'placement_manager'):
+            effect_manager.add_status_text(target, "Mas falhou!", duration=1.0)
+            print(f"[FORCE_SWITCH] Não foi possível fazer {target.name} retornar!")
+            return False
+
+        placement_manager = battle_system.game_scene.placement_manager
+
+        # Verifica se o target está no mapa
+        if not target.is_placed or target not in placement_manager.placed_pokemon:
+            effect_manager.add_status_text(target, "Mas falhou!", duration=1.0)
+            print(f"[FORCE_SWITCH] {target.name} não está no mapa!")
+            return False
+
+        # Mostra mensagem de retorno
+        effect_manager.add_status_text(target, f"{target.name} foi forçado a retornar!", duration=2.0)
+        print(f"[FORCE_SWITCH] {target.name} foi forçado a retornar ao time por {attacker.name}!")
+
+        # ===== LIMPA REFERÊNCIAS =====
+        # Limpa target de outros Pokémon que possam estar mirando nele
+        for ally in placement_manager.placed_pokemon:
+            if ally != target and hasattr(ally, 'target') and ally.target == target:
+                ally.target = None
+                if hasattr(ally, '_attack_attempts'):
+                    ally._attack_attempts = 0
+                ally.combat_state = "idle"
+
+        # Limpa target do próprio Pokémon
+        if hasattr(target, 'target'):
+            target.target = None
+
+        # Reseta estado de combate
+        target.combat_state = "idle"
+        target.charge_cooldown = 0
+
+        # Remove efeitos residuais
+        if hasattr(battle_system, 'residual_effects'):
+            battle_system.residual_effects.remove_effect_on_target(target)
+
+        # Remove do placement_manager (volta para o time)
+        placement_manager.remove_pokemon(target)
+
+        # Opcional: toca som de retorno
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("return")
+
+        print(f"[FORCE_SWITCH] {target.name} retornou ao time com sucesso!")
+        return True

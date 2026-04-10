@@ -7,6 +7,8 @@ class EffectFactory:
     """Fábrica para criar efeitos de movimento a partir de configuração"""
 
     # Configurações pré-definidas para moves comuns
+    # src/battle/effects/effect_factory.py
+
     MOVE_EFFECTS = {
         # Status moves - Stat Modifiers (4 segundos de duração)
         "string-shot": {
@@ -19,8 +21,7 @@ class EffectFactory:
                 "duration": 4.0
             },
             "description": "Reduz a Velocidade do oponente",
-            "attacker_animation": "shoot",  # Animação do atacante
-            "min_distance": 0  # Distância mínima para usar animação
+            "min_distance": 0
         },
         "growl": {
             "effect_type": "stat_mod",
@@ -55,7 +56,6 @@ class EffectFactory:
             },
             "description": "Reduz a defesa do oponente"
         },
-
         "defense-curl": {
             "effect_type": "stat_mod",
             "target": EffectTarget.SELF,
@@ -89,16 +89,76 @@ class EffectFactory:
             },
             "description": "Aumenta sua defesa em um nivel"
         },
+        "amnesia": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "sp_defense",
+                "stages": 2,
+                "duration": 6.0
+            },
+            "description": "Aumenta sua defesa especial em dois nivel"
+        },
+        "withdraw": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": 1,
+                "duration": 6.0
+            },
+            "description": "Aumenta sua defesa em um nivel"
+        },
+        "barrier": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": 2,
+                "duration": 6.0
+            },
+            "description": "Aumenta sua defesa em dois nivel"
+        },
+        "acid-armor": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": 2,
+                "duration": 6.0
+            },
+            "description": "Aumenta sua defesa em dois nivel"
+        },
         "growth": {
             "effect_type": "stat_mod",
             "target": EffectTarget.SELF,
             "timing": EffectTiming.ON_HIT,
             "params": {
-                "stat": "sp_attack",
-                "stages": 1,
-                "duration": 6.0
+                "stats": [
+                    {"stat": "attack", "stages": 1},
+                    {"stat": "sp_attack", "stages": 1}
+                ],
+                "duration": 6.0,
+                "sun_boost": True,
             },
-            "description": "Aumenta o Ataque Especial"
+            "description": "Aumenta o Ataque e o Ataque Especial"
+        },
+        "meditate": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stats": [
+                    {"stat": "attack", "stages": 1},
+                ],
+                "duration": 6.0,
+                "sun_boost": True,
+            },
+            "description": "Aumenta o Ataque"
         },
         "swords-dance": {
             "effect_type": "stat_mod",
@@ -110,6 +170,17 @@ class EffectFactory:
                 "duration": 6.0
             },
             "description": "Aumenta muito o Ataque"
+        },
+        "sharpen": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "attack",
+                "stages": 1,
+                "duration": 6.0
+            },
+            "description": "Aumenta  o Ataque"
         },
         "agility": {
             "effect_type": "stat_mod",
@@ -132,15 +203,36 @@ class EffectFactory:
                 "duration": 8.0
             },
             "description": "Reduz a Precisão do oponente",
-            "attacker_animation": "shoot",
+        },
+        "flash": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "accuracy",
+                "stages": -1,
+                "duration": 8.0
+            },
+            "description": "Reduz a Precisão do oponente",
+        },
+        "smokescreen": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "accuracy",
+                "stages": -1,
+                "duration": 8.0
+            },
+            "description": "Reduz a Precisão do oponente",
         },
         "double-team": {
             "effect_type": "stat_mod",
-            "target": EffectTarget.SELF,  # Aplica no próprio usuário
+            "target": EffectTarget.SELF,
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "stat": "evasion",
-                "stages": 1,  # Aumenta evasão em 1 estágio
+                "stages": 1,
                 "duration": 8.0
             },
             "description": "Aumenta a Evasão do usuário",
@@ -152,9 +244,9 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "poison",
-                "chance": 0.30,  # 30% de chance de envenenar
-                "duration": None,  # Veneno é permanente até cura
-                "overwrite": False  # Não sobrescreve outros status
+                "chance": 0.30,
+                "duration": None,
+                "overwrite": False
             },
             "description": "Pode envenenar o oponente (30% de chance)"
         },
@@ -176,7 +268,18 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "poison",
-                "duration": None,  # Veneno permanente
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Envenena o oponente",
+        },
+        "poison-gas": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "poison",
+                "duration": None,
                 "overwrite": False
             },
             "description": "Envenena o oponente",
@@ -186,11 +289,35 @@ class EffectFactory:
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "params": {
-                "status": "toxic_poison",  # Veneno tóxico (dano aumenta)
+                "status": "toxic_poison",
                 "duration": None,
                 "overwrite": True
             },
             "description": "Envenena gravemente o oponente"
+        },
+        "smog": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "poison",
+                "chance": 0.40,
+                "duration": None,
+                "overwrite": True
+            },
+            "description": "Envenena o oponente"
+        },
+        "sludge": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "poison",
+                "chance": 0.30,
+                "duration": None,
+                "overwrite": True
+            },
+            "description": "Envenena o oponente"
         },
         # ===== PARALIZIA (PARALYZED) =====
         "thunder-wave": {
@@ -199,6 +326,38 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "paralysis",
+                "duration": None
+            },
+            "description": "Paralisa o oponente"
+        },
+        "glare": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "paralysis",
+                "duration": None
+            },
+            "description": "Paralisa o oponente"
+        },
+        "thunderbolt": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "paralysis",
+                "chance": 0.1,
+                "duration": None
+            },
+            "description": "Paralisa o oponente"
+        },
+        "thunder": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "paralysis",
+                "chance": 0.3,
                 "duration": None
             },
             "description": "Paralisa o oponente"
@@ -214,19 +373,40 @@ class EffectFactory:
             "description": "Paralisa o oponente",
         },
         "body-slam": {
-            "effect_type": "status",
+            "effect_type": "status_chance",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "paralysis",
                 "chance": 0.3,
                 "duration": None
-
             },
-            "description": "Paralisa o oponente",
+            "description": "Pode paralisar o oponente (30% de chance)",
+        },
+        "lick": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "paralysis",
+                "chance": 0.3,
+                "duration": None
+            },
+            "description": "Pode paralisar o oponente (30% de chance)",
         },
         # ===== ADORMECER (SLEEP) =====
         "sleep-powder": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "sleep",
+                "duration": None,
+                "overwrite": True
+            },
+            "description": "Coloca o oponente para dormir",
+        },
+        "spore": {
             "effect_type": "status",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
@@ -259,7 +439,17 @@ class EffectFactory:
             },
             "description": "Coloca o oponente para dormir"
         },
-
+        "lovely-kiss": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "sleep",
+                "duration": None,
+                "overwrite": True
+            },
+            "description": "Coloca o oponente para dormir"
+        },
         # ===== QUEIMADURA (BURN) =====
         "will-o-wisp": {
             "effect_type": "status",
@@ -267,7 +457,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "burn",
-                "duration": None,  # Queimadura é permanente
+                "duration": None,
                 "overwrite": False
             },
             "description": "Queima o oponente"
@@ -290,7 +480,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "burn",
-                "chance": 0.10,  # 10% de chance
+                "chance": 0.10,
                 "duration": None,
                 "overwrite": False
             },
@@ -302,7 +492,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "burn",
-                "chance": 0.10,  # 10% de chance
+                "chance": 0.10,
                 "duration": None,
                 "overwrite": False
             },
@@ -314,7 +504,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "burn",
-                "chance": 0.10,  # 10% de chance
+                "chance": 0.10,
                 "duration": None,
                 "overwrite": False
             },
@@ -327,7 +517,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "freeze",
-                "chance": 0.10,  # 10% de chance de congelar
+                "chance": 0.10,
                 "duration": None,
                 "overwrite": False
             },
@@ -339,7 +529,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "freeze",
-                "chance": 0.90,
+                "chance": 0.10,
                 "duration": None,
                 "overwrite": False
             },
@@ -376,9 +566,9 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "residual_type": "leech_seed",
-                "duration": 8,  # 8 turnos
+                "duration": 8,
                 "tick_interval": 2.0,
-                "drain_percentage": 0.125  # 1/8 do HP máximo por tick
+                "drain_percentage": 0.125
             },
             "description": "Planta uma semente que drena HP do oponente a cada turno"
         },
@@ -388,10 +578,9 @@ class EffectFactory:
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "params": {
-                "duration": None  # Aleatório 1-4 turnos
+                "duration": None
             },
             "description": "Causa confusão no oponente",
-            "attacker_animation": "shoot"
         },
         "supersonic": {
             "effect_type": "confusion",
@@ -401,16 +590,24 @@ class EffectFactory:
                 "duration": None
             },
             "description": "Causa confusão no oponente com ondas sônicas",
-            "attacker_animation": "shoot"
         },
         "psybeam": {
             "effect_type": "damage_with_confusion_chance",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.AFTER_DAMAGE,
             "params": {
-                "chance": 0.10  # 10% de chance de confundir
+                "chance": 0.10
             },
             "description": "Pode causar confusão (10% de chance)"
+        },
+        "dizzy-punch": {
+            "effect_type": "damage_with_confusion_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "chance": 0.20
+            },
+            "description": "Pode causar confusão (20% de chance)"
         },
         "confusion": {
             "effect_type": "damage_with_confusion_chance",
@@ -462,7 +659,27 @@ class EffectFactory:
             },
             "description": "Ataque que acerta 2-5 vezes"
         },
+        "bonemerang": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "min_hits": 2,
+                "max_hits": 2
+            },
+            "description": "Ataque que acerta 2 vezes"
+        },
         "pin-missile": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "min_hits": 2,
+                "max_hits": 5
+            },
+            "description": "Ataque que acerta 2-5 vezes"
+        },
+        "barrage": {
             "effect_type": "multi_hit",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
@@ -491,12 +708,48 @@ class EffectFactory:
             },
             "description": "Pode fazer o oponente hesitar"
         },
+        "rock-slide": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "chance": 0.3
+            },
+            "description": "Pode fazer o oponente hesitar"
+        },
+        "hyper-fang": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "chance": 0.1
+            },
+            "description": "Pode fazer o oponente hesitar"
+        },
         "stomp": {
             "effect_type": "flinch",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "chance": 0.3
+            },
+            "description": "Pode fazer o oponente hesitar"
+        },
+        "waterfall": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "chance": 0.2
+            },
+            "description": "Pode fazer o oponente hesitar"
+        },
+        "bone-club": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "chance": 0.1
             },
             "description": "Pode fazer o oponente hesitar"
         },
@@ -509,6 +762,7 @@ class EffectFactory:
             },
             "description": "Pode fazer o oponente hesitar"
         },
+
         # Recoil moves
         "take-down": {
             "effect_type": "recoil",
@@ -536,6 +790,17 @@ class EffectFactory:
                 "percentage": 0.25
             },
             "description": "Causa dano de retorno"
+        },
+        "struggle": {
+            "effect_type": "struggle",  # Tipo especial para Struggle
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "recoil_percentage": 0.25,  # 25% do HP máximo de recoil
+                "ignore_accuracy": True,  # Sempre acerta (accuracy null)
+                "ignore_immunity": True,  # Typeless - não tem imunidade
+            },
+            "description": "Usado quando todos os PP acabam. Causa dano e dano de retorno."
         },
 
         # ===== DRENAGEM DE VIDA (DRAIN) =====
@@ -577,14 +842,42 @@ class EffectFactory:
         },
         # ===== DANOS COM EFEITOS DE STATS =====
         "karate-chop": {
-            "effect_type": "high_crit",  # Novo tipo de efeito
+            "effect_type": "high_crit",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "params": {
-                "crit_stage": 1  # Aumenta estágio de crítico em 1
+                "crit_stage": 1
             },
             "description": "Alta taxa de acerto crítico"
         },
+        "crabhammer": {
+            "effect_type": "high_crit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "crit_stage": 1
+            },
+            "description": "Alta taxa de acerto crítico"
+        },
+        "razor-leaf": {
+            "effect_type": "high_crit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "crit_stage": 1
+            },
+            "description": "Alta taxa de acerto crítico"
+        },
+        "slash": {
+            "effect_type": "high_crit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "crit_stage": 1
+            },
+            "description": "Alta taxa de acerto crítico"
+        },
+
         "acid": {
             "effect_type": "stat_mod",
             "target": EffectTarget.TARGET,
@@ -595,7 +888,7 @@ class EffectFactory:
                 "chance": 0.1,
                 "duration": 6.0
             },
-            "description": "Causa dano e tem chance de 10% de Reduzir a defesa do oponente"
+            "description": "Causa dano e tem chance de 10% de reduzir a Defesa Especial do oponente"
         },
         "bubble-beam": {
             "effect_type": "stat_mod",
@@ -607,7 +900,19 @@ class EffectFactory:
                 "chance": 0.1,
                 "duration": 4.0
             },
-            "description": "Causa dano e tem chance de 10% de Reduzir a defesa do oponente"
+            "description": "Causa dano e tem chance de 10% de reduzir a Velocidade do oponente"
+        },
+        "bubble": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "speed",
+                "stages": -1,
+                "chance": 0.1,
+                "duration": 4.0
+            },
+            "description": "Causa dano e tem chance de 10% de reduzir a Velocidade do oponente"
         },
         "aurora-beam": {
             "effect_type": "stat_mod",
@@ -619,7 +924,175 @@ class EffectFactory:
                 "chance": 0.1,
                 "duration": 6.0
             },
-            "description": "Causa dano e tem chance de 10% de Reduzir a defesa do oponente"
+            "description": "Causa dano e tem chance de 10% de reduzir o Ataque do oponente"
+        },
+
+        # ===== FORÇAR MOVIMENTAÇÃO =====
+        "roar": {
+            "effect_type": "force_switch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "force_wild_flee": True,
+                "force_ally_return": True,
+                "bypass_protect": True,
+            },
+            "description": "Força o oponente a fugir ou ser substituído"
+        },
+        "whirlwind": {
+            "effect_type": "force_switch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "force_wild_flee": True,
+                "force_ally_return": True,
+                "bypass_protect": False,
+            },
+            "description": "Força o oponente a fugir ou ser substituído"
+        },
+
+        # ===== MOVIMENTOS ESPECÍFICOS =====
+        "focus-energy": {
+            "effect_type": "critical_stage_mod",  # Modifica estágio de crítico
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stage_increase": 2,  # Aumenta 2 estágios
+                "max_stage": 4,  # Máximo +4 estágios (50% de chance)
+                "stackable": False,  # Não pode acumular com outro Focus Energy
+            },
+            "description": "Aumenta muito a taxa de acerto crítico"
+        },
+        # ===== CURA (HEAL) =====
+        "recover": {
+            "effect_type": "heal",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "heal_percentage": 0.5,
+                "heal_formula": "max_hp_percentage",
+            },
+            "description": "Recupera metade do HP máximo do usuário"
+        },
+        "soft-boiled": {
+            "effect_type": "heal",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "heal_percentage": 0.5,
+                "heal_formula": "max_hp_percentage",
+            },
+            "description": "Recupera metade do HP máximo do usuário"
+        },
+
+        "seismic-toss": {
+            "effect_type": "level_damage",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "damage_formula": "level",
+                "ignore_type_effectiveness": True,
+            },
+            "description": "Causa dano igual ao nível do usuário"
+        },
+        "constrict": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,  # Ou AFTER_DAMAGE, tanto faz
+            "params": {
+                "stat": "speed",
+                "stages": -1,
+                "chance": 0.10,
+                "duration": 4.0
+            },
+            "description": "Causa dano e tem 10% de chance de reduzir a Velocidade do oponente"
+        },
+        "kinesis": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "stat": "accuracy",
+                "stages": -1,
+                "duration": 6.0
+            },
+            "description": "Causa dano e reduz a precisão do oponente"
+        },
+        # ===== HITKILL =====
+        "horn-drill": {
+            "effect_type": "ohko",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "base_accuracy": 30,
+                "level_difference_bonus": 1,
+                "max_accuracy": 100,
+            },
+            "description": "Golpe que pode derrubar o oponente com um só golpe"
+        },
+        "fissure": {
+            "effect_type": "ohko",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "base_accuracy": 30,
+                "level_difference_bonus": 0,
+                "max_accuracy": 100,
+            },
+            "description": "Golpe que pode derrubar o oponente com um só golpe"
+        },
+        "guillotine": {
+            "effect_type": "ohko",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "base_accuracy": 30,
+                "level_difference_bonus": 0,
+                "max_accuracy": 100,
+            },
+            "description": "Golpe que pode derrubar o oponente com um só golpe"
+        },
+
+        # ===== DANOS FIXOS =====
+        "sonic-boom": {
+            "effect_type": "fixed_damage",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "fixed_damage": 20,
+            },
+            "description": "Sempre causa 20 de dano"
+        },
+        "dragon-rage": {
+            "effect_type": "fixed_damage",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "fixed_damage": 40,
+            },
+            "description": "Sempre causa 40 de dano"
+        },
+
+        # ===== DANO NO ATACANTE SE ERRAR =====
+        "jump-kick": {
+            "effect_type": "crash_damage_on_miss",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "crash_damage_percentage": 0.5,
+                "crash_damage_formula": "max_hp_percentage",
+            },
+            "description": "Se errar, o usuário se machuca perdendo metade do HP máximo"
+        },
+        "high-jump-kick": {
+            "effect_type": "crash_damage_on_miss",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "crash_damage_percentage": 0.5,
+                "crash_damage_formula": "max_hp_percentage",
+            },
+            "description": "Se errar, o usuário se machuca perdendo metade do HP máximo"
         },
     }
 
