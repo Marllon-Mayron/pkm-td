@@ -261,20 +261,8 @@ class Pokemon(Entity):
     def find_nearest_enemy(self, enemies):
         return self.combat.find_nearest_enemy(enemies)
 
-    def _handle_idle_state(self, dt, enemies):
-        self.combat.handle_idle_state(dt, enemies)
-
-    def _handle_charging_state(self, dt):
-        self.combat.handle_charging_state(dt)
-
     def _handle_returning_state(self, dt):
         self.combat.handle_returning_state(dt)
-
-    def _perform_charge_attack(self, target):
-        self.combat.perform_charge_attack(target)
-
-    def _show_miss_on_self(self):
-        self.combat.show_miss_on_self()
 
     def is_immune_to_status(self, status_type) -> bool:
         """Verifica se o Pokémon é imune a um tipo específico de status"""

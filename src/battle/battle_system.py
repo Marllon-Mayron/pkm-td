@@ -1,7 +1,7 @@
 # src/battle/battle_system.py
 import random
 
-from battle.effects.residual_effect import ResidualEffectManager
+from src.battle.effects.residual_effect import ResidualEffectManager
 from src.battle.damage_calculator import DamageCalculator
 from src.battle.effects import EffectManager, EffectTiming, StatType, StatusType
 from src.battle.projectile import Projectile

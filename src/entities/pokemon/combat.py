@@ -148,6 +148,7 @@ class PokemonCombat:
             print(f"[TARGET_LOST] {self.pokemon.name} perdeu o alvo {self.pokemon.target.name}. Motivo: {reason}")
             self.pokemon.target = None
 
+
         # Reseta estado de combate
         self.pokemon.combat_state = "idle"
 
@@ -276,6 +277,7 @@ class PokemonCombat:
             if self.pokemon.is_wild:
                 if not self.pokemon.target.is_placed:
                     self.pokemon.target = None
+                    self.pokemon.combat_state = "idle"
                 else:
                     self._try_attack(self.pokemon.target, dt)
             else:

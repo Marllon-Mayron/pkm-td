@@ -15,9 +15,9 @@ class Settings:
         self.vsync = True
 
         # Configurações de performance
-        self.target_fps = 60  # FPS alvo para renderização
+        self.target_fps = 60 # FPS alvo para renderização
         self.game_tick_rate = 60  # Updates por segundo (lógica do jogo)
-        self.max_fps = 240  # FPS máximo (para evitar uso desnecessário de CPU)
+        self.max_fps = 60  # FPS máximo (para evitar uso desnecessário de CPU)
 
         # Configurações de áudio (NOVO)
         self.sfx_volume = 0.7
