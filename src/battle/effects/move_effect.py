@@ -4,9 +4,9 @@ from typing import Optional, List, Any, Callable
 from dataclasses import dataclass, field
 import random
 
-from battle.effects import StatusType
-from battle.effects.residual_effect import ResidualEffect
-from battle.effects.residual_effect import ResidualEffectType, ResidualEffectManager
+from src.battle.effects import StatusType
+from src.battle.effects.residual_effect import ResidualEffect
+from src.battle.effects.residual_effect import ResidualEffectType, ResidualEffectManager
 
 
 class EffectTarget(Enum):
@@ -177,6 +177,8 @@ class MoveEffect:
             return self._apply_force_switch(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "level_damage":
             return self._apply_level_damage(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "variable_level_damage":
+            return self._apply_variable_level_damage(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "ohko":
             return self._apply_ohko(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "fixed_damage":
@@ -197,6 +199,10 @@ class MoveEffect:
             return self._apply_stat_mod_with_visual(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "rage_mode":
             return self._apply_rage_mode(attacker, target, effect_manager)
+        elif self.effect_type == "teleport_swap":
+            return self._apply_teleport_swap(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "random_status_chance":
+            return self._apply_random_status_chance(attacker, target, effect_manager)
         elif self.effect_type == "struggle":
             return self._apply_struggle(attacker, target, battle_system, effect_manager, damage)
         return True
@@ -831,6 +837,68 @@ class MoveEffect:
 
         return True
 
+    def _apply_variable_level_damage(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica dano variável baseado no nível (Psywave)
+        Dano = nível * (50% a 150%, em incrementos de 10%)
+        """
+
+        # Obtém os parâmetros
+        min_percentage = self.params.get("min_percentage", 0.5)
+        max_percentage = self.params.get("max_percentage", 1.5)
+        increment = self.params.get("increment", 0.1)
+        ignore_type_immunity = self.params.get("ignore_type_immunity", True)
+        is_typeless = self.params.get("is_typeless", True)
+
+        # ===== VERIFICA IMUNIDADE DE TIPO (se não for typeless) =====
+        if not ignore_type_immunity:
+            from src.battle.damage_calculator import DamageCalculator
+            effectiveness = DamageCalculator._get_type_effectiveness(
+                self.name, target.types
+            )
+            if effectiveness == 0:
+                effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
+                print(f"[PSYWAVE] {target.name} é imune!")
+                return False
+
+        # ===== CALCULA O DANO =====
+        # Número de incrementos possíveis
+        # Ex: 0.5 a 1.5 com incremento 0.1 = 11 valores possíveis (50, 60, 70... 150)
+        num_increments = int((max_percentage - min_percentage) / increment) + 1
+
+        # Escolhe um índice aleatório
+        random_index = random.randint(0, num_increments - 1)
+
+        # Calcula a porcentagem
+        percentage = min_percentage + (random_index * increment)
+
+        # Calcula o dano baseado no nível
+        damage = int(attacker.level * percentage)
+
+        # Garante dano mínimo de 1
+        damage = max(1, damage)
+
+        # ===== MOSTRA A PORCENTAGEM (opcional, para debug) =====
+        percentage_display = int(percentage * 100)
+        effect_manager.add_status_text(
+            attacker,
+            f"Poder: {percentage_display}% do nível!",
+            duration=0.8
+        )
+
+        # ===== APLICA O DANO =====
+        target.take_damage(damage, attacker=attacker)
+
+        # Mostra mensagem
+        effect_manager.add_status_text(target, f"-{damage} HP", duration=1.0)
+        print(f"[PSYWAVE] {attacker.name} causou {damage} de dano ({percentage_display}% do nível) em {target.name}!")
+
+        # Toca som (reutiliza som de psychic)
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("psywave")
+
+        return True
+
     def _apply_percent_damage(self, attacker, target, battle_system, effect_manager):
         """
         Aplica dano baseado em porcentagem do HP (Super Fang)
@@ -931,6 +999,74 @@ class MoveEffect:
 
         effect_manager.add_status_text(target, f"{target.name} foi derrubado!", duration=1.5)
         print(f"[OHKO] {attacker.name} usou {self.name} e derrubou {target.name}!")
+
+        return True
+
+    def _apply_random_status_chance(self, attacker, target, effect_manager):
+        """
+        Aplica um status aleatório com uma chance (Tri Attack, Secret Power, etc)
+        """
+        from .status_effect import StatusEffect, StatusType
+
+        chance = self.params.get("chance", 0.20)
+        possible_status = self.params.get("possible_status", [])
+        weights = self.params.get("weights", [1] * len(possible_status))
+        overwrite = self.params.get("overwrite", False)
+
+        # Verifica se já tem status (se não permitir overwrite)
+        existing_status = effect_manager.get_status(target)
+        if existing_status and existing_status.type != StatusType.NONE and not overwrite:
+            print(f"[RANDOM_STATUS] {target.name} já está com {existing_status.name}, não aplica novo status!")
+            return False
+
+        # Tenta aplicar com a chance
+        if random.random() >= chance:
+            print(f"[RANDOM_STATUS] {self.name} falhou em aplicar status ({chance * 100}% de chance)")
+            return False
+
+        # Se não há status possíveis, falha
+        if not possible_status:
+            return False
+
+        # Escolhe um status aleatório baseado nos pesos
+        chosen_status_str = random.choices(possible_status, weights=weights, k=1)[0]
+
+        # Mapeia para StatusType
+        status_map = {
+            "poison": StatusType.POISON,
+            "toxic_poison": StatusType.TOXIC_POISON,
+            "burn": StatusType.BURN,
+            "paralysis": StatusType.PARALYSIS,
+            "sleep": StatusType.SLEEP,
+            "freeze": StatusType.FREEZE,
+        }
+
+        status_type = status_map.get(chosen_status_str.lower())
+        if not status_type:
+            return False
+
+        # Mensagem específica para o Tri Attack
+        status_names = {
+            StatusType.BURN: "queimadura",
+            StatusType.FREEZE: "congelamento",
+            StatusType.PARALYSIS: "paralisia",
+        }
+        status_name_pt = status_names.get(status_type, chosen_status_str)
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} causou {status_name_pt} com {self.name}!",
+            duration=1.0
+        )
+
+        # Aplica o status
+        status = StatusEffect(status_type, duration=None)
+        effect_manager.apply_status(target, status, attacker)
+
+        # Registra contribuição
+        target.register_status_application(attacker, self.name)
+
+        print(f"[RANDOM_STATUS] {attacker.name} aplicou {status_type.value} em {target.name} com {self.name}!")
 
         return True
 
@@ -1183,6 +1319,186 @@ class MoveEffect:
         return False
 
     # ===== MÉTODOS DE MOVIMENTAÇÕES =====
+
+    def _apply_teleport_swap(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito do Teleport:
+        - Teleporta para um spot livre aleatório
+        - 20% de chance de trocar de lugar com um aliado se houver
+        """
+
+        # Verifica se o atacante está colocado no mapa
+        if not hasattr(attacker, 'is_placed') or not attacker.is_placed:
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            print(f"[TELEPORT] {attacker.name} não está no mapa!")
+            return False
+
+        # Obtém o placement_manager
+        if not battle_system.game_scene or not hasattr(battle_system.game_scene, 'placement_manager'):
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            print(f"[TELEPORT] PlacementManager não encontrado!")
+            return False
+
+        placement_manager = battle_system.game_scene.placement_manager
+        spot_renderer = battle_system.game_scene.spot_renderer
+
+        # Obtém todos os spots
+        all_spots = spot_renderer.get_spots()
+        if not all_spots:
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
+        # ===== VERIFICA A CHANCE DE TROCA COM ALIADO (20%) =====
+        swap_chance = self.params.get("swap_chance", 0.20)
+        will_swap = random.random() < swap_chance
+
+        if will_swap:
+            # Tenta trocar com um aliado
+            swapped = self._try_swap_with_ally(attacker, placement_manager, effect_manager)
+            if swapped:
+                return True
+
+        # ===== TELEPORT NORMAL: Encontra um spot livre aleatório =====
+        # Filtra spots livres (não ocupados)
+        free_spots = [spot for spot in all_spots if not spot.occupied]
+
+        if not free_spots:
+            # Não tem spot livre - TELEPORT ERRA
+            effect_manager.add_status_text(attacker,
+                                           f"{attacker.name} usou Teleport, mas não encontrou um local seguro!",
+                                           duration=1.5)
+            print(f"[TELEPORT] {attacker.name} falhou! Nenhum spot livre disponível!")
+            return False
+
+        # Escolhe um spot livre aleatório
+        target_spot = random.choice(free_spots)
+
+        # Realiza o teleport
+        return self._perform_teleport(attacker, target_spot, placement_manager, effect_manager)
+
+    def _try_swap_with_ally(self, attacker, placement_manager, effect_manager):
+        """
+        Tenta trocar de lugar com um Pokémon aliado
+        Retorna True se conseguiu trocar, False caso contrário
+        """
+        # Filtra aliados colocados (exclui o próprio atacante)
+        allies = [p for p in placement_manager.placed_pokemon if p != attacker and p.is_alive()]
+
+        if not allies:
+            print(f"[TELEPORT] {attacker.name} tentou trocar, mas não há aliados!")
+            return False
+
+        # Escolhe um aliado aleatório
+        target_ally = random.choice(allies)
+
+        # Guarda as posições atuais
+        attacker_old_x = attacker.x
+        attacker_old_y = attacker.y
+        attacker_old_spot_tile = (attacker.placed_tile_x, attacker.placed_tile_y) if hasattr(attacker,
+                                                                                             'placed_tile_x') else None
+
+        ally_old_x = target_ally.x
+        ally_old_y = target_ally.y
+        ally_old_spot_tile = (target_ally.placed_tile_x, target_ally.placed_tile_y) if hasattr(target_ally,
+                                                                                               'placed_tile_x') else None
+
+        # Troca as posições
+        attacker.x = ally_old_x
+        attacker.y = ally_old_y
+        if hasattr(attacker, 'placed_tile_x'):
+            attacker.placed_tile_x = target_ally.placed_tile_x
+            attacker.placed_tile_y = target_ally.placed_tile_y
+        attacker.original_spot_x = attacker.x
+        attacker.original_spot_y = attacker.y
+
+        target_ally.x = attacker_old_x
+        target_ally.y = attacker_old_y
+        if hasattr(target_ally, 'placed_tile_x'):
+            target_ally.placed_tile_x = attacker_old_spot_tile[0] if attacker_old_spot_tile else None
+            target_ally.placed_tile_y = attacker_old_spot_tile[1] if attacker_old_spot_tile else None
+        target_ally.original_spot_x = target_ally.x
+        target_ally.original_spot_y = target_ally.y
+
+        # Atualiza os rects
+        attacker.rect.x, attacker.rect.y = attacker.x, attacker.y
+        target_ally.rect.x, target_ally.rect.y = target_ally.x, target_ally.y
+
+        # Reseta estados de combate
+        attacker.combat_state = "idle"
+        attacker.target = None
+        target_ally.combat_state = "idle"
+        target_ally.target = None
+
+        # Mostra mensagem
+        effect_manager.add_status_text(attacker, f"{attacker.name} trocou de lugar com {target_ally.name}!",
+                                       duration=1.5)
+        print(f"[TELEPORT] {attacker.name} trocou de lugar com {target_ally.name}!")
+
+        # Toca som (opcional)
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("teleport")
+
+        return True
+
+    def _perform_teleport(self, attacker, target_spot, placement_manager, effect_manager):
+        """
+        Executa o teleport para um spot específico
+        """
+        tile_size = placement_manager.tile_size
+
+        # Calcula o centro do spot destino
+        new_x = (target_spot.x // tile_size) * tile_size + tile_size // 2
+        new_y = (target_spot.y // tile_size) * tile_size + tile_size // 2
+
+        # Salva a posição antiga para debug
+        old_x = attacker.x
+        old_y = attacker.y
+        old_tile = (attacker.placed_tile_x, attacker.placed_tile_y) if hasattr(attacker, 'placed_tile_x') else None
+
+        # Move o Pokémon
+        attacker.x = new_x
+        attacker.y = new_y
+        attacker.original_spot_x = new_x
+        attacker.original_spot_y = new_y
+
+        # Atualiza as coordenadas de tile
+        attacker.placed_tile_x = new_x // tile_size
+        attacker.placed_tile_y = new_y // tile_size
+
+        # Atualiza o rect
+        attacker.rect.x, attacker.rect.y = attacker.x, attacker.y
+
+        # Marca o novo spot como ocupado
+        target_spot.occupied = True
+
+        # Desocupa o spot antigo
+        if old_tile:
+            for spot in placement_manager.game.spot_renderer.get_spots():
+                spot_tile_x = spot.x // tile_size
+                spot_tile_y = spot.y // tile_size
+                if spot_tile_x == old_tile[0] and spot_tile_y == old_tile[1]:
+                    spot.occupied = False
+                    print(f"[TELEPORT] Spot antigo ({spot.x}, {spot.y}) desocupado")
+                    break
+
+        # Reseta estado de combate
+        attacker.combat_state = "idle"
+        attacker.target = None
+        attacker.charge_cooldown = 0
+
+        # Mostra mensagem
+        effect_manager.add_status_text(attacker, f"{attacker.name} usou Teleport!", duration=1.0)
+        print(f"[TELEPORT] {attacker.name} teleportou de ({old_x}, {old_y}) para ({new_x}, {new_y})!")
+
+        # Toca som
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("teleport")
+
+        # Toca animação de teleporte (se tiver)
+        if hasattr(attacker, 'play_teleport_animation'):
+            attacker.play_teleport_animation()
+
+        return True
 
     def _apply_force_switch(self, attacker, target, battle_system, effect_manager):
         """

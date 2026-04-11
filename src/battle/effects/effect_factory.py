@@ -689,6 +689,16 @@ class EffectFactory:
             },
             "description": "Ataque que acerta 2-5 vezes"
         },
+        "spike-cannon": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "min_hits": 2,
+                "max_hits": 5
+            },
+            "description": "Dispara espinhos que acertam 2-5 vezes"
+        },
         # Flinch moves
         "bite": {
             "effect_type": "flinch",
@@ -1017,6 +1027,28 @@ class EffectFactory:
             },
             "description": "A cada vez que o usuário é atingido, seu Ataque aumenta",
         },
+        "teleport": {
+            "effect_type": "teleport_swap",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "swap_chance": 0.20,  # 20% de chance de trocar com aliado
+            },
+            "description": "Teleporta para um spot livre aleatório. Pode trocar de lugar com um aliado (20%)"
+        },
+        "tri-attack": {
+            "effect_type": "random_status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "chance": 0.20,  # 20% de chance total
+                "possible_status": ["burn", "freeze", "paralysis"],
+                # Pesos iguais para cada status (1/3 cada quando ativa)
+                "weights": [1, 1, 1],
+                "overwrite": False,
+            },
+            "description": "20% de chance de queimar, congelar ou paralisar o oponente"
+        },
         # ===== CURA (HEAL) =====
         "recover": {
             "effect_type": "heal",
@@ -1072,15 +1104,30 @@ class EffectFactory:
             "description": "Corta metade do HP restante do oponente"
         },
         "seismic-toss": {
-    "effect_type": "level_damage",
-    "target": EffectTarget.TARGET,
-    "timing": EffectTiming.ON_HIT,
-    "params": {
-        "damage_formula": "level",
-        "ignore_type_effectiveness": True,
-    },
-    "description": "Causa dano igual ao nível do usuário"
-},
+            "effect_type": "level_damage",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "damage_formula": "level",
+                "ignore_type_effectiveness": True,
+            },
+            "description": "Causa dano igual ao nível do usuário"
+        },
+        "psywave": {
+            "effect_type": "variable_level_damage",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "damage_formula": "level_percentage",
+                "min_percentage": 0.5,  # 50%
+                "max_percentage": 1.5,  # 150%
+                "increment": 0.1,  # Incrementos de 10%
+                "ignore_type_immunity": False,  # Dark é imune a Psychic
+                "ignore_effectiveness": True,  # Sem resistências
+                "is_typeless": True,
+            },
+            "description": "Causa dano typeless entre 50% e 150% do nível do usuário"
+        },
         "night-shade": {
             "effect_type": "level_damage",  # Mesmo tipo do Seismic Toss
             "target": EffectTarget.TARGET,

@@ -9,6 +9,7 @@ class PlacementManager:
         self.placed_pokemon = []  # Lista de Pokémon no mapa
         self.tile_size = 24
 
+
     def add_pokemon(self, spot, pokemon):
         """Adiciona um Pokémon no spot - USA O MESMO OBJETO"""
         # Verifica se já tem Pokémon neste spot
@@ -109,6 +110,22 @@ class PlacementManager:
 
                 return pokemon
 
+        return None
+
+    def get_free_spots(self):
+        """Retorna lista de spots livres"""
+        spots = self.game.spot_renderer.get_spots()
+        return [spot for spot in spots if not spot.occupied]
+
+    def get_ally_at_spot(self, spot):
+        """Retorna o aliado em um spot específico"""
+        spot_tile_x = spot.x // self.tile_size
+        spot_tile_y = spot.y // self.tile_size
+
+        for pokemon in self.placed_pokemon:
+            if hasattr(pokemon, 'placed_tile_x'):
+                if pokemon.placed_tile_x == spot_tile_x and pokemon.placed_tile_y == spot_tile_y:
+                    return pokemon
         return None
 
     def get_pokemon_at_spot(self, spot):

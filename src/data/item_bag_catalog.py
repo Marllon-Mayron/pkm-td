@@ -278,6 +278,7 @@ class ItemBagCatalog:
             ("tm_whirlwind", "TM04 - Whirlwind", "machine_NORMAL.png", "whirlwind", "1-4", 1500),
             ("tm_mega_kick", "TM05 - Mega Kick", "machine_NORMAL.png", "mega-kick", "2-1", 2000),
             ("tm_bubble_beam", "TM11 - Bubble Beam", "machine_WATER.png", "bubble-beam", "2-8", 2000),
+            ("tm_teleport", "TM30 - Teleport", "machine_PSYCHIC.png", "teleport", "2-8", 100),
         ]
 
         for tm_id, tm_name, sprite_file, move_name, unlock_phase, price in tms:
