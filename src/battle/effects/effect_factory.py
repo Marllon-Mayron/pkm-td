@@ -1005,6 +1005,18 @@ class EffectFactory:
             },
             "description": "Remove todos os modificadores de stat de todos os Pokémon em campo"
         },
+        "rage": {
+            "effect_type": "rage_mode",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "attack",
+                "stages_per_hit": 1,
+                "max_stages": 6,
+                "duration": None,  # Até o próximo ataque
+            },
+            "description": "A cada vez que o usuário é atingido, seu Ataque aumenta",
+        },
         # ===== CURA (HEAL) =====
         "recover": {
             "effect_type": "heal",

@@ -634,6 +634,8 @@ class PokemonCombat:
             success = self.pokemon.battle_system.attempt_attack(self.pokemon, target)
             if success:
                 print(f"[ATTACK] {self.pokemon.name} usou {move.name} em {target.name}!")
+                if hasattr(self.pokemon, '_rage_active') and self.pokemon._rage_active:
+                    self._clear_rage_after_attack()
         else:
             hit_chance = move.accuracy / 100
             will_hit = random.random() <= hit_chance
@@ -818,7 +820,25 @@ class PokemonCombat:
                 carried_item.carried_by = None
                 self.pokemon.is_carrying = None
 
+        # ===== CALLBACK DO RAGE =====
+        if hasattr(self, '_rage_active') and self._rage_active and hasattr(self, '_rage_callback'):
+            self._rage_callback(self, damage)
         return self.pokemon.current_hp <= 0
+
+    def _clear_rage_after_attack(self):
+        """Limpa o modo Rage após o Pokémon atacar"""
+        if hasattr(self.pokemon, '_rage_active') and self.pokemon._rage_active:
+            self.pokemon._rage_active = False
+            self.pokemon._rage_callback = None
+            print(f"[RAGE] {self.pokemon.name} atacou e saiu do modo fúria!")
+
+            # Opcional: mostra mensagem visual
+            if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+                self.pokemon.effect_manager.add_status_text(
+                    self.pokemon,
+                    f"{self.pokemon.name} saiu da fúria!",
+                    duration=1.0
+                )
 
     # ===== MÉTODOS LEGADOS =====
     def handle_idle_state(self, dt, enemies):

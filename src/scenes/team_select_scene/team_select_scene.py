@@ -36,11 +36,23 @@ class TeamSelectScene(BaseScene):
         self.total_pages = 1
         self.layout_initialized = False
 
+        # Controle de resize (NOVO)
+        self.last_window_size = (self.game.screen_manager.window_width, self.game.screen_manager.window_height)
+
         # Fonts
         self.title_font = pygame.font.Font(None, FONT_SIZES['TITLE'])
         self.slot_font = pygame.font.Font(None, FONT_SIZES['SLOT'])
         self.grid_font = pygame.font.Font(None, FONT_SIZES['GRID'])
         self.page_font = pygame.font.Font(None, FONT_SIZES['PAGE'])
+
+    def _check_resize(self):
+        """Verifica se a tela foi redimensionada e reinicializa o layout se necessário"""
+        current_size = (self.game.screen_manager.window_width, self.game.screen_manager.window_height)
+        if current_size != self.last_window_size:
+            self.last_window_size = current_size
+            self.layout_initialized = False
+            return True
+        return False
 
     def _initialize_layout(self):
         """Inicializa o layout da cena"""
@@ -124,6 +136,14 @@ class TeamSelectScene(BaseScene):
         self.total_pages = self.pokemon_manager.get_page_count(self.layout_manager.items_per_page)
 
     def handle_event(self, event):
+        # Verifica se houve resize (NOVO)
+        self._check_resize()
+
+        # Processa evento de redimensionamento explicitamente (NOVO)
+        if event.type == pygame.VIDEORESIZE:
+            self.layout_initialized = False
+            return
+
         # Verifica se precisa recriar layout
         if not self.layout_initialized:
             self._initialize_layout()
@@ -235,13 +255,20 @@ class TeamSelectScene(BaseScene):
                 print(f"Pokémon {pokemon_to_release.name} libertado com sucesso!")
 
         elif action_type == 'RESIZE':
-            pass
+            # NOVO: Trata evento de resize do layout_manager
+            self.layout_initialized = False
 
     def fixed_update(self, dt):
+        # Verifica se houve resize (NOVO)
+        self._check_resize()
+
         if not self.layout_initialized:
             self._initialize_layout()
 
     def render(self, screen):
+        # Verifica se houve resize antes de renderizar (NOVO)
+        self._check_resize()
+
         # Fundo
         self.background.render(screen)
 

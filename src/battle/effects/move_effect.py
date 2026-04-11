@@ -195,6 +195,8 @@ class MoveEffect:
             return self._apply_dream_eater(attacker, target, battle_system, effect_manager, damage)
         elif self.effect_type == "stat_mod_with_visual":
             return self._apply_stat_mod_with_visual(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "rage_mode":
+            return self._apply_rage_mode(attacker, target, effect_manager)
         elif self.effect_type == "struggle":
             return self._apply_struggle(attacker, target, battle_system, effect_manager, damage)
         return True
@@ -1056,6 +1058,66 @@ class MoveEffect:
         print(f"[FIXED_DAMAGE] {attacker.name} causou {fixed_damage} de dano fixo em {target.name}!")
 
         return True
+
+    # ===== MÉTODOS DE RAGE =====
+    def _apply_rage_mode(self, attacker, target, effect_manager):
+        """Aplica o efeito Rage - aumenta Attack quando atingido"""
+        from .stat_modifier import StatType
+
+        # Verifica se já está em modo Rage
+        if hasattr(attacker, '_rage_active') and attacker._rage_active:
+            effect_manager.add_status_text(attacker, f"{attacker.name} já está em fúria!", duration=1.0)
+            return False
+
+        # Ativa o modo Rage
+        attacker._rage_active = True
+        attacker._rage_stage_increase = self.params.get("stages_per_hit", 1)
+        attacker._rage_max_stages = self.params.get("max_stages", 6)
+
+        # Registra o callback para ser chamado quando o Pokémon for atingido
+        attacker._rage_callback = lambda pokemon, damage: self._on_rage_hit(
+            pokemon, damage, effect_manager
+        )
+
+        effect_manager.add_status_text(attacker, f"{attacker.name} entrou em fúria!", duration=1.5)
+        print(f"[RAGE] {attacker.name} agora aumenta Ataque quando atingido!")
+
+        return True
+
+    def _on_rage_hit(self, pokemon, damage, effect_manager):
+        """Callback chamado quando o Pokémon em Rage é atingido"""
+        from .stat_modifier import StatType
+
+        # Verifica se ainda está em Rage
+        if not hasattr(pokemon, '_rage_active') or not pokemon._rage_active:
+            return
+
+        # Obtém estágio atual
+        current_stage = 0
+        if hasattr(pokemon, 'effect_manager') and pokemon.effect_manager:
+            pokemon_id = id(pokemon)
+            if pokemon_id in pokemon.effect_manager.stat_stages:
+                current_stage = pokemon.effect_manager.stat_stages[pokemon_id].get_stage(StatType.ATTACK)
+
+        # Verifica se já atingiu o máximo
+        if current_stage >= pokemon._rage_max_stages:
+            print(f"[RAGE] {pokemon.name} já atingiu o máximo de Ataque!")
+            return
+
+        # Aumenta o Attack
+        stages = pokemon._rage_stage_increase
+        pokemon.effect_manager.add_stat_modifier(pokemon, StatType.ATTACK, stages, duration=6.0)
+
+        effect_manager.add_status_text(pokemon, f"Ataque de {pokemon.name} aumentou pela fúria!", duration=1.0)
+        print(f"[RAGE] {pokemon.name} foi atingido! Ataque +{stages}!")
+
+    def _clear_rage_mode(self, pokemon):
+        """Limpa o modo Rage (quando o Pokémon ataca ou a batalha termina)"""
+        if hasattr(pokemon, '_rage_active'):
+            pokemon._rage_active = False
+            pokemon._rage_callback = None
+            print(f"[RAGE] Modo fúria de {pokemon.name} terminou!")
+
     # ===== MÉTODOS DE CONFUSÃO =====
 
     def _apply_confusion(self, attacker, target, effect_manager):
