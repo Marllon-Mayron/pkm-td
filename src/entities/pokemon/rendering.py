@@ -23,10 +23,21 @@ class PokemonRendering:
         if not self.pokemon.sprite:
             return None
 
+        # ===== APLICA ESCALA DO MINIMIZE =====
+        base_scale = 1.0
+        if hasattr(self.pokemon, '_current_sprite_scale') and self.pokemon._current_sprite_scale != 1.0:
+            base_scale = self.pokemon._current_sprite_scale
+
         if self.pokemon.is_boss:
             orig_width, orig_height = self.pokemon.sprite.get_width(), self.pokemon.sprite.get_height()
-            new_width = orig_width * 2
-            new_height = orig_height * 2
+            new_width = int(orig_width * 2 * base_scale)
+            new_height = int(orig_height * 2 * base_scale)
+            return pygame.transform.scale(self.pokemon.sprite, (new_width, new_height))
+
+        if base_scale != 1.0:
+            orig_width, orig_height = self.pokemon.sprite.get_width(), self.pokemon.sprite.get_height()
+            new_width = max(1, int(orig_width * base_scale))
+            new_height = max(1, int(orig_height * base_scale))
             return pygame.transform.scale(self.pokemon.sprite, (new_width, new_height))
 
         return self.pokemon.sprite

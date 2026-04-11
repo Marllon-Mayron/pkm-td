@@ -252,6 +252,16 @@ class DamageCalculator:
             attack_stat = attacker.sp_attack
             defense_stat = defender.sp_defense
 
+        # ===== VERIFICA MINIMIZE PARA STOMP =====
+        if move.name.lower() == "stomp":
+            if hasattr(defender, '_minimize_active') and defender._minimize_active:
+                power = move.power * 2  # Dobra o poder
+                print(f"[STOMP] Dano dobrado contra {defender.name} (Minimize)!")
+            else:
+                power = move.power
+        else:
+            power = move.power
+
         # 7. Fórmula de dano (adaptada dos jogos Pokémon)
         # Dano = ((((2 * Level / 5 + 2) * Power * Attack/Defense) / 50) + 2) * STAB * Eficácia * Random
         level = attacker.level

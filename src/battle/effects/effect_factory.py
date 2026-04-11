@@ -926,7 +926,6 @@ class EffectFactory:
             },
             "description": "Causa dano e tem chance de 10% de reduzir o Ataque do oponente"
         },
-
         # ===== FORÇAR MOVIMENTAÇÃO =====
         "roar": {
             "effect_type": "force_switch",
@@ -950,7 +949,6 @@ class EffectFactory:
             },
             "description": "Força o oponente a fugir ou ser substituído"
         },
-
         # ===== MOVIMENTOS ESPECÍFICOS =====
         "focus-energy": {
             "effect_type": "critical_stage_mod",  # Modifica estágio de crítico
@@ -962,6 +960,50 @@ class EffectFactory:
                 "stackable": False,  # Não pode acumular com outro Focus Energy
             },
             "description": "Aumenta muito a taxa de acerto crítico"
+        },
+        "dream-eater": {
+            "effect_type": "dream_eater",  # Tipo especial para Dream Eater
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "drain_percentage": 0.5,  # Cura 50% do dano causado
+                "requires_sleep": True,  # Só funciona se alvo estiver dormindo
+            },
+            "description": "Só funciona em Pokémon dormindo. Cura metade do dano causado"
+        },
+        "swift": {
+            "effect_type": "never_miss",  # Tipo: nunca erra
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "never_miss": True,
+            },
+            "description": "Ataque que nunca erra"
+        },
+        "minimize": {
+            "effect_type": "stat_mod_with_visual",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stats": [
+                    {"stat": "evasion", "stages": 2}
+                ],
+                "duration": 8.0,  # 8 segundos (ajuste conforme necessidade)
+                "visual_effect": "minimize",  # Efeito visual de diminuir tamanho
+                "sprite_scale": 0.70,  # Metade do tamanho
+            },
+            "description": "Aumenta muito a Evasão e diminui o tamanho do Pokémon"
+        },
+        "haze": {
+            "effect_type": "remove_all_stat_mods",  # Remove todos os modificadores de stat
+            "target": EffectTarget.BOTH,  # Afeta todos os Pokémon em campo
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "clear_all": True,  # Limpa todos os modificadores
+                "affects_user": True,  # Afeta também o usuário
+                "affects_target": True,  # Afeta também o alvo
+            },
+            "description": "Remove todos os modificadores de stat de todos os Pokémon em campo"
         },
         # ===== CURA (HEAL) =====
         "recover": {
@@ -984,14 +1026,56 @@ class EffectFactory:
             },
             "description": "Recupera metade do HP máximo do usuário"
         },
+        # ===== AUTODESTRUIÇÃO =====
+        "explosion": {
+            "effect_type": "self_faint",  # Tipo: usuário desmaia
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,  # Após causar dano
+            "params": {
+                "self_faint": True,
+            },
+            "description": "Causa dano massivo, mas o usuário desmaia"
+        },
+        "self-destruct": {
+            "effect_type": "self_faint",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "self_faint": True,
+            },
+            "description": "Causa muito dano, mas o usuário desmaia"
+        },
 
-        "seismic-toss": {
-            "effect_type": "level_damage",
+        "super-fang": {
+            "effect_type": "percent_damage",  # Dano baseado em porcentagem
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "params": {
-                "damage_formula": "level",
-                "ignore_type_effectiveness": True,
+                "damage_percentage": 0.5,  # 50% do HP atual
+                "damage_formula": "current_hp_percentage",  # Baseado no HP atual
+                "min_damage": 1,  # Dano mínimo de 1
+                "ignore_type_immunity": True,  # Normal não afeta Ghost, mas vamos ignorar
+                "ignore_effectiveness": True,  # Typeless, sem resistências
+            },
+            "description": "Corta metade do HP restante do oponente"
+        },
+        "seismic-toss": {
+    "effect_type": "level_damage",
+    "target": EffectTarget.TARGET,
+    "timing": EffectTiming.ON_HIT,
+    "params": {
+        "damage_formula": "level",
+        "ignore_type_effectiveness": True,
+    },
+    "description": "Causa dano igual ao nível do usuário"
+},
+        "night-shade": {
+            "effect_type": "level_damage",  # Mesmo tipo do Seismic Toss
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "damage_formula": "level",  # level do atacante = dano
+                "ignore_type_effectiveness": True,  # Ignora resistências, mas verifica imunidade
             },
             "description": "Causa dano igual ao nível do usuário"
         },

@@ -27,11 +27,11 @@ class CriticalHitSystem:
     # Estágio 3: 1/3 (33.3%)
     # Estágio 4: 1/2 (50%)
     STAGE_MULTIPLIERS = {
-        0: 1.0,  # 1/16
-        1: 2.0,  # 1/8
-        2: 4.0,  # 1/4
+        0: 1.0,   # 1/16
+        1: 2.0,   # 1/8
+        2: 4.0,   # 1/4
         3: 5.33,  # ~1/3
-        4: 8.0,  # 1/2
+        4: 8.0,   # 1/2
     }
 
     # Movimentos que aumentam estágio de crítico
@@ -41,10 +41,9 @@ class CriticalHitSystem:
         "shadow-claw", "stone-edge", "leaf-blade"
     }
 
-    def __init__(self):
-        # Modificadores temporários para ataques específicos
-        self._temp_stage_modifiers: Dict[int, int] = {}  # pokemon_id -> stage_bonus
-        self._crit_stage_modifiers: Dict[int, int] = {}  # pokemon_id -> extra_stages
+    # ===== ATRIBUTOS DE CLASSE =====
+    _crit_stage_modifiers: Dict[int, int] = {}  # pokemon_id -> extra_stages (Focus Energy)
+    _temp_stage_modifiers: Dict[int, int] = {}  # pokemon_id -> stage_bonus (para ataques específicos)
 
     @classmethod
     def get_critical_stage(cls, move_name: str = None, attacker=None) -> int:
@@ -59,9 +58,8 @@ class CriticalHitSystem:
             if move_key in cls.HIGH_CRIT_MOVES:
                 base_stage = 1
 
-        # Adiciona modificadores do atacante (Focus Energy, etc)
-        if attacker and hasattr(attacker, 'effect_manager') and attacker.effect_manager:
-            # Verifica se tem modificador de crítico ativo
+        # Adiciona modificadores persistentes do atacante (Focus Energy)
+        if attacker:
             pokemon_id = id(attacker)
             if pokemon_id in cls._crit_stage_modifiers:
                 base_stage += cls._crit_stage_modifiers[pokemon_id]
@@ -73,6 +71,13 @@ class CriticalHitSystem:
     def calculate_critical_chance(cls, attacker, move_name: str = None) -> float:
         """
         Calcula a chance real de acerto crítico
+
+        Args:
+            attacker: Pokémon atacante
+            move_name: Nome do movimento (para high-crit moves)
+
+        Returns:
+            Chance de crítico (0.0 a 1.0)
         """
         # Estágio base do movimento + modificadores
         total_stage = cls.get_critical_stage(move_name, attacker)
@@ -129,40 +134,68 @@ class CriticalHitSystem:
     @classmethod
     def add_crit_stage_modifier(cls, pokemon, stages: int, duration: float = None):
         """
-        Adiciona um modificador de estágio de crítico (Focus Energy)
+        Adiciona um modificador PERSISTENTE de estágio de crítico (Focus Energy)
 
         Args:
             pokemon: Pokémon que recebe o modificador
             stages: Quantidade de estágios a adicionar (+2 para Focus Energy)
-            duration: Duração em segundos (None = permanente até o fim da batalha)
+            duration: Duração em segundos (None = permanente até sair de campo)
         """
         pokemon_id = id(pokemon)
 
-        # Verifica se já tem Focus Energy ativo
-        if pokemon_id in cls._crit_stage_modifiers and stages > 0:
+        # Verifica se já tem Focus Energy ativo (não acumula)
+        if pokemon_id in cls._crit_stage_modifiers:
             print(f"[CRIT] {pokemon.name} já está com Focus Energy ativo!")
             return False
 
-        # Armazena o modificador
-        cls._crit_stage_modifiers[pokemon_id] = min(4, cls._crit_stage_modifiers.get(pokemon_id, 0) + stages)
+        # Armazena o modificador (limitado a +4)
+        current = cls._crit_stage_modifiers.get(pokemon_id, 0)
+        new_stage = min(4, current + stages)
+        cls._crit_stage_modifiers[pokemon_id] = new_stage
 
-        # Se tiver duração, agenda remoção
+        print(f"[CRIT] {pokemon.name} ganhou +{stages} estágio(s) de crítico! (total: +{new_stage})")
+
+        # TODO: Implementar sistema de remoção por tempo se duration não for None
         if duration:
-            # TODO: Implementar sistema de remoção por tempo
-            pass
+            # Por enquanto, apenas registra
+            print(f"[CRIT] O efeito durará {duration} segundos (implementar remoção futuramente)")
 
-        print(f"[CRIT] {pokemon.name} agora tem +{cls._crit_stage_modifiers[pokemon_id]} estágio(s) de crítico!")
         return True
 
     @classmethod
     def remove_crit_stage_modifier(cls, pokemon):
-        """Remove o modificador de estágio de crítico (quando o Pokémon sai de campo)"""
+        """
+        Remove o modificador persistente de estágio de crítico
+        (quando o Pokémon sai de campo ou a batalha termina)
+        """
         pokemon_id = id(pokemon)
         if pokemon_id in cls._crit_stage_modifiers:
-            del cls._crit_stage_modifiers[pokemon_id]
-            print(f"[CRIT] Modificador de crítico removido de {pokemon.name}")
+            removed = cls._crit_stage_modifiers.pop(pokemon_id)
+            print(f"[CRIT] Modificador de crítico removido de {pokemon.name} (era +{removed})")
+            return True
+        return False
+
+    @classmethod
+    def get_crit_stage(cls, pokemon) -> int:
+        """
+        Retorna o estágio de crítico atual de um Pokémon
+        """
+        pokemon_id = id(pokemon)
+        return cls._crit_stage_modifiers.get(pokemon_id, 0)
 
     @classmethod
     def clear_all_modifiers(cls):
-        """Limpa todos os modificadores (usado quando a batalha termina)"""
+        """
+        Limpa todos os modificadores (usado quando a batalha termina)
+        """
+        count = len(cls._crit_stage_modifiers)
         cls._crit_stage_modifiers.clear()
+        cls._temp_stage_modifiers.clear()
+        print(f"[CRIT] Todos os modificadores de crítico foram limpos! ({count} modificadores removidos)")
+
+    @classmethod
+    def reset(cls):
+        """
+        Reseta completamente o sistema (alias para clear_all_modifiers)
+        """
+        cls.clear_all_modifiers()

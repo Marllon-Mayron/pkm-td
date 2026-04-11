@@ -145,23 +145,48 @@ class BattleSystem:
                 self._show_miss_on_attacker(attacker)
                 return True
 
+        # ===== VERIFICAÇÃO ESPECIAL PARA DREAM EATER =====
+        if move.name.lower() == "dream-eater":
+            target_status = self.effect_manager.get_status(target)
+            if not target_status or target_status.type != StatusType.SLEEP:
+                # Falha - alvo não está dormindo
+                print(f"[BATTLE] {move.name} falhou! {target.name} não está dormindo!")
+                self.effect_manager.add_status_text(attacker, f"Mas falhou! {target.name} não está dormindo!",
+                                                    duration=1.5)
+                move.current_pp -= 1
+                attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+                return True
+
         # ===== TRATAMENTO ESPECIAL PARA STRUGGLE =====
         if move.name.lower() == "struggle":
             return self._attempt_struggle(attacker, target, move)
 
-        # Calcular acerto
-        hit_chance = move.accuracy / 100
-        accuracy_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)
-        evasion_mult = self.effect_manager.get_stat_multiplier(target, StatType.EVASION)
-        hit_chance = hit_chance * accuracy_mult / evasion_mult
-        hit_chance = max(0.01, min(1.0, hit_chance))
+        # ===== MOVIMENTOS COM POWER NULL (Super Fang, Seismic Toss, etc) =====
+        if move.power is None or move.power == 0:
+            return self._handle_special_damage_move(attacker, target, move)
 
-        will_hit = random.random() <= hit_chance
-
-        # ===== VERIFICA SE O MOVE TEM EFEITO DE CRASH AO ERRAR =====
+        # ===== VERIFICA EFEITO DO MOVE =====
         from src.battle.effects import EffectFactory
         effect = EffectFactory.create_effect(move.name)
+
+        # ===== MOVIMENTOS QUE NUNCA ERRAM (Swift, Aerial Ace, etc) =====
+        never_miss = effect and effect.effect_type == "never_miss"
+
+        # ===== VERIFICA SE O MOVE TEM EFEITO DE CRASH AO ERRAR =====
         has_crash_effect = effect and effect.effect_type == "crash_damage_on_miss"
+
+        # Calcular acerto
+        if never_miss:
+            # Sempre acerta (ignora accuracy/evasion)
+            will_hit = True
+            print(f"[BATTLE] {move.name} nunca erra!")
+        else:
+            hit_chance = move.accuracy / 100
+            accuracy_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)
+            evasion_mult = self.effect_manager.get_stat_multiplier(target, StatType.EVASION)
+            hit_chance = hit_chance * accuracy_mult / evasion_mult
+            hit_chance = max(0.01, min(1.0, hit_chance))
+            will_hit = random.random() <= hit_chance
 
         # Ataques de status (que aplicam efeitos como veneno, queimadura, etc)
         if move.category == "status":
@@ -185,7 +210,7 @@ class BattleSystem:
 
             return True
 
-        # Calcular dano
+        # Calcular dano para movimentos normais
         if will_hit:
             damage_result = self._calculate_move_damage(attacker, target, move)
         else:
@@ -241,6 +266,52 @@ class BattleSystem:
             move.current_pp -= 1
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             return True
+
+    def _handle_special_damage_move(self, attacker: 'Pokemon', target: 'Pokemon', move) -> bool:
+        """
+        Processa movimentos especiais que causam dano de forma diferente
+        (Super Fang, Seismic Toss, etc)
+        """
+        import random
+
+        print(f"[BATTLE] {attacker.name} usou {move.name}!")
+
+        # Verifica acerto
+        hit_chance = move.accuracy / 100
+        accuracy_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)
+        evasion_mult = self.effect_manager.get_stat_multiplier(target, StatType.EVASION)
+        hit_chance = hit_chance * accuracy_mult / evasion_mult
+        hit_chance = max(0.01, min(1.0, hit_chance))
+
+        will_hit = random.random() <= hit_chance
+
+        if not will_hit:
+            print(f"[BATTLE] {move.name} errou!")
+            self._show_miss_on_attacker(attacker)
+            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            return True
+
+        # Toca som
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound(move.sound_name)
+
+        # Aplica o efeito (que vai causar o dano)
+        from src.battle.effects import EffectFactory
+        effect = EffectFactory.create_effect(move.name)
+
+        if effect:
+            # O dano será aplicado dentro do effect
+            effect.execute(attacker, target, self, self.effect_manager)
+        else:
+            # Fallback: dano baseado no nível
+            damage = attacker.level
+            target.take_damage(damage, attacker=attacker)
+            self.effect_manager.add_status_text(target, f"-{damage} HP", duration=1.0)
+
+        # Cooldown
+        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+        return True
 
     def _attempt_struggle(self, attacker: 'Pokemon', target: 'Pokemon', move) -> bool:
         """

@@ -171,6 +171,11 @@ class Pokemon(Entity):
         self.status_effect = None
         self.stat_stages = None
 
+        self._original_sprite_scale = 1.0
+        self._current_sprite_scale = 1.0
+        self._minimize_active = False
+        self._minimize_timer = 0.0
+
         # ===== 16. EFEITOS VISUAIS =====
         self.hp_bar_width = 48
         self.hp_bar_height = 5
@@ -751,6 +756,20 @@ class Pokemon(Entity):
         self.last_x = self.x
         self.last_y = self.y
 
+        # ===== ATUALIZA TIMER DO MINIMIZE =====
+        if hasattr(self, '_minimize_active') and self._minimize_active:
+            self._minimize_timer -= dt
+            if self._minimize_timer <= 0:
+                # Remove o efeito minimize
+                self._minimize_active = False
+                self._current_sprite_scale = self._original_sprite_scale
+                self._sprite_scaled = None
+                print(f"[MINIMIZE] {self.name} voltou ao tamanho normal!")
+
+                # Mostra mensagem
+                if hasattr(self, 'effect_manager') and self.effect_manager:
+                    self.effect_manager.add_status_text(self, f"{self.name} voltou ao normal!", duration=1.0)
+
         # Atualiza timer de MISS
         if hasattr(self, 'miss_timer') and self.miss_timer > 0:
             self.miss_timer -= dt
@@ -800,6 +819,12 @@ class Pokemon(Entity):
 
     def get_distance_to(self, entity):
         return self.movement.get_distance_to(entity)
+
+    def _update_sprite_size(self):
+        """Atualiza o tamanho do sprite baseado no efeito Minimize"""
+        if hasattr(self, '_current_sprite_scale') and self._current_sprite_scale != 1.0:
+            # Força recriação do sprite na próxima renderização
+            self._sprite_scaled = None
 
     def render(self, screen, camera=None, show_hp=True):
         """Renderiza o Pokémon com todos os elementos visuais ajustados"""

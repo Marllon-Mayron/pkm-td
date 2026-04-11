@@ -473,6 +473,32 @@ class PokemonModal:
         release_rect = release_surf.get_rect(center=self.release_button.center)
         screen.blit(release_surf, release_rect)
 
+    def _calculate_actual_ev_bonus(self, stat: str) -> int:
+        """
+        Calcula o bônus REAL que os EVs estão fornecendo no nível atual.
+        Retorna quantos pontos de stat os EVs estão contribuindo.
+        """
+        ev_value = self.pokemon.evs.get(stat, 0)
+        ev_bonus_raw = ev_value // 8  # Bônus teórico no level 100
+
+        if ev_bonus_raw == 0:
+            return 0
+
+        # Calcula o stat COM e SEM os EVs para ver a diferença real
+        base = self.pokemon.base_stats[stat]
+        iv = self.pokemon.ivs.get(stat, 0)
+        level = self.pokemon.level
+
+        # Fórmula: ((2 * Base + IV + Bônus_EV) * Level/100) + (5 ou Level+10)
+        if stat == 'hp':
+            stat_with_evs = ((2 * base + iv + ev_bonus_raw) * level) // 100 + level + 10
+            stat_without_evs = ((2 * base + iv) * level) // 100 + level + 10
+        else:
+            stat_with_evs = ((2 * base + iv + ev_bonus_raw) * level) // 100 + 5
+            stat_without_evs = ((2 * base + iv) * level) // 100 + 5
+
+        return stat_with_evs - stat_without_evs
+
     def _render_stats_page(self, screen, content_rect):
         section_font = pygame.font.Font(None, 18)
 
@@ -498,7 +524,7 @@ class PokemonModal:
             ("VELOCIDADE", self.pokemon.speed_stat, 255)
         ]
 
-        stat_start_y = left_col.y + 40
+        stat_start_y = left_col.y + 20
         stat_spacing = 48
 
         for i, (name, value, max_val) in enumerate(stats):
@@ -531,7 +557,7 @@ class PokemonModal:
         if nature_y + 40 < left_col.bottom:
             nature_card = pygame.Rect(left_col.x + 10, nature_y, left_col.width - 20, 40)
             self._draw_rounded_rect(screen, self.colors['bg_tertiary'], nature_card, radius=8)
-            nature_text = pygame.font.Font(None, 13).render(f"NATUREZA: {self.pokemon.nature}", True,
+            nature_text = pygame.font.Font(None, 16).render(f"NATUREZA: {self.pokemon.nature}", True,
                                                             self.colors['text_secondary'])
             screen.blit(nature_text, (nature_card.centerx - nature_text.get_width() // 2,
                                       nature_card.centery - nature_text.get_height() // 2))
@@ -553,7 +579,7 @@ class PokemonModal:
             ("VELOCIDADE", self.pokemon.ivs.get('speed', 0))
         ]
 
-        iv_start_y = right_col.y + 40
+        iv_start_y = right_col.y + 20
         iv_spacing = 48
 
         for i, (name, value) in enumerate(iv_list):
@@ -603,9 +629,9 @@ class PokemonModal:
                 screen.blit(rank_surf, (card_rect.x + card_rect.width - rank_surf.get_width() - 12, card_rect.y + 18))
 
         # ===== EFFORT VALUES (EVs) =====
-        ev_section_y = iv_start_y + (len(iv_list) * iv_spacing) + 15
+        ev_section_y = iv_start_y + 5 + (len(iv_list) * iv_spacing)
 
-        if ev_section_y + 60 < right_col.bottom:
+        if ev_section_y < right_col.bottom:
             ev_title = section_font.render("ESFORCO (EVs)", True, self.colors['text_accent'])
             ev_title_x = right_col.x + (right_col.width - ev_title.get_width()) // 2
             screen.blit(ev_title, (ev_title_x, ev_section_y))
@@ -617,27 +643,26 @@ class PokemonModal:
             value_font = pygame.font.Font(None, 15)
             bonus_font = pygame.font.Font(None, 12)
 
+            # Mapeamento dos stats para cálculo do bônus real
             ev_stats = [
-                ("HP", self.pokemon.evs.get('hp', 0), self.pokemon.stats.get_ev_bonus('hp')),
-                ("ATAQUE", self.pokemon.evs.get('attack', 0), self.pokemon.stats.get_ev_bonus('attack')),
-                ("DEFESA", self.pokemon.evs.get('defense', 0), self.pokemon.stats.get_ev_bonus('defense')),
-                ("SP. ATAQUE", self.pokemon.evs.get('special_attack', 0),
-                 self.pokemon.stats.get_ev_bonus('special_attack')),
-                ("SP. DEFESA", self.pokemon.evs.get('special_defense', 0),
-                 self.pokemon.stats.get_ev_bonus('special_defense')),
-                ("VELOCIDADE", self.pokemon.evs.get('speed', 0), self.pokemon.stats.get_ev_bonus('speed'))
+                ("HP", self.pokemon.evs.get('hp', 0), 'hp'),
+                ("ATAQUE", self.pokemon.evs.get('attack', 0), 'attack'),
+                ("DEFESA", self.pokemon.evs.get('defense', 0), 'defense'),
+                ("SP. ATAQUE", self.pokemon.evs.get('special_attack', 0), 'special_attack'),
+                ("SP. DEFESA", self.pokemon.evs.get('special_defense', 0), 'special_defense'),
+                ("VELOCIDADE", self.pokemon.evs.get('speed', 0), 'speed')
             ]
 
             row_height = 35
             cols = 2
             card_width = (right_col.width - 30) // cols
 
-            for idx, (name, ev_value, bonus) in enumerate(ev_stats):
+            for idx, (name, ev_value, stat_key) in enumerate(ev_stats):
                 row = idx // cols
                 col = idx % cols
 
                 card_x = right_col.x + 10 + (col * (card_width + 10))
-                card_y = ev_section_y + 40 + (row * row_height)
+                card_y = ev_section_y + 20 + (row * row_height)
 
                 if card_y + row_height < right_col.bottom:
                     card_rect = pygame.Rect(card_x, card_y, card_width, row_height - 5)
@@ -667,8 +692,16 @@ class PokemonModal:
                     value_text = value_font.render(str(ev_value), True, ev_color)
                     screen.blit(value_text, (card_rect.centerx - 20, card_rect.y + 9))
 
-                    bonus_text = f"(+{bonus})" if bonus > 0 else "(+0)"
-                    bonus_color = self.colors['text_good'] if bonus > 0 else (60, 65, 75)
+                    # CALCULA O BÔNUS REAL BASEADO NO NÍVEL ATUAL
+                    actual_bonus = self._calculate_actual_ev_bonus(stat_key)
+
+                    if actual_bonus > 0:
+                        bonus_text = f"(+{actual_bonus})"
+                        bonus_color = self.colors['text_good']
+                    else:
+                        bonus_text = "(+0)"
+                        bonus_color = (60, 65, 75)
+
                     bonus_surf = bonus_font.render(bonus_text, True, bonus_color)
                     screen.blit(bonus_surf, (card_rect.x + card_width - bonus_surf.get_width() - 12, card_rect.y + 10))
 
@@ -688,14 +721,14 @@ class PokemonModal:
             total_text = total_font.render(f"TOTAL: {total_evs}/{max_evs} EVs ({ev_percent * 100:.1f}%)",
                                            True, total_color)
 
-            total_y = ev_section_y + 40 + (3 * row_height) + 5
-            if total_y + 25 < right_col.bottom:
+            total_y = ev_section_y + 20 + (3 * row_height) + 5
+            if total_y + 0 < right_col.bottom:
                 screen.blit(total_text, (right_col.centerx - total_text.get_width() // 2, total_y))
 
                 bar_width = right_col.width - 40
                 bar_height = 10
                 bar_x = right_col.x + 20
-                bar_y = total_y + 20
+                bar_y = total_y + 15
 
                 pygame.draw.rect(screen, (45, 48, 55), (bar_x, bar_y, bar_width, bar_height), border_radius=5)
                 if total_evs > 0:

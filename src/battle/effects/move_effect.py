@@ -181,10 +181,20 @@ class MoveEffect:
             return self._apply_ohko(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "fixed_damage":
             return self._apply_fixed_damage(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "percent_damage":
+            return self._apply_percent_damage(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "heal":
             return self._apply_heal(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "remove_all_stat_mods":
+            return self._apply_remove_all_stat_mods(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "critical_stage_mod":
             return self._apply_critical_stage_mod(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "self_faint":
+            return self._apply_self_faint(attacker, target, battle_system, effect_manager, damage)
+        elif self.effect_type == "dream_eater":
+            return self._apply_dream_eater(attacker, target, battle_system, effect_manager, damage)
+        elif self.effect_type == "stat_mod_with_visual":
+            return self._apply_stat_mod_with_visual(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "struggle":
             return self._apply_struggle(attacker, target, battle_system, effect_manager, damage)
         return True
@@ -495,6 +505,138 @@ class MoveEffect:
 
         return True
 
+    def _apply_self_faint(self, attacker, target, battle_system, effect_manager, damage):
+        """
+        Aplica efeito de auto-destruição (Explosion, Self-Destruct)
+        O usuário desmaia após causar dano
+        """
+        # Verifica se o atacante já não está derrotado
+        if attacker.is_defeated:
+            print(f"[SELF_FAINT] {attacker.name} já está derrotado!")
+            return False
+
+        # Causa dano ao atacante igual ao HP atual (desmaia)
+        attacker.take_damage(attacker.current_hp, attacker=attacker)
+
+        # Força a derrota
+        attacker.set_defeated(True)
+
+        # Mensagem
+        effect_manager.add_status_text(attacker, f"{attacker.name} desmaiou!", duration=1.5)
+        print(f"[SELF_FAINT] {attacker.name} desmaiou após usar {self.name}!")
+
+        # Toca som de faint
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("faint")
+
+        return True
+
+    def _apply_remove_all_stat_mods(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica efeito de Haze - remove todos os modificadores de stat de todos os Pokémon em campo
+        """
+        print(f"[HAZE] {attacker.name} usou {self.name}!")
+
+        # Lista para armazenar todos os Pokémon em campo
+        all_pokemon_in_field = []
+
+        # Adiciona o atacante
+        all_pokemon_in_field.append(attacker)
+
+        # Adiciona o alvo
+        if target and target != attacker:
+            all_pokemon_in_field.append(target)
+
+        # Adiciona todos os aliados do atacante (se houver placement_manager)
+        if battle_system.game_scene and hasattr(battle_system.game_scene, 'placement_manager'):
+            placement_manager = battle_system.game_scene.placement_manager
+            for pokemon in placement_manager.placed_pokemon:
+                if pokemon not in all_pokemon_in_field and pokemon.is_alive():
+                    all_pokemon_in_field.append(pokemon)
+
+        # Adiciona todos os inimigos selvagens ativos (se houver wave_manager)
+        if battle_system.game_scene and hasattr(battle_system.game_scene, 'wave_manager'):
+            wave_manager = battle_system.game_scene.wave_manager
+            for enemy in wave_manager.active_enemies:
+                if enemy not in all_pokemon_in_field and enemy.is_alive():
+                    all_pokemon_in_field.append(enemy)
+
+        # Remove modificadores de stat de cada Pokémon
+        removed_count = 0
+        for pokemon in all_pokemon_in_field:
+            pokemon_id = id(pokemon)
+
+            # Remove todos os estágios de stat
+            if pokemon_id in effect_manager.stat_stages:
+                # Reseta todos os estágios para 0
+                for stat_type in list(effect_manager.stat_stages[pokemon_id].stages.keys()):
+                    current_stage = effect_manager.stat_stages[pokemon_id].get_stage(stat_type)
+                    if current_stage != 0:
+                        # Aplica modificação inversa para resetar
+                        effect_manager.stat_stages[pokemon_id].modify(stat_type, -current_stage)
+                        removed_count += 1
+
+                # Se todos os estágios estão 0, remove o StatStage
+                if all(stage == 0 for stage in effect_manager.stat_stages[pokemon_id].stages.values()):
+                    del effect_manager.stat_stages[pokemon_id]
+
+            # Remove modificadores temporários (com duração)
+            if pokemon_id in effect_manager.stat_modifiers:
+                effect_manager.stat_modifiers[pokemon_id].clear()
+
+            # Força atualização da velocidade
+            if hasattr(pokemon, 'update_move_speed_from_effects'):
+                pokemon.update_move_speed_from_effects()
+
+            # Mostra mensagem para cada Pokémon afetado
+            effect_manager.add_status_text(pokemon, f"Os stats de {pokemon.name} voltaram ao normal!", duration=1.5)
+
+        # Mensagem global
+        effect_manager.add_status_text(attacker, "Todos os modificadores de stat foram removidos!", duration=2.0)
+        print(
+            f"[HAZE] {self.name} removeu {removed_count} modificadores de stat de {len(all_pokemon_in_field)} Pokémon!")
+
+        # Toca som (opcional)
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("haze")
+
+        return True
+
+    def _apply_dream_eater(self, attacker, target, battle_system, effect_manager, damage):
+        """
+        Aplica efeito de Dream Eater
+        - Só funciona se o alvo estiver dormindo
+        - Cura metade do dano causado
+        """
+        from src.battle.effects import StatusType
+
+        # ===== VERIFICA SE O ALVO ESTÁ DORMINDO =====
+        target_status = effect_manager.get_status(target)
+
+        if not target_status or target_status.type != StatusType.SLEEP:
+            # Falhou - alvo não está dormindo
+            effect_manager.add_status_text(attacker, f"Mas falhou! {target.name} não está dormindo!", duration=1.5)
+            print(f"[DREAM_EATER] {attacker.name} tentou usar {self.name}, mas {target.name} não está dormindo!")
+            return False
+
+        # ===== APLICA DRENAGEM (cura metade do dano) =====
+        drain_percentage = self.params.get("drain_percentage", 0.5)
+        drain_amount = int(damage * drain_percentage)
+
+        if drain_amount > 0:
+            old_hp = attacker.current_hp
+            attacker.current_hp = min(attacker.max_hp, attacker.current_hp + drain_amount)
+            actual_heal = attacker.current_hp - old_hp
+
+            effect_manager.add_status_text(attacker, f"{attacker.name} drenou {actual_heal} HP!", duration=1.5)
+            print(f"[DREAM_EATER] {attacker.name} recuperou {actual_heal} HP de {target.name}!")
+
+            # Toca som de dreno
+            from src.managers.move_sound_manager import move_sound_manager
+            move_sound_manager.play_attack_sound("drain")
+
+        return True
+
     def _apply_struggle(self, attacker, target, battle_system, effect_manager, damage):
         """
         Aplica efeitos do Struggle (recoil)
@@ -687,6 +829,47 @@ class MoveEffect:
 
         return True
 
+    def _apply_percent_damage(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica dano baseado em porcentagem do HP (Super Fang)
+        """
+        damage_percentage = self.params.get("damage_percentage", 0.5)
+        damage_formula = self.params.get("damage_formula", "current_hp_percentage")
+        min_damage = self.params.get("min_damage", 1)
+        ignore_type_immunity = self.params.get("ignore_type_immunity", True)
+        ignore_effectiveness = self.params.get("ignore_effectiveness", True)
+
+        # Verifica imunidade de tipo (se não ignorar)
+        if not ignore_type_immunity:
+            from src.battle.damage_calculator import DamageCalculator
+            effectiveness = DamageCalculator._get_type_effectiveness(
+                self.name, target.types
+            )
+            if effectiveness == 0:
+                effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
+                print(f"[PERCENT_DAMAGE] {target.name} é imune!")
+                return False
+
+        # Calcula dano baseado na fórmula
+        if damage_formula == "current_hp_percentage":
+            damage = int(target.current_hp * damage_percentage)
+        elif damage_formula == "max_hp_percentage":
+            damage = int(target.max_hp * damage_percentage)
+        else:
+            damage = int(target.current_hp * 0.5)  # Fallback
+
+        # Garante dano mínimo
+        damage = max(min_damage, damage)
+
+        # Aplica dano
+        target.take_damage(damage, attacker=attacker)
+
+        # Mostra mensagem
+        effect_manager.add_status_text(target, f"-{damage} HP", duration=1.0)
+        print(f"[PERCENT_DAMAGE] {attacker.name} cortou {damage} HP de {target.name} com {self.name}!")
+
+        return True
+
     def _apply_ohko(self, attacker, target, battle_system, effect_manager):
         """
         Aplica One-Hit KO (Horn Drill, Fissure, Guillotine)
@@ -748,6 +931,63 @@ class MoveEffect:
         print(f"[OHKO] {attacker.name} usou {self.name} e derrubou {target.name}!")
 
         return True
+
+    def _apply_stat_mod_with_visual(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica modificador de stat com efeito visual (Minimize)
+        """
+        from .stat_modifier import StatType
+
+        stats_list = self.params.get("stats", [])
+        duration = self.params.get("duration", 8.0)
+        visual_effect = self.params.get("visual_effect", None)
+        sprite_scale = self.params.get("sprite_scale", 1.0)
+
+        target_entity = target if self.target == EffectTarget.TARGET else attacker
+
+        # Aplica os modificadores de stat
+        success_count = 0
+        for stat_config in stats_list:
+            stat_name = stat_config.get("stat", "attack")
+            stages = stat_config.get("stages", 0)
+
+            stat_map = {
+                'attack': StatType.ATTACK,
+                'defense': StatType.DEFENSE,
+                'sp_attack': StatType.SP_ATTACK,
+                'sp_defense': StatType.SP_DEFENSE,
+                'speed': StatType.SPEED,
+                'accuracy': StatType.ACCURACY,
+                'evasion': StatType.EVASION
+            }
+
+            stat_type = stat_map.get(stat_name.lower())
+            if stat_type:
+                effect_manager.add_stat_modifier(target_entity, stat_type, stages, duration)
+                success_count += 1
+
+        # ===== APLICA EFEITO VISUAL =====
+        if visual_effect == "minimize" and sprite_scale != 1.0:
+            # Armazena o scale original e aplica o novo
+            if not hasattr(target_entity, '_original_sprite_scale'):
+                target_entity._original_sprite_scale = 1.0
+            target_entity._current_sprite_scale = sprite_scale
+            target_entity._minimize_active = True
+            target_entity._minimize_timer = duration
+
+            # Força atualização do sprite
+            if hasattr(target_entity, '_update_sprite_size'):
+                target_entity._update_sprite_size()
+
+            effect_manager.add_status_text(target_entity, f"{target_entity.name} ficou minúsculo!", duration=1.5)
+            print(f"[MINIMIZE] {target_entity.name} diminuiu de tamanho! (scale: {sprite_scale})")
+
+        if success_count > 0:
+            effect_manager.add_status_text(target_entity, f"A Evasão de {target_entity.name} aumentou muito!",
+                                           duration=1.5)
+            return True
+
+        return False
 
     def _apply_critical_stage_mod(self, attacker, target, battle_system, effect_manager):
         """
