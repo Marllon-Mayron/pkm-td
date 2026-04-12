@@ -148,6 +148,12 @@ class PokemonCombat:
             print(f"[TARGET_LOST] {self.pokemon.name} perdeu o alvo {self.pokemon.target.name}. Motivo: {reason}")
             self.pokemon.target = None
 
+        if (hasattr(self.pokemon, 'battle_system') and
+                self.pokemon.battle_system and
+                self.pokemon.battle_system.active_charge_move and
+                self.pokemon.battle_system.active_charge_move['attacker'] == self.pokemon):
+            print(f"[TWO_TURN] Carga de {self.pokemon.name} foi cancelada!")
+            self.pokemon.battle_system.active_charge_move = None
 
         # Reseta estado de combate
         self.pokemon.combat_state = "idle"
@@ -636,15 +642,6 @@ class PokemonCombat:
                 print(f"[ATTACK] {self.pokemon.name} usou {move.name} em {target.name}!")
                 if hasattr(self.pokemon, '_rage_active') and self.pokemon._rage_active:
                     self._clear_rage_after_attack()
-        else:
-            hit_chance = move.accuracy / 100
-            will_hit = random.random() <= hit_chance
-            if will_hit:
-                self._simple_attack(target, move)
-            else:
-                print(f"[COMBAT] {move.name} errou!")
-                self.show_miss_on_self()
-            move.current_pp -= 1
 
         self.pokemon.charge_cooldown = self.pokemon.charge_cooldown_max
 
@@ -732,21 +729,6 @@ class PokemonCombat:
 
             # Atualiza direção
             self._update_direction_to_target(dx, dy)
-
-    def _simple_attack(self, target: 'Pokemon', move):
-        """Ataque simples (fallback)"""
-        if move.category == "physical":
-            atk = self.pokemon.attack
-            defense = target.defense_value
-        else:
-            atk = self.pokemon.sp_attack
-            defense = target.sp_defense
-
-        base_damage = ((2 * self.pokemon.level / 5 + 2) * move.power * atk / defense) / 50 + 2
-        damage_multiplier = random.uniform(0.85, 1.15)
-        damage = max(1, int(base_damage * damage_multiplier))
-
-        target.take_damage(damage, attacker=self.pokemon)
 
     def show_miss_on_self(self):
         """Mostra o texto MISS no próprio Pokémon"""

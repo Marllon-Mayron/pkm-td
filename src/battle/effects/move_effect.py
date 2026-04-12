@@ -100,6 +100,9 @@ class MoveEffect:
     attacker_animation: Optional[str] = None  # Nome da animação que o atacante deve fazer
     min_distance: float = 0  # Distância mínima para usar a animação (0 = sempre usa)
 
+    # ===== MENSAGEM PERSONALIZADA PARA GOLPES DE 2 TURNOS =====
+    charge_message: Optional[str] = None
+
     # Callback opcional
     callback: Optional[Callable] = None
 
@@ -109,7 +112,6 @@ class MoveEffect:
     @classmethod
     def from_config(cls, name: str, config: dict) -> 'MoveEffect':
         """Cria um MoveEffect a partir de configuração"""
-        # Converte target para enum se for string
         target = config.get("target", EffectTarget.TARGET)
         if isinstance(target, str):
             target = EffectTarget[target.upper()]
@@ -126,6 +128,7 @@ class MoveEffect:
             params=config.get("params", {}),
             attacker_animation=config.get("attacker_animation"),
             min_distance=config.get("min_distance", 0),
+            charge_message=config.get("charge_message"),
             description=config.get("description", "")
         )
 
@@ -203,6 +206,8 @@ class MoveEffect:
             return self._apply_teleport_swap(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "random_status_chance":
             return self._apply_random_status_chance(attacker, target, effect_manager)
+        elif self.effect_type == "two_turn_attack":
+            return self._apply_two_turn_attack(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "struggle":
             return self._apply_struggle(attacker, target, battle_system, effect_manager, damage)
         return True
@@ -1192,6 +1197,62 @@ class MoveEffect:
         target.take_damage(fixed_damage, attacker=attacker)
 
         print(f"[FIXED_DAMAGE] {attacker.name} causou {fixed_damage} de dano fixo em {target.name}!")
+
+        return True
+        # ===== MÉTODO PARA GOLPES DE 2 TURNOS =====
+
+    def _apply_two_turn_attack(self, attacker, target, battle_system, effect_manager):
+        """
+        Gerencia o ciclo de golpes de 2 turnos.
+        Retorna True se o efeito foi aplicado com sucesso.
+        """
+        # ===== SEGUNDO TURNO =====
+        if (battle_system.active_charge_move and
+                battle_system.active_charge_move['attacker'] == attacker and
+                battle_system.active_charge_move['move_name'] == self.name):
+            print(f"[TWO_TURN] {attacker.name} liberando {self.name}!")
+            return True
+
+        # ===== PRIMEIRO TURNO: INICIA A CARGA =====
+        # Verifica se o atacante já está carregando outro movimento
+        if battle_system.active_charge_move:
+            effect_manager.add_status_text(attacker, f"{attacker.name} já está preparando um golpe!", duration=1.0)
+            return False
+
+        # Verifica se tem PP
+        current_move = attacker.get_current_move()
+        if not current_move or current_move.current_pp <= 0:
+            return False
+
+        # Gasta PP UMA VEZ
+        current_move.current_pp -= 1
+        print(
+            f"[TWO_TURN] {attacker.name} gastou 1 PP para carregar {self.name} (PP restante: {current_move.current_pp})")
+
+        # Inicia o estado de carga
+        battle_system.active_charge_move = {
+            'attacker': attacker,
+            'move_name': self.name,
+            'target': target
+        }
+
+        # ===== CONSUME A MENSAGEM DE CARGA DO FACTORY =====
+        charge_message = getattr(self, 'charge_message', None)
+        if charge_message:
+            # Substitui {pokemon} pelo nome do atacante
+            formatted_message = charge_message.format(pokemon=attacker.name)
+            effect_manager.add_status_text(attacker, formatted_message, duration=1.5)
+        else:
+            # Mensagem padrão caso não tenha definido
+            effect_manager.add_status_text(attacker, f"{attacker.name} está carregando {self.name}!", duration=1.5)
+
+        print(f"[TWO_TURN] {attacker.name} começou a carregar {self.name}")
+
+        # ===== APLICA EFEITOS ADICIONAIS DO PRIMEIRO TURNO =====
+        if self.name.lower() == "skull-bash":
+            from .stat_modifier import StatType
+            effect_manager.add_stat_modifier(attacker, StatType.DEFENSE, 1, duration=6.0)
+            effect_manager.add_status_text(attacker, f"Defesa de {attacker.name} aumentou!", duration=1.0)
 
         return True
 

@@ -699,6 +699,52 @@ class EffectFactory:
             },
             "description": "Dispara espinhos que acertam 2-5 vezes"
         },
+        # ===== GOLPES DE 2 TURNOS =====
+        "sky-attack": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "charge_turn": True,
+                "high_crit": True,
+                "flinch_chance": 0.30,
+            },
+            "charge_message": "O céu escurece... {pokemon} está brilhando intensamente!",
+            "description": "1st turn: Prepare 2nd turn: Attack. High crit ratio. May cause flinching."
+        },
+        "skull-bash": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "charge_turn": True,
+                "defense_boost": 1,
+            },
+            "charge_message": "{pokemon} baixou a cabeça e está concentrando força!",
+            "description": "1st turn: Raise Defense. 2nd turn: Attack."
+        },
+        "solar-beam": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "charge_turn": True,
+                "sun_skip": True,
+            },
+            "charge_message": "{pokemon} está absorvendo luz solar!",
+            "description": "1st turn: Prepare 2nd turn: Attack. Skips charge turn in sunlight."
+        },
+        "razor-wind": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "charge_turn": True,
+                "high_crit": True,
+            },
+            "charge_message": "Ventos fortes se formam ao redor de {pokemon}!",
+            "description": "1st turn: Prepare 2nd turn: Attack. High crit ratio."
+        },
         # Flinch moves
         "bite": {
             "effect_type": "flinch",

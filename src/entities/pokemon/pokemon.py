@@ -1026,6 +1026,12 @@ class Pokemon(Entity):
         """Define se o Pokémon está derrotado"""
         self.is_defeated = defeated
         if defeated:
+            # ===== CANCELA QUALQUER CARGA DE GOLPE =====
+            if hasattr(self, 'battle_system') and self.battle_system:
+                if (self.battle_system.active_charge_move and
+                        self.battle_system.active_charge_move['attacker'] == self):
+                    print(f"[TWO_TURN] Carga de {self.name} foi cancelada devido à derrota!")
+                    self.battle_system.active_charge_move = None
             # Força animação de sono
             self.set_animation_direct("sleep")
             # Reseta estado de combate

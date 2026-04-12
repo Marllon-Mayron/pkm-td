@@ -99,7 +99,6 @@ class MoveSoundManager:
 
         try:
             self._default_hit_sound = pygame.mixer.Sound(buffer=sample_array)
-            print("[MOVE_SOUND] Som padrão de beep criado!")
         except:
             self._default_hit_sound = None
             print("[MOVE_SOUND] Não foi possível criar som padrão")
@@ -120,7 +119,6 @@ class MoveSoundManager:
             attacker_sound.set_volume(final_volume)
             try:
                 attacker_sound.play()
-                print(f"[MOVE_SOUND] Som do atacante: {move_key}")
                 played = True
             except Exception as e:
                 print(f"[MOVE_SOUND] Erro ao tocar som do atacante {move_key}: {e}")
@@ -140,7 +138,6 @@ class MoveSoundManager:
             target_sound.set_volume(final_volume)
             try:
                 target_sound.play()
-                print(f"[MOVE_SOUND] Som do alvo: {target_sound_key}")
                 played = True
             except Exception as e:
                 print(f"[MOVE_SOUND] Erro ao tocar som do alvo: {e}")
@@ -181,9 +178,6 @@ class MoveSoundManager:
             move_key = move_name.lower().strip().replace(" ", "").replace("-", "").replace("'", "")
             target_sound_key = f"{move_key}_target"
 
-            print(f"[DEBUG] Procurando som de impacto: {target_sound_key}")
-            print(f"[DEBUG] Sons disponíveis: {list(self._sounds.keys())}")
-
             sound = self._sounds.get(target_sound_key)
 
             if sound:
@@ -191,7 +185,6 @@ class MoveSoundManager:
                 sound.set_volume(final_volume)
                 try:
                     sound.play()
-                    print(f"[DEBUG] Som de impacto tocado: {target_sound_key}")
                     return True
                 except Exception as e:
                     print(f"[DEBUG] Erro ao tocar: {e}")
@@ -204,7 +197,6 @@ class MoveSoundManager:
             self._default_hit_sound.set_volume(final_volume)
             try:
                 self._default_hit_sound.play()
-                print(f"[DEBUG] Usando som padrão de impacto")
                 return True
             except Exception as e:
                 print(f"[DEBUG] Erro ao tocar som padrão: {e}")

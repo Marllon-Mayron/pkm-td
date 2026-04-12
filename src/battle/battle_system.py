@@ -19,6 +19,7 @@ class BattleSystem:
         self.projectiles: List[Projectile] = []
         self.effect_manager = EffectManager()
         self.active_multi_hit = None  # Estado do multi-hit ativo
+        self.active_charge_move = None
         self.residual_effects = ResidualEffectManager(self)
 
     def set_effect_manager_for_pokemon(self, pokemon):
@@ -50,6 +51,41 @@ class BattleSystem:
             print(f"[BATTLE] Aguardando término do multi-hit...")
             return False
 
+        # ===== VERIFICAÇÃO CRÍTICA: GOLPES DE 2 TURNOS =====
+        if self.active_charge_move and self.active_charge_move['attacker'] == attacker:
+            move_name = self.active_charge_move['move_name']
+            charged_target = self.active_charge_move['target']
+
+            # Verifica se o alvo ainda existe e está vivo
+            if not charged_target or charged_target.is_defeated or not charged_target.is_alive():
+                print(f"[TWO_TURN] Alvo {charged_target.name if charged_target else '?'} não está mais disponível!")
+                self.active_charge_move = None
+                self.effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+                attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+                return True
+
+            print(f"[TWO_TURN] {attacker.name} está liberando {move_name}!")
+
+            # Obtém o movimento real
+            move = None
+            for m in attacker.moves:
+                if m.name.lower() == move_name.lower():
+                    move = m
+                    break
+
+            if not move:
+                print(f"[BATTLE] Erro: Movimento {move_name} não encontrado!")
+                self.active_charge_move = None
+                return False
+
+            # ===== EXECUTA O ATAQUE UMA ÚNICA VEZ =====
+            success = self._execute_two_turn_attack(attacker, charged_target, move)
+            self.active_charge_move = None
+
+            # ===== NÃO CHAMA MAIS NADA! =====
+            return success
+
+        # ===== FLUXO NORMAL =====
         # Se o atacante está derrotado, não ataca
         if attacker.is_defeated:
             print(f"[BATTLE] {attacker.name} está derrotado e não pode atacar!")
@@ -70,12 +106,29 @@ class BattleSystem:
             print(f"[BATTLE] {attacker.name} não tem move selecionado!")
             return False
 
-        # Verificar PP (exceto para Struggle)
+        # Verifica se é golpe de 2 turnos
+        from src.battle.effects import EffectFactory
+        effect = EffectFactory.create_effect(move.name)
+
+        # ===== SE FOR GOLPE DE 2 TURNOS, USA O EFEITO E SAI =====
+        if effect and effect.effect_type == "two_turn_attack":
+            # Verifica se tem PP
+            if move.current_pp <= 0:
+                print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
+                return False
+
+            # Executa o efeito (vai gastar 1 PP e iniciar carga)
+            result = effect.execute(attacker, target, self, self.effect_manager)
+            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+            # ===== NÃO CONTINUA O FLUXO NORMAL =====
+            return result
+
+        # ===== MOVIMENTOS NORMAIS (continuam o fluxo) =====
+        # Verificar PP
         if move.current_pp <= 0:
             print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
             attacker.has_no_pp = True
-
-            # Se for Struggle, não bloqueia
             if move.name.lower() == "struggle":
                 attacker.has_no_pp = False
             else:
@@ -344,6 +397,39 @@ class BattleSystem:
             attacker.play_hurt_animation()
 
         # Cooldown
+        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+        return True
+
+    def _execute_two_turn_attack(self, attacker: 'Pokemon', target: 'Pokemon', move) -> bool:
+        """
+        Executa o ataque de um golpe de 2 turnos no segundo turno.
+        Não gasta PP.
+        """
+        # Verifica se o alvo ainda é válido
+        if target.is_defeated or not target.is_alive():
+            print(f"[TWO_TURN] Alvo {target.name} não está mais disponível para o ataque!")
+            self.effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
+        # Verifica se o atacante ainda pode agir
+        status = self.effect_manager.get_status(attacker)
+        if status and not status.can_attack():
+            self.effect_manager.add_status_text(attacker, f"{attacker.name} não conseguiu executar o ataque!")
+            return False
+
+        # ===== NÃO GASTA PP =====
+
+        # Calcula dano UMA ÚNICA VEZ
+        damage_result = self._calculate_move_damage(attacker, target, move)
+
+        if damage_result["hit"]:
+            self._apply_damage(attacker, target, damage_result, move)
+            self._apply_move_effect(attacker, target, move, damage_result["damage"])
+        else:
+            self._show_miss_on_attacker(attacker)
+
+        # Aplica cooldown
         attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
         return True
