@@ -96,6 +96,42 @@ class BattleSystem:
             print(f"[BATTLE] {target.name} está derrotado e não pode ser atacado!")
             return False
 
+        # ===== VERIFICA SE O ATACANTE TEM PP EM ALGUM MOVE =====
+        # Primeiro, verifica se tem algum move com PP (exceto Struggle)
+        has_pp = False
+        for m in attacker.moves:
+            if m.current_pp > 0:
+                has_pp = True
+                break
+
+        # Se não tem PP em nenhum move, usa Struggle (instância temporária)
+        if not has_pp:
+            print(f"[BATTLE] {attacker.name} está sem PP em todos os moves! Usando Struggle!")
+
+            # Cria Struggle temporário
+            from src.entities.move import Move
+            struggle_info = {
+                "name": "Struggle",
+                "type": "normal",
+                "power": 50,
+                "accuracy": 100,
+                "pp": 1,
+                "max_pp": 1,
+                "category": "physical",
+                "description": "Usado quando todos os PP acabam. Causa dano e dano de retorno."
+            }
+            move = Move("struggle", struggle_info)
+            move.current_pp = 1
+
+            # Mostra mensagem uma vez
+            if not hasattr(attacker, '_struggle_message_shown') or not attacker._struggle_message_shown:
+                self.effect_manager.add_status_text(attacker, f"{attacker.name} não tem PP! Usou Struggle!",
+                                                    duration=2.0)
+                attacker._struggle_message_shown = True
+
+            # Executa Struggle diretamente
+            return self._attempt_struggle(attacker, target, move)
+
         # Usa o padrão de ataque do Pokémon (se existir)
         if hasattr(attacker, 'get_current_move_for_pattern'):
             move = attacker.get_current_move_for_pattern()
@@ -129,10 +165,7 @@ class BattleSystem:
         if move.current_pp <= 0:
             print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
             attacker.has_no_pp = True
-            if move.name.lower() == "struggle":
-                attacker.has_no_pp = False
-            else:
-                return False
+            return False
 
         attacker.has_no_pp = False
 
@@ -209,10 +242,6 @@ class BattleSystem:
                 move.current_pp -= 1
                 attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
                 return True
-
-        # ===== TRATAMENTO ESPECIAL PARA STRUGGLE =====
-        if move.name.lower() == "struggle":
-            return self._attempt_struggle(attacker, target, move)
 
         # ===== MOVIMENTOS COM POWER NULL (Super Fang, Seismic Toss, etc) =====
         if move.power is None or move.power == 0:
@@ -378,12 +407,25 @@ class BattleSystem:
         # Mostra mensagem
         self.effect_manager.add_status_text(attacker, f"{attacker.name} usou Struggle!", duration=1.5)
 
-        # ===== CALCULA DANO (ignora modificadores de accuracy/evasion) =====
-        # Struggle sempre acerta
+        # ===== CALCULA DANO =====
         damage_result = self._calculate_struggle_damage(attacker, target, move)
 
-        # Aplica dano ao alvo
-        self._apply_damage(attacker, target, damage_result, move)
+        print(f"[STRUGGLE] Dano calculado: {damage_result['damage']}")
+
+        # ===== APLICA DANO AO ALVO =====
+        if damage_result["damage"] > 0:
+            target.take_damage(damage_result["damage"], attacker=attacker)
+            print(f"[STRUGGLE] {attacker.name} causou {damage_result['damage']} de dano em {target.name}!")
+
+            # Toca som de impacto
+            from src.managers.move_sound_manager import move_sound_manager
+            move_sound_manager.play_hit_sound("struggle")
+
+            # Toca animação de hurt no alvo
+            if hasattr(target, 'play_hurt_animation'):
+                target.play_hurt_animation()
+        else:
+            print(f"[STRUGGLE] Nenhum dano causado!")
 
         # ===== APLICA RECOIL (1/4 do HP máximo) =====
         recoil_damage = max(1, int(attacker.max_hp * 0.25))
@@ -442,14 +484,25 @@ class BattleSystem:
         # Mas ainda usa a fórmula normal de dano físico
         level = attacker.level
         power = move.power  # 50
+
+        # ===== USA O STAT DE ATAQUE FÍSICO DO ATACANTE =====
         attack_stat = attacker.attack
         defense_stat = target.defense
+
+        # Aplica modificadores de estágio (buff/debuff)
+        if hasattr(attacker, 'effect_manager') and attacker.effect_manager:
+            atk_mult = attacker.effect_manager.get_stat_multiplier(attacker, StatType.ATTACK)
+            def_mult = attacker.effect_manager.get_stat_multiplier(target, StatType.DEFENSE)
+            attack_stat = int(attack_stat * atk_mult)
+            defense_stat = int(defense_stat * def_mult)
+            print(f"[STRUGGLE] Modificadores: atk_mult={atk_mult:.2f}, def_mult={def_mult:.2f}")
 
         # Evita divisão por zero
         if defense_stat <= 0:
             defense_stat = 1
 
-        # Fórmula de dano padrão
+        # Fórmula de dano padrão Pokémon
+        # damage = ((2 * level / 5 + 2) * power * attack / defense) / 50 + 2
         damage = ((2 * level / 5 + 2) * power * attack_stat / defense_stat) / 50 + 2
 
         # Variação aleatória (85-100%)
@@ -457,6 +510,9 @@ class BattleSystem:
 
         # Dano mínimo de 1
         damage = max(1, int(damage))
+
+        print(
+            f"[STRUGGLE] Dano calculado: {damage} (Level={level}, Power={power}, Atk={attack_stat}, Def={defense_stat})")
 
         return {
             "damage": damage,

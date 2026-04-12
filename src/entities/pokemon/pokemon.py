@@ -1137,13 +1137,16 @@ class Pokemon(Entity):
         self.full_restore()
 
         self.target = None
-
         self.current_animation = "idle"
         self.combat_state = "idle"
         self.spot_id = None
         self.is_moving = False
         self.is_placed = False
 
+        # ===== LIMPA FLAG DO STRUGGLE =====
+        if hasattr(self, '_struggle_message_shown'):
+            self._struggle_message_shown = False
+
         self.set_battle_system(game_scene.battle_system)
-        self.screen_manager= game_scene.screen_manager
-        self.camera= game_scene.camera
+        self.screen_manager = game_scene.screen_manager
+        self.camera = game_scene.camera

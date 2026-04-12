@@ -306,11 +306,51 @@ class PokemonCombat:
                 self.pokemon.set_animation("idle")
             return
 
-        # Verifica se tem move disponível
+        # ===== VERIFICA SE TEM MOVE DISPONÍVEL COM PP =====
         current_move = self._get_current_move()
-        if not current_move or current_move.current_pp <= 0:
+
+        # Se não tem move disponível (todos sem PP e Struggle não disponível)
+        if not current_move:
+            print(f"[COMBAT] {self.pokemon.name} está sem moves disponíveis!")
             self.pokemon.has_no_pp = True
+
+            # ===== ALIADOS: Voltam para o spot =====
+            if not self.pokemon.is_wild:
+                self.pokemon.combat_state = "returning"
+                if self.pokemon.has_animation("walk"):
+                    self.pokemon.set_animation("walk")
+            else:
+                self.pokemon.combat_state = "idle"
+                if self.pokemon.has_animation("idle"):
+                    self.pokemon.set_animation("idle")
             return
+
+        # Verifica se o move atual tem PP (se for Struggle, current_pp = 1)
+        if current_move.current_pp <= 0:
+            print(f"[COMBAT] {self.pokemon.name} move {current_move.name} sem PP, procurando outro...")
+            # Tenta encontrar outro move com PP
+            for move in self.pokemon.moves:
+                if move.current_pp > 0:
+                    current_move = move
+                    break
+            else:
+                # Não tem nenhum move com PP (exceto Struggle se foi criado)
+                if current_move.name.lower() == "struggle":
+                    # Struggle sempre tem PP=1, pode continuar
+                    pass
+                else:
+                    print(f"[COMBAT] {self.pokemon.name} está sem PP em todos os moves!")
+                    self.pokemon.has_no_pp = True
+
+                    if not self.pokemon.is_wild:
+                        self.pokemon.combat_state = "returning"
+                        if self.pokemon.has_animation("walk"):
+                            self.pokemon.set_animation("walk")
+                    else:
+                        self.pokemon.combat_state = "idle"
+                        if self.pokemon.has_animation("idle"):
+                            self.pokemon.set_animation("idle")
+                    return
 
         # Calcula distância até o alvo
         dx = target.x - self.pokemon.x
@@ -493,7 +533,7 @@ class PokemonCombat:
     def _get_current_move(self):
         """
         Obtém o move atual.
-        Se não houver moves com PP, retorna Struggle.
+        Só retorna Struggle se TODOS os moves estiverem sem PP.
         """
         # Primeiro tenta pegar pelo padrão de ataque
         if hasattr(self.pokemon, 'get_current_move_for_pattern'):
@@ -506,32 +546,33 @@ class PokemonCombat:
         if move and move.current_pp > 0:
             return move
 
-        # Verifica se tem algum move com PP
+        # ===== VERIFICA SE TEM ALGUM MOVE COM PP =====
         for m in self.pokemon.moves:
             if m.current_pp > 0:
+                # Ainda tem PP em algum move - volta para ele
                 return m
 
-        # ===== SEM PP! MOSTRA MENSAGEM E USA STRUGGLE =====
-        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
-            self.pokemon.effect_manager.add_status_text(
-                self.pokemon,
-                f"{self.pokemon.name} não tem PP! Usou Struggle!",
-                duration=2.0
-            )
+        # ===== SEM PP EM NENHUM MOVE! USA STRUGGLE (TEMPORÁRIO) =====
+        # Verifica se já está em cooldown para não spammar mensagem
+        if not hasattr(self.pokemon, '_struggle_message_shown') or not self.pokemon._struggle_message_shown:
+            if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+                self.pokemon.effect_manager.add_status_text(
+                    self.pokemon,
+                    f"{self.pokemon.name} não tem PP! Usou Struggle!",
+                    duration=2.0
+                )
+            self.pokemon._struggle_message_shown = True
 
-        print(f"[STRUGGLE] {self.pokemon.name} está sem PP! Usando Struggle!")
+        print(f"[STRUGGLE] {self.pokemon.name} está sem PP em TODOS os moves! Usando Struggle!")
+
+        # Retorna uma instância TEMPORÁRIA de Struggle (NÃO salva no moveset)
         return self._get_struggle_move()
 
     def _get_struggle_move(self):
         """
-        Cria e retorna o movimento Struggle (typeless, sempre acerta, com recoil)
+        Cria e retorna o movimento Struggle APENAS para uso imediato.
+        NÃO salva no moveset do Pokémon.
         """
-        # Verifica se já tem Struggle nos moves
-        for move in self.pokemon.moves:
-            if move.name.lower() == "struggle":
-                return move
-
-        # Cria Struggle dinamicamente
         from src.entities.move import Move
 
         struggle_info = {
@@ -545,11 +586,9 @@ class PokemonCombat:
             "description": "Usado quando todos os PP acabam. Causa dano e dano de retorno."
         }
 
+        # Cria uma instância TEMPORÁRIA
         struggle_move = Move("struggle", struggle_info)
         struggle_move.current_pp = 1  # Sempre disponível
-
-        # Adiciona aos moves temporariamente (opcional)
-        # self.pokemon.moves.append(struggle_move)
 
         return struggle_move
 
@@ -614,24 +653,35 @@ class PokemonCombat:
                 self.pokemon._path_tracker.set_ignore_path(self.pokemon, 0)
             return
 
-        if not move or move.current_pp <= 0:
-            print(f"[COMBAT] {self.pokemon.name} está sem PP!")
-            self.pokemon.has_no_pp = True
-            self.pokemon.target = None
+        # ===== VERIFICA PP DO MOVE =====
+        # Struggle é um caso especial - sempre tem PP=1
+        if move.name.lower() != "struggle" and move.current_pp <= 0:
+            print(f"[COMBAT] {self.pokemon.name} move {move.name} sem PP!")
 
-            if not self.pokemon.is_wild:
-                print(f"[ATTACK] {self.pokemon.name}: sem PP, voltando para o spot")
-                self.pokemon.combat_state = "returning"
-                if self.pokemon.has_animation("walk"):
-                    self.pokemon.set_animation("walk")
+            # Tenta encontrar outro move com PP
+            for m in self.pokemon.moves:
+                if m.current_pp > 0:
+                    move = m
+                    break
             else:
-                self.pokemon.combat_state = "idle"
-                if self.pokemon.has_animation("idle"):
-                    self.pokemon.set_animation("idle")
+                # Se não tem nenhum move com PP, tenta Struggle
+                struggle = self._get_struggle_move()
+                if struggle:
+                    move = struggle
+                    print(f"[COMBAT] {self.pokemon.name} usando Struggle por falta de PP!")
+                else:
+                    print(f"[COMBAT] {self.pokemon.name} está sem PP e não consegue atacar!")
+                    self.pokemon.has_no_pp = True
 
-            if self.pokemon.is_wild and hasattr(self.pokemon, '_path_tracker'):
-                self.pokemon._path_tracker.set_ignore_path(self.pokemon, 0)
-            return
+                    if not self.pokemon.is_wild:
+                        self.pokemon.combat_state = "returning"
+                        if self.pokemon.has_animation("walk"):
+                            self.pokemon.set_animation("walk")
+                    else:
+                        self.pokemon.combat_state = "idle"
+                        if self.pokemon.has_animation("idle"):
+                            self.pokemon.set_animation("idle")
+                    return
 
         # Executa o ataque
         target_was_alive_before = target.is_alive() and not target.is_defeated
