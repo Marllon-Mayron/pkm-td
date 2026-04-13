@@ -142,11 +142,24 @@ class BattleSystem:
             print(f"[BATTLE] {attacker.name} não tem move selecionado!")
             return False
 
-        # Verifica se é golpe de 2 turnos
+        # ===== VERIFICA EFEITO DO MOVE =====
         from src.battle.effects import EffectFactory
         effect = EffectFactory.create_effect(move.name)
 
-        # ===== SE FOR GOLPE DE 2 TURNOS, USA O EFEITO E SAI =====
+        # ===== VERIFICA SE O MOVE É DE ÁREA (PELA FLAG is_area) =====
+        if effect and effect.is_area:
+            print(f"[BATTLE_DEBUG] {move.name} é ataque em área (is_area=True)!")
+            # Verifica PP
+            if move.current_pp <= 0:
+                print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
+                return False
+
+            # Executa o efeito de área
+            result = effect.execute(attacker, target, self, self.effect_manager)
+            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            return result
+
+        # ===== VERIFICA SE É GOLPE DE 2 TURNOS =====
         if effect and effect.effect_type == "two_turn_attack":
             # Verifica se tem PP
             if move.current_pp <= 0:
@@ -242,12 +255,6 @@ class BattleSystem:
                 move.current_pp -= 1
                 attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
                 return True
-
-
-
-        # ===== VERIFICA EFEITO DO MOVE =====
-        from src.battle.effects import EffectFactory
-        effect = EffectFactory.create_effect(move.name)
 
         # ===== MOVIMENTOS QUE NUNCA ERRAM (Swift, Aerial Ace, etc) =====
         never_miss = effect and effect.effect_type == "never_miss"

@@ -164,3 +164,71 @@ class PokemonRendering:
         pygame.draw.rect(screen, (255, 0, 255), rect)
         pygame.draw.rect(screen, (255, 255, 255), rect, 2)
         return rect
+
+    def render_debug_range(self, screen, screen_x, screen_y, zoom_scale, enemies_in_range):
+        """
+        Renderiza o range do Pokémon e os inimigos dentro dele (modo debug)
+        """
+        radius = self.pokemon.get_range_radius()
+
+        if radius <= 0:
+            return
+
+        # Calcula raio em pixels na tela
+        radius_pixels = int(radius * zoom_scale)
+
+        # Centro do Pokémon na tela
+        center_x = int(screen_x)
+        center_y = int(screen_y)
+
+        # Desenha o círculo do range (amarelo semi-transparente)
+        circle_surface = pygame.Surface((radius_pixels * 2, radius_pixels * 2), pygame.SRCALPHA)
+        pygame.draw.circle(
+            circle_surface,
+            (255, 255, 0, 60),  # Amarelo com 60 de alpha (semi-transparente)
+            (radius_pixels, radius_pixels),
+            radius_pixels
+        )
+        screen.blit(circle_surface, (center_x - radius_pixels, center_y - radius_pixels))
+
+        # Desenha a borda do círculo
+        pygame.draw.circle(
+            screen,
+            (255, 255, 0, 200),  # Amarelo mais opaco para a borda
+            (center_x, center_y),
+            radius_pixels,
+            2  # Largura da linha
+        )
+
+        # Mostra o valor do range
+        font = pygame.font.Font(None, max(10, int(12 * zoom_scale)))
+        range_text = font.render(f"Range: {radius:.0f}", True, (255, 255, 0))
+        text_x = center_x - range_text.get_width() // 2
+        text_y = center_y - radius_pixels - 15
+        screen.blit(range_text, (text_x, text_y))
+
+        # Mostra a quantidade de inimigos no range
+        enemies_count = len(enemies_in_range)
+        if enemies_count > 0:
+            count_color = (0, 255, 0) if enemies_count > 0 else (255, 100, 100)
+            count_text = font.render(f"In range: {enemies_count}", True, count_color)
+            count_x = center_x - count_text.get_width() // 2
+            count_y = center_y + radius_pixels + 5
+            screen.blit(count_text, (count_x, count_y))
+
+            # Desenha linhas para cada inimigo no range (opcional, visualmente legal)
+            for enemy in enemies_in_range:
+                # Converte posição do inimigo para tela
+                if hasattr(self.pokemon, 'camera') and self.pokemon.camera:
+                    if hasattr(self.pokemon, 'screen_manager') and self.pokemon.screen_manager:
+                        enemy_screen_x, enemy_screen_y = self.pokemon.screen_manager.world_to_screen(
+                            enemy.x, enemy.y, self.pokemon.camera
+                        )
+                        # Desenha linha do Pokémon ao inimigo
+                        pygame.draw.line(
+                            screen,
+                            (0, 255, 0, 100),
+                            (center_x, center_y),
+                            (int(enemy_screen_x), int(enemy_screen_y)),
+                            1
+                        )

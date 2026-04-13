@@ -217,7 +217,7 @@ class Pokemon(Entity):
         self.screen_manager = None
 
         # ===== 24. DEBUG =====
-        self.show_debug = False
+        self.show_debug = True
 
         # ===== 25. MOVES =====
         self.move_data = MoveData()
@@ -443,6 +443,14 @@ class Pokemon(Entity):
 
     def _get_font(self, size):
         return self.rendering.get_font(size)
+
+    def get_enemies_in_range(self, enemies: List) -> List['Pokemon']:
+        """Retorna lista de inimigos dentro do range (delega para combat)"""
+        return self.combat.get_enemies_in_range(enemies)
+
+    def get_range_radius(self) -> float:
+        """Retorna o raio atual do range de ataque"""
+        return self.combat.get_range_radius()
 
     def _prepare_sprite(self, zoom_scale):
         return self.rendering.prepare_sprite(zoom_scale)
@@ -866,8 +874,29 @@ class Pokemon(Entity):
             if hasattr(self, 'miss_timer') and self.miss_timer > 0:
                 self._render_miss_text(screen, sprite_rect, zoom_scale)
 
-        if hasattr(self, 'show_debug') and self.show_debug and sprite_rect:
-            self._render_debug(screen, screen_x, screen_y, zoom_scale, sprite_rect)
+        # ===== DEBUG DO RANGE - MOVIDO PARA DENTRO DA VERIFICAÇÃO show_debug =====
+        if hasattr(self, 'show_debug') and self.show_debug:
+            # Renderiza informações básicas de debug
+            if sprite_rect:
+                self._render_debug(screen, screen_x, screen_y, zoom_scale, sprite_rect)
+
+            # Renderiza o range (sempre, mesmo sem sprite_rect)
+            # Obtém inimigos no range
+            enemies_in_range = []
+            if hasattr(self, 'battle_system') and self.battle_system:
+                if hasattr(self.battle_system, 'game_scene') and self.battle_system.game_scene:
+                    if hasattr(self.battle_system.game_scene, 'wave_manager'):
+                        enemies = self.battle_system.game_scene.wave_manager.active_enemies
+                        enemies_in_range = self.get_enemies_in_range(enemies)
+
+            # Renderiza o range usando o rendering manager
+            self.rendering.render_debug_range(
+                screen,
+                screen_x,
+                screen_y,
+                zoom_scale,
+                enemies_in_range
+            )
 
     def render_hp_enemy(self, screen, camera=None):
         """Método de compatibilidade para chamar o _render_hp_bar"""

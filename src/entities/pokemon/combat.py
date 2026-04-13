@@ -813,3 +813,56 @@ class PokemonCombat:
                     f"{self.pokemon.name} saiu da fúria!",
                     duration=1.0
                 )
+
+    def get_enemies_in_range(self, all_entities: List) -> List['Pokemon']:
+        """
+        Retorna lista de todos os inimigos dentro do range de ataque.
+        Útil para ataques em área futuramente.
+        """
+        enemies_in_range = []
+
+        if not all_entities:
+            return enemies_in_range
+
+        # ===== USA O RANGE PADRÃO DO POKÉMON (NÃO DEPENDE DO MOVE) =====
+        # Para ataques em área como Earthquake, sempre usa o attack_range padrão
+        required_range = self.pokemon.attack_range
+
+        range_sq = required_range * required_range
+
+        print(f"[AREA_RANGE] {self.pokemon.name} verificando range {required_range} para {len(all_entities)} entidades")
+
+        for entity in all_entities:
+            # Pula entidades mortas
+            if not entity.is_alive() or entity.is_defeated:
+                continue
+
+            # Verifica se é inimigo
+            is_valid_target = False
+            if self.pokemon.is_wild:
+                is_valid_target = not entity.is_wild
+            else:
+                is_valid_target = entity.is_wild
+
+            if is_valid_target:
+                dx = self.pokemon.x - entity.x
+                dy = self.pokemon.y - entity.y
+                distance_sq = dx * dx + dy * dy
+
+                if distance_sq <= range_sq:
+                    enemies_in_range.append(entity)
+        return enemies_in_range
+
+    def get_range_radius(self) -> float:
+        """
+        Retorna o raio atual do range de ataque.
+        """
+        current_move = self._get_current_move()
+
+        if current_move:
+            if current_move.category == "physical":
+                return float(self.pokemon.attack_range)
+            else:
+                return float(self.pokemon.attack_range)
+        else:
+            return float(self.pokemon.attack_range)

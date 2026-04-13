@@ -95,6 +95,7 @@ class MoveEffect:
 
     # Parâmetros do efeito
     params: dict = field(default_factory=dict)
+    is_area: bool = False
 
     # ===== ATRIBUTOS PARA ANIMAÇÃO =====
     attacker_animation: Optional[str] = None  # Nome da animação que o atacante deve fazer
@@ -129,7 +130,8 @@ class MoveEffect:
             attacker_animation=config.get("attacker_animation"),
             min_distance=config.get("min_distance", 0),
             charge_message=config.get("charge_message"),
-            description=config.get("description", "")
+            description=config.get("description", ""),
+            is_area=config.get("is_area", False)
         )
 
     def execute(self, attacker, target, battle_system, effect_manager, damage: int = 0):
@@ -143,6 +145,10 @@ class MoveEffect:
             effect_manager: Gerenciador de efeitos
             damage: Dano causado (se houver)
         """
+        # ===== SE FOR ATAQUE EM ÁREA, PROCESSA MÚLTIPLOS ALVOS =====
+        if self.is_area:
+            return self._execute_area_effect(attacker, target, battle_system, effect_manager, damage)
+
         if self.callback:
             return self.callback(attacker, target, battle_system, effect_manager, damage, self.params)
 
@@ -543,6 +549,34 @@ class MoveEffect:
         move_sound_manager.play_attack_sound("faint")
 
         return True
+
+    def _apply_self_faint_area(self, attacker, target, battle_system, effect_manager, damage):
+        """
+        Aplica Explosion em área (causa dano ao alvo)
+        O desmaio do atacante acontece APÓS todos os alvos serem atingidos
+        """
+        from src.battle.damage_calculator import DamageCalculator
+
+        current_move = attacker.get_current_move()
+        if not current_move:
+            return
+
+        # Calcula dano para este alvo
+        damage_result = DamageCalculator.calculate_damage(attacker, target, current_move)
+
+        if damage_result["hit"]:
+            old_hp = target.current_hp
+            target.take_damage(damage_result["damage"], attacker=attacker)
+            actual_damage = old_hp - target.current_hp
+
+            effect_manager.add_status_text(target, f"-{actual_damage} HP", duration=0.8)
+
+            if damage_result["effectiveness"] > 1.0:
+                effect_manager.add_status_text(target, "Super efetivo!", duration=0.8)
+            elif 0 < damage_result["effectiveness"] < 1.0:
+                effect_manager.add_status_text(target, "Não é muito efetivo...", duration=0.8)
+
+            print(f"[AREA_EXPLOSION] {attacker.name} causou {actual_damage} de dano em {target.name}!")
 
     def _apply_remove_all_stat_mods(self, attacker, target, battle_system, effect_manager):
         """
@@ -1256,6 +1290,147 @@ class MoveEffect:
 
         return True
 
+    def _execute_area_effect(self, attacker, target, battle_system, effect_manager, damage: int = 0):
+        """
+        Executa um efeito em área (afeta todos os inimigos no range)
+        """
+        print(f"[AREA_EFFECT] {attacker.name} usou {self.name} em área! (tipo: {self.effect_type})")
+
+        # Obtém todos os inimigos vivos dentro do range
+        if not battle_system.game_scene or not hasattr(battle_system.game_scene, 'wave_manager'):
+            print(f"[AREA_EFFECT] wave_manager não encontrado!")
+            effect_manager.add_status_text(attacker, "Mas falhou!", duration=1.0)
+            return False
+
+        wave_manager = battle_system.game_scene.wave_manager
+        active_enemies = wave_manager.active_enemies
+
+        if not active_enemies:
+            print(f"[AREA_EFFECT] Nenhum inimigo ativo!")
+            effect_manager.add_status_text(attacker, "Mas não há inimigos!", duration=1.0)
+            return False
+
+        # Obtém inimigos no range
+        enemies_in_range = attacker.get_enemies_in_range(active_enemies)
+
+        print(f"[AREA_EFFECT] Inimigos ativos: {len(active_enemies)}, no range: {len(enemies_in_range)}")
+
+        if not enemies_in_range:
+            effect_manager.add_status_text(attacker, "Mas não há inimigos no alcance!", duration=1.0)
+            print(f"[AREA_EFFECT] Nenhum inimigo no range de {attacker.name}!")
+            return False
+
+        # Obtém o move atual
+        current_move = attacker.get_current_move()
+        if not current_move:
+            print(f"[AREA_EFFECT] {attacker.name} não tem move selecionado!")
+            return False
+
+        # Consome PP uma única vez
+        if current_move.current_pp > 0:
+            current_move.current_pp -= 1
+            print(f"[AREA_EFFECT] {attacker.name} gastou 1 PP para {self.name} (atingiu {len(enemies_in_range)} alvos)")
+        else:
+            print(f"[AREA_EFFECT] {attacker.name} não tem PP para {self.name}!")
+            return False
+
+        # Toca som do ataque uma vez
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound(current_move.sound_name)
+
+        # Animação do atacante
+        from src.battle.effects.animation_mapper import AnimationMapper
+        animation_to_use = AnimationMapper.get_animation_for_move(self.name, current_move.category)
+        if attacker.has_animation(animation_to_use):
+            attacker.set_animation_direct(animation_to_use)
+            attacker.current_frame = 0
+            attacker.animation_timer = 0
+
+        # ===== APLICA O EFEITO A CADA INIMIGO NO RANGE =====
+        hit_count = 0
+
+        for enemy in enemies_in_range:
+            if not enemy.is_alive() or enemy.is_defeated:
+                continue
+
+            print(f"[AREA_EFFECT] Aplicando {self.effect_type} em {enemy.name}...")
+
+            # ===== DIFERENCIA O TIPO DE EFEITO =====
+            if self.effect_type == "self_faint":
+                # Explosion: causa dano a todos e depois desmaia
+                self._apply_self_faint_area(attacker, enemy, battle_system, effect_manager, damage)
+                hit_count += 1
+
+            elif self.effect_type == "status" or self.effect_type == "status_chance":
+                # Para golpes como Stun Spore em área
+                success = self._apply_status(attacker, enemy, effect_manager)
+                if success:
+                    hit_count += 1
+
+            elif self.effect_type == "stat_mod":
+                # Para golpes como Growl em área
+                success = self._apply_stat_mod(attacker, enemy, effect_manager)
+                if success:
+                    hit_count += 1
+
+            elif self.effect_type == "drain":
+                # Para Giga Drain em área
+                success = self._apply_drain(attacker, enemy, damage, effect_manager)
+                if success:
+                    hit_count += 1
+
+            elif self.effect_type == "recoil":
+                # Para Double-Edge em área
+                success = self._apply_recoil(attacker, enemy, damage, effect_manager)
+                if success:
+                    hit_count += 1
+
+            elif self.effect_type == "percent_damage":
+                # Para Super Fang em área
+                success = self._apply_percent_damage(attacker, enemy, battle_system, effect_manager)
+                if success:
+                    hit_count += 1
+
+            elif self.effect_type == "fixed_damage":
+                # Para Sonic Boom em área
+                success = self._apply_fixed_damage(attacker, enemy, battle_system, effect_manager)
+                if success:
+                    hit_count += 1
+
+            elif self.effect_type == "level_damage":
+                # Para Seismic Toss em área
+                success = self._apply_level_damage(attacker, enemy, battle_system, effect_manager)
+                if success:
+                    hit_count += 1
+
+            else:
+                # Fallback: tenta executar o efeito normal
+                if self.callback:
+                    self.callback(attacker, enemy, battle_system, effect_manager, damage, self.params)
+                hit_count += 1
+
+        # Mensagem final
+        if hit_count > 0:
+            effect_manager.add_status_text(
+                attacker,
+                f"{self.name} atingiu {hit_count} inimigos!",
+                duration=1.5
+            )
+        else:
+            effect_manager.add_status_text(attacker, f"{self.name} não acertou ninguém!", duration=1.5)
+
+        # Cooldown do ataque
+        attacker.charge_cooldown = attacker.charge_cooldown_max
+
+        # Reseta estado de combate
+        if not attacker.is_wild:
+            attacker.combat_state = "returning"
+            if attacker.has_animation("walk"):
+                attacker.set_animation("walk")
+        else:
+            attacker.combat_state = "attacking"
+
+        return hit_count > 0
     # ===== MÉTODOS DE RAGE =====
     def _apply_rage_mode(self, attacker, target, effect_manager):
         """Aplica o efeito Rage - aumenta Attack quando atingido"""

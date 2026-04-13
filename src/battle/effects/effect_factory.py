@@ -197,6 +197,7 @@ class EffectFactory:
             "effect_type": "stat_mod",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "stat": "accuracy",
                 "stages": -1,
@@ -208,6 +209,7 @@ class EffectFactory:
             "effect_type": "stat_mod",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "stat": "accuracy",
                 "stages": -1,
@@ -219,6 +221,7 @@ class EffectFactory:
             "effect_type": "stat_mod",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "stat": "accuracy",
                 "stages": -1,
@@ -266,6 +269,7 @@ class EffectFactory:
             "effect_type": "status",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "status": "poison",
                 "duration": None,
@@ -277,6 +281,7 @@ class EffectFactory:
             "effect_type": "status",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "status": "poison",
                 "duration": None,
@@ -299,6 +304,7 @@ class EffectFactory:
             "effect_type": "status",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "status": "poison",
                 "chance": 0.40,
@@ -366,6 +372,7 @@ class EffectFactory:
             "effect_type": "status",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "status": "paralysis",
                 "duration": None
@@ -399,6 +406,7 @@ class EffectFactory:
             "effect_type": "status",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "status": "sleep",
                 "duration": None,
@@ -410,6 +418,7 @@ class EffectFactory:
             "effect_type": "status",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "status": "sleep",
                 "duration": None,
@@ -432,6 +441,7 @@ class EffectFactory:
             "effect_type": "status",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "status": "sleep",
                 "duration": None,
@@ -551,6 +561,7 @@ class EffectFactory:
             "effect_type": "status_chance",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "status": "freeze",
                 "chance": 0.10,
@@ -617,6 +628,30 @@ class EffectFactory:
                 "chance": 0.10
             },
             "description": "Pode causar confusão (10% de chance)"
+        },
+        # ===== ATAQUES EM ÁREA =====
+        "earthquake": {
+            "effect_type": "stat_mod",  # Pode ser qualquer tipo, o importante é is_area=True
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,  # Flag de área
+            "params": {
+                "area": True,
+                "hit_all_in_range": True,
+            },
+            "description": "Causa dano a todos os inimigos próximos."
+        },
+
+        "surf": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,
+            "params": {
+                "area": True,
+                "hit_all_in_range": True,
+            },
+            "description": "Causa dano a todos os inimigos próximos."
         },
         # Multi-hit moves
         "double-slap": {
@@ -745,6 +780,39 @@ class EffectFactory:
             "charge_message": "Ventos fortes se formam ao redor de {pokemon}!",
             "description": "1st turn: Prepare 2nd turn: Attack. High crit ratio."
         },
+        "dig": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "charge_turn": True,
+                "high_crit": True,
+            },
+            "charge_message": "{pokemon} está cavando um buraco!",
+            "description": "1st turn: Prepare 2nd turn: Attack. High crit ratio."
+        },
+        "fly": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "charge_turn": True,
+                "high_crit": True,
+            },
+            "charge_message": "{pokemon} está se preparando para voar!",
+            "description": "1st turn: Prepare 2nd turn: Attack. High crit ratio."
+        },
+        "hyper-beam": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "charge_turn": True,
+                "high_crit": True,
+            },
+            "charge_message": "{pokemon} está descansando...",
+            "description": "1st turn: Prepare 2nd turn: Attack. High crit ratio."
+        },
         # Flinch moves
         "bite": {
             "effect_type": "flinch",
@@ -768,6 +836,7 @@ class EffectFactory:
             "effect_type": "flinch",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "chance": 0.3
             },
@@ -987,6 +1056,7 @@ class EffectFactory:
             "effect_type": "force_switch",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "force_wild_flee": True,
                 "force_ally_return": True,
@@ -1031,6 +1101,7 @@ class EffectFactory:
             "effect_type": "never_miss",  # Tipo: nunca erra
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "never_miss": True,
             },
@@ -1054,6 +1125,7 @@ class EffectFactory:
             "effect_type": "remove_all_stat_mods",  # Remove todos os modificadores de stat
             "target": EffectTarget.BOTH,  # Afeta todos os Pokémon em campo
             "timing": EffectTiming.ON_HIT,
+            "is_area": True,
             "params": {
                 "clear_all": True,  # Limpa todos os modificadores
                 "affects_user": True,  # Afeta também o usuário
@@ -1121,6 +1193,7 @@ class EffectFactory:
             "effect_type": "self_faint",  # Tipo: usuário desmaia
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.AFTER_DAMAGE,  # Após causar dano
+            "is_area": True,
             "params": {
                 "self_faint": True,
             },
