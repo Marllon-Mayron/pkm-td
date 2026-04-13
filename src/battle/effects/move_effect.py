@@ -1916,7 +1916,7 @@ class MoveEffect:
             battle_system.residual_effects.remove_effect_on_target(target)
 
         # Remove do placement_manager (volta para o time)
-        placement_manager.remove_pokemon(target)
+        placement_manager._remove_pokemon(target)
 
         # Opcional: toca som de retorno
         from src.managers.move_sound_manager import move_sound_manager

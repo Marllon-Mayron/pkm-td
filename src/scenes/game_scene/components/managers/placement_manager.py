@@ -158,7 +158,7 @@ class PlacementManager:
                 pokemon.update_combat(dt, enemies)
 
     def _remove_pokemon(self, pokemon):
-        """Remove um Pokémon do mapa (por derrota) - CORRIGIDO"""
+        """Remove um Pokémon do mapa """
         if pokemon in self.placed_pokemon:
             self.placed_pokemon.remove(pokemon)
 

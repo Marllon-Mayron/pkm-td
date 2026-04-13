@@ -24,8 +24,8 @@ _FONT_CACHE = {}
 
 class Pokemon(Entity):
     # Constantes de classe
-    _MIN_MOVE_SPEED = 0.2
-    _MAX_MOVE_SPEED = 4.5
+    _MIN_MOVE_SPEED = 0.5
+    _MAX_MOVE_SPEED = 4.0
     _speed_cache = {}
 
     def __init__(self, x, y, pokemon_id, level=5, is_wild=False, shiny=False, is_boss=False):
@@ -143,7 +143,7 @@ class Pokemon(Entity):
         self.original_path = None
         self.path_index_origin = 0
         self.is_returning_with_item = False
-        self.speed_bonus_not_wild = 0.3
+        self.speed_bonus_not_wild = 0.5
         if is_wild:
             self.base_move_speed = self._get_cached_move_speed()
             self.move_speed = self.base_move_speed
@@ -217,7 +217,7 @@ class Pokemon(Entity):
         self.screen_manager = None
 
         # ===== 24. DEBUG =====
-        self.show_debug = True
+        self.show_debug = False
 
         # ===== 25. MOVES =====
         self.move_data = MoveData()
