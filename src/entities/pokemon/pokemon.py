@@ -4,19 +4,18 @@ import uuid
 import random
 from typing import List, Dict, Optional
 
+from src.battle.attack_pattern import AttackPattern, AttackPatternManager, AttackTypeCategory
 from src.entities.base import Entity
 from src.data.pokedex import Pokedex
 from src.data.move_data import MoveData
-from .animation import PokemonAnimation
+from src.entities.pokemon.animation import PokemonAnimation
 
-from .stats import PokemonStats
-from .movement import PokemonMovement
-from .combat import PokemonCombat
-from .moves import PokemonMoves
-from .evolution import PokemonEvolution
-from .rendering import PokemonRendering
-from ...battle.attack_pattern import AttackTypeCategory, AttackPattern, AttackPatternManager
-from ...battle.effects import StatusType
+from src.entities.pokemon.stats import PokemonStats
+from src.entities.pokemon.movement import PokemonMovement
+from src.entities.pokemon.combat import PokemonCombat
+from src.entities.pokemon.moves import PokemonMoves
+from src.entities.pokemon.evolution import PokemonEvolution
+from src.entities.pokemon.rendering import PokemonRendering
 
 # Cache global de sprites e fontes para reduzir recriação
 _SPRITE_CACHE = {}

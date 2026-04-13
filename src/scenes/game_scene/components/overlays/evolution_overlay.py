@@ -2,7 +2,7 @@
 
 import pygame
 import math
-from .base_overlay import BaseOverlay
+from src.scenes.game_scene.components.overlays.base_overlay import BaseOverlay
 
 _FONT_CACHE = {}
 

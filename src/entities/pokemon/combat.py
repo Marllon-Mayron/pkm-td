@@ -306,51 +306,49 @@ class PokemonCombat:
                 self.pokemon.set_animation("idle")
             return
 
-        # ===== VERIFICA SE TEM MOVE DISPONÍVEL COM PP =====
-        current_move = self._get_current_move()
-
-        # Se não tem move disponível (todos sem PP e Struggle não disponível)
-        if not current_move:
-            print(f"[COMBAT] {self.pokemon.name} está sem moves disponíveis!")
-            self.pokemon.has_no_pp = True
-
-            # ===== ALIADOS: Voltam para o spot =====
-            if not self.pokemon.is_wild:
-                self.pokemon.combat_state = "returning"
-                if self.pokemon.has_animation("walk"):
-                    self.pokemon.set_animation("walk")
-            else:
-                self.pokemon.combat_state = "idle"
-                if self.pokemon.has_animation("idle"):
-                    self.pokemon.set_animation("idle")
+        # ===== ANTI-SPAM: Evita ficar tentando atacar sem PP a cada frame =====
+        if hasattr(self.pokemon, '_no_move_cooldown') and self.pokemon._no_move_cooldown > 0:
+            self.pokemon._no_move_cooldown -= dt
             return
 
-        # Verifica se o move atual tem PP (se for Struggle, current_pp = 1)
-        if current_move.current_pp <= 0:
-            print(f"[COMBAT] {self.pokemon.name} move {current_move.name} sem PP, procurando outro...")
-            # Tenta encontrar outro move com PP
-            for move in self.pokemon.moves:
-                if move.current_pp > 0:
-                    current_move = move
-                    break
-            else:
-                # Não tem nenhum move com PP (exceto Struggle se foi criado)
-                if current_move.name.lower() == "struggle":
-                    # Struggle sempre tem PP=1, pode continuar
-                    pass
-                else:
-                    print(f"[COMBAT] {self.pokemon.name} está sem PP em todos os moves!")
-                    self.pokemon.has_no_pp = True
+        # ===== OBTÉM O MOVE SELECIONADO (NÃO TROCA AUTOMATICAMENTE) =====
+        current_move = self._get_current_move()
 
-                    if not self.pokemon.is_wild:
-                        self.pokemon.combat_state = "returning"
-                        if self.pokemon.has_animation("walk"):
-                            self.pokemon.set_animation("walk")
-                    else:
-                        self.pokemon.combat_state = "idle"
-                        if self.pokemon.has_animation("idle"):
-                            self.pokemon.set_animation("idle")
-                    return
+        # Se não tem move disponível (sem PP ou nenhum move selecionado)
+        if not current_move:
+            print(f"[COMBAT] {self.pokemon.name} não tem move disponível para atacar!")
+            self.pokemon.has_no_pp = True
+
+            # Aplica cooldown de 0.5 segundos para não spammar
+            self.pokemon._no_move_cooldown = 0.5
+
+            self._handle_no_moves()
+            return
+
+        # ===== SÓ STRUGGLE SE NÃO TIVER NENHUM MOVE COM PP =====
+        all_moves_no_pp = True
+        for move in self.pokemon.moves:
+            if move.current_pp > 0:
+                all_moves_no_pp = False
+                break
+
+        if current_move.current_pp <= 0 and not all_moves_no_pp:
+            print(
+                f"[COMBAT] {self.pokemon.name}: {current_move.name} sem PP, mas há outros moves com PP. O player precisa trocar!")
+            self.pokemon.has_no_pp = True
+            self.pokemon._no_move_cooldown = 0.5
+            self._handle_no_moves()
+            return
+
+        self.pokemon._no_move_cooldown = 0
+
+        if all_moves_no_pp:
+            struggle = self._get_struggle_move()
+            if struggle:
+                current_move = struggle
+                print(f"[STRUGGLE] {self.pokemon.name} está sem PP em TODOS os moves! Usando Struggle!")
+            else:
+                return
 
         # Calcula distância até o alvo
         dx = target.x - self.pokemon.x
@@ -360,56 +358,52 @@ class PokemonCombat:
         # Atualiza direção para olhar para o alvo
         self._update_direction_to_target(dx, dy)
 
-        # ===== ALIADOS (NOT WILD): Atacam de qualquer distância se for special/status =====
+        # ===== ALIADOS (NOT WILD) =====
         if not self.pokemon.is_wild:
             attack_distance = 12
             is_status_move = current_move.category == "status"
             is_special_move = current_move.category == "special"
 
-            # Moves de status e especiais podem atacar de qualquer distância
             if is_status_move or is_special_move:
                 self._start_attack_animation(target, current_move)
                 return
 
-            # Moves físicos precisam se aproximar
             if distance > attack_distance:
                 self.pokemon.combat_state = "moving_to_target"
+                # ===== FORÇA ANIMAÇÃO WALK ANTES DE MOVER =====
+                if self.pokemon.current_animation != "walk" and self.pokemon.has_animation("walk"):
+                    self.pokemon.set_animation("walk")
+                    print(f"[MOVE] {self.pokemon.name} indo atacar (walk)")
                 self._move_towards_target(target, dx, dy, distance, dt)
             else:
                 self._start_attack_animation(target, current_move)
             return
 
-        # ===== INIMIGOS (WILD): Precisam estar no range =====
-        # Define range baseado no tipo de move
+        # ===== INIMIGOS (WILD) =====
         if current_move.category == "physical":
             attack_distance = 25
         else:
             attack_distance = self.pokemon.attack_range
 
         if distance <= attack_distance:
-            # Reseta contador de tentativas
             if hasattr(self.pokemon, '_attack_attempts'):
                 self.pokemon._attack_attempts = 0
             self._start_attack_animation(target, current_move)
         else:
-            # Fora do range, incrementa tentativa
             if not hasattr(self.pokemon, '_attack_attempts'):
                 self.pokemon._attack_attempts = 0
             self.pokemon._attack_attempts += 1
-
-            # Tenta se mover em direção ao alvo
+            # ===== FORÇA ANIMAÇÃO WALK ANTES DE MOVER =====
+            if self.pokemon.current_animation != "walk" and self.pokemon.has_animation("walk"):
+                self.pokemon.set_animation("walk")
+                print(f"[MOVE] {self.pokemon.name} indo atacar (walk)")
             self._move_towards_target(target, dx, dy, distance, dt)
-            print(
-                f"[COMBAT] {self.pokemon.name}: se aproximando de {target.name} (distância: {distance:.0f}/{attack_distance:.0f})")
 
-            # Se tentou muitas vezes sem sucesso, abandona o alvo
             if self.pokemon._attack_attempts > 5:
-                print(f"[COMBAT] {self.pokemon.name}: muitas tentativas sem sucesso, abandonando alvo {target.name}")
+                print(f"[COMBAT] {self.pokemon.name}: abandonando alvo {target.name}")
                 self.pokemon.target = None
                 self.pokemon.combat_state = "idle"
                 self.pokemon._attack_attempts = 0
-                if hasattr(self.pokemon, '_path_tracker'):
-                    self.pokemon._path_tracker.set_ignore_path(self.pokemon, 0)
 
     def _move_towards_target(self, target: 'Pokemon', dx: float, dy: float, distance: float, dt: float):
         """Move em direção ao alvo (para aliados E inimigos)"""
@@ -455,70 +449,6 @@ class PokemonCombat:
         self.pokemon.y += move_y
         self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
 
-    def _handle_returning_state(self, dt: float):
-        """
-        GERENCIA O RETORNO DO POKÉMON AO SPOT ORIGINAL
-        """
-        # Verifica se tem spot original definido
-        if not hasattr(self.pokemon, 'original_spot_x') or not hasattr(self.pokemon, 'original_spot_y'):
-            print(f"[RETURN] {self.pokemon.name} não tem spot original! Voltando para idle.")
-            self.pokemon.combat_state = "idle"
-            self.pokemon.target = None
-            if self.pokemon.has_animation("idle"):
-                self.pokemon.set_animation("idle")
-            return
-
-        target_x = self.pokemon.original_spot_x
-        target_y = self.pokemon.original_spot_y
-        dx = target_x - self.pokemon.x
-        dy = target_y - self.pokemon.y
-        distance = math.sqrt(dx * dx + dy * dy)
-
-        # Se chegou perto o suficiente
-        if distance < 3:
-            # Posiciona exatamente no spot
-            self.pokemon.x = target_x
-            self.pokemon.y = target_y
-            self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
-
-            # Reseta estado
-            self.pokemon.combat_state = "idle"
-            self.pokemon.target = None
-
-            # Restaura animação idle
-            if self.pokemon.has_animation("idle"):
-                self.pokemon.set_animation("idle")
-
-            print(f"[RETURN] {self.pokemon.name} retornou ao spot!")
-            return
-
-        # Ainda voltando
-        if distance > 0:
-            # Atualiza animação para walk (se não estiver atacando)
-            is_attacking = hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active
-            if not is_attacking and self.pokemon.current_animation != "walk":
-                if self.pokemon.has_animation("walk"):
-                    self.pokemon.set_animation("walk")
-
-            # Calcula movimento
-            move_distance = self.pokemon.move_speed * dt * 60
-            move_x = (dx / distance) * move_distance
-            move_y = (dy / distance) * move_distance
-
-            # Não ultrapassar
-            if abs(move_x) > abs(dx):
-                move_x = dx
-            if abs(move_y) > abs(dy):
-                move_y = dy
-
-            # Aplica movimento
-            self.pokemon.x += move_x
-            self.pokemon.y += move_y
-            self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
-
-            # Atualiza direção
-            self._update_direction_to_target(dx, dy)
-
     def _can_act(self, dt: float) -> bool:
         """Verifica se o Pokémon pode agir"""
         if self.update_stun(dt):
@@ -533,40 +463,34 @@ class PokemonCombat:
     def _get_current_move(self):
         """
         Obtém o move atual.
-        Só retorna Struggle se TODOS os moves estiverem sem PP.
+        Só retorna o move que está selecionado pelo player.
+        NUNCA troca de golpe automaticamente.
         """
-        # Primeiro tenta pegar pelo padrão de ataque
-        if hasattr(self.pokemon, 'get_current_move_for_pattern'):
-            move = self.pokemon.get_current_move_for_pattern()
-            if move and move.current_pp > 0:
-                return move
-
-        # Tenta o move normal
+        # Tenta o move padrão (selecionado pelo player)
         move = self.pokemon.get_current_move()
-        if move and move.current_pp > 0:
+
+        # Se não tem move selecionado, retorna None
+        if not move:
+            return None
+
+        # Se o move tem PP, retorna ele
+        if move.current_pp > 0:
             return move
 
-        # ===== VERIFICA SE TEM ALGUM MOVE COM PP =====
-        for m in self.pokemon.moves:
-            if m.current_pp > 0:
-                # Ainda tem PP em algum move - volta para ele
-                return m
+        # ===== MOVE SELECIONADO ESTÁ SEM PP =====
+        # NÃO TROCA AUTOMATICAMENTE!
+        # Retorna None para indicar que não pode atacar
+        print(f"[PP] {self.pokemon.name}: move {move.name} está sem PP! Aguardando o player trocar.")
 
-        # ===== SEM PP EM NENHUM MOVE! USA STRUGGLE (TEMPORÁRIO) =====
-        # Verifica se já está em cooldown para não spammar mensagem
-        if not hasattr(self.pokemon, '_struggle_message_shown') or not self.pokemon._struggle_message_shown:
-            if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
-                self.pokemon.effect_manager.add_status_text(
-                    self.pokemon,
-                    f"{self.pokemon.name} não tem PP! Usou Struggle!",
-                    duration=2.0
-                )
-            self.pokemon._struggle_message_shown = True
+        # Mostra mensagem visual
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            self.pokemon.effect_manager.add_status_text(
+                self.pokemon,
+                f"{move.name} está sem PP!",
+                duration=2.0
+            )
 
-        print(f"[STRUGGLE] {self.pokemon.name} está sem PP em TODOS os moves! Usando Struggle!")
-
-        # Retorna uma instância TEMPORÁRIA de Struggle (NÃO salva no moveset)
-        return self._get_struggle_move()
+        return None  # Sem move disponível
 
     def _get_struggle_move(self):
         """
@@ -701,16 +625,15 @@ class PokemonCombat:
         if not self.pokemon.is_wild:
             # ===== ALIADOS =====
             if target_is_dead_now:
-                # Alvo morreu no ataque!
                 print(f"[ATTACK] {self.pokemon.name}: matou {target.name}! Voltando para o spot.")
-                self.pokemon.target = None  # Limpa o target
+                self.pokemon.target = None
             else:
-                # Alvo sobreviveu
                 print(f"[ATTACK] {self.pokemon.name}: atacou {target.name}, voltando para o spot.")
 
-            # SEMPRE volta para o spot após atacar (independente se matou ou não)
+            # SEMPRE volta para o spot após atacar
             self.pokemon.combat_state = "returning"
-            if self.pokemon.has_animation("walk"):
+            # Força animação walk APENAS se não estiver já em walk
+            if self.pokemon.current_animation != "walk" and self.pokemon.has_animation("walk"):
                 self.pokemon.set_animation("walk")
         else:
             # ===== INIMIGOS =====
@@ -719,15 +642,14 @@ class PokemonCombat:
                 self.pokemon._path_tracker.set_ignore_path(self.pokemon, 0)
 
     def _handle_returning_state(self, dt: float):
-        """
-        GERENCIA O RETORNO DO POKÉMON AO SPOT ORIGINAL
-        Este método é chamado quando combat_state == "returning"
-        """
+        """GERENCIA O RETORNO DO POKÉMON AO SPOT ORIGINAL"""
         # Verifica se tem spot original definido
         if not hasattr(self.pokemon, 'original_spot_x') or not hasattr(self.pokemon, 'original_spot_y'):
             print(f"[RETURN] {self.pokemon.name} não tem spot original! Voltando para idle.")
             self.pokemon.combat_state = "idle"
             self.pokemon.target = None
+            if self.pokemon.has_animation("idle"):
+                self.pokemon.set_animation("idle")
             return
 
         target_x = self.pokemon.original_spot_x
@@ -747,37 +669,39 @@ class PokemonCombat:
             self.pokemon.combat_state = "idle"
             self.pokemon.target = None
 
-            # Restaura animação idle
+            # ===== FORÇA RESET DAS FLAGS DE MOVIMENTO =====
+            self.pokemon.is_moving = False
+            self.pokemon.last_x = self.pokemon.x
+            self.pokemon.last_y = self.pokemon.y
+
+            # ===== FORÇA ANIMAÇÃO IDLE =====
             if self.pokemon.has_animation("idle"):
                 self.pokemon.set_animation("idle")
-
-            print(f"[RETURN] {self.pokemon.name} retornou ao spot!")
+                print(f"[RETURN] {self.pokemon.name} retornou ao spot! Animação: idle")
+            else:
+                print(f"[RETURN] {self.pokemon.name} retornou ao spot, mas não tem animação idle!")
             return
 
         # Ainda voltando
         if distance > 0:
-            # Atualiza animação para walk
+            # Só define walk se não estiver em animação de ataque
             is_attacking = hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active
-            if not is_attacking and self.pokemon.current_animation != "walk":
-                self.pokemon.set_animation("walk")
+            if not is_attacking:
+                if self.pokemon.current_animation != "walk" and self.pokemon.has_animation("walk"):
+                    self.pokemon.set_animation("walk")
 
-            # Calcula movimento
             move_distance = self.pokemon.move_speed * dt * 60
             move_x = (dx / distance) * move_distance
             move_y = (dy / distance) * move_distance
 
-            # Não ultrapassar
             if abs(move_x) > abs(dx):
                 move_x = dx
             if abs(move_y) > abs(dy):
                 move_y = dy
 
-            # Aplica movimento
             self.pokemon.x += move_x
             self.pokemon.y += move_y
             self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
-
-            # Atualiza direção
             self._update_direction_to_target(dx, dy)
 
     def show_miss_on_self(self):
@@ -823,6 +747,24 @@ class PokemonCombat:
                     self.pokemon.current_direction = "up-left"
                 else:
                     self.pokemon.current_direction = "up"
+
+    def _handle_no_moves(self):
+        """Lida com a situação onde não há moves disponíveis (sem PP)"""
+        print(f"[NO_MOVES] {self.pokemon.name} sem moves disponíveis!")
+
+        if not self.pokemon.is_wild:
+            # Para aliados: volta para o spot
+            if self.pokemon.combat_state != "returning":
+                self.pokemon.combat_state = "returning"
+                # Só define walk se não estiver já em walk
+                if self.pokemon.current_animation != "walk" and self.pokemon.has_animation("walk"):
+                    self.pokemon.set_animation("walk")
+        else:
+            # Para selvagens: fica idle
+            if self.pokemon.combat_state != "idle":
+                self.pokemon.combat_state = "idle"
+                if self.pokemon.has_animation("idle"):
+                    self.pokemon.set_animation("idle")
 
     # ===== MÉTODOS DE DANO =====
     def take_damage(self, damage, attacker=None):
@@ -871,31 +813,3 @@ class PokemonCombat:
                     f"{self.pokemon.name} saiu da fúria!",
                     duration=1.0
                 )
-
-    # ===== MÉTODOS LEGADOS =====
-    def handle_idle_state(self, dt, enemies):
-        if self.pokemon.target:
-            return
-        self.pokemon.target = self.find_nearest_enemy(enemies)
-        if self.pokemon.target:
-            self.pokemon.combat_state = "charging"
-
-    def handle_charging_state(self, dt):
-        if self.pokemon.is_wild:
-            if self.pokemon.target and self.pokemon.target.is_alive() and self.pokemon.target.is_placed:
-                self._try_attack(self.pokemon.target, dt)
-            else:
-                self.pokemon.combat_state = "idle"
-                self.pokemon.target = None
-
-    def handle_returning_state(self, dt):
-        """Legado - usa o novo método"""
-        self._handle_returning_state(dt)
-
-    def find_nearest_enemy_legacy(self, enemies: List) -> Optional['Pokemon']:
-        return self.find_nearest_enemy(enemies)
-
-    def perform_charge_attack(self, target):
-        current_move = self._get_current_move()
-        if current_move and current_move.current_pp > 0:
-            self._execute_attack(target, current_move)

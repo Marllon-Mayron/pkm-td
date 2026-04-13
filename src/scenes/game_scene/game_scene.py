@@ -18,6 +18,7 @@ from src.scenes.game_scene.components.managers.target_item_manager import Target
 from src.scenes.game_scene.components.managers.team_manager import GameTeamManager
 from src.scenes.game_scene.components.managers.wave_manager import WaveManager
 from src.scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
+from src.scenes.game_scene.components.overlays.evolution_overlay import EvolutionOverlay
 from src.scenes.game_scene.components.phase_loader import phase_loader
 from src.scenes.game_scene.components.renderer.item_bag_renderer import ItemBagRenderer
 from src.scenes.game_scene.components.renderer.map_renderer import MapRenderer
@@ -188,6 +189,24 @@ class GameScene(BaseScene):
             self.world_width = 2000
             self.world_height = 2000
 
+    def is_team_defeated(self) -> bool:
+        """
+        Verifica se todos os Pokémon do time estão derrotados.
+        Retorna True se não houver nenhum Pokémon vivo no time.
+        """
+        # Verifica se o time está vazio
+        if not self.player.team:
+            return True
+
+        # Verifica se TODOS os Pokémon estão derrotados
+        for pokemon in self.player.team:
+            # Se encontrar algum Pokémon vivo, o time ainda está OK
+            if pokemon.is_alive():
+                return False
+
+        # Se chegou aqui, todos estão derrotados
+        print(f"[GAME_OVER] Time inteiro derrotado! Total: {len(self.player.team)} Pokémon, 0 vivos.")
+        return True
     # ===== MÉTODOS DE OVERLAY (mantidos) =====
 
     def open_move_select_overlay(self, pokemon):
@@ -262,7 +281,6 @@ class GameScene(BaseScene):
 
     def open_evolution_overlay(self, pokemon, evolution_data):
         """Abre o overlay de evolução para um Pokémon"""
-        from src.scenes.game_scene.components.overlays.evolution_overlay import EvolutionOverlay
 
         sound_manager.play_effect(SoundEffect.EVOLUTION)
         self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data)
@@ -928,9 +946,26 @@ class GameScene(BaseScene):
             self.battle_system.effect_manager.update(dt)
             profiler.end_section()
 
-        # Game Over Check
-        if target_mgr.game_over:
+        # ===== GAME OVER CHECK - MODIFICADO =====
+        # Verifica se o time inteiro foi derrotado
+        team_defeated = self.is_team_defeated()
+        # Verifica se todos os itens foram roubados
+        items_lost = target_mgr.items_protected <= 0
+
+        if team_defeated:
+            print(f"[GAME_OVER] Time derrotado! Fim de jogo.")
             self._stop_battle_music(fade_ms=1000)
+            self.game_state = "game_over"
+            self.overlay_manager.show(OverlayType.GAME_OVER)
+
+            for pokemon in self.player.team:
+                pokemon.reset(self)
+
+            profiler.end_frame()
+            return
+
+        if items_lost:
+            print(f"[GAME_OVER] Todos os itens foram roubados!")
             self.game_state = "game_over"
             self.overlay_manager.show(OverlayType.GAME_OVER)
 

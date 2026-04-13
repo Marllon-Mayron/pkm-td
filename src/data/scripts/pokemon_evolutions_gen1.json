@@ -215,9 +215,9 @@
       "method": "level_up"
    },
    "44": {
-      "lvlMin": "sun-stone",
-      "EvolveTo": 182,
-      "method": "sun-stone"
+      "lvlMin": "leaf-stone",
+      "EvolveTo": 45,
+      "method": "leaf-stone"
    },
    "45": {
       "lvlMin": "none",

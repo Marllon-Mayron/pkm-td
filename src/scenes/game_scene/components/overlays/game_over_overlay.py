@@ -5,12 +5,13 @@ from .base_overlay import BaseOverlay
 
 
 class GameOverOverlay(BaseOverlay):
-    """Overlay de Game Over - sem timer automático"""
+    """Overlay de Game Over - suporta diferentes motivos"""
 
-    def __init__(self, game_scene):
+    def __init__(self, game_scene, reason="items_stolen"):
         super().__init__(game_scene)
         self.target_item_manager = game_scene.target_item_manager
-        self.music_played = False  # Flag para garantir que a música toque apenas uma vez
+        self.music_played = False
+        self.reason = reason  # "items_stolen" ou "team_defeated"
 
         # Botão de voltar
         self.button_rect = None
@@ -72,14 +73,21 @@ class GameOverOverlay(BaseOverlay):
         screen.blit(game_over_text, (game_over_x, y_offset))
         y_offset += game_over_text.get_height() + 20
 
-        # Texto de itens levados
-        items_lost_text = font_medium.render(
-            f"{self.target_item_manager.items_stolen} itens foram levados!",
-            True, (255, 100, 100)
-        )
-        items_lost_x = center_x - items_lost_text.get_width() // 2
-        screen.blit(items_lost_text, (items_lost_x, y_offset))
-        y_offset += items_lost_text.get_height() + 40
+        # Mensagem específica do motivo
+        if self.reason == "team_defeated":
+            reason_text = font_medium.render(
+                "Seu time inteiro foi derrotado!",
+                True, (255, 100, 100)
+            )
+        else:
+            reason_text = font_medium.render(
+                f"{self.target_item_manager.items_stolen} itens foram levados!",
+                True, (255, 100, 100)
+            )
+
+        reason_x = center_x - reason_text.get_width() // 2
+        screen.blit(reason_text, (reason_x, y_offset))
+        y_offset += reason_text.get_height() + 40
 
         # Botão de voltar
         self.button_rect = self._create_button(

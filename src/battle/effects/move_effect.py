@@ -214,7 +214,7 @@ class MoveEffect:
 
     def _apply_status(self, attacker, target, effect_manager):
         """Aplica efeito de status"""
-        from .status_effect import StatusEffect, StatusType
+        from src.battle.effects.status_effect import StatusEffect, StatusType
 
         status_type_str = self.params.get('status', 'NONE').upper()
 

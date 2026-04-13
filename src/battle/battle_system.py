@@ -243,9 +243,7 @@ class BattleSystem:
                 attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
                 return True
 
-        # ===== MOVIMENTOS COM POWER NULL (Super Fang, Seismic Toss, etc) =====
-        if move.power is None or move.power == 0:
-            return self._handle_special_damage_move(attacker, target, move)
+
 
         # ===== VERIFICA EFEITO DO MOVE =====
         from src.battle.effects import EffectFactory
@@ -291,6 +289,10 @@ class BattleSystem:
                     self._apply_crash_damage(attacker, move, effect)
 
             return True
+
+        # ===== MOVIMENTOS COM POWER NULL (Super Fang, Seismic Toss, etc) =====
+        if move.power is None or move.power == 0:
+            return self._handle_special_damage_move(attacker, target, move)
 
         # Calcular dano para movimentos normais
         if will_hit:

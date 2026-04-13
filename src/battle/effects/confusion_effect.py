@@ -68,7 +68,7 @@ class ConfusionEffect:
         Calcula o dano que o Pokémon causa a si mesmo.
         Power 40, typeless, baseado no Attack físico.
         """
-        from .stat_modifier import StatType
+        from src.battle.effects.stat_modifier import StatType
 
         # Dano base: Power 40
         base_power = 40

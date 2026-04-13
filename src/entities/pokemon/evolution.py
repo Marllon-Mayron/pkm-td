@@ -1,5 +1,6 @@
 # src/entities/pokemon/evolution.py
 
+from src.managers.evolution_manager import evolution_manager
 
 class PokemonEvolution:
     """Gerencia evolução do Pokémon"""
@@ -8,7 +9,6 @@ class PokemonEvolution:
         self.pokemon = pokemon
 
     def check_and_evolve(self):
-        from src.managers.evolution_manager import evolution_manager
 
         evolution = evolution_manager.check_evolution(self.pokemon.id, current_level=self.pokemon.level)
 
@@ -63,7 +63,6 @@ class PokemonEvolution:
             self.pokemon.attack_damage = self.pokemon._calculate_attack_damage()
             self.pokemon.defense_value = self.pokemon._calculate_defense()
 
-            from src.managers.evolution_manager import evolution_manager
             evolution = evolution_manager.check_evolution(self.pokemon.id, current_level=self.pokemon.level)
             if evolution and self.pokemon.game_scene:
                 self.pokemon.game_scene.open_evolution_overlay(self.pokemon, evolution)
