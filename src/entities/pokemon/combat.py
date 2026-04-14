@@ -170,8 +170,16 @@ class PokemonCombat:
         if not self.pokemon.is_wild:
             print(f"[TARGET_LOST] {self.pokemon.name}: voltando para o spot")
             self.pokemon.combat_state = "returning"
+            # ===== FORÇA RESET DAS FLAGS DE MOVIMENTO =====
+            self.pokemon.is_moving = False
+            self.pokemon.last_x = self.pokemon.x
+            self.pokemon.last_y = self.pokemon.y
+            # ===== FORÇA ANIMAÇÃO DE WALK =====
             if self.pokemon.has_animation("walk"):
                 self.pokemon.set_animation("walk")
+            # ===== CANCELA QUALQUER ANIMAÇÃO DE ATAQUE PENDENTE =====
+            if hasattr(self.pokemon, '_attack_animation_active'):
+                self.pokemon._attack_animation_active = False
         else:
             # Para selvagens: voltam para idle e seguirão o path
             if self.pokemon.has_animation("idle"):
@@ -214,31 +222,21 @@ class PokemonCombat:
                     # Reseta qualquer estado de ataque pendente
                     if hasattr(self.pokemon, '_attack_animation_active'):
                         self.pokemon._attack_animation_active = False
+                    # ===== FORÇA RESET DAS FLAGS DE MOVIMENTO =====
+                    self.pokemon.is_moving = False
+                    self.pokemon.last_x = self.pokemon.x
+                    self.pokemon.last_y = self.pokemon.y
                     # Garante animação de walk
                     if self.pokemon.has_animation("walk"):
                         self.pokemon.set_animation("walk")
                     # Reseta cooldown
                     self.pokemon.charge_cooldown = 0
+                    # Não retorna - continua para processar o movimento de retorno
+                    # return  # <-- REMOVA ESTE RETURN!
                 else:
                     self.pokemon.combat_state = "idle"
                     if self.pokemon.has_animation("idle"):
                         self.pokemon.set_animation("idle")
-                return
-
-            # ===== PARA ALIADOS: NÃO PERDE O TARGET POR RANGE =====
-            if not self.pokemon.is_wild:
-                dx = self.pokemon.target.x - self.pokemon.x
-                dy = self.pokemon.target.y - self.pokemon.y
-                distance = math.sqrt(dx * dx + dy * dy)
-
-                # Só perde o target se o alvo estiver EXTREMAMENTE longe
-                if distance > self.pokemon.attack_range * 3:
-                    print(
-                        f"[COMBAT] {self.pokemon.name}: alvo {self.pokemon.target.name} extremamente longe! Perdendo target.")
-                    self.pokemon.target = None
-                    self.pokemon.combat_state = "returning"
-                    if self.pokemon.has_animation("walk"):
-                        self.pokemon.set_animation("walk")
                     return
 
         # Se não tem alvo, procura um
@@ -682,27 +680,38 @@ class PokemonCombat:
                 print(f"[RETURN] {self.pokemon.name} retornou ao spot, mas não tem animação idle!")
             return
 
-        # Ainda voltando
-        if distance > 0:
-            # Só define walk se não estiver em animação de ataque
-            is_attacking = hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active
-            if not is_attacking:
-                if self.pokemon.current_animation != "walk" and self.pokemon.has_animation("walk"):
-                    self.pokemon.set_animation("walk")
+        # ===== AINDA VOLTANDO =====
+        # Verifica se não está em animação de ataque
+        is_attacking = hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active
 
-            move_distance = self.pokemon.move_speed * dt * 60
-            move_x = (dx / distance) * move_distance
-            move_y = (dy / distance) * move_distance
+        if not is_attacking:
+            # Força animação walk APENAS se não estiver já em walk
+            if self.pokemon.current_animation != "walk" and self.pokemon.has_animation("walk"):
+                self.pokemon.set_animation("walk")
+                print(f"[RETURN] {self.pokemon.name} voltando ao spot (walk)")
 
-            if abs(move_x) > abs(dx):
-                move_x = dx
-            if abs(move_y) > abs(dy):
-                move_y = dy
+        # Move em direção ao spot
+        move_distance = self.pokemon.move_speed * dt * 60
 
-            self.pokemon.x += move_x
-            self.pokemon.y += move_y
-            self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
-            self._update_direction_to_target(dx, dy)
+        # Evita divisão por zero
+        if distance <= 0:
+            return
+
+        move_x = (dx / distance) * move_distance
+        move_y = (dy / distance) * move_distance
+
+        # Não ultrapassar o spot
+        if abs(move_x) > abs(dx):
+            move_x = dx
+        if abs(move_y) > abs(dy):
+            move_y = dy
+
+        self.pokemon.x += move_x
+        self.pokemon.y += move_y
+        self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
+
+        # Atualiza direção baseada no movimento
+        self._update_direction_to_target(dx, dy)
 
     def show_miss_on_self(self):
         """Mostra o texto MISS no próprio Pokémon"""
