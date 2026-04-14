@@ -304,6 +304,23 @@ class PokemonCombat:
                 self.pokemon.set_animation("idle")
             return
 
+        # ===== VERIFICA SE O ALVO AINDA ESTÁ NO RANGE DURANTE PERSEGUIÇÃO =====
+        # Se for aliado e já está se movendo para o alvo, verifica se o alvo ainda está no range
+        if not self.pokemon.is_wild and self.pokemon.combat_state == "moving_to_target":
+            dx_check = target.x - self.pokemon.x
+            dy_check = target.y - self.pokemon.y
+            distance_check = math.sqrt(dx_check * dx_check + dy_check * dy_check)
+
+            # Se o alvo saiu do range (com margem de 30% a mais), desiste
+            if distance_check > self.pokemon.attack_range * 1.3:
+                print(f"[COMBAT] {self.pokemon.name}: alvo {target.name} saiu do range durante perseguição! "
+                      f"Distância: {distance_check:.0f} > {self.pokemon.attack_range:.0f}")
+                self.pokemon.target = None
+                self.pokemon.combat_state = "returning"
+                if self.pokemon.has_animation("walk"):
+                    self.pokemon.set_animation("walk")
+                return
+
         # ===== ANTI-SPAM: Evita ficar tentando atacar sem PP a cada frame =====
         if hasattr(self.pokemon, '_no_move_cooldown') and self.pokemon._no_move_cooldown > 0:
             self.pokemon._no_move_cooldown -= dt
@@ -403,6 +420,8 @@ class PokemonCombat:
                 self.pokemon.combat_state = "idle"
                 self.pokemon._attack_attempts = 0
 
+    # src/entities/pokemon/combat.py
+
     def _move_towards_target(self, target: 'Pokemon', dx: float, dy: float, distance: float, dt: float):
         """Move em direção ao alvo (para aliados E inimigos)"""
         # Verifica se o alvo ainda existe antes de mover
@@ -410,7 +429,6 @@ class PokemonCombat:
             print(f"[MOVE] {self.pokemon.name}: alvo {target.name} morreu, parando movimento!")
             self.pokemon.target = None
 
-            # ===== ALIADOS: VOLTAM PARA O SPOT =====
             if not self.pokemon.is_wild:
                 print(f"[MOVE] {self.pokemon.name}: voltando para o spot (alvo morto durante movimento)")
                 self.pokemon.combat_state = "returning"
@@ -421,6 +439,22 @@ class PokemonCombat:
                 if self.pokemon.has_animation("idle"):
                     self.pokemon.set_animation("idle")
             return
+
+        # ===== NOVO: VERIFICA SE O ALVO ESTÁ MUITO LONGE DURANTE O MOVIMENTO =====
+        if not self.pokemon.is_wild:
+            dx_check = target.x - self.pokemon.x
+            dy_check = target.y - self.pokemon.y
+            distance_check = math.sqrt(dx_check * dx_check + dy_check * dy_check)
+
+            # Se o alvo estiver a mais de 1.5x o range, desiste
+            if distance_check > self.pokemon.attack_range * 1.5:
+                print(f"[MOVE] {self.pokemon.name}: alvo {target.name} muito longe durante movimento! "
+                      f"Distância: {distance_check:.0f} > {self.pokemon.attack_range * 1.5:.0f}")
+                self.pokemon.target = None
+                self.pokemon.combat_state = "returning"
+                if self.pokemon.has_animation("walk"):
+                    self.pokemon.set_animation("walk")
+                return
 
         # Garante animação de walk
         is_attacking = hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active
