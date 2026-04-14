@@ -631,13 +631,14 @@ class EffectFactory:
         },
         # ===== ATAQUES EM ÁREA =====
         "earthquake": {
-            "effect_type": "stat_mod",  # Pode ser qualquer tipo, o importante é is_area=True
+            "effect_type": "",  # Pode ser qualquer tipo, o importante é is_area=True
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "is_area": True,  # Flag de área
             "params": {
                 "area": True,
                 "hit_all_in_range": True,
+                "use_normal_damage": True,
             },
             "description": "Causa dano a todos os inimigos próximos."
         },
@@ -650,6 +651,7 @@ class EffectFactory:
             "params": {
                 "area": True,
                 "hit_all_in_range": True,
+                "use_normal_damage": True,
             },
             "description": "Causa dano a todos os inimigos próximos."
         },

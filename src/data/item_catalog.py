@@ -74,6 +74,14 @@ class ItemCatalog:
             "category": "badge"
         }
 
+        items[4] = {
+            "id": 4,
+            "name": "Insignia do trovão",
+            "sprite": badge_path / "thunder-badge.png",
+            "description": "Insignia 3",
+            "category": "badge"
+        }
+
         return items
 
     def _check_sprites(self):
