@@ -554,7 +554,7 @@ class WaveConfigDialog:
 
         # Botão adicionar inimigo
         if self.add_enemy_button.collidepoint(mouse_x, mouse_y):
-            if len(wave.enemies) < 8:
+            if len(wave.enemies) < 12:
                 first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
                 wave.enemies.append(WaveEnemy(first_id, 0))
                 self.input_errors.pop("total", None)

@@ -2328,11 +2328,11 @@
                 "enemies": [
                     {
                         "pokemon_id": 15,
-                        "percentage": 16
+                        "percentage": 14
                     },
                     {
                         "pokemon_id": 12,
-                        "percentage": 16
+                        "percentage": 14
                     },
                     {
                         "pokemon_id": 29,
@@ -2356,7 +2356,11 @@
                     },
                     {
                         "pokemon_id": 25,
-                        "percentage": 10
+                        "percentage": 9
+                    },
+                    {
+                        "pokemon_id": 69,
+                        "percentage": 5
                     }
                 ],
                 "min_level": 12,
@@ -2375,11 +2379,11 @@
                 "enemies": [
                     {
                         "pokemon_id": 15,
-                        "percentage": 16
+                        "percentage": 14
                     },
                     {
                         "pokemon_id": 12,
-                        "percentage": 16
+                        "percentage": 14
                     },
                     {
                         "pokemon_id": 29,
@@ -2399,11 +2403,15 @@
                     },
                     {
                         "pokemon_id": 25,
-                        "percentage": 10
+                        "percentage": 9
                     },
                     {
                         "pokemon_id": 48,
                         "percentage": 14
+                    },
+                    {
+                        "pokemon_id": 69,
+                        "percentage": 5
                     }
                 ],
                 "min_level": 12,
@@ -2415,7 +2423,7 @@
                 "repeat_count": 3
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 1
     },
     "tower_spots": {
         "spot_size": 24,
