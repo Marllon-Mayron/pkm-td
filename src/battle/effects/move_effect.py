@@ -1410,14 +1410,8 @@ class MoveEffect:
                 hit_count += 1
 
         # Mensagem final
-        if hit_count > 0:
-            effect_manager.add_status_text(
-                attacker,
-                f"{self.name} atingiu {hit_count} inimigos!",
-                duration=1.5
-            )
-        else:
-            effect_manager.add_status_text(attacker, f"{self.name} não acertou ninguém!", duration=1.5)
+        #if hit_count > 0:
+            #effect_manager.add_status_text(attacker,f"{self.name} atingiu {hit_count} inimigos!", duration=1.5)
 
         # Cooldown do ataque
         attacker.charge_cooldown = attacker.charge_cooldown_max
