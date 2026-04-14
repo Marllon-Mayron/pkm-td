@@ -1054,6 +1054,16 @@ class Pokemon(Entity):
         """Define se o Pokémon está derrotado"""
         self.is_defeated = defeated
         if defeated:
+            # ===== LIMPA DISABLE =====
+            if hasattr(self, '_disabled_move'):
+                delattr(self, '_disabled_move')
+            if hasattr(self, '_disabled_turns'):
+                delattr(self, '_disabled_turns')
+            if hasattr(self, '_disabled_original_pp'):
+                delattr(self, '_disabled_original_pp')
+            if hasattr(self, '_disable_timer'):
+                delattr(self, '_disable_timer')
+
             # ===== CANCELA QUALQUER CARGA DE GOLPE =====
             if hasattr(self, 'battle_system') and self.battle_system:
                 if (self.battle_system.active_charge_move and

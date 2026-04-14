@@ -619,6 +619,17 @@ class GameScene(BaseScene):
         for pokemon in self.player.team:
             pokemon.reset(self)
 
+        # ===== LIMPA FLAGS DE PAY DAY DE TODOS OS INIMIGOS =====
+        for enemy in self.wave_manager.active_enemies:
+            if hasattr(enemy, '_pay_day_hit'):
+                delattr(enemy, '_pay_day_hit')
+            if hasattr(enemy, '_pay_day_hit_count'):
+                delattr(enemy, '_pay_day_hit_count')
+            if hasattr(enemy, '_pay_day_gold_multiplier'):
+                delattr(enemy, '_pay_day_gold_multiplier')
+            if hasattr(enemy, '_pay_day_xp_multiplier'):
+                delattr(enemy, '_pay_day_xp_multiplier')
+
         self.wave_manager.active_enemies.clear()
 
     # ===== MÉTODOS DE MÚSICA =====

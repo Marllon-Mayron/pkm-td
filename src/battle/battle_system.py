@@ -36,6 +36,9 @@ class BattleSystem:
             if projectile.is_finished:
                 self.projectiles.remove(projectile)
 
+        # ===== ATUALIZA DISABLE =====
+        self._update_disable(dt)
+
         # Atualiza multi-hit ativo
         if self.active_multi_hit:
             still_active = self.active_multi_hit.update(dt)
@@ -100,6 +103,19 @@ class BattleSystem:
             print(f"[BATTLE] {target.name} está derrotado e não pode ser atacado!")
             return False
 
+        # ===== VERIFICA SE O MOVE DO ATACANTE ESTÁ DESABILITADO (DISABLE) =====
+        current_move = attacker.get_current_move()
+        if current_move and hasattr(attacker, '_disabled_move') and attacker._disabled_move:
+            if current_move.name == attacker._disabled_move:
+                self.effect_manager.add_status_text(
+                    attacker,
+                    f"{current_move.name} está desabilitado!",
+                    duration=1.0
+                )
+                print(f"[DISABLE] {attacker.name} não pode usar {current_move.name}!")
+                attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+                return True
+
         # ===== VERIFICA SE O ATACANTE TEM PP EM ALGUM MOVE =====
         # Primeiro, verifica se tem algum move com PP (exceto Struggle)
         has_pp = False
@@ -134,7 +150,14 @@ class BattleSystem:
                 attacker._struggle_message_shown = True
 
             # Executa Struggle diretamente
-            return self._attempt_struggle(attacker, target, move)
+            result = self._attempt_struggle(attacker, target, move)
+
+            # Registra o movimento usado (para Disable)
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} usou {move.name}")
+
+            return result
 
         # Usa o padrão de ataque do Pokémon (se existir)
         if hasattr(attacker, 'get_current_move_for_pattern'):
@@ -161,6 +184,12 @@ class BattleSystem:
             # Executa o efeito de área
             result = effect.execute(attacker, target, self, self.effect_manager)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+            # Registra o movimento usado (para Disable)
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} usou {move.name}")
+
             return result
 
         # ===== VERIFICA SE É GOLPE DE 2 TURNOS =====
@@ -174,7 +203,11 @@ class BattleSystem:
             result = effect.execute(attacker, target, self, self.effect_manager)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
-            # ===== NÃO CONTINUA O FLUXO NORMAL =====
+            # Registra o movimento usado (para Disable)
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} usou {move.name}")
+
             return result
 
         # ===== MOVIMENTOS NORMAIS (continuam o fluxo) =====
@@ -196,6 +229,12 @@ class BattleSystem:
                 # Ataca a si mesmo
                 self._apply_confusion_self_damage(attacker, confusion)
                 attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+                # Registra o movimento usado (para Disable)
+                if move.name.lower() != "struggle":
+                    attacker._last_used_move = move.name
+                    print(f"[TRACK] {attacker.name} tentou usar {move.name} mas se machucou")
+
                 return True
 
             # Se confusão acabou durante before_attack, remove automaticamente
@@ -234,6 +273,12 @@ class BattleSystem:
                 self.effect_manager.add_status_text(attacker, f"{attacker.name} não pode atacar!")
                 print(f"[BATTLE] {attacker.name} está {status.name.lower()} e não pode atacar!")
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+            # Registra a tentativa de movimento (para Disable)
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} tentou usar {move.name} mas falhou devido a status")
+
             return True
 
         # ===== VERIFICAÇÃO ESPECÍFICA PARA STATUS MOVES =====
@@ -246,6 +291,12 @@ class BattleSystem:
                 move.current_pp -= 1
                 attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
                 self._show_miss_on_attacker(attacker)
+
+                # Registra o movimento usado (para Disable)
+                if move.name.lower() != "struggle":
+                    attacker._last_used_move = move.name
+                    print(f"[TRACK] {attacker.name} usou {move.name}")
+
                 return True
 
         # ===== VERIFICAÇÃO ESPECIAL PARA DREAM EATER =====
@@ -258,6 +309,12 @@ class BattleSystem:
                                                     duration=1.5)
                 move.current_pp -= 1
                 attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+                # Registra o movimento usado (para Disable)
+                if move.name.lower() != "struggle":
+                    attacker._last_used_move = move.name
+                    print(f"[TRACK] {attacker.name} usou {move.name}")
+
                 return True
 
         # ===== MOVIMENTOS QUE NUNCA ERRAM (Swift, Aerial Ace, etc) =====
@@ -299,11 +356,23 @@ class BattleSystem:
                 if has_crash_effect:
                     self._apply_crash_damage(attacker, move, effect)
 
+            # Registra o movimento usado (para Disable)
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} usou {move.name}")
+
             return True
 
         # ===== MOVIMENTOS COM POWER NULL (Super Fang, Seismic Toss, etc) =====
         if move.power is None or move.power == 0:
-            return self._handle_special_damage_move(attacker, target, move)
+            result = self._handle_special_damage_move(attacker, target, move)
+
+            # Registra o movimento usado (para Disable)
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} usou {move.name}")
+
+            return result
 
         # Calcular dano para movimentos normais
         if will_hit:
@@ -331,6 +400,11 @@ class BattleSystem:
             self._create_projectile(attacker, target, move, damage_result, will_hit)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
+            # Registra o movimento usado (para Disable)
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} usou {move.name}")
+
             return True
 
         # Ataques físicos
@@ -353,6 +427,12 @@ class BattleSystem:
                 # Não precisa fazer nada extra aqui
 
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+            # Registra o movimento usado (para Disable)
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} usou {move.name}")
+
             return True
 
         # Fallback
@@ -360,6 +440,12 @@ class BattleSystem:
             print(f"[BATTLE] {attacker.name} usou {move.name}!")
             move.current_pp -= 1
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+            # Registra o movimento usado (para Disable)
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} usou {move.name}")
+
             return True
 
     def _handle_special_damage_move(self, attacker: 'Pokemon', target: 'Pokemon', move) -> bool:
@@ -812,3 +898,64 @@ class BattleSystem:
         # ===== LIMPA MODIFICADORES DE CRÍTICO =====
         from src.battle.critical_hit import CriticalHitSystem
         CriticalHitSystem.clear_all_modifiers()
+
+    def _update_disable(self, dt: float):
+        """Atualiza o contador de turnos do Disable"""
+        # Método 1: varrer todos os Pokémon em campo
+        if hasattr(self, 'game_scene') and self.game_scene:
+            # Verifica Pokémon aliados
+            if hasattr(self.game_scene, 'placement_manager'):
+                for pokemon in self.game_scene.placement_manager.placed_pokemon:
+                    self._update_pokemon_disable(pokemon, dt)
+
+            # Verifica inimigos
+            if hasattr(self.game_scene, 'wave_manager'):
+                for pokemon in self.game_scene.wave_manager.active_enemies:
+                    self._update_pokemon_disable(pokemon, dt)
+
+    def _update_pokemon_disable(self, pokemon, dt: float):
+        """Atualiza o disable de um Pokémon individual"""
+        if not hasattr(pokemon, '_disabled_move') or not pokemon._disabled_move:
+            return
+
+        # Usamos um timer simples (cada turno ≈ 2 segundos)
+        if not hasattr(pokemon, '_disable_timer'):
+            pokemon._disable_timer = 0.0
+
+        pokemon._disable_timer += dt
+
+        # A cada 2 segundos, decrementa um turno
+        if pokemon._disable_timer >= 2.0:
+            pokemon._disable_timer = 0
+            pokemon._disabled_turns -= 1
+
+            print(
+                f"[DISABLE] {pokemon.name}: {pokemon._disabled_move} desabilitado por mais {pokemon._disabled_turns} turnos")
+
+            if pokemon._disabled_turns <= 0:
+                # Remove o disable
+                self._remove_disable(pokemon)
+
+    def _remove_disable(self, pokemon):
+        """Remove o efeito Disable do Pokémon"""
+        if hasattr(pokemon, '_disabled_move') and pokemon._disabled_move:
+            move_name = pokemon._disabled_move
+
+            # Mostra mensagem
+            if hasattr(self, 'effect_manager') and self.effect_manager:
+                self.effect_manager.add_status_text(
+                    pokemon,
+                    f"{move_name} não está mais desabilitado!",
+                    duration=1.5
+                )
+
+            print(f"[DISABLE] {move_name} de {pokemon.name} foi liberado!")
+
+            # Limpa as flags
+            delattr(pokemon, '_disabled_move')
+            if hasattr(pokemon, '_disabled_turns'):
+                delattr(pokemon, '_disabled_turns')
+            if hasattr(pokemon, '_disabled_original_pp'):
+                delattr(pokemon, '_disabled_original_pp')
+            if hasattr(pokemon, '_disable_timer'):
+                delattr(pokemon, '_disable_timer')

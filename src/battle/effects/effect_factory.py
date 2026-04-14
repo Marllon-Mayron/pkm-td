@@ -1336,7 +1336,6 @@ class EffectFactory:
             },
             "description": "Sempre causa 40 de dano"
         },
-
         # ===== DANO NO ATACANTE SE ERRAR =====
         "jump-kick": {
             "effect_type": "crash_damage_on_miss",
@@ -1370,7 +1369,6 @@ class EffectFactory:
             },
             "description": "Erects a barrier that reduces special attack damage for 5 turns."
         },
-
         "reflect": {
             "effect_type": "reflect",
             "target": EffectTarget.SELF,
@@ -1392,7 +1390,68 @@ class EffectFactory:
             },
             "description": "Returns double the physical damage received."
         },
+        "bide": {
+            "effect_type": "counter",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "multiplier": 1.5,
+            },
+            "description": "Returns double the physical damage received."
+        },
 
+        "thrash": {
+            "effect_type": "self_confusion_after_uses",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "required_uses": 2,
+                "reset_on_switch": True,  # Reseta se trocar de golpe
+            },
+            "description": "After 3 uses, user becomes confused."
+        },
+        "petal-dance": {
+            "effect_type": "self_confusion_after_uses",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "required_uses": 2,
+                "reset_on_switch": True,
+            },
+            "description": "After 3 uses, user becomes confused."
+        },
+
+        "mist": {
+            "effect_type": "mist",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,  # Afeta todos aliados em área
+            "params": {
+                "clear_negative_stats": True,  # Limpa debuffs
+            },
+            "description": "Removes all stat reductions from allies in range."
+        },
+        "disable": {
+            "effect_type": "disable",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "duration": 4,  # 4-7 turns, vamos usar 4 por simplicidade
+                "disable_last_move": True,
+            },
+            "description": "Disables the target's last used move."
+        },
+
+        "pay-day": {
+            "effect_type": "pay_day",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "gold_multiplier": 2.0,  # Dobra o gold
+                "xp_multiplier": 1.5,  # Aumenta XP em 50%
+            },
+            "description": "Doubles gold and increases XP from defeated Pokémon."
+        },
     }
 
     @classmethod

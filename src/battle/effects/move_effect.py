@@ -2,7 +2,7 @@
 from enum import Enum
 from typing import Optional, List, Any, Callable
 from dataclasses import dataclass, field
-import random
+import random, math
 
 from src.battle.effects import StatusType
 from src.battle.effects.residual_effect import ResidualEffect
@@ -220,6 +220,14 @@ class MoveEffect:
             return self._apply_reflect(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "counter":
             return self._apply_counter(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "self_confusion_after_uses":
+            return self._apply_self_confusion_after_uses(attacker, target, battle_system, effect_manager, damage)
+        elif self.effect_type == "pay_day":
+            return self._apply_pay_day(attacker, target, battle_system, effect_manager, damage)
+        elif self.effect_type == "mist":
+            return self._apply_mist(attacker, target, battle_system, effect_manager, damage)
+        elif self.effect_type == "disable":
+            return self._apply_disable(attacker, target, battle_system, effect_manager, damage)
         elif self.effect_type == "struggle":
             return self._apply_struggle(attacker, target, battle_system, effect_manager, damage)
         return True
@@ -1464,6 +1472,53 @@ class MoveEffect:
 
         return hit_count > 0
 
+    def _apply_self_confusion_after_uses(self, attacker, target, battle_system, effect_manager, damage):
+        """
+        Aplica confusão no usuário após usar o golpe X vezes.
+        Simplificado: conta usos no próprio Pokémon.
+        """
+        required_uses = self.params.get("required_uses", 3)
+        reset_on_switch = self.params.get("reset_on_switch", True)
+
+        # Inicializa contador se não existir
+        if not hasattr(attacker, '_move_use_counter'):
+            attacker._move_use_counter = {}
+
+        move_name = self.name.lower()
+
+        # Incrementa contador para este move
+        current_uses = attacker._move_use_counter.get(move_name, 0) + 1
+        attacker._move_use_counter[move_name] = current_uses
+
+        print(f"[{self.name.upper()}] {attacker.name} usou {current_uses}/{required_uses} vezes")
+
+        # Verifica se atingiu o limite
+        if current_uses >= required_uses:
+            # Reseta contador
+            attacker._move_use_counter[move_name] = 0
+
+            # Verifica se o Pokémon já não está com algum status que impede
+            status = effect_manager.get_status(attacker)
+            from src.battle.effects import StatusType
+            if status and status.type in [StatusType.SLEEP, StatusType.FREEZE]:
+                effect_manager.add_status_text(
+                    attacker,
+                    f"{attacker.name} está {status.name.lower()} e não ficou confuso!",
+                    duration=1.0
+                )
+                return True
+
+            # Aplica confusão
+            effect_manager.apply_confusion(attacker, source=attacker)
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} ficou confuso devido ao esforço!",
+                duration=1.5
+            )
+            print(f"[{self.name.upper()}] {attacker.name} ficou confuso após {required_uses} usos!")
+
+        return True
+
     def _apply_light_screen(self, attacker, target, battle_system, effect_manager):
         """Aplica Light Screen - reduz dano de ataques especiais por X golpes"""
         return self._apply_screen(attacker, battle_system, effect_manager, "light_screen")
@@ -1628,6 +1683,263 @@ class MoveEffect:
 
         return True
 
+    def _apply_disable(self, attacker, target, battle_system, effect_manager, damage):
+        """
+        Aplica efeito Disable - desabilita o último movimento usado pelo alvo
+
+        Funcionamento:
+        - Rastreia o último movimento usado pelo alvo
+        - Impede o uso desse movimento por X turnos
+        - Se o alvo não usou nenhum movimento, falha
+        """
+        duration = self.params.get("duration", 4)
+
+        # ===== VERIFICA SE O ALVO JÁ ESTÁ COM MOVE DESABILITADO =====
+        if hasattr(target, '_disabled_move') and target._disabled_move:
+            effect_manager.add_status_text(
+                target,
+                f"Mas já está desabilitado!",
+                duration=1.0
+            )
+            print(f"[DISABLE] {target.name} já tem um move desabilitado!")
+            return False
+
+        # ===== VERIFICA SE O ALVO USOU ALGUM MOVE =====
+        if not hasattr(target, '_last_used_move') or not target._last_used_move:
+            effect_manager.add_status_text(
+                attacker,
+                f"Mas falhou!",
+                duration=1.0
+            )
+            print(f"[DISABLE] {target.name} não usou nenhum movimento ainda!")
+            return False
+
+        last_move_name = target._last_used_move
+
+        # ===== VERIFICA SE O MOVE AINDA TEM PP =====
+        last_move = None
+        for move in target.moves:
+            if move.name == last_move_name:
+                last_move = move
+                break
+
+        if last_move and last_move.current_pp <= 0:
+            effect_manager.add_status_text(
+                attacker,
+                f"Mas falhou!",
+                duration=1.0
+            )
+            print(f"[DISABLE] {last_move_name} de {target.name} já está sem PP!")
+            return False
+
+        # ===== APLICA DISABLE =====
+        target._disabled_move = last_move_name
+        target._disabled_turns = duration
+        target._disabled_original_pp = last_move.current_pp if last_move else 0
+
+        # Mostra mensagem
+        effect_manager.add_status_text(
+            attacker,
+            f"{target.name} não pode mais usar {last_move_name}!",
+            duration=1.5
+        )
+        effect_manager.add_status_text(
+            target,
+            f"{last_move_name} foi desabilitado!",
+            duration=1.5
+        )
+
+        print(f"[DISABLE] {attacker.name} desabilitou {last_move_name} de {target.name} por {duration} turnos!")
+
+        return True
+
+    def _apply_pay_day(self, attacker, target, battle_system, effect_manager, damage):
+        """
+        Aplica efeito Pay Day - marca o alvo para dar mais recompensas quando derrotado
+
+        Só funciona se:
+        - Atacante é aliado (not wild)
+        - Alvo é inimigo (wild)
+        """
+        # ===== VERIFICA SE É ALIADO USANDO O GOLPE =====
+        if attacker.is_wild:
+            # Inimigos não ganham bônus
+            print(f"[PAY_DAY] Inimigos não podem usar Pay Day para bônus!")
+            return True
+
+        # Verifica se o alvo é inimigo
+        if not target.is_wild:
+            print(f"[PAY_DAY] Pay Day só funciona contra inimigos!")
+            return True
+
+        gold_multiplier = self.params.get("gold_multiplier", 2.0)
+        xp_multiplier = self.params.get("xp_multiplier", 1.5)
+
+        # Verifica se o alvo já está morto
+        if target.is_defeated or not target.is_alive():
+            print(f"[PAY_DAY] {target.name} já está derrotado, Pay Day não teve efeito!")
+            return False
+
+        # Marca o alvo (acumula multiplicador a cada hit)
+        if not hasattr(target, '_pay_day_hit_count'):
+            target._pay_day_hit_count = 0
+            target._pay_day_gold_multiplier = 1.0
+            target._pay_day_xp_multiplier = 1.0
+
+        # Incrementa contador
+        target._pay_day_hit_count += 1
+
+        # Calcula multiplicadores (diminishing returns)
+        # 1 hit: 2.0x gold, 1.5x XP
+        # 2 hits: 2.5x gold, 1.8x XP
+        # 3 hits: 2.8x gold, 2.0x XP
+        # Máximo: 3.0x gold, 2.5x XP
+        gold_mult = min(3.0, 1.0 + (gold_multiplier - 1.0) * (1 - 0.5 ** target._pay_day_hit_count))
+        xp_mult = min(2.5, 1.0 + (xp_multiplier - 1.0) * (1 - 0.5 ** target._pay_day_hit_count))
+
+        target._pay_day_gold_multiplier = gold_mult
+        target._pay_day_xp_multiplier = xp_mult
+        target._pay_day_hit = True
+
+        # Mostra mensagem visual
+        effect_manager.add_status_text(
+            attacker,
+            f"💰 Moedas! (x{gold_mult:.1f})",
+            duration=0.8
+        )
+
+        effect_manager.add_status_text(
+            target,
+            f"💰 Marcado!",
+            duration=1.0
+        )
+
+        print(
+            f"[PAY_DAY] {attacker.name} usou Pay Day em {target.name}! Multiplicadores: Gold x{gold_mult:.1f}, XP x{xp_mult:.1f} (hit #{target._pay_day_hit_count})")
+
+        return True
+
+    # ===== MÉTODOS DE MIST =====
+    def _apply_mist(self, attacker, target, battle_system, effect_manager, damage):
+        """
+        Aplica efeito Mist - limpa todos os debuffs dos aliados em área
+
+        Funcionamento:
+        - Remove TODOS os debuffs (modificadores negativos) dos aliados próximos
+        - Afeta em área (todos aliados no range)
+        - Não tem duração, é efeito instantâneo
+        """
+        from src.battle.effects.stat_modifier import StatType
+
+        # Obtém todos os aliados no range
+        allies_in_range = self._get_allies_in_area(attacker, battle_system)
+
+        if not allies_in_range:
+            effect_manager.add_status_text(attacker, f"Mas não há aliados por perto!", duration=1.0)
+            return False
+
+        # Limpa debuffs de cada aliado
+        cleared_count = 0
+
+        for ally in allies_in_range:
+            cleared = self._clear_all_negative_stats(ally, effect_manager)
+            if cleared > 0:
+                cleared_count += cleared
+                effect_manager.add_status_text(
+                    ally,
+                    f"Névoa purificadora limpou os debuffs de {ally.name}!",
+                    duration=1.0
+                )
+
+        if cleared_count > 0:
+            effect_manager.add_status_text(
+                attacker,
+                f"A névoa purificou {cleared_count} debuff(s) dos aliados!",
+                duration=1.5
+            )
+            print(
+                f"[MIST] {attacker.name} usou Mist e limpou {cleared_count} debuffs de {len(allies_in_range)} aliados!")
+        else:
+            effect_manager.add_status_text(
+                attacker,
+                f"Mas nada aconteceu!",
+                duration=1.0
+            )
+            print(f"[MIST] {attacker.name} usou Mist, mas ninguém tinha debuffs!")
+
+        return True
+
+    def _get_allies_in_area(self, attacker, battle_system):
+        """
+        Retorna todos os aliados (incluindo o atacante) dentro do range da névoa
+        """
+        allies = []
+
+        if not battle_system.game_scene:
+            return [attacker]
+
+        if not hasattr(battle_system.game_scene, 'placement_manager'):
+            return [attacker]
+
+        placement_manager = battle_system.game_scene.placement_manager
+        mist_range = 150  # Raio da névoa (ajustável)
+
+        for pokemon in placement_manager.placed_pokemon:
+            # Verifica se é aliado (não selvagem) e está vivo
+            if pokemon.is_wild:
+                continue
+            if not pokemon.is_alive() or pokemon.is_defeated:
+                continue
+
+            # Calcula distância
+            dx = pokemon.x - attacker.x
+            dy = pokemon.y - attacker.y
+            distance = math.sqrt(dx * dx + dy * dy)
+
+            if distance <= mist_range:
+                allies.append(pokemon)
+
+        # Sempre inclui o próprio atacante se não estiver na lista e estiver vivo
+        if attacker not in allies and attacker.is_alive() and not attacker.is_wild:
+            allies.append(attacker)
+
+        return allies
+
+    def _clear_all_negative_stats(self, pokemon, effect_manager):
+        """
+        Remove todos os debuffs (modificadores negativos de stat) do Pokémon
+        Retorna a quantidade de debuffs removidos
+        """
+        from src.battle.effects.stat_modifier import StatType
+
+        pokemon_id = id(pokemon)
+
+        if pokemon_id not in effect_manager.stat_stages:
+            return 0
+
+        cleared_count = 0
+
+        # Lista de stats que podem ser afetados
+        for stat_type in [StatType.ATTACK, StatType.DEFENSE, StatType.SP_ATTACK,
+                          StatType.SP_DEFENSE, StatType.SPEED, StatType.ACCURACY,
+                          StatType.EVASION]:
+
+            current_stage = effect_manager.stat_stages[pokemon_id].get_stage(stat_type)
+
+            # Se tem debuff (estágio negativo), remove
+            if current_stage < 0:
+                # Aplica modificação positiva para cancelar o debuff
+                effect_manager.stat_stages[pokemon_id].modify(stat_type, -current_stage)
+                cleared_count += 1
+                print(f"[MIST] {pokemon.name}: {stat_type.value} {current_stage:+d} -> 0")
+
+        # Se todos os estágios estão 0, remove o StatStage
+        if cleared_count > 0:
+            all_zero = all(stage == 0 for stage in effect_manager.stat_stages[pokemon_id].stages.values())
+            if all_zero:
+                del effect_manager.stat_stages[pokemon_id]
+
+        return cleared_count
     # ===== MÉTODOS DE RAGE =====
     def _apply_rage_mode(self, attacker, target, effect_manager):
         """Aplica o efeito Rage - aumenta Attack quando atingido"""
