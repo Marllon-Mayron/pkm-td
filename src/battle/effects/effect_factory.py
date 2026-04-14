@@ -1358,6 +1358,41 @@ class EffectFactory:
             },
             "description": "Se errar, o usuário se machuca perdendo metade do HP máximo"
         },
+
+        "light-screen": {
+            "effect_type": "light_screen",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "turns": 5,  # 5 turns
+                "damage_reduction": 0.5,  # 50% reduction
+                "affected_attacks": ["special"],
+            },
+            "description": "Erects a barrier that reduces special attack damage for 5 turns."
+        },
+
+        "reflect": {
+            "effect_type": "reflect",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "turns": 5,
+                "damage_reduction": 0.5,
+                "affected_attacks": ["physical"],
+            },
+            "description": "Erects a barrier that reduces physical attack damage for 5 turns."
+        },
+
+        "counter": {
+            "effect_type": "counter",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "multiplier": 2.0,
+            },
+            "description": "Returns double the physical damage received."
+        },
+
     }
 
     @classmethod

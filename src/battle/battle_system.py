@@ -46,6 +46,10 @@ class BattleSystem:
 
     def attempt_attack(self, attacker: 'Pokemon', target: 'Pokemon') -> bool:
         """Tenta realizar um ataque com o move atual do atacante"""
+        # ===== LIMPA RASTROS DE COUNTER DO ATACANTE ANTES DE ATACAR =====
+        # Isso evita que o Pokémon use Counter duas vezes seguidas
+        self.clear_counter_tracking(attacker)
+
         # Se já tem um multi-hit ativo, não permite novo ataque
         if self.active_multi_hit:
             print(f"[BATTLE] Aguardando término do multi-hit...")
@@ -590,15 +594,7 @@ class BattleSystem:
         print(f"[SOM] {move.name} - som do atacante: {move.sound_name}")
 
     def _apply_damage(self, attacker: 'Pokemon', target: 'Pokemon', damage_result: dict, move):
-        """
-        Aplica dano a um alvo
-
-        Args:
-            attacker: Pokémon atacante
-            target: Pokémon alvo
-            damage_result: Resultado do cálculo de dano (contém damage, effectiveness, critical, etc)
-            move: Movimento usado
-        """
+        """Aplica dano a um alvo com rastreamento para Counter"""
         damage = damage_result["damage"]
 
         # Verifica se o movimento é inefetivo (imune)
@@ -613,6 +609,13 @@ class BattleSystem:
         if move.category == "physical":
             move_sound_manager.play_attack_sound(move.sound_name)
             print(f"[SOM] {move.name} (físico) - som do atacante: {move.sound_name}")
+
+            # ===== RASTREIA DANO FÍSICO PARA COUNTER =====
+            # Só rastreia se o alvo (quem tomou dano) estiver vivo e o dano for > 0
+            if damage > 0 and target.is_alive() and not target.is_defeated:
+                target._last_physical_damage_received = damage
+                target._last_physical_attacker = attacker
+                print(f"[COUNTER_TRACK] {target.name} registrou {damage} de dano físico de {attacker.name}")
 
         # Toca som de impacto
         move_sound_manager.play_hit_sound(move.sound_name)
@@ -689,12 +692,13 @@ class BattleSystem:
             attacker.play_hurt_animation()
 
     def _calculate_move_damage(self, attacker, target, move):
-        """Calcula dano do move com modificadores de stat"""
+        """Calcula dano do move com modificadores de stat e screens"""
         damage_result = DamageCalculator.calculate_damage(attacker, target, move)
 
         if not damage_result["hit"]:
             return damage_result
 
+        # Aplica modificadores de stat
         from src.battle.effects import StatType
 
         if move.category == "physical":
@@ -709,6 +713,14 @@ class BattleSystem:
                 f"[DAMAGE] {attacker.name} sp_atk_mult={sp_atk_mult:.2f}, {target.name} sp_def_mult={sp_def_mult:.2f}")
             damage_result["damage"] = int(damage_result["damage"] * sp_atk_mult / sp_def_mult)
 
+        # ===== APLICA REDUÇÃO DE SCREENS =====
+        screen_reduction = self.get_screen_damage_reduction(target, move.category)
+        if screen_reduction < 1.0:
+            old_damage = damage_result["damage"]
+            damage_result["damage"] = int(damage_result["damage"] * screen_reduction)
+            print(f"[SCREEN] Dano reduzido de {old_damage} para {damage_result['damage']} (x{screen_reduction})")
+
+        # Queimadura reduz ataque físico
         if move.category == "physical":
             status = self.effect_manager.get_status(attacker)
             if status and status.type == StatusType.BURN:
@@ -761,6 +773,27 @@ class BattleSystem:
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")
             self.effect_manager.add_status_text(target, f"{move.name} usado!")
 
+    def get_screen_damage_reduction(self, defender, move_category):
+        """
+        Retorna a redução de dano aplicável baseada nos screens ativos do defensor
+        E decrementa os turns automaticamente
+        """
+        # Cria um MoveEffect temporário para usar o método
+        from src.battle.effects.move_effect import MoveEffect
+        temp_effect = MoveEffect("temp", "temp")
+
+        # Usa o método de decremento
+        reduction = temp_effect._decrement_screen_turns(self, defender, move_category)
+
+        return reduction
+
+    def clear_counter_tracking(self, pokemon):
+        """Limpa os rastros de Counter de um Pokémon"""
+        if hasattr(pokemon, '_last_physical_damage_received'):
+            pokemon._last_physical_damage_received = 0
+        if hasattr(pokemon, '_last_physical_attacker'):
+            pokemon._last_physical_attacker = None
+
     def render_projectiles(self, screen, camera, screen_manager):
         """Renderiza projéteis"""
         for projectile in self.projectiles:
@@ -770,6 +803,11 @@ class BattleSystem:
         """Limpa todos os efeitos (usado quando batalha termina)"""
         self.residual_effects.clear_all()
         self.effect_manager.clear_all()
+
+        # ===== LIMPA SCREENS =====
+        if hasattr(self, 'active_screens'):
+            self.active_screens.clear()
+            print(f"[SCREEN] Todos os screens foram limpos!")
 
         # ===== LIMPA MODIFICADORES DE CRÍTICO =====
         from src.battle.critical_hit import CriticalHitSystem

@@ -214,6 +214,12 @@ class MoveEffect:
             return self._apply_random_status_chance(attacker, target, effect_manager)
         elif self.effect_type == "two_turn_attack":
             return self._apply_two_turn_attack(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "light_screen":
+            return self._apply_light_screen(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "reflect":
+            return self._apply_reflect(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "counter":
+            return self._apply_counter(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "struggle":
             return self._apply_struggle(attacker, target, battle_system, effect_manager, damage)
         return True
@@ -1457,6 +1463,171 @@ class MoveEffect:
             attacker.combat_state = "attacking"
 
         return hit_count > 0
+
+    def _apply_light_screen(self, attacker, target, battle_system, effect_manager):
+        """Aplica Light Screen - reduz dano de ataques especiais por X golpes"""
+        return self._apply_screen(attacker, battle_system, effect_manager, "light_screen")
+
+    def _apply_reflect(self, attacker, target, battle_system, effect_manager):
+        """Aplica Reflect - reduz dano de ataques físicos por X golpes"""
+        return self._apply_screen(attacker, battle_system, effect_manager, "reflect")
+
+    def _apply_screen(self, attacker, battle_system, effect_manager, screen_type):
+        """Aplica screen baseado em contagem de golpes"""
+
+        # Verifica se já tem screen ativo
+        if hasattr(battle_system, 'active_screens'):
+            team_key = f"{'wild' if attacker.is_wild else 'ally'}_{screen_type}"
+            if team_key in battle_system.active_screens:
+                effect_manager.add_status_text(attacker, f"Mas já está ativo!", duration=1.0)
+                print(f"[SCREEN] {attacker.name} já tem {screen_type} ativo!")
+                return False
+
+        # Obtém parâmetros
+        turns = self.params.get("turns", 5)
+        damage_reduction = self.params.get("damage_reduction", 0.5)
+        affected_attacks = self.params.get("affected_attacks", ["special"])
+
+        # Inicializa sistema de screens se não existir
+        if not hasattr(battle_system, 'active_screens'):
+            battle_system.active_screens = {}
+
+        # Ativa o screen
+        team_key = f"{'wild' if attacker.is_wild else 'ally'}_{screen_type}"
+        battle_system.active_screens[team_key] = {
+            'turns_remaining': turns,
+            'max_turns': turns,
+            'reduction': damage_reduction,
+            'affected_attacks': affected_attacks,
+            'pokemon': attacker,
+            'screen_type': screen_type
+        }
+
+        # Mostra mensagem
+        screen_names = {
+            "light_screen": "Light Screen",
+            "reflect": "Reflect"
+        }
+        screen_display = screen_names.get(screen_type, screen_type)
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} usou {screen_display}!",
+            duration=1.5
+        )
+        effect_manager.add_status_text(
+            attacker,
+            f"Proteção por {turns} golpes!",
+            duration=1.5
+        )
+
+        print(f"[SCREEN] {attacker.name} ativou {screen_display} por {turns} turns!")
+
+        return True
+
+    def _decrement_screen_turns(self, battle_system, defending_pokemon, move_category):
+        """
+        Decrementa os turns dos screens quando o Pokémon defensor é atingido
+        Retorna a redução de dano aplicável
+        """
+        if not hasattr(battle_system, 'active_screens'):
+            return 1.0
+
+        reduction = 1.0
+        screens_to_remove = []
+
+        for key, screen in battle_system.active_screens.items():
+            # Verifica se este screen afeta o Pokémon defensor
+            # (screen do mesmo lado que o defensor)
+            is_ally_screen = (not defending_pokemon.is_wild and key.startswith("ally_"))
+            is_wild_screen = (defending_pokemon.is_wild and key.startswith("wild_"))
+
+            if (is_ally_screen or is_wild_screen) and move_category in screen['affected_attacks']:
+                # Aplica redução de dano
+                reduction = min(reduction, screen['reduction'])
+
+                # Decrementa os turns restantes
+                screen['turns_remaining'] -= 1
+
+                print(f"[SCREEN] {screen['screen_type']} ativo! Turns restantes: {screen['turns_remaining']}")
+
+                # Marca para remover se acabou
+                if screen['turns_remaining'] <= 0:
+                    screens_to_remove.append(key)
+                    pokemon = screen.get('pokemon')
+                    if pokemon and pokemon.is_alive():
+                        screen_name = "Light Screen" if "light_screen" in key else "Reflect"
+                        battle_system.effect_manager.add_status_text(
+                            pokemon,
+                            f"{screen_name} de {pokemon.name} acabou!",
+                            duration=1.5
+                        )
+                    print(f"[SCREEN] {key} expirou!")
+
+        # Remove screens expirados
+        for key in screens_to_remove:
+            del battle_system.active_screens[key]
+
+        return reduction
+
+    def _apply_counter(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica Counter - retorna o dobro do dano físico recebido no último golpe
+        """
+        # Verifica se o atacante foi atingido por um ataque físico
+        if not hasattr(attacker, '_last_physical_damage_received') or attacker._last_physical_damage_received <= 0:
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            print(f"[COUNTER] {attacker.name} não foi atingido por um ataque físico!")
+            return False
+
+        # Verifica se tem registro de quem atacou
+        if not hasattr(attacker, '_last_physical_attacker') or not attacker._last_physical_attacker:
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
+        counter_target = attacker._last_physical_attacker
+
+        # Verifica se o alvo ainda está vivo
+        if not counter_target.is_alive() or counter_target.is_defeated:
+            effect_manager.add_status_text(attacker, f"Mas o alvo já foi derrotado!", duration=1.0)
+            return False
+
+        # Calcula dano de retorno (dobro)
+        multiplier = self.params.get("multiplier", 2.0)
+        counter_damage = int(attacker._last_physical_damage_received * multiplier)
+
+        # Garante dano mínimo de 1
+        counter_damage = max(1, counter_damage)
+
+        # Aplica dano ao alvo
+        old_hp = counter_target.current_hp
+        counter_target.take_damage(counter_damage, attacker=attacker)
+        actual_damage = old_hp - counter_target.current_hp
+
+        # Mostra mensagens
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} revidou com Counter!",
+            duration=1.5
+        )
+        effect_manager.add_status_text(
+            counter_target,
+            f"-{actual_damage} HP",
+            duration=1.0
+        )
+
+        print(f"[COUNTER] {attacker.name} causou {actual_damage} de dano de retorno a {counter_target.name}!")
+
+        # Toca som
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("counter")
+
+        # Limpa o registro após usar
+        attacker._last_physical_damage_received = 0
+        attacker._last_physical_attacker = None
+
+        return True
+
     # ===== MÉTODOS DE RAGE =====
     def _apply_rage_mode(self, attacker, target, effect_manager):
         """Aplica o efeito Rage - aumenta Attack quando atingido"""
