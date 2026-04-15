@@ -71,7 +71,6 @@ class ItemBagCatalog:
             "unlock_phase": None,
             "unlock_chapter": None
         }
-
         items["greatball"] = {
             "id": "greatball",
             "name": "GREATBALL",
@@ -86,7 +85,34 @@ class ItemBagCatalog:
             "unlock_phase": "1-5",
             "unlock_chapter": None
         }
-
+        items["ultraball"] = {
+            "id": "ultraball",
+            "name": "ULTRABALL",
+            "sprite_path": pokeballs_path / "ULTRABALL.png",
+            "description": "Captura Pokémon selvagens com 2 vezes a taxa de captura.",
+            "category": "pokeball",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "capture",
+            "effect_value": 2,
+            "price": 1200,
+            "unlock_phase": "2-8",
+            "unlock_chapter": None
+        }
+        items["masterball"] = {
+            "id": "masterball",
+            "name": "MASTERBALL",
+            "sprite_path": pokeballs_path / "MASTERBALL.png",
+            "description": "Captura Pokémon selvagens com 100% a taxa de captura.",
+            "category": "pokeball",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "capture",
+            "effect_value": 2,
+            "price": 10000,
+            "unlock_phase": "3-4",
+            "unlock_chapter": None
+        }
         # ===== POÇÕES =====
         items["potion"] = {
             "id": "potion",
@@ -100,6 +126,34 @@ class ItemBagCatalog:
             "effect_value": 20,
             "price": 200,
             "unlock_phase": None,
+            "unlock_chapter": None
+        }
+        items["superpotion"] = {
+            "id": "superpotion",
+            "name": "SUPERPOTION",
+            "sprite_path": medicine_path / "superporion.png",
+            "description": "Recupera 50 HP de um Pokémon",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "heal",
+            "effect_value": 50,
+            "price": 450,
+            "unlock_phase": "1-5",
+            "unlock_chapter": None
+        }
+        items["hyperpotion"] = {
+            "id": "hyperpotion",
+            "name": "HYPERPOTION",
+            "sprite_path": medicine_path / "hyperpotion.png",
+            "description": "Recupera 200 HP de um Pokémon",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "heal",
+            "effect_value": 200,
+            "price": 1200,
+            "unlock_phase": "3-4",
             "unlock_chapter": None
         }
         # ===== ITENS DE CURA DE STATUS =====

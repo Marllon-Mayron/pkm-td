@@ -703,7 +703,7 @@
         ]
     },
     "rewards": {
-        "money": 0,
+        "money": 100,
         "experience": 0
     }
 }

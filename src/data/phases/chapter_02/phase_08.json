@@ -738,7 +738,7 @@
         ]
     },
     "rewards": {
-        "money": 0,
+        "money": 200,
         "experience": 0
     }
 }
