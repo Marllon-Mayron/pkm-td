@@ -1691,8 +1691,8 @@
                 ],
                 "min_level": 17,
                 "max_level": 20,
-                "wave_size": 15,
-                "spawn_interval": 2.0,
+                "wave_size": 12,
+                "spawn_interval": 2.5,
                 "initial_delay": 6.0,
                 "repeat_wave": true,
                 "repeat_count": 2
@@ -1730,8 +1730,8 @@
                 ],
                 "min_level": 17,
                 "max_level": 20,
-                "wave_size": 15,
-                "spawn_interval": 2.0,
+                "wave_size": 12,
+                "spawn_interval": 2.5,
                 "initial_delay": 6.0,
                 "repeat_wave": true,
                 "repeat_count": 2
