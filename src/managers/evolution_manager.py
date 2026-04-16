@@ -4,10 +4,11 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Dict, List, Optional, Any
 
 
 class EvolutionManager:
-    """Gerencia as evoluções dos Pokémon"""
+    """Gerencia as evoluções dos Pokémon - SUPORTA MÚLTIPLAS VARIANTES"""
 
     _instance = None
 
@@ -22,40 +23,139 @@ class EvolutionManager:
             return
 
         self._initialized = True
-        self.evolutions = {}
+        self.evolutions = {}  # Formato: {pokemon_id: {"lvlMin": x, "EvolveTo": y, "method": z}}
+        self.evolution_variants = {}  # Formato: {pokemon_id: [{"evolves_to": x, "method": y, ...}]}
         self._load_evolution_data()
 
     def _get_json_path(self):
-        """Obtém o caminho correto para o arquivo JSON independente de onde o jogo é executado"""
+        """Obtém o caminho correto para o arquivo JSON unificado"""
         if getattr(sys, 'frozen', False):
-            # Se for executado como executável
             root_dir = os.path.dirname(sys.executable)
         else:
-            # Se for executado como script Python
-            # Vai do diretório atual até a raiz do projeto
             current_file = Path(__file__).resolve()
-            # src/managers/evolution_manager.py -> sobe 3 níveis até a raiz
             root_dir = current_file.parent.parent.parent
 
+        # PRIORIDADE 1: src/data/scripts/pokemon_completo.json
+        json_path = root_dir / "src" / "data" / "scripts" / "pokemon_completo.json"
+
+        if json_path.exists():
+            return json_path
+
+        # PRIORIDADE 2: res/json/pokemon_completo.json
+        json_path = root_dir / "res" / "json" / "pokemon_completo.json"
+
+        if json_path.exists():
+            return json_path
+
+        # FALLBACK
         json_path = root_dir / "src" / "data" / "scripts" / "pokemon_evolutions_gen1.json"
+
         return json_path
 
     def _load_evolution_data(self):
-        """Carrega os dados de evolução do arquivo JSON"""
+        """Carrega os dados de evolução do arquivo JSON unificado"""
         try:
             json_path = self._get_json_path()
 
             if not json_path.exists():
                 print(f"⚠️ Arquivo de evoluções não encontrado: {json_path}")
-                print(f"   Diretório atual: {os.getcwd()}")
-                print(f"   Caminho tentado: {json_path}")
                 self._create_fallback_data()
                 return
 
             with open(json_path, 'r', encoding='utf-8') as file:
-                self.evolutions = json.load(file)
+                data = json.load(file)
+
+            # Verifica se é o novo formato (lista com campo "evolution")
+            if isinstance(data, list) and len(data) > 0 and "evolution" in data[0]:
+                for pokemon in data:
+                    pokemon_id = str(pokemon["id"])
+                    evo_data = pokemon.get("evolution", {})
+
+                    # Coleta TODAS as variantes de evolução
+                    all_variants = []
+
+                    # 1. Pega do campo "evolution_details"
+                    evolution_details = evo_data.get("evolution_details", [])
+                    for detail in evolution_details:
+                        variant = {
+                            "evolves_to_id": detail.get("evolves_to_id"),
+                            "evolves_to_name": detail.get("evolves_to_name"),
+                            "method": detail.get("method", "unknown"),
+                            "min_level": detail.get("min_level"),
+                            "item": detail.get("item"),
+                            "min_happiness": detail.get("min_happiness"),
+                            "time_of_day": detail.get("time_of_day"),
+                            "location": detail.get("location"),
+                            "gender": detail.get("gender"),
+                            "known_move": detail.get("known_move"),
+                            "trade_species": detail.get("trade_species")
+                        }
+                        # Remove None values
+                        variant = {k: v for k, v in variant.items() if v is not None}
+                        all_variants.append(variant)
+
+                    # 2. Pega do campo "variants" (se existir)
+                    variants = evo_data.get("variants", [])
+                    for variant in variants:
+                        # Normaliza o formato
+                        norm_variant = {
+                            "evolves_to_id": variant.get("evolves_to_id"),
+                            "evolves_to_name": variant.get("evolves_to_name"),
+                            "method": variant.get("method", "unknown"),
+                            "min_level": variant.get("min_level"),
+                            "item": variant.get("item"),
+                            "min_happiness": variant.get("min_happiness"),
+                            "time_of_day": variant.get("time_of_day"),
+                            "location": variant.get("location"),
+                            "gender": variant.get("gender"),
+                            "known_move": variant.get("known_move")
+                        }
+                        norm_variant = {k: v for k, v in norm_variant.items() if v is not None}
+                        if norm_variant not in all_variants:
+                            all_variants.append(norm_variant)
+
+                    # Armazena as variantes
+                    if all_variants:
+                        self.evolution_variants[pokemon_id] = all_variants
+
+                    # Para compatibilidade com código antigo, pega a PRIMEIRA evolução
+                    # como a evolução "padrão"
+                    if all_variants:
+                        first_variant = all_variants[0]
+                        evolve_to = first_variant.get("evolves_to_id")
+                        method = first_variant.get("method", "none")
+
+                        if method == "level_up":
+                            lvl_min = first_variant.get("min_level", "none")
+                        elif method == "use_item":
+                            lvl_min = first_variant.get("item", "none")
+                        else:
+                            lvl_min = "none"
+
+                        if evolve_to:
+                            self.evolutions[pokemon_id] = {
+                                "lvlMin": lvl_min if lvl_min is not None else "none",
+                                "EvolveTo": evolve_to,
+                                "method": method
+                            }
+                        else:
+                            self.evolutions[pokemon_id] = {
+                                "lvlMin": "none",
+                                "EvolveTo": "none",
+                                "method": "none"
+                            }
+                    else:
+                        self.evolutions[pokemon_id] = {
+                            "lvlMin": "none",
+                            "EvolveTo": "none",
+                            "method": "none"
+                        }
+            else:
+                # Formato antigo
+                self.evolutions = data
 
             print(f"✓ Carregados dados de evolução para {len(self.evolutions)} Pokémon")
+            print(f"✓ Pokémon com múltiplas variantes: {len(self.evolution_variants)}")
 
         except Exception as e:
             print(f"✗ Erro ao carregar dados de evolução: {e}")
@@ -63,7 +163,6 @@ class EvolutionManager:
 
     def _create_fallback_data(self):
         """Cria dados de evolução básicos para fallback"""
-        # Fallback para os starters pelo menos
         self.evolutions = {
             "1": {"lvlMin": 16, "EvolveTo": 2, "method": "level_up"},
             "2": {"lvlMin": 32, "EvolveTo": 3, "method": "level_up"},
@@ -77,114 +176,169 @@ class EvolutionManager:
         }
         print("⚠️ Usando dados de evolução de fallback (apenas starters)")
 
+    def get_evolution_variants(self, pokemon_id) -> List[Dict]:
+        """
+        Retorna todas as variantes de evolução possíveis para um Pokémon.
+        Ex: Eevee retorna [Vaporeon, Jolteon, Flareon, Espeon, Umbreon, Leafeon, Glaceon, Sylveon]
+        """
+        return self.evolution_variants.get(str(pokemon_id), [])
+
+    def has_multiple_evolutions(self, pokemon_id) -> bool:
+        """Verifica se o Pokémon tem múltiplas opções de evolução"""
+        variants = self.get_evolution_variants(pokemon_id)
+        return len(variants) > 1
+
     def can_evolve_by_level(self, pokemon_id, current_level):
-        """Verifica se o Pokémon pode evoluir por nível"""
-        evo_data = self.evolutions.get(str(pokemon_id))
+        """Verifica se o Pokémon pode evoluir por nível (pega a PRIMEIRA evolução por nível)"""
+        variants = self.get_evolution_variants(pokemon_id)
 
-        if not evo_data:
-            return None
-
-        lvl_min = evo_data.get("lvlMin")
-        method = evo_data.get("method", "none")
-
-        # Verifica se é evolução por nível (lvlMin é um número)
-        if method == "level_up" and isinstance(lvl_min, (int, float)):
-            if current_level >= lvl_min:
-                return {
-                    "evolve_to": evo_data.get("EvolveTo"),
-                    "method": "level",
-                    "requirement": lvl_min
-                }
-
+        for variant in variants:
+            method = variant.get("method", "")
+            if method == "level_up":
+                min_level = variant.get("min_level")
+                if isinstance(min_level, (int, float)) and current_level >= min_level:
+                    return {
+                        "evolve_to": variant.get("evolves_to_id"),
+                        "method": "level",
+                        "requirement": min_level,
+                        "variant_name": variant.get("evolves_to_name")
+                    }
         return None
 
     def can_evolve_by_stone(self, pokemon_id, stone_name):
         """Verifica se o Pokémon pode evoluir com uma pedra específica"""
-        evo_data = self.evolutions.get(str(pokemon_id))
+        variants = self.get_evolution_variants(pokemon_id)
 
-        if not evo_data:
-            return None
-
-        lvl_min = evo_data.get("lvlMin")
-        method = evo_data.get("method", "none")
-
-        # Verifica se é evolução por pedra
-        # Normaliza os nomes das pedras (remove hífens e espaços)
         stone_name_normalized = stone_name.lower().replace("-", "").replace(" ", "")
-        method_normalized = method.lower().replace("-", "").replace(" ", "")
 
-        # Lista de pedras de evolução válidas
-        evolution_stones = [
-            "firestone", "waterstone", "thunderstone", "leafstone",
-            "moonstone", "sunstone", "icystone", "dawnstone",
-            "duskstone", "shinystone"
-        ]
+        for variant in variants:
+            method = variant.get("method", "")
+            item = variant.get("item", "")
 
-        # Verifica se o método contém o nome da pedra
-        if method_normalized in evolution_stones and method_normalized == stone_name_normalized:
-            return {
-                "evolve_to": evo_data.get("EvolveTo"),
-                "method": "stone",
-                "requirement": stone_name
-            }
+            item_normalized = item.lower().replace("-", "").replace(" ", "") if item else ""
+            method_normalized = method.lower().replace("-", "").replace(" ", "")
 
-        # Verificação alternativa: lvlMin pode conter o nome da pedra
-        if isinstance(lvl_min, str):
-            lvl_min_normalized = lvl_min.lower().replace("-", "").replace(" ", "")
-            if lvl_min_normalized in evolution_stones and lvl_min_normalized == stone_name_normalized:
+            evolution_stones = [
+                "firestone", "waterstone", "thunderstone", "leafstone",
+                "moonstone", "sunstone", "icystone", "dawnstone",
+                "duskstone", "shinystone"
+            ]
+
+            if method_normalized in evolution_stones and method_normalized == stone_name_normalized:
                 return {
-                    "evolve_to": evo_data.get("EvolveTo"),
+                    "evolve_to": variant.get("evolves_to_id"),
                     "method": "stone",
-                    "requirement": stone_name
+                    "requirement": stone_name,
+                    "variant_name": variant.get("evolves_to_name")
+                }
+
+            if item_normalized in evolution_stones and item_normalized == stone_name_normalized:
+                return {
+                    "evolve_to": variant.get("evolves_to_id"),
+                    "method": "stone",
+                    "requirement": stone_name,
+                    "variant_name": variant.get("evolves_to_name")
                 }
 
         return None
 
     def can_evolve_by_trade(self, pokemon_id):
         """Verifica se o Pokémon pode evoluir por troca"""
-        evo_data = self.evolutions.get(str(pokemon_id))
+        variants = self.get_evolution_variants(pokemon_id)
 
-        if not evo_data:
-            return False
-
-        method = evo_data.get("method", "none")
-
-        # Verifica se é evolução por troca
-        if method == "trade":
-            return {
-                "evolve_to": evo_data.get("EvolveTo"),
-                "method": "trade",
-                "requirement": "trade"
-            }
+        for variant in variants:
+            method = variant.get("method", "")
+            if method == "trade":
+                return {
+                    "evolve_to": variant.get("evolves_to_id"),
+                    "method": "trade",
+                    "requirement": "trade",
+                    "variant_name": variant.get("evolves_to_name")
+                }
 
         return False
 
-    def check_evolution(self, pokemon_id, current_level=None, stone_name=None, is_trade=False):
+    def can_evolve_by_happiness(self, pokemon_id, current_happiness, time_of_day=None):
+        """Verifica se o Pokémon pode evoluir por felicidade (Eevee -> Espeon/Umbreon)"""
+        variants = self.get_evolution_variants(pokemon_id)
+
+        for variant in variants:
+            method = variant.get("method", "")
+            if method == "happiness":
+                min_happiness = variant.get("min_happiness", 160)
+                if current_happiness >= min_happiness:
+                    # Verifica horário se necessário
+                    req_time = variant.get("time_of_day")
+                    if req_time and time_of_day:
+                        if req_time.lower() == time_of_day.lower():
+                            return {
+                                "evolve_to": variant.get("evolves_to_id"),
+                                "method": "happiness",
+                                "requirement": min_happiness,
+                                "variant_name": variant.get("evolves_to_name"),
+                                "time_of_day": req_time
+                            }
+                    elif not req_time:
+                        return {
+                            "evolve_to": variant.get("evolves_to_id"),
+                            "method": "happiness",
+                            "requirement": min_happiness,
+                            "variant_name": variant.get("evolves_to_name")
+                        }
+        return None
+
+    def can_evolve_by_location(self, pokemon_id, location_name):
+        """Verifica se o Pokémon pode evoluir por local específico (Eevee -> Leafeon/Glaceon)"""
+        variants = self.get_evolution_variants(pokemon_id)
+        location_normalized = location_name.lower().replace("-", "").replace(" ", "")
+
+        for variant in variants:
+            method = variant.get("method", "")
+            req_location = variant.get("location", "")
+
+            if method == "location" and req_location:
+                req_normalized = req_location.lower().replace("-", "").replace(" ", "")
+                if req_normalized == location_normalized:
+                    return {
+                        "evolve_to": variant.get("evolves_to_id"),
+                        "method": "location",
+                        "requirement": req_location,
+                        "variant_name": variant.get("evolves_to_name")
+                    }
+        return None
+
+    def check_evolution(self, pokemon_id, current_level=None, stone_name=None,
+                        is_trade=False, current_happiness=None, time_of_day=None,
+                        location_name=None):
         """
         Verifica todas as possibilidades de evolução
-
-        Args:
-            pokemon_id: ID do Pokémon
-            current_level: Nível atual (para evolução por nível)
-            stone_name: Nome da pedra (para evolução por pedra)
-            is_trade: Se é uma troca (para evolução por troca)
-
-        Returns:
-            dict ou None: Informações da evolução se possível, None caso contrário
+        Retorna a PRIMEIRA evolução encontrada (para compatibilidade)
         """
-        # Primeiro verifica evolução por nível
+        # 1. Evolução por nível
         if current_level is not None:
             level_evo = self.can_evolve_by_level(pokemon_id, current_level)
             if level_evo:
                 return level_evo
 
-        # Depois verifica evolução por pedra
+        # 2. Evolução por pedra
         if stone_name is not None:
             stone_evo = self.can_evolve_by_stone(pokemon_id, stone_name)
             if stone_evo:
                 return stone_evo
 
-        # Por último verifica evolução por troca
+        # 3. Evolução por felicidade
+        if current_happiness is not None:
+            happiness_evo = self.can_evolve_by_happiness(pokemon_id, current_happiness, time_of_day)
+            if happiness_evo:
+                return happiness_evo
+
+        # 4. Evolução por local
+        if location_name is not None:
+            location_evo = self.can_evolve_by_location(pokemon_id, location_name)
+            if location_evo:
+                return location_evo
+
+        # 5. Evolução por troca
         if is_trade:
             trade_evo = self.can_evolve_by_trade(pokemon_id)
             if trade_evo:
@@ -192,8 +346,12 @@ class EvolutionManager:
 
         return None
 
+    def get_all_evolution_options(self, pokemon_id) -> List[Dict]:
+        """Retorna TODAS as opções de evolução disponíveis para um Pokémon"""
+        return self.get_evolution_variants(pokemon_id)
+
     def get_evolution_info(self, pokemon_id):
-        """Retorna informações de evolução do Pokémon"""
+        """Retorna informações de evolução do Pokémon (formato antigo para compatibilidade)"""
         return self.evolutions.get(str(pokemon_id), {
             "lvlMin": "none",
             "EvolveTo": "none",
@@ -201,7 +359,7 @@ class EvolutionManager:
         })
 
     def get_next_evolution(self, pokemon_id):
-        """Retorna o próximo estágio de evolução"""
+        """Retorna o próximo estágio de evolução (primeiro da lista)"""
         evo_data = self.get_evolution_info(pokemon_id)
         next_id = evo_data.get("EvolveTo")
 
@@ -210,12 +368,7 @@ class EvolutionManager:
         return None
 
     def get_evolution_chain(self, pokemon_id, max_depth=3):
-        """
-        Retorna toda a cadeia de evolução
-
-        Returns:
-            list: Lista com os IDs da cadeia de evolução [atual, proximo, ...]
-        """
+        """Retorna toda a cadeia de evolução (ignora ramificações)"""
         chain = [pokemon_id]
         current_id = pokemon_id
 
@@ -230,11 +383,35 @@ class EvolutionManager:
 
     def is_final_form(self, pokemon_id):
         """Verifica se o Pokémon é a forma final"""
-        next_id = self.get_next_evolution(pokemon_id)
-        return next_id is None
+        variants = self.get_evolution_variants(pokemon_id)
+        return len(variants) == 0
 
     def get_evolution_method_string(self, pokemon_id):
-        """Retorna uma string legível do método de evolução"""
+        """Retorna uma string legível do método de evolução (primeiro método)"""
+        variants = self.get_evolution_variants(pokemon_id)
+
+        if not variants:
+            return "Não evolui"
+
+        if self.has_multiple_evolutions(pokemon_id):
+            methods = []
+            for v in variants:
+                method = v.get("method", "")
+                if method == "level_up":
+                    level = v.get("min_level", "?")
+                    methods.append(f"Nível {level}")
+                elif method == "use_item":
+                    item = v.get("item", "item")
+                    methods.append(f"Usar {item}")
+                elif method == "happiness":
+                    methods.append("Felicidade")
+                elif method == "trade":
+                    methods.append("Troca")
+                elif method == "location":
+                    methods.append(f"Local especial")
+            return f"Múltiplas: {', '.join(methods)}"
+
+        # Forma antiga para compatibilidade
         evo_data = self.get_evolution_info(pokemon_id)
         method = evo_data.get("method", "none")
         lvl_min = evo_data.get("lvlMin")

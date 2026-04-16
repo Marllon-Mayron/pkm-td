@@ -45,14 +45,9 @@ class PhaseCatalog:
             try:
                 chapter_num = int(chapter_dir.name.split("_")[1])
                 phases = []
-
-                print(f"[PhaseCatalog] Processando: {chapter_dir.name}")
-
                 # Lista todos os arquivos JSON de fase
                 for phase_file in sorted(chapter_dir.glob("phase_*.json")):
                     try:
-                        print(f"[PhaseCatalog]   Carregando: {phase_file.name}")
-
                         # Carrega o arquivo para pegar o nome
                         with open(phase_file, 'r', encoding='utf-8') as f:
                             data = json.load(f)
@@ -67,17 +62,13 @@ class PhaseCatalog:
                     except (json.JSONDecodeError, ValueError, KeyError) as e:
                         print(f"Erro ao carregar fase {phase_file}: {e}")
                         continue
-
                 if phases:
                     catalog[chapter_num] = phases
-                    print(f"[PhaseCatalog] Capítulo {chapter_num}: {len(phases)} fases")
-
             except (ValueError, IndexError) as e:
                 print(f"Pasta ignorada: {chapter_dir} - {e}")
                 continue
 
         self.cache = catalog
-        print(f"[PhaseCatalog] Total de capítulos: {len(catalog)}")
         return catalog
 
     def get_chapter_phases(self, chapter: int) -> List[Dict]:

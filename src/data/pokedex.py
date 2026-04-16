@@ -1,4 +1,4 @@
-# src/data/pokedex.py - ATUALIZADO COM TODAS AS ANIMAÇÕES
+# src/data/pokedex.py - ATUALIZADO PARA CONSUMIR O NOVO JSON UNIFICADO
 import json
 import os
 import pygame
@@ -34,8 +34,8 @@ class Pokedex:
         self.back_shiny_sprites = {}
 
         # Cache para sprites InMap (novo sistema)
-        self.inmap_animations_cache = {}  # Cache para animações carregadas
-        self.pokemon_animations_info = {}  # Cache para informações de animações disponíveis
+        self.inmap_animations_cache = {}
+        self.pokemon_animations_info = {}
 
         # Tipos
         self.type_colors = {
@@ -59,50 +59,132 @@ class Pokedex:
             "fairy": (238, 153, 238)
         }
 
+        # Inicializa limites de speed
+        self.min_base_speed = 0
+        self.max_base_speed = 1
+
         self.load_pokemon_data()
-        self.load_sprites()  # Carrega front e back (mantém igual)
+        self.load_sprites()
 
     def load_pokemon_data(self):
-        """Carrega dados do arquivo JSON"""
+        """Carrega dados do arquivo JSON unificado (pokemon_completo.json)"""
         try:
-            json_path = Path(__file__).parent.parent.parent / "res" / "json" / "pokemon_data.json"
+            # PRIORIDADE 1: src/data/scripts/pokemon_completo.json
+            json_path = Path(__file__).parent.parent.parent / "src" / "data" / "scripts" / "pokemon_completo.json"
+
+            if not json_path.exists():
+                # PRIORIDADE 2: res/json/pokemon_completo.json
+                json_path = Path(__file__).parent.parent.parent / "res" / "json" / "pokemon_completo.json"
+
+            if not json_path.exists():
+                # PRIORIDADE 3: res/json/pokemon_data.json (fallback antigo)
+                json_path = Path(__file__).parent.parent.parent / "res" / "json" / "pokemon_data.json"
+
+            if not json_path.exists():
+                print(f"⚠️ Arquivo JSON não encontrado: {json_path}")
+                self._load_fallback_data()
+                return
 
             with open(json_path, 'r', encoding='utf-8') as file:
                 data = json.load(file)
 
-            for pokemon in data:
-                pokemon_id = pokemon["id"]
-                self.pokemon_data[pokemon_id] = {
-                    "id": pokemon_id,
-                    "name": pokemon["name"],
-                    "is_legendary": pokemon["is_legendary"],
-                    "is_mythical": pokemon["is_mythical"],
-                    "types": pokemon["type"],
-                    "base_stats": {
-                        "hp": pokemon["base"]["hp"],
-                        "attack": pokemon["base"]["attack"],
-                        "defense": pokemon["base"]["defense"],
-                        "special_attack": pokemon["base"]["special-attack"],
-                        "special_defense": pokemon["base"]["special-defense"],
-                        "speed": pokemon["base"]["speed"]
-                    },
-                    "ev_yield": {  # <--- JÁ TEMOS ISSO!
-                        "hp": pokemon["ev"]["hp"],
-                        "attack": pokemon["ev"]["attack"],
-                        "defense": pokemon["ev"]["defense"],
-                        "special_attack": pokemon["ev"]["special-attack"],
-                        "special_defense": pokemon["ev"]["special-defense"],
-                        "speed": pokemon["ev"]["speed"]
-                    },
-                    "catch_rate": pokemon["rate"],
-                    "evolution": pokemon["Evolucao"]
-                }
+            # Verifica se é o novo formato (lista com campo "evolution")
+            if isinstance(data, list) and len(data) > 0 and "evolution" in data[0]:
+                for pokemon in data:
+                    pokemon_id = pokemon["id"]
 
-            print(f"Carregados {len(self.pokemon_data)} Pokémon do JSON")
+                    # Extrai o próximo estágio de evolução do family_members
+                    next_evolution_id = None
+                    evolution_method = "none"
+                    evolution_level = None
+
+                    evo_data = pokemon.get("evolution", {})
+                    family_members = evo_data.get("family_members", [])
+
+                    # Encontra o próximo estágio na cadeia
+                    for i, member in enumerate(family_members):
+                        if member.get("id") == pokemon_id and i + 1 < len(family_members):
+                            next_evolution_id = family_members[i + 1].get("id")
+                            break
+
+                    # Pega o método e nível dos evolution_details
+                    evolution_details = evo_data.get("evolution_details", [])
+                    if evolution_details:
+                        detail = evolution_details[0]
+                        evolution_method = detail.get("method", "none")
+                        if evolution_method == "level_up":
+                            evolution_level = detail.get("min_level")
+                        elif evolution_method == "use_item":
+                            evolution_method = detail.get("item", "none")
+
+                    self.pokemon_data[pokemon_id] = {
+                        "id": pokemon_id,
+                        "name": pokemon["name"],
+                        "is_legendary": pokemon["is_legendary"],
+                        "is_mythical": pokemon["is_mythical"],
+                        "types": pokemon["type"],
+                        "base_stats": {
+                            "hp": pokemon["base"]["hp"],
+                            "attack": pokemon["base"]["attack"],
+                            "defense": pokemon["base"]["defense"],
+                            "special_attack": pokemon["base"]["special-attack"],
+                            "special_defense": pokemon["base"]["special-defense"],
+                            "speed": pokemon["base"]["speed"]
+                        },
+                        "ev_yield": {
+                            "hp": pokemon["ev"]["hp"],
+                            "attack": pokemon["ev"]["attack"],
+                            "defense": pokemon["ev"]["defense"],
+                            "special_attack": pokemon["ev"]["special-attack"],
+                            "special_defense": pokemon["ev"]["special-defense"],
+                            "speed": pokemon["ev"]["speed"]
+                        },
+                        "catch_rate": pokemon["capture_rate"],
+                        "evolution": {
+                            "EvolveTo": next_evolution_id,
+                            "lvlMin": evolution_level if evolution_level is not None else "none",
+                            "method": evolution_method
+                        }
+                    }
+
+                    if pokemon_id > self.max_id:
+                        self.max_id = pokemon_id
+
+            # Formato antigo
+            else:
+                for pokemon in data:
+                    pokemon_id = pokemon["id"]
+                    self.pokemon_data[pokemon_id] = {
+                        "id": pokemon_id,
+                        "name": pokemon["name"],
+                        "is_legendary": pokemon["is_legendary"],
+                        "is_mythical": pokemon["is_mythical"],
+                        "types": pokemon["type"],
+                        "base_stats": {
+                            "hp": pokemon["base"]["hp"],
+                            "attack": pokemon["base"]["attack"],
+                            "defense": pokemon["base"]["defense"],
+                            "special_attack": pokemon["base"]["special-attack"],
+                            "special_defense": pokemon["base"]["special-defense"],
+                            "speed": pokemon["base"]["speed"]
+                        },
+                        "ev_yield": {
+                            "hp": pokemon["ev"]["hp"],
+                            "attack": pokemon["ev"]["attack"],
+                            "defense": pokemon["ev"]["defense"],
+                            "special_attack": pokemon["ev"]["special-attack"],
+                            "special_defense": pokemon["ev"]["special-defense"],
+                            "speed": pokemon["ev"]["speed"]
+                        },
+                        "catch_rate": pokemon["rate"],
+                        "evolution": pokemon.get("Evolucao", {})
+                    }
+
+            print(f"✓ Carregados {len(self.pokemon_data)} Pokémon do JSON")
             self._cache_base_speed_limits()
 
         except Exception as e:
-            print(f"Erro ao carregar Pokémon data: {e}")
+            print(f"✗ Erro ao carregar Pokémon data: {e}")
             self._load_fallback_data()
 
     def load_sprites(self):
@@ -174,42 +256,26 @@ class Pokedex:
             filename += "s"
         return filename
 
-    # ===== MÉTODOS PARA INMAP (NOVO SISTEMA) =====
+    # ===== MÉTODOS PARA INMAP =====
 
     def get_inmap_animation(self, pokemon_id: int, shiny: bool = False) -> Dict:
-        """
-        Retorna animações InMap no formato compatível com 4 direções
-        """
         cache_key = f"{pokemon_id}_{shiny}"
         if cache_key in self.inmap_animations_cache:
             return self.inmap_animations_cache[cache_key]
 
-        # Carrega do novo sistema
         animation = self.sprite_manager.get_inmap_animation(pokemon_id, shiny)
         self.inmap_animations_cache[cache_key] = animation
         return animation
 
     def get_pokemon_animations_info(self, pokemon_id: int, shiny: bool = False) -> Dict:
-        """
-        Retorna informações completas sobre todas as animações disponíveis para um Pokémon
-
-        Returns:
-            Dict com:
-            - available_animations: Lista de nomes das animações disponíveis
-            - animation_details: Detalhes de cada animação (frames, direções, durações)
-            - raw_data: Dados brutos do XML
-        """
         cache_key = f"{pokemon_id}_{shiny}_info"
         if cache_key in self.pokemon_animations_info:
             return self.pokemon_animations_info[cache_key]
 
         raw_data = self.sprite_manager.loader.load_pokemon_sprites(pokemon_id, shiny)
 
-        # Coleta informações detalhadas de cada animação
         animation_details = {}
-
         for anim_name, anim_frames in raw_data.get("animations", {}).items():
-            # Para cada animação, conta frames por direção
             directions_info = {}
             total_frames = 0
 
@@ -217,7 +283,6 @@ class Pokedex:
                 directions_info[direction] = len(frames)
                 total_frames += len(frames)
 
-            # Pega dados do XML se disponíveis
             xml_info = raw_data.get("anim_data", {}).get(anim_name.capitalize(), {})
 
             animation_details[anim_name] = {
@@ -241,49 +306,26 @@ class Pokedex:
         return result
 
     def get_all_animations(self, pokemon_id: int, shiny: bool = False) -> List[str]:
-        """
-        Retorna lista de todas as animações disponíveis para um Pokémon
-        """
         info = self.get_pokemon_animations_info(pokemon_id, shiny)
         return info.get("available_animations", [])
 
     def has_animation(self, pokemon_id: int, animation_name: str, shiny: bool = False) -> bool:
-        """
-        Verifica se um Pokémon tem uma animação específica disponível
-        """
         animations = self.get_all_animations(pokemon_id, shiny)
         return animation_name.lower() in [a.lower() for a in animations]
 
     def get_animation_frames(self, pokemon_id: int, animation_name: str,
                              direction: str = "down", shiny: bool = False) -> List[pygame.Surface]:
-        """
-        Retorna os frames de uma animação específica
-
-        Args:
-            pokemon_id: ID do Pokémon
-            animation_name: Nome da animação (ex: "walk", "idle", "run", "attack")
-            direction: Direção desejada
-            shiny: Versão shiny
-
-        Returns:
-            Lista de frames da animação
-        """
         return self.sprite_manager.get_animation_frames(pokemon_id, shiny, animation_name, direction)
 
     def get_animation_durations(self, pokemon_id: int, animation_name: str, shiny: bool = False) -> List[int]:
-        """
-        Retorna as durações dos frames de uma animação (do XML)
-        """
         info = self.get_pokemon_animations_info(pokemon_id, shiny)
         anim_details = info.get("animation_details", {}).get(animation_name.lower(), {})
         return anim_details.get("durations", [])
 
     def get_map_sprite_size(self, pokemon_id: int, shiny: bool = False) -> int:
-        """Retorna o tamanho do sprite InMap"""
         return self.sprite_manager.get_sprite_size(pokemon_id, shiny)
 
     def get_raw_inmap_data(self, pokemon_id: int, shiny: bool = False) -> Dict:
-        """Retorna dados brutos do InMap (com 8 direções e AnimData)"""
         return self.sprite_manager.loader.load_pokemon_sprites(pokemon_id, shiny)
 
     # ===== MÉTODOS EXISTENTES (MANTIDOS) =====
@@ -300,16 +342,6 @@ class Pokedex:
         self.max_base_speed = max(base_speeds)
 
     def get_sprite(self, pokemon_id, sprite_type="front", shiny=False, direction="down", frame=0):
-        """
-        Retorna sprite do Pokémon
-
-        Args:
-            pokemon_id: ID do Pokémon
-            sprite_type: "front", "back", ou "inmap"
-            shiny: True para versão shiny
-            direction: para inmap: "down", "left", "right", "up"
-            frame: para inmap: índice do frame
-        """
         if sprite_type == "front":
             cache = self.front_shiny_sprites if shiny else self.front_sprites
             return cache.get(pokemon_id, self._create_placeholder(pokemon_id, "front", 96))
@@ -329,7 +361,6 @@ class Pokedex:
         return self._create_placeholder(pokemon_id, "front", 96)
 
     def _create_placeholder(self, pokemon_id, sprite_type="front", size=96):
-        """Cria sprite placeholder"""
         sprite = pygame.Surface((size, size), pygame.SRCALPHA)
         color = self._get_placeholder_color(pokemon_id)
 
@@ -349,21 +380,17 @@ class Pokedex:
         return sprite
 
     def get_pokemon(self, pokemon_id):
-        """Retorna dados de um Pokémon pelo ID"""
         return self.pokemon_data.get(pokemon_id, None)
 
     def get_name(self, pokemon_id):
-        """Retorna nome do Pokémon"""
         pokemon = self.get_pokemon(pokemon_id)
         return pokemon["name"] if pokemon else f"Pokemon {pokemon_id}"
 
     def get_types(self, pokemon_id):
-        """Retorna tipos do Pokémon"""
         pokemon = self.get_pokemon(pokemon_id)
         return pokemon["types"] if pokemon else ["normal"]
 
     def get_base_stats(self, pokemon_id):
-        """Retorna stats base do Pokémon"""
         pokemon = self.get_pokemon(pokemon_id)
         return pokemon["base_stats"] if pokemon else {
             "hp": 50, "attack": 50, "defense": 50,
@@ -371,16 +398,13 @@ class Pokedex:
         }
 
     def get_ev_yield(self, pokemon_id: int) -> Dict[str, int]:
-        """Retorna os EVs concedidos por um Pokémon quando derrotado"""
         pokemon = self.get_pokemon(pokemon_id)
         if pokemon and "ev_yield" in pokemon:
             return pokemon["ev_yield"]
-        # Fallback: concede 1 HP EV por padrão
         return {"hp": 1, "attack": 0, "defense": 0,
                 "special_attack": 0, "special_defense": 0, "speed": 0}
 
     def _get_placeholder_color(self, pokemon_id):
-        """Gera cor baseada no ID para placeholder"""
         colors = [
             (255, 99, 71), (135, 206, 235), (144, 238, 144),
             (255, 215, 0), (221, 160, 221), (255, 182, 193)
@@ -388,11 +412,9 @@ class Pokedex:
         return colors[pokemon_id % len(colors)]
 
     def get_type_color(self, type_name):
-        """Retorna cor associada ao tipo"""
         return self.type_colors.get(type_name.lower(), (150, 150, 150))
 
     def calculate_stats(self, pokemon_id, level, ivs=None, evs=None):
-        """Calcula stats baseado no ID do Pokémon"""
         base = self.get_base_stats(pokemon_id)
 
         if ivs is None:
@@ -402,38 +424,20 @@ class Pokedex:
             evs = {"hp": 0, "attack": 0, "defense": 0,
                    "special_attack": 0, "special_defense": 0, "speed": 0}
 
-        # Reutiliza o novo método
         return self.calculate_stats_with_base(base, level, ivs, evs)
 
     def calculate_stats_with_base(self, base_stats: dict, level: int, ivs: dict, evs: dict) -> dict:
-        """
-        Calcula stats usando base_stats fornecidos (para Transform do Ditto)
-
-        Args:
-            base_stats: Dicionário com stats base (ex: {"hp": 80, "attack": 85, ...})
-            level: Nível do Pokémon
-            ivs: Dicionário com IVs
-            evs: Dicionário com EVs
-
-        Returns:
-            Dicionário com stats calculados
-        """
-        # Usa a mesma constante do stats.py (8)
         EV_DIVISOR = 8
 
         stats = {}
-
-        # HP: ((2 * Base + IV + (EV/4)) * Level / 100) + Level + 10
         stats["hp"] = int(((2 * base_stats["hp"] + ivs["hp"] + (evs["hp"] // EV_DIVISOR)) * level) / 100) + level + 10
 
-        # Outros stats: ((2 * Base + IV + (EV/4)) * Level / 100) + 5
         for stat in ["attack", "defense", "special_attack", "special_defense", "speed"]:
             stats[stat] = int(((2 * base_stats[stat] + ivs[stat] + (evs[stat] // EV_DIVISOR)) * level) / 100) + 5
 
         return stats
 
     def search_pokemon(self, query):
-        """Busca Pokémon por nome ou ID"""
         results = []
         query = str(query).lower()
 
@@ -444,11 +448,9 @@ class Pokedex:
         return results
 
     def get_all_ids(self):
-        """Retorna todos os IDs disponíveis"""
         return sorted(self.pokemon_data.keys())
 
     def _load_fallback_data(self):
-        """Dados de fallback em caso de erro"""
         print("Carregando dados de fallback...")
         for i in range(1, self.max_id + 1):
             self.pokemon_data[i] = {
@@ -464,25 +466,14 @@ class Pokedex:
                 "ev_yield": {"hp": 0, "attack": 0, "defense": 0,
                              "special_attack": 0, "special_defense": 0, "speed": 0},
                 "catch_rate": 120,
-                "evolution": None
+                "evolution": {"EvolveTo": "none", "lvlMin": "none", "method": "none"}
             }
+        self._cache_base_speed_limits()
 
     # ===== MÉTODOS PARA RETRATOS (PORTRAITS) =====
 
     def get_portrait(self, pokemon_id: int, expression: str = "normal", shiny: bool = False) -> Optional[
         pygame.Surface]:
-        """
-        Retorna o retrato do Pokémon para o expression solicitado.
-
-        Args:
-            pokemon_id: ID do Pokémon (ex: 5)
-            expression: "normal", "happy", "angry", etc.
-            shiny: Se é versão shiny
-
-        Returns:
-            Surface do retrato (40x40) ou None se não encontrar
-        """
-        # Cache para retratos
         if not hasattr(self, '_portrait_cache'):
             self._portrait_cache = {}
 
@@ -490,51 +481,38 @@ class Pokedex:
         if cache_key in self._portrait_cache:
             return self._portrait_cache[cache_key]
 
-        # Monta o caminho base
         base_path = Path(__file__).parent.parent.parent / "res" / "PokemonSprites" / "Portrait"
         pokemon_dir = f"{pokemon_id:04d}"
 
         if shiny:
-            # Shiny: .../Portrait/0005/0000/0001/
             portrait_path = base_path / pokemon_dir / "0000" / "0001" / f"{expression}.png"
         else:
-            # Normal: .../Portrait/0005/
             portrait_path = base_path / pokemon_dir / f"{expression}.png"
 
-        # Tenta carregar
         portrait = None
         if portrait_path.exists():
             try:
                 portrait = pygame.image.load(str(portrait_path)).convert_alpha()
-                # Garante tamanho 40x40 (já deve ser, mas escala se necessário)
                 if portrait.get_width() != 40 or portrait.get_height() != 40:
                     portrait = pygame.transform.scale(portrait, (40, 40))
-                print(f"[PORTRAIT] Carregado: {pokemon_id}/{expression} (shiny={shiny})")
             except Exception as e:
-                print(f"[PORTRAIT] Erro ao carregar {portrait_path}: {e}")
+                print(f"Erro ao carregar portrait {portrait_path}: {e}")
 
-        # Se não encontrou e não é o normal, tenta o normal
         if portrait is None and expression != "normal":
             portrait = self.get_portrait(pokemon_id, "normal", shiny)
 
-        # Se ainda não encontrou, cria placeholder
         if portrait is None:
             portrait = self._create_portrait_placeholder(pokemon_id, expression)
 
-        # Guarda no cache
         self._portrait_cache[cache_key] = portrait
         return portrait
 
     def _create_portrait_placeholder(self, pokemon_id: int, expression: str) -> pygame.Surface:
-        """Cria um placeholder para retratos que não existem"""
         portrait = pygame.Surface((40, 40), pygame.SRCALPHA)
-
-        # Fundo baseado no ID
         color = self._get_placeholder_color(pokemon_id)
         pygame.draw.rect(portrait, color, (0, 0, 40, 40))
         pygame.draw.rect(portrait, (100, 100, 100), (0, 0, 40, 40), 2)
 
-        # Texto do expression
         font = pygame.font.Font(None, 16)
         expr_text = expression[0].upper() if expression else "?"
         text = font.render(expr_text, True, (255, 255, 255))
@@ -544,12 +522,6 @@ class Pokedex:
         return portrait
 
     def get_portraits_info(self, pokemon_id: int, shiny: bool = False) -> Dict[str, bool]:
-        """
-        Retorna informações sobre quais retratos estão disponíveis para um Pokémon.
-
-        Returns:
-            Dict com keys: "normal", "happy", "angry" e valores booleanos
-        """
         result = {}
         expressions = ["normal", "happy", "angry"]
 
@@ -566,24 +538,11 @@ class Pokedex:
         return result
 
     def get_animation_directions(self, pokemon_id: int, animation_name: str, shiny: bool = False) -> List[str]:
-        """
-        Retorna lista de direções disponíveis para uma animação específica
-
-        Returns:
-            Lista de direções (ex: ['down', 'up', 'left', 'right'] ou ['down'] para direção única)
-        """
         raw_data = self.get_raw_inmap_data(pokemon_id, shiny)
         animations = raw_data.get("animations", {})
-
         anim_frames = animations.get(animation_name.lower(), {})
-        if anim_frames:
-            return list(anim_frames.keys())
-
-        return []
+        return list(anim_frames.keys()) if anim_frames else []
 
     def is_single_direction_animation(self, pokemon_id: int, animation_name: str, shiny: bool = False) -> bool:
-        """
-        Verifica se uma animação tem apenas uma direção disponível
-        """
         directions = self.get_animation_directions(pokemon_id, animation_name, shiny)
         return len(directions) == 1
