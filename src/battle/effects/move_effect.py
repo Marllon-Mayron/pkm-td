@@ -230,6 +230,10 @@ class MoveEffect:
             return self._apply_disable(attacker, target, battle_system, effect_manager, damage)
         elif self.effect_type == "struggle":
             return self._apply_struggle(attacker, target, battle_system, effect_manager, damage)
+        elif self.effect_type == "metronome":
+            return self._apply_metronome(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "mimic":
+            return self._apply_mimic(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "transform":
             return self._apply_transform(attacker, target, battle_system, effect_manager)
         return True
@@ -1821,6 +1825,168 @@ class MoveEffect:
 
         return True
 
+    def _apply_metronome(self, attacker, target, battle_system, effect_manager):
+        """
+        Metronome - Usa um movimento aleatório.
+        Simplificado para Gen 1: escolhe qualquer move aleatório da lista de moves disponíveis.
+        """
+        from src.data.move_data import MoveData
+        from src.entities.move import Move
+        import random
+
+        move_data = MoveData()
+
+        # Lista de todos os moves disponíveis (excluindo alguns problemáticos)
+        all_moves = move_data.get_all_move_names()
+
+        # Moves que NÃO devem ser escolhidos pelo Metronome (Gen 1)
+        excluded_moves = self.params.get("exclude_moves", [
+            "metronome", "mimic", "struggle", "transform",
+            "counter", "mirror-coat", "protect", "detect", "endure"
+        ])
+
+        # Filtra moves válidos
+        valid_moves = [m for m in all_moves if m not in excluded_moves]
+
+        if not valid_moves:
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
+        # Escolhe um move aleatório
+        chosen_move_name = random.choice(valid_moves)
+        move_info = move_data.get_move_info(chosen_move_name)
+
+        if not move_info:
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
+        # Cria o move temporário
+        temp_move = Move(chosen_move_name, move_info)
+        temp_move.current_pp = 1  # PP temporário
+
+        # Mostra a mensagem
+        effect_manager.add_status_text(
+            attacker,
+            f"Metronome: {chosen_move_name.upper()}!",
+            duration=1.5
+        )
+
+        print(f"[METRONOME] {attacker.name} usou {chosen_move_name}!")
+
+        # Determina se o move acerta ou não (accuracy padrão)
+        hit_chance = temp_move.accuracy / 100 if temp_move.accuracy else 1.0
+        import random
+        will_hit = random.random() <= hit_chance
+
+        # Executa o move de acordo com sua categoria
+        if temp_move.category == "status":
+            # Move de status - aplica efeito
+            from .effect_factory import EffectFactory
+            effect = EffectFactory.create_effect(temp_move.name)
+            if effect:
+                effect.execute(attacker, target, battle_system, effect_manager)
+            else:
+                effect_manager.add_status_text(target, f"{attacker.name} usou {temp_move.name}!", duration=1.0)
+
+        elif temp_move.power and temp_move.power > 0:
+            # Move de dano
+            if will_hit:
+                from src.battle.damage_calculator import DamageCalculator
+                damage_result = DamageCalculator.calculate_damage(attacker, target, temp_move)
+
+                if damage_result["hit"]:
+                    # Aplica dano
+                    target.take_damage(damage_result["damage"], attacker=attacker)
+                    effect_manager.add_status_text(target, f"-{damage_result['damage']} HP", duration=0.8)
+
+                    if damage_result["effectiveness"] > 1.0:
+                        effect_manager.add_status_text(target, "Super efetivo!", duration=0.8)
+                    elif 0 < damage_result["effectiveness"] < 1.0:
+                        effect_manager.add_status_text(target, "Não é muito efetivo...", duration=0.8)
+
+                    # Aplica efeitos do move (se houver)
+                    from .effect_factory import EffectFactory
+                    effect = EffectFactory.create_effect(temp_move.name)
+                    if effect and effect.timing in [EffectTiming.AFTER_DAMAGE, EffectTiming.ON_HIT]:
+                        effect.execute(attacker, target, battle_system, effect_manager, damage_result["damage"])
+
+                    # Toca som
+                    from src.managers.move_sound_manager import move_sound_manager
+                    move_sound_manager.play_attack_sound(temp_move.sound_name)
+                    move_sound_manager.play_hit_sound(temp_move.sound_name)
+                else:
+                    effect_manager.add_status_text(attacker, f"{temp_move.name} errou!", duration=0.8)
+            else:
+                effect_manager.add_status_text(attacker, f"{temp_move.name} errou!", duration=0.8)
+
+        # Cooldown do ataque
+        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+        return True
+
+    def _apply_mimic(self, attacker, target, battle_system, effect_manager):
+        """
+        Mimic - Copia o último movimento usado pelo alvo.
+        Simplificado para Gen 1: substitui o move Mimic pelo move copiado.
+        """
+        from src.entities.move import Move
+
+        # Verifica se o alvo usou algum movimento
+        if not hasattr(target, '_last_used_move') or not target._last_used_move:
+            effect_manager.add_status_text(attacker, f"Mas falhou! {target.name} não usou nenhum movimento!",
+                                           duration=1.5)
+            print(f"[MIMIC] {attacker.name} tentou copiar, mas {target.name} não usou nenhum movimento!")
+            return False
+
+        move_to_copy = target._last_used_move
+
+        # Verifica se é um movimento que não pode ser copiado
+        cannot_copy = ["metronome", "mimic", "struggle", "transform", "counter"]
+        if move_to_copy.lower() in cannot_copy:
+            effect_manager.add_status_text(attacker, f"Mas não conseguiu copiar {move_to_copy}!", duration=1.5)
+            print(f"[MIMIC] {attacker.name} não pode copiar {move_to_copy}!")
+            return False
+
+        # Obtém as informações do move
+        from src.data.move_data import MoveData
+        move_data = MoveData()
+        move_info = move_data.get_move_info(move_to_copy)
+
+        if not move_info:
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
+        # Encontra o move Mimic no moveset do atacante
+        mimic_index = None
+        for i, move in enumerate(attacker.moves):
+            if move.name.lower() == "mimic":
+                mimic_index = i
+                break
+
+        if mimic_index is None:
+            print(f"[MIMIC] {attacker.name} não tem Mimic no moveset!")
+            return False
+
+        # Substitui o Mimic pelo move copiado
+        new_move = Move(move_to_copy, move_info)
+        new_move.current_pp = self.params.get("pp_on_copy", 5)  # PP padrão ao copiar
+        new_move.max_pp = move_info.get("pp", 5)
+
+        old_move_name = attacker.moves[mimic_index].name
+        attacker.moves[mimic_index] = new_move
+
+        # Mostra mensagem
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} aprendeu {move_to_copy.upper()}!",
+            duration=2.0
+        )
+
+        print(f"[MIMIC] {attacker.name} copiou {move_to_copy} de {target.name}!")
+        print(f"[MIMIC] {old_move_name} foi substituído por {move_to_copy}!")
+
+        return True
+
     # ===== MÉTODOS DE TRANSFORM (DITTO) =====
 
     def _apply_transform(self, attacker, target, battle_system, effect_manager):
@@ -2106,6 +2272,7 @@ class MoveEffect:
                 del effect_manager.stat_stages[pokemon_id]
 
         return cleared_count
+
     # ===== MÉTODOS DE RAGE =====
     def _apply_rage_mode(self, attacker, target, effect_manager):
         """Aplica o efeito Rage - aumenta Attack quando atingido"""

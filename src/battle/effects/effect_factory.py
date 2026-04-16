@@ -1466,6 +1466,28 @@ class EffectFactory:
             },
             "description": "O usuário se transforma no oponente, copiando sua aparência, moves e stats."
         },
+        "metronome": {
+            "effect_type": "metronome",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "random_move": True,
+                "exclude_moves": ["metronome", "mimic", "struggle", "transform", "counter", "mirror-coat", "protect",
+                                  "detect", "endure"]
+            },
+            "description": "Randomly uses any Pokémon move."
+        },
+
+        "mimic": {
+            "effect_type": "mimic",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "copy_last_move": True,
+                "pp_on_copy": 5
+            },
+            "description": "Copies a move used by the foe."
+        }
     }
 
     @classmethod
