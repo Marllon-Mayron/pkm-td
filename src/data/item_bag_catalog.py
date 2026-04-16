@@ -8,6 +8,12 @@ from pathlib import Path
 # Importa os paths centralizados
 from src.config.paths import PROJECT_ROOT, ITEMS_PATH
 
+# Importa o EffectFactory para pegar descrições dos moves
+from src.battle.effects.effect_factory import EffectFactory
+
+# Importa o MoveData para pegar descrições originais como fallback
+from src.data.move_data import MoveData
+
 
 class ItemBagCatalog:
     """Catálogo de itens da mochila - similar ao Pokedex"""
@@ -36,6 +42,9 @@ class ItemBagCatalog:
         self.root_dir = PROJECT_ROOT
         self.base_path = ITEMS_PATH
 
+        # Inicializa MoveData para fallback
+        self.move_data = MoveData()
+
         # Debug dos caminhos
         print(f"[ItemBagCatalog] Root dir: {self.root_dir}")
         print(f"[ItemBagCatalog] Base path: {self.base_path}")
@@ -45,6 +54,45 @@ class ItemBagCatalog:
         self.items = self._build_item_catalog()
 
         # Não carrega sprites aqui - será feito sob demanda
+
+    def _get_move_description(self, move_name: str) -> str:
+        """
+        Obtém a descrição de um movimento.
+        Prioridade:
+        1. EffectFactory (descrições customizadas para o jogo)
+        2. MoveData (descrições originais do JSON)
+        3. Mensagem padrão
+        """
+        if not move_name:
+            return "Ensina um movimento ao Pokémon"
+
+        # Tenta 1: Buscar no EffectFactory
+        effect = EffectFactory.create_effect(move_name)
+
+        if effect and hasattr(effect, 'description') and effect.description:
+            return effect.description
+
+        # Tenta 2: Buscar diretamente na configuração do EffectFactory
+        move_key = move_name.lower().replace(" ", "-").replace("'", "")
+        config = EffectFactory.MOVE_EFFECTS.get(move_key)
+
+        if config and config.get("description"):
+            return config["description"]
+
+        # Tenta 3: Buscar no MoveData (JSON original)
+        try:
+            move_info = self.move_data.get_move_info(move_name)
+            if move_info and move_info.get("description"):
+                original_desc = move_info["description"]
+                # Limpa a descrição original se necessário
+                if original_desc and original_desc != f"Usa {move_name}.":
+                    return original_desc
+        except Exception as e:
+            print(f"[ItemBagCatalog] Erro ao buscar descrição no MoveData: {e}")
+
+        # Fallback: Mensagem padrão
+        move_display_name = move_name.replace("-", " ").title()
+        return f"Ensina o movimento {move_display_name} ao Pokémon"
 
     def _build_item_catalog(self):
         """Constrói o catálogo de itens usando Path objects"""
@@ -131,7 +179,7 @@ class ItemBagCatalog:
         items["superpotion"] = {
             "id": "superpotion",
             "name": "SUPERPOTION",
-            "sprite_path": medicine_path / "superporion.png",
+            "sprite_path": medicine_path / "superpotion.png",
             "description": "Recupera 50 HP de um Pokémon",
             "category": "medicine",
             "usable_in_battle": True,
@@ -325,11 +373,12 @@ class ItemBagCatalog:
             }
 
         # ===== TMs/HMs =====
+        # Lista de TMs: (id, nome, sprite_file, move_name, unlock_phase, price)
         tms = [
             ("tm_mega_punch", "TM01 - Mega Punch", "machine_NORMAL.png", "mega-punch", "1-3", 2000),
             ("tm_razor_wind", "TM02 - Razor Wind", "machine_NORMAL.png", "razor-wind", "1-4", 1500),
             ("tm_swords_dance", "TM03 - Swords Dance", "machine_NORMAL.png", "swords-dance", "1-5", 1500),
-            ("tm_whirlwind", "TM04 - Whirlwind", "machine_NORMAL.png", "whirlwind", "1-4", 1500),
+            ("tm_whirlwind", "TM04 - Whirlwind", "machine_NORMAL.png", "whirlwind", "1-4", 100),
             ("tm_mega_kick", "TM05 - Mega Kick", "machine_NORMAL.png", "mega-kick", "2-1", 2000),
             ("tm_bubble_beam", "TM11 - Bubble Beam", "machine_WATER.png", "bubble-beam", "2-8", 2000),
             ("tm_teleport", "TM30 - Teleport", "machine_PSYCHIC.png", "teleport", "2-8", 500),
@@ -338,11 +387,14 @@ class ItemBagCatalog:
         ]
 
         for tm_id, tm_name, sprite_file, move_name, unlock_phase, price in tms:
+            # Busca a descrição do movimento (prioridade: EffectFactory -> MoveData -> padrão)
+            move_description = self._get_move_description(move_name)
+
             items[tm_id] = {
                 "id": tm_id,
                 "name": tm_name,
                 "sprite_path": tm_hm_path / sprite_file,
-                "description": f"Ensina o movimento {tm_name} a um Pokémon.",
+                "description": move_description,  # Usa a melhor descrição disponível
                 "category": "tm",
                 "usable_in_battle": False,
                 "usable_on_map": True,
@@ -351,6 +403,7 @@ class ItemBagCatalog:
                 "price": price,
                 "unlock_phase": unlock_phase,
                 "unlock_chapter": None,
+                "move_name": move_name,  # Guarda o nome do movimento para referência
             }
 
         return items
@@ -522,6 +575,32 @@ class ItemBagCatalog:
             return True
 
         return progress_manager.is_phase_completed(unlock_phase)
+
+    def get_move_description(self, item_id):
+        """
+        Método público para obter a descrição do movimento de um TM.
+        Útil se precisar atualizar a descrição dinamicamente.
+        """
+        item = self.get_item(item_id)
+        if item.get("category") == "tm":
+            move_name = item.get("move_name") or item.get("effect_value")
+            if move_name:
+                return self._get_move_description(move_name)
+        return item.get("description", "Ensina um movimento ao Pokémon")
+
+    def refresh_tm_description(self, item_id):
+        """
+        Atualiza a descrição de um TM específico.
+        Útil se as descrições dos moves mudarem em runtime.
+        """
+        item = self.get_item(item_id)
+        if item.get("category") == "tm":
+            move_name = item.get("move_name") or item.get("effect_value")
+            if move_name:
+                new_description = self._get_move_description(move_name)
+                item["description"] = new_description
+                return new_description
+        return item.get("description", "Ensina um movimento ao Pokémon")
 
 
 # Instância global

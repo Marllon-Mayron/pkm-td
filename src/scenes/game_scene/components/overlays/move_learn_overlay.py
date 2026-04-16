@@ -2,6 +2,8 @@
 
 import pygame
 from src.scenes.game_scene.components.overlays.base_overlay import BaseOverlay
+from src.battle.effects.effect_factory import EffectFactory
+from src.data.move_data import MoveData
 
 _FONT_CACHE = {}
 
@@ -18,6 +20,9 @@ class MoveLearnOverlay(BaseOverlay):
         self.hovered_index = -1
         self.animation_time = 0
 
+        # Adiciona MoveData como atributo
+        self.move_data = MoveData()
+
         # Busca informações do novo move
         self._load_new_move_info()
 
@@ -30,7 +35,7 @@ class MoveLearnOverlay(BaseOverlay):
         self.target_zoom = 2.2
 
         # Painel lateral (direita)
-        self.panel_width = 520
+        self.panel_width = 580  # Aumentado para acomodar melhor as informações
         self.panel_padding = 20
 
         # Cores do tema
@@ -41,6 +46,7 @@ class MoveLearnOverlay(BaseOverlay):
             'success': (100, 200, 100),
             'warning': (255, 150, 100),
             'danger': (255, 100, 100),
+            'danger_dark': (180, 60, 60),
             'bg_dark': (15, 20, 35),
             'bg_medium': (25, 30, 50),
             'bg_light': (35, 40, 65),
@@ -59,14 +65,40 @@ class MoveLearnOverlay(BaseOverlay):
             'dark': (112, 88, 72), 'steel': (184, 184, 208), 'fairy': (238, 153, 238)
         }
 
+    def _get_move_description(self, move_name: str) -> str:
+        """Obtém a descrição do movimento (prioridade: EffectFactory -> MoveData)"""
+        move_key = move_name.lower().replace(" ", "-").replace("'", "")
+
+        # Tenta 1: EffectFactory (descrições customizadas do jogo)
+        effect = EffectFactory.create_effect(move_key)
+        if effect and hasattr(effect, 'description') and effect.description:
+            return effect.description
+
+        # Tenta 2: Configuração direta do EffectFactory
+        config = EffectFactory.MOVE_EFFECTS.get(move_key)
+        if config and config.get("description"):
+            return config["description"]
+
+        # Tenta 3: MoveData (descrições originais do JSON)
+        try:
+            move_info = self.move_data.get_move_info(move_name)
+            if move_info and move_info.get("description"):
+                desc = move_info["description"]
+                if desc and not desc.startswith(f"Usa {move_name}"):
+                    return desc
+        except Exception:
+            pass
+
+        return "Um movimento que causa dano ao oponente."
+
     def _load_new_move_info(self):
         """Carrega informações do novo move"""
-        from src.data.move_data import MoveData
-        move_data = MoveData()
-        move_info = move_data.get_move_info(self.new_move_name)
+        move_info = self.move_data.get_move_info(self.new_move_name)
         if move_info:
             from src.entities.move import Move
             self.new_move = Move(self.new_move_name, move_info)
+            print(
+                f"[MoveLearnOverlay] Novo move carregado: {self.new_move.name}, PP: {self.new_move.current_pp}/{self.new_move.max_pp}")
 
     def _get_font(self, size, bold=False):
         """Obtém fonte do cache"""
@@ -85,7 +117,6 @@ class MoveLearnOverlay(BaseOverlay):
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                # Não aprende o novo move
                 self.close(cancel=True)
                 return True
             elif event.key == pygame.K_RETURN:
@@ -105,13 +136,11 @@ class MoveLearnOverlay(BaseOverlay):
                 return True
             elif event.key == pygame.K_LEFT:
                 if self.selected_index >= 0:
-                    # Move para o slot da esquerda
                     if self.selected_index % 2 == 1:
                         self.selected_index -= 1
                 return True
             elif event.key == pygame.K_RIGHT:
                 if self.selected_index >= 0:
-                    # Move para o slot da direita
                     if self.selected_index % 2 == 0 and self.selected_index + 1 < 4:
                         self.selected_index += 1
                 return True
@@ -124,24 +153,23 @@ class MoveLearnOverlay(BaseOverlay):
                 self.selected_index = self.hovered_index
                 return True
             elif self._is_in_new_move_area(event.pos):
-                self.selected_index = -1  # Não aprender
+                self.selected_index = -1
                 return True
 
         return False
 
     def _update_hover(self, mouse_pos):
         """Atualiza o índice do move sob o mouse"""
-        # Verifica hover nos moves existentes
         panel_rect = self._get_panel_rect()
         if not panel_rect.collidepoint(mouse_pos):
             self.hovered_index = -1
             return
 
         # Grid 2x2 para os moves existentes
-        grid_x = panel_rect.x + 50
-        grid_y = panel_rect.y + 200
-        slot_width = (panel_rect.width - 100) // 2
-        slot_height = 100
+        grid_x = panel_rect.x + 40
+        grid_y = panel_rect.y + 240
+        slot_width = (panel_rect.width - 80) // 2
+        slot_height = 110
 
         for i in range(4):
             row = i // 2
@@ -171,10 +199,10 @@ class MoveLearnOverlay(BaseOverlay):
     def _get_cancel_rect(self, panel_rect):
         """Retorna o retângulo da opção de cancelar (não aprender)"""
         return pygame.Rect(
-            panel_rect.x + 50,
-            panel_rect.y + 420,
-            panel_rect.width - 100,
-            60
+            panel_rect.x + 40,
+            panel_rect.y + 490,
+            panel_rect.width - 80,
+            70
         )
 
     def _get_panel_rect(self):
@@ -216,13 +244,7 @@ class MoveLearnOverlay(BaseOverlay):
     def confirm_selection(self):
         """Confirma a seleção e aprende o move"""
         if self.selected_index >= 0:
-            # Substitui o move selecionado
             self.pokemon.replace_move(self.selected_index, self.new_move_name)
-            print(f"[MOVES] {self.pokemon.name} aprendeu {self.new_move_name} (substituiu {self.pokemon.moves[self.selected_index].name if self.selected_index < len(self.pokemon.moves) else '?'})")
-        else:
-            # Não aprende o novo move
-            print(f"[MOVES] {self.pokemon.name} decidiu não aprender {self.new_move_name}")
-
         self.close(cancel=(self.selected_index == -1))
 
     def render(self, screen):
@@ -232,16 +254,12 @@ class MoveLearnOverlay(BaseOverlay):
 
         viewport = self.get_viewport_rect()
 
-        # Fundo escuro semi-transparente
         overlay = pygame.Surface((viewport.width, viewport.height))
         overlay.set_alpha(180)
         overlay.fill((0, 0, 0))
         screen.blit(overlay, (viewport.x, viewport.y))
 
-        # Área do Pokémon (metade esquerda)
         self._render_pokemon_area(screen, viewport)
-
-        # Painel lateral (direita)
         self._render_panel(screen, viewport)
 
     def _render_pokemon_area(self, screen, viewport):
@@ -250,21 +268,18 @@ class MoveLearnOverlay(BaseOverlay):
             self.pokemon.x, self.pokemon.y, self.camera
         )
 
-        # Círculo de fundo
         bg_radius = 75
         bg_center = (int(screen_x), int(screen_y))
 
         pygame.draw.circle(screen, (*self.colors['bg_medium'], 200), bg_center, bg_radius + 8)
         pygame.draw.circle(screen, (*self.colors['bg_dark'], 180), bg_center, bg_radius + 5)
 
-        # Renderiza o Pokémon
         if self.pokemon.sprite:
             sprite_size = 130
             scaled_sprite = pygame.transform.scale(self.pokemon.sprite, (sprite_size, sprite_size))
             sprite_rect = scaled_sprite.get_rect(center=(screen_x, screen_y))
             screen.blit(scaled_sprite, sprite_rect)
 
-        # Nome e nível
         font_name = self._get_font(32, True)
         name_text = f"{self.pokemon.name}"
         name_surf = font_name.render(name_text, True, self.colors['accent'])
@@ -279,10 +294,7 @@ class MoveLearnOverlay(BaseOverlay):
         level_y = screen_y - 70
         screen.blit(level_surf, (level_x, level_y))
 
-        # Tipos
         self._render_types(screen, screen_x, screen_y - 50, self.pokemon.types)
-
-        # Barra de HP
         self._render_hp_bar(screen, screen_x, screen_y + 80, self.pokemon)
 
     def _render_types(self, screen, center_x, y, types):
@@ -398,13 +410,12 @@ class MoveLearnOverlay(BaseOverlay):
         if not self.new_move:
             return
 
-        # Área do novo move
         new_move_y = panel_rect.y + 110
-        new_move_rect = pygame.Rect(panel_rect.x + 50, new_move_y,
-                                    panel_rect.width - 100, 70)
+        new_move_rect = pygame.Rect(panel_rect.x + 40, new_move_y,
+                                    panel_rect.width - 80, 95)
 
-        # Fundo com destaque
-        pygame.draw.rect(screen, (*self.colors['success'], 80), new_move_rect, border_radius=12)
+        # Fundo mais escuro para contraste
+        pygame.draw.rect(screen, (*self.colors['bg_medium'], 200), new_move_rect, border_radius=12)
         pygame.draw.rect(screen, self.colors['success'], new_move_rect, 2, border_radius=12)
 
         # Tipo do move
@@ -436,8 +447,9 @@ class MoveLearnOverlay(BaseOverlay):
 
         # Informações do novo move
         info_x = type_x + type_width + 12
+        info_width = new_move_rect.width - (info_x - new_move_rect.x) - 10
 
-        name_font = self._get_font(22, True)
+        name_font = self._get_font(20, True)
         name_surf = name_font.render(f"{self.new_move.name.upper()}", True, self.colors['accent'])
         screen.blit(name_surf, (info_x, new_move_rect.y + 8))
 
@@ -445,25 +457,60 @@ class MoveLearnOverlay(BaseOverlay):
         category = self.new_move.category.upper()
         cat_color = (255, 100, 100) if category == "PHYSICAL" else (100, 100, 255)
         cat_surf = info_font.render(category, True, cat_color)
-        screen.blit(cat_surf, (info_x, new_move_rect.y + 34))
+        screen.blit(cat_surf, (info_x, new_move_rect.y + 32))
 
+        # Linha de stats: Power e PP (lado a lado)
         power_text = f"PWR: {self.new_move.power}" if self.new_move.power > 0 else "PWR: --"
         power_surf = info_font.render(power_text, True, (255, 255, 255))
-        screen.blit(power_surf, (info_x, new_move_rect.y + 54))
+        screen.blit(power_surf, (info_x, new_move_rect.y + 50))
+
+        # PP do novo move - CORRIGIDO para usar current_pp e max_pp
+        pp_text = f"PP: {self.new_move.current_pp}/{self.new_move.max_pp}"
+        pp_surf = info_font.render(pp_text, True, self.colors.get('move_pp_text', (120, 180, 120)))
+        pp_x = info_x + 100  # Posiciona ao lado do power
+        screen.blit(pp_surf, (pp_x, new_move_rect.y + 50))
+
+        # DESCRIÇÃO - LARGURA TOTAL disponível
+        description = self._get_move_description(self.new_move.name)
+
+        desc_font = self._get_font(14)
+        # Calcula quantos caracteres cabem na largura disponível
+        max_desc_width = info_width
+        desc_lines = []
+        current_line = ""
+
+        for char in description:
+            test_line = current_line + char
+            test_width = desc_font.size(test_line)[0]
+            if test_width <= max_desc_width:
+                current_line = test_line
+            else:
+                if current_line:
+                    desc_lines.append(current_line)
+                current_line = char
+
+        if current_line:
+            desc_lines.append(current_line)
+
+        # Mostra até 2 linhas
+        desc_y = new_move_rect.y + 70
+        for idx, line in enumerate(desc_lines[:2]):
+            desc_surf = desc_font.render(line, True, (220, 220, 180))
+            screen.blit(desc_surf, (info_x, desc_y + (idx * 16)))
 
         # Ícone de "NOVO!"
         new_tag = self._get_font(12, True).render("NOVO!", True, self.colors['success'])
         screen.blit(new_tag, (new_move_rect.right - 55, new_move_rect.y + 5))
 
     def _render_moves_grid(self, screen, panel_rect):
-        """Renderiza os moves existentes em grid 2x2"""
+        """Renderiza os moves existentes em grid 2x2 com descrição"""
         if not self.pokemon.moves:
             return
 
-        grid_x = panel_rect.x + 50
-        grid_y = panel_rect.y + 200
-        slot_width = (panel_rect.width - 100) // 2
-        slot_height = 100
+        grid_x = panel_rect.x + 40
+        grid_y = panel_rect.y + 240
+        slot_width = (panel_rect.width - 80) // 2
+        slot_height = 110
 
         for i in range(min(4, len(self.pokemon.moves))):
             move = self.pokemon.moves[i]
@@ -479,7 +526,7 @@ class MoveLearnOverlay(BaseOverlay):
                                    move, is_selected, is_hovered)
 
     def _render_move_slot(self, screen, x, y, width, height, move, is_selected, is_hovered):
-        """Renderiza um slot de move individual"""
+        """Renderiza um slot de move individual com descrição"""
         # Fundo
         if is_selected:
             bg_color = (*self.colors['primary'], 80)
@@ -495,12 +542,12 @@ class MoveLearnOverlay(BaseOverlay):
         pygame.draw.rect(screen, bg_color, rect, border_radius=12)
         pygame.draw.rect(screen, border_color, rect, 2, border_radius=12)
 
-        # Tipo do move (pequeno)
+        # Tipo do move
         type_name = move.type.capitalize()
         type_color = self.type_colors.get(move.type.lower(), (150, 150, 150))
         type_width = 55
         type_x = rect.x + 8
-        type_y = rect.centery - 20
+        type_y = rect.y + 8
 
         type_rect = pygame.Rect(type_x, type_y, type_width, 40)
         pygame.draw.rect(screen, type_color, type_rect, border_radius=6)
@@ -522,46 +569,71 @@ class MoveLearnOverlay(BaseOverlay):
         info_font = self._get_font(11)
         pp_text = f"PP: {move.current_pp}/{move.max_pp}"
         pp_surf = info_font.render(pp_text, True, self.colors['text_dim'])
-        screen.blit(pp_surf, (info_x, rect.y + 32))
+        screen.blit(pp_surf, (info_x, rect.y + 28))
 
         power_text = f"PWR: {move.power}" if move.power > 0 else "PWR: --"
         power_surf = info_font.render(power_text, True, self.colors['text_dim'])
-        screen.blit(power_surf, (info_x, rect.y + 48))
+        screen.blit(power_surf, (info_x, rect.y + 44))
+
+        # Descrição do move - COR MAIS LEGÍVEL
+        description = self._get_move_description(move.name)
+        if len(description) > 38:
+            description = description[:35] + "..."
+
+        desc_font = self._get_font(12)
+        # Mudando para amarelo claro/bege para melhor contraste
+        desc_surf = desc_font.render(description, True, (200, 200, 160))
+        screen.blit(desc_surf, (info_x, rect.y + 62))
+
+        # Indicador de selecionado
+        if is_selected:
+            selected_rect = rect.inflate(-4, -4)
+            pygame.draw.rect(screen, self.colors['accent'], selected_rect, 2, border_radius=10)
 
     def _render_cancel_option(self, screen, panel_rect):
-        """Renderiza a opção de não aprender o novo move"""
+        """Renderiza a opção de não aprender o novo move com legenda"""
         cancel_rect = self._get_cancel_rect(panel_rect)
         is_selected = (self.selected_index == -1)
 
         # Fundo
         if is_selected:
-            bg_color = (*self.colors['danger'], 80)
+            bg_color = (*self.colors['danger'], 100)
             border_color = self.colors['danger']
         else:
-            bg_color = (*self.colors['bg_medium'], 100)
+            bg_color = (*self.colors['danger_dark'], 60)
             border_color = self.colors['border']
 
         pygame.draw.rect(screen, bg_color, cancel_rect, border_radius=12)
         pygame.draw.rect(screen, border_color, cancel_rect, 2, border_radius=12)
 
-        # Texto
+        # Texto principal - BRANCO para contraste
         font = self._get_font(18, is_selected)
-        text = font.render("✗ NÃO APRENDER ESTE ATAQUE", True, self.colors['danger'] if is_selected else self.colors['text_dim'])
+        text_color = (255, 255, 255) if is_selected else self.colors['text_dim']
+        text = font.render("NÃO APRENDER ESTE ATAQUE", True, text_color)
         text_x = cancel_rect.centerx - text.get_width() // 2
-        text_y = cancel_rect.centery - text.get_height() // 2
+        text_y = cancel_rect.centery - 12
         screen.blit(text, (text_x, text_y))
+
+        # Legenda explicativa - COR MAIS CLARA
+        legend_font = self._get_font(12)
+        legend_text = "O Pokémon não aprenderá este novo ataque"
+        legend_color = (200, 200, 160) if is_selected else (140, 140, 120)
+        legend_surf = legend_font.render(legend_text, True, legend_color)
+        legend_x = cancel_rect.centerx - legend_surf.get_width() // 2
+        legend_y = cancel_rect.centery + 15
+        screen.blit(legend_surf, (legend_x, legend_y))
 
     def _render_instructions(self, screen, panel_rect):
         """Renderiza as instruções na parte inferior"""
-        inst_y = panel_rect.bottom - 50
+        inst_y = panel_rect.bottom - 55
         font = self._get_font(12)
 
         inst_bg = pygame.Rect(panel_rect.x + 15, inst_y - 5,
-                              panel_rect.width - 30, 40)
+                              panel_rect.width - 30, 45)
         pygame.draw.rect(screen, (*self.colors['bg_medium'], 150), inst_bg, border_radius=8)
 
         instructions = [
-            ("SETAS/WASD", "NAVEGAR"),
+            ("SETAS/CLICK", "SELECIONAR"),
             ("ENTER", "CONFIRMAR"),
             ("ESC", "NÃO APRENDER")
         ]

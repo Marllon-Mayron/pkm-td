@@ -1,7 +1,11 @@
+# src/ui/pokemon_modal.py
+
 import pygame
 import random
 import math
 from src.data.pokedex import Pokedex
+from src.battle.effects.effect_factory import EffectFactory
+from src.data.move_data import MoveData
 
 
 class PokemonModal:
@@ -9,10 +13,11 @@ class PokemonModal:
         self.game = game
         self.pokemon = pokemon
         self.pokedex = Pokedex()
+        self.move_data = MoveData()
         self.visible = True
         self.current_page = 0
         self.total_pages = 3
-        self.confirmation_active = False  # Estado da confirmação de libertação
+        self.confirmation_active = False
         self._setup_dimensions()
 
         self.particle_timer = 0
@@ -80,8 +85,8 @@ class PokemonModal:
             return "HORRIVEL", self.colors['iv_horrible']
 
     def _setup_dimensions(self):
-        self.width = int(self.game.screen_manager.window_width * 0.8)
-        self.height = int(self.game.screen_manager.window_height * 0.85)
+        self.width = int(self.game.screen_manager.window_width * 0.85)
+        self.height = int(self.game.screen_manager.window_height * 0.9)
         self.x = (self.game.screen_manager.window_width - self.width) // 2
         self.y = (self.game.screen_manager.window_height - self.height) // 2
 
@@ -105,16 +110,13 @@ class PokemonModal:
             page_button_height
         )
 
-        # Configuração dos dois botões lado a lado
         button_width = 165
         button_height = 44
         button_spacing = 15
 
-        # Calcula posição central para os dois botões
         total_buttons_width = (button_width * 2) + button_spacing
         start_x = self.x + (self.width - total_buttons_width) // 2
 
-        # Botão de ação (adicionar/remover) - ESQUERDA
         self.action_button = pygame.Rect(
             start_x,
             self.y + self.height - 60,
@@ -122,7 +124,6 @@ class PokemonModal:
             button_height
         )
 
-        # Botão de libertar - DIREITA
         self.release_button = pygame.Rect(
             start_x + button_width + button_spacing,
             self.y + self.height - 60,
@@ -130,7 +131,6 @@ class PokemonModal:
             button_height
         )
 
-        # Botões de confirmação (SIM/NÃO)
         confirm_width = 110
         confirm_height = 40
         confirm_spacing = 20
@@ -153,7 +153,6 @@ class PokemonModal:
         )
 
     def _create_shiny_particles(self, sprite_x, sprite_y, sprite_size):
-        """Cria partículas brilhantes ao redor do sprite shiny"""
         for _ in range(4):
             angle = random.uniform(0, math.pi * 2)
             radius = random.uniform(sprite_size // 2 + 5, sprite_size // 2 + 25)
@@ -173,7 +172,6 @@ class PokemonModal:
             })
 
     def _update_shiny_particles(self):
-        """Atualiza as partículas shiny"""
         for particle in self.particles[:]:
             particle['x'] += particle['vx']
             particle['y'] += particle['vy']
@@ -182,27 +180,54 @@ class PokemonModal:
                 self.particles.remove(particle)
 
     def _draw_shiny_particles(self, screen):
-        """Desenha as partículas brilhantes"""
         for particle in self.particles:
-            alpha = int(particle['life'] * 200)
             color = (particle['color'][0], particle['color'][1], particle['color'][2])
-
             pygame.draw.circle(screen, color,
                                (int(particle['x']), int(particle['y'])),
                                particle['size'])
+
+    def _get_move_description(self, move_name: str) -> str:
+        """Obtém a descrição do movimento (prioridade: EffectFactory -> MoveData)"""
+        move_key = move_name.lower().replace(" ", "-").replace("'", "")
+
+        # Tenta EffectFactory
+        effect = EffectFactory.create_effect(move_key)
+        if effect and hasattr(effect, 'description') and effect.description:
+            desc = effect.description
+            # Limita tamanho para caber no card
+            if len(desc) > 85:
+                desc = desc[:82] + "..."
+            return desc
+
+        # Tenta configuração direta
+        config = EffectFactory.MOVE_EFFECTS.get(move_key)
+        if config and config.get("description"):
+            desc = config["description"]
+            if len(desc) > 85:
+                desc = desc[:82] + "..."
+            return desc
+
+        # Tenta MoveData
+        move_info = self.move_data.get_move_info(move_name)
+        if move_info and move_info.get("description"):
+            desc = move_info["description"]
+            if desc and not desc.startswith(f"Usa {move_name}"):
+                if len(desc) > 85:
+                    desc = desc[:82] + "..."
+                return desc
+
+        return "Um movimento que causa dano ao oponente."
 
     def handle_event(self, event):
         if not self.visible:
             return None
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # Fechar modal
             if self.close_button.collidepoint(event.pos):
                 self.visible = False
                 self.confirmation_active = False
                 return "close"
 
-            # Navegação de páginas
             if self.prev_page_button.collidepoint(event.pos) and self.current_page > 0:
                 self.current_page -= 1
                 self.confirmation_active = False
@@ -213,7 +238,6 @@ class PokemonModal:
                 self.confirmation_active = False
                 return None
 
-            # Se confirmação está ativa, processa SIM/NÃO
             if self.confirmation_active:
                 if self.confirm_yes_button.collidepoint(event.pos):
                     self.confirmation_active = False
@@ -223,18 +247,15 @@ class PokemonModal:
                     return None
                 return None
 
-            # Botão de ação (adicionar/remover)
             if self.action_button.collidepoint(event.pos):
                 if not self.pokemon.is_in_team and len(self.game.player.team) >= 6:
                     return None
                 return "action"
 
-            # Botão de libertar - ativa confirmação
             if self.release_button.collidepoint(event.pos):
                 self.confirmation_active = True
                 return None
 
-            # Fechar ao clicar fora
             if not self.rect.collidepoint(event.pos):
                 self.visible = False
                 self.confirmation_active = False
@@ -252,7 +273,6 @@ class PokemonModal:
             pygame.draw.rect(screen, border_color, rect, border, border_radius=radius)
 
     def _draw_sparkle(self, screen, x, y, size, color):
-        """Desenha uma estrela/brilho pequena"""
         points = []
         for i in range(4):
             angle = math.radians(i * 90)
@@ -266,34 +286,95 @@ class PokemonModal:
             pygame.draw.polygon(screen, color, points, 1)
 
     def _draw_move_card(self, screen, move, x, y, width):
-        card_height = 72
+        """Renderiza um card de movimento - PP e Categoria alinhados à direita"""
+        card_height = 135
         move_rect = pygame.Rect(x, y, width, card_height)
-        self._draw_rounded_rect(screen, self.colors['move_bg'], move_rect, radius=8)
-        self._draw_rounded_rect(screen, self.colors['move_border'], move_rect, radius=8, border=1)
 
-        name_font = pygame.font.Font(None, 15)
-        stats_font = pygame.font.Font(None, 12)
+        # Fundo do card
+        self._draw_rounded_rect(screen, self.colors['move_bg'], move_rect, radius=10)
+        self._draw_rounded_rect(screen, self.colors['move_border'], move_rect, radius=10, border=2)
 
+        # Nome do movimento (esquerda)
+        name_font = pygame.font.Font(None, 20)
         name_text = name_font.render(move.name.upper(), True, self.colors['text_accent'])
         screen.blit(name_text, (x + 12, y + 10))
 
+        # Badge do tipo (direita)
         type_color = self._get_type_color(move.type)
-        type_rect = pygame.Rect(x + width - 65, y + 8, 55, 22)
-        pygame.draw.rect(screen, type_color, type_rect, border_radius=6)
-        type_text = pygame.font.Font(None, 10).render(move.type.upper(), True, (255, 255, 255))
-        screen.blit(type_text,
-                    (type_rect.centerx - type_text.get_width() // 2, type_rect.centery - type_text.get_height() // 2))
+        type_rect = pygame.Rect(x + width - 75, y + 8, 65, 26)
+        pygame.draw.rect(screen, type_color, type_rect, border_radius=8)
+        type_font = pygame.font.Font(None, 14)
+        type_text = type_font.render(move.type.upper(), True, (255, 255, 255))
+        screen.blit(type_text, (type_rect.centerx - type_text.get_width() // 2,
+                                type_rect.centery - type_text.get_height() // 2))
 
-        stats_y = y + 38
-        power_text = stats_font.render(f"PWR: {move.power if move.power > 0 else '--'}", True,
-                                       self.colors['text_secondary'])
+        # Stats do movimento
+        stats_font = pygame.font.Font(None, 14)
+        stats_y = y + 44
+
+        # Poder (esquerda)
+        power_text = stats_font.render(f"Poder: {move.power if move.power > 0 else '--'}", True,
+                                       self.colors['text_primary'])
         screen.blit(power_text, (x + 12, stats_y))
 
-        acc_text = stats_font.render(f"ACC: {move.accuracy}", True, self.colors['text_secondary'])
-        screen.blit(acc_text, (x + 85, stats_y))
+        # Acerto (esquerda)
+        acc_text = stats_font.render(f"Acerto: {move.accuracy}%", True, self.colors['text_primary'])
+        screen.blit(acc_text, (x + 12, stats_y + 20))
 
-        pp_text = stats_font.render(f"PP: {move.current_pp}/{move.max_pp}", True, self.colors['move_pp_text'])
-        screen.blit(pp_text, (x + width - 75, stats_y))
+        # PP (direita - alinhado com o tipo)
+        pp_text = stats_font.render(f"PP: {move.current_pp}/{move.max_pp}", True,
+                                    self.colors['move_pp_text'])
+        pp_width = pp_text.get_width()
+        screen.blit(pp_text, (x + width - pp_width - 12, stats_y))
+
+        # Categoria (direita - abaixo do PP)
+        if move.power > 0:
+            category = "FÍSICO" if move.category == "physical" else "ESPECIAL"
+            cat_color = (255, 180, 100) if move.category == "physical" else (100, 180, 255)
+        else:
+            category = "STATUS"
+            cat_color = (180, 180, 180)
+
+        cat_text = stats_font.render(category, True, cat_color)
+        cat_width = cat_text.get_width()
+        screen.blit(cat_text, (x + width - cat_width - 12, stats_y + 20))
+
+        # Linha separadora
+        separator_y = y + 88
+        pygame.draw.line(screen, self.colors['border'],
+                         (x + 10, separator_y), (x + width - 10, separator_y), 1)
+
+        # Descrição do movimento
+        desc = self._get_move_description(move.name)
+        desc_font = pygame.font.Font(None, 18)
+
+        # Quebra a descrição em até 2 linhas
+        words = desc.split()
+        lines = []
+        current_line = []
+        current_width = 0
+        max_width = width - 24
+
+        for word in words:
+            test_line = current_line + [word]
+            test_text = " ".join(test_line)
+            test_width = desc_font.size(test_text)[0]
+
+            if test_width <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(" ".join(current_line))
+                current_line = [word]
+
+        if current_line:
+            lines.append(" ".join(current_line))
+
+        # Mostra até 2 linhas de descrição
+        desc_y = separator_y + 8
+        for idx, line in enumerate(lines[:2]):
+            line_surface = desc_font.render(line, True, self.colors['text_secondary'])
+            screen.blit(line_surface, (x + 12, desc_y + (idx * 16)))
 
     def render(self, screen):
         if not self.visible:
@@ -340,7 +421,6 @@ class PokemonModal:
                     self._draw_sparkle(screen, sparkle_x, sparkle_y, sparkle_size, sparkle_color)
 
         name_font = pygame.font.Font(None, 26)
-
         name_text = name_font.render(f"{self.pokemon.name}  Lv.{self.pokemon.level}", True, self.colors['text_accent'])
         name_x = self.x + (self.width - name_text.get_width()) // 2
         screen.blit(name_text, (name_x, sprite_y + sprite_size))
@@ -379,15 +459,12 @@ class PokemonModal:
         screen.blit(prev_text, (self.prev_page_button.centerx - 8, self.prev_page_button.centery - 11))
         screen.blit(next_text, (self.next_page_button.centerx - 8, self.next_page_button.centery - 11))
 
-        # Se confirmação está ativa, mostra overlay de confirmação
         if self.confirmation_active:
-            # Overlay escuro semi-transparente para destacar confirmação
             confirm_overlay = pygame.Surface((self.width, self.height))
             confirm_overlay.set_alpha(200)
             confirm_overlay.fill((0, 0, 0))
             screen.blit(confirm_overlay, (self.x, self.y))
 
-            # Fundo da caixa de confirmação
             confirm_box = pygame.Rect(
                 self.x + self.width // 4,
                 self.y + self.height // 3,
@@ -397,26 +474,22 @@ class PokemonModal:
             self._draw_rounded_rect(screen, self.colors['bg_secondary'], confirm_box, radius=12)
             self._draw_rounded_rect(screen, self.colors['border'], confirm_box, radius=12, border=2)
 
-            # Texto de confirmação
             confirm_font = pygame.font.Font(None, 20)
             confirm_text = confirm_font.render("Tem certeza que deseja LIBERTAR este Pokémon?", True, (255, 200, 200))
             confirm_rect = confirm_text.get_rect(center=(confirm_box.centerx, confirm_box.y + 30))
             screen.blit(confirm_text, confirm_rect)
 
-            # Aviso de irreversibilidade
             warning_font = pygame.font.Font(None, 14)
             warning_text = warning_font.render("Esta ação é IRREVERSÍVEL!", True, (255, 100, 100))
             warning_rect = warning_text.get_rect(center=(confirm_box.centerx, confirm_box.y + 55))
             screen.blit(warning_text, warning_rect)
 
-            # Nome do Pokémon sendo libertado
             pokemon_font = pygame.font.Font(None, 18)
             pokemon_text = pokemon_font.render(f"{self.pokemon.name} Lv.{self.pokemon.level}", True,
                                                self.colors['text_accent'])
             pokemon_rect = pokemon_text.get_rect(center=(confirm_box.centerx, confirm_box.y + 78))
             screen.blit(pokemon_text, pokemon_rect)
 
-            # Botão SIM
             self._draw_rounded_rect(screen, (180, 60, 60), self.confirm_yes_button, radius=8)
             self._draw_rounded_rect(screen, (220, 80, 80), self.confirm_yes_button, radius=8, border=1)
             sim_font = pygame.font.Font(None, 18)
@@ -424,20 +497,14 @@ class PokemonModal:
             sim_rect = sim_text.get_rect(center=self.confirm_yes_button.center)
             screen.blit(sim_text, sim_rect)
 
-            # Botão NÃO
             self._draw_rounded_rect(screen, (60, 60, 80), self.confirm_no_button, radius=8)
             self._draw_rounded_rect(screen, (80, 80, 100), self.confirm_no_button, radius=8, border=1)
             nao_font = pygame.font.Font(None, 18)
             nao_text = nao_font.render("NÃO, CANCELAR", True, (255, 255, 255))
             nao_rect = nao_text.get_rect(center=self.confirm_no_button.center)
             screen.blit(nao_text, nao_rect)
-
-            # Não renderiza os botões normais em modo confirmação
             return
 
-        # Renderiza botões normais (quando não está em confirmação)
-
-        # Botão de ação (Adicionar/Remover)
         if self.pokemon.is_in_team:
             button_color = (120, 60, 60)
             button_text = "REMOVER DO TIME"
@@ -457,39 +524,26 @@ class PokemonModal:
         action_rect = action_surf.get_rect(center=self.action_button.center)
         screen.blit(action_surf, action_rect)
 
-        # Botão de LIBERTAR
-        if self.pokemon.is_in_team:
-            release_color = (150, 40, 40)  # Vermelho escuro
-            release_text = "LIBERTAR"
-        else:
-            release_color = (180, 50, 50)  # Vermelho vivo
-            release_text = "LIBERTAR"
-
+        release_color = (150, 40, 40) if self.pokemon.is_in_team else (180, 50, 50)
         self._draw_rounded_rect(screen, release_color, self.release_button, radius=10)
         self._draw_rounded_rect(screen, (200, 70, 70), self.release_button, radius=10, border=1)
 
         release_font = pygame.font.Font(None, 15)
-        release_surf = release_font.render(release_text, True, (255, 255, 255))
+        release_surf = release_font.render("LIBERTAR", True, (255, 255, 255))
         release_rect = release_surf.get_rect(center=self.release_button.center)
         screen.blit(release_surf, release_rect)
 
     def _calculate_actual_ev_bonus(self, stat: str) -> int:
-        """
-        Calcula o bônus REAL que os EVs estão fornecendo no nível atual.
-        Retorna quantos pontos de stat os EVs estão contribuindo.
-        """
         ev_value = self.pokemon.evs.get(stat, 0)
-        ev_bonus_raw = ev_value // 8  # Bônus teórico no level 100
+        ev_bonus_raw = ev_value // 8
 
         if ev_bonus_raw == 0:
             return 0
 
-        # Calcula o stat COM e SEM os EVs para ver a diferença real
         base = self.pokemon.base_stats[stat]
         iv = self.pokemon.ivs.get(stat, 0)
         level = self.pokemon.level
 
-        # Fórmula: ((2 * Base + IV + Bônus_EV) * Level/100) + (5 ou Level+10)
         if stat == 'hp':
             stat_with_evs = ((2 * base + iv + ev_bonus_raw) * level) // 100 + level + 10
             stat_without_evs = ((2 * base + iv) * level) // 100 + level + 10
@@ -507,7 +561,6 @@ class PokemonModal:
         left_col = pygame.Rect(content_rect.x, content_rect.y, left_width, content_rect.height)
         right_col = pygame.Rect(content_rect.x + left_width + 15, content_rect.y, right_width, content_rect.height)
 
-        # ===== STATS ATUAIS (LADO ESQUERDO) =====
         stats_title = section_font.render("STATS ATUAIS", True, self.colors['text_accent'])
         stats_title_x = left_col.x + (left_col.width - stats_title.get_width()) // 2
         screen.blit(stats_title, (stats_title_x, left_col.y))
@@ -562,7 +615,6 @@ class PokemonModal:
             screen.blit(nature_text, (nature_card.centerx - nature_text.get_width() // 2,
                                       nature_card.centery - nature_text.get_height() // 2))
 
-        # ===== VALORES INDIVIDUAIS (IVs) - LADO DIREITO =====
         iv_title = section_font.render("VALORES INDIVIDUAIS", True, self.colors['text_accent'])
         iv_title_x = right_col.x + (right_col.width - iv_title.get_width()) // 2
         screen.blit(iv_title, (iv_title_x, right_col.y))
@@ -628,7 +680,6 @@ class PokemonModal:
                 rank_surf = rank_font.render(rank_text, True, rank_color)
                 screen.blit(rank_surf, (card_rect.x + card_rect.width - rank_surf.get_width() - 12, card_rect.y + 18))
 
-        # ===== EFFORT VALUES (EVs) =====
         ev_section_y = iv_start_y + 5 + (len(iv_list) * iv_spacing)
 
         if ev_section_y < right_col.bottom:
@@ -643,7 +694,6 @@ class PokemonModal:
             value_font = pygame.font.Font(None, 15)
             bonus_font = pygame.font.Font(None, 12)
 
-            # Mapeamento dos stats para cálculo do bônus real
             ev_stats = [
                 ("HP", self.pokemon.evs.get('hp', 0), 'hp'),
                 ("ATAQUE", self.pokemon.evs.get('attack', 0), 'attack'),
@@ -692,7 +742,6 @@ class PokemonModal:
                     value_text = value_font.render(str(ev_value), True, ev_color)
                     screen.blit(value_text, (card_rect.centerx - 20, card_rect.y + 9))
 
-                    # CALCULA O BÔNUS REAL BASEADO NO NÍVEL ATUAL
                     actual_bonus = self._calculate_actual_ev_bonus(stat_key)
 
                     if actual_bonus > 0:
@@ -736,20 +785,22 @@ class PokemonModal:
                                      (bar_x, bar_y, int(bar_width * ev_percent), bar_height), border_radius=5)
 
     def _render_moves_page(self, screen, content_rect):
-        section_font = pygame.font.Font(None, 18)
+        """Renderiza página de moves - Layout 2x2 como nos jogos originais"""
+        section_font = pygame.font.Font(None, 24)
         moves_title = section_font.render("MOVIMENTOS", True, self.colors['text_accent'])
         moves_title_x = content_rect.x + (content_rect.width - moves_title.get_width()) // 2
         screen.blit(moves_title, (moves_title_x, content_rect.y))
 
-        pygame.draw.line(screen, self.colors['border'], (content_rect.x + 10, content_rect.y + 22),
-                         (content_rect.x + content_rect.width - 10, content_rect.y + 22), 1)
+        pygame.draw.line(screen, self.colors['border'], (content_rect.x + 10, content_rect.y + 32),
+                         (content_rect.x + content_rect.width - 10, content_rect.y + 32), 2)
 
+        # Layout 2 colunas
         cards_per_row = 2
-        card_width = (content_rect.width - 20) // cards_per_row
-        card_height = 72
+        card_width = (content_rect.width - 30) // cards_per_row
+        card_height = 135
         start_x = content_rect.x
-        start_y = content_rect.y + 45
-        spacing = 12
+        start_y = content_rect.y + 50
+        spacing = 15
 
         for i in range(4):
             row = i // cards_per_row
@@ -762,10 +813,10 @@ class PokemonModal:
                     self._draw_move_card(screen, self.pokemon.moves[i], card_x, card_y, card_width)
                 else:
                     empty_rect = pygame.Rect(card_x, card_y, card_width, card_height)
-                    self._draw_rounded_rect(screen, (25, 27, 32), empty_rect, radius=8)
-                    self._draw_rounded_rect(screen, (40, 43, 50), empty_rect, radius=8, border=1)
-                    empty_font = pygame.font.Font(None, 13)
-                    empty_text = empty_font.render("─ VAZIO ─", True, (60, 65, 75))
+                    self._draw_rounded_rect(screen, (25, 27, 32), empty_rect, radius=10)
+                    self._draw_rounded_rect(screen, (40, 43, 50), empty_rect, radius=10, border=2)
+                    empty_font = pygame.font.Font(None, 14)
+                    empty_text = empty_font.render("─ VAZIO ─", True, (80, 85, 95))
                     text_rect = empty_text.get_rect(center=empty_rect.center)
                     screen.blit(empty_text, text_rect)
 

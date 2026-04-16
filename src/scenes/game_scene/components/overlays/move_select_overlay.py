@@ -3,6 +3,8 @@
 import pygame
 import math
 from src.scenes.game_scene.components.overlays.base_overlay import BaseOverlay
+from src.battle.effects.effect_factory import EffectFactory
+from src.data.move_data import MoveData
 
 # Cache de fontes
 _FONT_CACHE = {}
@@ -17,6 +19,9 @@ class MoveSelectOverlay(BaseOverlay):
         self.selected_index = pokemon.current_move_index if hasattr(pokemon, 'current_move_index') else 0
         self.hovered_index = -1
         self.animation_time = 0
+
+        # Adiciona MoveData como atributo
+        self.move_data = MoveData()
 
         # Configuração de zoom (MESMO MECANISMO DO SCROLL DO MOUSE)
         self.original_camera_pos = (self.camera.x, self.camera.y)
@@ -70,6 +75,34 @@ class MoveSelectOverlay(BaseOverlay):
             _FONT_CACHE[key] = font
         return _FONT_CACHE[key]
 
+    def _get_move_description(self, move_name: str) -> str:
+        """Obtém a descrição do movimento (prioridade: EffectFactory -> MoveData)"""
+        move_key = move_name.lower().replace(" ", "-").replace("'", "")
+
+        # Tenta 1: EffectFactory (descrições customizadas do jogo)
+        effect = EffectFactory.create_effect(move_key)
+        if effect and hasattr(effect, 'description') and effect.description:
+            return effect.description
+
+        # Tenta 2: Configuração direta do EffectFactory
+        config = EffectFactory.MOVE_EFFECTS.get(move_key)
+        if config and config.get("description"):
+            return config["description"]
+
+        # Tenta 3: MoveData (descrições originais do JSON)
+        try:
+            move_info = self.move_data.get_move_info(move_name)
+            if move_info and move_info.get("description"):
+                desc = move_info["description"]
+                # Verifica se não é a descrição genérica
+                if desc and not desc.startswith(f"Usa {move_name}"):
+                    return desc
+        except Exception as e:
+            print(f"[MoveSelectOverlay] Erro ao buscar descrição: {e}")
+
+        # Fallback: descrição básica baseada nos dados do move
+        return "Um movimento que causa dano ao oponente."
+
     def handle_event(self, event):
         """Processa eventos do overlay"""
         if not self.active:
@@ -108,12 +141,13 @@ class MoveSelectOverlay(BaseOverlay):
             self.hovered_index = -1
             return
 
-        start_y = panel_rect.y + 150
-        item_height = 95
+        start_y = panel_rect.y + 115
+        item_height = 105  # Altura total incluindo espaçamento
+        spacing = 8  # Espaçamento entre cards
 
         relative_y = mouse_pos[1] - start_y
         if relative_y >= 0:
-            idx = relative_y // item_height
+            idx = relative_y // (item_height + spacing)
             if 0 <= idx < len(self.pokemon.moves):
                 self.hovered_index = idx
                 return
@@ -210,7 +244,7 @@ class MoveSelectOverlay(BaseOverlay):
         bg_radius = 75
         bg_center = (int(screen_x), int(screen_y))
 
-        # Círculo de fundo (sem círculos amarelos)
+        # Círculo de fundo
         pygame.draw.circle(screen, (*self.colors['bg_medium'], 200), bg_center, bg_radius + 8)
         pygame.draw.circle(screen, (*self.colors['bg_dark'], 180), bg_center, bg_radius + 5)
 
@@ -378,7 +412,9 @@ class MoveSelectOverlay(BaseOverlay):
             return
 
         start_y = panel_rect.y + 115
-        item_height = 95
+        item_height = 97  # Altura do card (um pouco menor que o espaçamento)
+        spacing = 8  # Espaçamento entre os cards
+        total_height = item_height + spacing
         max_visible = 5
         visible_count = min(len(self.pokemon.moves), max_visible)
 
@@ -387,7 +423,7 @@ class MoveSelectOverlay(BaseOverlay):
                 break
 
             move = self.pokemon.moves[i]
-            item_y = start_y + i * item_height
+            item_y = start_y + i * total_height
             is_selected = (i == self.selected_index)
             is_hovered = (i == self.hovered_index)
             is_current = (i == self.pokemon.current_move_index)
@@ -395,10 +431,10 @@ class MoveSelectOverlay(BaseOverlay):
             self._render_move_item(screen, panel_rect, item_y, move, is_selected, is_hovered, is_current)
 
     def _render_move_item(self, screen, panel_rect, y, move, is_selected, is_hovered, is_current):
-        """Renderiza um item de move individual"""
+        """Renderiza um item de move individual com descrição correta"""
         margin = 15
         item_rect = pygame.Rect(panel_rect.x + margin, y,
-                                panel_rect.width - margin * 2, 88)
+                                panel_rect.width - margin * 2, 97)
 
         # Fundo
         if is_selected:
@@ -427,10 +463,10 @@ class MoveSelectOverlay(BaseOverlay):
         type_color = self.type_colors.get(move.type.lower(), (150, 150, 150))
         type_width = 70
         type_x = item_rect.x + 12
-        type_y = item_rect.centery - 28
+        type_y = item_rect.centery - 30
 
         # Quadrado do tipo
-        type_rect = pygame.Rect(type_x, type_y, type_width, 56)
+        type_rect = pygame.Rect(type_x, type_y, type_width, 60)
         pygame.draw.rect(screen, type_color, type_rect, border_radius=8)
         pygame.draw.rect(screen, (255, 255, 255, 100), type_rect, 2, border_radius=8)
 
@@ -446,11 +482,11 @@ class MoveSelectOverlay(BaseOverlay):
             text1_x = type_x + (type_width - text1.get_width()) // 2
             text2_x = type_x + (type_width - text2.get_width()) // 2
             screen.blit(text1, (text1_x, type_y + 12))
-            screen.blit(text2, (text2_x, type_y + 32))
+            screen.blit(text2, (text2_x, type_y + 34))
         else:
             text = type_font.render(type_name, True, (255, 255, 255))
             text_x = type_x + (type_width - text.get_width()) // 2
-            text_y = type_y + (56 - text.get_height()) // 2
+            text_y = type_y + (60 - text.get_height()) // 2
             screen.blit(text, (text_x, text_y))
 
         # Área de informações do move
@@ -486,11 +522,24 @@ class MoveSelectOverlay(BaseOverlay):
         acc_surf = info_font.render(acc_text, True, (255, 255, 255))
         screen.blit(acc_surf, (info_x + 220, stats_y))
 
-        # Descrição
-        desc = move.description[:45] + "..." if len(move.description) > 45 else move.description
-        desc_font = self._get_font(12)
+        # DESCRIÇÃO CORRETA - Busca a descrição do movimento
+        correct_description = self._get_move_description(move.name)
+
+        # Limita o tamanho da descrição para caber no card
+        max_desc_length = 55
+        if len(correct_description) > max_desc_length:
+            # Tenta cortar no último espaço antes do limite
+            cut_at = correct_description[:max_desc_length].rfind(' ')
+            if cut_at > 0:
+                desc = correct_description[:cut_at] + "..."
+            else:
+                desc = correct_description[:max_desc_length] + "..."
+        else:
+            desc = correct_description
+
+        desc_font = self._get_font(16)
         desc_surf = desc_font.render(desc, True, self.colors['text_dim'])
-        screen.blit(desc_surf, (info_x, item_rect.y + 74))
+        screen.blit(desc_surf, (info_x, item_rect.y + 78))
 
         # Indicador de selecionado
         if is_selected:
