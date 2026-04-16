@@ -16,9 +16,18 @@ class PokemonStats:
         self.pokemon = pokemon
 
     def calculate_stats(self):
-        """Calcula stats baseado em level, IVs e EVs"""
-        stats = self.pokemon.pokedex.calculate_stats(
-            self.pokemon.id,
+        """Calcula stats baseado em level, IVs e EVs - SUPORTA TRANSFORM"""
+
+        # ===== VERIFICA SE ESTÁ TRANSFORMADO =====
+        if hasattr(self.pokemon, '_is_transformed') and self.pokemon._is_transformed:
+            # Usa os base_stats copiados do oponente
+            base_stats = self.pokemon.base_stats
+        else:
+            # Usa os base_stats originais
+            base_stats = self.pokemon.pokedex.get_pokemon(self.pokemon.id)["base_stats"]
+
+        stats = self.pokemon.pokedex.calculate_stats_with_base(
+            base_stats,
             self.pokemon.level,
             self.pokemon.ivs,
             self.pokemon.evs
@@ -31,7 +40,7 @@ class PokemonStats:
         self.pokemon.sp_defense = stats["special_defense"]
         self.pokemon.speed_stat = stats["speed"]
 
-        # Aplica modificadores de natureza
+        # Aplica modificadores de natureza (NÃO COPIA a natureza do oponente)
         if hasattr(self.pokemon, 'nature_multipliers'):
             mult = self.pokemon.nature_multipliers
             if mult["attack"] != 1.0:

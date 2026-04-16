@@ -206,6 +206,10 @@ class GameScene(BaseScene):
 
         # Se chegou aqui, todos estão derrotados
         print(f"[GAME_OVER] Time inteiro derrotado! Total: {len(self.player.team)} Pokémon, 0 vivos.")
+
+        # ===== RESETA DITTOS TRANSFORMADOS EM CASO DE GAME OVER =====
+        self.reset_all_transformed_dittos()
+
         return True
     # ===== MÉTODOS DE OVERLAY (mantidos) =====
 
@@ -606,8 +610,11 @@ class GameScene(BaseScene):
     # ===== MÉTODOS DE LIMPEZA =====
 
     def cleanup(self):
-        """Limpa o estado da fase antes de sair"""
+        """Limpa o estado da fase antes de sair - INCLUI RESET DOS DITTOS"""
         self._stop_battle_music(fade_ms=500)
+
+        # ===== RESETA TODOS OS DITTOS TRANSFORMADOS =====
+        self.reset_all_transformed_dittos()
 
         for spot in self.spot_renderer.get_spots():
             spot.occupied = False
@@ -631,6 +638,23 @@ class GameScene(BaseScene):
                 delattr(enemy, '_pay_day_xp_multiplier')
 
         self.wave_manager.active_enemies.clear()
+
+    def reset_all_transformed_dittos(self):
+        """
+        Reseta todos os Dittos transformados no time do jogador.
+        Deve ser chamado quando a partida termina (game over, fase completa, ou sair com ESC).
+        """
+        reset_count = 0
+        for pokemon in self.player.team:
+            # Verifica se é Ditto (ID 132) E está transformado
+            if pokemon.id == 132 and hasattr(pokemon, '_is_transformed') and pokemon._is_transformed:
+                if hasattr(pokemon, 'reset_transform'):
+                    pokemon.reset_transform()
+                    reset_count += 1
+                    print(f"[GAME_SCENE] Ditto {pokemon.name} resetado após fim da partida")
+
+        if reset_count > 0:
+            print(f"[GAME_SCENE] {reset_count} Ditto(s) transformado(s) foram resetados!")
 
     # ===== MÉTODOS DE MÚSICA =====
 
@@ -1008,10 +1032,13 @@ class GameScene(BaseScene):
         profiler.end_frame()
 
     def _complete_phase(self):
-        """Marca a fase como completada e dá as recompensas"""
+        """Marca a fase como completada e dá as recompensas - INCLUI RESET DOS DITTOS"""
         from src.config.progress import progress_manager
 
         self._stop_battle_music(fade_ms=1000)
+
+        # ===== RESETA TODOS OS DITTOS TRANSFORMADOS =====
+        self.reset_all_transformed_dittos()
 
         base_reward = self.phase_rewards['money']
         gold_from_defeats = self.wave_manager.get_total_gold_earned()

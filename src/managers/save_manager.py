@@ -80,12 +80,86 @@ class SaveManager:
         }
 
     def _pokemon_to_dict(self, pokemon) -> Dict:
-        """Converte um objeto Pokémon para dicionário, incluindo moves"""
-        # Importar MoveData aqui para evitar circular import
+        """
+        Converte um objeto Pokémon para dicionário.
+        Se o Pokémon for um Ditto transformado, usa os dados ORIGINAIS para salvar.
+        """
         from src.data.move_data import MoveData
 
         move_data = MoveData()
 
+        # ===== VERIFICA SE É DITTO TRANSFORMADO =====
+        is_transformed_ditto = (
+                pokemon.id == 132 and
+                hasattr(pokemon, '_is_transformed') and
+                pokemon._is_transformed and
+                hasattr(pokemon, '_original_id')
+        )
+
+        if is_transformed_ditto:
+            # Usa os dados ORIGINAIS para salvar
+            print(f"[SAVE] Ditto {pokemon.name} está transformado - salvando estado ORIGINAL")
+
+            # Dados originais
+            pokemon_id = pokemon._original_id
+            pokemon_name = pokemon._original_name
+            pokemon_types = pokemon._original_types
+            pokemon_base_stats = pokemon._original_base_stats
+            pokemon_moves = pokemon._original_moves
+
+            # Stats atuais (HP, etc) - mantém os valores atuais
+            current_hp = pokemon.current_hp
+            max_hp = pokemon.max_hp  # Este é o max_hp calculado com stats transformados
+            # Mas o HP deve ser baseado no max_hp original, não no transformado
+            # Vamos recalcular o max_hp original
+            original_max_hp = pokemon._original_max_hp if hasattr(pokemon, '_original_max_hp') else pokemon.max_hp
+
+            # Recalcula o HP proporcionalmente
+            if original_max_hp > 0:
+                hp_ratio = current_hp / max_hp if max_hp > 0 else 1.0
+                save_hp = max(1, int(original_max_hp * hp_ratio))
+            else:
+                save_hp = current_hp
+
+            # Moves data
+            moves_data = []
+            for move in pokemon_moves:
+                moves_data.append({
+                    "name": move.name,
+                    "current_pp": move.current_pp,
+                    "max_pp": move.max_pp
+                })
+
+            pokemon_dict = {
+                "unique_id": getattr(pokemon, 'unique_id', str(uuid.uuid4())),
+                "id": pokemon_id,
+                "name": pokemon_name,
+                "level": pokemon.level,
+                "is_shiny": pokemon.is_shiny,
+                "current_hp": save_hp,
+                "max_hp": original_max_hp,
+                "xp": pokemon.xp,
+                "ivs": pokemon.ivs,  # IVs são do Ditto original
+                "evs": pokemon.evs,  # EVs são do Ditto original
+                "nature": pokemon.nature,
+                "types": pokemon_types,
+                "attack": pokemon._original_attack if hasattr(pokemon, '_original_attack') else pokemon.attack,
+                "defense": pokemon._original_defense if hasattr(pokemon, '_original_defense') else pokemon.defense,
+                "sp_attack": pokemon._original_sp_attack if hasattr(pokemon,
+                                                                    '_original_sp_attack') else pokemon.sp_attack,
+                "sp_defense": pokemon._original_sp_defense if hasattr(pokemon,
+                                                                      '_original_sp_defense') else pokemon.sp_defense,
+                "speed": pokemon._original_speed if hasattr(pokemon, '_original_speed') else pokemon.speed_stat,
+                "is_in_team": pokemon.is_in_team,
+                "is_placed": getattr(pokemon, 'is_placed', False),
+                "spot_id": getattr(pokemon, 'spot_id', None),
+                "moves": moves_data
+            }
+
+            # NÃO salva transform_state - o Ditto sempre carrega normal
+            return pokemon_dict
+
+        # ===== POKÉMON NORMAL (não transformado) =====
         moves_data = []
         for move in pokemon.moves:
             moves_data.append({
@@ -94,7 +168,7 @@ class SaveManager:
                 "max_pp": move.max_pp
             })
 
-        return {
+        pokemon_dict = {
             "unique_id": getattr(pokemon, 'unique_id', str(uuid.uuid4())),
             "id": pokemon.id,
             "name": pokemon.name,
@@ -115,8 +189,10 @@ class SaveManager:
             "is_in_team": pokemon.is_in_team,
             "is_placed": getattr(pokemon, 'is_placed', False),
             "spot_id": getattr(pokemon, 'spot_id', None),
-            "moves": moves_data  # Adiciona os moves ao save
+            "moves": moves_data
         }
+
+        return pokemon_dict
 
     def _dict_to_pokemon(self, data: Dict):
         """Converte dicionário para objeto Pokémon, incluindo moves"""

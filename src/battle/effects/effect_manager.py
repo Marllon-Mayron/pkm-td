@@ -75,8 +75,8 @@ class EffectManager:
             StatusType.CONFUSION: f"{pokemon.name} está confuso!"
         }
 
-        if status.type in status_messages:
-            self.add_status_text(pokemon, status_messages[status.type], duration=1.5)
+        #if status.type in status_messages:
+            #self.add_status_text(pokemon, status_messages[status.type], duration=1.5)
 
         # ===== FORÇA ATUALIZAÇÃO DA ANIMAÇÃO =====
         if hasattr(pokemon, 'update_status_animation'):

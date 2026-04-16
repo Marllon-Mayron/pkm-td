@@ -1452,6 +1452,20 @@ class EffectFactory:
             },
             "description": "Doubles gold and increases XP from defeated Pokémon."
         },
+
+        "transform": {
+            "effect_type": "transform",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "copy_stats": True,
+                "copy_moves": True,
+                "copy_sprite": True,
+                "copy_types": True,
+                "copy_abilities": False,
+            },
+            "description": "O usuário se transforma no oponente, copiando sua aparência, moves e stats."
+        },
     }
 
     @classmethod

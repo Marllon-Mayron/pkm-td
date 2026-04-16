@@ -754,6 +754,18 @@ class Pokemon(Entity):
             move.max_pp = move_dict.get("max_pp", move.max_pp)
             self.moves.append(move)
 
+        # ===== GARANTE QUE TRANSFORM NÃO SEJA PERDIDO =====
+        # Se o Pokémon é Ditto (ID 132) e não tem Transform, adiciona
+        if self.id == 132:  # ID do Ditto
+            has_transform = any(m.name.lower() == "transform" for m in self.moves)
+            if not has_transform:
+                transform_info = move_data.get_move_info("transform")
+                if transform_info:
+                    transform_move = Move("transform", transform_info)
+                    transform_move.current_pp = transform_move.max_pp
+                    self.moves.insert(0, transform_move)
+                    print(f"[TRANSFORM] Transform adicionado a {self.name} durante restore!")
+
         print(f"[LOAD] {self.name} restaurado com {len(self.moves)} moves")
 
     def update(self, dt, player=None, enemies=None, items=None):
@@ -1188,3 +1200,187 @@ class Pokemon(Entity):
         self.set_battle_system(game_scene.battle_system)
         self.screen_manager = game_scene.screen_manager
         self.camera = game_scene.camera
+
+    def reset_transform(self):
+        """
+        Reseta o Ditto ao seu estado original.
+        DEVE SER CHAMADO APENAS QUANDO A PARTIDA TERMINA (game over, fase completa, ESC).
+        """
+        # Verifica se está transformado
+        if not hasattr(self, '_is_transformed') or not self._is_transformed:
+            return False
+
+        print(f"[TRANSFORM_RESET] Resetando {self.name} ao estado original...")
+
+        # Verifica se tem dados originais
+        if not hasattr(self, '_original_id'):
+            print(f"[TRANSFORM_RESET] ERRO: {self.name} não tem dados originais!")
+            self._is_transformed = False
+            return False
+
+        # ===== RESTAURA DADOS ORIGINAIS =====
+        self.id = self._original_id
+        self.name = self._original_name
+        self.types = self._original_types.copy()
+        self.base_stats = self._original_base_stats.copy()
+        self.moves = self._original_moves.copy()
+
+        # Restaura sprites
+        self.ui_sprite = self._original_sprite_data["ui_sprite"]
+        self.battle_sprite = self._original_sprite_data["battle_sprite"]
+        self.inmap_frames = self._original_sprite_data["inmap_frames"]
+        self.inmap_animations = self._original_sprite_data["inmap_animations"]
+
+        if hasattr(self, 'animation'):
+            self.animation._available_animations = self._original_sprite_data["available_animations"]
+
+        # Recalcula stats
+        self.stats.calculate_stats()
+
+        if self.current_hp > self.max_hp:
+            self.current_hp = self.max_hp
+
+        # Limpa flags de transformação (mas NÃO os dados originais - eles serão sobrescritos no próximo Transform)
+        self._is_transformed = False
+
+        # Recarrega animação
+        if hasattr(self, 'animation'):
+            self.animation.load_sprites(self.id, self.is_shiny)
+
+        self.set_animation("idle")
+
+        print(f"[TRANSFORM_RESET] {self.name} resetado com sucesso!")
+        return True
+
+    def serialize_transform_state(self) -> dict:
+        """
+        Serializa o estado de transformação para salvar no disco.
+        Retorna None se não estiver transformado.
+        """
+        if not hasattr(self, '_is_transformed') or not self._is_transformed:
+            return None
+
+        # Serializa apenas os dados necessários para restaurar
+        transform_data = {
+            "is_transformed": True,
+            "transformed_id": self._transformed_id,
+            "transformed_name": self._transformed_name,
+            "transformed_types": self.types.copy(),  # Tipos já estão substituídos
+            "transformed_base_stats": self.base_stats.copy(),
+            "transformed_moves": [
+                {
+                    "name": move.name,
+                    "current_pp": move.current_pp,
+                    "max_pp": move.max_pp,
+                    "type": move.type,
+                    "power": move.power,
+                    "accuracy": move.accuracy,
+                    "category": move.category
+                }
+                for move in self.moves
+            ],
+            # Não salvamos sprites (serão recarregados via Pokedex)
+            # Não salvamos IVs/EVs (são do Ditto original)
+        }
+
+        print(f"[SERIALIZE] Ditto {self.name} transformado em {self._transformed_name} - estado salvo")
+        return transform_data
+
+    def deserialize_transform_state(self, transform_data: dict):
+        """
+        Restaura o estado de transformação a partir de dados salvos.
+        """
+        if not transform_data or not transform_data.get("is_transformed"):
+            return False
+
+        from src.entities.move import Move
+        from src.data.move_data import MoveData
+
+        print(f"[DESERIALIZE] Restaurando Ditto {self.name} transformado em {transform_data['transformed_name']}...")
+
+        # ===== SALVA O ESTADO ORIGINAL (caso não tenha) =====
+        if not hasattr(self, '_original_id'):
+            self._original_id = self.id
+            self._original_name = self.name
+            self._original_types = self.types.copy()
+            self._original_moves = [move for move in self.moves]
+            self._original_base_stats = self.base_stats.copy()
+
+            # Salva sprites originais
+            self._original_sprite_data = {
+                "ui_sprite": self.ui_sprite,
+                "battle_sprite": self.battle_sprite,
+                "inmap_frames": self.inmap_frames,
+                "inmap_animations": self.inmap_animations.copy() if self.inmap_animations else {},
+                "available_animations": self.animation.get_available_animations().copy()
+            }
+
+        # ===== RESTAURA O ESTADO TRANSFORMADO =====
+        self._is_transformed = True
+        self._transformed_id = transform_data["transformed_id"]
+        self._transformed_name = transform_data["transformed_name"]
+
+        # Restaura tipos
+        self.types = transform_data["transformed_types"].copy()
+
+        # Restaura stats base
+        self.base_stats = transform_data["transformed_base_stats"].copy()
+
+        # Restaura moves
+        move_data = MoveData()
+        self.moves = []
+        for move_dict in transform_data["transformed_moves"]:
+            move_info = move_data.get_move_info(move_dict["name"])
+            if move_info:
+                move = Move(move_dict["name"], move_info)
+                move.current_pp = move_dict["current_pp"]
+                move.max_pp = move_dict["max_pp"]
+                self.moves.append(move)
+            else:
+                # Fallback
+                move = Move(move_dict["name"], move_dict)
+                move.current_pp = move_dict["current_pp"]
+                self.moves.append(move)
+
+        # Garante que Transform está presente
+        has_transform = any(m.name.lower() == "transform" for m in self.moves)
+        if not has_transform:
+            transform_info = move_data.get_move_info("transform")
+            if transform_info:
+                transform_move = Move("transform", transform_info)
+                transform_move.current_pp = transform_move.max_pp
+                self.moves.insert(0, transform_move)
+
+        # ===== RECARREGA OS SPRITES DO ALVO =====
+        # Usa a Pokedex para carregar os sprites do Pokémon alvo
+        pokedex = self.pokedex
+        self.ui_sprite = pokedex.get_sprite(transform_data["transformed_id"], "front", self.is_shiny)
+        self.battle_sprite = pokedex.get_sprite(transform_data["transformed_id"], "back", self.is_shiny)
+        self.inmap_frames = pokedex.get_inmap_animation(transform_data["transformed_id"], self.is_shiny)
+
+        # Carrega animações
+        anim_info = pokedex.get_pokemon_animations_info(transform_data["transformed_id"], self.is_shiny)
+        if hasattr(self, 'animation'):
+            self.animation._available_animations = anim_info.get("available_animations", [])
+            self.inmap_animations = anim_info.get("raw_data", {}).get("animations", {})
+
+        # Atualiza tamanho do sprite
+        self.map_sprite_size = pokedex.get_map_sprite_size(transform_data["transformed_id"], self.is_shiny)
+
+        # ===== RECALCULA STATS =====
+        self.stats.calculate_stats()
+
+        # Mantém o HP proporcional (se possível)
+        if self.current_hp > self.max_hp:
+            self.current_hp = self.max_hp
+
+        # Atualiza sprite atual
+        if self.inmap_frames and self.current_direction in self.inmap_frames:
+            frames = self.inmap_frames[self.current_direction]
+            if frames:
+                self.sprite = frames[0]
+
+        print(f"[DESERIALIZE] Ditto {self.name} restaurado como {self._transformed_name}!")
+        print(f"[DESERIALIZE] Moves: {[m.name for m in self.moves]}")
+
+        return True

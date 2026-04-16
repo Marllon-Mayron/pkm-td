@@ -392,17 +392,43 @@ class Pokedex:
         return self.type_colors.get(type_name.lower(), (150, 150, 150))
 
     def calculate_stats(self, pokemon_id, level, ivs=None, evs=None):
+        """Calcula stats baseado no ID do Pokémon"""
         base = self.get_base_stats(pokemon_id)
 
-        # Use a mesma constante do stats.py
-        EV_DIVISOR = 8  # Mude de 4 para 8
+        if ivs is None:
+            ivs = {"hp": 0, "attack": 0, "defense": 0,
+                   "special_attack": 0, "special_defense": 0, "speed": 0}
+        if evs is None:
+            evs = {"hp": 0, "attack": 0, "defense": 0,
+                   "special_attack": 0, "special_defense": 0, "speed": 0}
+
+        # Reutiliza o novo método
+        return self.calculate_stats_with_base(base, level, ivs, evs)
+
+    def calculate_stats_with_base(self, base_stats: dict, level: int, ivs: dict, evs: dict) -> dict:
+        """
+        Calcula stats usando base_stats fornecidos (para Transform do Ditto)
+
+        Args:
+            base_stats: Dicionário com stats base (ex: {"hp": 80, "attack": 85, ...})
+            level: Nível do Pokémon
+            ivs: Dicionário com IVs
+            evs: Dicionário com EVs
+
+        Returns:
+            Dicionário com stats calculados
+        """
+        # Usa a mesma constante do stats.py (8)
+        EV_DIVISOR = 8
 
         stats = {}
 
-        stats["hp"] = int(((2 * base["hp"] + ivs["hp"] + (evs["hp"] // EV_DIVISOR)) * level) / 100) + level + 10
+        # HP: ((2 * Base + IV + (EV/4)) * Level / 100) + Level + 10
+        stats["hp"] = int(((2 * base_stats["hp"] + ivs["hp"] + (evs["hp"] // EV_DIVISOR)) * level) / 100) + level + 10
 
+        # Outros stats: ((2 * Base + IV + (EV/4)) * Level / 100) + 5
         for stat in ["attack", "defense", "special_attack", "special_defense", "speed"]:
-            stats[stat] = int(((2 * base[stat] + ivs[stat] + (evs[stat] // EV_DIVISOR)) * level) / 100) + 5
+            stats[stat] = int(((2 * base_stats[stat] + ivs[stat] + (evs[stat] // EV_DIVISOR)) * level) / 100) + 5
 
         return stats
 

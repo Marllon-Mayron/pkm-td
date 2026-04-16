@@ -230,6 +230,8 @@ class MoveEffect:
             return self._apply_disable(attacker, target, battle_system, effect_manager, damage)
         elif self.effect_type == "struggle":
             return self._apply_struggle(attacker, target, battle_system, effect_manager, damage)
+        elif self.effect_type == "transform":
+            return self._apply_transform(attacker, target, battle_system, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -1818,6 +1820,170 @@ class MoveEffect:
             f"[PAY_DAY] {attacker.name} usou Pay Day em {target.name}! Multiplicadores: Gold x{gold_mult:.1f}, XP x{xp_mult:.1f} (hit #{target._pay_day_hit_count})")
 
         return True
+
+    # ===== MÉTODOS DE TRANSFORM (DITTO) =====
+
+    def _apply_transform(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Transform do Ditto.
+        Copia aparência, moves e stats base do oponente, mas mantém IVs/EVs próprios.
+        """
+        from src.entities.move import Move
+
+        # ===== VERIFICA SE O ALVO É VÁLIDO =====
+        if not target or target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            print(f"[TRANSFORM] {attacker.name} tentou se transformar, mas falhou!")
+            return False
+
+        # Verifica se o Ditto já está transformado
+        if hasattr(attacker, '_is_transformed') and attacker._is_transformed:
+            effect_manager.add_status_text(attacker, f"{attacker.name} já está transformado!", duration=1.0)
+            return False
+
+        # ===== SALVA O ESTADO ORIGINAL DO DITTO =====
+
+        attacker._original_id = attacker.id
+        attacker._original_name = attacker.name
+        attacker._original_types = attacker.types.copy()
+        attacker._original_moves = [move for move in attacker.moves]  # Cópia profunda
+        attacker._original_base_stats = attacker.base_stats.copy()
+
+        # ===== SALVA OS STATS ORIGINAIS DO DITTO =====
+        attacker._original_max_hp = attacker.max_hp
+        attacker._original_attack = attacker.attack
+        attacker._original_defense = attacker.defense
+        attacker._original_sp_attack = attacker.sp_attack
+        attacker._original_sp_defense = attacker.sp_defense
+        attacker._original_speed = attacker.speed_stat
+
+        # Salva os sprites originais
+        attacker._original_sprite_data = {
+            "ui_sprite": attacker.ui_sprite,
+            "battle_sprite": attacker.battle_sprite,
+            "inmap_frames": attacker.inmap_frames,
+            "inmap_animations": attacker.inmap_animations.copy() if attacker.inmap_animations else {},
+            "available_animations": attacker.animation.get_available_animations().copy()
+        }
+
+        # Guarda também os IVs e EVs (não mudam, mas salvamos para debug)
+        attacker._original_ivs = attacker.ivs.copy()
+        attacker._original_evs = attacker.evs.copy()
+
+        # ===== COPIA OS DADOS DO OPONENTE =====
+        # 1. ID (apenas para referência, o id real continua o mesmo)
+        attacker._transformed_id = target.id
+        attacker._transformed_name = target.name
+
+        # 2. Tipos
+        if self.params.get("copy_types", True):
+            attacker.types = target.types.copy()
+
+        # 3. Stats base (para cálculos futuros)
+        if self.params.get("copy_stats", True):
+            attacker.base_stats = target.base_stats.copy()
+
+        # 4. Moves
+        if self.params.get("copy_moves", True):
+            # Salva os moves originais
+            attacker._original_moves_list = attacker.moves.copy()
+
+            # Cria cópias dos moves do oponente
+            new_moves = []
+            for move in target.moves:
+                new_move = Move(move.name, {
+                    "type": move.type,
+                    "power": move.power,
+                    "accuracy": move.accuracy,
+                    "pp": move.max_pp,
+                    "max_pp": move.max_pp,
+                    "category": move.category,
+                    "description": move.description
+                })
+                new_move.current_pp = move.max_pp
+                new_moves.append(new_move)
+
+            attacker.moves = new_moves
+
+            # Garante que Transform ainda está disponível (como primeiro move)
+            transform_exists = any(m.name.lower() == "transform" for m in attacker.moves)
+            if not transform_exists:
+                from src.data.move_data import MoveData
+                move_data = MoveData()
+                transform_info = move_data.get_move_info("transform")
+                if transform_info:
+                    transform_move = Move("transform", transform_info)
+                    transform_move.current_pp = transform_move.max_pp
+                    attacker.moves.insert(0, transform_move)
+
+        # 5. Sprite e animações (usa o sistema da Pokedex)
+        if self.params.get("copy_sprite", True):
+            self._copy_sprites_via_pokedex(attacker, target, battle_system)
+
+        # 6. Recalcula stats com os novos base_stats mas usando IVs/EVs do Ditto
+        attacker._is_transformed = True
+        attacker._transformed_target = target
+
+        # Força recálculo dos stats usando o stats manager
+        attacker.stats.calculate_stats()
+
+        # ===== AJUSTE ESPECIAL: HP NÃO É COPIADO! =====
+        if attacker.current_hp > attacker.max_hp:
+            attacker.current_hp = attacker.max_hp
+
+        # ===== ATUALIZA ANIMAÇÃO =====
+        if hasattr(attacker, 'animation'):
+            # Recarrega os sprites para a nova forma
+            attacker.animation.load_sprites(target.id, target.is_shiny)
+
+        # ===== MENSAGEM E FEEDBACK =====
+        effect_manager.add_status_text(attacker, f"{attacker.name} se transformou em {target.name}!", duration=2.0)
+        print(f"[TRANSFORM] {attacker.name} (Ditto) se transformou em {target.name}!")
+        print(f"[TRANSFORM] Stats recalculados: HP={attacker.max_hp}, ATK={attacker.attack}, DEF={attacker.defense}")
+        print(f"[TRANSFORM] Moves copiados: {[m.name for m in attacker.moves]}")
+
+        # Registra contribuição para XP
+        if hasattr(target, 'register_status_application'):
+            target.register_status_application(attacker, "Transform")
+
+        # Toca som
+        from src.managers.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("transform")
+
+        return True
+
+    def _copy_sprites_via_pokedex(self, attacker, target, battle_system):
+        """
+        Copia os sprites do alvo usando o sistema da Pokedex.
+        Isso garante compatibilidade com seu sistema de animações.
+        """
+        pokedex = target.pokedex
+
+        # Copia os sprites principais
+        attacker.ui_sprite = target.ui_sprite
+        attacker.battle_sprite = target.battle_sprite
+
+        # Usa o sistema da Pokedex para carregar as animações InMap do alvo
+        # Mas com os parâmetros do atacante (shiny, etc)
+        attacker.inmap_frames = pokedex.get_inmap_animation(target.id, attacker.is_shiny)
+
+        # Copia as informações de animações
+        anim_info = pokedex.get_pokemon_animations_info(target.id, attacker.is_shiny)
+        attacker._transformed_available_animations = anim_info.get("available_animations", []).copy()
+
+        # Copia os dados brutos de animação
+        if hasattr(pokedex, 'get_raw_inmap_data'):
+            attacker.raw_animations = pokedex.get_raw_inmap_data(target.id, attacker.is_shiny)
+            attacker.inmap_animations = attacker.raw_animations.get("animations", {})
+
+        # Força atualização do sprite atual
+        if attacker.inmap_frames and attacker.current_direction in attacker.inmap_frames:
+            frames = attacker.inmap_frames[attacker.current_direction]
+            if frames:
+                attacker.sprite = frames[0]
+
+        # Atualiza o tamanho do sprite
+        attacker.map_sprite_size = pokedex.get_map_sprite_size(target.id, attacker.is_shiny)
 
     # ===== MÉTODOS DE MIST =====
     def _apply_mist(self, attacker, target, battle_system, effect_manager, damage):
