@@ -747,15 +747,11 @@
                 "enemies": [
                     {
                         "pokemon_id": 10,
-                        "percentage": 34
+                        "percentage": 50
                     },
                     {
                         "pokemon_id": 13,
-                        "percentage": 33
-                    },
-                    {
-                        "pokemon_id": 133,
-                        "percentage": 33
+                        "percentage": 50
                     }
                 ],
                 "min_level": 2,

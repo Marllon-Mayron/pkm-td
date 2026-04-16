@@ -81,6 +81,20 @@ class ItemCatalog:
             "description": "Insignia 3",
             "category": "badge"
         }
+        items[5] = {
+            "id": 5,
+            "name": "Insignia do arco-iris",
+            "sprite": badge_path / "rainbow-badge.png",
+            "description": "Insignia 4",
+            "category": "badge"
+        }
+        items[6] = {
+            "id": 6,
+            "name": "Isca Safari",
+            "sprite": medicine_path / "safari_bait.png",
+            "description": "Isca para o safari",
+            "category": "medicine"
+        }
 
         return items
 

@@ -144,7 +144,7 @@ class ItemBagCatalog:
             "effect": "capture",
             "effect_value": 2,
             "price": 1200,
-            "unlock_phase": "2-8",
+            "unlock_phase": "3-4",
             "unlock_chapter": None
         }
         items["masterball"] = {
@@ -158,7 +158,21 @@ class ItemBagCatalog:
             "effect": "capture",
             "effect_value": 2,
             "price": 10000,
-            "unlock_phase": "3-4",
+            "unlock_phase": "4-5",
+            "unlock_chapter": None
+        }
+        items["safariball"] = {
+            "id": "safariball",
+            "name": "SAFARIBALL",
+            "sprite_path": pokeballs_path / "SAFARIBALL.png",
+            "description": "Captura Pokémon selvagens com 1 vezes a taxa de captura.",
+            "category": "pokeball",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "capture",
+            "effect_value": 1,
+            "price": 999999,
+            "unlock_phase": "999-999",
             "unlock_chapter": None
         }
         # ===== POÇÕES =====
@@ -230,7 +244,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "paralysis",
             "price": 200,
-            "unlock_phase": "1-2",
+            "unlock_phase": "1-5",
             "unlock_chapter": None
         }
         items["awakening"] = {
@@ -258,7 +272,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "burn",
             "price": 250,
-            "unlock_phase": "1-5",
+            "unlock_phase": "4-5",
             "unlock_chapter": None
         }
         items["ice_heal"] = {
@@ -272,7 +286,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "freeze",
             "price": 250,
-            "unlock_phase": "1-5",
+            "unlock_phase": "4-5",
             "unlock_chapter": None
         }
         items["full_heal"] = {
@@ -349,14 +363,17 @@ class ItemBagCatalog:
         }
         # ===== PEDRAS DE EVOLUÇÃO =====
         stones = [
-            ("firestone", "FIRESTONE"),
-            ("leafstone", "LEAFSTONE"),
-            ("moonstone", "MOONSTONE"),
-            ("thunderstone", "THUNDERSTONE"),
-            ("waterstone", "WATERSTONE")
+            ("firestone", "FIRESTONE", "2-8"),
+            ("thunderstone", "THUNDERSTONE", "2-8"),
+            ("waterstone", "WATERSTONE", "2-8"),
+            ("leafstone", "LEAFSTONE", "3-4"),
+            ("moonstone", "MOONSTONE", "3-4"),
+            ("sunstone", "SUNSTONE", "4-5"),
+            ("shinystone", "SHINYSTONE", "4-5"),
+            ("dawnstone", "DAWNSTONE", "4-5")
         ]
 
-        for stone_id, stone_name in stones:
+        for stone_id, stone_name, unlock_phase in stones:
             items[stone_id] = {
                 "id": stone_id,
                 "name": stone_name,
@@ -368,22 +385,42 @@ class ItemBagCatalog:
                 "effect": "evolution",
                 "effect_value": 0,
                 "price": 1200,
-                "unlock_phase": "1-5",
+                "unlock_phase": unlock_phase,
                 "unlock_chapter": None
             }
 
         # ===== TMs/HMs =====
         # Lista de TMs: (id, nome, sprite_file, move_name, unlock_phase, price)
         tms = [
-            ("tm_mega_punch", "TM01 - Mega Punch", "machine_NORMAL.png", "mega-punch", "1-3", 2000),
-            ("tm_razor_wind", "TM02 - Razor Wind", "machine_NORMAL.png", "razor-wind", "1-4", 1500),
-            ("tm_swords_dance", "TM03 - Swords Dance", "machine_NORMAL.png", "swords-dance", "1-5", 1500),
-            ("tm_whirlwind", "TM04 - Whirlwind", "machine_NORMAL.png", "whirlwind", "1-4", 100),
-            ("tm_mega_kick", "TM05 - Mega Kick", "machine_NORMAL.png", "mega-kick", "2-1", 2000),
-            ("tm_bubble_beam", "TM11 - Bubble Beam", "machine_WATER.png", "bubble-beam", "2-8", 2000),
-            ("tm_teleport", "TM30 - Teleport", "machine_PSYCHIC.png", "teleport", "2-8", 500),
-            ("tm_earthquake", "TM26 - Earthquake", "machine_GROUND.png", "earthquake", "2-8", 3000),
-            ("hm_surf", "HM03 - Surf", "machine_WATER.png", "surf", "2-8", 3000),
+            ("tm_bide", "TM01 - Bide", "machine_NORMAL.png", "bide", "1-5", 2000),
+            ("tm_thunder_wave", "TM45 - Thunder Wave", "machine_ELECTRIC.png", "thunder-wave", "2-2", 1500),
+            ("tm_whirlwind", "TM04 - Whirlwind", "machine_NORMAL.png", "whirlwind", "2-3", 2500),
+            ("tm_water_gun", "TM12 - Water Gun", "machine_WATER.png", "water-gun", "2-4", 2000),
+            ("tm_mega_punch", "TM34 - Mega Punch", "machine_NORMAL.png", "mega-punch", "2-5", 2000),
+            ("tm_seismic_toss", "TM19 - Seismic Toss", "machine_FIGHTING.png", "seismic-toss", "2-6", 2000),
+            ("tm_dig", "TM28 - Dig", "machine_WATER.png", "dig", "2-7", 2000),
+            ("tm_bubble_beam", "TM11 - Bubble Beam", "machine_WATER.png", "bubble-beam", "2-8", 2500),
+            ("hm_cut", "HM01 - CUT", "machine_NORMAL.png", "cut", "2-8", 2000),
+            ("hm_flash", "HM05 - FLASH", "machine_NORMAL.png", "flash", "2-8", 1000),
+            ("hm_body_slam", "TM08 - Body Slam ", "machine_NORMAL.png", "body-slam", "3-1", 2000),
+            ("hm_rest", "TM44 - Rest  ", "machine_NORMAL.png", "rest", "3-3", 2000),
+            ("tm_thunderbolt", "TM24 - Thunderbolt", "machine_ELECTRIC.png", "thunderbolt", "3-4", 3000),
+            ("tm_swift", "TM39  - Swift ", "machine_NORMAL.png", "swift", "3-5", 2500),
+            ("tm_pay-_ay", "TM16  - Pay Day ", "machine_NORMAL.png", "pay-day", "3-5", 5000),
+            ("tm_double_edge", "TM10  - Double Edge ", "machine_NORMAL.png", "double-edge", "4-1", 3000),
+            ("tm_razor_wind", "TM02 - Razor Wind", "machine_NORMAL.png", "razor-wind", "4-1", 1500),
+            ("tm_horn_drill", "TM07 - Horn Drill", "machine_NORMAL.png", "horn-drill", "4-1", 4500),
+            ("tm_teleport", "TM30 - Teleport", "machine_PSYCHIC.png", "teleport", "4-4", 750),
+            ("tm_mega_drain", "TM21 - Mega Drain", "machine_GRASS.png", "mega-drain", "4-5", 3500),
+            ("tm_ice_beam", "TM13 - Ice Beam", "machine_ICE.png", "ice-beam", "4-6", 3000),
+            ("tm_rock_slide", "TM48 - Rock Slide", "machine_ICE.png", "rock-slide", "4-6", 3000),
+            ("tm_tri_attack", "TM49 Tri Attack", "machine_ICE.png", "tri-attack", "4-6", 3333),
+            ("hm_surf", "HM03 - Surf", "machine_WATER.png", "surf", "4-6", 4500),
+
+            ("tm_swords_dance", "TM03 - Swords Dance", "machine_NORMAL.png", "swords-dance", "4-6", 1500),
+            ("tm_mega_kick", "TM05 - Mega Kick", "machine_NORMAL.png", "mega-kick", "4-6", 2000),
+            ("tm_earthquake", "TM26 - Earthquake", "machine_GROUND.png", "earthquake", "4-6", 4000),
+
         ]
 
         for tm_id, tm_name, sprite_file, move_name, unlock_phase, price in tms:
