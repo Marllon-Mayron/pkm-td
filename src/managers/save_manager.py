@@ -189,7 +189,10 @@ class SaveManager:
             "is_in_team": pokemon.is_in_team,
             "is_placed": getattr(pokemon, 'is_placed', False),
             "spot_id": getattr(pokemon, 'spot_id', None),
-            "moves": moves_data
+            "moves": moves_data,
+            "weight_kg": pokemon.weight_kg,
+            "height_m": pokemon.height_m,
+            "gender": pokemon.gender,
         }
 
         return pokemon_dict
@@ -219,7 +222,9 @@ class SaveManager:
         pokemon.is_in_team = data["is_in_team"]
         pokemon.is_placed = False
         pokemon.spot_id = None
-
+        pokemon.weight_kg = data.get("weight_kg", 10.0)
+        pokemon.height_m = data.get("height_m", 1.0)
+        pokemon.gender = data.get("gender")
         # Restaura os moves
         moves_data = data.get("moves", [])
         if moves_data:

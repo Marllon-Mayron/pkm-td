@@ -32,6 +32,9 @@
             "chlorophyll"
         ],
         "hidden_ability": "chlorophyll",
+        "weight_kg": 6.9,
+        "height_m": 0.7,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -95,6 +98,9 @@
             "chlorophyll"
         ],
         "hidden_ability": "chlorophyll",
+        "weight_kg": 13.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 1,
@@ -161,6 +167,9 @@
             "chlorophyll"
         ],
         "hidden_ability": "chlorophyll",
+        "weight_kg": 100.0,
+        "height_m": 2.0,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 2,
@@ -219,6 +228,9 @@
             "solar-power"
         ],
         "hidden_ability": "solar-power",
+        "weight_kg": 8.5,
+        "height_m": 0.6,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -281,6 +293,9 @@
             "solar-power"
         ],
         "hidden_ability": "solar-power",
+        "weight_kg": 19.0,
+        "height_m": 1.1,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 4,
@@ -347,6 +362,9 @@
             "solar-power"
         ],
         "hidden_ability": "solar-power",
+        "weight_kg": 90.5,
+        "height_m": 1.7,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 5,
@@ -405,6 +423,9 @@
             "rain-dish"
         ],
         "hidden_ability": "rain-dish",
+        "weight_kg": 9.0,
+        "height_m": 0.5,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -467,6 +488,9 @@
             "rain-dish"
         ],
         "hidden_ability": "rain-dish",
+        "weight_kg": 22.5,
+        "height_m": 1.0,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 7,
@@ -532,6 +556,9 @@
             "rain-dish"
         ],
         "hidden_ability": "rain-dish",
+        "weight_kg": 85.5,
+        "height_m": 1.6,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 8,
@@ -590,6 +617,9 @@
             "run-away"
         ],
         "hidden_ability": "run-away",
+        "weight_kg": 2.9,
+        "height_m": 0.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -651,6 +681,9 @@
             "shed-skin"
         ],
         "hidden_ability": null,
+        "weight_kg": 9.9,
+        "height_m": 0.7,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 10,
@@ -717,6 +750,9 @@
             "tinted-lens"
         ],
         "hidden_ability": "tinted-lens",
+        "weight_kg": 32.0,
+        "height_m": 1.1,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 11,
@@ -776,6 +812,9 @@
             "run-away"
         ],
         "hidden_ability": "run-away",
+        "weight_kg": 3.2,
+        "height_m": 0.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -838,6 +877,9 @@
             "shed-skin"
         ],
         "hidden_ability": null,
+        "weight_kg": 10.0,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 13,
@@ -904,6 +946,9 @@
             "sniper"
         ],
         "hidden_ability": "sniper",
+        "weight_kg": 29.5,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 14,
@@ -964,6 +1009,9 @@
             "big-pecks"
         ],
         "hidden_ability": "big-pecks",
+        "weight_kg": 1.8,
+        "height_m": 0.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -1028,6 +1076,9 @@
             "big-pecks"
         ],
         "hidden_ability": "big-pecks",
+        "weight_kg": 30.0,
+        "height_m": 1.1,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 16,
@@ -1095,6 +1146,9 @@
             "big-pecks"
         ],
         "hidden_ability": "big-pecks",
+        "weight_kg": 39.5,
+        "height_m": 1.5,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 17,
@@ -1154,6 +1208,9 @@
             "hustle"
         ],
         "hidden_ability": "hustle",
+        "weight_kg": 3.5,
+        "height_m": 0.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -1220,6 +1277,9 @@
             "hustle"
         ],
         "hidden_ability": "hustle",
+        "weight_kg": 18.5,
+        "height_m": 0.7,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 19,
@@ -1275,6 +1335,9 @@
             "sniper"
         ],
         "hidden_ability": "sniper",
+        "weight_kg": 2.0,
+        "height_m": 0.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -1334,6 +1397,9 @@
             "sniper"
         ],
         "hidden_ability": "sniper",
+        "weight_kg": 38.0,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 21,
@@ -1389,6 +1455,9 @@
             "unnerve"
         ],
         "hidden_ability": "unnerve",
+        "weight_kg": 6.9,
+        "height_m": 2.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -1448,6 +1517,9 @@
             "unnerve"
         ],
         "hidden_ability": "unnerve",
+        "weight_kg": 65.0,
+        "height_m": 3.5,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 23,
@@ -1502,6 +1574,9 @@
             "lightning-rod"
         ],
         "hidden_ability": "lightning-rod",
+        "weight_kg": 6.0,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 172,
@@ -1567,6 +1642,9 @@
             "lightning-rod"
         ],
         "hidden_ability": "lightning-rod",
+        "weight_kg": 30.0,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 25,
@@ -1625,6 +1703,9 @@
             "sand-rush"
         ],
         "hidden_ability": "sand-rush",
+        "weight_kg": 12.0,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -1689,6 +1770,9 @@
             "sand-rush"
         ],
         "hidden_ability": "sand-rush",
+        "weight_kg": 29.5,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 27,
@@ -1744,6 +1828,9 @@
             "hustle"
         ],
         "hidden_ability": "hustle",
+        "weight_kg": 7.0,
+        "height_m": 0.4,
+        "gender_ratio": 0.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -1807,6 +1894,9 @@
             "hustle"
         ],
         "hidden_ability": "hustle",
+        "weight_kg": 20.0,
+        "height_m": 0.8,
+        "gender_ratio": 0.0,
         "evolution": {
             "evolves_from": {
                 "id": 29,
@@ -1874,6 +1964,9 @@
             "sheer-force"
         ],
         "hidden_ability": "sheer-force",
+        "weight_kg": 60.0,
+        "height_m": 1.3,
+        "gender_ratio": 0.0,
         "evolution": {
             "evolves_from": {
                 "id": 30,
@@ -1933,6 +2026,9 @@
             "hustle"
         ],
         "hidden_ability": "hustle",
+        "weight_kg": 9.0,
+        "height_m": 0.5,
+        "gender_ratio": 1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -1996,6 +2092,9 @@
             "hustle"
         ],
         "hidden_ability": "hustle",
+        "weight_kg": 19.5,
+        "height_m": 0.9,
+        "gender_ratio": 1.0,
         "evolution": {
             "evolves_from": {
                 "id": 32,
@@ -2063,6 +2162,9 @@
             "sheer-force"
         ],
         "hidden_ability": "sheer-force",
+        "weight_kg": 62.0,
+        "height_m": 1.4,
+        "gender_ratio": 1.0,
         "evolution": {
             "evolves_from": {
                 "id": 33,
@@ -2122,6 +2224,9 @@
             "friend-guard"
         ],
         "hidden_ability": "friend-guard",
+        "weight_kg": 7.5,
+        "height_m": 0.6,
+        "gender_ratio": 0.25,
         "evolution": {
             "evolves_from": {
                 "id": 173,
@@ -2188,6 +2293,9 @@
             "unaware"
         ],
         "hidden_ability": "unaware",
+        "weight_kg": 40.0,
+        "height_m": 1.3,
+        "gender_ratio": 0.25,
         "evolution": {
             "evolves_from": {
                 "id": 35,
@@ -2246,6 +2354,9 @@
             "drought"
         ],
         "hidden_ability": "drought",
+        "weight_kg": 9.9,
+        "height_m": 0.6,
+        "gender_ratio": 0.25,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -2310,6 +2421,9 @@
             "drought"
         ],
         "hidden_ability": "drought",
+        "weight_kg": 19.9,
+        "height_m": 1.1,
+        "gender_ratio": 0.25,
         "evolution": {
             "evolves_from": {
                 "id": 37,
@@ -2366,6 +2480,9 @@
             "friend-guard"
         ],
         "hidden_ability": "friend-guard",
+        "weight_kg": 5.5,
+        "height_m": 0.5,
+        "gender_ratio": 0.25,
         "evolution": {
             "evolves_from": {
                 "id": 174,
@@ -2433,6 +2550,9 @@
             "frisk"
         ],
         "hidden_ability": "frisk",
+        "weight_kg": 12.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.25,
         "evolution": {
             "evolves_from": {
                 "id": 39,
@@ -2492,6 +2612,9 @@
             "infiltrator"
         ],
         "hidden_ability": "infiltrator",
+        "weight_kg": 7.5,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -2555,6 +2678,9 @@
             "infiltrator"
         ],
         "hidden_ability": "infiltrator",
+        "weight_kg": 55.0,
+        "height_m": 1.6,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 41,
@@ -2565,8 +2691,7 @@
                     "evolves_to_id": 169,
                     "evolves_to_name": "crobat",
                     "method": "happiness",
-                    "min_happiness": 160,
-                    "method_description": "Evolui por felicidade"
+                    "min_happiness": 160
                 }
             ],
             "variants": [],
@@ -2622,6 +2747,9 @@
             "run-away"
         ],
         "hidden_ability": "run-away",
+        "weight_kg": 5.4,
+        "height_m": 0.5,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -2689,6 +2817,9 @@
             "stench"
         ],
         "hidden_ability": "stench",
+        "weight_kg": 8.6,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 43,
@@ -2778,6 +2909,9 @@
             "effect-spore"
         ],
         "hidden_ability": "effect-spore",
+        "weight_kg": 18.6,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 44,
@@ -2842,6 +2976,9 @@
             "damp"
         ],
         "hidden_ability": "damp",
+        "weight_kg": 5.4,
+        "height_m": 0.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -2902,6 +3039,9 @@
             "damp"
         ],
         "hidden_ability": "damp",
+        "weight_kg": 29.5,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 46,
@@ -2958,6 +3098,9 @@
             "run-away"
         ],
         "hidden_ability": "run-away",
+        "weight_kg": 30.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -3018,6 +3161,9 @@
             "wonder-skin"
         ],
         "hidden_ability": "wonder-skin",
+        "weight_kg": 12.5,
+        "height_m": 1.5,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 48,
@@ -3073,6 +3219,9 @@
             "sand-force"
         ],
         "hidden_ability": "sand-force",
+        "weight_kg": 0.8,
+        "height_m": 0.2,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -3132,6 +3281,9 @@
             "sand-force"
         ],
         "hidden_ability": "sand-force",
+        "weight_kg": 33.3,
+        "height_m": 0.7,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 50,
@@ -3187,6 +3339,9 @@
             "unnerve"
         ],
         "hidden_ability": "unnerve",
+        "weight_kg": 4.2,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -3200,8 +3355,7 @@
                     "evolves_to_id": 53,
                     "evolves_to_name": "persian",
                     "method": "happiness",
-                    "min_happiness": 160,
-                    "method_description": "Evolui por felicidade"
+                    "min_happiness": 160
                 },
                 {
                     "evolves_to_id": 863,
@@ -3282,6 +3436,9 @@
             "unnerve"
         ],
         "hidden_ability": "unnerve",
+        "weight_kg": 32.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 52,
@@ -3341,6 +3498,9 @@
             "swift-swim"
         ],
         "hidden_ability": "swift-swim",
+        "weight_kg": 19.6,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -3400,6 +3560,9 @@
             "swift-swim"
         ],
         "hidden_ability": "swift-swim",
+        "weight_kg": 76.6,
+        "height_m": 1.7,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 54,
@@ -3455,6 +3618,9 @@
             "defiant"
         ],
         "hidden_ability": "defiant",
+        "weight_kg": 28.0,
+        "height_m": 0.5,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -3518,6 +3684,9 @@
             "defiant"
         ],
         "hidden_ability": "defiant",
+        "weight_kg": 32.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 56,
@@ -3583,6 +3752,9 @@
             "justified"
         ],
         "hidden_ability": "justified",
+        "weight_kg": 19.0,
+        "height_m": 0.7,
+        "gender_ratio": 0.75,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -3642,6 +3814,9 @@
             "justified"
         ],
         "hidden_ability": "justified",
+        "weight_kg": 155.0,
+        "height_m": 1.9,
+        "gender_ratio": 0.75,
         "evolution": {
             "evolves_from": {
                 "id": 58,
@@ -3697,6 +3872,9 @@
             "swift-swim"
         ],
         "hidden_ability": "swift-swim",
+        "weight_kg": 12.4,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -3764,6 +3942,9 @@
             "swift-swim"
         ],
         "hidden_ability": "swift-swim",
+        "weight_kg": 20.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 60,
@@ -3852,6 +4033,9 @@
             "swift-swim"
         ],
         "hidden_ability": "swift-swim",
+        "weight_kg": 54.0,
+        "height_m": 1.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 61,
@@ -3915,6 +4099,9 @@
             "magic-guard"
         ],
         "hidden_ability": "magic-guard",
+        "weight_kg": 19.5,
+        "height_m": 0.9,
+        "gender_ratio": 0.75,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -3978,6 +4165,9 @@
             "magic-guard"
         ],
         "hidden_ability": "magic-guard",
+        "weight_kg": 56.5,
+        "height_m": 1.3,
+        "gender_ratio": 0.75,
         "evolution": {
             "evolves_from": {
                 "id": 63,
@@ -4043,6 +4233,9 @@
             "magic-guard"
         ],
         "hidden_ability": "magic-guard",
+        "weight_kg": 48.0,
+        "height_m": 1.5,
+        "gender_ratio": 0.75,
         "evolution": {
             "evolves_from": {
                 "id": 64,
@@ -4102,6 +4295,9 @@
             "steadfast"
         ],
         "hidden_ability": "steadfast",
+        "weight_kg": 19.5,
+        "height_m": 0.8,
+        "gender_ratio": 0.75,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -4165,6 +4361,9 @@
             "steadfast"
         ],
         "hidden_ability": "steadfast",
+        "weight_kg": 70.5,
+        "height_m": 1.5,
+        "gender_ratio": 0.75,
         "evolution": {
             "evolves_from": {
                 "id": 66,
@@ -4230,6 +4429,9 @@
             "steadfast"
         ],
         "hidden_ability": "steadfast",
+        "weight_kg": 130.0,
+        "height_m": 1.6,
+        "gender_ratio": 0.75,
         "evolution": {
             "evolves_from": {
                 "id": 67,
@@ -4289,6 +4491,9 @@
             "gluttony"
         ],
         "hidden_ability": "gluttony",
+        "weight_kg": 4.0,
+        "height_m": 0.7,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -4352,6 +4557,9 @@
             "gluttony"
         ],
         "hidden_ability": "gluttony",
+        "weight_kg": 6.4,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 69,
@@ -4418,6 +4626,9 @@
             "gluttony"
         ],
         "hidden_ability": "gluttony",
+        "weight_kg": 15.5,
+        "height_m": 1.7,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 70,
@@ -4478,6 +4689,9 @@
             "rain-dish"
         ],
         "hidden_ability": "rain-dish",
+        "weight_kg": 45.5,
+        "height_m": 0.9,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -4538,6 +4752,9 @@
             "rain-dish"
         ],
         "hidden_ability": "rain-dish",
+        "weight_kg": 55.0,
+        "height_m": 1.6,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 72,
@@ -4594,6 +4811,9 @@
             "sand-veil"
         ],
         "hidden_ability": "sand-veil",
+        "weight_kg": 20.0,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -4658,6 +4878,9 @@
             "sand-veil"
         ],
         "hidden_ability": "sand-veil",
+        "weight_kg": 105.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 74,
@@ -4724,6 +4947,9 @@
             "sand-veil"
         ],
         "hidden_ability": "sand-veil",
+        "weight_kg": 300.0,
+        "height_m": 1.4,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 75,
@@ -4783,6 +5009,9 @@
             "flame-body"
         ],
         "hidden_ability": "flame-body",
+        "weight_kg": 30.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -4842,6 +5071,9 @@
             "flame-body"
         ],
         "hidden_ability": "flame-body",
+        "weight_kg": 95.0,
+        "height_m": 1.7,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 77,
@@ -4898,6 +5130,9 @@
             "regenerator"
         ],
         "hidden_ability": "regenerator",
+        "weight_kg": 36.0,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -5003,6 +5238,9 @@
             "regenerator"
         ],
         "hidden_ability": "regenerator",
+        "weight_kg": 78.5,
+        "height_m": 1.6,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 79,
@@ -5063,6 +5301,9 @@
             "analytic"
         ],
         "hidden_ability": "analytic",
+        "weight_kg": 6.0,
+        "height_m": 0.3,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -5127,6 +5368,9 @@
             "analytic"
         ],
         "hidden_ability": "analytic",
+        "weight_kg": 60.0,
+        "height_m": 1.0,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": {
                 "id": 81,
@@ -5224,6 +5468,9 @@
             "defiant"
         ],
         "hidden_ability": "defiant",
+        "weight_kg": 15.0,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -5283,6 +5530,9 @@
             "tangled-feet"
         ],
         "hidden_ability": "tangled-feet",
+        "weight_kg": 39.2,
+        "height_m": 1.4,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -5343,6 +5593,9 @@
             "tangled-feet"
         ],
         "hidden_ability": "tangled-feet",
+        "weight_kg": 85.2,
+        "height_m": 1.8,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 84,
@@ -5398,6 +5651,9 @@
             "ice-body"
         ],
         "hidden_ability": "ice-body",
+        "weight_kg": 90.0,
+        "height_m": 1.1,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -5458,6 +5714,9 @@
             "ice-body"
         ],
         "hidden_ability": "ice-body",
+        "weight_kg": 120.0,
+        "height_m": 1.7,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 86,
@@ -5513,6 +5772,9 @@
             "poison-touch"
         ],
         "hidden_ability": "poison-touch",
+        "weight_kg": 30.0,
+        "height_m": 0.9,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -5572,6 +5834,9 @@
             "poison-touch"
         ],
         "hidden_ability": "poison-touch",
+        "weight_kg": 30.0,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 88,
@@ -5627,6 +5892,9 @@
             "overcoat"
         ],
         "hidden_ability": "overcoat",
+        "weight_kg": 4.0,
+        "height_m": 0.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -5687,6 +5955,9 @@
             "overcoat"
         ],
         "hidden_ability": "overcoat",
+        "weight_kg": 132.5,
+        "height_m": 1.5,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 90,
@@ -5741,6 +6012,9 @@
             "levitate"
         ],
         "hidden_ability": null,
+        "weight_kg": 0.1,
+        "height_m": 1.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -5803,6 +6077,9 @@
             "levitate"
         ],
         "hidden_ability": null,
+        "weight_kg": 0.1,
+        "height_m": 1.6,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 92,
@@ -5867,6 +6144,9 @@
             "cursed-body"
         ],
         "hidden_ability": null,
+        "weight_kg": 40.5,
+        "height_m": 1.5,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 93,
@@ -5927,6 +6207,9 @@
             "weak-armor"
         ],
         "hidden_ability": "weak-armor",
+        "weight_kg": 210.0,
+        "height_m": 8.8,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -5985,6 +6268,9 @@
             "inner-focus"
         ],
         "hidden_ability": "inner-focus",
+        "weight_kg": 32.4,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -6044,6 +6330,9 @@
             "inner-focus"
         ],
         "hidden_ability": "inner-focus",
+        "weight_kg": 75.6,
+        "height_m": 1.6,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 96,
@@ -6099,6 +6388,9 @@
             "sheer-force"
         ],
         "hidden_ability": "sheer-force",
+        "weight_kg": 6.5,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -6158,6 +6450,9 @@
             "sheer-force"
         ],
         "hidden_ability": "sheer-force",
+        "weight_kg": 60.0,
+        "height_m": 1.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 98,
@@ -6213,6 +6508,9 @@
             "aftermath"
         ],
         "hidden_ability": "aftermath",
+        "weight_kg": 10.4,
+        "height_m": 0.5,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -6272,6 +6570,9 @@
             "aftermath"
         ],
         "hidden_ability": "aftermath",
+        "weight_kg": 66.6,
+        "height_m": 1.2,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": {
                 "id": 100,
@@ -6327,6 +6628,9 @@
             "harvest"
         ],
         "hidden_ability": "harvest",
+        "weight_kg": 2.5,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -6386,6 +6690,9 @@
             "harvest"
         ],
         "hidden_ability": "harvest",
+        "weight_kg": 120.0,
+        "height_m": 2.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 102,
@@ -6441,6 +6748,9 @@
             "battle-armor"
         ],
         "hidden_ability": "battle-armor",
+        "weight_kg": 6.5,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -6507,6 +6817,9 @@
             "battle-armor"
         ],
         "hidden_ability": "battle-armor",
+        "weight_kg": 45.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 104,
@@ -6562,6 +6875,9 @@
             "unburden"
         ],
         "hidden_ability": "unburden",
+        "weight_kg": 49.8,
+        "height_m": 1.5,
+        "gender_ratio": 1.0,
         "evolution": {
             "evolves_from": {
                 "id": 236,
@@ -6625,6 +6941,9 @@
             "inner-focus"
         ],
         "hidden_ability": "inner-focus",
+        "weight_kg": 50.2,
+        "height_m": 1.4,
+        "gender_ratio": 1.0,
         "evolution": {
             "evolves_from": {
                 "id": 236,
@@ -6688,6 +7007,9 @@
             "cloud-nine"
         ],
         "hidden_ability": "cloud-nine",
+        "weight_kg": 65.5,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -6747,6 +7069,9 @@
             "stench"
         ],
         "hidden_ability": "stench",
+        "weight_kg": 1.0,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -6806,6 +7131,9 @@
             "stench"
         ],
         "hidden_ability": "stench",
+        "weight_kg": 9.5,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 109,
@@ -6862,6 +7190,9 @@
             "reckless"
         ],
         "hidden_ability": "reckless",
+        "weight_kg": 115.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -6926,6 +7257,9 @@
             "reckless"
         ],
         "hidden_ability": "reckless",
+        "weight_kg": 120.0,
+        "height_m": 1.9,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 111,
@@ -6991,6 +7325,9 @@
             "healer"
         ],
         "hidden_ability": "healer",
+        "weight_kg": 34.6,
+        "height_m": 1.1,
+        "gender_ratio": 0.0,
         "evolution": {
             "evolves_from": {
                 "id": 440,
@@ -7001,8 +7338,7 @@
                     "evolves_to_id": 242,
                     "evolves_to_name": "blissey",
                     "method": "happiness",
-                    "min_happiness": 160,
-                    "method_description": "Evolui por felicidade"
+                    "min_happiness": 160
                 }
             ],
             "variants": [],
@@ -7058,6 +7394,9 @@
             "regenerator"
         ],
         "hidden_ability": "regenerator",
+        "weight_kg": 35.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -7117,6 +7456,9 @@
             "inner-focus"
         ],
         "hidden_ability": "inner-focus",
+        "weight_kg": 80.0,
+        "height_m": 2.2,
+        "gender_ratio": 0.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [],
@@ -7165,6 +7507,9 @@
             "damp"
         ],
         "hidden_ability": "damp",
+        "weight_kg": 8.0,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -7228,6 +7573,9 @@
             "damp"
         ],
         "hidden_ability": "damp",
+        "weight_kg": 25.0,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 116,
@@ -7293,6 +7641,9 @@
             "lightning-rod"
         ],
         "hidden_ability": "lightning-rod",
+        "weight_kg": 15.0,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -7352,6 +7703,9 @@
             "lightning-rod"
         ],
         "hidden_ability": "lightning-rod",
+        "weight_kg": 39.0,
+        "height_m": 1.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 118,
@@ -7407,6 +7761,9 @@
             "analytic"
         ],
         "hidden_ability": "analytic",
+        "weight_kg": 34.5,
+        "height_m": 0.8,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -7467,6 +7824,9 @@
             "analytic"
         ],
         "hidden_ability": "analytic",
+        "weight_kg": 80.0,
+        "height_m": 1.1,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": {
                 "id": 120,
@@ -7523,6 +7883,9 @@
             "technician"
         ],
         "hidden_ability": "technician",
+        "weight_kg": 54.5,
+        "height_m": 1.3,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 439,
@@ -7590,6 +7953,9 @@
             "steadfast"
         ],
         "hidden_ability": "steadfast",
+        "weight_kg": 56.0,
+        "height_m": 1.5,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -7671,6 +8037,9 @@
             "dry-skin"
         ],
         "hidden_ability": "dry-skin",
+        "weight_kg": 40.6,
+        "height_m": 1.4,
+        "gender_ratio": 0.0,
         "evolution": {
             "evolves_from": {
                 "id": 238,
@@ -7725,6 +8094,9 @@
             "vital-spirit"
         ],
         "hidden_ability": "vital-spirit",
+        "weight_kg": 30.0,
+        "height_m": 1.1,
+        "gender_ratio": 0.75,
         "evolution": {
             "evolves_from": {
                 "id": 239,
@@ -7789,6 +8161,9 @@
             "vital-spirit"
         ],
         "hidden_ability": "vital-spirit",
+        "weight_kg": 44.5,
+        "height_m": 1.3,
+        "gender_ratio": 0.75,
         "evolution": {
             "evolves_from": {
                 "id": 240,
@@ -7854,6 +8229,9 @@
             "moxie"
         ],
         "hidden_ability": "moxie",
+        "weight_kg": 55.0,
+        "height_m": 1.5,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [],
@@ -7902,6 +8280,9 @@
             "sheer-force"
         ],
         "hidden_ability": "sheer-force",
+        "weight_kg": 88.4,
+        "height_m": 1.4,
+        "gender_ratio": 1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [],
@@ -7949,6 +8330,9 @@
             "rattled"
         ],
         "hidden_ability": "rattled",
+        "weight_kg": 10.0,
+        "height_m": 0.9,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -8008,6 +8392,9 @@
             "moxie"
         ],
         "hidden_ability": "moxie",
+        "weight_kg": 235.0,
+        "height_m": 6.5,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 129,
@@ -8064,6 +8451,9 @@
             "hydration"
         ],
         "hidden_ability": "hydration",
+        "weight_kg": 220.0,
+        "height_m": 2.5,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [],
@@ -8111,6 +8501,9 @@
             "imposter"
         ],
         "hidden_ability": "imposter",
+        "weight_kg": 4.0,
+        "height_m": 0.3,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [],
@@ -8159,6 +8552,9 @@
             "anticipation"
         ],
         "hidden_ability": "anticipation",
+        "weight_kg": 6.5,
+        "height_m": 0.3,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -8185,7 +8581,6 @@
                     "evolves_to_name": "espeon",
                     "method": "happiness",
                     "min_happiness": 160,
-                    "method_description": "Evolui por felicidade",
                     "time_of_day": "day"
                 },
                 {
@@ -8193,7 +8588,6 @@
                     "evolves_to_name": "umbreon",
                     "method": "happiness",
                     "min_happiness": 160,
-                    "method_description": "Evolui por felicidade",
                     "time_of_day": "night"
                 },
                 {
@@ -8253,8 +8647,7 @@
                     "evolves_to_id": 700,
                     "evolves_to_name": "sylveon",
                     "method": "happiness",
-                    "min_happiness": 160,
-                    "method_description": "Evolui por felicidade"
+                    "min_happiness": 160
                 }
             ],
             "variants": [
@@ -8419,6 +8812,9 @@
             "hydration"
         ],
         "hidden_ability": "hydration",
+        "weight_kg": 29.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 133,
@@ -8501,6 +8897,9 @@
             "quick-feet"
         ],
         "hidden_ability": "quick-feet",
+        "weight_kg": 24.5,
+        "height_m": 0.8,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 133,
@@ -8583,6 +8982,9 @@
             "guts"
         ],
         "hidden_ability": "guts",
+        "weight_kg": 25.0,
+        "height_m": 0.9,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 133,
@@ -8666,6 +9068,9 @@
             "analytic"
         ],
         "hidden_ability": "analytic",
+        "weight_kg": 36.5,
+        "height_m": 0.8,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -8729,6 +9134,9 @@
             "weak-armor"
         ],
         "hidden_ability": "weak-armor",
+        "weight_kg": 7.5,
+        "height_m": 0.4,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -8789,6 +9197,9 @@
             "weak-armor"
         ],
         "hidden_ability": "weak-armor",
+        "weight_kg": 35.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 138,
@@ -8845,6 +9256,9 @@
             "weak-armor"
         ],
         "hidden_ability": "weak-armor",
+        "weight_kg": 11.5,
+        "height_m": 0.5,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -8905,6 +9319,9 @@
             "weak-armor"
         ],
         "hidden_ability": "weak-armor",
+        "weight_kg": 40.5,
+        "height_m": 1.3,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 140,
@@ -8961,6 +9378,9 @@
             "unnerve"
         ],
         "hidden_ability": "unnerve",
+        "weight_kg": 59.0,
+        "height_m": 1.8,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [],
@@ -9009,6 +9429,9 @@
             "gluttony"
         ],
         "hidden_ability": "gluttony",
+        "weight_kg": 460.0,
+        "height_m": 2.1,
+        "gender_ratio": 0.875,
         "evolution": {
             "evolves_from": {
                 "id": 446,
@@ -9064,6 +9487,9 @@
             "snow-cloak"
         ],
         "hidden_ability": "snow-cloak",
+        "weight_kg": 55.4,
+        "height_m": 1.7,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [],
@@ -9112,6 +9538,9 @@
             "static"
         ],
         "hidden_ability": "static",
+        "weight_kg": 52.6,
+        "height_m": 1.6,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [],
@@ -9160,6 +9589,9 @@
             "flame-body"
         ],
         "hidden_ability": "flame-body",
+        "weight_kg": 60.0,
+        "height_m": 2.0,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [],
@@ -9207,6 +9639,9 @@
             "marvel-scale"
         ],
         "hidden_ability": "marvel-scale",
+        "weight_kg": 3.3,
+        "height_m": 1.8,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [
@@ -9269,6 +9704,9 @@
             "marvel-scale"
         ],
         "hidden_ability": "marvel-scale",
+        "weight_kg": 16.5,
+        "height_m": 4.0,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 147,
@@ -9335,6 +9773,9 @@
             "multiscale"
         ],
         "hidden_ability": "multiscale",
+        "weight_kg": 210.0,
+        "height_m": 2.2,
+        "gender_ratio": 0.5,
         "evolution": {
             "evolves_from": {
                 "id": 148,
@@ -9393,6 +9834,9 @@
             "unnerve"
         ],
         "hidden_ability": "unnerve",
+        "weight_kg": 122.0,
+        "height_m": 2.0,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [],
@@ -9439,6 +9883,9 @@
             "synchronize"
         ],
         "hidden_ability": null,
+        "weight_kg": 4.0,
+        "height_m": 0.4,
+        "gender_ratio": -1.0,
         "evolution": {
             "evolves_from": null,
             "evolution_details": [],

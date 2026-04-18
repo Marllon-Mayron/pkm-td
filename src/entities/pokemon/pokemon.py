@@ -51,6 +51,23 @@ class Pokemon(Entity):
         self.types = self.pokemon_data["types"]
         self.base_stats = self.pokemon_data["base_stats"]
 
+        # Peso (kg) - com variação individual de ±10%
+        base_weight = self.pokemon_data.get("weight_kg", 10.0)  # Fallback 10kg
+        weight_variance = random.uniform(-0.10, 0.10)
+        self.weight_kg = round(base_weight * (1 + weight_variance), 2)
+
+        # Altura (m) - com variação individual de ±10%
+        base_height = self.pokemon_data.get("height_m", 1.0)  # Fallback 1m
+        height_variance = random.uniform(-0.10, 0.10)
+        self.height_m = round(base_height * (1 + height_variance), 2)
+
+        # Sexo
+        gender_ratio = self.pokemon_data.get("gender_ratio", 0.5)  # Fallback 50/50
+        if gender_ratio is None or gender_ratio == -1:
+            self.gender = None  # Sem gênero
+        else:
+            self.gender = "male" if random.random() < gender_ratio else "female"
+
         # ===== 3. IVs E EVs =====
         self.ivs = {
             "hp": random.randint(0, 31),
@@ -664,11 +681,45 @@ class Pokemon(Entity):
         """Retorna informações completas sobre as animações deste Pokémon"""
         return self.pokedex.get_pokemon_animations_info(self.id, self.is_shiny)
 
+    def get_gender_symbol(self) -> str:
+        """Retorna o símbolo do gênero"""
+        if self.gender == "male":
+            return "♂"
+        elif self.gender == "female":
+            return "♀"
+        return ""
+
+    def get_gender_color(self) -> tuple:
+        """Retorna a cor do símbolo de gênero"""
+        if self.gender == "male":
+            return (70, 120, 200)  # Azul
+        elif self.gender == "female":
+            return (230, 80, 120)  # Rosa
+        return (150, 150, 150)  # Cinza
+
+    def get_gender_name(self) -> str:
+        """Retorna nome do gênero em português"""
+        if self.gender == "male":
+            return "Macho"
+        elif self.gender == "female":
+            return "Fêmea"
+        return "Sem gênero"
+
+    def get_info_with_gender_weight(self) -> str:
+        """Retorna string com informações incluindo peso, altura e sexo"""
+        gender_text = self.get_gender_name()
+        return (f"{self.name} Lv.{self.level} ({gender_text})\n"
+                f"Peso: {self.weight_kg}kg | Altura: {self.height_m}m\n"
+                f"HP: {self.current_hp}/{self.max_hp}\n"
+                f"Tipos: {'/'.join(self.types)}\n"
+                f"Natureza: {self.nature}")
+
     def play_hurt_animation(self):
         """Toca a animação de dano (hurt)"""
         if hasattr(self, 'animation') and self.animation:
             return self.animation.play_hurt_animation()
         return False
+
     def set_battle_system(self, battle_system):
         """Define o sistema de combate para este Pokémon"""
         self.battle_system = battle_system

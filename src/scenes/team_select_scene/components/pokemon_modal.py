@@ -874,6 +874,7 @@ class PokemonModal:
 
         right_y = right_card.y + 20
 
+        # ===== INFORMAÇÕES DO LADO DIREITO =====
         right_items = [
             ("TIPO 1", self.pokemon.types[0] if len(self.pokemon.types) > 0 else "???"),
         ]
@@ -881,16 +882,37 @@ class PokemonModal:
         if len(self.pokemon.types) > 1:
             right_items.append(("TIPO 2", self.pokemon.types[1]))
 
-        if hasattr(self.pokemon, 'height') and self.pokemon.height:
-            right_items.append(("ALTURA", f"{self.pokemon.height:.1f} m"))
+        # ===== ALTURA =====
+        if hasattr(self.pokemon, 'height_m') and self.pokemon.height_m:
+            height_value = f"{self.pokemon.height_m:.2f} m"
         else:
-            right_items.append(("ALTURA", "??? m"))
+            height_value = "??? m"
+        right_items.append(("ALTURA", height_value))
 
-        if hasattr(self.pokemon, 'weight') and self.pokemon.weight:
-            right_items.append(("PESO", f"{self.pokemon.weight:.1f} kg"))
+        # ===== PESO =====
+        if hasattr(self.pokemon, 'weight_kg') and self.pokemon.weight_kg:
+            weight_value = f"{self.pokemon.weight_kg:.1f} kg"
         else:
-            right_items.append(("PESO", "??? kg"))
+            weight_value = "??? kg"
+        right_items.append(("PESO", weight_value))
 
+        # ===== SEXO =====
+        if hasattr(self.pokemon, 'gender'):
+            if self.pokemon.gender == "male":
+                gender_value = "Macho ♂"
+                gender_color = (70, 120, 200)  # Azul
+            elif self.pokemon.gender == "female":
+                gender_value = "Fêmea ♀"
+                gender_color = (230, 80, 120)  # Rosa
+            else:
+                gender_value = "Sem gênero"
+                gender_color = self.colors['text_secondary']
+        else:
+            gender_value = "??? gênero"
+            gender_color = self.colors['text_secondary']
+        right_items.append(("SEXO", gender_value))
+
+        # ===== HABILIDADE =====
         if hasattr(self.pokemon, 'ability') and self.pokemon.ability:
             right_items.append(("HABILIDADE", self.pokemon.ability[:18]))
         else:
@@ -910,8 +932,14 @@ class PokemonModal:
                 type_text = pygame.font.Font(None, 11).render(value.upper(), True, (255, 255, 255))
                 screen.blit(type_text, (type_badge.centerx - type_text.get_width() // 2,
                                         type_badge.centery - type_text.get_height() // 2))
+            elif label == "SEXO":
+                # Renderiza o sexo com cor especial
+                value_color = gender_color if 'gender_color' in dir() else self.colors['text_primary']
+                value_text = value_font.render(value, True, value_color)
+                screen.blit(value_text, (right_card.x + 20, right_y + 20))
             else:
                 value_color = self.colors['text_good'] if "BOSS" in value else self.colors['text_primary']
                 value_text = value_font.render(value, True, value_color)
                 screen.blit(value_text, (right_card.x + 20, right_y + 20))
+
             right_y += line_spacing

@@ -77,10 +77,6 @@ class Pokedex:
                 json_path = Path(__file__).parent.parent.parent / "res" / "json" / "pokemon_completo.json"
 
             if not json_path.exists():
-                # PRIORIDADE 3: res/json/pokemon_data.json (fallback antigo)
-                json_path = Path(__file__).parent.parent.parent / "res" / "json" / "pokemon_data.json"
-
-            if not json_path.exists():
                 print(f"⚠️ Arquivo JSON não encontrado: {json_path}")
                 self._load_fallback_data()
                 return
@@ -88,97 +84,70 @@ class Pokedex:
             with open(json_path, 'r', encoding='utf-8') as file:
                 data = json.load(file)
 
-            # Verifica se é o novo formato (lista com campo "evolution")
-            if isinstance(data, list) and len(data) > 0 and "evolution" in data[0]:
-                for pokemon in data:
-                    pokemon_id = pokemon["id"]
+            # Carrega os Pokémon do novo formato unificado
+            for pokemon in data:
+                pokemon_id = pokemon["id"]
 
-                    # Extrai o próximo estágio de evolução do family_members
-                    next_evolution_id = None
-                    evolution_method = "none"
-                    evolution_level = None
+                # Extrai informações de evolução
+                next_evolution_id = None
+                evolution_method = "none"
+                evolution_level = None
 
-                    evo_data = pokemon.get("evolution", {})
-                    family_members = evo_data.get("family_members", [])
+                evo_data = pokemon.get("evolution", {})
+                family_members = evo_data.get("family_members", [])
 
-                    # Encontra o próximo estágio na cadeia
-                    for i, member in enumerate(family_members):
-                        if member.get("id") == pokemon_id and i + 1 < len(family_members):
-                            next_evolution_id = family_members[i + 1].get("id")
-                            break
+                # Encontra o próximo estágio na cadeia
+                for i, member in enumerate(family_members):
+                    if member.get("id") == pokemon_id and i + 1 < len(family_members):
+                        next_evolution_id = family_members[i + 1].get("id")
+                        break
 
-                    # Pega o método e nível dos evolution_details
-                    evolution_details = evo_data.get("evolution_details", [])
-                    if evolution_details:
-                        detail = evolution_details[0]
-                        evolution_method = detail.get("method", "none")
-                        if evolution_method == "level_up":
-                            evolution_level = detail.get("min_level")
-                        elif evolution_method == "use_item":
-                            evolution_method = detail.get("item", "none")
+                # Pega o método e nível dos evolution_details
+                evolution_details = evo_data.get("evolution_details", [])
+                if evolution_details:
+                    detail = evolution_details[0]
+                    evolution_method = detail.get("method", "none")
+                    if evolution_method == "level_up":
+                        evolution_level = detail.get("min_level")
+                    elif evolution_method == "use_item":
+                        evolution_method = detail.get("item", "none")
 
-                    self.pokemon_data[pokemon_id] = {
-                        "id": pokemon_id,
-                        "name": pokemon["name"],
-                        "is_legendary": pokemon["is_legendary"],
-                        "is_mythical": pokemon["is_mythical"],
-                        "types": pokemon["type"],
-                        "base_stats": {
-                            "hp": pokemon["base"]["hp"],
-                            "attack": pokemon["base"]["attack"],
-                            "defense": pokemon["base"]["defense"],
-                            "special_attack": pokemon["base"]["special-attack"],
-                            "special_defense": pokemon["base"]["special-defense"],
-                            "speed": pokemon["base"]["speed"]
-                        },
-                        "ev_yield": {
-                            "hp": pokemon["ev"]["hp"],
-                            "attack": pokemon["ev"]["attack"],
-                            "defense": pokemon["ev"]["defense"],
-                            "special_attack": pokemon["ev"]["special-attack"],
-                            "special_defense": pokemon["ev"]["special-defense"],
-                            "speed": pokemon["ev"]["speed"]
-                        },
-                        "catch_rate": pokemon["capture_rate"],
-                        "evolution": {
-                            "EvolveTo": next_evolution_id,
-                            "lvlMin": evolution_level if evolution_level is not None else "none",
-                            "method": evolution_method
-                        }
-                    }
+                self.pokemon_data[pokemon_id] = {
+                    "id": pokemon_id,
+                    "name": pokemon["name"],
+                    "is_legendary": pokemon.get("is_legendary", False),
+                    "is_mythical": pokemon.get("is_mythical", False),
+                    "types": pokemon["type"],
+                    "base_stats": {
+                        "hp": pokemon["base"]["hp"],
+                        "attack": pokemon["base"]["attack"],
+                        "defense": pokemon["base"]["defense"],
+                        "special_attack": pokemon["base"]["special-attack"],
+                        "special_defense": pokemon["base"]["special-defense"],
+                        "speed": pokemon["base"]["speed"]
+                    },
+                    "ev_yield": {
+                        "hp": pokemon["ev"]["hp"],
+                        "attack": pokemon["ev"]["attack"],
+                        "defense": pokemon["ev"]["defense"],
+                        "special_attack": pokemon["ev"]["special-attack"],
+                        "special_defense": pokemon["ev"]["special-defense"],
+                        "speed": pokemon["ev"]["speed"]
+                    },
+                    "catch_rate": pokemon.get("rate", pokemon.get("capture_rate", 120)),
+                    "evolution": {
+                        "EvolveTo": next_evolution_id,
+                        "lvlMin": evolution_level if evolution_level is not None else "none",
+                        "method": evolution_method
+                    },
+                    # ===== NOVOS CAMPOS =====
+                    "weight_kg": pokemon.get("weight_kg", 10.0),
+                    "height_m": pokemon.get("height_m", 1.0),
+                    "gender_ratio": pokemon.get("gender_ratio", 0.5),
+                }
 
-                    if pokemon_id > self.max_id:
-                        self.max_id = pokemon_id
-
-            # Formato antigo
-            else:
-                for pokemon in data:
-                    pokemon_id = pokemon["id"]
-                    self.pokemon_data[pokemon_id] = {
-                        "id": pokemon_id,
-                        "name": pokemon["name"],
-                        "is_legendary": pokemon["is_legendary"],
-                        "is_mythical": pokemon["is_mythical"],
-                        "types": pokemon["type"],
-                        "base_stats": {
-                            "hp": pokemon["base"]["hp"],
-                            "attack": pokemon["base"]["attack"],
-                            "defense": pokemon["base"]["defense"],
-                            "special_attack": pokemon["base"]["special-attack"],
-                            "special_defense": pokemon["base"]["special-defense"],
-                            "speed": pokemon["base"]["speed"]
-                        },
-                        "ev_yield": {
-                            "hp": pokemon["ev"]["hp"],
-                            "attack": pokemon["ev"]["attack"],
-                            "defense": pokemon["ev"]["defense"],
-                            "special_attack": pokemon["ev"]["special-attack"],
-                            "special_defense": pokemon["ev"]["special-defense"],
-                            "speed": pokemon["ev"]["speed"]
-                        },
-                        "catch_rate": pokemon["rate"],
-                        "evolution": pokemon.get("Evolucao", {})
-                    }
+                if pokemon_id > self.max_id:
+                    self.max_id = pokemon_id
 
             print(f"✓ Carregados {len(self.pokemon_data)} Pokémon do JSON")
             self._cache_base_speed_limits()

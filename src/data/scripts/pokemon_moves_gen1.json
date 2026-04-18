@@ -799,7 +799,7 @@
          "type": "fighting",
          "damage_class": "physical",
          "pp": 20,
-         "power": null,
+         "power": 20,
          "accuracy": 100,
          "description": "An attack that may cause flinching.",
          "effect_chance": null,

@@ -127,9 +127,34 @@ class PokemonRendering:
         level_x = start_x + name_width + 2
         level_y = text_y + (name_font_size - level_font_size)
 
+        # ===== RENDERIZA ÍCONE DE GÊNERO =====
+        if hasattr(self.pokemon, 'gender') and self.pokemon.gender:
+            gender_symbol = self.pokemon.get_gender_symbol()
+            if gender_symbol:
+                # Tamanho da fonte
+                gender_font_size = max(10, int(12 * zoom_scale))
+                gender_font = self.get_font(gender_font_size)
+                gender_color = self.pokemon.get_gender_color()
+
+                gender_surface = gender_font.render(gender_symbol, True, gender_color)
+                gender_outline = gender_font.render(gender_symbol, True, (0, 0, 0))
+
+                # Posiciona após o nível
+                level_width = level_surface.get_width()
+                gender_x = start_x + name_width + 2 + level_width + 4
+                gender_y = text_y + (name_font_size - gender_font_size)
+
+                # Contorno
+                for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+                    screen.blit(gender_outline, (gender_x + dx, gender_y + dy))
+
+                # Símbolo
+                screen.blit(gender_surface, (gender_x, gender_y))
+
         for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
             screen.blit(name_outline, (name_x + dx, name_y + dy))
             screen.blit(level_outline, (level_x + dx, level_y + dy))
+
 
         screen.blit(name_surface, (name_x, name_y))
         screen.blit(level_surface, (level_x, level_y))
