@@ -255,7 +255,6 @@ class TeamSelectScene(BaseScene):
                 print(f"Pokémon {pokemon_to_release.name} libertado com sucesso!")
 
         elif action_type == 'RESIZE':
-            # NOVO: Trata evento de resize do layout_manager
             self.layout_initialized = False
 
     def fixed_update(self, dt):

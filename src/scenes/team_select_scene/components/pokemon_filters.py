@@ -36,8 +36,8 @@ class PokemonFilters:
             ("CAPTURA", "capture"),
             ("A-Z", "name_asc"),
             ("Z-A", "name_desc"),
-            ("ID ↑", "id_asc"),
-            ("ID ↓", "id_desc")
+            ("ID v", "id_asc"),
+            ("ID ^", "id_desc")
         ]
 
         # Calcula largura total dos botões

@@ -10,7 +10,7 @@ class MapRenderer:
     def __init__(self):
         self.layer_manager = GameLayerManager()
         self.loaded = False
-        self.tile_size = 24  # NOVO: tile_size padrão
+        self.tile_size = 24
 
     def load_from_data(self, map_data: dict, base_path: str = ""):
         """Carrega o mapa a partir dos dados"""

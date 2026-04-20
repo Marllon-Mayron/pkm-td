@@ -1500,5 +1500,5 @@ class EffectFactory:
         if not config:
             return None
 
-        # Usa o novo método from_config
+        # Usa o método from_config
         return MoveEffect.from_config(move_name, config)

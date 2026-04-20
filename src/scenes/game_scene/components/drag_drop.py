@@ -21,7 +21,6 @@ class DragDropManager:
         self.place_preview_alpha = 0
         self.tile_size = 24
 
-        # NOVO: Tipo de drag (team ou placed)
         self.drag_type = None  # "team" ou "placed"
         self.drag_source_spot = None
 

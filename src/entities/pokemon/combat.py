@@ -1,11 +1,9 @@
 # src/entities/pokemon/combat.py
 
 import math
-import random
 from typing import List, Optional
 
 from src.battle.effects import StatusType
-from src.battle.effects.animation_mapper import AnimationMapper
 
 
 class PokemonCombat:
@@ -440,7 +438,7 @@ class PokemonCombat:
                     self.pokemon.set_animation("idle")
             return
 
-        # ===== NOVO: VERIFICA SE O ALVO ESTÁ MUITO LONGE DURANTE O MOVIMENTO =====
+        # ===== VERIFICA SE O ALVO ESTÁ MUITO LONGE DURANTE O MOVIMENTO =====
         if not self.pokemon.is_wild:
             dx_check = target.x - self.pokemon.x
             dy_check = target.y - self.pokemon.y

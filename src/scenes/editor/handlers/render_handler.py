@@ -47,7 +47,6 @@ class EditorRenderHandler:
 
         # Diálogos (renderizar na ordem inversa de prioridade)
 
-        # NOVO: Diálogo de gerenciamento de tilesets (deve ser o primeiro para aparecer por cima)
         if hasattr(self.editor, 'tileset_manager_dialog') and self.editor.tileset_manager_dialog and self.editor.tileset_manager_dialog.visible:
             self.editor.tileset_manager_dialog.render(screen)
 

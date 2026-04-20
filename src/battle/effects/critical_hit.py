@@ -1,4 +1,4 @@
-# src/battle/critical_hit.py
+# src/battle/effects/critical_hit.py
 """
 Sistema de acertos críticos para batalhas Pokémon
 Baseado nas mecânicas originais (Gen 1-6)

@@ -20,7 +20,7 @@ class ShopItemCard:
         self.description = item_data["description"]
         self.price = item_data.get("price", 100)
         self.index = index
-        self.is_locked = False  # Novo: indica se o item está bloqueado
+        self.is_locked = False
         self.unlock_phase = item_data.get("unlock_phase") or item_data.get("unlock_chapter")  # Fase necessária
 
         self.rect = pygame.Rect(0, 0, 0, 0)

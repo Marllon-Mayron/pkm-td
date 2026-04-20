@@ -1,6 +1,6 @@
 # src/battle/effects/move_effect.py
 from enum import Enum
-from typing import Optional, List, Any, Callable
+from typing import Optional, Callable
 from dataclasses import dataclass, field
 import random, math
 
@@ -325,7 +325,6 @@ class MoveEffect:
 
         # Verifica se é formato antigo (stat único) ou novo (stats lista)
         if "stats" in self.params:
-            # Formato novo: lista de stats
             stats_list = self.params.get("stats", [])
             duration = self.params.get("duration", 8.0)
 
@@ -1183,7 +1182,7 @@ class MoveEffect:
         """
         Aplica modificador de estágio de crítico (Focus Energy)
         """
-        from src.battle.critical_hit import CriticalHitSystem
+        from battle.effects.critical_hit import CriticalHitSystem
 
         stage_increase = self.params.get("stage_increase", 2)
         max_stage = self.params.get("max_stage", 4)
@@ -1218,7 +1217,7 @@ class MoveEffect:
                 f"[FOCUS_ENERGY] {target_entity.name} aumentou sua taxa de acerto crítico em {stage_increase} estágios!")
 
             # Mensagem adicional sobre a taxa
-            from src.battle.critical_hit import CriticalHitSystem
+            from battle.effects.critical_hit import CriticalHitSystem
             new_chance = CriticalHitSystem.calculate_critical_chance(target_entity)
             effect_manager.add_status_text(target_entity, f"Taxa de crítico aumentada!", duration=1.0)
 
@@ -2161,7 +2160,6 @@ class MoveEffect:
         - Afeta em área (todos aliados no range)
         - Não tem duração, é efeito instantâneo
         """
-        from src.battle.effects.stat_modifier import StatType
 
         # Obtém todos os aliados no range
         allies_in_range = self._get_allies_in_area(attacker, battle_system)
@@ -2276,7 +2274,6 @@ class MoveEffect:
     # ===== MÉTODOS DE RAGE =====
     def _apply_rage_mode(self, attacker, target, effect_manager):
         """Aplica o efeito Rage - aumenta Attack quando atingido"""
-        from .stat_modifier import StatType
 
         # Verifica se já está em modo Rage
         if hasattr(attacker, '_rage_active') and attacker._rage_active:

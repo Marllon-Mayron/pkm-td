@@ -1090,7 +1090,7 @@
             },
             {
                 "wave_index": 1,
-                "path_index": 0,
+                "path_index": 1,
                 "name": "Wave 2",
                 "enabled": true,
                 "enemies": [
@@ -1109,7 +1109,7 @@
             },
             {
                 "wave_index": 2,
-                "path_index": 0,
+                "path_index": 2,
                 "name": "Wave 3",
                 "enabled": true,
                 "enemies": [

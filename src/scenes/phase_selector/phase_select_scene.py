@@ -445,11 +445,11 @@ class PhaseSelectScene(BaseScene):
                 self.available_chapters = sorted(self.catalog.get_all_phases().keys())
                 self.current_chapter_id = self._get_first_available_chapter()
                 self.layout_initialized = False
-            elif event.key == pygame.K_u:  # Tecla U para desbloquear fase específica
+            elif event.key == pygame.K_u:
                 self._debug_unlock_next()
-            elif event.key == pygame.K_a:  # Tecla A para desbloquear todas
+            elif event.key == pygame.K_a:
                 self._debug_unlock_all()
-            elif event.key == pygame.K_s:  # NOVO: Tecla S para abrir a loja
+            elif event.key == pygame.K_s:
                 self._open_shop()
 
         elif event.type == pygame.VIDEORESIZE:
@@ -468,7 +468,6 @@ class PhaseSelectScene(BaseScene):
             for tab in self.chapter_tabs:
                 tab.handle_event(event)
 
-            # NOVO: Atualiza hover do botão da loja
             if self.shop_button:
                 self.shop_button_hovered = self.shop_button.collidepoint(event.pos)
 
@@ -487,7 +486,6 @@ class PhaseSelectScene(BaseScene):
                     self.game.current_scene = self.game.menu_scene
                     return
 
-                # NOVO: Botão da loja
                 if self.shop_button and self.shop_button.collidepoint(event.pos):
                     self._open_shop()
                     return
@@ -634,7 +632,6 @@ class PhaseSelectScene(BaseScene):
             text_rect = text.get_rect(center=self.back_button.center)
             screen.blit(text, text_rect)
 
-        # NOVO: Botão da loja (centralizado na parte inferior)
         if self.shop_button:
             # Cores baseadas no hover
             if self.shop_button_hovered:

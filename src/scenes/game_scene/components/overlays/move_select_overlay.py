@@ -31,7 +31,7 @@ class MoveSelectOverlay(BaseOverlay):
         self.zoom_progress = 0
 
         # Zoom alvo (mesmo estilo do scroll, sem estabilização)
-        self.target_zoom = 2.2
+        self.target_zoom = 2.0
         self.min_zoom = 1.0
         self.max_zoom = 4.0
 
@@ -234,8 +234,7 @@ class MoveSelectOverlay(BaseOverlay):
         self._render_panel(screen, viewport)
 
     def _render_pokemon_area(self, screen, viewport):
-        """Renderiza a área do Pokémon"""
-        # Posição do Pokémon na tela
+        """Renderiza a área do Pokémon com sprite proporcional"""
         screen_x, screen_y = self.screen_manager.world_to_screen(
             self.pokemon.x, self.pokemon.y, self.camera
         )
@@ -244,46 +243,54 @@ class MoveSelectOverlay(BaseOverlay):
         bg_radius = 75
         bg_center = (int(screen_x), int(screen_y))
 
-        # Círculo de fundo
         pygame.draw.circle(screen, (*self.colors['bg_medium'], 200), bg_center, bg_radius + 8)
         pygame.draw.circle(screen, (*self.colors['bg_dark'], 180), bg_center, bg_radius + 5)
 
-        # Renderiza o Pokémon
+        # Renderiza o Pokémon com proporção preservada
         if self.pokemon.sprite:
-            sprite_size = 130
-            scaled_sprite = pygame.transform.scale(self.pokemon.sprite, (sprite_size, sprite_size))
-            sprite_rect = scaled_sprite.get_rect(center=(screen_x, screen_y))
-            screen.blit(scaled_sprite, sprite_rect)
+            target_size = 130
+            original_width = self.pokemon.sprite.get_width()
+            original_height = self.pokemon.sprite.get_height()
 
-        # Nome e nível
+            if original_width > 0 and original_height > 0:
+                scale_factor = min(target_size / original_width, target_size / original_height)
+                new_width = int(original_width * scale_factor)
+                new_height = int(original_height * scale_factor)
+
+                scaled_sprite = pygame.transform.scale(self.pokemon.sprite, (new_width, new_height))
+                sprite_rect = scaled_sprite.get_rect(center=(screen_x, screen_y))
+                screen.blit(scaled_sprite, sprite_rect)
+
+        # Nome e nível na mesma linha (nome elevado)
         font_name = self._get_font(32, True)
         name_text = f"{self.pokemon.name}"
         name_surf = font_name.render(name_text, True, self.colors['accent'])
         name_x = screen_x - name_surf.get_width() // 2
-        name_y = screen_y - 100
+        name_y = screen_y - 110  # Elevado de -100 para -110
         screen.blit(name_surf, (name_x, name_y))
 
-        font_level = self._get_font(20)
-        level_text = f"Nível {self.pokemon.level}"
+        # Nível ao lado do nome
+        font_level = self._get_font(24, True)
+        level_text = f"Lv.{self.pokemon.level}"
         level_surf = font_level.render(level_text, True, self.colors['text_dim'])
-        level_x = screen_x - level_surf.get_width() // 2
-        level_y = screen_y - 70
+        level_x = name_x + name_surf.get_width() + 12
+        level_y = name_y + (name_surf.get_height() - level_surf.get_height()) // 2
         screen.blit(level_surf, (level_x, level_y))
 
-        # Tipos
-        self._render_types(screen, screen_x, screen_y - 50, self.pokemon.types)
-
-        # Barra de HP
+        # Barra de HP (posição ajustada)
         self._render_hp_bar(screen, screen_x, screen_y + 80, self.pokemon)
 
-        # Move atual selecionado (mostra o que está selecionado atualmente)
+        # Tipos abaixo da barra de vida
+        self._render_types(screen, screen_x, screen_y + 115, self.pokemon.types)
+
+        # Move atual selecionado
         if self.pokemon.moves and self.selected_index < len(self.pokemon.moves):
             selected_move = self.pokemon.moves[self.selected_index]
             font_move = self._get_font(16, True)
             move_text = f"SELECIONADO: {selected_move.name.upper()}"
             move_surf = font_move.render(move_text, True, self.colors['accent'])
             move_x = screen_x - move_surf.get_width() // 2
-            move_y = screen_y + 115
+            move_y = screen_y + 165  # Ajustado para ficar abaixo dos tipos
             screen.blit(move_surf, (move_x, move_y))
 
     def _render_types(self, screen, center_x, y, types):

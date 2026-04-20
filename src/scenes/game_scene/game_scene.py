@@ -62,7 +62,6 @@ class GameScene(BaseScene):
         # Cria o overlay_manager
         self.overlay_manager = OverlayManager(self)
 
-        # ===== NOVO: Wave Manager refatorado =====
         self.wave_manager = WaveManager(phase_loader, self)
         self.wave_manager.set_paths(self.path_renderer.paths)  # Define os paths
 

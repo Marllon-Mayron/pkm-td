@@ -36,7 +36,7 @@ class ItemDragManager:
         # Mensagem de erro específica
         self.error_message = None
         self.error_message_timer = 0
-        self.error_message_target = None  # NOVO: guarda qual alvo gerou o erro
+        self.error_message_target = None
 
         # Animação
         self.animation_time = 0
@@ -246,11 +246,6 @@ class ItemDragManager:
                             self.hovered_target = ally
                             self.target_type = "ally"
                             return
-
-                    # ===== NOVO: Verifica se tem espaço para aprender =====
-                    # Se tem menos de 4 moves, pode aprender direto
-                    # Se tem 4 moves, ainda é válido (vai abrir overlay de escolha)
-                    # Então NÃO bloqueia aqui!
 
                 # Alvo válido (mesmo com 4 moves, pois vamos abrir overlay)
                 self.hovered_target = ally

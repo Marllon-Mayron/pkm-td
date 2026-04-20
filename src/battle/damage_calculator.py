@@ -2,11 +2,11 @@
 """
 Calculadora de dano baseada nos jogos Pokémon originais
 """
-from typing import Dict, Tuple, Optional
+from typing import Dict
 import random
 
 from src.battle.effects import StatusType
-from src.battle.critical_hit import CriticalHitSystem
+from src.battle.effects.critical_hit import CriticalHitSystem
 
 
 class DamageCalculator:

@@ -17,7 +17,7 @@ class ModeButtons:
             ("ITEMS", "items"),
             ("EVENTS", "events"),
             ("TILESETS", "tilesets"),
-            ("REWARDS", "rewards"),  # NOVO: Botão de recompensas
+            ("REWARDS", "rewards"),
         ]
 
         for i, (text, mode) in enumerate(modes):

@@ -896,7 +896,7 @@ class BattleSystem:
             print(f"[SCREEN] Todos os screens foram limpos!")
 
         # ===== LIMPA MODIFICADORES DE CRÍTICO =====
-        from src.battle.critical_hit import CriticalHitSystem
+        from battle.effects.critical_hit import CriticalHitSystem
         CriticalHitSystem.clear_all_modifiers()
 
     def _update_disable(self, dt: float):

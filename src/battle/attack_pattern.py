@@ -6,11 +6,11 @@ import random
 
 class AttackPattern(Enum):
     """Padrões de ataque para inimigos"""
-    AGGRESSIVE = "aggressive"  # Pode atacar (30% dos inimigos comuns)
+    AGGRESSIVE = "aggressive"  # Pode atacar (20% dos inimigos comuns)
     VICIOUS = "vicious"  # Só ataca com um golpe específico até acabar PP
     RANDOM = "random"  # Ataca com todos os ataques disponíveis aleatoriamente
     VICIOUS_SELECTIVE = "vicious_selective"  # Só usa golpes do mesmo tipo (status, físico ou especial)
-    PASSIVE = "passive"  # Não ataca (70% dos inimigos comuns)
+    PASSIVE = "passive"  # Não ataca (80% dos inimigos comuns)
 
 
 class AttackTypeCategory(Enum):
