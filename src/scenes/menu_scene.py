@@ -6,7 +6,6 @@ Cena do menu principal
 import pygame
 import random
 
-from scenes.starter_select_scene.starter_select_scene import StarterSelectScene
 from src.scenes.base_scene import BaseScene
 from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 from src.scenes.settings_scene.settings_scene import SettingsScene
@@ -222,6 +221,7 @@ class MenuScene(BaseScene):
 
         if not save_loaded:
             # Sem save: mostra tela de seleção de inicial
+            from src.scenes.starter_select_scene.starter_select_scene import StarterSelectScene
             print("[MENU] Nenhum save encontrado - abrindo seleção de inicial")
             self.game.starter_select_scene = StarterSelectScene(self.game)
             self.game.current_scene = self.game.starter_select_scene
