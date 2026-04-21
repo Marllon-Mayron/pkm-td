@@ -41,7 +41,7 @@ class PokemonGridItem:
     def render(self, screen, font, pokedex):
         self._draw_shadow(screen)
         self._draw_card_background(screen)
-        self._draw_portrait(screen, pokedex)
+        self._draw_portrait_and_id(screen, pokedex, font)  # Modificado para incluir ID
         self._draw_info(screen, font)
 
         if self.pokemon.is_in_team:
@@ -67,13 +67,38 @@ class PokemonGridItem:
         pygame.draw.rect(screen, color, self.rect, border_radius=6)
         pygame.draw.rect(screen, border_color, self.rect, 1, border_radius=6)
 
-    def _draw_portrait(self, screen, pokedex):
-        """Desenha o retrato do Pokémon (40x40)"""
+    def _draw_portrait_and_id(self, screen, pokedex, font):
+        """Desenha o retrato do Pokémon (40x40) e o ID acima dele"""
         portrait = self._get_portrait(pokedex)
+
+        # Posição do retrato (esquerda do card)
+        portrait_x = self.rect.x + 5
+        portrait_y = self.rect.y + (self.rect.height - 40) // 2
+
+        # ===== DESENHA O ID ACIMA DO RETRATO =====
+        # Formata o ID com 3 dígitos (ex: 001, 025, 151)
+        formatted_id = f"#{self.pokemon.id:03d}"
+
+        # Cor do ID baseada no shiny (usa a mesma fonte passada como parâmetro)
+        if self.pokemon.is_shiny:
+            id_color = COLORS['TEXT']['YELLOW']
+        else:
+            id_color = COLORS['TEXT']['GRAY'] if 'GRAY' in COLORS['TEXT'] else (128, 128, 128)
+
+        # Renderiza o ID com a mesma fonte (mas tamanho um pouco menor para caber)
+        # Usamos a mesma fonte, apenas reduzimos o tamanho
+        id_font = pygame.font.Font(None, font.get_height() +4)  # Um pouco menor que a fonte principal
+        id_text = id_font.render(formatted_id, True, id_color)
+        id_x = portrait_x + (40 - id_text.get_width()) // 2  # Centraliza acima do retrato
+        id_y = portrait_y - id_text.get_height() - 4  # 2px acima do retrato
+
+        # Sombra do texto do ID
+        id_shadow = id_font.render(formatted_id, True, (0, 0, 0))
+        screen.blit(id_shadow, (id_x + 1, id_y + 1))
+        screen.blit(id_text, (id_x, id_y))
+
+        # ===== DESENHA O RETRATO =====
         if portrait:
-            # Centraliza o retrato na área esquerda do card
-            portrait_x = self.rect.x + 5
-            portrait_y = self.rect.y + (self.rect.height - 40) // 2
             screen.blit(portrait, (portrait_x, portrait_y))
 
     def _draw_info(self, screen, font):
@@ -88,7 +113,7 @@ class PokemonGridItem:
         name_text = font.render(self.pokemon.name, True, name_color)
         screen.blit(name_text, (name_x, self.rect.y + 10))
 
-        # Nível (também pode ser amarelo para shiny? Mantive amarelo padrão)
+        # Nível
         lvl_text = font.render(f"Lv.{self.pokemon.level}", True, COLORS['TEXT']['YELLOW'])
         screen.blit(lvl_text, (name_x, self.rect.y + 30))
 
@@ -126,5 +151,5 @@ class PokemonGridItem:
         screen.blit(overlay, self.rect)
 
         team_text = font.render("No time", True, COLORS['TEXT']['GREEN'])
-        text_rect = team_text.get_rect(center=(self.rect.centerx, self.rect.centery + 20))
+        text_rect = team_text.get_rect(center=(self.rect.centerx, self.rect.centery + 35))
         screen.blit(team_text, text_rect)

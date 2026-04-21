@@ -446,9 +446,11 @@ class PhaseSelectScene(BaseScene):
                 self.current_chapter_id = self._get_first_available_chapter()
                 self.layout_initialized = False
             elif event.key == pygame.K_u:
-                self._debug_unlock_next()
+                if self.dev_mode:
+                    self._debug_unlock_next()
             elif event.key == pygame.K_a:
-                self._debug_unlock_all()
+                if self.dev_mode:
+                    self._debug_unlock_all()
             elif event.key == pygame.K_s:
                 self._open_shop()
 

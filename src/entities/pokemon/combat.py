@@ -164,23 +164,31 @@ class PokemonCombat:
         if self.pokemon.is_wild and hasattr(self.pokemon, '_path_tracker'):
             self.pokemon._path_tracker.set_ignore_path(self.pokemon, 0)
 
-        # Para aliados: voltam para o spot
+        # ===== CORREÇÃO: PARA ALIADOS, FORÇA RETORNO AO SPOT =====
         if not self.pokemon.is_wild:
-            print(f"[TARGET_LOST] {self.pokemon.name}: voltando para o spot")
+            print(f"[TARGET_LOST] {self.pokemon.name}: voltando para o spot (motivo: {reason})")
             self.pokemon.combat_state = "returning"
+
             # ===== FORÇA RESET DAS FLAGS DE MOVIMENTO =====
             self.pokemon.is_moving = False
             self.pokemon.last_x = self.pokemon.x
             self.pokemon.last_y = self.pokemon.y
+
             # ===== FORÇA ANIMAÇÃO DE WALK =====
-            if self.pokemon.has_animation("walk"):
+            if hasattr(self.pokemon, 'has_animation') and self.pokemon.has_animation("walk"):
                 self.pokemon.set_animation("walk")
+
             # ===== CANCELA QUALQUER ANIMAÇÃO DE ATAQUE PENDENTE =====
             if hasattr(self.pokemon, '_attack_animation_active'):
                 self.pokemon._attack_animation_active = False
+                # Limpa flags relacionadas
+                if hasattr(self.pokemon, '_pending_attack_move'):
+                    delattr(self.pokemon, '_pending_attack_move')
+                if hasattr(self.pokemon, '_pending_attack_target'):
+                    delattr(self.pokemon, '_pending_attack_target')
         else:
             # Para selvagens: voltam para idle e seguirão o path
-            if self.pokemon.has_animation("idle"):
+            if hasattr(self.pokemon, 'has_animation') and self.pokemon.has_animation("idle"):
                 self.pokemon.set_animation("idle")
 
     # ===== MÉTODO PRINCIPAL DE COMBATE =====
@@ -678,7 +686,7 @@ class PokemonCombat:
             print(f"[RETURN] {self.pokemon.name} não tem spot original! Voltando para idle.")
             self.pokemon.combat_state = "idle"
             self.pokemon.target = None
-            if self.pokemon.has_animation("idle"):
+            if hasattr(self.pokemon, 'has_animation') and self.pokemon.has_animation("idle"):
                 self.pokemon.set_animation("idle")
             return
 
@@ -693,7 +701,8 @@ class PokemonCombat:
             # Posiciona exatamente no spot
             self.pokemon.x = target_x
             self.pokemon.y = target_y
-            self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
+            if hasattr(self.pokemon, 'rect'):
+                self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
 
             # Reseta estado
             self.pokemon.combat_state = "idle"
@@ -705,9 +714,9 @@ class PokemonCombat:
             self.pokemon.last_y = self.pokemon.y
 
             # ===== FORÇA ANIMAÇÃO IDLE =====
-            if self.pokemon.has_animation("idle"):
+            if hasattr(self.pokemon, 'has_animation') and self.pokemon.has_animation("idle"):
                 self.pokemon.set_animation("idle")
-                print(f"[RETURN] {self.pokemon.name} retornou ao spot! Animação: idle")
+                print(f"[RETURN] {self.pokemon.name} retornou ao spot! Posição: ({self.pokemon.x:.0f}, {self.pokemon.y:.0f})")
             else:
                 print(f"[RETURN] {self.pokemon.name} retornou ao spot, mas não tem animação idle!")
             return
@@ -718,9 +727,10 @@ class PokemonCombat:
 
         if not is_attacking:
             # Força animação walk APENAS se não estiver já em walk
-            if self.pokemon.current_animation != "walk" and self.pokemon.has_animation("walk"):
-                self.pokemon.set_animation("walk")
-                print(f"[RETURN] {self.pokemon.name} voltando ao spot (walk)")
+            if hasattr(self.pokemon, 'current_animation') and self.pokemon.current_animation != "walk":
+                if hasattr(self.pokemon, 'has_animation') and self.pokemon.has_animation("walk"):
+                    self.pokemon.set_animation("walk")
+                    print(f"[RETURN] {self.pokemon.name} voltando ao spot (walk)")
 
         # Move em direção ao spot
         move_distance = self.pokemon.move_speed * dt * 60
@@ -740,7 +750,8 @@ class PokemonCombat:
 
         self.pokemon.x += move_x
         self.pokemon.y += move_y
-        self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
+        if hasattr(self.pokemon, 'rect'):
+            self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
 
         # Atualiza direção baseada no movimento
         self._update_direction_to_target(dx, dy)

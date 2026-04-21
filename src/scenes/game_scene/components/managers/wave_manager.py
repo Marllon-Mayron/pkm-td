@@ -393,20 +393,24 @@ class WaveManager:
         print(f"[ITEM] {item.item_name} foi ROUBADO! Itens restantes protegidos: {remaining}")
 
     def _remove_enemy(self, enemy: 'Pokemon'):
-        """Remove inimigo da lista ativa"""
+        """Remove inimigo da lista ativa e limpa referências de aliados"""
         if enemy in self.active_enemies:
             enemy._marked_for_removal = True
             enemy.is_placed = False  # Garante que não está mais no mapa
 
+            print(f"[WaveManager] Removendo {enemy.name} (BOSS={enemy.is_boss})")
+
             # ===== LIMPA REFERÊNCIAS DE OUTROS INIMIGOS =====
             for other in self.active_enemies:
                 if other != enemy and hasattr(other, 'target') and other.target == enemy:
-                    print(f"[WaveManager] {other.name} perdeu o alvo {enemy.name}")
+                    print(f"[WaveManager] Inimigo {other.name} perdeu o alvo {enemy.name}")
                     other.target = None
                     if hasattr(other, '_attack_attempts'):
                         other._attack_attempts = 0
-                    # Reseta estado de combate do outro inimigo
                     other.combat_state = "idle"
+                    # Reseta ignore_path_timer
+                    if hasattr(other, '_path_tracker'):
+                        other._path_tracker.set_ignore_path(other, 0)
 
             # ===== LIMPA REFERÊNCIAS DE POKÉMON ALIADOS =====
             if hasattr(self.game_scene, 'placement_manager'):
@@ -416,13 +420,26 @@ class WaveManager:
                         ally.target = None
                         if hasattr(ally, '_attack_attempts'):
                             ally._attack_attempts = 0
-                        ally.combat_state = "idle"
+                        # Força aliado a voltar para o spot
+                        ally.combat_state = "returning"
+                        if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
+                            ally.set_animation("walk")
+                        # Reseta qualquer animação de ataque pendente
+                        if hasattr(ally, '_attack_animation_active'):
+                            ally._attack_animation_active = False
+                        # Limpa flags de ataque pendente
+                        if hasattr(ally, '_pending_attack_move'):
+                            delattr(ally, '_pending_attack_move')
+                        if hasattr(ally, '_pending_attack_target'):
+                            delattr(ally, '_pending_attack_target')
 
-            print(f"[WaveManager] Marcando {enemy.name} para remoção")
-
+            # Limpa effect_manager
             if hasattr(enemy, 'effect_manager') and enemy.effect_manager:
                 enemy.effect_manager.unregister_pokemon(enemy)
+
             enemy.clear_damage_tracking()
+
+            print(f"[WaveManager] {enemy.name} removido com sucesso")
 
     def _distribute_xp(self, defeated_enemy: 'Pokemon'):
         """Distribui XP e EVs quando um inimigo é derrotado (COM SUPORTE A PAY DAY)"""
