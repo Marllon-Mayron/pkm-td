@@ -121,12 +121,26 @@ class Player(Entity):
         return info
 
     def add_starter(self, starter_id=1):
-        """Adiciona Pokémon inicial (para testes)"""
+        """Adiciona Pokémon inicial (para testes ou seleção)"""
+        from src.entities.pokemon import Pokemon
+
+        # Verifica se o time está vazio
+        if len(self.team) > 0:
+            print(f"[PLAYER] Time já tem {len(self.team)} Pokémon. Limpando...")
+            self.team.clear()
+
         starter = Pokemon(0, 0, starter_id, level=5, is_wild=False)
-        success, msg = self.add_to_team(starter, 0)
-        if success:
-            self.caught_pokemon.add(starter_id)
-            self.register_seen(starter_id)
+
+        # Garante que o Pokémon está configurado corretamente
+        starter.is_in_team = True
+        starter.is_placed = False
+        starter.is_wild = False
+
+        self.team.append(starter)
+        self.caught_pokemon.add(starter_id)
+        self.register_seen(starter_id)
+
+        print(f"[PLAYER] Pokémon inicial adicionado: {starter.name} (ID: {starter_id})")
         return starter
 
     #SALVAMENTOS

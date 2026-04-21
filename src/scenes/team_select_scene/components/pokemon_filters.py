@@ -162,14 +162,6 @@ class PokemonFilters:
         pygame.draw.rect(screen, search_color, self.search_rect, border_radius=6)
         pygame.draw.rect(screen, search_border, self.search_rect, 2, border_radius=6)
 
-        # Ícone de lupa
-        try:
-            icon_font = pygame.font.Font(None, 18)
-            icon = icon_font.render("🔍", True, COLORS['TEXT'].get('DARK_GRAY', (150, 150, 160)))
-            screen.blit(icon, (self.search_rect.x + 8, self.search_rect.y + 7))
-        except:
-            pass
-
         # Texto da busca
         text_x = self.search_rect.x + 32
         text_y = self.search_rect.y + 8

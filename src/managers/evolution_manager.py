@@ -28,39 +28,16 @@ class EvolutionManager:
         self._load_evolution_data()
 
     def _get_json_path(self):
-        """Obtém o caminho correto para o arquivo JSON unificado"""
-        if getattr(sys, 'frozen', False):
-            root_dir = os.path.dirname(sys.executable)
-        else:
-            current_file = Path(__file__).resolve()
-            root_dir = current_file.parent.parent.parent
+        """Retorna o caminho do JSON de evoluções"""
+        from pathlib import Path
+        from src.config.paths import PROJECT_ROOT
 
-        # PRIORIDADE 1: src/data/scripts/pokemon_completo.json
-        json_path = root_dir / "src" / "data" / "scripts" / "pokemon_completo.json"
-
-        if json_path.exists():
-            return json_path
-
-        # PRIORIDADE 2: res/json/pokemon_completo.json
-        json_path = root_dir / "res" / "json" / "pokemon_completo.json"
-
-        if json_path.exists():
-            return json_path
-
-        # FALLBACK
-        json_path = root_dir / "src" / "data" / "scripts" / "pokemon_evolutions_gen1.json"
-
-        return json_path
+        return PROJECT_ROOT / "src" / "data" / "scripts" / "pokemon_completo.json"
 
     def _load_evolution_data(self):
         """Carrega os dados de evolução do arquivo JSON unificado"""
         try:
             json_path = self._get_json_path()
-
-            if not json_path.exists():
-                print(f"⚠️ Arquivo de evoluções não encontrado: {json_path}")
-                self._create_fallback_data()
-                return
 
             with open(json_path, 'r', encoding='utf-8') as file:
                 data = json.load(file)
@@ -97,7 +74,6 @@ class EvolutionManager:
                     # 2. Pega do campo "variants" (se existir)
                     variants = evo_data.get("variants", [])
                     for variant in variants:
-                        # Normaliza o formato
                         norm_variant = {
                             "evolves_to_id": variant.get("evolves_to_id"),
                             "evolves_to_name": variant.get("evolves_to_name"),
@@ -119,7 +95,6 @@ class EvolutionManager:
                         self.evolution_variants[pokemon_id] = all_variants
 
                     # Para compatibilidade com código antigo, pega a PRIMEIRA evolução
-                    # como a evolução "padrão"
                     if all_variants:
                         first_variant = all_variants[0]
                         evolve_to = first_variant.get("evolves_to_id")
@@ -134,9 +109,9 @@ class EvolutionManager:
 
                         if evolve_to:
                             self.evolutions[pokemon_id] = {
-                                "lvlMin": lvl_min if lvl_min is not None else "none",
-                                "EvolveTo": evolve_to,
-                                "method": method
+                                "lvlMin": str(lvl_min) if lvl_min is not None else "none",
+                                "EvolveTo": str(evolve_to),
+                                "method": str(method)
                             }
                         else:
                             self.evolutions[pokemon_id] = {
@@ -153,9 +128,6 @@ class EvolutionManager:
             else:
                 # Formato antigo
                 self.evolutions = data
-
-            print(f"✓ Carregados dados de evolução para {len(self.evolutions)} Pokémon")
-            print(f"✓ Pokémon com múltiplas variantes: {len(self.evolution_variants)}")
 
         except Exception as e:
             print(f"✗ Erro ao carregar dados de evolução: {e}")

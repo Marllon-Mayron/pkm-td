@@ -1,8 +1,12 @@
+# src/scenes/menu_scene.py
+
 """
 Cena do menu principal
 """
 import pygame
 import random
+
+from scenes.starter_select_scene.starter_select_scene import StarterSelectScene
 from src.scenes.base_scene import BaseScene
 from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 from src.scenes.settings_scene.settings_scene import SettingsScene
@@ -66,6 +70,7 @@ class Button:
         # Desenha texto
         screen.blit(self.text_surface, self.text_rect)
 
+
 class MenuScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
@@ -74,10 +79,10 @@ class MenuScene(BaseScene):
         self.logo = None
         self.create_logo()
 
-        # Botões - AGORA: "Iniciar Jogo" vai para seleção de fases
+        # Botões - "Iniciar Jogo" agora verifica save
         self.buttons = [
             Button(0.3, 0.5, 0.4, 0.08, "Iniciar Jogo",
-                  (100, 100, 0), (150, 150, 0), self.open_phase_select, None),
+                  (100, 100, 0), (150, 150, 0), self.start_game, None),
             Button(0.3, 0.6, 0.4, 0.08, "Configurações",
                   (100, 100, 0), (150, 150, 0), self.open_settings, None),
             Button(0.3, 0.4, 0.4, 0.08, "Editor de Fases",
@@ -129,7 +134,7 @@ class MenuScene(BaseScene):
             if event.key == pygame.K_p:
                 self.toggle_pause()
             elif event.key == pygame.K_RETURN:
-                self.open_phase_select()
+                self.start_game()
 
         for button in self.buttons:
             button.handle_event(event)
@@ -208,16 +213,33 @@ class MenuScene(BaseScene):
         text_y = (self.screen_manager.window_height - pause_text.get_height()) // 2
         screen.blit(pause_text, (text_x, text_y))
 
-    def open_phase_select(self):
-        """Abre tela de seleção de fases"""
-        print("Abrindo seleção de fases...")
-        self.game.current_scene = PhaseSelectScene(self.game)
+    def start_game(self):
+        """Inicia o jogo - verifica se tem save ou precisa escolher inicial"""
+        print("[MENU] Iniciando jogo...")
+
+        # Verifica se existe um save
+        save_loaded = self.game.player.load_game(1)
+
+        if not save_loaded:
+            # Sem save: mostra tela de seleção de inicial
+            print("[MENU] Nenhum save encontrado - abrindo seleção de inicial")
+            self.game.starter_select_scene = StarterSelectScene(self.game)
+            self.game.current_scene = self.game.starter_select_scene
+        else:
+            # Com save: vai direto para seleção de fases
+            print("[MENU] Save encontrado - indo para seleção de fases")
+            print(f"  - Time: {len(self.game.player.team)} Pokémon")
+
+            # Carrega as configurações do save
+            from src.config.progress import progress_manager
+            progress_manager._load_settings_from_save()
+
+            self.game.current_scene = PhaseSelectScene(self.game)
 
     def open_settings(self):
         """Abre configurações"""
         print("Abrindo configurações...")
         self.game.current_scene = SettingsScene(self.game)
-
 
     def open_editor(self):
         """Abre o editor de fases"""

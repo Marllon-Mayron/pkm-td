@@ -321,7 +321,7 @@ class MoveEffect:
         """
         Aplica modificador de stat - SUPORTA MÚLTIPLOS STATS
         """
-        from .stat_modifier import StatType
+        from src.battle.effects.stat_modifier import StatType
 
         # Verifica se é formato antigo (stat único) ou novo (stats lista)
         if "stats" in self.params:

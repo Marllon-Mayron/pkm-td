@@ -4,10 +4,11 @@
 Classe principal do jogo
 """
 import pygame
+
 from src.config.settings import settings
 from src.core.screen import ScreenManager
 from src.core.camera import Camera
-from src.entities.player import Player  # Importa a classe Player
+from src.entities.player import Player
 from src.scenes.menu_scene import MenuScene
 
 
@@ -17,33 +18,8 @@ class Game:
         self.screen_manager = ScreenManager()
         self.running = True
 
-        # Cria o jogador primeiro (sem starter)
+        # Cria o jogador primeiro
         self.player = Player(100, 100)
-
-        # TENTA CARREGAR O SAVE AUTOMATICAMENTE
-        save_loaded = self.player.load_game(1)  # Tenta carregar slot 1
-
-        if not save_loaded:
-            # Se não tinha save, cria um Pokémon inicial
-            print("[GAME] Nenhum save encontrado, criando novo jogo")
-            self.player.add_starter(4)  # ID 7 = Squirtle
-
-            # Cria um save inicial com configurações padrão
-            from src.config.progress import progress_manager
-            progress_manager._sync_with_save_manager()  # Cria o save com configurações padrão
-            print("[GAME] Save inicial criado com configurações padrão")
-        else:
-            print("[GAME] Save carregado com sucesso!")
-            print(f"  - Time: {len(self.player.team)} Pokémon")
-            print(f"  - Box: {len(self.player.pc_box)} Pokémon")
-            print(f"  - Itens: {self.player.bag.items}")
-
-            # Carrega as configurações do save
-            from src.config.progress import progress_manager
-            progress_manager._load_settings_from_save()  # Carrega configurações do save
-
-            # Aplica as configurações de áudio carregadas
-            print(f"[GAME] Configurações carregadas: Música={settings.music_volume} ({'ON' if settings.music_enabled else 'OFF'}), SFX={settings.sfx_volume}")
 
         # Câmera
         self.camera = None
@@ -57,16 +33,18 @@ class Game:
         self.menu_scene = MenuScene(self)
 
         # Referências para cenas (serão inicializadas quando necessárias)
+        self.starter_select_scene = None
         self.phase_select_scene = None
         self.team_select_scene = None
         self.game_scene = None
+        self.shop_scene = None
 
-        # Começa com o menu
+        # Começa sempre com o menu
         self.current_scene = self.menu_scene
 
         print(f"Jogo inicializado - FPS alvo: {settings.target_fps}")
         print(f"Tick rate do jogo: {settings.game_tick_rate} updates/segundo")
-        print(f"Jogador criado com time: {len(self.player.team)} Pokémon")
+        print(f"Cena inicial: MenuScene")
 
     def initialize_camera(self, world_width, world_height):
         """Inicializa a câmera com o tamanho do mundo"""
