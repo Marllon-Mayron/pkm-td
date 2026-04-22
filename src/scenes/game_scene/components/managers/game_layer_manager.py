@@ -10,7 +10,7 @@ from src.core.render_context import render_context
 
 
 class GameLayer:
-    """Camada do mapa para o jogo - COM CACHE DE SUPERFÍCIE"""
+    """Camada do mapa para o jogo - COM CACHE OTIMIZADO"""
 
     def __init__(self, name, layer_type, width, height, tile_size=24):
         self.name = name
@@ -21,13 +21,30 @@ class GameLayer:
         self.tiles = [[0 for _ in range(width)] for _ in range(height)]
         self.visible = True
         self.opacity = 255
-        self.tileset = []  # Lista com TODOS os tiles de TODOS os tilesets
-        self.tilesets = []  # Lista de informações de cada tileset
-        self.tileset_paths = []  # Lista de caminhos dos tilesets
-        self._cached_tiles = {}  # Cache de tiles individuais escalados
-        self._cached_surface = None  # Superfície cacheada da camada inteira
-        self._cached_scale = None  # Escala usada na superfície cacheada
-        self._cached_zoom = None  # Zoom usado na superfície cacheada
+        self.tileset = []
+        self.tilesets = []
+        self.tileset_paths = []
+        self._cached_tiles = {}
+
+        # ===== NOVOS CACHES =====
+        self._cached_surface = None
+        self._cached_scale = None
+        self._cached_zoom = None
+        self._cached_visible_section = None
+        self._last_camera_rect = None
+        self._last_screen_pos = None
+        self._frame_counter = 0
+        self._recreate_counter = 0
+
+    def _invalidate_surface_cache(self):
+        """Invalida o cache quando algo muda"""
+        self._cached_surface = None
+        self._cached_scale = None
+        self._cached_zoom = None
+        self._cached_visible_section = None
+        self._last_camera_rect = None
+        self._last_screen_pos = None
+        self._recreate_counter += 1
 
     def set_tile(self, x, y, tile_id):
         if 0 <= x < self.width and 0 <= y < self.height:
@@ -36,12 +53,6 @@ class GameLayer:
             self._invalidate_surface_cache()
             return True
         return False
-
-    def _invalidate_surface_cache(self):
-        """Invalida a superfície cacheada"""
-        self._cached_surface = None
-        self._cached_scale = None
-        self._cached_zoom = None
 
     def load_tileset_6x8(self, image_path, tile_width, tile_height):
         """
@@ -196,18 +207,27 @@ class GameLayer:
             return None
 
     def _get_scaled_tile(self, tile_index, target_size):
-        """Obtém tile escalado do cache"""
+        """Obtém tile escalado do cache - OTIMIZADO"""
         cache_key = (tile_index, target_size)
         if cache_key not in self._cached_tiles:
             original = self.tileset[tile_index]
+            # Usa smoothscale para melhor qualidade, mas é mais lento
+            # Para performance, use scale() em vez de smoothscale()
             scaled = pygame.transform.scale(original, (target_size, target_size))
+
+            # Limita o tamanho do cache para não crescer infinitamente
+            if len(self._cached_tiles) > 1000:
+                # Remove metade do cache quando fica muito grande
+                keys_to_remove = list(self._cached_tiles.keys())[:500]
+                for key in keys_to_remove:
+                    del self._cached_tiles[key]
+
             self._cached_tiles[cache_key] = scaled
         return self._cached_tiles[cache_key]
 
     def _render_to_surface(self, scale):
         """
-        Renderiza toda a camada em uma única superfície
-        Isso elimina gaps porque todos os tiles são renderizados juntos
+        Renderiza toda a camada em uma única superfície - OTIMIZADO
         """
         tile_size_scaled = max(1, int(self.tile_size * scale))
 
@@ -215,14 +235,20 @@ class GameLayer:
         total_width = self.width * tile_size_scaled
         total_height = self.height * tile_size_scaled
 
-        # Cria a superfície
-        surface = pygame.Surface((total_width, total_height), pygame.SRCALPHA)
+        # ===== OTIMIZAÇÃO: Cria superfície diretamente =====
+        # Usa SRCALPHA só se necessário (camadas com transparência)
+        if self.layer_type in ["decoration", "ceiling"]:
+            surface = pygame.Surface((total_width, total_height), pygame.SRCALPHA)
+        else:
+            # Ground layer não precisa de alpha, é mais rápido
+            surface = pygame.Surface((total_width, total_height))
 
-        # Renderiza cada tile na posição exata
+        # ===== OTIMIZAÇÃO: Pré-aloca lista de tiles a renderizar =====
+        tiles_to_render = []
+
         for y in range(self.height):
             for x in range(self.width):
                 tile_id = self.tiles[y][x]
-
                 if tile_id == 0:
                     continue
 
@@ -232,12 +258,14 @@ class GameLayer:
                     continue
 
                 if 0 <= tile_index < len(self.tileset):
-                    # Posição na superfície cacheada
                     surface_x = x * tile_size_scaled
                     surface_y = y * tile_size_scaled
+                    tiles_to_render.append((tile_index, surface_x, surface_y))
 
-                    tile_img = self._get_scaled_tile(tile_index, tile_size_scaled)
-                    surface.blit(tile_img, (surface_x, surface_y))
+        # ===== OTIMIZAÇÃO: Renderiza em batch =====
+        for tile_index, surface_x, surface_y in tiles_to_render:
+            tile_img = self._get_scaled_tile(tile_index, tile_size_scaled)
+            surface.blit(tile_img, (surface_x, surface_y))
 
         return surface
 
@@ -260,52 +288,70 @@ class GameLayer:
         return self._cached_surface
 
     def render(self, screen, camera, screen_manager):
-        """Renderiza a camada usando superfície cacheada - SEM GAPS"""
+        """Renderiza a camada usando superfície cacheada - OTIMIZADO"""
         if not self.visible or not self.tileset:
             return
 
-        # Obtém a superfície cacheada para o zoom atual
-        cached_surface = self._get_or_create_cached_surface(camera, screen_manager)
+        # Obtém a escala atual
+        current_scale = render_context.get_scale(camera, screen_manager)
+        current_zoom = camera.zoom if camera else 1.0
 
-        # Calcula a escala atual
-        scale = render_context.get_scale(camera, screen_manager)
-        tile_size_scaled = max(1, int(self.tile_size * scale))
+        # ===== CACHE DA SUPERFÍCIE COMPLETA =====
+        # Só recria quando escala ou zoom mudam
+        if (self._cached_surface is None or
+                self._cached_scale != current_scale or
+                self._cached_zoom != current_zoom):
+            self._cached_surface = self._render_to_surface(current_scale)
+            self._cached_scale = current_scale
+            self._cached_zoom = current_zoom
+            # Invalida a seção visível também
+            self._cached_visible_section = None
 
         # Calcula a posição do primeiro tile (0,0) na tela
-        world_x = 0
-        world_y = 0
-        screen_x, screen_y = render_context.world_to_screen(world_x, world_y, camera, screen_manager)
+        screen_x, screen_y = render_context.world_to_screen(0, 0, camera, screen_manager)
 
-        # Calcula a área visível da superfície cacheada
+        # ===== CACHE DA SEÇÃO VISÍVEL =====
         visible_rect = camera.get_visible_rect()
 
         # Converte a área visível para coordenadas da superfície cacheada
+        tile_size_scaled = max(1, int(self.tile_size * current_scale))
+
         visible_start_x = max(0, int(visible_rect.x / self.tile_size) * tile_size_scaled)
         visible_start_y = max(0, int(visible_rect.y / self.tile_size) * tile_size_scaled)
 
-        visible_end_x = min(cached_surface.get_width(),
+        visible_end_x = min(self._cached_surface.get_width(),
                             int((
                                             visible_rect.x + visible_rect.width) / self.tile_size) * tile_size_scaled + tile_size_scaled)
-        visible_end_y = min(cached_surface.get_height(),
+        visible_end_y = min(self._cached_surface.get_height(),
                             int((
                                             visible_rect.y + visible_rect.height) / self.tile_size) * tile_size_scaled + tile_size_scaled)
 
-        # Só renderiza se houver área visível
-        if visible_start_x < visible_end_x and visible_start_y < visible_end_y:
-            # Recorta a parte visível da superfície
-            visible_section = cached_surface.subsurface((
-                visible_start_x,
-                visible_start_y,
-                visible_end_x - visible_start_x,
-                visible_end_y - visible_start_y
-            ))
+        # Verifica se a área visível mudou significativamente
+        current_visible_key = (visible_start_x, visible_start_y, visible_end_x, visible_end_y, screen_x, screen_y)
 
-            # Calcula a posição na tela para esta seção
-            screen_section_x = screen_x + visible_start_x
-            screen_section_y = screen_y + visible_start_y
+        if (self._cached_visible_section is None or
+                self._last_camera_rect != current_visible_key):
 
-            # Renderiza a seção visível (arredondado para inteiro)
-            screen.blit(visible_section, (round(screen_section_x), round(screen_section_y)))
+            # Só recria se a área visível mudou
+            if visible_start_x < visible_end_x and visible_start_y < visible_end_y:
+                try:
+                    self._cached_visible_section = self._cached_surface.subsurface((
+                        visible_start_x,
+                        visible_start_y,
+                        visible_end_x - visible_start_x,
+                        visible_end_y - visible_start_y
+                    ))
+                    self._last_camera_rect = current_visible_key
+                    self._last_screen_pos = (screen_x + visible_start_x, screen_y + visible_start_y)
+                except ValueError:
+                    # Fallback se a subsurface for inválida
+                    self._cached_visible_section = None
+                    return
+
+        # Renderiza a seção visível se existir
+        if self._cached_visible_section and self._last_screen_pos:
+            screen.blit(self._cached_visible_section,
+                        (round(self._last_screen_pos[0]), round(self._last_screen_pos[1])))
 
 
 class GameLayerManager:

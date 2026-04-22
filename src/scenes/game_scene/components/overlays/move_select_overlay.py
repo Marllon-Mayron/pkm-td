@@ -19,6 +19,7 @@ class MoveSelectOverlay(BaseOverlay):
         self.selected_index = pokemon.current_move_index if hasattr(pokemon, 'current_move_index') else 0
         self.hovered_index = -1
         self.animation_time = 0
+        self.confirm_button_rect = None  # Adiciona retângulo do botão confirmar
 
         # Adiciona MoveData como atributo
         self.move_data = MoveData()
@@ -126,16 +127,23 @@ class MoveSelectOverlay(BaseOverlay):
             self._update_hover(event.pos)
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # APENAS seleciona o move, NÃO fecha o overlay
+            # Verifica se clicou no botão de confirmar
+            if self.confirm_button_rect and self.confirm_button_rect.collidepoint(event.pos):
+                self.confirm_selection()
+                return True
+
+            # Verifica se clicou em algum move
             if self.hovered_index >= 0:
                 self.selected_index = self.hovered_index
                 return True
+
             # NÃO fecha o overlay ao clicar fora - apenas ignora
 
         return False
 
     def _update_hover(self, mouse_pos):
         """Atualiza o índice do move sob o mouse"""
+        # Atualiza hover dos moves
         panel_rect = self._get_panel_rect()
         if not panel_rect.collidepoint(mouse_pos):
             self.hovered_index = -1
@@ -382,6 +390,9 @@ class MoveSelectOverlay(BaseOverlay):
         # Lista de moves
         self._render_moves_list(screen, panel_rect)
 
+        # Botão de confirmar
+        self._render_confirm_button(screen, panel_rect)
+
         # Instruções
         self._render_panel_instructions(screen, panel_rect)
 
@@ -553,19 +564,58 @@ class MoveSelectOverlay(BaseOverlay):
             selected_rect = item_rect.inflate(-4, -4)
             pygame.draw.rect(screen, self.colors['accent'], selected_rect, 2, border_radius=10)
 
+    def _render_confirm_button(self, screen, panel_rect):
+        """Renderiza o botão de confirmar"""
+        button_width = 200
+        button_height = 50
+        button_x = panel_rect.x + (panel_rect.width - button_width) // 2
+        button_y = panel_rect.bottom - 120  # Posiciona acima das instruções
+
+        self.confirm_button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+
+        # Efeito de hover no botão
+        mouse_pos = pygame.mouse.get_pos()
+        is_hovered = self.confirm_button_rect.collidepoint(mouse_pos)
+
+        # Cor do botão
+        if is_hovered:
+            bg_color = self.colors['success']
+            border_color = self.colors['accent']
+            shadow_offset = 2
+        else:
+            bg_color = self.colors['secondary']
+            border_color = self.colors['primary']
+            shadow_offset = 0
+
+        # Sombra
+        shadow_rect = self.confirm_button_rect.copy()
+        shadow_rect.y += 3
+        pygame.draw.rect(screen, (0, 0, 0, 100), shadow_rect, border_radius=12)
+
+        # Fundo do botão
+        pygame.draw.rect(screen, bg_color, self.confirm_button_rect, border_radius=12)
+        pygame.draw.rect(screen, border_color, self.confirm_button_rect, 3, border_radius=12)
+
+        # Texto do botão
+        font = self._get_font(24, True)
+        text = font.render("CONFIRMAR", True, (255, 255, 255))
+        text_x = button_x + (button_width - text.get_width()) // 2
+        text_y = button_y + (button_height - text.get_height()) // 2
+        screen.blit(text, (text_x, text_y))
+
     def _render_panel_instructions(self, screen, panel_rect):
         """Renderiza as instruções na parte inferior do painel"""
-        inst_y = panel_rect.bottom - 60
+        inst_y = panel_rect.bottom - 55
         font = self._get_font(14)
 
         # Fundo das instruções
         inst_bg = pygame.Rect(panel_rect.x + 15, inst_y - 5,
-                              panel_rect.width - 30, 50)
+                              panel_rect.width - 30, 45)
         pygame.draw.rect(screen, (*self.colors['bg_medium'], 150), inst_bg, border_radius=8)
 
         instructions = [
             ("SETAS/CLICK", "SELECIONAR"),
-            ("ENTER", "CONFIRMAR"),
+            ("ENTER/CLICK", "CONFIRMAR"),
             ("ESC", "FECHAR")
         ]
 

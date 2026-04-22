@@ -7,7 +7,7 @@ import pygame
 from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
 from src.config.settings import settings
-from src.core.profiler import profiler
+from src.core.performance_monitor import perf_monitor
 from src.managers.sound_manager import SoundEffect, sound_manager
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
@@ -187,6 +187,13 @@ class GameScene(BaseScene):
         else:
             self.world_width = 2000
             self.world_height = 2000
+
+    def _update_perf_monitor(self):
+        """Atualiza o estado do monitor de performance baseado no debug"""
+        perf_monitor.set_enabled(self.show_debug)
+        if self.show_debug:
+            # Reseta as métricas quando ativa
+            perf_monitor.reset()
 
     def is_team_defeated(self) -> bool:
         """
@@ -733,12 +740,6 @@ class GameScene(BaseScene):
                 if hasattr(player, 'bag'):
                     player.bag.cycle_category()
                 return None
-            elif event.key == pygame.K_F2:
-                if not profiler.enabled:
-                    profiler.start()
-                else:
-                    profiler.stop()
-                return None
             elif event.key == pygame.K_p:
                 self.toggle_pause()
                 return None
@@ -748,6 +749,7 @@ class GameScene(BaseScene):
                 return None
             elif event.key == pygame.K_F1:
                 self.show_debug = not self.show_debug
+                self._update_perf_monitor()
                 return None
 
         # ===== MOUSE WHEEL =====
@@ -884,42 +886,42 @@ class GameScene(BaseScene):
     # ===== MÉTODO FIXED_UPDATE  =====
 
     def fixed_update(self, dt):
-        """Update da lógica do jogo"""
+        """Update da lógica do jogo - COM NOVO SISTEMA DE PERFORMANCE"""
 
-        profiler.begin_frame()
+        perf_monitor.start_frame()
 
         # ===== OVERLAYS =====
-        profiler.begin_section("OVERLAYS")
+        perf_monitor.start_section("OVERLAYS")
 
         if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
             self.evolution_overlay.update(dt)
-            profiler.end_section()
-            profiler.end_frame()
+            perf_monitor.end_section()
+            perf_monitor.end_frame()
             return
 
         if self.move_learn_overlay and self.move_learn_overlay.active:
             self.move_learn_overlay.update(dt)
-            profiler.end_section()
-            profiler.end_frame()
+            perf_monitor.end_section()
+            perf_monitor.end_frame()
             return
 
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.update(dt)
-            profiler.end_section()
-            profiler.end_frame()
+            perf_monitor.end_section()
+            perf_monitor.end_frame()
             return
 
         if self.overlay_manager.is_active:
             self.overlay_manager.update(dt)
-            profiler.end_section()
-            profiler.end_frame()
+            perf_monitor.end_section()
+            perf_monitor.end_frame()
             return
 
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # ===== PAUSA =====
         if self.game_paused or self.paused:
-            profiler.end_frame()
+            perf_monitor.end_frame()
             return
 
         # ===== ATUALIZAÇÃO NORMAL =====
@@ -934,57 +936,59 @@ class GameScene(BaseScene):
         path_renderer = self.path_renderer
 
         # Battle System
-        profiler.begin_section("BATTLE_SYSTEM")
+        perf_monitor.start_section("BATTLE_SYSTEM")
         if hasattr(self, 'battle_system'):
             self.battle_system.update(dt)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Bag Renderer
-        profiler.begin_section("BAG_RENDERER_UPDATE")
+        perf_monitor.start_section("BAG_RENDERER_UPDATE")
         if bag_renderer:
             bag_renderer.update(dt)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Team Manager
-        profiler.begin_section("TEAM_MANAGER_UPDATE")
+        perf_monitor.start_section("TEAM_MANAGER_UPDATE")
         if team_mgr:
             team_mgr.update(dt)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Placement Manager
-        profiler.begin_section("PLACEMENT_MANAGER_UPDATE")
+        perf_monitor.start_section("PLACEMENT_MANAGER_UPDATE")
         if placement_mgr:
             placement_mgr.update(dt, wave_mgr.active_enemies)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Spot Renderer
-        profiler.begin_section("SPOT_RENDERER_UPDATE")
+        perf_monitor.start_section("SPOT_RENDERER_UPDATE")
         if spot_renderer:
             spot_renderer.update(dt)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Pokémon Updates
-        profiler.begin_section("POKEMON_UPDATES")
+        perf_monitor.start_section("POKEMON_UPDATES")
         for pokemon in placed_pokemon:
             pokemon.update(dt)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Target Items Update
-        profiler.begin_section("TARGET_ITEMS_UPDATE")
+        perf_monitor.start_section("TARGET_ITEMS_UPDATE")
         target_mgr.update(dt)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Effect Manager
         if hasattr(self, 'battle_system') and self.battle_system:
-            profiler.begin_section("EFFECT_MANAGER")
+            perf_monitor.start_section("EFFECT_MANAGER")
             self.battle_system.effect_manager.update(dt)
-            profiler.end_section()
+            perf_monitor.end_section()
 
         # ===== GAME OVER CHECK - MODIFICADO =====
+        perf_monitor.start_section("GAME_OVER_CHECK")
         # Verifica se o time inteiro foi derrotado
         team_defeated = self.is_team_defeated()
         # Verifica se todos os itens foram roubados
         items_lost = target_mgr.items_protected <= 0
+        perf_monitor.end_section()
 
         if team_defeated:
             print(f"[GAME_OVER] Time derrotado! Fim de jogo.")
@@ -995,7 +999,7 @@ class GameScene(BaseScene):
             for pokemon in self.player.team:
                 pokemon.reset(self)
 
-            profiler.end_frame()
+            perf_monitor.end_frame()
             return
 
         if items_lost:
@@ -1006,15 +1010,16 @@ class GameScene(BaseScene):
             for pokemon in self.player.team:
                 pokemon.reset(self)
 
-            profiler.end_frame()
+            perf_monitor.end_frame()
             return
 
         # ===== Wave Manager Update =====
-        profiler.begin_section("WAVE_MANAGER_UPDATE")
+        perf_monitor.start_section("WAVE_MANAGER_UPDATE")
         enemies_at_end = wave_mgr.update(dt)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # ===== TRANSIÇÕES DE ESTADO =====
+        perf_monitor.start_section("STATE_TRANSITIONS")
         if self.game_state == "in_wave":
             # Verifica se a wave está completamente finalizada
             # (sem inimigos vivos E sem waves pendentes)
@@ -1027,8 +1032,9 @@ class GameScene(BaseScene):
                     print(f"[GAME] GAME OVER! Todos os itens foram roubados!")
                     self.game_state = "game_over"
                     self.overlay_manager.show(OverlayType.GAME_OVER)
+        perf_monitor.end_section()
 
-        profiler.end_frame()
+        perf_monitor.end_frame()
 
     def _complete_phase(self):
         """Marca a fase como completada e dá as recompensas - INCLUI RESET DOS DITTOS"""
@@ -1083,10 +1089,13 @@ class GameScene(BaseScene):
     # ===== MÉTODOS DE RENDER =====
 
     def render(self, screen):
-        """Renderiza o jogo"""
-        profiler.begin_section("RENDER_CLEAR")
+        """Renderiza o jogo - COM NOVO SISTEMA DE PERFORMANCE"""
+
+        perf_monitor.start_section("RENDER_TOTAL")
+
+        perf_monitor.start_section("RENDER_CLEAR")
         screen.fill((0, 0, 0))
-        profiler.end_section()
+        perf_monitor.end_section()
 
         camera = self.camera
         screen_mgr = self.screen_manager
@@ -1103,131 +1112,133 @@ class GameScene(BaseScene):
         show_debug = self.show_debug
 
         # Mapa
-        profiler.begin_section("RENDER_MAP")
+        perf_monitor.start_section("RENDER_MAP")
         map_renderer.render(screen, camera, screen_mgr)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Paths (apenas debug)
         if show_debug:
-            profiler.begin_section("RENDER_PATHS")
+            perf_monitor.start_section("RENDER_PATHS")
             path_renderer.render(screen, camera, screen_mgr, show_editing=False)
-            profiler.end_section()
+            perf_monitor.end_section()
 
         # Spots
-        profiler.begin_section("RENDER_SPOTS")
+        perf_monitor.start_section("RENDER_SPOTS")
         if spot_renderer:
             spot_renderer.render(
                 screen, camera, screen_mgr,
                 show_editing=False,
                 highlight_spot=self.hovered_spot if hasattr(self, 'hovered_spot') else None
             )
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Target items (ground)
-        profiler.begin_section("RENDER_TARGET_ITEMS_GROUND")
+        perf_monitor.start_section("RENDER_TARGET_ITEMS_GROUND")
         target_mgr.render_in_ground(screen, camera)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Inimigos
-        profiler.begin_section("RENDER_ENEMIES")
+        perf_monitor.start_section("RENDER_ENEMIES")
         for enemy in wave_mgr.active_enemies:
             enemy.render(screen, camera, show_hp=False)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Pokémon colocados
-        profiler.begin_section("RENDER_PLACED_POKEMON")
+        perf_monitor.start_section("RENDER_PLACED_POKEMON")
         if placement_mgr:
             placement_mgr.render(screen, camera, screen_mgr)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Projéteis
-        profiler.begin_section("RENDER_PROJECTILES")
+        perf_monitor.start_section("RENDER_PROJECTILES")
         if hasattr(self, 'battle_system'):
             self.battle_system.render_projectiles(screen, camera, self.screen_manager)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Target items (on pokemon)
-        profiler.begin_section("RENDER_TARGET_ITEMS_POKEMON")
+        perf_monitor.start_section("RENDER_TARGET_ITEMS_POKEMON")
         target_mgr.render_in_pokemon(screen, camera)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # HP Bars - Inimigos
-        profiler.begin_section("RENDER_ENEMY_HP")
+        perf_monitor.start_section("RENDER_ENEMY_HP")
         for enemy in wave_mgr.active_enemies:
             enemy.render_hp_enemy(screen, camera)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # HP Bars - Pokémon
-        profiler.begin_section("RENDER_POKEMON_HP")
+        perf_monitor.start_section("RENDER_POKEMON_HP")
         if placement_mgr:
             placement_mgr.render_hp(screen, camera)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # UI do jogo
-        profiler.begin_section("RENDER_GAME_UI")
+        perf_monitor.start_section("RENDER_GAME_UI")
         self._render_game_ui(screen)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Team Manager UI
-        profiler.begin_section("RENDER_TEAM_MANAGER")
+        perf_monitor.start_section("RENDER_TEAM_MANAGER")
         if team_mgr:
             team_mgr.render(screen, camera, spot_renderer.get_spots() if spot_renderer else [])
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Drag Manager
-        profiler.begin_section("RENDER_DRAG_MANAGER")
+        perf_monitor.start_section("RENDER_DRAG_MANAGER")
         if drag_mgr:
             drag_mgr.render(screen, camera)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Item Bag
-        profiler.begin_section("RENDER_ITEM_BAG")
+        perf_monitor.start_section("RENDER_ITEM_BAG")
         if bag_renderer:
             bag_renderer.render(screen)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Borda da viewport
-        profiler.begin_section("RENDER_VIEWPORT_BORDER")
+        perf_monitor.start_section("RENDER_VIEWPORT_BORDER")
         pygame.draw.rect(screen, (80, 80, 80),
                          (screen_mgr.viewport_x, screen_mgr.viewport_y,
                           screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Pause overlay
         if self.paused and not self.game_paused:
-            profiler.begin_section("RENDER_PAUSE_OVERLAY")
+            perf_monitor.start_section("RENDER_PAUSE_OVERLAY")
             self._render_pause_overlay(screen)
-            profiler.end_section()
+            perf_monitor.end_section()
 
         # Overlay Manager
-        profiler.begin_section("RENDER_OVERLAY_MANAGER")
+        perf_monitor.start_section("RENDER_OVERLAY_MANAGER")
         if overlay_mgr:
             overlay_mgr.render(screen)
-        profiler.end_section()
+        perf_monitor.end_section()
 
         # Move Learn Overlay
         if self.move_learn_overlay and self.move_learn_overlay.active:
-            profiler.begin_section("RENDER_MOVE_LEARN")
+            perf_monitor.start_section("RENDER_MOVE_LEARN")
             self.move_learn_overlay.render(screen)
-            profiler.end_section()
+            perf_monitor.end_section()
 
         # Move Select Overlay
         if self.move_select_overlay and self.move_select_overlay.active:
-            profiler.begin_section("RENDER_MOVE_SELECT")
+            perf_monitor.start_section("RENDER_MOVE_SELECT")
             self.move_select_overlay.render(screen)
-            profiler.end_section()
+            perf_monitor.end_section()
 
         # Evolution Overlay
         if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
-            profiler.begin_section("RENDER_EVOLUTION")
+            perf_monitor.start_section("RENDER_EVOLUTION")
             self.evolution_overlay.render(screen)
-            profiler.end_section()
+            perf_monitor.end_section()
 
         # Debug Info
         if show_debug:
-            profiler.begin_section("RENDER_DEBUG")
+            perf_monitor.start_section("RENDER_DEBUG")
             self._render_debug_info(screen)
-            profiler.end_section()
+            perf_monitor.end_section()
+
+        perf_monitor.end_section()
 
     def _render_game_ui(self, screen):
         """Renderiza a UI do jogo"""
