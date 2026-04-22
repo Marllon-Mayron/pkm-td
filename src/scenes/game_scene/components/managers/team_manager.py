@@ -32,24 +32,39 @@ class GameTeamManager:
         # Drag and Drop
         self.drag_manager = DragDropManager(game)
 
-        # Cache de Superfícies (Otimização de FPS)
-        self.bg_surface = None
-        self.glow_surface = None
-        self.deco_line_surface = None
+        # ===== OTIMIZAÇÃO: Cache de Superfícies =====
+        self._bg_surface = None
+        self._glow_surface = None
+        self._deco_line_surface = None
+        self._last_window_width = 0
+        self._last_window_height = 0
+        self._needs_cache_rebuild = True
 
-        # Cache de Fontes (Evita recriar objetos todo frame)
-        self.title_font = pygame.font.Font(None, 28)
-        self.stat_font = pygame.font.Font(None, 22)
+        # ===== OTIMIZAÇÃO: Cache de Fontes =====
+        self._title_font = None
+        self._stat_font = None
 
         # Inicializa
         self._calculate_dimensions()
         self._create_slots()
 
+    def _get_title_font(self):
+        """Obtém fonte do título com lazy loading"""
+        if self._title_font is None:
+            self._title_font = pygame.font.Font(None, 28)
+        return self._title_font
+
+    def _get_stat_font(self):
+        """Obtém fonte de stats com lazy loading"""
+        if self._stat_font is None:
+            self._stat_font = pygame.font.Font(None, 22)
+        return self._stat_font
+
     def set_game_scene(self, game_scene):
         self.game_scene = game_scene
 
     def _calculate_dimensions(self):
-        """Calcula dimensões e limpa o cache de superfícies para regeneração"""
+        """Calcula dimensões e marca para rebuild do cache"""
         self.window_width = self.game.screen_manager.window_width
         self.window_height = self.game.screen_manager.window_height
 
@@ -58,38 +73,47 @@ class GameTeamManager:
         self.slot_spacing = max(6, min(20, int(self.window_width * self.slot_spacing_ratio)))
         self.bottom_margin = int(self.window_height * self.bottom_margin_ratio)
 
-        # Recalcula o cache sempre que as dimensões mudarem (ex: resize)
-        self._pre_render_cache()
+        # Marca para rebuild do cache
+        self._needs_cache_rebuild = True
 
-    def _pre_render_cache(self):
-        """Pré-renderiza elementos visuais pesados uma única vez"""
+    def _rebuild_cache(self):
+        """Reconstrói os caches visuais (só quando necessário)"""
+        if not self._needs_cache_rebuild:
+            return
+
         hud_height = self.slot_height + 40
 
-        # 1. Cache do Fundo Gradiente
-        self.bg_surface = pygame.Surface((self.window_width, hud_height), pygame.SRCALPHA)
-        for i in range(hud_height):
+        # 1. Cache do Fundo Gradiente (SIMPLIFICADO - menos linhas)
+        self._bg_surface = pygame.Surface((self.window_width, hud_height), pygame.SRCALPHA)
+        step = max(1, hud_height // 20)  # Reduzido de 1px para 20px chunks
+        for i in range(0, hud_height, step):
             progress = i / hud_height
             alpha = int(80 + 100 * progress)
-            pygame.draw.line(self.bg_surface, (10, 15, 25, alpha), (0, i), (self.window_width, i))
+            color = (10, 15, 25, alpha)
+            pygame.draw.rect(self._bg_surface, color, (0, i, self.window_width, min(step, hud_height - i)))
 
-        # 2. Cache do Glow Superior
-        self.glow_surface = pygame.Surface((self.window_width, 2), pygame.SRCALPHA)
-        for x in range(self.window_width):
+        # 2. Cache do Glow Superior (SIMPLIFICADO)
+        self._glow_surface = pygame.Surface((self.window_width, 2), pygame.SRCALPHA)
+        # Só desenha alguns pontos em vez de todos os pixels
+        for x in range(0, self.window_width, max(1, self.window_width // 50)):
             dist_from_center = abs(x - self.window_width // 2) / (self.window_width // 2)
             alpha = int(100 * (1 - dist_from_center))
             if alpha > 0:
-                self.glow_surface.set_at((x, 0), (100, 150, 255, alpha))
-                self.glow_surface.set_at((x, 1), (80, 120, 200, alpha // 2))
+                self._glow_surface.set_at((x, 0), (100, 150, 255, alpha))
+                self._glow_surface.set_at((x, 1), (80, 120, 200, alpha // 2))
 
-        # 3. Cache da Linha Decorativa (Reduzido processamento de pixel)
+        # 3. Cache da Linha Decorativa
         line_width = int(self.window_width * 0.85)
-        self.deco_line_surface = pygame.Surface((line_width, 4), pygame.SRCALPHA)
+        self._deco_line_surface = pygame.Surface((line_width, 4), pygame.SRCALPHA)
         for i in range(4):
             alpha = 40 - i * 8
             if alpha > 0:
-                pygame.draw.line(self.deco_line_surface, (80, 120, 200, alpha), (0, i), (line_width, i))
+                pygame.draw.line(self._deco_line_surface, (80, 120, 200, alpha), (0, i), (line_width, i))
+
+        self._needs_cache_rebuild = False
 
     def _create_slots(self):
+        """Cria os slots (sem cache aqui, pois é chamado raramente)"""
         self.team_slots = []
         total_width = (self.slot_width * 6) + (self.slot_spacing * 5)
         start_x = (self.window_width - total_width) // 2
@@ -102,16 +126,31 @@ class GameTeamManager:
             self.team_slots.append(slot)
 
     def update(self, dt):
+        """Atualiza slots - OTIMIZADO: só recalcula cache se necessário"""
+        # Verifica se dimensões mudaram
+        if (self.game.screen_manager.window_width != self._last_window_width or
+                self.game.screen_manager.window_height != self._last_window_height):
+            self._last_window_width = self.game.screen_manager.window_width
+            self._last_window_height = self.game.screen_manager.window_height
+            self._calculate_dimensions()
+            self._create_slots()
+
+        # Atualiza posições dos slots
         for slot in self.team_slots:
             if abs(slot.rect.y - self.target_y) > 0.5:
                 slot.rect.y += (self.target_y - slot.rect.y) * dt * 12
             slot.update(dt)
 
+        # Reconstroi cache se necessário
+        if self._needs_cache_rebuild:
+            self._rebuild_cache()
+
     def is_dragging(self):
         return self.drag_manager.is_dragging
 
     def handle_event(self, event, tower_spots, camera, on_place_callback=None, on_swap_callback=None):
-        if not self.visible: return None
+        if not self.visible:
+            return None
 
         if self.drag_manager.is_dragging:
             if event.type == pygame.MOUSEMOTION:
@@ -152,57 +191,79 @@ class GameTeamManager:
                         self.game_scene.open_move_select_overlay(result['pokemon'])
                     return result
             elif result is not None:
-                for s in self.team_slots: s.is_selected = (s.slot_index == result)
+                for s in self.team_slots:
+                    s.is_selected = (s.slot_index == result)
                 self.selected_slot_index = result
                 return result
         return None
 
     def render(self, screen, camera, tower_spots):
-        if not self.visible or not self.team_slots: return
+        """Renderiza o time manager - OTIMIZADO com cache"""
+        if not self.visible or not self.team_slots:
+            return
 
-        # Render fundo via Cache (Super rápido)
+        # Garante que o cache está construído
+        if self._needs_cache_rebuild:
+            self._rebuild_cache()
+
+        # Render fundo via Cache
         hud_y = self.team_slots[0].rect.y - 20
-        screen.blit(self.bg_surface, (0, hud_y))
-        screen.blit(self.glow_surface, (0, hud_y - 2))
+
+        if self._bg_surface:
+            screen.blit(self._bg_surface, (0, hud_y))
+        if self._glow_surface:
+            screen.blit(self._glow_surface, (0, hud_y - 2))
 
         # Linha decorativa via Cache
-        line_x = (self.window_width - self.deco_line_surface.get_width()) // 2
-        screen.blit(self.deco_line_surface, (line_x, hud_y + 5))
+        if self._deco_line_surface:
+            line_x = (self.window_width - self._deco_line_surface.get_width()) // 2
+            screen.blit(self._deco_line_surface, (line_x, hud_y + 5))
 
+        # Renderiza slots
         for slot in self.team_slots:
             slot.render(screen)
 
+        # Drag manager (só renderiza se estiver arrastando)
         if self.drag_manager.is_dragging:
             self.drag_manager.render(screen, camera)
 
+        # Expanded info (só se necessário)
         if self.expanded and self.selected_slot_index >= 0:
             self._render_expanded_info(screen)
 
     def _render_expanded_info(self, screen):
-        """Renderiza informações usando fontes em cache"""
-        if self.selected_slot_index < 0 or self.selected_slot_index >= len(self.team_slots): return
+        """Renderiza informações expandidas - OTIMIZADO"""
+        if self.selected_slot_index < 0 or self.selected_slot_index >= len(self.team_slots):
+            return
 
         slot = self.team_slots[self.selected_slot_index]
         pokemon = slot.pokemon
-        if not pokemon: return
+        if not pokemon:
+            return
 
         panel_width, panel_height = 300, 200
         panel_x = slot.rect.centerx - panel_width // 2
         panel_y = slot.rect.y - panel_height - 25
 
-        # Nota: Idealmente este painel também deveria ser cacheado se ficar aberto muito tempo
-        pygame.draw.rect(screen, (20, 25, 35, 230), (panel_x, panel_y, panel_width, panel_height), border_radius=15)
-        pygame.draw.rect(screen, (80, 120, 200, 150), (panel_x, panel_y, panel_width, panel_height), 2,
-                         border_radius=15)
+        # Usa cores sólidas em vez de alpha blending quando possível
+        pygame.draw.rect(screen, (20, 25, 35), (panel_x, panel_y, panel_width, panel_height), border_radius=15)
+        pygame.draw.rect(screen, (80, 120, 200), (panel_x, panel_y, panel_width, panel_height), 2, border_radius=15)
 
-        title = self.title_font.render(f"{pokemon.name}", True, (255, 255, 255))
+        title_font = self._get_title_font()
+        stat_font = self._get_stat_font()
+
+        title = title_font.render(f"{pokemon.name}", True, (255, 255, 255))
         screen.blit(title, (panel_x + 20, panel_y + 20))
 
-        stats = [("HP", f"{pokemon.current_hp}/{pokemon.max_hp}"), ("ATK", pokemon.attack),
-                 ("DEF", pokemon.defense), ("SPD", pokemon.speed)]
+        stats = [
+            ("HP", f"{pokemon.current_hp}/{pokemon.max_hp}"),
+            ("ATK", pokemon.attack),
+            ("DEF", pokemon.defense),
+            ("SPD", pokemon.speed_stat)
+        ]
 
         for i, (name, val) in enumerate(stats):
-            txt = self.stat_font.render(f"{name}: {val}", True, (200, 200, 220))
+            txt = stat_font.render(f"{name}: {val}", True, (200, 200, 220))
             screen.blit(txt, (panel_x + 20 + (i // 2 * 130), panel_y + 60 + (i % 2 * 30)))
 
     def toggle_visibility(self):
@@ -211,3 +272,4 @@ class GameTeamManager:
     def on_resize(self):
         self._calculate_dimensions()
         self._create_slots()
+        self._needs_cache_rebuild = True

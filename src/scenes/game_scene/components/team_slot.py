@@ -1,4 +1,4 @@
-# src/scenes/game_scene/components/ui/team_slot.py
+# src/scenes/game_scene/components/team_slot.py
 
 import pygame
 import math
@@ -7,20 +7,20 @@ from src.scenes.team_select_scene.utils.constants import COLORS
 
 
 class GameTeamSlot:
-    """Slot do time com visual melhorado para o jogo"""
+    """Slot do time com visual melhorado para o jogo - OTIMIZADO"""
 
-    # Cores e estilos
+    # Cores e estilos (constantes de classe)
     COLORS = {
         'bg_default': (25, 30, 40, 200),
         'bg_hover': (35, 45, 60, 220),
         'bg_selected': (45, 60, 80, 230),
-        'bg_placed': (25, 50, 70, 180),  # Fundo azulado para Pokémon no mapa
-        'bg_hover_placed': (35, 65, 90, 200),  # Hover quando está no mapa
+        'bg_placed': (25, 50, 70, 180),
+        'bg_hover_placed': (35, 65, 90, 200),
         'border': (70, 80, 100),
         'border_hover': (100, 140, 200),
         'border_selected': (255, 215, 0),
-        'border_placed': (50, 150, 255),  # Borda azul para Pokémon no mapa
-        'border_hover_placed': (100, 200, 255),  # Borda hover para Pokémon no mapa
+        'border_placed': (50, 150, 255),
+        'border_hover_placed': (100, 200, 255),
         'text': (255, 255, 255),
         'text_dim': (150, 150, 170),
         'hp_green': (78, 201, 96),
@@ -32,17 +32,24 @@ class GameTeamSlot:
         'xp_bar': (100, 180, 255),
         'xp_bg': (40, 45, 60),
         'level_bg': (50, 40, 70),
-        'map_indicator': (50, 150, 255),  # Cor do indicador de mapa
+        'map_indicator': (50, 150, 255),
     }
 
-    # Variável de classe para controlar o pulso global
+    # Cache de fontes por tamanho (classe)
+    _font_cache = {}
+    _type_font_cache = {}
+    _pokedex = Pokedex()
+
+    # Cache de sprites por slot
+    _sprite_cache = {}
+
+    # Variável de classe para o pulso global
     _global_pulse_time = 0
 
     def __init__(self, x, y, width, height, slot_index, game):
         self.rect = pygame.Rect(x, y, width, height)
         self.slot_index = slot_index
         self.game = game
-        self.pokedex = Pokedex()
 
         self.is_hovered = False
         self.is_selected = False
@@ -50,12 +57,46 @@ class GameTeamSlot:
         self.hp_animation = 0
         self.glow_alpha = 0
 
-        # Fontes (serão recriadas no resize)
-        self.name_font = None
-        self.level_font = None
-        self.hp_font = None
-        self.xp_font = None
-        self._create_fonts()
+        # ===== OTIMIZAÇÃO: Pré-calcular dimensões =====
+        self._sprite_size = int(height * 0.65)
+        self._name_y = y + 12
+        self._hp_y = y + height - 45
+        self._xp_y = y + height - 22
+
+        # ===== OTIMIZAÇÃO: Cache de superfícies =====
+        self._cached_bg = None
+        self._cached_border_color = None
+        self._last_pokemon_id = None
+        self._last_is_shiny = None
+        self._cached_sprite = None
+        self._cached_types_surface = None
+        self._last_types = None
+
+        # Fontes (serão obtidas do cache)
+        self._name_font = None
+        self._level_font = None
+        self._hp_font = None
+        self._xp_font = None
+        self._get_fonts()
+
+    def _get_font(self, size, bold=False):
+        """Obtém fonte do cache de classe"""
+        key = (size, bold)
+        if key not in self.__class__._font_cache:
+            font = pygame.font.Font(None, size)
+            if bold:
+                font.set_bold(True)
+            self.__class__._font_cache[key] = font
+        return self.__class__._font_cache[key]
+
+    def _get_fonts(self):
+        """Inicializa fontes com tamanhos responsivos"""
+        base_size = max(14, int(self.rect.height * 0.18))
+        small_size = max(12, int(base_size * 0.8))
+        self._name_font = self._get_font(base_size)
+        self._level_font = self._get_font(base_size)
+        self._hp_font = self._get_font(small_size)
+        self._xp_font = self._get_font(max(10, int(small_size * 0.8)))
 
     @property
     def pokemon(self):
@@ -70,18 +111,8 @@ class GameTeamSlot:
         pokemon = self.pokemon
         return pokemon and hasattr(pokemon, 'is_placed') and pokemon.is_placed
 
-    def _create_fonts(self):
-        """Cria fontes com tamanhos responsivos"""
-        base_size = max(14, int(self.rect.height * 0.18))
-        small_size = max(12, int(base_size * 0.8))
-        self.name_font = pygame.font.Font(None, base_size)
-        self.level_font = pygame.font.Font(None, base_size)
-        self.hp_font = pygame.font.Font(None, small_size)
-        self.xp_font = pygame.font.Font(None, max(10, int(small_size * 0.8)))
-
     def handle_event(self, event, bag_manager=None):
         """Processa eventos no slot"""
-        # Variáveis para detectar clique vs arrasto
         if not hasattr(self, 'click_start_time'):
             self.click_start_time = 0
             self.click_start_pos = None
@@ -94,22 +125,19 @@ class GameTeamSlot:
             if was_hovered != self.is_hovered:
                 self.animation_offset = 8 if self.is_hovered else 0
                 self.glow_alpha = 100 if self.is_hovered else 0
+                # Invalida cache de fundo quando hover muda
+                self._cached_bg = None
 
-            # Verifica se está com o botão pressionado e já moveu o suficiente para iniciar drag
             if self.click_start_time > 0 and not self.is_dragging_started:
                 if self.click_start_pos:
                     distance = ((event.pos[0] - self.click_start_pos[0]) ** 2 +
                                 (event.pos[1] - self.click_start_pos[1]) ** 2) ** 0.5
 
-                    # Se moveu mais de 10 pixels, inicia o drag
                     if distance >= 10:
                         pokemon = self.pokemon
                         if pokemon:
                             is_placed = hasattr(pokemon, 'is_placed') and pokemon.is_placed
-
-                            # Só inicia drag se NÃO estiver no mapa
                             if not is_placed:
-                                print(f"[SLOT] Arrasto detectado em {pokemon.name} - Iniciando drag")
                                 self.is_dragging_started = True
                                 return {
                                     'action': 'start_drag',
@@ -121,37 +149,29 @@ class GameTeamSlot:
             if self.is_hovered:
                 pokemon = self.pokemon
                 if pokemon:
-                    # Registra o início do clique
                     self.click_start_time = pygame.time.get_ticks()
                     self.click_start_pos = event.pos
                     self.is_dragging_started = False
-                    return None  # Aguarda para ver se é clique ou arrasto
+                    return None
                 else:
-                    # Slot vazio - apenas seleciona
                     return {
                         'action': 'select',
                         'slot_index': self.slot_index
                     }
 
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            # Se não houve drag, é um clique
             if self.click_start_time > 0 and not self.is_dragging_started:
                 pokemon = self.pokemon
                 if pokemon and self.is_hovered:
-                    # Verifica se foi um clique simples (curto e pouco movimento)
                     click_duration = pygame.time.get_ticks() - self.click_start_time
                     distance = 0
                     if self.click_start_pos:
                         distance = ((event.pos[0] - self.click_start_pos[0]) ** 2 +
                                     (event.pos[1] - self.click_start_pos[1]) ** 2) ** 0.5
 
-                    # Se foi um clique simples (menos de 200ms e pouco movimento)
                     if click_duration < 200 and distance < 10:
                         is_placed = hasattr(pokemon, 'is_placed') and pokemon.is_placed
-
                         if is_placed:
-                            # Pokémon no mapa - ABRE OVERLAY DE MOVES
-                            print(f"[SLOT] Clique em {pokemon.name} (no mapa) - Abrindo overlay de moves")
                             self.click_start_time = 0
                             self.click_start_pos = None
                             return {
@@ -160,8 +180,6 @@ class GameTeamSlot:
                                 'pokemon': pokemon
                             }
                         else:
-                            # Pokémon no time (não colocado) - apenas seleciona
-                            print(f"[SLOT] Clique em {pokemon.name} (no time) - Selecionando")
                             self.click_start_time = 0
                             self.click_start_pos = None
                             return {
@@ -169,7 +187,6 @@ class GameTeamSlot:
                                 'slot_index': self.slot_index
                             }
 
-            # Limpa os dados do clique
             self.click_start_time = 0
             self.click_start_pos = None
             self.is_dragging_started = False
@@ -196,7 +213,7 @@ class GameTeamSlot:
         self.glow_alpha += (target_glow - self.glow_alpha) * dt * 8
 
         # Atualiza o pulso global
-        GameTeamSlot._global_pulse_time += dt
+        self.__class__._global_pulse_time += dt
 
         if self.pokemon:
             self.hp_animation += dt
@@ -207,128 +224,71 @@ class GameTeamSlot:
         """Inicia o arrasto deste slot"""
         self.is_selected = True
         self.animation_offset = 10
+        self._cached_bg = None
 
     def render(self, screen):
-        """Renderiza o slot com visual melhorado"""
+        """Renderiza o slot com visual melhorado - OTIMIZADO"""
         pokemon = self.pokemon
 
         animated_rect = self.rect.copy()
         animated_rect.y -= int(self.animation_offset)
 
-        self._draw_shadow(screen, animated_rect)
         self._draw_background(screen, animated_rect, pokemon)
 
         if pokemon:
             self._draw_pokemon_info(screen, animated_rect, pokemon)
-
             if self.is_placed:
                 self._draw_placed_indicator(screen, animated_rect)
         else:
             self._draw_empty_slot(screen, animated_rect)
 
-    def _draw_placed_indicator(self, screen, rect):
-        """Desenha indicador de que o Pokémon está no mapa - versão com pulso global"""
-        indicator_size = 20
-        indicator_x = rect.x + 8
-        indicator_y = rect.y + 8
-
-        # Usa o pulso global (mais lento - 2 segundos para ciclo completo)
-        # Seno de 0 a 1, onde 0 = mínimo, 1 = máximo
-        pulse_value = (math.sin(GameTeamSlot._global_pulse_time * 0.5) + 1) / 2
-        # Ajusta para pulsar entre 0.8 e 1.2
-        pulse = 0.8 + (pulse_value * 0.4)
-
-        # Círculo externo com brilho
-        for i in range(3):
-            alpha = int(100 - i * 30)
-            # O alpha também pulsa suavemente
-            alpha = int(alpha * (0.6 + pulse_value * 0.4))
-            glow_radius = int(indicator_size // 2 + i * 2)
-            glow_surface = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
-            glow_color = (self.COLORS['map_indicator'][0],
-                          self.COLORS['map_indicator'][1],
-                          self.COLORS['map_indicator'][2],
-                          alpha)
-            pygame.draw.circle(glow_surface, glow_color,
-                               (glow_radius, glow_radius), glow_radius)
-            screen.blit(glow_surface,
-                        (indicator_x + indicator_size // 2 - glow_radius,
-                         indicator_y + indicator_size // 2 - glow_radius))
-
-        # Círculo principal (tamanho também pulsa)
-        pygame.draw.circle(screen, self.COLORS['map_indicator'],
-                           (indicator_x + indicator_size // 2, indicator_y + indicator_size // 2),
-                           int(indicator_size // 2 * pulse))
-
-        # Círculo interno branco
-        inner_radius = int(indicator_size // 3 * pulse)
-        pygame.draw.circle(screen, (255, 255, 255),
-                           (indicator_x + indicator_size // 2, indicator_y + indicator_size // 2),
-                           inner_radius)
-
-        # Ícone de mapa (globo simplificado)
-        icon_font = pygame.font.Font(None, int(indicator_size * 0.6))
-        map_icon = icon_font.render("🌍", True, self.COLORS['map_indicator'])
-        icon_rect = map_icon.get_rect(center=(indicator_x + indicator_size // 2,
-                                              indicator_y + indicator_size // 2))
-        screen.blit(map_icon, icon_rect)
-
-    def _draw_shadow(self, screen, rect):
-        """Desenha sombra suave"""
-        shadow_rect = rect.copy()
-        shadow_rect.x += 5
-        shadow_rect.y += 5
-
-        for i in range(4):
-            alpha = 40 - i * 10
-            if alpha > 0:
-                shadow = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-                shadow.fill((0, 0, 0, alpha))
-                screen.blit(shadow, (shadow_rect.x + i, shadow_rect.y + i))
-
     def _draw_background(self, screen, rect, pokemon=None):
-        """Desenha fundo do slot com gradiente - versão com fundo azulado para Pokémon no mapa"""
+        """Desenha fundo do slot - COM CACHE"""
         is_on_map = self.is_placed
 
-        # Define as cores base baseado no estado
+        # Determina cores base
         if self.is_selected:
-            base_color = self.COLORS['bg_selected']
+            bg_color = self.COLORS['bg_selected']
             border_color = self.COLORS['border_selected']
         elif is_on_map:
             if self.is_hovered:
-                base_color = self.COLORS['bg_hover_placed']
+                bg_color = self.COLORS['bg_hover_placed']
                 border_color = self.COLORS['border_hover_placed']
             else:
-                base_color = self.COLORS['bg_placed']
+                bg_color = self.COLORS['bg_placed']
                 border_color = self.COLORS['border_placed']
         elif self.is_hovered:
-            base_color = self.COLORS['bg_hover']
+            bg_color = self.COLORS['bg_hover']
             border_color = self.COLORS['border_hover']
         else:
-            base_color = self.COLORS['bg_default']
+            bg_color = self.COLORS['bg_default']
             border_color = self.COLORS['border']
 
-        # Cria superfície com gradiente
-        bg_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+        # Verifica se precisa recriar o cache
+        cache_key = (bg_color, border_color, rect.width, rect.height)
+        if self._cached_bg is None or self._cached_border_color != cache_key:
+            self._cached_bg = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
 
-        for y in range(rect.height):
-            progress = y / rect.height
-            color = (
-                int(base_color[0] * (1 - progress * 0.2)),
-                int(base_color[1] * (1 - progress * 0.2)),
-                int(base_color[2] * (1 - progress * 0.2)),
-                base_color[3]
-            )
-            bg_surface.set_at((0, y), color)
-            bg_surface.set_at((rect.width - 1, y), color)
+            # Gradiente simplificado (apenas algumas linhas em vez de todas)
+            step = max(1, rect.height // 8)  # Só 8 linhas de gradiente
+            for y in range(0, rect.height, step):
+                progress = y / rect.height
+                color = (
+                    int(bg_color[0] * (1 - progress * 0.2)),
+                    int(bg_color[1] * (1 - progress * 0.2)),
+                    int(bg_color[2] * (1 - progress * 0.2)),
+                    bg_color[3]
+                )
+                pygame.draw.rect(self._cached_bg, color, (0, y, rect.width, min(step, rect.height - y)))
 
-        screen.blit(bg_surface, rect)
+            self._cached_border_color = cache_key
 
-        # Efeito de brilho extra para Pokémon no mapa (pulsante global)
+        screen.blit(self._cached_bg, rect)
+
+        # Efeito de brilho para Pokémon no mapa (pulsante)
         if is_on_map:
-            # Usa o mesmo pulso global para o brilho de fundo
-            pulse_value = (math.sin(GameTeamSlot._global_pulse_time * 0.5) + 1) / 2
-            glow_alpha = int(30 + 20 * pulse_value)  # Pulsa entre 30 e 50
+            pulse_value = (math.sin(self.__class__._global_pulse_time * 0.5) + 1) / 2
+            glow_alpha = int(30 + 20 * pulse_value)
             glow_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
             glow_color = (50, 150, 255, glow_alpha)
             pygame.draw.rect(glow_surface, glow_color, glow_surface.get_rect(), border_radius=8)
@@ -345,11 +305,13 @@ class GameTeamSlot:
         pygame.draw.rect(screen, border_color, rect, 2, border_radius=10)
 
     def _draw_pokemon_info(self, screen, rect, pokemon):
-        """Desenha informações do Pokémon"""
+        """Desenha informações do Pokémon - OTIMIZADO"""
+        # Tipos (com cache)
         self._draw_types_above(screen, rect, pokemon)
 
+        # Nível
         level_text = f"Lv.{pokemon.level}"
-        level_surf = self.level_font.render(level_text, True, (255, 215, 100))
+        level_surf = self._level_font.render(level_text, True, (255, 215, 100))
 
         level_bg_width = level_surf.get_width() + 8
         level_bg_height = level_surf.get_height() + 4
@@ -365,14 +327,12 @@ class GameTeamSlot:
 
         screen.blit(level_surf, (level_bg_x + 4, level_bg_y + 2))
 
+        # Nome do Pokémon
         name_y = rect.y + 12
         name_text = pokemon.name
-        if self.name_font.size(name_text)[0] > rect.width * 0.5:
-            name_text = pokemon.name[:12] + "..."
-
-        name_surf = self.name_font.render(name_text, True, self.COLORS['text'])
-
         max_name_width = rect.width - level_bg_width - 30
+
+        name_surf = self._name_font.render(name_text, True, self.COLORS['text'])
         if name_surf.get_width() > max_name_width:
             name_x = rect.x + 10
         else:
@@ -380,115 +340,135 @@ class GameTeamSlot:
 
         screen.blit(name_surf, (name_x, name_y))
 
-        sprite_size = int(rect.height * 0.65)
-        sprite = self.pokedex.get_sprite(pokemon.id, "front", pokemon.is_shiny)
-
+        # Sprite (com cache)
+        sprite = self._get_cached_sprite(pokemon)
         if sprite:
-            sprite_scaled = pygame.transform.scale(sprite, (sprite_size, sprite_size))
-            sprite_x = rect.x + (rect.width - sprite_size) // 2
-            sprite_y = rect.y + (rect.height - sprite_size) // 2 - 5
-            screen.blit(sprite_scaled, (sprite_x, sprite_y))
+            sprite_x = rect.x + (rect.width - self._sprite_size) // 2
+            sprite_y = rect.y + (rect.height - self._sprite_size) // 2 - 5
+            screen.blit(sprite, (sprite_x, sprite_y))
 
             if pokemon.is_shiny:
-                self._draw_shiny_effect(screen, sprite_x, sprite_y, sprite_size)
+                self._draw_shiny_effect(screen, sprite_x, sprite_y, self._sprite_size)
 
-        hp_y = rect.y + rect.height - 45
-        self._draw_hp_bar(screen, rect, hp_y, pokemon)
+        # Barras
+        self._draw_hp_bar(screen, rect, self._hp_y, pokemon)
+        self._draw_xp_bar(screen, rect, self._xp_y, pokemon)
 
-        xp_y = rect.y + rect.height - 22
-        self._draw_xp_bar(screen, rect, xp_y, pokemon)
+    def _get_cached_sprite(self, pokemon):
+        """Obtém sprite do cache"""
+        cache_key = (pokemon.id, pokemon.is_shiny, self._sprite_size)
+
+        if cache_key not in self.__class__._sprite_cache:
+            sprite = self.__class__._pokedex.get_sprite(pokemon.id, "front", pokemon.is_shiny)
+            if sprite:
+                sprite = pygame.transform.scale(sprite, (self._sprite_size, self._sprite_size))
+            self.__class__._sprite_cache[cache_key] = sprite
+
+        return self.__class__._sprite_cache[cache_key]
 
     def _draw_types_above(self, screen, rect, pokemon):
-        """Desenha os tipos ACIMA do slot, centralizados"""
+        """Desenha os tipos ACIMA do slot - COM CACHE"""
         if not pokemon.types:
             return
 
-        type_colors = {
-            'normal': (168, 168, 120), 'fire': (240, 128, 48), 'water': (104, 144, 240),
-            'electric': (248, 208, 48), 'grass': (120, 200, 80), 'ice': (152, 216, 216),
-            'fighting': (192, 48, 40), 'poison': (160, 64, 160), 'ground': (224, 192, 104),
-            'flying': (168, 144, 240), 'psychic': (248, 88, 136), 'bug': (168, 184, 32),
-            'rock': (184, 160, 56), 'ghost': (112, 88, 152), 'dragon': (112, 56, 248),
-            'dark': (112, 88, 72), 'steel': (184, 184, 208), 'fairy': (238, 153, 238)
-        }
+        # Verifica se o cache de tipos é válido
+        current_types = tuple(pokemon.types)
+        if (self._cached_types_surface is None or
+                self._last_types != current_types or
+                self._last_types_rect != rect):
 
-        total_width = 0
-        type_surfs = []
-        type_bg_widths = []
+            self._last_types = current_types
+            self._last_types_rect = rect
 
-        for type_name in pokemon.types:
-            color = type_colors.get(type_name.lower(), (150, 150, 150))
-            type_text = type_name.capitalize()
-            type_surf = self.xp_font.render(type_text, True, (255, 255, 255))
-            padding = 8
-            bg_width = type_surf.get_width() + padding * 2
+            type_colors = {
+                'normal': (168, 168, 120), 'fire': (240, 128, 48), 'water': (104, 144, 240),
+                'electric': (248, 208, 48), 'grass': (120, 200, 80), 'ice': (152, 216, 216),
+                'fighting': (192, 48, 40), 'poison': (160, 64, 160), 'ground': (224, 192, 104),
+                'flying': (168, 144, 240), 'psychic': (248, 88, 136), 'bug': (168, 184, 32),
+                'rock': (184, 160, 56), 'ghost': (112, 88, 152), 'dragon': (112, 56, 248),
+                'dark': (112, 88, 72), 'steel': (184, 184, 208), 'fairy': (238, 153, 238)
+            }
 
-            type_surfs.append((type_surf, color))
-            type_bg_widths.append(bg_width)
-            total_width += bg_width + 5
+            # Pré-renderiza os tipos em uma superfície
+            type_height = 24
+            total_width = 0
+            type_surfs = []
+            type_bg_widths = []
 
-        if len(pokemon.types) > 0:
-            total_width -= 5
+            for type_name in pokemon.types:
+                color = type_colors.get(type_name.lower(), (150, 150, 150))
+                type_text = type_name.capitalize()
+                type_surf = self._xp_font.render(type_text, True, (255, 255, 255))
+                padding = 8
+                bg_width = type_surf.get_width() + padding * 2
+                type_surfs.append((type_surf, color))
+                type_bg_widths.append(bg_width)
+                total_width += bg_width + 5
 
-        start_x = rect.x + (rect.width - total_width) // 2
-        y = rect.y - 22
+            if pokemon.types:
+                total_width -= 5
 
-        for i, (type_surf, color) in enumerate(type_surfs):
-            bg_width = type_bg_widths[i]
-            bg_height = type_surf.get_height() + 6
+            start_x = rect.x + (rect.width - total_width) // 2
+            y = rect.y - 22
 
-            shadow_rect = pygame.Rect(start_x + 2, y + 2, bg_width, bg_height)
-            pygame.draw.rect(screen, (0, 0, 0, 100), shadow_rect, border_radius=8)
+            # Cria a superfície cacheada
+            self._cached_types_surface = pygame.Surface((total_width + 10, type_height + 10), pygame.SRCALPHA)
+            current_x = start_x - rect.x
 
-            bg_rect = pygame.Rect(start_x, y, bg_width, bg_height)
-            pygame.draw.rect(screen, color, bg_rect, border_radius=8)
-            pygame.draw.rect(screen, (255, 255, 255, 180), bg_rect, 2, border_radius=8)
+            for i, (type_surf, color) in enumerate(type_surfs):
+                bg_width = type_bg_widths[i]
+                bg_height = type_surf.get_height() + 6
 
-            text_x = start_x + (bg_width - type_surf.get_width()) // 2
-            text_y = y + (bg_height - type_surf.get_height()) // 2
-            screen.blit(type_surf, (text_x, text_y))
+                # Desenha na superfície cacheada
+                bg_rect = pygame.Rect(current_x, y - rect.y, bg_width, bg_height)
+                pygame.draw.rect(self._cached_types_surface, color, bg_rect, border_radius=8)
+                pygame.draw.rect(self._cached_types_surface, (255, 255, 255, 180), bg_rect, 2, border_radius=8)
 
-            start_x += bg_width + 5
+                text_x = current_x + (bg_width - type_surf.get_width()) // 2
+                text_y = (y - rect.y) + (bg_height - type_surf.get_height()) // 2
+                self._cached_types_surface.blit(type_surf, (text_x, text_y))
+
+                current_x += bg_width + 5
+
+        # Renderiza a superfície cacheada
+        if self._cached_types_surface:
+            screen.blit(self._cached_types_surface, (rect.x, rect.y - 22))
 
     def _draw_hp_bar(self, screen, rect, y, pokemon):
-        """Desenha barra de HP MAIS LARGA"""
+        """Desenha barra de HP - OTIMIZADO"""
         hp_percent = pokemon.current_hp / pokemon.max_hp
 
         bar_width = rect.width - 20
         bar_x = rect.x + 10
         bar_height = 18
 
-        bg_rect = pygame.Rect(bar_x, y, bar_width, bar_height)
-        pygame.draw.rect(screen, self.COLORS['hp_bg'], bg_rect, border_radius=8)
+        # Fundo
+        pygame.draw.rect(screen, self.COLORS['hp_bg'], (bar_x, y, bar_width, bar_height), border_radius=8)
 
+        # Cor baseada no percentual
         if hp_percent > 0.6:
             hp_color = self.COLORS['hp_green']
         elif hp_percent > 0.3:
             hp_color = self.COLORS['hp_yellow']
         else:
             hp_color = self.COLORS['hp_red']
-
-        if hp_percent < 0.2:
-            pulse = 1.0 + 0.2 * math.sin(self.hp_animation * 10)
-            hp_color = tuple(min(255, int(c * pulse)) for c in hp_color)
+            if hp_percent < 0.2:
+                pulse = 1.0 + 0.2 * math.sin(self.hp_animation * 10)
+                hp_color = tuple(min(255, int(c * pulse)) for c in hp_color)
 
         current_width = max(3, int(bar_width * hp_percent))
-        hp_rect = pygame.Rect(bar_x, y, current_width, bar_height)
-        pygame.draw.rect(screen, hp_color, hp_rect, border_radius=8)
-        pygame.draw.rect(screen, (100, 100, 120, 150), bg_rect, 2, border_radius=8)
+        pygame.draw.rect(screen, hp_color, (bar_x, y, current_width, bar_height), border_radius=8)
+        pygame.draw.rect(screen, (100, 100, 120, 150), (bar_x, y, bar_width, bar_height), 2, border_radius=8)
 
+        # Texto HP
         hp_text = f"{pokemon.current_hp}/{pokemon.max_hp}"
-        text_surf = self.hp_font.render(hp_text, True, self.COLORS['hp_text'])
+        text_surf = self._hp_font.render(hp_text, True, self.COLORS['hp_text'])
         text_x = bar_x + (bar_width - text_surf.get_width()) // 2
         text_y = y + (bar_height - text_surf.get_height()) // 2
-
-        text_bg = pygame.Surface((text_surf.get_width() + 6, text_surf.get_height() + 4), pygame.SRCALPHA)
-        text_bg.fill((0, 0, 0, 120))
-        screen.blit(text_bg, (text_x - 3, text_y - 2))
         screen.blit(text_surf, (text_x, text_y))
 
     def _draw_xp_bar(self, screen, rect, y, pokemon):
-        """Desenha barra de XP MAIS LARGA"""
+        """Desenha barra de XP - OTIMIZADO"""
         xp_percent = pokemon.xp / pokemon.xp_to_next if pokemon.xp_to_next > 0 else 0
         xp_percent = min(1.0, max(0.0, xp_percent))
 
@@ -496,53 +476,73 @@ class GameTeamSlot:
         bar_x = rect.x + 10
         bar_height = 14
 
-        bg_rect = pygame.Rect(bar_x, y, bar_width, bar_height)
-        pygame.draw.rect(screen, self.COLORS['xp_bg'], bg_rect, border_radius=6)
+        pygame.draw.rect(screen, self.COLORS['xp_bg'], (bar_x, y, bar_width, bar_height), border_radius=6)
 
-        xp_width = max(2, int(bar_width * xp_percent))
-        if xp_width > 0:
-            xp_rect = pygame.Rect(bar_x, y, xp_width, bar_height)
-
+        if xp_percent > 0:
+            xp_width = max(2, int(bar_width * xp_percent))
             if xp_percent > 0.8:
                 xp_color = (150, 230, 255)
             elif xp_percent > 0.5:
                 xp_color = (100, 200, 255)
             else:
                 xp_color = (70, 150, 255)
+            pygame.draw.rect(screen, xp_color, (bar_x, y, xp_width, bar_height), border_radius=6)
 
-            pygame.draw.rect(screen, xp_color, xp_rect, border_radius=6)
-
-        pygame.draw.rect(screen, (60, 70, 90), bg_rect, 1, border_radius=6)
+        pygame.draw.rect(screen, (60, 70, 90), (bar_x, y, bar_width, bar_height), 1, border_radius=6)
 
         xp_text = f"{pokemon.xp}/{pokemon.xp_to_next} XP"
-        text_surf = self.xp_font.render(xp_text, True, (200, 220, 255))
+        text_surf = self._xp_font.render(xp_text, True, (200, 220, 255))
         text_x = bar_x + (bar_width - text_surf.get_width()) // 2
         text_y = y + (bar_height - text_surf.get_height()) // 2
-
-        text_bg = pygame.Surface((text_surf.get_width() + 4, text_surf.get_height() + 2), pygame.SRCALPHA)
-        text_bg.fill((0, 0, 0, 80))
-        screen.blit(text_bg, (text_x - 2, text_y - 1))
         screen.blit(text_surf, (text_x, text_y))
 
         if xp_percent >= 1.0:
-            star_font = pygame.font.Font(None, 16)
+            star_font = self._get_font(16)
             star = star_font.render("★", True, (255, 215, 0))
             screen.blit(star, (bar_x + bar_width + 5, y - 2))
 
     def _draw_shiny_effect(self, screen, x, y, size):
-        """Desenha efeito de brilho para Pokémon shiny"""
-        for i in range(6):
-            angle = (self.hp_animation * 2 + i * 60) % 360
+        """Desenha efeito de brilho para Pokémon shiny - OTIMIZADO"""
+        # Limita o número de partículas
+        for i in range(4):  # Reduzido de 6 para 4
+            angle = (self.hp_animation * 2 + i * 90) % 360
             rad = math.radians(angle)
-            px = x + size // 2 + math.cos(rad) * (size // 2 + 10)
-            py = y + size // 2 + math.sin(rad) * (size // 2 + 10)
+            px = x + size // 2 + math.cos(rad) * (size // 2 + 8)
+            py = y + size // 2 + math.sin(rad) * (size // 2 + 8)
             alpha = int(150 + 105 * math.sin(self.hp_animation * 4 + i))
-            particle_size = 5 + int(3 * math.sin(self.hp_animation * 3 + i))
+            particle_size = 4 + int(2 * math.sin(self.hp_animation * 3 + i))
 
             particle = pygame.Surface((particle_size, particle_size), pygame.SRCALPHA)
             pygame.draw.circle(particle, (255, 215, 0, alpha),
                                (particle_size // 2, particle_size // 2), particle_size // 2)
             screen.blit(particle, (px - particle_size // 2, py - particle_size // 2))
+
+    def _draw_placed_indicator(self, screen, rect):
+        """Desenha indicador de que o Pokémon está no mapa - OTIMIZADO"""
+        indicator_size = 20
+        indicator_x = rect.x + 8
+        indicator_y = rect.y + 8
+
+        pulse_value = (math.sin(self.__class__._global_pulse_time * 0.5) + 1) / 2
+        pulse = 0.8 + (pulse_value * 0.4)
+
+        # Círculo principal
+        pygame.draw.circle(screen, self.COLORS['map_indicator'],
+                           (indicator_x + indicator_size // 2, indicator_y + indicator_size // 2),
+                           int(indicator_size // 2 * pulse))
+
+        # Círculo interno
+        inner_radius = int(indicator_size // 3 * pulse)
+        pygame.draw.circle(screen, (255, 255, 255),
+                           (indicator_x + indicator_size // 2, indicator_y + indicator_size // 2),
+                           inner_radius)
+
+        # Ícone simplificado (texto em vez de fonte)
+        icon_font = self._get_font(int(indicator_size * 0.6))
+        map_icon = icon_font.render("🌍", True, self.COLORS['map_indicator'])
+        icon_rect = map_icon.get_rect(center=(indicator_x + indicator_size // 2,
+                                              indicator_y + indicator_size // 2))
+        screen.blit(map_icon, icon_rect)
 
     def _draw_empty_slot(self, screen, rect):
         """Desenha slot vazio com estilo"""
@@ -553,12 +553,12 @@ class GameTeamSlot:
         pygame.draw.circle(screen, (60, 70, 90), center, radius, 3)
 
         plus_size = int(radius * 1.2)
-        plus_font = pygame.font.Font(None, plus_size)
+        plus_font = self._get_font(plus_size)
         plus_text = plus_font.render("+", True, (80, 90, 120))
         plus_rect = plus_text.get_rect(center=center)
         screen.blit(plus_text, plus_rect)
 
-        empty_font = pygame.font.Font(None, max(12, int(rect.height * 0.15)))
+        empty_font = self._get_font(max(12, int(rect.height * 0.15)))
         empty_text = empty_font.render("Vazio", True, (80, 90, 120))
         empty_rect = empty_text.get_rect(centerx=center[0], top=rect.y + rect.height - 20)
         screen.blit(empty_text, empty_rect)
@@ -567,4 +567,10 @@ class GameTeamSlot:
         """Atualiza posição do slot"""
         self.rect.x = new_x
         self.rect.y = new_y
-        self._create_fonts()
+        self._sprite_size = int(self.rect.height * 0.65)
+        self._name_y = self.rect.y + 12
+        self._hp_y = self.rect.y + self.rect.height - 45
+        self._xp_y = self.rect.y + self.rect.height - 22
+        self._get_fonts()
+        self._cached_bg = None
+        self._cached_types_surface = None
