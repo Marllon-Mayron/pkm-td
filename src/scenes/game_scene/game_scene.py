@@ -25,7 +25,8 @@ from src.scenes.game_scene.components.renderer.map_renderer import MapRenderer
 from src.scenes.game_scene.components.renderer.path_renderer import PathRenderer
 from src.scenes.game_scene.components.renderer.pokemon_spot_renderer import PokemonSpotRenderer # NOVO
 from src.scenes.game_scene.components.renderer.target_item_renderer import TargetItemRenderer
-
+from src.managers.notification_manager import notification_manager
+from src.ui.toast_renderer import toast_info, toast_success, toast_warning, toast_error, toast_achievement, toast_battle
 
 class GameScene(BaseScene):
     def __init__(self, game, chapter_id=1, phase_number=1):
@@ -53,6 +54,7 @@ class GameScene(BaseScene):
         # Cria os gerenciadores
         self.placement_manager = PlacementManager(self)
         self.team_manager = GameTeamManager(game, self)
+        self.notification_manager = notification_manager
         self.target_item_manager = TargetItemManager(game)
         self.target_item_renderer = TargetItemRenderer()
 
@@ -217,7 +219,7 @@ class GameScene(BaseScene):
         self.reset_all_transformed_dittos()
 
         return True
-    # ===== MÉTODOS DE OVERLAY (mantidos) =====
+    # ===== MÉTODOS DE OVERLAY  =====
 
     def open_move_select_overlay(self, pokemon):
         """Abre o overlay de seleção de moves para um Pokémon"""
@@ -476,8 +478,10 @@ class GameScene(BaseScene):
 
             is_to_team = self.player.has_team_space()
             if is_to_team:
+                toast_battle(f"{caught.name} foi adicionado ao time!", duration=4.0, pokemon=caught, portrait="happy")
                 self.player.add_to_team(caught)
             else:
+                toast_battle(f"{caught.name} foi adicionado à box!", duration=4.0, pokemon=caught)
                 self.player.add_to_box(caught)
 
             self.player.caught_pokemon.add(enemy.id)
@@ -485,11 +489,12 @@ class GameScene(BaseScene):
             self.player.auto_save()
 
             self.show_capture_overlay(caught, is_to_team)
+            #toast_success(f"{caught.name} foi capturado!", duration=4.0)
+
             return True
 
         return False
 
-    @staticmethod
     @staticmethod
     def use_medicine(pokemon, item_data):
         """Usa poção ou revive em um Pokémon aliado"""
@@ -825,6 +830,9 @@ class GameScene(BaseScene):
                                     self.open_move_select_overlay(clicked_pokemon)
                                     return None
 
+        # ===== NOTIFICATION SCROLL =====
+        if self.notification_manager.handle_event(event):
+            return None
         # ===== TEAM MANAGER =====
         if team_manager:
             result = team_manager.handle_event(
@@ -880,6 +888,7 @@ class GameScene(BaseScene):
                     if world_pos:
                         self.hovered_spot = spot_renderer.get_spot_at_world_pos(world_pos[0], world_pos[1])
             return None
+
 
         return None
 
@@ -982,6 +991,7 @@ class GameScene(BaseScene):
             self.battle_system.effect_manager.update(dt)
             perf_monitor.end_section()
 
+        self.notification_manager.update(dt)
         # ===== GAME OVER CHECK - MODIFICADO =====
         perf_monitor.start_section("GAME_OVER_CHECK")
         # Verifica se o time inteiro foi derrotado
@@ -1209,6 +1219,14 @@ class GameScene(BaseScene):
             perf_monitor.end_section()
 
         # Overlay Manager
+        viewport_rect = pygame.Rect(
+            self.screen_manager.viewport_x,
+            self.screen_manager.viewport_y,
+            self.screen_manager.viewport_width,
+            self.screen_manager.viewport_height
+        )
+        self.notification_manager.render(screen, viewport_rect)
+
         perf_monitor.start_section("RENDER_OVERLAY_MANAGER")
         if overlay_mgr:
             overlay_mgr.render(screen)

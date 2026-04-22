@@ -254,6 +254,40 @@ class Pokemon(Entity):
             self._setup_attack_pattern()
 
     # ===== MÉTODOS DE DELEGAÇÃO (mantém compatibilidade) =====
+    def get_portrait(self, expression: str = "normal", size: tuple = (48, 48)) -> Optional[pygame.Surface]:
+        """
+        Retorna o portrait do Pokémon com fallback automático.
+
+        Args:
+            expression: Expressão facial ("normal", "happy", "angry", "sad", "shocked")
+            size: Tamanho desejado (largura, altura)
+
+        Returns:
+            Superfície do pygame com o portrait redimensionado
+        """
+        # Tenta carregar a expressão solicitada
+        portrait = self.pokedex.get_portrait(self.id, expression, self.is_shiny)
+
+        # Fallback: se não encontrou a expressão, tenta "normal"
+        if portrait is None and expression != "normal":
+            portrait = self.pokedex.get_portrait(self.id, "normal", self.is_shiny)
+            if portrait:
+                print(f"[PORTRAIT] Fallback: '{expression}' não encontrado para {self.name}, usando 'normal'")
+
+        if portrait:
+            # Redimensiona para o tamanho desejado
+            if portrait.get_size() != size:
+                portrait = pygame.transform.scale(portrait, size)
+
+            # Se for shiny, adiciona efeito de brilho
+            if self.is_shiny:
+                overlay = pygame.Surface(size, pygame.SRCALPHA)
+                overlay.fill((255, 215, 0, 60))
+                portrait.blit(overlay, (0, 0))
+
+            return portrait
+
+        return None
 
     def _calculate_stats(self):
         self.stats.calculate_stats()
