@@ -213,7 +213,7 @@ class GameScene(BaseScene):
                 return False
 
         # Se chegou aqui, todos estão derrotados
-        print(f"[GAME_OVER] Time inteiro derrotado! Total: {len(self.player.team)} Pokémon, 0 vivos.")
+        toast_info(f"Time inteiro derrotado!", duration=4.0)
 
         # ===== RESETA DITTOS TRANSFORMADOS EM CASO DE GAME OVER =====
         self.reset_all_transformed_dittos()
@@ -336,7 +336,7 @@ class GameScene(BaseScene):
                     current_status = self.battle_system.effect_manager.get_status(target)
                     if current_status and current_status.type == status_type:
                         self.battle_system.effect_manager.remove_status(target)
-                        self.battle_system.effect_manager.add_status_text(target, f"curou {status_to_cure}!")
+                        toast_battle(f"{target.name} curou {status_to_cure}!", duration=4.0, pokemon=target, portrait="happy")
                         return True
                 return False
 
@@ -346,7 +346,7 @@ class GameScene(BaseScene):
                 if current_status and current_status.type.value != "none":
                     self.battle_system.effect_manager.remove_status(target)
                     self.battle_system.effect_manager.add_status_text(target, "todos os status curados!")
-                    print(f"[ITEM] {item_data['name']} usado em {target.name}!")
+                    toast_battle(f"{item_data['name']} usado em {target.name}!", duration=4.0, pokemon=target,portrait="happy")
                     return True
                 return False
 
@@ -355,7 +355,7 @@ class GameScene(BaseScene):
                 percentage = item_data.get("effect_value", 1.0)
                 restored = target.restore_pp(percentage=percentage)
                 if restored > 0:
-                    print(f"[ITEM] {item_data['name']} usado em {target.name}! {restored} PP restaurados!")
+                    toast_battle(f"{item_data['name']} usado em {target.name}! {restored} PP restaurados!!", duration=4.0, pokemon=target, portrait="happy")
                     return True
                 return False
 
@@ -493,6 +493,8 @@ class GameScene(BaseScene):
 
             return True
 
+        toast_battle(f"{enemy.name} escapou...", duration=4.0, pokemon=enemy, portrait="angry")
+
         return False
 
     @staticmethod
@@ -512,6 +514,7 @@ class GameScene(BaseScene):
             revive_percentage = item_data.get("effect_value", 0.5)
 
             # Usa o método revive da classe Pokemon
+            toast_battle(f"{pokemon.name} foi revivido!", duration=4.0, pokemon=pokemon, portrait="happy")
             return pokemon.revive(heal_percentage=revive_percentage)
 
         # ===== POÇÕES E CURAS =====
@@ -525,7 +528,7 @@ class GameScene(BaseScene):
 
         if heal_amount == -1:
             pokemon.heal()  # Cura completa
-            print(f"[MEDICINE] {pokemon.name} foi completamente curado!")
+            toast_battle(f"{pokemon.name} foi completamente curado!", duration=4.0, pokemon=pokemon, portrait="happy")
             return True
 
         # Cura parcial (potion, super potion, etc)
@@ -533,7 +536,7 @@ class GameScene(BaseScene):
             old_hp = pokemon.current_hp
             pokemon.current_hp = min(pokemon.max_hp, pokemon.current_hp + heal_amount)
             healed = pokemon.current_hp - old_hp
-            print(f"[MEDICINE] {pokemon.name} recuperou {healed} HP! ({pokemon.current_hp}/{pokemon.max_hp})")
+            toast_battle(f"{pokemon.name} recuperou {healed} HP! ({pokemon.current_hp}/{pokemon.max_hp})", duration=4.0, pokemon=pokemon, portrait="happy")
             return True
 
         return False

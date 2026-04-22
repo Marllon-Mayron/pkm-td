@@ -16,6 +16,8 @@ from src.entities.pokemon.combat import PokemonCombat
 from src.entities.pokemon.moves import PokemonMoves
 from src.entities.pokemon.evolution import PokemonEvolution
 from src.entities.pokemon.rendering import PokemonRendering
+from src.managers.notification_manager import notification_manager
+from src.ui.toast_renderer import toast_battle
 
 # Cache global de sprites e fontes para reduzir recriação
 _SPRITE_CACHE = {}
@@ -100,6 +102,7 @@ class Pokemon(Entity):
         self.evolution = PokemonEvolution(self)
         self.rendering = PokemonRendering(self)
         self.camera = None
+        self.notification_manager = notification_manager
 
         # ===== 6. NATUREZA (AGORA COM STATS JÁ CRIADO) =====
         self.nature_multipliers = self.stats.generate_nature()
@@ -117,6 +120,7 @@ class Pokemon(Entity):
             self.defense = int(self.defense * 2)
             self.sp_defense = int(self.sp_defense * 2)
             self.defense_value = self._calculate_defense()
+            toast_battle(f"Um grande {self.name} chefe apareceu...", duration=4.0, pokemon=self, portrait="angry")
 
         # ===== 9. ESTADO ATUAL =====
         self.current_hp = self.max_hp
@@ -1178,8 +1182,8 @@ class Pokemon(Entity):
                 # Remove efeitos residuais quando derrotado
                 if hasattr(self.battle_system, 'residual_effects'):
                     self.battle_system.residual_effects.remove_effect_on_target(self)
-
-            print(f"[DEFEATED] {self.name} foi derrotado! Animação de sono ativada.")
+            if not self.is_wild:
+                toast_battle(f"{self.name} foi derrotado!", duration=4.0, pokemon=self, portrait="dizzy")
         else:
             # Restaura animação normal
             self.update_status_animation()

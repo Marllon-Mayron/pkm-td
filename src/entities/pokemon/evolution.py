@@ -1,6 +1,8 @@
 # src/entities/pokemon/evolution.py
 
 from src.managers.evolution_manager import evolution_manager
+from src.ui.toast_renderer import toast_battle
+
 
 class PokemonEvolution:
     """Gerencia evolução do Pokémon"""
@@ -79,10 +81,11 @@ class PokemonEvolution:
         self.pokemon.current_hp = self.pokemon.max_hp
         self.pokemon.xp_to_next = self.pokemon._calculate_xp_needed()
 
+        toast_battle(f"{self.pokemon.name} subiu de nivel!!!", duration=4.0, pokemon=self.pokemon,portrait="joyous")
         new_moves, pending_moves = self.pokemon.check_new_moves_on_level_up(old_level)
         if new_moves:
-            print(
-                f"[LEVEL UP] {self.pokemon.name} subiu para Lv.{self.pokemon.level} e aprendeu: {', '.join(new_moves)}")
+            toast_battle(f"{self.pokemon.name} aprendeu: {', '.join(new_moves)} ", duration=5.0, pokemon=self.pokemon, portrait="inspired")
+
 
         cache_key = (self.pokemon.id, self.pokemon.level, self.pokemon.speed_stat,
                      self.pokemon.is_shiny, self.pokemon.is_boss)

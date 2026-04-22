@@ -4,6 +4,8 @@ from .status_effect import StatusEffect, StatusType
 from .stat_modifier import StatModifier, StatType, StatStage
 import pygame
 
+from ...ui.toast_renderer import toast_battle
+
 
 class EffectManager:
     """
@@ -75,8 +77,8 @@ class EffectManager:
             StatusType.CONFUSION: f"{pokemon.name} está confuso!"
         }
 
-        #if status.type in status_messages:
-            #self.add_status_text(pokemon, status_messages[status.type], duration=1.5)
+        if not pokemon.is_wild and status.type in status_messages:
+            toast_battle(f"{status_messages[status.type]}", duration=5.0, pokemon=pokemon, portrait="pain")
 
         # ===== FORÇA ATUALIZAÇÃO DA ANIMAÇÃO =====
         if hasattr(pokemon, 'update_status_animation'):
