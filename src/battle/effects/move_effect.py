@@ -1306,176 +1306,170 @@ class MoveEffect:
         """
         Executa um efeito em área (afeta todos os inimigos no range)
         """
-        print(f"[AREA_EFFECT] {attacker.name} usou {self.name} em área! (tipo: {self.effect_type})")
-
-        # ===== OBTÉM A LISTA CORRETA DE ENTIDADES BASEADA NO ATACANTE =====
-        if not battle_system.game_scene:
-            print(f"[AREA_EFFECT] game_scene não encontrado!")
-            effect_manager.add_status_text(attacker, "Mas falhou!", duration=1.0)
+        # ===== PREVINE RECURSÃO =====
+        if hasattr(attacker, '_processing_area_effect') and attacker._processing_area_effect:
+            print(f"[AREA_EFFECT] {attacker.name} já está processando área, ignorando")
             return False
 
-        all_targets = []
+        attacker._processing_area_effect = True
 
-        if attacker.is_wild:
-            # Atacante é selvagem: procura aliados do player (placed_pokemon)
-            if hasattr(battle_system.game_scene, 'placement_manager'):
-                placement_manager = battle_system.game_scene.placement_manager
-                all_targets = placement_manager.placed_pokemon.copy()
-                print(f"[AREA_EFFECT] Atacante selvagem: procurando em {len(all_targets)} aliados")
+        try:
+            # ===== APLICA COOLDOWN IMEDIATAMENTE =====
+            attacker.charge_cooldown = attacker.charge_cooldown_max
+
+            print(f"[AREA_EFFECT] {attacker.name} usou {self.name} em área! (tipo: {self.effect_type})")
+
+            all_targets = []
+
+            if attacker.is_wild:
+                # Atacante é selvagem: procura aliados do player (placed_pokemon)
+                if hasattr(battle_system.game_scene, 'placement_manager'):
+                    placement_manager = battle_system.game_scene.placement_manager
+                    all_targets = placement_manager.placed_pokemon.copy()
+                    print(f"[AREA_EFFECT] Atacante selvagem: procurando em {len(all_targets)} aliados")
+                else:
+                    print(f"[AREA_EFFECT] placement_manager não encontrado!")
             else:
-                print(f"[AREA_EFFECT] placement_manager não encontrado!")
-        else:
-            # Atacante é aliado: procura inimigos selvagens (active_enemies)
-            if hasattr(battle_system.game_scene, 'wave_manager'):
-                wave_manager = battle_system.game_scene.wave_manager
-                all_targets = wave_manager.active_enemies.copy()
-                print(f"[AREA_EFFECT] Atacante aliado: procurando em {len(all_targets)} inimigos")
+                # Atacante é aliado: procura inimigos selvagens (active_enemies)
+                if hasattr(battle_system.game_scene, 'wave_manager'):
+                    wave_manager = battle_system.game_scene.wave_manager
+                    all_targets = wave_manager.active_enemies.copy()
+                    print(f"[AREA_EFFECT] Atacante aliado: procurando em {len(all_targets)} inimigos")
+                else:
+                    print(f"[AREA_EFFECT] wave_manager não encontrado!")
+
+            if not all_targets:
+                print(f"[AREA_EFFECT] Nenhum alvo encontrado!")
+                effect_manager.add_status_text(attacker, "Mas não há inimigos!", duration=1.0)
+                return False
+
+            # Obtém alvos no range
+            targets_in_range = attacker.get_enemies_in_range(all_targets)
+
+            print(f"[AREA_EFFECT] Alvos totais: {len(all_targets)}, no range: {len(targets_in_range)}")
+
+            if not targets_in_range:
+                effect_manager.add_status_text(attacker, "Mas não há inimigos no alcance!", duration=1.0)
+                print(f"[AREA_EFFECT] Nenhum alvo no range de {attacker.name}!")
+                return False
+
+            # Obtém o move atual
+            current_move = attacker.get_current_move()
+            if not current_move:
+                print(f"[AREA_EFFECT] {attacker.name} não tem move selecionado!")
+                return False
+
+            # Consome PP uma única vez
+            if current_move.current_pp > 0:
+                current_move.current_pp -= 1
+                print(
+                    f"[AREA_EFFECT] {attacker.name} gastou 1 PP para {self.name} (atingiu {len(targets_in_range)} alvos)")
             else:
-                print(f"[AREA_EFFECT] wave_manager não encontrado!")
+                print(f"[AREA_EFFECT] {attacker.name} não tem PP para {self.name}!")
+                return False
 
-        if not all_targets:
-            print(f"[AREA_EFFECT] Nenhum alvo encontrado!")
-            effect_manager.add_status_text(attacker, "Mas não há inimigos!", duration=1.0)
-            return False
+            # Toca som do ataque uma vez
+            from src.managers.move_sound_manager import move_sound_manager
+            move_sound_manager.play_attack_sound(current_move.sound_name)
 
-        # Obtém alvos no range
-        targets_in_range = attacker.get_enemies_in_range(all_targets)
+            # Animação do atacante
+            from src.battle.effects.animation_mapper import AnimationMapper
+            animation_to_use = AnimationMapper.get_animation_for_move(self.name, current_move.category)
+            if attacker.has_animation(animation_to_use):
+                attacker.set_animation_direct(animation_to_use)
+                attacker.current_frame = 0
+                attacker.animation_timer = 0
 
-        print(f"[AREA_EFFECT] Alvos totais: {len(all_targets)}, no range: {len(targets_in_range)}")
+            # ===== APLICA O EFEITO A CADA ALVO NO RANGE =====
+            hit_count = 0
 
-        if not targets_in_range:
-            effect_manager.add_status_text(attacker, "Mas não há inimigos no alcance!", duration=1.0)
-            print(f"[AREA_EFFECT] Nenhum alvo no range de {attacker.name}!")
-            return False
+            for target_entity in targets_in_range:
+                if not target_entity.is_alive() or target_entity.is_defeated:
+                    continue
 
-        # Obtém o move atual
-        current_move = attacker.get_current_move()
-        if not current_move:
-            print(f"[AREA_EFFECT] {attacker.name} não tem move selecionado!")
-            return False
+                print(f"[AREA_EFFECT] Aplicando {self.effect_type} em {target_entity.name}...")
 
-        # Consome PP uma única vez
-        if current_move.current_pp > 0:
-            current_move.current_pp -= 1
-            print(f"[AREA_EFFECT] {attacker.name} gastou 1 PP para {self.name} (atingiu {len(targets_in_range)} alvos)")
-        else:
-            print(f"[AREA_EFFECT] {attacker.name} não tem PP para {self.name}!")
-            return False
-
-        # Toca som do ataque uma vez
-        from src.managers.move_sound_manager import move_sound_manager
-        move_sound_manager.play_attack_sound(current_move.sound_name)
-
-        # Animação do atacante
-        from src.battle.effects.animation_mapper import AnimationMapper
-        animation_to_use = AnimationMapper.get_animation_for_move(self.name, current_move.category)
-        if attacker.has_animation(animation_to_use):
-            attacker.set_animation_direct(animation_to_use)
-            attacker.current_frame = 0
-            attacker.animation_timer = 0
-
-        # ===== APLICA O EFEITO A CADA ALVO NO RANGE =====
-        hit_count = 0
-
-        for target_entity in targets_in_range:
-            if not target_entity.is_alive() or target_entity.is_defeated:
-                continue
-
-            print(f"[AREA_EFFECT] Aplicando {self.effect_type} em {target_entity.name}...")
-
-            # ===== DIFERENCIA O TIPO DE EFEITO =====
-            if self.effect_type == "self_faint":
-                self._apply_self_faint_area(attacker, target_entity, battle_system, effect_manager, damage)
-                hit_count += 1
-
-            elif self.effect_type == "status" or self.effect_type == "status_chance":
-                success = self._apply_status(attacker, target_entity, effect_manager)
-                if success:
+                # ===== DIFERENCIA O TIPO DE EFEITO =====
+                if self.effect_type == "self_faint":
+                    self._apply_self_faint_area(attacker, target_entity, battle_system, effect_manager, damage)
                     hit_count += 1
 
-            elif self.effect_type == "stat_mod":
-                # Para golpes como Sand Attack em área
-                success = self._apply_stat_mod(attacker, target_entity, effect_manager)
-                if success:
-                    hit_count += 1
-                    print(f"[AREA_EFFECT] stat_mod aplicado com sucesso em {target_entity.name}")
+                elif self.effect_type == "status" or self.effect_type == "status_chance":
+                    success = self._apply_status(attacker, target_entity, effect_manager)
+                    if success:
+                        hit_count += 1
 
-            elif self.effect_type == "drain":
-                success = self._apply_drain(attacker, target_entity, damage, effect_manager)
-                if success:
-                    hit_count += 1
+                elif self.effect_type == "stat_mod":
+                    # Para golpes como Sand Attack em área
+                    success = self._apply_stat_mod(attacker, target_entity, effect_manager)
+                    if success:
+                        hit_count += 1
+                        print(f"[AREA_EFFECT] stat_mod aplicado com sucesso em {target_entity.name}")
 
-            elif self.effect_type == "recoil":
-                success = self._apply_recoil(attacker, target_entity, damage, effect_manager)
-                if success:
-                    hit_count += 1
+                elif self.effect_type == "drain":
+                    success = self._apply_drain(attacker, target_entity, damage, effect_manager)
+                    if success:
+                        hit_count += 1
 
-            elif self.effect_type == "percent_damage":
-                success = self._apply_percent_damage(attacker, target_entity, battle_system, effect_manager)
-                if success:
-                    hit_count += 1
+                elif self.effect_type == "recoil":
+                    success = self._apply_recoil(attacker, target_entity, damage, effect_manager)
+                    if success:
+                        hit_count += 1
 
-            elif self.effect_type == "fixed_damage":
-                success = self._apply_fixed_damage(attacker, target_entity, battle_system, effect_manager)
-                if success:
-                    hit_count += 1
+                elif self.effect_type == "percent_damage":
+                    success = self._apply_percent_damage(attacker, target_entity, battle_system, effect_manager)
+                    if success:
+                        hit_count += 1
 
-            elif self.effect_type == "level_damage":
-                success = self._apply_level_damage(attacker, target_entity, battle_system, effect_manager)
-                if success:
-                    hit_count += 1
+                elif self.effect_type == "fixed_damage":
+                    success = self._apply_fixed_damage(attacker, target_entity, battle_system, effect_manager)
+                    if success:
+                        hit_count += 1
 
-            elif self.effect_type == "area_damage" or self.params.get("use_normal_damage", False):
-                from src.battle.damage_calculator import DamageCalculator
+                elif self.effect_type == "level_damage":
+                    success = self._apply_level_damage(attacker, target_entity, battle_system, effect_manager)
+                    if success:
+                        hit_count += 1
 
-                damage_result = DamageCalculator.calculate_damage(attacker, target_entity, current_move)
+                elif self.effect_type == "area_damage" or self.params.get("use_normal_damage", False):
+                    from src.battle.damage_calculator import DamageCalculator
 
-                if damage_result["hit"]:
-                    old_hp = target_entity.current_hp
-                    target_entity.take_damage(damage_result["damage"], attacker=attacker)
-                    actual_damage = old_hp - target_entity.current_hp
+                    damage_result = DamageCalculator.calculate_damage(attacker, target_entity, current_move)
 
-                    effect_manager.add_status_text(target_entity, f"-{actual_damage} HP", duration=0.8)
+                    if damage_result["hit"]:
+                        old_hp = target_entity.current_hp
+                        target_entity.take_damage(damage_result["damage"], attacker=attacker)
+                        actual_damage = old_hp - target_entity.current_hp
 
-                    if damage_result["effectiveness"] > 1.0:
-                        effect_manager.add_status_text(target_entity, "Super efetivo!", duration=0.8)
-                    elif 0 < damage_result["effectiveness"] < 1.0:
-                        effect_manager.add_status_text(target_entity, "Não é muito efetivo...", duration=0.8)
+                        effect_manager.add_status_text(target_entity, f"-{actual_damage} HP", duration=0.8)
 
-                    battle_system._apply_move_effect(attacker, target_entity, current_move, damage_result["damage"])
-                    move_sound_manager.play_hit_sound(current_move.sound_name)
+                        if damage_result["effectiveness"] > 1.0:
+                            effect_manager.add_status_text(target_entity, "Super efetivo!", duration=0.8)
+                        elif 0 < damage_result["effectiveness"] < 1.0:
+                            effect_manager.add_status_text(target_entity, "Não é muito efetivo...", duration=0.8)
 
-                    hit_count += 1
-                    print(f"[AREA_DAMAGE] {self.name} causou {actual_damage} de dano em {target_entity.name}!")
+                        # ===== CORREÇÃO CRÍTICA: NÃO CHAMA _apply_move_effect PARA ATAQUES EM ÁREA =====
+                        # Isso evita recursão e duplicação de PP
+                        # battle_system._apply_move_effect(attacker, target_entity, current_move, damage_result["damage"])
 
+                        move_sound_manager.play_hit_sound(current_move.sound_name)
+
+                        hit_count += 1
+                        print(f"[AREA_DAMAGE] {self.name} causou {actual_damage} de dano em {target_entity.name}!")
+
+            # Reseta estado de combate (cooldown já foi aplicado no início)
+            if not attacker.is_wild:
+                attacker.combat_state = "returning"
+                if attacker.has_animation("walk"):
+                    attacker.set_animation("walk")
             else:
-                # Fallback: tenta dano normal
-                print(f"[AREA_EFFECT] Tipo {self.effect_type} não reconhecido, tentando dano normal...")
-                from src.battle.damage_calculator import DamageCalculator
+                attacker.combat_state = "attacking"
 
-                damage_result = DamageCalculator.calculate_damage(attacker, target_entity, current_move)
+            return hit_count > 0
 
-                if damage_result["hit"]:
-                    old_hp = target_entity.current_hp
-                    target_entity.take_damage(damage_result["damage"], attacker=attacker)
-                    actual_damage = old_hp - target_entity.current_hp
-
-                    effect_manager.add_status_text(target_entity, f"-{actual_damage} HP", duration=0.8)
-                    move_sound_manager.play_hit_sound(current_move.sound_name)
-                    hit_count += 1
-
-        # Cooldown do ataque
-        attacker.charge_cooldown = attacker.charge_cooldown_max
-
-        # Reseta estado de combate
-        if not attacker.is_wild:
-            attacker.combat_state = "returning"
-            if attacker.has_animation("walk"):
-                attacker.set_animation("walk")
-        else:
-            attacker.combat_state = "attacking"
-
-        return hit_count > 0
+        finally:
+            # ===== LIMPA A FLAG =====
+            attacker._processing_area_effect = False
 
     def _apply_self_confusion_after_uses(self, attacker, target, battle_system, effect_manager, damage):
         """

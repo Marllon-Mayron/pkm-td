@@ -426,8 +426,6 @@ class PokemonCombat:
                 self.pokemon.combat_state = "idle"
                 self.pokemon._attack_attempts = 0
 
-    # src/entities/pokemon/combat.py
-
     def _move_towards_target(self, target: 'Pokemon', dx: float, dy: float, distance: float, dt: float):
         """Move em direção ao alvo (para aliados E inimigos)"""
         # Verifica se o alvo ainda existe antes de mover
