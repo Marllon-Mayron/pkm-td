@@ -1151,6 +1151,58 @@ class Pokemon(Entity):
         # Fallback: usa o sistema normal
         return self.get_current_move()
 
+    def clear_all_status(self):
+        """
+        Remove todos os efeitos de status do Pokémon.
+        Chamado quando o Pokémon é derrotado.
+        """
+        # ===== USA O EFFECT_MANAGER DO BATTLE_SYSTEM =====
+        # O effect_manager pode estar no battle_system ou diretamente no pokemon
+        effect_mgr = None
+
+        # Tenta pegar do battle_system primeiro
+        if hasattr(self, 'battle_system') and self.battle_system:
+            effect_mgr = self.battle_system.effect_manager
+
+        # Se não tem battle_system, tenta o effect_manager direto
+        if not effect_mgr and hasattr(self, 'effect_manager') and self.effect_manager:
+            effect_mgr = self.effect_manager
+
+        if effect_mgr:
+            # Usa o método do EffectManager para limpar tudo
+            effect_mgr.clear_all_effects_for_pokemon(self)
+            print(f"[STATUS_CLEAR] {self.name}: todos os efeitos limpos via EffectManager")
+        else:
+            print(f"[STATUS_CLEAR] {self.name}: effect_manager não disponível, pulando limpeza")
+
+        # ===== LIMPA TIMERS E CONTADORES LOCAIS (sempre faz) =====
+        if hasattr(self, '_stun_timer'):
+            self._stun_timer = 0.0
+        if hasattr(self, '_last_stun_check'):
+            self._last_stun_check = 0.0
+        if hasattr(self, '_sleep_timer'):
+            self._sleep_timer = 0.0
+        if hasattr(self, '_sleep_check_timer'):
+            self._sleep_check_timer = 0.0
+        if hasattr(self, '_freeze_timer'):
+            self._freeze_timer = 0.0
+        if hasattr(self, '_freeze_check_timer'):
+            self._freeze_check_timer = 0.0
+        if hasattr(self, '_damage_timer'):
+            self._damage_timer = 0.0
+        if hasattr(self, '_toxic_tick_count'):
+            self._toxic_tick_count = 0
+
+        # Remove referência local ao status_effect se existir
+        if hasattr(self, 'status_effect'):
+            self.status_effect = None
+
+        # Força atualização da animação para estado normal
+        if hasattr(self, 'update_status_animation'):
+            self.update_status_animation()
+
+        print(f"[STATUS_CLEAR] Todos os status de {self.name} foram removidos!")
+
     def set_defeated(self, defeated: bool):
         """Define se o Pokémon está derrotado"""
         self.is_defeated = defeated
@@ -1165,25 +1217,33 @@ class Pokemon(Entity):
             if hasattr(self, '_disable_timer'):
                 delattr(self, '_disable_timer')
 
+            # ===== LIMPA TODOS OS STATUS EFFECTS =====
+            self.clear_all_status()
+
             # ===== CANCELA QUALQUER CARGA DE GOLPE =====
             if hasattr(self, 'battle_system') and self.battle_system:
                 if (self.battle_system.active_charge_move and
                         self.battle_system.active_charge_move['attacker'] == self):
                     print(f"[TWO_TURN] Carga de {self.name} foi cancelada devido à derrota!")
                     self.battle_system.active_charge_move = None
-            # Força animação de sono
-            self.set_animation_direct("sleep")
+
+            # ===== REMOVE EFEITOS RESIDUAIS DO BATTLE_SYSTEM (apenas se existir) =====
+            if hasattr(self, 'battle_system') and self.battle_system:
+                if hasattr(self.battle_system, 'residual_effects'):
+                    self.battle_system.residual_effects.remove_effect_on_target(self)
+
+            # Força animação de sono/derrota
+            if hasattr(self, 'set_animation_direct'):
+                self.set_animation_direct("sleep")
+
             # Reseta estado de combate
             self.combat_state = "idle"
             self.target = None
             self.charge_cooldown = 0
 
-            if defeated and hasattr(self, 'battle_system') and self.battle_system:
-                # Remove efeitos residuais quando derrotado
-                if hasattr(self.battle_system, 'residual_effects'):
-                    self.battle_system.residual_effects.remove_effect_on_target(self)
             if not self.is_wild:
                 toast_battle(f"{self.name} foi derrotado!", duration=4.0, pokemon=self, portrait="dizzy")
+
         else:
             # Restaura animação normal
             self.update_status_animation()

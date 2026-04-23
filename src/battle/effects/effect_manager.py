@@ -273,9 +273,19 @@ class EffectManager:
         # ===== ATUALIZA STATUS EFFECTS (não-voláteis) =====
         status_to_remove = []
 
-        for pokemon_id, status in self.status_effects.items():
+        # Cria uma lista de tuplas (pokemon_id, status) para iterar com segurança
+        status_items = list(self.status_effects.items())
+
+        for pokemon_id, status in status_items:
             if pokemon_id in self._pokemon_refs:
                 pokemon = self._pokemon_refs[pokemon_id]
+
+                # ===== PULA SE O POKÉMON ESTÁ DERROTADO =====
+                if hasattr(pokemon, 'is_defeated') and pokemon.is_defeated:
+                    # Pokémon derrotado não deve mais ter status
+                    print(f"[EFFECT] {pokemon.name} está derrotado mas ainda tem status! Removendo...")
+                    status_to_remove.append(pokemon_id)
+                    continue
 
                 # Para congelamento, o update retorna False se descongelou
                 if status.type == StatusType.FREEZE:
@@ -288,7 +298,6 @@ class EffectManager:
                 if not status.update(pokemon, self, dt):
                     status_to_remove.append(pokemon_id)
 
-        # Remove status que acabaram
         for pokemon_id in status_to_remove:
             if pokemon_id in self._pokemon_refs:
                 pokemon = self._pokemon_refs[pokemon_id]
@@ -526,3 +535,46 @@ class EffectManager:
         self.stat_modifiers.clear()
         self.stat_stages.clear()
         self.status_texts.clear()
+
+    def clear_all_effects_for_pokemon(self, pokemon):
+        """
+        Remove TODOS os efeitos (status, confusão, modificadores de stat) de um Pokémon.
+        Usado quando o Pokémon é derrotado.
+        """
+        if not pokemon:
+            return
+
+        pokemon_id = id(pokemon)
+
+        print(f"[EFFECT_MANAGER] Limpando todos os efeitos de {pokemon.name}...")
+
+        # Remove status não-volátil (veneno, queimadura, paralisia, sono, congelamento)
+        if pokemon_id in self.status_effects:
+            status = self.status_effects[pokemon_id]
+            # Remove o status (isso vai chamar status.remove e atualizar animação)
+            status.remove(pokemon, self)
+            del self.status_effects[pokemon_id]
+            print(f"  └─ Status {status.name} removido")
+
+        # Remove confusão
+        if pokemon_id in self.confusion_effects:
+            effect = self.confusion_effects[pokemon_id]
+            effect.remove(pokemon, self)
+            del self.confusion_effects[pokemon_id]
+            print(f"  └─ Confusão removida")
+
+        # Remove modificadores de stat
+        if pokemon_id in self.stat_modifiers:
+            del self.stat_modifiers[pokemon_id]
+            print(f"  └─ Modificadores de stat removidos")
+
+        # Remove estágios de stat
+        if pokemon_id in self.stat_stages:
+            del self.stat_stages[pokemon_id]
+            print(f"  └─ Estágios de stat removidos")
+
+        # Força atualização da animação para estado normal
+        if hasattr(pokemon, 'update_status_animation'):
+            pokemon.update_status_animation()
+
+        print(f"[EFFECT_MANAGER] Todos os efeitos de {pokemon.name} foram limpos!")

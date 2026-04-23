@@ -260,17 +260,12 @@ class BattleSystem:
         # Verifica se o atacante está impossibilitado de agir
         if status and not status.can_attack():
             if status.type == StatusType.PARALYSIS:
-                self.effect_manager.add_status_text(attacker,
-                                                    f"{attacker.name} está paralisado e não consegue se mover!")
                 print(f"[BATTLE] {attacker.name} está paralisado e não consegue se mover!")
             elif status.type == StatusType.SLEEP:
-                self.effect_manager.add_status_text(attacker, f"{attacker.name} está dormindo!")
                 print(f"[BATTLE] {attacker.name} está dormindo e não pode atacar!")
             elif status.type == StatusType.FREEZE:
-                self.effect_manager.add_status_text(attacker, f"{attacker.name} está congelado!")
                 print(f"[BATTLE] {attacker.name} está congelado e não pode atacar!")
             else:
-                self.effect_manager.add_status_text(attacker, f"{attacker.name} não pode atacar!")
                 print(f"[BATTLE] {attacker.name} está {status.name.lower()} e não pode atacar!")
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
@@ -896,7 +891,7 @@ class BattleSystem:
             print(f"[SCREEN] Todos os screens foram limpos!")
 
         # ===== LIMPA MODIFICADORES DE CRÍTICO =====
-        from battle.effects.critical_hit import CriticalHitSystem
+        from src.battle.effects.critical_hit import CriticalHitSystem
         CriticalHitSystem.clear_all_modifiers()
 
     def _update_disable(self, dt: float):
