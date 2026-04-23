@@ -36,6 +36,13 @@ class Player(Entity):
         self.seen_pokemon = set()
         self.caught_pokemon = set()
 
+        # Mystery Gift: códigos já resgatados (completo)
+        # Formato: {"CODIGO": {"pokemon_id": int, "pokemon_name": str, "date": str, "event_name": str}}
+        self.redeemed_codes = {}
+
+        # Histórico completo de gifts resgatados
+        self.mystery_gift_history = []
+
         self.save_manager = SaveManager()
 
 

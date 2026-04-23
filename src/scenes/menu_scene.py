@@ -86,6 +86,8 @@ class MenuScene(BaseScene):
                   (100, 100, 0), (150, 150, 0), self.open_settings, None),
             Button(0.3, 0.4, 0.4, 0.08, "Editor de Fases",
                    (100, 100, 0), (150, 150, 0), self.open_editor, None),
+            Button(0.015, 0.86, 0.15, 0.06, "Mystery Gift",
+                   (100, 50, 100), (150, 80, 150), self.open_mystery_gift, None),
             Button(0.3, 0.7, 0.4, 0.08, "Sair",
                   (100, 0, 0), (150, 0, 0), self.quit_game, None)
         ]
@@ -246,6 +248,12 @@ class MenuScene(BaseScene):
         print("Abrindo editor de fases...")
         from src.scenes.editor.editor_scene import EditorScene
         self.game.current_scene = EditorScene(self.game)
+
+    def open_mystery_gift(self):
+        """Abre a tela de Mystery Gift"""
+        print("[MENU] Abrindo Mystery Gift...")
+        from src.scenes.mystery_gift_scene.mystery_gift_scene import MysteryGiftScene
+        self.game.current_scene = MysteryGiftScene(self.game)
 
     def quit_game(self):
         """Sai do jogo"""

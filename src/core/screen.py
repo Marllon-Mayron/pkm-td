@@ -162,6 +162,12 @@ class ScreenManager:
         )
         self._calculate_viewport()
 
+        # Propaga resize para a cena atual (se existir)
+        from src.core.game import Game
+        if hasattr(self, '_game') and self._game and self._game.current_scene:
+            if hasattr(self._game.current_scene, 'on_resize'):
+                self._game.current_scene.on_resize()
+
     def toggle_fullscreen(self):
         """Alterna entre tela cheia e janela"""
         self.settings.fullscreen = not self.settings.fullscreen

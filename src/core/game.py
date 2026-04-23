@@ -81,8 +81,16 @@ class Game:
             if event.type == pygame.QUIT:
                 self.running = False
 
+
             elif event.type == pygame.VIDEORESIZE:
+
                 self.screen_manager.handle_resize(event.w, event.h)
+
+                # Propaga para a cena atual
+
+                if self.current_scene and hasattr(self.current_scene, 'on_resize'):
+                    self.current_scene.on_resize()
+
                 print(f"Janela redimensionada para: {event.w}x{event.h}")
 
             elif event.type == pygame.KEYDOWN:

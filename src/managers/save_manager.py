@@ -7,6 +7,8 @@ import pickle
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+SAVE_FORMAT_VERSION = "0.1.2"  # Versão do FORMATO do save
+GAME_VERSION_COMPATIBLE = "0.1.2"  # Versão do jogo que usa este formato
 
 class SaveManager:
     """
@@ -41,10 +43,10 @@ class SaveManager:
             print(f"[SAVE] Pasta criada: {self.save_dir}")
 
     def _get_default_save_data(self) -> Dict:
-        """Retorna a estrutura padrão de save"""
+        """Retorna a estrutura padrão de save (versão 0.1.2)"""
         return {
             "meta": {
-                "version": "1.0.0",
+                "version": SAVE_FORMAT_VERSION,  # Versão atualizada (APENAS PARA MUDANÇAS JSON)
                 "last_save": None,
                 "play_time": 0,
                 "save_name": "Novo Jogo"
@@ -53,11 +55,15 @@ class SaveManager:
                 "money": 100,
                 "score": 0,
                 "position": {"x": 0, "y": 0},
-                "team": [],  # Pokémons no time
-                "pc_box": [],  # Pokémons na box
-                "bag": {},  # Itens da mochila {item_id: quantity}
-                "seen_pokemon": [],  # IDs vistos
-                "caught_pokemon": []  # IDs capturados
+                "team": [],
+                "pc_box": [],
+                "bag": {},
+                "seen_pokemon": [],
+                "caught_pokemon": [],
+                "mystery_gift": {
+                    "redeemed_codes": {},
+                    "history": []
+                }
             },
             "game_state": {
                 "current_chapter": 1,
@@ -67,7 +73,6 @@ class SaveManager:
                 "completed_phases": [],
                 "stars": {}
             },
-            # Configurações de áudio e vídeo
             "settings": {
                 "sfx_volume": 0.7,
                 "music_volume": 0.5,
@@ -235,22 +240,63 @@ class SaveManager:
     def save_game(self, player, game_state=None, save_name="save", slot=1) -> bool:
         """
         Salva o estado completo do jogo
+        CORRIGIDO: SEMPRE carrega o save existente primeiro
         """
-        # Atualiza o slot atual
+        import copy
+        import os
+
+        # Define o slot atual
         self.current_save_file = slot
 
-        # Atualiza os dados do jogador
-        self.save_data["player"]["money"] = player.money
-        self.save_data["player"]["score"] = player.score
-        self.save_data["player"]["position"] = {"x": player.x, "y": player.y}
+        # ===== SEMPRE TENTA CARREGAR O SAVE EXISTENTE PRIMEIRO =====
+        filename = f"save_{slot}.json"
+        filepath = os.path.join(self.save_dir, filename)
 
-        # IMPORTANTE: Usa unique_id como identificador único
+        existing_data = None
+
+        # Tenta carregar o save existente
+        if os.path.exists(filepath):
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+                print(f"[SAVE] Save existente carregado de {filepath}")
+            except Exception as e:
+                print(f"[SAVE] Erro ao carregar save existente: {e}")
+                existing_data = None
+
+        # Se não existe save, cria novo
+        if not existing_data:
+            existing_data = self._get_default_save_data()
+            print(f"[SAVE] Criando novo save para slot {slot}")
+
+        # Mantém metadados importantes
+        existing_data["meta"]["last_save"] = datetime.now().isoformat()
+        existing_data["meta"]["save_name"] = save_name
+
+        # ===== ATUALIZA DADOS DO JOGADOR (PRESERVANDO ESTRUTURA) =====
+        existing_data["player"]["money"] = player.money
+        existing_data["player"]["score"] = player.score
+        existing_data["player"]["position"] = {"x": player.x, "y": player.y}
+
+        # ===== PRESERVA A BAG (itens da mochila) =====
+        existing_data["player"]["bag"] = dict(player.bag.items)
+
+        # ===== PRESERVA POKÉDEX =====
+        existing_data["player"]["seen_pokemon"] = list(player.seen_pokemon)
+        existing_data["player"]["caught_pokemon"] = list(player.caught_pokemon)
+
+        # ===== PRESERVA MYSTERY GIFT =====
+        existing_data["player"]["mystery_gift"] = {
+            "redeemed_codes": getattr(player, 'redeemed_codes', {}),
+            "history": getattr(player, 'mystery_gift_history', [])
+        }
+
+        # ===== SALVA POKÉMONS (PRESERVANDO OS EXISTENTES) =====
         box_ids = set()
         unique_box = []
 
         # Primeiro, adiciona todos os Pokémon da box atual
         for p in player.pc_box:
-            # Usa unique_id como identificador único
             if p.unique_id not in box_ids:
                 box_ids.add(p.unique_id)
                 unique_box.append(p)
@@ -262,47 +308,49 @@ class SaveManager:
                 unique_box.append(p)
                 print(f"[SAVE] Pokémon {p.name} do time não estava na box, adicionando...")
 
-        # Agora salva a box completa (todos os Pokémon)
-        self.save_data["player"]["pc_box"] = [
+        # Salva a box completa
+        existing_data["player"]["pc_box"] = [
             self._pokemon_to_dict(p) for p in unique_box
         ]
 
         # Salva o time (apenas as referências)
-        self.save_data["player"]["team"] = [
+        existing_data["player"]["team"] = [
             self._pokemon_to_dict(p) for p in player.team
         ]
 
-        # Salva a bag
-        self.save_data["player"]["bag"] = dict(player.bag.items)
-
-        # Salva Pokédex
-        self.save_data["player"]["seen_pokemon"] = list(player.seen_pokemon)
-        self.save_data["player"]["caught_pokemon"] = list(player.caught_pokemon)
-
-        # Salva estado do jogo
+        # ===== ATUALIZA ESTADO DO JOGO =====
         if game_state:
-            self.save_data["game_state"].update(game_state)
+            for key, value in game_state.items():
+                existing_data["game_state"][key] = value
 
-        # Atualiza metadados
-        self.save_data["meta"]["last_save"] = datetime.now().isoformat()
-        self.save_data["meta"]["save_name"] = save_name
+        # ===== SALVA CONFIGURAÇÕES ATUAIS =====
+        from src.config.settings import settings
+        existing_data["settings"] = {
+            "sfx_volume": settings.sfx_volume,
+            "music_volume": settings.music_volume,
+            "music_enabled": settings.music_enabled,
+            "sfx_enabled": settings.sfx_enabled,
+            "fullscreen": settings.fullscreen,
+            "vsync": settings.vsync,
+            "target_fps": settings.target_fps
+        }
 
-        # Define o nome do arquivo
-        filename = f"save_{slot}.json"
-        filepath = os.path.join(self.save_dir, filename)
+        # Atualiza o save_data interno
+        self.save_data = existing_data
 
-        # Salva em JSON
+        # Salva em arquivo
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(self.save_data, f, indent=2, ensure_ascii=False)
             print(f"[SAVE] Jogo salvo em {filepath}")
             print(f"[SAVE] Box: {len(unique_box)} Pokémon | Time: {len(player.team)} Pokémon")
             print(f"[SAVE] Itens salvos: {self.save_data['player']['bag']}")
-            print(
-                f"[SAVE] Configurações salvas: Volume Música={self.save_data['settings']['music_volume']}, SFX={self.save_data['settings']['sfx_volume']}")
+            print(f"[SAVE] Mystery Gift: {len(getattr(player, 'redeemed_codes', {}))} códigos resgatados")
             return True
         except Exception as e:
             print(f"[ERRO] Falha ao salvar: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def save_settings(self, settings_obj) -> bool:
@@ -338,13 +386,7 @@ class SaveManager:
     def load_game(self, player, slot=1) -> bool:
         """
         Carrega um save e aplica ao jogador
-
-        Args:
-            player: Objeto Player para aplicar os dados
-            slot: Número do slot (1-3)
-
-        Returns:
-            bool: True se carregou com sucesso
+        COM SUPORTE A MIGRAÇÃO DE VERSÕES ANTIGAS
         """
         filename = f"save_{slot}.json"
         filepath = os.path.join(self.save_dir, filename)
@@ -355,12 +397,22 @@ class SaveManager:
 
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
-                self.save_data = json.load(f)
+                raw_data = json.load(f)
+
+            # ===== VERIFICA VERSÃO E MIGRA SE NECESSÁRIO =====
+            save_version = raw_data.get("meta", {}).get("version", "0.1.1")
+            current_version = SAVE_FORMAT_VERSION
+
+            if save_version != current_version:
+                print(f"[SAVE] Save versão {save_version} - será migrado para {current_version}")
+                raw_data = self.migrate_save_data(raw_data, save_version)
+
+            self.save_data = raw_data
 
             # Define o slot atual
             self.current_save_file = slot
 
-            # Aplica dados ao jogador
+            # Aplica dados ao jogador (MESMO CÓDIGO QUE VOCÊ JÁ TEM)
             player_data = self.save_data["player"]
 
             # Dados básicos
@@ -369,55 +421,57 @@ class SaveManager:
             player.x = player_data["position"]["x"]
             player.y = player_data["position"]["y"]
 
-            # CARREGA A BAG (itens da mochila)
+            # Carrega a bag
             player.bag.items = player_data.get("bag", {})
-            player.bag._update_filtered_items()
+            if hasattr(player.bag, '_update_filtered_items'):
+                player.bag._update_filtered_items()
 
-            # Carrega Pokémons
+            # Carrega Pokémons (preservando unique_id)
             player.pc_box = []
             for pokemon_data in player_data["pc_box"]:
                 pokemon = self._dict_to_pokemon(pokemon_data)
                 player.pc_box.append(pokemon)
 
-            # Carrega o time - AGORA usando unique_id para match
+            # Carrega o time
             player.team = []
             for pokemon_data in player_data["team"]:
                 # Encontra o Pokémon na box usando unique_id
+                found = False
                 for p in player.pc_box:
                     if p.unique_id == pokemon_data.get("unique_id"):
                         player.team.append(p)
                         p.is_in_team = True
+                        found = True
                         break
-                else:
-                    # Fallback: se não encontrar por unique_id, tenta pelos atributos
-                    for p in player.pc_box:
-                        if (p.id == pokemon_data["id"] and
-                                p.level == pokemon_data["level"] and
-                                p.is_shiny == pokemon_data["is_shiny"] and
-                                p not in player.team):
-                            player.team.append(p)
-                            p.is_in_team = True
-                            break
+
+                if not found:
+                    # Fallback: cria uma nova instância
+                    pokemon = self._dict_to_pokemon(pokemon_data)
+                    player.team.append(pokemon)
+                    pokemon.is_in_team = True
+                    player.pc_box.append(pokemon)
 
             # Carrega Pokédex
-            player.seen_pokemon = set(player_data["seen_pokemon"])
-            player.caught_pokemon = set(player_data["caught_pokemon"])
+            player.seen_pokemon = set(player_data.get("seen_pokemon", []))
+            player.caught_pokemon = set(player_data.get("caught_pokemon", []))
 
-            # Carrega configurações do save
-            settings_data = self.save_data.get("settings", {})
-            if settings_data:
-                print(
-                    f"[SAVE] Configurações carregadas do save: Música={settings_data.get('music_volume', 0.5)}, SFX={settings_data.get('sfx_volume', 0.7)}")
-            else:
-                print("[SAVE] Nenhuma configuração encontrada no save, usando padrões")
+            # Carrega Mystery Gift (novo formato)
+            mg_data = player_data.get("mystery_gift", {})
+            player.redeemed_codes = mg_data.get("redeemed_codes", {})
+            player.mystery_gift_history = mg_data.get("history", [])
 
             print(f"[SAVE] Jogo carregado de {filepath}")
+            print(f"[SAVE] Versão: {self.save_data['meta']['version']}")
             print(f"[SAVE] Itens carregados: {player.bag.items}")
             print(f"[SAVE] Pokémons: {len(player.pc_box)} na box, {len(player.team)} no time")
+            print(f"[SAVE] Mystery Gift: {len(player.redeemed_codes)} códigos resgatados")
+
             return True
 
         except Exception as e:
             print(f"[ERRO] Falha ao carregar: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def load_settings(self, settings_obj) -> bool:
@@ -446,6 +500,79 @@ class SaveManager:
         print(
             f"[SAVE] Configurações carregadas: Música={settings_obj.music_volume} ({'ON' if settings_obj.music_enabled else 'OFF'}), SFX={settings_obj.sfx_volume} ({'ON' if settings_obj.sfx_enabled else 'OFF'})")
         return True
+
+    def migrate_save_data(self, save_data: Dict, version: str) -> Dict:
+        """
+        Migra dados de save de versões antigas para o formato atual
+        """
+        import copy
+        migrated = copy.deepcopy(save_data)
+
+        current_version = SAVE_FORMAT_VERSION
+
+        print(f"[MIGRATE] Migrando save da versão {version} para {current_version}")
+
+        # ===== MIGRAÇÃO DE 0.1.1 (ou sem versão) para 0.1.2 =====
+        if version in ["0.1.1", "0.1.0", "0.0.0"]:
+            # Adiciona estrutura de Mystery Gift se não existir
+            if "mystery_gift" not in migrated.get("player", {}):
+                migrated["player"]["mystery_gift"] = {
+                    "redeemed_codes": {},
+                    "history": []
+                }
+                print("[MIGRATE] Estrutura Mystery Gift adicionada")
+
+            # Se existia redeemed_codes antigo (string), converte
+            if "redeemed_codes" in migrated.get("player", {}):
+                old_codes = migrated["player"]["redeemed_codes"]
+                if isinstance(old_codes, dict):
+                    new_codes = {}
+                    for code, value in old_codes.items():
+                        if isinstance(value, str):
+                            new_codes[code] = {
+                                "pokemon_id": 0,
+                                "pokemon_name": "Pokémon Antigo",
+                                "date": value,
+                                "timestamp": 0,
+                                "event_name": "Evento Anterior",
+                                "is_shiny": False
+                            }
+                        else:
+                            new_codes[code] = value
+                    migrated["player"]["mystery_gift"]["redeemed_codes"] = new_codes
+                    print(f"[MIGRATE] Convertidos {len(new_codes)} códigos resgatados antigos")
+
+                # Remove o campo antigo
+                del migrated["player"]["redeemed_codes"]
+
+            # Garante history existe
+            if "history" not in migrated["player"]["mystery_gift"]:
+                migrated["player"]["mystery_gift"]["history"] = []
+
+            # Atualiza versão
+            migrated["meta"]["version"] = current_version
+
+        # ===== FUTURAS MIGRAÇÕES =====
+        # if version == "0.1.2" and current_version == "0.1.3":
+        #     # migra para 0.1.3
+        #     pass
+
+        # ===== VALIDAÇÃO PÓS-MIGRAÇÃO =====
+        # Garante campos obrigatórios
+        if "player" not in migrated:
+            migrated["player"] = {}
+
+        if "mystery_gift" not in migrated["player"]:
+            migrated["player"]["mystery_gift"] = {"redeemed_codes": {}, "history": []}
+
+        if "seen_pokemon" not in migrated["player"]:
+            migrated["player"]["seen_pokemon"] = []
+
+        if "caught_pokemon" not in migrated["player"]:
+            migrated["player"]["caught_pokemon"] = []
+
+        print(f"[MIGRATE] Migração concluída! Versão: {migrated['meta']['version']}")
+        return migrated
 
     def delete_save(self, slot=1):
         """Deleta um save específico"""
