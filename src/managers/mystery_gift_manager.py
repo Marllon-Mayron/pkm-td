@@ -7,6 +7,7 @@ Com suporte para histórico e códigos inválidos
 """
 
 from datetime import datetime
+from src.utils.crypto_utils import mystery_crypto
 
 
 class MysteryGiftManager:
@@ -25,15 +26,22 @@ class MysteryGiftManager:
             self.player.mystery_gift_history = []
             print("[MYSTERY_GIFT] Histórico de gifts inicializado")
 
-    def can_redeem_code(self, code):
+    def can_redeem_code(self, raw_code):
         """
         Verifica se o código pode ser resgatado
+        raw_code é o código que o jogador DIGITOU (ex: 0BR1G4D0P0RJ0G4R)
         Retorna: (bool, str, dict) -> (pode_resgatar, mensagem, info_codigo)
         """
-        from src.data.mystery_gift_data import get_code_info, is_valid_code, is_code_invalid
+        from src.data.mystery_gift_data import get_code_info
 
-        # Verifica se o código existe
-        code_info = get_code_info(code)
+        # ===== CRIPTOGRAFA O CÓDIGO QUE O JOGADOR DIGITOU =====
+        encrypted_code = mystery_crypto.encrypt_code(raw_code, length=8)
+
+        print(f"[MYSTERY_GIFT] Código digitado: {raw_code}")
+        print(f"[MYSTERY_GIFT] Código criptografado: {encrypted_code}")
+
+        # ===== BUSCA O CÓDIGO CRIPTOGRAFADO NO BANCO =====
+        code_info = get_code_info(encrypted_code)
         if not code_info:
             return False, "Código inválido! Este código não existe.", None
 
@@ -42,24 +50,26 @@ class MysteryGiftManager:
             event_name = code_info.get("event_name", "Evento")
             return False, f"Este evento ({event_name}) já foi encerrado! Código não está mais disponível.", code_info
 
-        # Verifica se já foi resgatado neste save
-        code_key = code.upper()
-        if code_key in self.player.redeemed_codes:
-            redeemed_date = self.player.redeemed_codes[code_key]["date"]
+        # Verifica se já foi resgatado neste save (usa o código criptografado como chave)
+        if encrypted_code in self.player.redeemed_codes:
+            redeemed_date = self.player.redeemed_codes[encrypted_code]["date"]
             return False, f"Você já resgatou este código em {redeemed_date}", code_info
 
         return True, "Código válido!", code_info
 
-    def redeem_code(self, code):
+    def redeem_code(self, raw_code):
         """
         Resgata um código e adiciona o Pokémon ao time/box
+        raw_code é o código que o jogador DIGITOU (ex: 0BR1G4D0P0RJ0G4R)
         Retorna: (bool, str, Pokemon) -> (sucesso, mensagem, pokemon)
         """
-        from src.data.mystery_gift_data import get_code_info
         from src.entities.pokemon import Pokemon
 
-        # Verifica se pode resgatar
-        can_redeem, message, code_info = self.can_redeem_code(code)
+        # ===== CRIPTOGRAFA O CÓDIGO QUE O JOGADOR DIGITOU =====
+        encrypted_code = mystery_crypto.encrypt_code(raw_code, length=8)
+
+        # Verifica se pode resgatar (já usa o código criptografado)
+        can_redeem, message, code_info = self.can_redeem_code(raw_code)
         if not can_redeem:
             return False, message, None
 
@@ -69,13 +79,15 @@ class MysteryGiftManager:
         is_shiny = code_info.get("is_shiny", False)
         event_name = code_info.get("event_name", "Evento Especial")
 
+        # Recarrega o save antes de modificar
+        current_slot = getattr(self.player.save_manager, 'current_save_file', 1)
+        if current_slot:
+            self.player.load_game(current_slot)
+
         # Cria o Pokémon nível 5
-        import random
-        x = random.randint(100, 500)
-        y = random.randint(100, 500)
 
         new_pokemon = Pokemon(
-            x, y,
+            0, 0,
             pokemon_id=pokemon_id,
             level=5,
             is_wild=False,
@@ -96,22 +108,23 @@ class MysteryGiftManager:
             self.player.add_to_box(new_pokemon)
             message = f"{new_pokemon.name} foi adicionado à sua PC Box!"
 
-        # Registra o código como resgatado com informações completas
+        # Registra o código como resgatado (USA O CÓDIGO CRIPTOGRAFADO)
         current_time = datetime.now()
-        code_key = code.upper()
 
-        self.player.redeemed_codes[code_key] = {
+        self.player.redeemed_codes[encrypted_code] = {
             "pokemon_id": pokemon_id,
             "pokemon_name": pokemon_name,
             "date": current_time.strftime("%d/%m/%Y %H:%M"),
             "timestamp": current_time.timestamp(),
             "event_name": event_name,
-            "is_shiny": is_shiny
+            "is_shiny": is_shiny,
+            "raw_code": raw_code
         }
 
         # Adiciona ao histórico
         history_entry = {
-            "code": code_key,
+            "code": encrypted_code,
+            "raw_code": raw_code,
             "pokemon_id": pokemon_id,
             "pokemon_name": pokemon_name,
             "pokemon_level": 5,
@@ -130,7 +143,8 @@ class MysteryGiftManager:
         # Salva automaticamente após o resgate
         self.player.save_game()
 
-        print(f"[MYSTERY_GIFT] Código {code} resgatado! Pokémon: {new_pokemon.name}")
+        print(f"[MYSTERY_GIFT] Código {raw_code} -> {encrypted_code} resgatado!")
+        print(f"[MYSTERY_GIFT] Pokémon: {new_pokemon.name}")
         print(f"[MYSTERY_GIFT] Histórico atualizado. Total de gifts: {len(self.player.mystery_gift_history)}")
 
         return True, message, new_pokemon

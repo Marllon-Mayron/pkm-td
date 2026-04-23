@@ -9,6 +9,7 @@ import random
 from src.scenes.base_scene import BaseScene
 from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 from src.scenes.settings_scene.settings_scene import SettingsScene
+from ui.toast_renderer import toast_info
 
 
 class Button:
@@ -234,8 +235,8 @@ class MenuScene(BaseScene):
 
             # Carrega as configurações do save
             from src.config.progress import progress_manager
-            progress_manager._load_settings_from_save()
 
+            progress_manager._load_settings_from_save()
             self.game.current_scene = PhaseSelectScene(self.game)
 
     def open_settings(self):

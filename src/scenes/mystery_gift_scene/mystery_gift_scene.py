@@ -343,7 +343,7 @@ class MysteryGiftScene(BaseScene):
 
         # Container
         container_width = 500
-        container_height = 250
+        container_height = 280
         container_x = viewport_x + (viewport_w - container_width) // 2
         container_y = viewport_y + (viewport_h - container_height) // 2 - 50
 
@@ -352,23 +352,20 @@ class MysteryGiftScene(BaseScene):
         pygame.draw.rect(screen, (40, 40, 60), container_rect)
         pygame.draw.rect(screen, (255, 200, 0), container_rect, 3, border_radius=15)
 
-
         # Título
         title_font = self._get_font(28, bold=True)
         title_text = title_font.render("ACESSO BLOQUEADO", True, (255, 200, 100))
         title_x = container_x + (container_width - title_text.get_width()) // 2
-        title_y = container_y + 30
+        title_y = container_y + 20
         screen.blit(title_text, (title_x, title_y))
 
         # Mensagem
-        msg_font = self._get_font(18)
+        msg_font = self._get_font(20)
         lines = [
             "Você precisa iniciar um jogo primeiro!",
             "",
             "Volte ao menu principal e selecione:",
             "INICIAR JOGO",
-            "",
-            "Escolha seu Pokémon inicial e depois volte aqui para resgatar códigos!"
         ]
 
         line_y = title_y + 50
@@ -379,8 +376,7 @@ class MysteryGiftScene(BaseScene):
                 msg_text = msg_font.render("", True, (200, 200, 220))
             msg_x = container_x + (container_width - msg_text.get_width()) // 2
             screen.blit(msg_text, (msg_x, line_y))
-            line_y += 25
-
+            line_y += 35
 
     def _render_title(self, screen):
         """Renderiza o título"""
@@ -464,7 +460,7 @@ class MysteryGiftScene(BaseScene):
         screen.blit(overlay, (viewport_x, viewport_y))
 
         container_width = 450
-        container_height = 400
+        container_height = 420
         container_x = viewport_x + (viewport_w - container_width) // 2
         container_y = viewport_y + (viewport_h - container_height) // 2 - 50
 
@@ -475,13 +471,13 @@ class MysteryGiftScene(BaseScene):
         success_font = self._get_font(32, bold=True)
         success_text = success_font.render("RESGATE REALIZADO!", True, (255, 215, 0))
         text_x = container_x + (container_width - success_text.get_width()) // 2
-        text_y = container_y + 30
+        text_y = container_y + 20
         screen.blit(success_text, (text_x, text_y))
 
-        msg_font = self._get_font(20)
+        msg_font = self._get_font(18)
         msg_text = msg_font.render(self.success_message, True, (200, 255, 200))
         msg_x = container_x + (container_width - msg_text.get_width()) // 2
-        msg_y = text_y + 50
+        msg_y = text_y + 45
         screen.blit(msg_text, (msg_x, msg_y))
 
         if self.redeemed_pokemon:
@@ -495,11 +491,11 @@ class MysteryGiftScene(BaseScene):
                 scaled_sprite = pygame.transform.scale(sprite, (sprite_width, sprite_height))
 
                 sprite_x = container_x + (container_width - scaled_sprite.get_width()) // 2
-                sprite_y = container_y + 120
+                sprite_y = container_y + 100
                 screen.blit(scaled_sprite, (sprite_x, sprite_y))
 
                 name_font = self._get_font(24, bold=True)
-                shiny_text = "SHINY" if self.redeemed_pokemon.is_shiny else ""
+                shiny_text = " SHINY" if self.redeemed_pokemon.is_shiny else ""
                 name_text = name_font.render(f"{self.redeemed_pokemon.name} Lv.5{shiny_text}",
                                              True, (255, 255, 255))
                 name_x = container_x + (container_width - name_text.get_width()) // 2
@@ -516,7 +512,7 @@ class MysteryGiftScene(BaseScene):
         info_font = self._get_font(14)
         info_text = info_font.render("Voltando ao menu em alguns segundos...", True, (150, 150, 150))
         info_x = container_x + (container_width - info_text.get_width()) // 2
-        info_y = container_y + container_height - 40
+        info_y = container_y + container_height - 35
         screen.blit(info_text, (info_x, info_y))
 
         for particle in self.particles:
@@ -552,7 +548,7 @@ class MysteryGiftScene(BaseScene):
             error_text = error_font.render("ERRO!", True, (255, 100, 100))
 
         text_x = container_x + (container_width - error_text.get_width()) // 2
-        text_y = container_y + 30
+        text_y = container_y + 25
         screen.blit(error_text, (text_x, text_y))
 
         msg_font = self._get_font(18)

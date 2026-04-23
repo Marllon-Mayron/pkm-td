@@ -7,21 +7,11 @@ Suporte para invalidação de códigos (eventos passados)
 """
 
 # Estrutura dos códigos disponíveis
-# Formato: "CODIGO": {"pokemon_id": int, "pokemon_name": str, "description": str, "invalid": bool}
 MYSTERY_GIFT_CODES = {
-    "TESTE123": {
-        "pokemon_id": 1,  # Bulbasaur
-        "pokemon_name": "Bulbasaur",
-        "description": "Pokémon Inicial Especial!",
-        "is_shiny": True,
-        "invalid": False,  # False = disponível, True = evento encerrado
-        "event_name": "Lançamento do sistema de MYSTERY GIFT",
-        "event_date": "2025-04-23"
-    },
-    "TESTE321": {
-        "pokemon_id": 4,  # Charmander
-        "pokemon_name": "Charmander",
-        "description": "Lançamento do sistema de MYSTERY GIFT",
+    "IJOHUFFZ": {  # ← Este é o código CRIPTOGRAFADO
+        "pokemon_id": 133,
+        "pokemon_name": "Eevee",
+        "description": "Eevee Especial Brilhante!",
         "is_shiny": True,
         "invalid": False,
         "event_name": "Lançamento do sistema de MYSTERY GIFT",
@@ -33,9 +23,7 @@ MYSTERY_GIFT_CODES = {
 def get_code_info(code):
     """Retorna informações do código ou None se inválido/não existe"""
     code_info = MYSTERY_GIFT_CODES.get(code.upper())
-
     if code_info:
-        # Retorna uma cópia para não modificar o original
         return code_info.copy()
     return None
 
