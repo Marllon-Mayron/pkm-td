@@ -5,7 +5,7 @@ import uuid
 import os
 import pickle
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Dict
 
 SAVE_FORMAT_VERSION = "0.1.2"  # Versão do FORMATO do save
 GAME_VERSION_COMPATIBLE = "0.1.2"  # Versão do jogo que usa este formato
@@ -242,7 +242,6 @@ class SaveManager:
         Salva o estado completo do jogo
         CORRIGIDO: SEMPRE carrega o save existente primeiro
         """
-        import copy
         import os
 
         # Define o slot atual
@@ -386,7 +385,6 @@ class SaveManager:
     def load_game(self, player, slot=1) -> bool:
         """
         Carrega um save e aplica ao jogador
-        COM SUPORTE A MIGRAÇÃO DE VERSÕES ANTIGAS
         """
         filename = f"save_{slot}.json"
         filepath = os.path.join(self.save_dir, filename)
@@ -412,7 +410,7 @@ class SaveManager:
             # Define o slot atual
             self.current_save_file = slot
 
-            # Aplica dados ao jogador (MESMO CÓDIGO QUE VOCÊ JÁ TEM)
+            # Aplica dados ao jogador
             player_data = self.save_data["player"]
 
             # Dados básicos
@@ -426,7 +424,7 @@ class SaveManager:
             if hasattr(player.bag, '_update_filtered_items'):
                 player.bag._update_filtered_items()
 
-            # Carrega Pokémons (preservando unique_id)
+            # Carrega Pokémons
             player.pc_box = []
             for pokemon_data in player_data["pc_box"]:
                 pokemon = self._dict_to_pokemon(pokemon_data)
@@ -435,7 +433,6 @@ class SaveManager:
             # Carrega o time
             player.team = []
             for pokemon_data in player_data["team"]:
-                # Encontra o Pokémon na box usando unique_id
                 found = False
                 for p in player.pc_box:
                     if p.unique_id == pokemon_data.get("unique_id"):
@@ -443,9 +440,7 @@ class SaveManager:
                         p.is_in_team = True
                         found = True
                         break
-
                 if not found:
-                    # Fallback: cria uma nova instância
                     pokemon = self._dict_to_pokemon(pokemon_data)
                     player.team.append(pokemon)
                     pokemon.is_in_team = True
@@ -455,17 +450,38 @@ class SaveManager:
             player.seen_pokemon = set(player_data.get("seen_pokemon", []))
             player.caught_pokemon = set(player_data.get("caught_pokemon", []))
 
-            # Carrega Mystery Gift (novo formato)
+            # Carrega Mystery Gift
             mg_data = player_data.get("mystery_gift", {})
             player.redeemed_codes = mg_data.get("redeemed_codes", {})
             player.mystery_gift_history = mg_data.get("history", [])
 
-            print(f"[SAVE] Jogo carregado de {filepath}")
-            print(f"[SAVE] Versão: {self.save_data['meta']['version']}")
-            print(f"[SAVE] Itens carregados: {player.bag.items}")
-            print(f"[SAVE] Pokémons: {len(player.pc_box)} na box, {len(player.team)} no time")
-            print(f"[SAVE] Mystery Gift: {len(player.redeemed_codes)} códigos resgatados")
+            # ===== CARREGA E APLICA AS CONFIGURAÇÕES DE ÁUDIO DO SAVE =====
+            settings_data = self.save_data.get("settings", {})
+            if settings_data:
+                from src.config.settings import settings
+                from src.managers.sounds.sound_manager import sound_manager
 
+                # Aplica as configurações salvas ao objeto settings
+                settings.sfx_volume = settings_data.get("sfx_volume", 0.7)
+                settings.music_volume = settings_data.get("music_volume", 0.5)
+                settings.music_enabled = settings_data.get("music_enabled", True)
+                settings.sfx_enabled = settings_data.get("sfx_enabled", True)
+                settings.fullscreen = settings_data.get("fullscreen", False)
+                settings.vsync = settings_data.get("vsync", True)
+                settings.target_fps = settings_data.get("target_fps", 60)
+
+                # APLICA IMEDIATAMENTE AO SOUND_MANAGER
+                if settings.music_enabled:
+                    sound_manager.set_music_volume(settings.music_volume)
+                else:
+                    sound_manager.set_music_volume(0)
+
+                if settings.sfx_enabled:
+                    sound_manager.set_sfx_volume(settings.sfx_volume)
+                else:
+                    sound_manager.set_sfx_volume(0)
+
+            print(f"[SAVE] Jogo carregado de {filepath}")
             return True
 
         except Exception as e:

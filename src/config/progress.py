@@ -5,13 +5,12 @@ Sistema de progresso do jogador - Integrado com SaveManager
 """
 import json
 import os
-from pathlib import Path
 from typing import Dict, List, Optional
 
 
 class ProgressManager:
     def __init__(self):
-        from src.managers.save_manager import save_manager
+        from managers.save_manager import save_manager
         from src.config.settings import settings
 
         self.save_manager = save_manager
@@ -60,7 +59,7 @@ class ProgressManager:
                 self.settings.target_fps = settings_data.get("target_fps", 60)
 
                 # Aplica volumes no sound_manager
-                from src.managers.sound_manager import sound_manager
+                from managers.sounds.sound_manager import sound_manager
                 if self.settings.sfx_enabled:
                     sound_manager.set_sfx_volume(self.settings.sfx_volume)
                 else:

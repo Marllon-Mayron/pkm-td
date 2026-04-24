@@ -1,10 +1,9 @@
 # src/entities/player.py
 import pygame
 from src.entities.base import Entity
-from src.entities.pokemon import Pokemon
 from src.data.pokedex import Pokedex
 from src.managers.bag_manager import BagManager
-from src.managers.save_manager import SaveManager
+from managers.save_manager import SaveManager
 
 
 class Player(Entity):
@@ -156,7 +155,7 @@ class Player(Entity):
 
     def save_game(self, slot=1):
         """Salva o jogo atual"""
-        from src.managers.save_manager import save_manager
+        from managers.save_manager import save_manager
 
         # Você pode passar o estado atual do jogo
         game_state = {
@@ -168,7 +167,7 @@ class Player(Entity):
 
     def load_game(self, slot=1):
         """Carrega um jogo"""
-        from src.managers.save_manager import save_manager
+        from managers.save_manager import save_manager
         return save_manager.load_game(self, slot)
 
     # Adicione este método para salvar automaticamente em momentos chave

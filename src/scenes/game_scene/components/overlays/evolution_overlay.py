@@ -165,7 +165,7 @@ class EvolutionOverlay(BaseOverlay):
 
     def _play_evolution_sound(self):
         try:
-            from src.managers.sound_manager import sound_manager
+            from managers.sounds.sound_manager import sound_manager
             sound_manager.play_evolution_sound()
         except:
             pass

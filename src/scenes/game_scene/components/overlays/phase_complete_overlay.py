@@ -48,12 +48,12 @@ class PhaseCompleteOverlay(BaseOverlay):
 
     def _play_victory_music(self):
         """Toca a música de vitória"""
-        from src.managers.sound_manager import sound_manager
+        from managers.sounds.sound_manager import sound_manager
         sound_manager.play_victory_music()
 
     def _stop_music(self):
         """Para a música de vitória"""
-        from src.managers.sound_manager import sound_manager
+        from managers.sounds.sound_manager import sound_manager
         sound_manager.stop_music(fade_ms=300)
 
     def render(self, screen):

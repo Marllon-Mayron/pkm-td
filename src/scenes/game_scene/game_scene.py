@@ -8,7 +8,7 @@ from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
 from src.config.settings import settings
 from src.core.performance_monitor import perf_monitor
-from src.managers.sound_manager import SoundEffect, sound_manager
+from managers.sounds.sound_manager import SoundEffect, sound_manager
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
 from src.scenes.game_scene.components.managers.overlay_manager import OverlayType, OverlayManager
@@ -26,7 +26,7 @@ from src.scenes.game_scene.components.renderer.path_renderer import PathRenderer
 from src.scenes.game_scene.components.renderer.pokemon_spot_renderer import PokemonSpotRenderer # NOVO
 from src.scenes.game_scene.components.renderer.target_item_renderer import TargetItemRenderer
 from src.managers.notification_manager import notification_manager
-from src.ui.toast_renderer import toast_info, toast_success, toast_warning, toast_error, toast_achievement, toast_battle
+from src.ui.toast_renderer import toast_info, toast_warning, toast_battle
 
 class GameScene(BaseScene):
     def __init__(self, game, chapter_id=1, phase_number=1):
@@ -676,9 +676,12 @@ class GameScene(BaseScene):
         """Inicia a música de batalha aleatória"""
         if not self.music_playing:
             if hasattr(settings, 'music_enabled') and settings.music_enabled:
-                success = sound_manager.play_random_battle_music()
-                if success:
-                    self.music_playing = True
+                sound_manager.play_random_battle_music()
+
+                self.music_playing = True
+                print("[GAME] Música de batalha iniciada")
+            else:
+                print("[GAME] Música desabilitada nas configurações")
 
     def _stop_battle_music(self, fade_ms=1000):
         """Para a música de batalha"""

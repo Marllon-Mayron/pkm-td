@@ -335,7 +335,7 @@ class BattleSystem:
         if move.category == "status":
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")
 
-            from src.managers.move_sound_manager import move_sound_manager
+            from managers.sounds.move_sound_manager import move_sound_manager
             move_sound_manager.play_attack_sound(move.sound_name)
 
             move.current_pp -= 1
@@ -406,7 +406,7 @@ class BattleSystem:
         elif move.category == "physical" and move.power > 0:
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Ataque físico)")
 
-            from src.managers.move_sound_manager import move_sound_manager
+            from managers.sounds.move_sound_manager import move_sound_manager
             move_sound_manager.play_attack_sound(move.sound_name)
 
             move.current_pp -= 1
@@ -468,7 +468,7 @@ class BattleSystem:
             return True
 
         # Toca som
-        from src.managers.move_sound_manager import move_sound_manager
+        from managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound(move.sound_name)
 
         # Aplica o efeito (que vai causar o dano)
@@ -512,7 +512,7 @@ class BattleSystem:
             print(f"[STRUGGLE] {attacker.name} causou {damage_result['damage']} de dano em {target.name}!")
 
             # Toca som de impacto
-            from src.managers.move_sound_manager import move_sound_manager
+            from managers.sounds.move_sound_manager import move_sound_manager
             move_sound_manager.play_hit_sound("struggle")
 
             # Toca animação de hurt no alvo
@@ -669,7 +669,7 @@ class BattleSystem:
         )
         self.projectiles.append(projectile)
 
-        from src.managers.move_sound_manager import move_sound_manager
+        from managers.sounds.move_sound_manager import move_sound_manager
 
         move_sound_manager.play_attack_sound(move.sound_name)
         print(f"[SOM] {move.name} - som do atacante: {move.sound_name}")
@@ -684,7 +684,7 @@ class BattleSystem:
             self.effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
             return
 
-        from src.managers.move_sound_manager import move_sound_manager
+        from managers.sounds.move_sound_manager import move_sound_manager
 
         # Toca som do ataque (físico)
         if move.category == "physical":
@@ -749,7 +749,7 @@ class BattleSystem:
             attacker.play_hurt_animation()
 
         # Toca som de dano
-        from src.managers.move_sound_manager import move_sound_manager
+        from managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("hurt")
 
     def _apply_confusion_self_damage(self, attacker, confusion):
@@ -757,7 +757,7 @@ class BattleSystem:
         damage = confusion.calculate_self_damage(attacker)
 
         # Toca som de dano
-        from src.managers.move_sound_manager import move_sound_manager
+        from managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("hurt")
 
         # Aplica dano (atacante é a fonte do dano para si mesmo)
