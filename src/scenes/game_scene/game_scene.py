@@ -6,7 +6,6 @@ import pygame
 
 from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
-from src.config.settings import settings
 from src.core.performance_monitor import perf_monitor
 from src.managers.sounds.sound_manager import SoundEffect, sound_manager
 from src.scenes.base_scene import BaseScene
@@ -85,7 +84,6 @@ class GameScene(BaseScene):
         # Controle de música
         self.music_playing = False
         self.current_music = None
-        self._start_battle_music()
 
         # Inicializa câmera
         self.game.initialize_camera(self.world_width, self.world_height)
@@ -136,6 +134,9 @@ class GameScene(BaseScene):
         """Inicia o jogo"""
         # ===== RESTAURA COMPLETAMENTE TODOS OS POKÉMON =====
         self.cleanup()
+
+        self._start_battle_music()
+
         for pokemon in self.player.team:
             pokemon.reset(self)
 
@@ -674,14 +675,8 @@ class GameScene(BaseScene):
 
     def _start_battle_music(self):
         """Inicia a música de batalha aleatória"""
-        if not self.music_playing:
-            if hasattr(settings, 'music_enabled') and settings.music_enabled:
-                sound_manager.play_random_battle_music()
-
-                self.music_playing = True
-                print("[GAME] Música de batalha iniciada")
-            else:
-                print("[GAME] Música desabilitada nas configurações")
+        sound_manager.play_random_battle_music()
+        self.music_playing = True
 
     def _stop_battle_music(self, fade_ms=1000):
         """Para a música de batalha"""

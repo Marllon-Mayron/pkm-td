@@ -125,8 +125,22 @@ class MoveSoundManager(BaseSoundManager):
         return played
 
     def play_attack_sound(self, move_name: str, volume: Optional[float] = None) -> bool:
-        """Versão simplificada: toca apenas o som do atacante"""
-        return self.play_sound(move_name, volume)
+
+        if not self._enabled or self._volume == 0:
+            return False
+
+        move_key = move_name.lower().strip().replace(" ", "").replace("-", "").replace("'", "")
+
+        sound = self._sounds.get(move_key)
+
+        if sound:
+            target_volume = volume if volume is not None else self._volume
+            sound.set_volume(target_volume)
+            sound.play()
+            return True
+        else:
+            print(f"[MOVE_SOUND] Som NÃO encontrado para '{move_key}'")
+            return False
 
     def play_hit_sound(self, move_name: str = None, volume: Optional[float] = None, use_fallback: bool = True) -> bool:
         """Toca o som de impacto"""

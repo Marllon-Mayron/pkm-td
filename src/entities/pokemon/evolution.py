@@ -91,4 +91,8 @@ class PokemonEvolution:
                      self.pokemon.is_shiny, self.pokemon.is_boss)
         self.pokemon._speed_cache.pop(cache_key, None)
 
+        from src.managers.sounds.sound_manager import sound_manager
+        from src.managers.sounds.sound_manager import SoundEffect
+
+        sound_manager.play_effect(SoundEffect.LEVELUP)
         return pending_moves

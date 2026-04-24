@@ -17,6 +17,7 @@ class SoundEffect(Enum):
     CAUGHT = "Caught"
     CLICK = "Click"
     EVOLUTION = "Evolution"
+    LEVELUP = "Levelup"
 
 
 class SoundManager(BaseSoundManager):
@@ -80,7 +81,8 @@ class SoundManager(BaseSoundManager):
             SoundEffect.SHINY: "Shiny.mp3",
             SoundEffect.CAUGHT: "Caught.mp3",
             SoundEffect.CLICK: "Click.mp3",
-            SoundEffect.EVOLUTION: "Evolution.mp3"
+            SoundEffect.EVOLUTION: "Evolution.mp3",
+            SoundEffect.LEVELUP: "LevelUp.mp3"
         }
 
         for effect, filename in effect_files.items():
@@ -178,29 +180,32 @@ class SoundManager(BaseSoundManager):
 
         if music_path.exists():
             for ext in ['.mp3', '.ogg', '.wav']:
-                music_files.extend(music_path.glob(f"*{ext}"))
+                files = list(music_path.glob(f"*{ext}"))
+                print(f"[MUSIC] Encontrados {len(files)} arquivos com extensão {ext}")
+                music_files.extend(files)
 
         if not music_files:
-            print(f"[SOUND] Nenhuma música de batalha encontrada")
             return False
 
         import random
         selected_music = random.choice(music_files)
+        print(f"[MUSIC] Música selecionada: {selected_music.name}")
         self.play_music(selected_music.stem, loop=True)
         return True
 
     def play_music(self, music_id: str, fade_ms: int = 1000, loop: bool = True):
         """Toca música de fundo"""
+        print(f"[MUSIC] play_music chamado: music_id='{music_id}'")
+
         if not self._music_enabled or self._music_volume == 0:
+            print(f"[MUSIC] Música desabilitada (enabled={self._music_enabled}, volume={self._music_volume})")
             return
 
         music_file = None
         possible_paths = [
             self.sounds_path / "music" / "gameBattle" / f"{music_id}.mp3",
             self.sounds_path / "music" / "gameBattle" / f"{music_id}.ogg",
-            self.sounds_path / "music" / f"{music_id}.mp3",
-            self.sounds_path / "music" / f"{music_id}.ogg",
-            self.sounds_path / f"{music_id}.mp3",
+            self.sounds_path / "music" / "gameBattle" / f"{music_id}.wav",
         ]
 
         for path in possible_paths:
@@ -209,7 +214,8 @@ class SoundManager(BaseSoundManager):
                 break
 
         if not music_file:
-            print(f"[SOUND] Música não encontrada: {music_id}")
+            print(f"[MUSIC] Música não encontrada: {music_id}")
+            print(f"[MUSIC] Procurado em: {possible_paths[:3]}...")
             return
 
         try:
@@ -227,7 +233,9 @@ class SoundManager(BaseSoundManager):
 
             self.music_playing = music_id
         except Exception as e:
-            print(f"[SOUND] Erro ao tocar música: {e}")
+            print(f"[MUSIC] Erro ao tocar música: {e}")
+            import traceback
+            traceback.print_exc()
 
     def stop_music(self, fade_ms: int = 500):
         """Para a música atual"""
@@ -292,6 +300,30 @@ class SoundManager(BaseSoundManager):
         move_sound_manager.sync_with_main_manager()
 
         print("[SOUND] Todos os gerenciadores de som sincronizados")
+
+    def play_victory_music(self):
+        """Toca a música de vitória (Victory_Wild.mp3)"""
+        from src.config.settings import settings
+
+        if not settings.music_enabled:
+            print(f"[SOUND] Música desabilitada")
+            return False
+
+        # Toca a música Victory_Wild (uma vez, sem loop)
+        self.play_music("Victory_Wild", fade_ms=500, loop=False)
+        return True
+
+    def play_defeat_music(self):
+        """Toca a música de derrota (Defeat.mp3)"""
+        from src.config.settings import settings
+
+        if not settings.music_enabled:
+            print(f"[SOUND] Música desabilitada")
+            return False
+
+        # Toca a música Defeat (uma vez, sem loop)
+        self.play_music("Defeat", fade_ms=500, loop=False)
+        return True
 
 
 # Instância global

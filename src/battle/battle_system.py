@@ -185,6 +185,10 @@ class BattleSystem:
             result = effect.execute(attacker, target, self, self.effect_manager)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
+            from src.managers.sounds.move_sound_manager import move_sound_manager
+            move_sound_manager.play_attack_sound(move.sound_name)
+            print(f"[SOM] {move.name} (área) - som do atacante: {move.sound_name}")
+
             # Registra o movimento usado (para Disable)
             if move.name.lower() != "struggle":
                 attacker._last_used_move = move.name
@@ -512,7 +516,7 @@ class BattleSystem:
             print(f"[STRUGGLE] {attacker.name} causou {damage_result['damage']} de dano em {target.name}!")
 
             # Toca som de impacto
-            from src.anagers.sounds.move_sound_manager import move_sound_manager
+            from src.managers.sounds.move_sound_manager import move_sound_manager
             move_sound_manager.play_hit_sound("struggle")
 
             # Toca animação de hurt no alvo
