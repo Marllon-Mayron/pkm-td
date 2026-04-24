@@ -300,18 +300,25 @@ class ItemDragManager:
                 valid_use = True
 
             if valid_use:
-                # Remove o item da mochila
-                self.bag.remove_item(self.drag_item_id, 1)
+                use_success = False
 
-                # Chama callback de uso
                 if on_item_use_callback:
                     result = on_item_use_callback(
                         self.hovered_target,
                         self.drag_item_data,
                         self.target_type
                     )
+                    # Se o callback retornar True/False, usa isso
+                    if isinstance(result, bool):
+                        use_success = result
+                    else:
+                        use_success = True
+                else:
+                    use_success = True
 
-                print(f"[ITEM] Usou {self.drag_item_data['name']} em {getattr(self.hovered_target, 'name', 'alvo')}")
+                # SÓ remove o item se o uso foi bem-sucedido
+                if use_success:
+                    self.bag.remove_item(self.drag_item_id, 1)
 
         # Reseta estado
         self.is_dragging = False

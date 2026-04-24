@@ -505,38 +505,38 @@ class GameScene(BaseScene):
 
         # ===== REVIVE =====
         if effect == "revive" or "revive" in item_id:
-            # Verifica se o Pokémon está vivo
+            # Verifica se o Pokémon está VIVO (não pode usar revive em vivo)
             if pokemon.is_alive():
                 print(f"[MEDICINE] {pokemon.name} já está vivo! Revive não pode ser usado.")
                 return False
 
-            # Obtém a porcentagem de cura do effect_value (0.5 para Revive, 1.0 para Max Revive)
             revive_percentage = item_data.get("effect_value", 0.5)
-
-            # Usa o método revive da classe Pokemon
             toast_battle(f"{pokemon.name} foi revivido!", duration=4.0, pokemon=pokemon, portrait="happy")
-            return pokemon.revive(heal_percentage=revive_percentage)
+            pokemon.revive(heal_percentage=revive_percentage)
+            return True
 
         # ===== POÇÕES E CURAS =====
-        # Verifica se o Pokémon está vivo para usar poções
+        # CRUCIAL: Verifica se o Pokémon está VIVO
         if not pokemon.is_alive():
             print(f"[MEDICINE] {pokemon.name} está derrotado! Use um Revive primeiro.")
+            toast_warning(f"{pokemon.name} está derrotado! Use um Revive primeiro.", duration=2.0)
             return False
 
-        # Cura completa (heal_amount = -1)
+        # Cura completa
         heal_amount = item_data.get("effect_value", 0)
 
         if heal_amount == -1:
-            pokemon.heal()  # Cura completa
+            pokemon.heal()
             toast_battle(f"{pokemon.name} foi completamente curado!", duration=4.0, pokemon=pokemon, portrait="happy")
             return True
 
-        # Cura parcial (potion, super potion, etc)
+        # Cura parcial
         elif heal_amount > 0:
             old_hp = pokemon.current_hp
             pokemon.current_hp = min(pokemon.max_hp, pokemon.current_hp + heal_amount)
             healed = pokemon.current_hp - old_hp
-            toast_battle(f"{pokemon.name} recuperou {healed} HP! ({pokemon.current_hp}/{pokemon.max_hp})", duration=4.0, pokemon=pokemon, portrait="happy")
+            toast_battle(f"{pokemon.name} recuperou {healed} HP! ({pokemon.current_hp}/{pokemon.max_hp})", duration=4.0,
+                         pokemon=pokemon, portrait="happy")
             return True
 
         return False

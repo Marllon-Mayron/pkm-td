@@ -9,7 +9,6 @@ import random
 from src.scenes.base_scene import BaseScene
 from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 from src.scenes.settings_scene.settings_scene import SettingsScene
-from ui.toast_renderer import toast_info
 
 
 class Button:
