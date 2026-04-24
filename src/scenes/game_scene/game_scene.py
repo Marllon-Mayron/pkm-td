@@ -8,7 +8,7 @@ from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
 from src.config.settings import settings
 from src.core.performance_monitor import perf_monitor
-from managers.sounds.sound_manager import SoundEffect, sound_manager
+from src.managers.sounds.sound_manager import SoundEffect, sound_manager
 from src.scenes.base_scene import BaseScene
 from src.config.phase_catalog import phase_catalog
 from src.scenes.game_scene.components.managers.overlay_manager import OverlayType, OverlayManager

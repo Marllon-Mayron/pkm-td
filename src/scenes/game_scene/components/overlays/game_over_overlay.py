@@ -43,12 +43,12 @@ class GameOverOverlay(BaseOverlay):
 
     def _play_defeat_music(self):
         """Toca a música de derrota"""
-        from managers.sounds.sound_manager import sound_manager
+        from src.managers.sounds.sound_manager import sound_manager
         sound_manager.play_defeat_music()
 
     def _stop_music(self):
         """Para a música de derrota"""
-        from managers.sounds.sound_manager import sound_manager
+        from src.managers.sounds.sound_manager import sound_manager
         sound_manager.stop_music(fade_ms=300)
         print(f"[MUSIC] Música de derrota parada")
 

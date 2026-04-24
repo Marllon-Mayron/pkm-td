@@ -43,7 +43,7 @@ class Settings:
     def apply_to_sound_manager(self):
         """Aplica as configurações atuais ao SoundManager"""
         try:
-            from managers.sounds.sound_manager import sound_manager
+            from src.managers.sounds.sound_manager import sound_manager
             sound_manager.set_music_volume(self.music_volume if self.music_enabled else 0)
             sound_manager.set_sfx_volume(self.sfx_volume if self.sfx_enabled else 0)
             print(f"[SETTINGS] Aplicado ao SoundManager: música={self.music_volume} (enabled={self.music_enabled}), SFX={self.sfx_volume} (enabled={self.sfx_enabled})")

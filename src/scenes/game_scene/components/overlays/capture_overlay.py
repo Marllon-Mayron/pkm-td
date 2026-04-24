@@ -115,7 +115,7 @@ class CaptureOverlay(BaseOverlay):
 
     def _play_capture_sound(self):
         try:
-            from managers.sounds.sound_manager import sound_manager
+            from src.managers.sounds.sound_manager import sound_manager
             sound_manager.play_capture_sound()
         except:
             pass

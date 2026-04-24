@@ -51,7 +51,7 @@ class MultiHitState:
 
     def _execute_next_hit(self):
         """Executa o próximo hit"""
-        from managers.sounds.move_sound_manager import move_sound_manager
+        from src.managers.sounds.move_sound_manager import move_sound_manager
 
         # Pega o move atual
         move = self.attacker.get_current_move()
@@ -531,7 +531,7 @@ class MoveEffect:
         print(f"[HEAL] {target_entity.name} recuperou {actual_heal} HP com {self.name}!")
 
         # Toca som de cura (opcional - pode usar um som existente)
-        from managers.sounds.move_sound_manager import move_sound_manager
+        from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("heal")  # Se não tiver, pode remover ou usar outro
 
         return True
@@ -557,7 +557,7 @@ class MoveEffect:
         print(f"[SELF_FAINT] {attacker.name} desmaiou após usar {self.name}!")
 
         # Toca som de faint
-        from managers.sounds.move_sound_manager import move_sound_manager
+        from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("faint")
 
         return True
@@ -656,7 +656,7 @@ class MoveEffect:
             f"[HAZE] {self.name} removeu {removed_count} modificadores de stat de {len(all_pokemon_in_field)} Pokémon!")
 
         # Toca som (opcional)
-        from managers.sounds.move_sound_manager import move_sound_manager
+        from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("haze")
 
         return True
@@ -691,7 +691,7 @@ class MoveEffect:
             print(f"[DREAM_EATER] {attacker.name} recuperou {actual_heal} HP de {target.name}!")
 
             # Toca som de dreno
-            from managers.sounds.move_sound_manager import move_sound_manager
+            from src.managers.sounds.move_sound_manager import move_sound_manager
             move_sound_manager.play_attack_sound("drain")
 
         return True
@@ -805,7 +805,7 @@ class MoveEffect:
             print(f"[LEECH_SEED] {target.name} perdeu {actual_damage} HP, {source.name} recuperou {heal_amount} HP")
 
             # Toca som de dreno
-            from managers.sounds.move_sound_manager import move_sound_manager
+            from src.managers.sounds.move_sound_manager import move_sound_manager
             move_sound_manager.play_attack_sound("drain")
         else:
             print(f"[LEECH_SEED] {target.name} não sofreu dano (imune?)")
@@ -945,7 +945,7 @@ class MoveEffect:
         print(f"[PSYWAVE] {attacker.name} causou {damage} de dano ({percentage_display}% do nível) em {target.name}!")
 
         # Toca som (reutiliza som de psychic)
-        from managers.sounds.move_sound_manager import move_sound_manager
+        from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("psywave")
 
         return True
@@ -1369,7 +1369,7 @@ class MoveEffect:
                 return False
 
             # Toca som do ataque uma vez
-            from managers.sounds.move_sound_manager import move_sound_manager
+            from src.managers.sounds.move_sound_manager import move_sound_manager
             move_sound_manager.play_attack_sound(current_move.sound_name)
 
             # Animação do atacante
@@ -1673,7 +1673,7 @@ class MoveEffect:
         print(f"[COUNTER] {attacker.name} causou {actual_damage} de dano de retorno a {counter_target.name}!")
 
         # Toca som
-        from managers.sounds.move_sound_manager import move_sound_manager
+        from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("counter")
 
         # Limpa o registro após usar
@@ -1904,7 +1904,7 @@ class MoveEffect:
                         effect.execute(attacker, target, battle_system, effect_manager, damage_result["damage"])
 
                     # Toca som
-                    from managers.sounds.move_sound_manager import move_sound_manager
+                    from src.managers.sounds.move_sound_manager import move_sound_manager
                     move_sound_manager.play_attack_sound(temp_move.sound_name)
                     move_sound_manager.play_hit_sound(temp_move.sound_name)
                 else:
@@ -2106,7 +2106,7 @@ class MoveEffect:
             target.register_status_application(attacker, "Transform")
 
         # Toca som
-        from managers.sounds.move_sound_manager import move_sound_manager
+        from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("transform")
 
         return True
@@ -2504,7 +2504,7 @@ class MoveEffect:
         print(f"[TELEPORT] {attacker.name} trocou de lugar com {target_ally.name}!")
 
         # Toca som (opcional)
-        from managers.sounds.move_sound_manager import move_sound_manager
+        from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("teleport")
 
         return True
@@ -2560,7 +2560,7 @@ class MoveEffect:
         print(f"[TELEPORT] {attacker.name} teleportou de ({old_x}, {old_y}) para ({new_x}, {new_y})!")
 
         # Toca som
-        from managers.sounds.move_sound_manager import move_sound_manager
+        from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("teleport")
 
         # Toca animação de teleporte (se tiver)
@@ -2752,7 +2752,7 @@ class MoveEffect:
         placement_manager._remove_pokemon(target)
 
         # Opcional: toca som de retorno
-        from managers.sounds.move_sound_manager import move_sound_manager
+        from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("return")
 
         print(f"[FORCE_SWITCH] {target.name} retornou ao time com sucesso!")

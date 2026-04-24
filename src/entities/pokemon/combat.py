@@ -829,7 +829,7 @@ class PokemonCombat:
             self.pokemon.play_hurt_animation()
 
         if self.pokemon.current_hp <= 0:
-            from managers.sounds.move_sound_manager import move_sound_manager
+            from src.managers.sounds.move_sound_manager import move_sound_manager
             move_sound_manager.play_attack_sound("faint")
             print(f"[BATTLE] {self.pokemon.name} foi derrotado!")
 

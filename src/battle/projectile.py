@@ -183,7 +183,7 @@ class Projectile:
             self.target.damage_contributions.get(attacker_id, 0) + self.damage
 
         # Toca som de impacto
-        from managers.sounds.move_sound_manager import move_sound_manager
+        from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_hit_sound(self.move_name)
 
         # Log
