@@ -216,7 +216,6 @@ class MenuScene(BaseScene):
 
     def start_game(self):
         """Inicia o jogo - verifica se tem save ou precisa escolher inicial"""
-        print("[MENU] Iniciando jogo...")
 
         # Verifica se existe um save
         save_loaded = self.game.player.load_game(1)
@@ -224,18 +223,20 @@ class MenuScene(BaseScene):
         if not save_loaded:
             # Sem save: mostra tela de seleção de inicial
             from src.scenes.starter_select_scene.starter_select_scene import StarterSelectScene
-            print("[MENU] Nenhum save encontrado - abrindo seleção de inicial")
+
             self.game.starter_select_scene = StarterSelectScene(self.game)
             self.game.current_scene = self.game.starter_select_scene
         else:
             # Com save: vai direto para seleção de fases
             print("[MENU] Save encontrado - indo para seleção de fases")
             print(f"  - Time: {len(self.game.player.team)} Pokémon")
+            print(f"  - Último capítulo acessado: {self.game.player.chapter_page_num}")
 
             # Carrega as configurações do save
             from src.config.progress import progress_manager
-
             progress_manager._load_settings_from_save()
+
+            # A PhaseSelectScene agora vai ler o chapter_page_num automaticamente
             self.game.current_scene = PhaseSelectScene(self.game)
 
     def open_settings(self):

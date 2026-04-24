@@ -19,6 +19,8 @@ class Player(Entity):
 
         self.bag = BagManager(self)
 
+        self.chapter_page_num = 1
+
         # Recursos
         self.money = 100
         self.score = 0

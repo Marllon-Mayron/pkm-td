@@ -205,9 +205,17 @@ class PhaseSelectScene(BaseScene):
         self.progress = progress_manager
         self.catalog = phase_catalog
 
-        # Estado atual
+        # Estados de navegação
         self.available_chapters = sorted(self.catalog.get_all_phases().keys())
-        self.current_chapter_id = self._get_first_available_chapter()
+
+        # TENTA CARREGAR DO PLAYER PRIMEIRO
+        if hasattr(game, 'player') and game.player and game.player.chapter_page_num > 0:
+            self.current_chapter_id = game.player.chapter_page_num
+            # Verifica se o capítulo salvo ainda está disponível
+            if self.current_chapter_id not in self.available_chapters:
+                self.current_chapter_id = self._get_first_available_chapter()
+        else:
+            self.current_chapter_id = self._get_first_available_chapter()
 
         # Elementos UI
         self.chapter_tabs = []
@@ -243,24 +251,6 @@ class PhaseSelectScene(BaseScene):
 
         # Modo de desenvolvimento (desbloqueia tudo)
         self.dev_mode = False
-        if self.dev_mode:
-            self._setup_dev_mode()
-
-    def _setup_dev_mode(self):
-        """Configurações para modo de desenvolvimento"""
-        # Descomente a linha abaixo para desbloquear todas as fases até o capítulo 3
-        # self.progress.unlock_all_for_testing(max_chapter=3, phases_per_chapter=5)
-
-        # Ou desbloqueie apenas a fase 2-1
-        # self.progress.unlock_specific_phase("2-1")
-
-        # Ou desbloqueie todo o capítulo 2
-        chapter_2_phases = []
-        for phase_data in self.catalog.get_chapter_phases(2):
-            chapter_2_phases.append(f"2-{phase_data['number']}")
-        if chapter_2_phases:
-            self.progress.unlock_chapter(2, chapter_2_phases)
-            print(f"Capítulo 2 desbloqueado! Fases: {chapter_2_phases}")
 
     def _get_first_available_chapter(self):
         """Retorna o primeiro capítulo com fases desbloqueadas"""
@@ -336,6 +326,9 @@ class PhaseSelectScene(BaseScene):
         # Cria cards das fases
         self._create_phase_cards()
 
+        if hasattr(self.game, 'player') and self.game.player:
+            self.game.player.chapter_page_num = self.current_chapter_id
+
         self.layout_initialized = True
         self.scroll_y = 0
         self.scroll_target = 0
@@ -409,7 +402,15 @@ class PhaseSelectScene(BaseScene):
 
         # Atualiza lista de capítulos disponíveis
         self.available_chapters = sorted(self.catalog.get_all_phases().keys())
-        self.current_chapter_id = self._get_first_available_chapter()
+
+        if hasattr(self.game, 'player') and self.game.player:
+            saved_chapter = self.game.player.chapter_page_num
+            if saved_chapter > 0 and saved_chapter in self.available_chapters:
+                self.current_chapter_id = saved_chapter
+            else:
+                self.current_chapter_id = self._get_first_available_chapter()
+        else:
+            self.current_chapter_id = self._get_first_available_chapter()
 
         # Força recriação do layout
         self.layout_initialized = False
@@ -421,36 +422,48 @@ class PhaseSelectScene(BaseScene):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_p:
                 self.toggle_pause()
+
             elif event.key == pygame.K_ESCAPE:
                 self.game.current_scene = self.game.menu_scene
+
             elif event.key == pygame.K_LEFT:
                 if self.available_chapters:
                     current_idx = self.available_chapters.index(self.current_chapter_id)
                     if current_idx > 0:
                         self.current_chapter_id = self.available_chapters[current_idx - 1]
+                        #salva no player
+                        if hasattr(self.game, 'player') and self.game.player:
+                            self.game.player.chapter_page_num = self.current_chapter_id
                         self._create_phase_cards()
                         for tab in self.chapter_tabs:
                             tab.active = (tab.chapter_id == self.current_chapter_id)
+
             elif event.key == pygame.K_RIGHT:
                 if self.available_chapters:
                     current_idx = self.available_chapters.index(self.current_chapter_id)
                     if current_idx < len(self.available_chapters) - 1:
                         self.current_chapter_id = self.available_chapters[current_idx + 1]
+                        if hasattr(self.game, 'player') and self.game.player:
+                            self.game.player.chapter_page_num = self.current_chapter_id
                         self._create_phase_cards()
                         for tab in self.chapter_tabs:
                             tab.active = (tab.chapter_id == self.current_chapter_id)
+
             elif event.key == pygame.K_r and pygame.key.get_mods() & pygame.KMOD_CTRL:
                 self.progress.reset_progress()
                 self.catalog.refresh()
                 self.available_chapters = sorted(self.catalog.get_all_phases().keys())
                 self.current_chapter_id = self._get_first_available_chapter()
                 self.layout_initialized = False
+
             elif event.key == pygame.K_u:
                 if self.dev_mode:
                     self._debug_unlock_next()
+
             elif event.key == pygame.K_a:
                 if self.dev_mode:
                     self._debug_unlock_all()
+
             elif event.key == pygame.K_s:
                 self._open_shop()
 
@@ -497,6 +510,8 @@ class PhaseSelectScene(BaseScene):
                     result = tab.handle_event(event)
                     if result:
                         self.current_chapter_id = result
+                        if hasattr(self.game, 'player') and self.game.player:
+                            self.game.player.chapter_page_num = self.current_chapter_id
                         self._create_phase_cards()
                         for t in self.chapter_tabs:
                             t.active = (t.chapter_id == self.current_chapter_id)
