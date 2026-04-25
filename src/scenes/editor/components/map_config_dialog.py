@@ -1,11 +1,13 @@
 # src/scenes/editor/components/map_config_dialog.py
 
 import pygame
+import os
 
 
 class MapConfigDialog:
     def __init__(self, x, y, width, height, current_width, current_height,
-                 current_chapter=1, current_phase=1, current_name="Fase"):
+                 current_chapter=1, current_phase=1, current_name="Fase",
+                 current_localization_type="default", current_custom_folder=""):
         self.rect = pygame.Rect(x, y, width, height)
         self.visible = True
         self.focused = True
@@ -14,6 +16,8 @@ class MapConfigDialog:
         self.current_chapter = current_chapter
         self.current_phase = current_phase
         self.current_name = current_name
+        self.current_localization_type = current_localization_type  # "default" ou "custom"
+        self.current_custom_folder = current_custom_folder
 
         # Valores temporários
         self.temp_width = str(current_width)
@@ -21,8 +25,10 @@ class MapConfigDialog:
         self.temp_chapter = str(current_chapter)
         self.temp_phase = str(current_phase)
         self.temp_name = current_name
+        self.temp_localization_type = current_localization_type
+        self.temp_custom_folder = current_custom_folder
 
-        self.active_input = "name"  # "name", "width", "height", "chapter", "phase"
+        self.active_input = "name"  # "name", "width", "height", "chapter", "phase", "custom_folder"
 
         # Botões
         button_width = 80
@@ -40,12 +46,20 @@ class MapConfigDialog:
             button_height
         )
 
-        # Input boxes (agora com campo de nome)
+        # Input boxes
         self.name_rect = pygame.Rect(x + 150, y + 40, 200, 30)
         self.width_rect = pygame.Rect(x + 150, y + 80, 100, 30)
         self.height_rect = pygame.Rect(x + 150, y + 120, 100, 30)
         self.chapter_rect = pygame.Rect(x + 150, y + 160, 100, 30)
         self.phase_rect = pygame.Rect(x + 150, y + 200, 100, 30)
+
+        # Radio buttons para tipo de localização
+        self.default_radio_rect = pygame.Rect(x + 150, y + 240, 20, 20)
+        self.custom_radio_rect = pygame.Rect(x + 300, y + 240, 20, 20)
+
+        # Input para pasta customizada (só aparece se custom estiver selecionado)
+        self.custom_folder_rect = pygame.Rect(x + 150, y + 280, 200, 30)
+        self.browse_button_rect = pygame.Rect(x + 360, y + 280, 30, 30)
 
     def handle_event(self, event):
         """Processa eventos do diálogo"""
@@ -70,7 +84,9 @@ class MapConfigDialog:
         elif event.key == pygame.K_TAB:
             # Alterna entre os inputs
             inputs = ["name", "width", "height", "chapter", "phase"]
-            current_index = inputs.index(self.active_input)
+            if self.temp_localization_type == "custom":
+                inputs.append("custom_folder")
+            current_index = inputs.index(self.active_input) if self.active_input in inputs else 0
             self.active_input = inputs[(current_index + 1) % len(inputs)]
             return None
         elif event.key == pygame.K_BACKSPACE:
@@ -84,6 +100,8 @@ class MapConfigDialog:
                 self.temp_chapter = self.temp_chapter[:-1]
             elif self.active_input == "phase":
                 self.temp_phase = self.temp_phase[:-1]
+            elif self.active_input == "custom_folder":
+                self.temp_custom_folder = self.temp_custom_folder[:-1]
             return None
         else:
             # Adiciona caracteres
@@ -91,6 +109,10 @@ class MapConfigDialog:
                 # Permite letras, números e espaços no nome
                 if event.unicode.isprintable() and event.unicode not in ['/', '\\', ':', '*', '?', '"', '<', '>', '|']:
                     self.temp_name += event.unicode
+            elif self.active_input == "custom_folder":
+                # Permite letras, números, underscore e hífen para nome de pasta
+                if event.unicode.isalnum() or event.unicode in ['_', '-']:
+                    self.temp_custom_folder += event.unicode
             elif event.unicode.isdigit():
                 if self.active_input == "width":
                     self.temp_width += event.unicode
@@ -122,6 +144,30 @@ class MapConfigDialog:
         elif self.phase_rect.collidepoint(mouse_pos):
             self.active_input = "phase"
             return None
+        # Radio buttons
+        elif self.default_radio_rect.collidepoint(mouse_pos):
+            self.temp_localization_type = "default"
+            self.temp_custom_folder = ""
+            self.active_input = "name"
+            return None
+        elif self.custom_radio_rect.collidepoint(mouse_pos):
+            self.temp_localization_type = "custom"
+            self.active_input = "custom_folder"
+            return None
+        # Botão browse
+        elif self.browse_button_rect.collidepoint(mouse_pos):
+            from tkinter import filedialog, Tk
+            root = Tk()
+            root.withdraw()
+            folder = filedialog.askdirectory(title="Selecione a pasta para salvar minigames")
+            if folder:
+                # Extrai apenas o nome da pasta
+                self.temp_custom_folder = os.path.basename(folder)
+            return None
+        # Input da pasta customizada
+        elif self.custom_folder_rect.collidepoint(mouse_pos) and self.temp_localization_type == "custom":
+            self.active_input = "custom_folder"
+            return None
         elif self.confirm_rect.collidepoint(mouse_pos):
             return self.confirm()
         elif self.cancel_rect.collidepoint(mouse_pos):
@@ -142,13 +188,25 @@ class MapConfigDialog:
             new_phase = max(1, min(99, int(self.temp_phase) if self.temp_phase else 1))
             new_name = self.temp_name.strip() or f"Fase {new_chapter}-{new_phase}"
 
+            # Valida pasta customizada
+            new_custom_folder = self.temp_custom_folder.strip()
+            if self.temp_localization_type == "custom" and not new_custom_folder:
+                # Se selecionou custom mas não deu nome, volta pra default
+                localization_type = "default"
+                custom_folder = ""
+            else:
+                localization_type = self.temp_localization_type
+                custom_folder = new_custom_folder if localization_type == "custom" else ""
+
             self.visible = False
             return {
                 'width': new_width,
                 'height': new_height,
                 'chapter': new_chapter,
                 'phase': new_phase,
-                'name': new_name
+                'name': new_name,
+                'localization_type': localization_type,
+                'custom_folder': custom_folder
             }
         except ValueError:
             return None
@@ -164,7 +222,8 @@ class MapConfigDialog:
         overlay.fill((0, 0, 0))
         screen.blit(overlay, (0, 0))
 
-        # Caixa de diálogo
+        # Caixa de diálogo - aumentada para acomodar novos campos
+        self.rect.height = 380  # Aumenta altura
         pygame.draw.rect(screen, (60, 60, 70), self.rect, border_radius=10)
         pygame.draw.rect(screen, (255, 215, 0), self.rect, 2, border_radius=10)
 
@@ -184,7 +243,6 @@ class MapConfigDialog:
         screen.blit(name_label, (label_x, self.rect.y + 45))
         color = (100, 150, 255) if self.active_input == "name" else (80, 80, 90)
         pygame.draw.rect(screen, color, self.name_rect, 2)
-        # Limita o texto visível
         display_name = self.temp_name
         if font.size(display_name)[0] > self.name_rect.width - 10:
             while font.size(display_name + "...")[0] > self.name_rect.width - 10 and len(display_name) > 3:
@@ -225,10 +283,65 @@ class MapConfigDialog:
         phase_surf = font.render(self.temp_phase, True, (255, 255, 255))
         screen.blit(phase_surf, (self.phase_rect.x + 5, self.phase_rect.y + 5))
 
+        # Localização
+        loc_label = font.render("Localização:", True, (200, 200, 200))
+        screen.blit(loc_label, (label_x, self.rect.y + 245))
+
+        # Radio button Default
+        pygame.draw.circle(screen, (100, 150, 255) if self.temp_localization_type == "default" else (80, 80, 90),
+                           (self.default_radio_rect.centerx, self.default_radio_rect.centery), 10)
+        pygame.draw.circle(screen, (255, 255, 255),
+                           (self.default_radio_rect.centerx, self.default_radio_rect.centery), 8)
+        if self.temp_localization_type == "default":
+            pygame.draw.circle(screen, (100, 150, 255),
+                               (self.default_radio_rect.centerx, self.default_radio_rect.centery), 5)
+
+        default_text = font.render("Default (capítulos)", True, (200, 200, 200))
+        screen.blit(default_text, (self.default_radio_rect.right + 5, self.rect.y + 241))
+
+        # Radio button Custom
+        pygame.draw.circle(screen, (100, 150, 255) if self.temp_localization_type == "custom" else (80, 80, 90),
+                           (self.custom_radio_rect.centerx, self.custom_radio_rect.centery), 10)
+        pygame.draw.circle(screen, (255, 255, 255),
+                           (self.custom_radio_rect.centerx, self.custom_radio_rect.centery), 8)
+        if self.temp_localization_type == "custom":
+            pygame.draw.circle(screen, (100, 150, 255),
+                               (self.custom_radio_rect.centerx, self.custom_radio_rect.centery), 5)
+
+        custom_text = font.render("Custom (minigames)", True, (200, 200, 200))
+        screen.blit(custom_text, (self.custom_radio_rect.right + 5, self.rect.y + 241))
+
+        # Pasta customizada (só aparece se custom estiver selecionado)
+        if self.temp_localization_type == "custom":
+            folder_label = font.render("Pasta:", True, (200, 200, 200))
+            screen.blit(folder_label, (label_x, self.rect.y + 285))
+
+            color = (100, 150, 255) if self.active_input == "custom_folder" else (80, 80, 90)
+            pygame.draw.rect(screen, color, self.custom_folder_rect, 2)
+
+            # Limita o texto visível
+            display_folder = self.temp_custom_folder
+            if font.size(display_folder)[0] > self.custom_folder_rect.width - 10:
+                while font.size(display_folder + "...")[0] > self.custom_folder_rect.width - 10 and len(
+                        display_folder) > 3:
+                    display_folder = display_folder[:-1]
+                display_folder += "..."
+
+            folder_surf = font.render(display_folder, True, (255, 255, 255))
+            screen.blit(folder_surf, (self.custom_folder_rect.x + 5, self.custom_folder_rect.y + 5))
+
+            # Botão Browse
+            pygame.draw.rect(screen, (80, 80, 90), self.browse_button_rect, border_radius=5)
+            browse_text = font.render("...", True, (255, 255, 255))
+            browse_x = self.browse_button_rect.x + (self.browse_button_rect.width - browse_text.get_width()) // 2
+            browse_y = self.browse_button_rect.y + (self.browse_button_rect.height - browse_text.get_height()) // 2
+            screen.blit(browse_text, (browse_x, browse_y))
+
         # Informação
         info = font.render("TAB para alternar | Min: 5, Max: 500 tiles", True, (150, 150, 150))
+        info_y = self.rect.y + (325 if self.temp_localization_type == "custom" else 285)
         info_x = self.rect.x + (self.rect.width - info.get_width()) // 2
-        screen.blit(info, (info_x, self.rect.y + 245))
+        screen.blit(info, (info_x, info_y))
 
         # Botões
         self._render_buttons(screen, font)

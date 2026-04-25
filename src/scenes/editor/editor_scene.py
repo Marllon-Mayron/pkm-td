@@ -122,6 +122,9 @@ class EditorScene(BaseScene):
         self.render_handler = EditorRenderHandler(self)
         self.path_manager.add_path()
 
+        self.localization_type = "default"  # "default" ou "custom"
+        self.custom_folder = ""  # Pasta do minigame
+
         print(f"Editor iniciado - {self.phase_name} - Grid size: {self.grid_size}px")
 
     def _create_default_layers(self):
@@ -345,15 +348,16 @@ class EditorScene(BaseScene):
         current_layer = self.layer_manager.get_current_layer()
         if current_layer:
             dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
-            dialog_y = self.screen_manager.viewport_y + (
-                    self.screen_manager.viewport_height - 350) // 2
+            dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 380) // 2
             self.map_config_dialog = MapConfigDialog(
-                dialog_x, dialog_y, 400, 350,
+                dialog_x, dialog_y, 400, 380,  # Altura aumentada
                 current_layer.width,
                 current_layer.height,
                 self.current_chapter,
                 self.current_phase,
-                self.phase_name
+                self.phase_name,
+                self.localization_type,  # Passa o tipo atual
+                self.custom_folder  # Passa a pasta atual
             )
 
     def _open_load_phase_dialog(self):
@@ -393,11 +397,19 @@ class EditorScene(BaseScene):
         if result and result.get('action') == 'load':
             chapter = result['chapter']
             phase = result['phase']
+            localization_type = result.get('localization_type', 'default')
+            custom_folder = result.get('custom_folder', '')
+
+            # Atualiza os atributos antes de carregar
+            self.localization_type = localization_type
+            self.custom_folder = custom_folder
+
             success = self.load_phase(chapter, phase)
             if success:
-                print(f"Fase {chapter}-{phase} carregada com sucesso!")
+                print(
+                    f"{'Minigame' if localization_type == 'custom' else 'Fase'} {chapter}-{phase} carregado com sucesso!")
             else:
-                print(f"Falha ao carregar fase {chapter}-{phase}")
+                print(f"Falha ao carregar {chapter}-{phase}")
 
     def _open_wave_config_dialog(self):
         """Abre o diálogo de configuração de waves"""
@@ -443,12 +455,21 @@ class EditorScene(BaseScene):
             phase_changed = result['phase'] != self.current_phase
             name_changed = result['name'] != self.phase_name
 
+            # Atualiza os atributos de localização
+            localization_changed = (result.get('localization_type', 'default') != self.localization_type or
+                                    result.get('custom_folder', '') != self.custom_folder)
+
             self.current_chapter = result['chapter']
             self.current_phase = result['phase']
             self.phase_name = result['name']
+            self.localization_type = result.get('localization_type', 'default')
+            self.custom_folder = result.get('custom_folder', '')
 
-            if chapter_changed or phase_changed or name_changed:
-                print(f"Fase alterada para: {self.phase_name} (Capítulo {self.current_chapter}, Fase {self.current_phase})")
+            if chapter_changed or phase_changed or name_changed or localization_changed:
+                print(
+                    f"Fase alterada para: {self.phase_name} (Capítulo {self.current_chapter}, Fase {self.current_phase})")
+                if self.localization_type == "custom":
+                    print(f"  Localização Custom: {self.custom_folder}")
                 self.clear_undo_history()
 
     def _handle_target_item_selected(self, item_id):
@@ -550,7 +571,7 @@ class EditorScene(BaseScene):
         self.render_handler.render(screen)
 
     def save_phase(self):
-        """Salva a fase atual - INCLUINDO RECOMPENSAS"""
+        """Salva a fase atual - agora com suporte a localização"""
         phase_data = {
             "name": self.phase_name,
             "map": self.layer_manager.to_dict(),
@@ -559,24 +580,40 @@ class EditorScene(BaseScene):
             "tower_spots": self.tower_spots.to_dict(),
             "target_items": self.target_items.to_dict(),
             "events": self.event_manager.to_dict(),
-            "rewards": self.phase_rewards  # INCLUI AS RECOMPENSAS
+            "rewards": self.phase_rewards
         }
 
-        self.exporter.export_phase(phase_data, self.current_chapter, self.current_phase)
-        print(f"Fase salva com {len(self.wave_manager.waves)} waves, "
+        self.exporter.export_phase(
+            phase_data,
+            self.current_chapter,
+            self.current_phase,
+            self.localization_type,
+            self.custom_folder
+        )
+
+        tipo = "Minigame" if self.localization_type == "custom" else "Fase"
+        print(f"{tipo} salva com {len(self.wave_manager.waves)} waves, "
               f"{len(self.tower_spots.spots)} spots, "
               f"{len(self.target_items.items)} itens alvo, "
               f"{len(self.event_manager.triggers)} gatilhos de evento, e "
               f"recompensas: {self.phase_rewards['money']} gold, {self.phase_rewards['experience']} XP!")
 
     def load_phase(self, chapter, phase_number):
-        """Carrega uma fase existente - INCLUINDO RECOMPENSAS"""
-        print(f"\n=== CARREGANDO FASE {chapter}-{phase_number} ===")
+        """Carrega uma fase existente - agora com suporte a localização"""
+        print(
+            f"\n=== CARREGANDO {'MINIGAME' if self.localization_type == 'custom' else 'FASE'} {chapter}-{phase_number} ===")
 
-        phase_data = self.exporter.load_phase(chapter, phase_number)
+        # Carrega usando a localização atual
+        phase_data = self.exporter.load_phase(
+            chapter,
+            phase_number,
+            self.localization_type,
+            self.custom_folder
+        )
 
         if not phase_data:
-            print(f"Fase {chapter}-{phase_number} não encontrada!")
+            print(
+                f"{'Minigame' if self.localization_type == 'custom' else 'Fase'} {chapter}-{phase_number} não encontrada!")
             return False
 
         try:
@@ -597,6 +634,10 @@ class EditorScene(BaseScene):
 
             print(f"Project root calculado: {project_root}")
             print(f"Pasta res existe? {os.path.exists(os.path.join(project_root, 'res'))}")
+
+            if "localization_type" in phase_data:
+                self.localization_type = phase_data["localization_type"]
+                self.custom_folder = phase_data.get("custom_folder", "")
 
             # Carrega o mapa
             if "map" in phase_data:

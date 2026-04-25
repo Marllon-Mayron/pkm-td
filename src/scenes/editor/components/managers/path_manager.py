@@ -9,7 +9,7 @@ class PathManager:
     def __init__(self):
         self.paths = []  # Lista de objetos Path
         self.current_path_index = 0
-        self.max_paths = 5  # Limite razoável de paths por fase
+        self.max_paths = 7  # Limite razoável de paths por fase
 
 
         # Cores para diferentes paths (para facilitar identificação)
