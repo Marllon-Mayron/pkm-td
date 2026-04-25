@@ -170,6 +170,20 @@ class SoundManager(BaseSoundManager):
             print(f"[SOUND] Erro ao tocar efeito {effect.value}: {e}")
             return False
 
+    def stop_effect(self, effect: SoundEffect):
+        """
+        Para um efeito sonoro específico se ele estiver tocando
+        """
+        sound = self.effects.get(effect)
+        if sound:
+            try:
+                sound.stop()
+                return True
+            except Exception as e:
+                print(f"[SOUND] Erro ao parar efeito {effect.value}: {e}")
+                return False
+        return False
+
     def play_random_battle_music(self):
         """Toca uma música de batalha aleatória"""
         if not self._music_enabled or self._music_volume == 0:
