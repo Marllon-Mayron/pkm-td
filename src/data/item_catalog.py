@@ -90,6 +90,13 @@ class ItemCatalog:
         }
         items[6] = {
             "id": 6,
+            "name": "Insignia do veneno",
+            "sprite": badge_path / "poison-badge.png",
+            "description": "Insignia 5",
+            "category": "badge"
+        }
+        items[7] = {
+            "id": 7,
             "name": "Isca Safari",
             "sprite": medicine_path / "safari_bait.png",
             "description": "Isca para o safari",

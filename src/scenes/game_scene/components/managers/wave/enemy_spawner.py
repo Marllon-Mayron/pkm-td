@@ -4,7 +4,7 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass
 
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
-from ui.toast_renderer import toast_battle
+from src.ui.toast_renderer import toast_battle
 
 
 @dataclass
