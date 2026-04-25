@@ -7,7 +7,8 @@ import os
 class MapConfigDialog:
     def __init__(self, x, y, width, height, current_width, current_height,
                  current_chapter=1, current_phase=1, current_name="Fase",
-                 current_localization_type="default", current_custom_folder=""):
+                 current_localization_type="default", current_custom_folder="",
+                 current_unlock_chapter=1, current_unlock_phase=1):
         self.rect = pygame.Rect(x, y, width, height)
         self.visible = True
         self.focused = True
@@ -18,6 +19,8 @@ class MapConfigDialog:
         self.current_name = current_name
         self.current_localization_type = current_localization_type  # "default" ou "custom"
         self.current_custom_folder = current_custom_folder
+        self.current_unlock_chapter = current_unlock_chapter
+        self.current_unlock_phase = current_unlock_phase
 
         # Valores temporários
         self.temp_width = str(current_width)
@@ -27,8 +30,10 @@ class MapConfigDialog:
         self.temp_name = current_name
         self.temp_localization_type = current_localization_type
         self.temp_custom_folder = current_custom_folder
+        self.temp_unlock_chapter = str(current_unlock_chapter)
+        self.temp_unlock_phase = str(current_unlock_phase)
 
-        self.active_input = "name"  # "name", "width", "height", "chapter", "phase", "custom_folder"
+        self.active_input = "name"  # "name", "width", "height", "chapter", "phase", "custom_folder", "unlock_chapter", "unlock_phase"
 
         # Botões
         button_width = 80
@@ -61,6 +66,18 @@ class MapConfigDialog:
         self.custom_folder_rect = pygame.Rect(x + 150, y + 280, 200, 30)
         self.browse_button_rect = pygame.Rect(x + 360, y + 280, 30, 30)
 
+        # Campos para requisito de desbloqueio (só aparecem se custom estiver selecionado)
+        self.unlock_chapter_label = pygame.Rect(x + 20, y + 325, 100, 25)
+        self.unlock_chapter_input = pygame.Rect(x + 150, y + 325, 80, 25)
+        self.unlock_phase_label = pygame.Rect(x + 250, y + 325, 60, 25)
+        self.unlock_phase_input = pygame.Rect(x + 310, y + 325, 80, 25)
+
+        # Ajusta altura do diálogo baseado no tipo
+        if current_localization_type == "custom":
+            self.rect.height = 400
+        else:
+            self.rect.height = 330
+
     def handle_event(self, event):
         """Processa eventos do diálogo"""
         if not self.visible:
@@ -85,7 +102,7 @@ class MapConfigDialog:
             # Alterna entre os inputs
             inputs = ["name", "width", "height", "chapter", "phase"]
             if self.temp_localization_type == "custom":
-                inputs.append("custom_folder")
+                inputs.extend(["custom_folder", "unlock_chapter", "unlock_phase"])
             current_index = inputs.index(self.active_input) if self.active_input in inputs else 0
             self.active_input = inputs[(current_index + 1) % len(inputs)]
             return None
@@ -102,6 +119,10 @@ class MapConfigDialog:
                 self.temp_phase = self.temp_phase[:-1]
             elif self.active_input == "custom_folder":
                 self.temp_custom_folder = self.temp_custom_folder[:-1]
+            elif self.active_input == "unlock_chapter":
+                self.temp_unlock_chapter = self.temp_unlock_chapter[:-1]
+            elif self.active_input == "unlock_phase":
+                self.temp_unlock_phase = self.temp_unlock_phase[:-1]
             return None
         else:
             # Adiciona caracteres
@@ -122,6 +143,10 @@ class MapConfigDialog:
                     self.temp_chapter += event.unicode
                 elif self.active_input == "phase":
                     self.temp_phase += event.unicode
+                elif self.active_input == "unlock_chapter":
+                    self.temp_unlock_chapter += event.unicode
+                elif self.active_input == "unlock_phase":
+                    self.temp_unlock_phase += event.unicode
             return None
 
     def _handle_mousedown(self, event):
@@ -149,10 +174,12 @@ class MapConfigDialog:
             self.temp_localization_type = "default"
             self.temp_custom_folder = ""
             self.active_input = "name"
+            self.rect.height = 330  # Altura padrão
             return None
         elif self.custom_radio_rect.collidepoint(mouse_pos):
             self.temp_localization_type = "custom"
             self.active_input = "custom_folder"
+            self.rect.height = 400  # Altura maior para unlock
             return None
         # Botão browse
         elif self.browse_button_rect.collidepoint(mouse_pos):
@@ -167,6 +194,13 @@ class MapConfigDialog:
         # Input da pasta customizada
         elif self.custom_folder_rect.collidepoint(mouse_pos) and self.temp_localization_type == "custom":
             self.active_input = "custom_folder"
+            return None
+        # Inputs de unlock
+        elif self.unlock_chapter_input.collidepoint(mouse_pos) and self.temp_localization_type == "custom":
+            self.active_input = "unlock_chapter"
+            return None
+        elif self.unlock_phase_input.collidepoint(mouse_pos) and self.temp_localization_type == "custom":
+            self.active_input = "unlock_phase"
             return None
         elif self.confirm_rect.collidepoint(mouse_pos):
             return self.confirm()
@@ -194,12 +228,28 @@ class MapConfigDialog:
                 # Se selecionou custom mas não deu nome, volta pra default
                 localization_type = "default"
                 custom_folder = ""
+                unlock_chapter = 1
+                unlock_phase = 1
             else:
                 localization_type = self.temp_localization_type
                 custom_folder = new_custom_folder if localization_type == "custom" else ""
 
+                # Valores de unlock (apenas para custom)
+                if localization_type == "custom":
+                    try:
+                        unlock_chapter = max(1,
+                                             min(99, int(self.temp_unlock_chapter) if self.temp_unlock_chapter else 1))
+                        unlock_phase = max(1, min(99, int(self.temp_unlock_phase) if self.temp_unlock_phase else 1))
+                    except ValueError:
+                        unlock_chapter = 1
+                        unlock_phase = 1
+                else:
+                    unlock_chapter = 1
+                    unlock_phase = 1
+
             self.visible = False
-            return {
+
+            result = {
                 'width': new_width,
                 'height': new_height,
                 'chapter': new_chapter,
@@ -208,6 +258,12 @@ class MapConfigDialog:
                 'localization_type': localization_type,
                 'custom_folder': custom_folder
             }
+
+            if localization_type == "custom":
+                result['unlock_chapter'] = unlock_chapter
+                result['unlock_phase'] = unlock_phase
+
+            return result
         except ValueError:
             return None
 
@@ -222,8 +278,7 @@ class MapConfigDialog:
         overlay.fill((0, 0, 0))
         screen.blit(overlay, (0, 0))
 
-        # Caixa de diálogo - aumentada para acomodar novos campos
-        self.rect.height = 380  # Aumenta altura
+        # Caixa de diálogo
         pygame.draw.rect(screen, (60, 60, 70), self.rect, border_radius=10)
         pygame.draw.rect(screen, (255, 215, 0), self.rect, 2, border_radius=10)
 
@@ -311,13 +366,15 @@ class MapConfigDialog:
         custom_text = font.render("Custom (minigames)", True, (200, 200, 200))
         screen.blit(custom_text, (self.custom_radio_rect.right + 5, self.rect.y + 241))
 
-        # Pasta customizada (só aparece se custom estiver selecionado)
+        # Pasta customizada e requisitos (só aparece se custom estiver selecionado)
         if self.temp_localization_type == "custom":
+            # Pasta
             folder_label = font.render("Pasta:", True, (200, 200, 200))
             screen.blit(folder_label, (label_x, self.rect.y + 285))
 
             color = (100, 150, 255) if self.active_input == "custom_folder" else (80, 80, 90)
-            pygame.draw.rect(screen, color, self.custom_folder_rect, 2)
+            pygame.draw.rect(screen, (50, 50, 60), self.custom_folder_rect, border_radius=5)
+            pygame.draw.rect(screen, color, self.custom_folder_rect, 2, border_radius=5)
 
             # Limita o texto visível
             display_folder = self.temp_custom_folder
@@ -337,9 +394,37 @@ class MapConfigDialog:
             browse_y = self.browse_button_rect.y + (self.browse_button_rect.height - browse_text.get_height()) // 2
             screen.blit(browse_text, (browse_x, browse_y))
 
+            # Seção de requisito de desbloqueio
+            unlock_title = font.render("Requisito para Desbloquear:", True, (255, 215, 0))
+            screen.blit(unlock_title, (label_x, self.rect.y + 325))
+
+            # Capítulo necessário
+            chapter_unlock_label = font.render("Capítulo:", True, (200, 200, 200))
+            screen.blit(chapter_unlock_label, (self.unlock_chapter_label.x, self.unlock_chapter_label.y + 3))
+
+            color = (100, 150, 255) if self.active_input == "unlock_chapter" else (80, 80, 90)
+            pygame.draw.rect(screen, (50, 50, 60), self.unlock_chapter_input, border_radius=5)
+            pygame.draw.rect(screen, color, self.unlock_chapter_input, 2, border_radius=5)
+            unlock_chapter_surf = font.render(self.temp_unlock_chapter, True, (255, 255, 255))
+            screen.blit(unlock_chapter_surf, (self.unlock_chapter_input.x + 5, self.unlock_chapter_input.y + 3))
+
+            # Fase necessária
+            phase_unlock_label = font.render("Fase:", True, (200, 200, 200))
+            screen.blit(phase_unlock_label, (self.unlock_phase_label.x, self.unlock_phase_label.y + 3))
+
+            color = (100, 150, 255) if self.active_input == "unlock_phase" else (80, 80, 90)
+            pygame.draw.rect(screen, (50, 50, 60), self.unlock_phase_input, border_radius=5)
+            pygame.draw.rect(screen, color, self.unlock_phase_input, 2, border_radius=5)
+            unlock_phase_surf = font.render(self.temp_unlock_phase, True, (255, 255, 255))
+            screen.blit(unlock_phase_surf, (self.unlock_phase_input.x + 5, self.unlock_phase_input.y + 3))
+
+            # Informação extra
+            info_y = self.rect.y + 365
+        else:
+            info_y = self.rect.y + 285
+
         # Informação
         info = font.render("TAB para alternar | Min: 5, Max: 500 tiles", True, (150, 150, 150))
-        info_y = self.rect.y + (325 if self.temp_localization_type == "custom" else 285)
         info_x = self.rect.x + (self.rect.width - info.get_width()) // 2
         screen.blit(info, (info_x, info_y))
 

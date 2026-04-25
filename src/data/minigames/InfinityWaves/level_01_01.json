@@ -2101,10 +2101,18 @@
             }
         ]
     },
+    "events": {
+        "triggers": [],
+        "selected_trigger": 0
+    },
     "rewards": {
         "money": 100,
         "experience": 50
     },
     "localization_type": "custom",
-    "custom_folder": "InfinityWaves"
+    "custom_folder": "InfinityWaves",
+    "unlock_requirement": {
+        "chapter": 1,
+        "phase": 2
+    }
 }

@@ -124,6 +124,8 @@ class EditorScene(BaseScene):
 
         self.localization_type = "default"  # "default" ou "custom"
         self.custom_folder = ""  # Pasta do minigame
+        self.unlock_chapter = 1  # Capítulo necessário para desbloquear (minigames)
+        self.unlock_phase = 1  # Fase necessária para desbloquear (minigames)
 
         print(f"Editor iniciado - {self.phase_name} - Grid size: {self.grid_size}px")
 
@@ -348,16 +350,23 @@ class EditorScene(BaseScene):
         current_layer = self.layer_manager.get_current_layer()
         if current_layer:
             dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
-            dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 380) // 2
+            dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 350) // 2
+
+            # Pega valores atuais de desbloqueio (para minigames)
+            unlock_chapter = getattr(self, 'unlock_chapter', 1)
+            unlock_phase = getattr(self, 'unlock_phase', 1)
+
             self.map_config_dialog = MapConfigDialog(
-                dialog_x, dialog_y, 400, 380,  # Altura aumentada
+                dialog_x, dialog_y, 400, 350,
                 current_layer.width,
                 current_layer.height,
                 self.current_chapter,
                 self.current_phase,
                 self.phase_name,
-                self.localization_type,  # Passa o tipo atual
-                self.custom_folder  # Passa a pasta atual
+                self.localization_type,
+                self.custom_folder,
+                unlock_chapter,
+                unlock_phase
             )
 
     def _open_load_phase_dialog(self):
@@ -455,7 +464,6 @@ class EditorScene(BaseScene):
             phase_changed = result['phase'] != self.current_phase
             name_changed = result['name'] != self.phase_name
 
-            # Atualiza os atributos de localização
             localization_changed = (result.get('localization_type', 'default') != self.localization_type or
                                     result.get('custom_folder', '') != self.custom_folder)
 
@@ -465,11 +473,20 @@ class EditorScene(BaseScene):
             self.localization_type = result.get('localization_type', 'default')
             self.custom_folder = result.get('custom_folder', '')
 
+            # Salva requisitos de desbloqueio para minigames
+            if self.localization_type == "custom":
+                self.unlock_chapter = result.get('unlock_chapter', 1)
+                self.unlock_phase = result.get('unlock_phase', 1)
+            else:
+                self.unlock_chapter = 1
+                self.unlock_phase = 1
+
             if chapter_changed or phase_changed or name_changed or localization_changed:
                 print(
                     f"Fase alterada para: {self.phase_name} (Capítulo {self.current_chapter}, Fase {self.current_phase})")
                 if self.localization_type == "custom":
                     print(f"  Localização Custom: {self.custom_folder}")
+                    print(f"  Requer desbloqueio: Capítulo {self.unlock_chapter}, Fase {self.unlock_phase}")
                 self.clear_undo_history()
 
     def _handle_target_item_selected(self, item_id):
@@ -571,7 +588,7 @@ class EditorScene(BaseScene):
         self.render_handler.render(screen)
 
     def save_phase(self):
-        """Salva a fase atual - agora com suporte a localização"""
+        """Salva a fase atual - INCLUINDO RECOMPENSAS E REQUISITOS"""
         phase_data = {
             "name": self.phase_name,
             "map": self.layer_manager.to_dict(),
@@ -580,7 +597,9 @@ class EditorScene(BaseScene):
             "tower_spots": self.tower_spots.to_dict(),
             "target_items": self.target_items.to_dict(),
             "events": self.event_manager.to_dict(),
-            "rewards": self.phase_rewards
+            "rewards": self.phase_rewards,
+            "unlock_chapter": getattr(self, 'unlock_chapter', 1),
+            "unlock_phase": getattr(self, 'unlock_phase', 1)
         }
 
         self.exporter.export_phase(
@@ -588,7 +607,9 @@ class EditorScene(BaseScene):
             self.current_chapter,
             self.current_phase,
             self.localization_type,
-            self.custom_folder
+            self.custom_folder,
+            getattr(self, 'unlock_chapter', 1),
+            getattr(self, 'unlock_phase', 1)
         )
 
         tipo = "Minigame" if self.localization_type == "custom" else "Fase"
@@ -598,12 +619,15 @@ class EditorScene(BaseScene):
               f"{len(self.event_manager.triggers)} gatilhos de evento, e "
               f"recompensas: {self.phase_rewards['money']} gold, {self.phase_rewards['experience']} XP!")
 
+        if self.localization_type == "custom":
+            print(
+                f"  Requisito de desbloqueio: Capítulo {getattr(self, 'unlock_chapter', 1)}, Fase {getattr(self, 'unlock_phase', 1)}")
+
     def load_phase(self, chapter, phase_number):
-        """Carrega uma fase existente - agora com suporte a localização"""
+        """Carrega uma fase existente - INCLUINDO RECOMPENSAS E SUPORTE A MINIGAMES"""
         print(
             f"\n=== CARREGANDO {'MINIGAME' if self.localization_type == 'custom' else 'FASE'} {chapter}-{phase_number} ===")
 
-        # Carrega usando a localização atual
         phase_data = self.exporter.load_phase(
             chapter,
             phase_number,
@@ -621,23 +645,16 @@ class EditorScene(BaseScene):
             print(f"Keys do phase_data: {phase_data.keys()}")
 
             # Pega o diretório raiz do projeto
-            # Caminho atual: .../pokemon-tower-defense/src/scenes/editor/editor_scene.py
             current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-            # Sobe 4 níveis para chegar na raiz
             project_root = os.path.abspath(os.path.join(current_dir))
 
             # Se ainda não estiver certo, tenta com caminho fixo para teste
             if not os.path.exists(os.path.join(project_root, "res")):
-                # Tenta caminho alternativo
                 project_root = os.path.dirname(
                     os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
             print(f"Project root calculado: {project_root}")
             print(f"Pasta res existe? {os.path.exists(os.path.join(project_root, 'res'))}")
-
-            if "localization_type" in phase_data:
-                self.localization_type = phase_data["localization_type"]
-                self.custom_folder = phase_data.get("custom_folder", "")
 
             # Carrega o mapa
             if "map" in phase_data:
@@ -676,6 +693,7 @@ class EditorScene(BaseScene):
                 self.target_items.from_dict(phase_data["target_items"])
                 print(f"Itens alvo carregados: {len(self.target_items.items)}")
 
+            # Carrega eventos
             if "events" in phase_data:
                 self.event_manager.from_dict(phase_data["events"])
                 print(f"Gatilhos de eventos carregados: {len(self.event_manager.triggers)}")
@@ -683,14 +701,35 @@ class EditorScene(BaseScene):
                 self.event_manager = EventManager()
                 print("Nenhum evento encontrado, criado gerenciador vazio")
 
-            # Carrega as recompensas (NOVO)
+            # Carrega as recompensas
             if "rewards" in phase_data:
                 self.phase_rewards = phase_data["rewards"]
-                print(f"Recompensas carregadas: Gold={self.phase_rewards.get('money', 100)}, XP={self.phase_rewards.get('experience', 50)}")
+                print(
+                    f"Recompensas carregadas: Gold={self.phase_rewards.get('money', 100)}, XP={self.phase_rewards.get('experience', 50)}")
             else:
                 # Valores padrão para fases antigas
                 self.phase_rewards = {"money": 100, "experience": 50}
                 print("Nenhuma recompensa encontrada, usando valores padrão (100 gold, 50 XP)")
+
+            # Carrega informações de localização (se vier do JSON)
+            if "localization_type" in phase_data:
+                self.localization_type = phase_data["localization_type"]
+                self.custom_folder = phase_data.get("custom_folder", "")
+                print(f"Localização carregada: {self.localization_type}" +
+                      (f" ({self.custom_folder})" if self.custom_folder else ""))
+            else:
+                # Compatibilidade com fases antigas
+                self.localization_type = "default"
+                self.custom_folder = ""
+
+            # Carrega requisito de desbloqueio para minigames
+            if self.localization_type == "custom" and "unlock_requirement" in phase_data:
+                self.unlock_chapter = phase_data["unlock_requirement"].get("chapter", 1)
+                self.unlock_phase = phase_data["unlock_requirement"].get("phase", 1)
+                print(f"Requisito de desbloqueio: Capítulo {self.unlock_chapter}, Fase {self.unlock_phase}")
+            else:
+                self.unlock_chapter = 1
+                self.unlock_phase = 1
 
             # Atualiza nome da fase
             self.phase_name = phase_data.get("name", f"Fase {chapter}-{phase_number}")
@@ -700,18 +739,47 @@ class EditorScene(BaseScene):
             # Atualiza a tile palette
             current_layer = self.layer_manager.get_current_layer()
             if current_layer and current_layer.tileset:
-                self.tile_palette.set_tileset(current_layer.tileset)
+                all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
+                self.tile_palette.set_tileset(all_tiles, boundaries)
                 print("Tile palette atualizada")
+
+            # Configura o wave manager com o path manager (se existir)
+            if hasattr(self, 'wave_manager') and hasattr(self, 'path_manager'):
+                self.path_manager.set_wave_manager(self.wave_manager)
 
             # Limpa historico
             self.clear_undo_history()
 
-            print(f"\n✓ Fase {chapter}-{phase_number} carregada com sucesso!")
+            # Atualiza os limites do mundo baseado no tamanho da layer atual
+            if current_layer:
+                map_width = current_layer.width * self.grid_size
+                map_height = current_layer.height * self.grid_size
+
+                # Atualiza limites expandidos
+                self.min_world_x = -1000
+                self.min_world_y = -1000
+                self.max_world_x = map_width + 1000
+                self.max_world_y = map_height + 1000
+
+                # Atualiza câmera
+                if hasattr(self, 'camera'):
+                    self.camera.set_limits(self.min_world_x, self.max_world_x,
+                                           self.min_world_y, self.max_world_y)
+
+            print(
+                f"\n✓ {'Minigame' if self.localization_type == 'custom' else 'Fase'} {chapter}-{phase_number} carregada com sucesso!")
+            print(f"  Nome: {self.phase_name}")
             print(f"  Layers: {len(self.layer_manager.layers)}")
             print(f"  Paths: {len(self.path_manager.paths)}")
             print(f"  Spots: {len(self.tower_spots.spots)}")
             print(f"  Itens: {len(self.target_items.items)}")
             print(f"  Recompensas: {self.phase_rewards['money']} gold, {self.phase_rewards['experience']} XP")
+
+            if self.localization_type == "custom":
+                print(f"  Tipo: Minigame")
+                print(f"  Pasta: {self.custom_folder}")
+                print(f"  Desbloqueio: Capítulo {self.unlock_chapter}, Fase {self.unlock_phase}")
+
             return True
 
         except Exception as e:

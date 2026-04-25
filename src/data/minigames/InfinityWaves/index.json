@@ -3,7 +3,11 @@
     "levels": [
         {
             "chapter": 1,
-            "level": 1
+            "level": 1,
+            "unlock_requirement": {
+                "chapter": 1,
+                "phase": 2
+            }
         }
     ]
 }
