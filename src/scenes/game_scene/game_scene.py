@@ -315,10 +315,13 @@ class GameScene(BaseScene):
     # ===== MÉTODOS DE ITEM E CAPTURA =====
 
     def _on_item_use(self, target, item_data, target_type):
-        """Callback quando um item é usado em um alvo"""
+        """Callback quando um item é usado em um alvo. """
         effect = item_data.get("effect", "")
         category = item_data.get("category", "")
 
+        print(f"[ITEM USE] Categoria: {category}, Efeito: {effect}, Alvo: {target_type}")
+
+        # ===== CURAS DE STATUS =====
         if effect == "cure_status":
             if target_type == "ally":
                 from src.battle.effects.status_effect import StatusType
@@ -337,43 +340,61 @@ class GameScene(BaseScene):
                     current_status = self.battle_system.effect_manager.get_status(target)
                     if current_status and current_status.type == status_type:
                         self.battle_system.effect_manager.remove_status(target)
-                        toast_battle(f"{target.name} curou {status_to_cure}!", duration=4.0, pokemon=target, portrait="happy")
+                        toast_battle(f"{target.name} curou {status_to_cure}!", duration=4.0, pokemon=target,
+                                     portrait="happy")
                         return True
                 return False
 
+        # ===== CURA TODOS STATUS =====
         elif effect == "cure_all_status":
             if target_type == "ally":
                 current_status = self.battle_system.effect_manager.get_status(target)
                 if current_status and current_status.type.value != "none":
                     self.battle_system.effect_manager.remove_status(target)
                     self.battle_system.effect_manager.add_status_text(target, "todos os status curados!")
-                    toast_battle(f"{item_data['name']} usado em {target.name}!", duration=4.0, pokemon=target,portrait="happy")
+                    toast_battle(f"{item_data['name']} usado em {target.name}!", duration=4.0, pokemon=target,
+                                 portrait="happy")
                     return True
                 return False
 
+        # ===== RESTAURA PP =====
         elif effect == "pp_restore":
             if target_type == "ally" and hasattr(target, 'restore_pp'):
                 percentage = item_data.get("effect_value", 1.0)
                 restored = target.restore_pp(percentage=percentage)
                 if restored > 0:
-                    toast_battle(f"{item_data['name']} usado em {target.name}! {restored} PP restaurados!!", duration=4.0, pokemon=target, portrait="happy")
+                    toast_battle(f"{item_data['name']} usado em {target.name}! {restored} PP restaurados!!",
+                                 duration=4.0, pokemon=target, portrait="happy")
                     return True
                 return False
 
+        # ===== PEDRA DE EVOLUÇÃO =====
         elif effect == "evolution":
             if target_type == "ally":
-                return self._use_evolution_stone(target, item_data)
+                success = self._use_evolution_stone(target, item_data)
+                return success
 
+        # ===== TM =====
         elif effect == "teach_move":
             if target_type == "ally":
                 move_to_teach = item_data.get("effect_value")
-                return self._teach_move_to_pokemon(target, move_to_teach, item_data)
+                success = self._teach_move_to_pokemon(target, move_to_teach, item_data)
+                return success
 
+        # ===== POKÉBOLA =====
         elif target_type == "enemy" and category == "pokeball":
-            return self._attempt_capture(target, item_data)
+            # Verifica se é BOSS primeiro
+            if hasattr(target, 'is_boss') and target.is_boss:
+                toast_battle(f"Não é possível capturar {target.name}!", duration=2.0, pokemon=target, portrait="angry")
+                return False  # BOSS: NÃO consome a pokébola
 
+            self._attempt_capture(target, item_data)
+            return True
+
+        # ===== MEDICAMENTOS =====
         elif target_type == "ally" and category == "medicine":
-            return self.use_medicine(target, item_data)
+            medicine_success = self.use_medicine(target, item_data)
+            return medicine_success
 
         return False
 
@@ -436,9 +457,11 @@ class GameScene(BaseScene):
         return True
 
     def _attempt_capture(self, enemy, item_data):
-        """Tenta capturar um Pokémon selvagem"""
+        """Tenta capturar um Pokémon selvagem."""
+        # BOSS não pode ser capturado
         if hasattr(enemy, 'is_boss') and enemy.is_boss:
-            return False
+            toast_battle(f"Não é possível capturar {enemy.name}!", duration=2.0, pokemon=enemy, portrait="angry")
+            return  # Sai sem fazer nada, mas a pokébola já foi consumida
 
         hp_ratio = enemy.current_hp / enemy.max_hp
         base_chance = (1 - hp_ratio * 0.5)
@@ -455,48 +478,57 @@ class GameScene(BaseScene):
         import random
         roll = random.random()
 
-        if roll < chance or item_data["id"] == "masterball":
-            carried_item = enemy.is_carrying
-            if carried_item:
-                enemy.drop_item()
+        print(f"[CAPTURE] Chance: {chance:.2f}, Roll: {roll:.2f}, Item: {item_data['id']}")
 
-            self.wave_manager.remove_enemy(enemy)
+        # Master Ball sempre captura
+        if item_data["id"] == "masterball":
+            self._perform_capture(enemy)
+            return
 
-            from src.entities.pokemon import Pokemon
-            caught = Pokemon(
-                enemy.x, enemy.y,
-                enemy.id,
-                level=enemy.level,
-                is_wild=False,
-                shiny=enemy.is_shiny
-            )
-            caught.current_hp = enemy.current_hp
-            caught.max_hp = enemy.max_hp
-            caught.ivs = enemy.ivs.copy()
-            caught.evs = enemy.evs.copy()
-            caught.xp = enemy.xp
-            caught.nature = enemy.nature
+        # Tentativa de captura normal
+        if roll < chance:
+            self._perform_capture(enemy)
+        else:
+            # Captura falhou
+            toast_battle(f"{enemy.name} escapou...", duration=2.0, pokemon=enemy, portrait="angry")
+            print(f"[CAPTURE] {enemy.name} escapou! Pokébola foi consumida.")
 
-            is_to_team = self.player.has_team_space()
-            if is_to_team:
-                toast_battle(f"{caught.name} foi adicionado ao time!", duration=4.0, pokemon=caught, portrait="happy")
-                self.player.add_to_team(caught)
-            else:
-                toast_battle(f"{caught.name} foi adicionado à box!", duration=4.0, pokemon=caught)
-                self.player.add_to_box(caught)
+    def _perform_capture(self, enemy):
+        """Executa a captura de um Pokémon (código extraído para reuso)"""
+        carried_item = enemy.is_carrying
+        if carried_item:
+            enemy.drop_item()
 
-            self.player.caught_pokemon.add(enemy.id)
-            self.player.register_seen(enemy.id)
-            self.player.auto_save()
+        self.wave_manager.remove_enemy(enemy)
 
-            self.show_capture_overlay(caught, is_to_team)
-            #toast_success(f"{caught.name} foi capturado!", duration=4.0)
+        from src.entities.pokemon import Pokemon
+        caught = Pokemon(
+            enemy.x, enemy.y,
+            enemy.id,
+            level=enemy.level,
+            is_wild=False,
+            shiny=enemy.is_shiny
+        )
+        caught.current_hp = enemy.current_hp
+        caught.max_hp = enemy.max_hp
+        caught.ivs = enemy.ivs.copy()
+        caught.evs = enemy.evs.copy()
+        caught.xp = enemy.xp
+        caught.nature = enemy.nature
 
-            return True
+        is_to_team = self.player.has_team_space()
+        if is_to_team:
+            toast_battle(f"{caught.name} foi adicionado ao time!", duration=4.0, pokemon=caught, portrait="happy")
+            self.player.add_to_team(caught)
+        else:
+            toast_battle(f"{caught.name} foi adicionado à box!", duration=4.0, pokemon=caught)
+            self.player.add_to_box(caught)
 
-        toast_battle(f"{enemy.name} escapou...", duration=4.0, pokemon=enemy, portrait="angry")
+        self.player.caught_pokemon.add(enemy.id)
+        self.player.register_seen(enemy.id)
+        self.player.auto_save()
 
-        return False
+        self.show_capture_overlay(caught, is_to_team)
 
     @staticmethod
     def use_medicine(pokemon, item_data):

@@ -3,6 +3,9 @@ import random
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 
+from src.managers.sounds.sound_manager import sound_manager, SoundEffect
+from ui.toast_renderer import toast_battle
+
 
 @dataclass
 class WaveConfig:
@@ -328,9 +331,10 @@ class EnemySpawner:
 
         # Garante que o inimigo está vivo
         pokemon.current_hp = pokemon.max_hp
+        if pokemon.is_shiny:
+            sound_manager.play_effect(SoundEffect.SHINY)
+            toast_battle(f"{pokemon.name} shiny apareceu!)", duration=4.0, pokemon=pokemon, portrait="angry")
 
-        print(
-            f"[Spawner] Criado {pokemon.name} Lv.{pokemon.level} {'(BOSS)' if is_boss else ''} em ({pokemon.x}, {pokemon.y})")
         return pokemon
 
     def _choose_enemy(self, enemies: List[dict]) -> Optional[dict]:

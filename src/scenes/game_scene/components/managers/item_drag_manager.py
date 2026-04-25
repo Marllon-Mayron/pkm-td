@@ -277,6 +277,7 @@ class ItemDragManager:
             return None
 
         result = None
+        should_consume = False  # Flag para controlar consumo do item
 
         # Se tem um alvo válido, tenta usar o item
         if self.valid_target and self.hovered_target and self.drag_item_id:
@@ -300,25 +301,37 @@ class ItemDragManager:
                 valid_use = True
 
             if valid_use:
-                use_success = False
-
                 if on_item_use_callback:
-                    result = on_item_use_callback(
+                    callback_result = on_item_use_callback(
                         self.hovered_target,
                         self.drag_item_data,
                         self.target_type
                     )
-                    # Se o callback retornar True/False, usa isso
-                    if isinstance(result, bool):
-                        use_success = result
-                    else:
-                        use_success = True
-                else:
-                    use_success = True
 
-                # SÓ remove o item se o uso foi bem-sucedido
-                if use_success:
-                    self.bag.remove_item(self.drag_item_id, 1)
+                    # Processa o resultado do callback
+                    if isinstance(callback_result, dict):
+                        # Formato novo: dicionário com 'consume_item'
+                        should_consume = callback_result.get('consume_item', False)
+                        result = callback_result
+                    elif isinstance(callback_result, bool):
+                        # Formato antigo: True = sucesso (consumir), False = falha (não consumir)
+                        should_consume = callback_result
+                        result = callback_result
+                    else:
+                        # Fallback: assume que não consome
+                        should_consume = False
+                        result = callback_result
+                else:
+                    # Sem callback, assume que deve consumir (caso raro)
+                    should_consume = True
+                    result = True
+
+        # SÓ remove o item se deve ser consumido
+        if should_consume and self.drag_item_id:
+            self.bag.remove_item(self.drag_item_id, 1)
+            print(f"[ITEM] ✓ Consumiu {self.drag_item_data['name']}")
+        elif self.drag_item_id and not should_consume:
+            print(f"[ITEM] ✗ NÃO consumiu {self.drag_item_data['name']} - uso falhou ou foi cancelado")
 
         # Reseta estado
         self.is_dragging = False
