@@ -2395,55 +2395,203 @@ class MoveEffect:
         - Teleporta para um spot livre aleatório
         - 20% de chance de trocar de lugar com um aliado se houver
         """
-
         # Verifica se o atacante está colocado no mapa
         if not hasattr(attacker, 'is_placed') or not attacker.is_placed:
             effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
             print(f"[TELEPORT] {attacker.name} não está no mapa!")
             return False
 
-        # Obtém o placement_manager
-        if not battle_system.game_scene or not hasattr(battle_system.game_scene, 'placement_manager'):
-            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
-            print(f"[TELEPORT] PlacementManager não encontrado!")
-            return False
-
-        placement_manager = battle_system.game_scene.placement_manager
-        spot_renderer = battle_system.game_scene.spot_renderer
-
-        # Obtém todos os spots
-        all_spots = spot_renderer.get_spots()
-        if not all_spots:
+        if not battle_system.game_scene:
             effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
             return False
 
-        # ===== VERIFICA A CHANCE DE TROCA COM ALIADO (20%) =====
-        swap_chance = self.params.get("swap_chance", 0.20)
-        will_swap = random.random() < swap_chance
+        # ===== CORREÇÃO: Detecta qual modo de jogo está ativo =====
+        game_scene = battle_system.game_scene
 
-        if will_swap:
-            # Tenta trocar com um aliado
-            swapped = self._try_swap_with_ally(attacker, placement_manager, effect_manager)
-            if swapped:
-                return True
+        # Verifica se é SurvivalMinigameScene (tem player_pokemon)
+        is_survival = hasattr(game_scene, 'player_pokemon')
 
-        # ===== TELEPORT NORMAL: Encontra um spot livre aleatório =====
-        # Filtra spots livres (não ocupados)
-        free_spots = [spot for spot in all_spots if not spot.occupied]
+        if is_survival:
+            # Modo Survival - usa SurvivalPlacementManager
+            placement_manager = game_scene.placement_manager
+            spot_renderer = game_scene.spot_renderer
 
-        if not free_spots:
-            # Não tem spot livre - TELEPORT ERRA
-            effect_manager.add_status_text(attacker,
-                                           f"{attacker.name} usou Teleport, mas não encontrou um local seguro!",
-                                           duration=1.5)
-            print(f"[TELEPORT] {attacker.name} falhou! Nenhum spot livre disponível!")
+            # Obtém todos os spots
+            all_spots = spot_renderer.get_spots()
+            if not all_spots:
+                effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+                return False
+
+            # Chance de trocar com aliado
+            swap_chance = self.params.get("swap_chance", 0.20)
+            will_swap = random.random() < swap_chance
+
+            if will_swap:
+                swapped = self._try_swap_with_ally_survival(attacker, placement_manager, effect_manager, game_scene)
+                if swapped:
+                    return True
+
+            # Teleport normal: spot livre
+            free_spots = [spot for spot in all_spots if not spot.occupied]
+            if not free_spots:
+                effect_manager.add_status_text(attacker,
+                                               f"{attacker.name} usou Teleport, mas não encontrou um local seguro!",
+                                               duration=1.5)
+                return False
+
+            target_spot = random.choice(free_spots)
+            return self._perform_teleport_survival(attacker, target_spot, placement_manager, effect_manager, game_scene)
+
+        else:
+            # Modo Campanha - usa PlacementManager com game
+            placement_manager = game_scene.placement_manager
+            spot_renderer = game_scene.spot_renderer
+
+            all_spots = spot_renderer.get_spots()
+            if not all_spots:
+                effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+                return False
+
+            swap_chance = self.params.get("swap_chance", 0.20)
+            will_swap = random.random() < swap_chance
+
+            if will_swap:
+                swapped = self._try_swap_with_ally(attacker, placement_manager, effect_manager)
+                if swapped:
+                    return True
+
+            free_spots = [spot for spot in all_spots if not spot.occupied]
+            if not free_spots:
+                effect_manager.add_status_text(attacker,
+                                               f"{attacker.name} usou Teleport, mas não encontrou um local seguro!",
+                                               duration=1.5)
+                return False
+
+            target_spot = random.choice(free_spots)
+            return self._perform_teleport(attacker, target_spot, placement_manager, effect_manager)
+
+    def _try_swap_with_ally_survival(self, attacker, placement_manager, effect_manager, game_scene):
+        """
+        Tenta trocar de lugar com um Pokémon aliado (modo Survival)
+        """
+        # No Survival, os aliados estão em player_pokemon
+        allies = []
+        for p in game_scene.player_pokemon:
+            if p != attacker and p.is_alive() and hasattr(p, 'is_placed') and p.is_placed:
+                allies.append(p)
+
+        if not allies:
+            print(f"[TELEPORT] {attacker.name} tentou trocar, mas não há aliados!")
             return False
 
-        # Escolhe um spot livre aleatório
-        target_spot = random.choice(free_spots)
+        target_ally = random.choice(allies)
 
-        # Realiza o teleport
-        return self._perform_teleport(attacker, target_spot, placement_manager, effect_manager)
+        # Guarda as posições atuais
+        attacker_old_x = attacker.x
+        attacker_old_y = attacker.y
+        attacker_old_spot_tile = (attacker.placed_tile_x, attacker.placed_tile_y) if hasattr(attacker,
+                                                                                             'placed_tile_x') else None
+
+        ally_old_x = target_ally.x
+        ally_old_y = target_ally.y
+        ally_old_spot_tile = (target_ally.placed_tile_x, target_ally.placed_tile_y) if hasattr(target_ally,
+                                                                                               'placed_tile_x') else None
+
+        # Troca as posições
+        attacker.x = ally_old_x
+        attacker.y = ally_old_y
+        if hasattr(attacker, 'placed_tile_x') and ally_old_spot_tile:
+            attacker.placed_tile_x = ally_old_spot_tile[0]
+            attacker.placed_tile_y = ally_old_spot_tile[1]
+        attacker.original_spot_x = attacker.x
+        attacker.original_spot_y = attacker.y
+
+        target_ally.x = attacker_old_x
+        target_ally.y = attacker_old_y
+        if hasattr(target_ally, 'placed_tile_x') and attacker_old_spot_tile:
+            target_ally.placed_tile_x = attacker_old_spot_tile[0]
+            target_ally.placed_tile_y = attacker_old_spot_tile[1]
+        target_ally.original_spot_x = target_ally.x
+        target_ally.original_spot_y = target_ally.y
+
+        # Atualiza rects
+        if hasattr(attacker, 'rect'):
+            attacker.rect.x, attacker.rect.y = attacker.x, attacker.y
+        if hasattr(target_ally, 'rect'):
+            target_ally.rect.x, target_ally.rect.y = target_ally.x, target_ally.y
+
+        # Reseta estados
+        attacker.combat_state = "idle"
+        attacker.target = None
+        target_ally.combat_state = "idle"
+        target_ally.target = None
+
+        effect_manager.add_status_text(attacker, f"{attacker.name} trocou de lugar com {target_ally.name}!",
+                                       duration=1.5)
+        print(f"[TELEPORT] {attacker.name} trocou de lugar com {target_ally.name}!")
+
+        return True
+
+    def _perform_teleport_survival(self, attacker, target_spot, placement_manager, effect_manager, game_scene):
+        """
+        Executa o teleport para um spot específico (modo Survival)
+        """
+        tile_size = placement_manager.tile_size
+
+        # Calcula o centro do spot destino
+        new_x = (target_spot.x // tile_size) * tile_size + tile_size // 2
+        new_y = (target_spot.y // tile_size) * tile_size + tile_size // 2
+
+        # Salva a posição antiga
+        old_x = attacker.x
+        old_y = attacker.y
+        old_tile = (attacker.placed_tile_x, attacker.placed_tile_y) if hasattr(attacker, 'placed_tile_x') else None
+
+        # Move o Pokémon
+        attacker.x = new_x
+        attacker.y = new_y
+        attacker.original_spot_x = new_x
+        attacker.original_spot_y = new_y
+
+        # Atualiza as coordenadas de tile
+        attacker.placed_tile_x = new_x // tile_size
+        attacker.placed_tile_y = new_y // tile_size
+
+        # Atualiza o rect
+        if hasattr(attacker, 'rect'):
+            attacker.rect.x, attacker.rect.y = attacker.x, attacker.y
+
+        # Marca o novo spot como ocupado
+        target_spot.occupied = True
+
+        # Desocupa o spot antigo (usando game_scene.spot_renderer)
+        if old_tile:
+            for spot in game_scene.spot_renderer.get_spots():
+                spot_tile_x = spot.x // tile_size
+                spot_tile_y = spot.y // tile_size
+                if spot_tile_x == old_tile[0] and spot_tile_y == old_tile[1]:
+                    spot.occupied = False
+                    print(f"[TELEPORT] Spot antigo ({spot.x}, {spot.y}) desocupado")
+                    break
+
+        # Reseta estado de combate
+        attacker.combat_state = "idle"
+        attacker.target = None
+        attacker.charge_cooldown = 0
+
+        # Mostra mensagem
+        effect_manager.add_status_text(attacker, f"{attacker.name} usou Teleport!", duration=1.0)
+        print(f"[TELEPORT] {attacker.name} teleportou de ({old_x}, {old_y}) para ({new_x}, {new_y})!")
+
+        # Toca som
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("teleport")
+
+        # Toca animação de teleporte (se tiver)
+        if hasattr(attacker, 'play_teleport_animation'):
+            attacker.play_teleport_animation()
+
+        return True
 
     def _try_swap_with_ally(self, attacker, placement_manager, effect_manager):
         """

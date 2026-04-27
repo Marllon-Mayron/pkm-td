@@ -1,7 +1,7 @@
 {
     "chapter": 1,
     "phase": 1,
-    "name": "TrySurvive",
+    "name": "sruvival",
     "map": {
         "width": 29,
         "height": 17,
@@ -2110,7 +2110,7 @@
         "experience": 50
     },
     "localization_type": "custom",
-    "custom_folder": "InfinityWaves",
+    "custom_folder": "survival",
     "unlock_requirement": {
         "chapter": 1,
         "phase": 2

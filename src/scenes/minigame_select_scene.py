@@ -1,4 +1,4 @@
-# src/scenes/minigame_select_scene.py
+# src/scenes/minigame_select_scene.py (versão atualizada)
 
 """
 Tela de Seleção de Minigames - Estilo Plants vs Zombies
@@ -363,24 +363,30 @@ class MinigameSelectScene(BaseScene):
         """Inicia um nível de minigame"""
         print(f"Iniciando minigame {self.selected_minigame_folder} - Nível {level_number}")
 
-        # Carrega os dados do nível
-        phase_data = self.exporter.load_phase(
-            level_number,  # chapter (usamos como nível)
-            1,  # phase (fixo 1)
-            localization_type="custom",
-            custom_folder=self.selected_minigame_folder
-        )
+        # Mapeamento de minigames para suas cenas
+        if self.selected_minigame_folder == "survival":
+            from src.scenes.minigames.survival import SurvivalMinigameScene
 
-        if phase_data:
-            # Aqui você pode chamar sua cena do minigame específico
-            # Por enquanto, vamos apenas printar
-            print(f"Minigame carregado: {phase_data.get('name', 'Sem nome')}")
-            print(f"Recompensas: {phase_data.get('rewards', {})}")
-
-            # TODO: Criar e mudar para a cena do minigame
-            # self.game.current_scene = MinigameScene(self.game, phase_data)
+            # O level_number é o número do nível (ex: 1)
+            # O chapter_id deve ser o level_number
+            # O phase_number é sempre 1
+            self.game.current_scene = SurvivalMinigameScene(
+                self.game,
+                chapter_id=level_number,
+                phase_number=1
+            )
         else:
-            print(f"Erro ao carregar nível {level_number} do minigame {self.selected_minigame_folder}")
+            # Para outros minigames...
+            phase_data = self.exporter.load_phase(
+                level_number,
+                1,
+                localization_type="custom",
+                custom_folder=self.selected_minigame_folder
+            )
+            if phase_data:
+                print(f"Minigame carregado: {phase_data.get('name', 'Sem nome')}")
+            else:
+                print(f"Erro ao carregar nível {level_number}")
 
     def _get_scroll_bar_rect(self):
         """Retorna retângulo da barra de scroll"""
