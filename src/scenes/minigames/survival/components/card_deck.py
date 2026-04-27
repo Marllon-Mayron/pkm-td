@@ -345,7 +345,7 @@ class CardDeck:
         return self.TYPE_COLORS.get(type_name.lower(), self.DEFAULT_TYPE_COLOR)
 
     def _calculate_fan_positions(self):
-        """Calcula posições em leque estilo UNO - SEMPRE CENTRALIZADO"""
+        """Calcula posições em leque - espaçamento DINÂMICO baseado no número de cartas"""
         viewport = self.game_scene.screen_manager
         viewport_width = viewport.viewport_width
         viewport_height = viewport.viewport_height
@@ -364,17 +364,36 @@ class CardDeck:
         self.fan_positions = []
         num_cards = len(self.cards)
 
+        # Ajuste DINÂMICO apenas quando tem MUITAS cartas
+        # Poucas cartas (até 5) = valores originais bons
+        # Muitas cartas (6+) = aumenta espaçamento
+        if num_cards <= 5:
+            # Mantém os valores originais que já estavam bons
+            current_angle = 35
+            current_radius = 270
+            current_spacing = 1.0
+        elif num_cards <= 7:
+            # Aumenta um pouco para 6-7 cartas
+            current_angle = 40
+            current_radius = 300
+            current_spacing = 1.3
+        else:
+            # Aumenta mais para 8-10 cartas
+            current_angle = 45
+            current_radius = 330
+            current_spacing = 1.5
+
         for i in range(num_cards):
             t = i / (num_cards - 1)
-            angle_deg = -self.FAN_ANGLE / 2 + t * self.FAN_ANGLE
+            angle_deg = -current_angle / 2 + t * current_angle
             angle_rad = math.radians(angle_deg)
             rotation = -angle_deg * 0.7
 
-            angle_normalized = abs(angle_deg) / (self.FAN_ANGLE / 2)
+            angle_normalized = abs(angle_deg) / (current_angle / 2)
             max_rise = self.CARD_HEIGHT * 0.10
             y_offset = -max_rise * (1 - angle_normalized)
 
-            x_offset = math.tan(angle_rad) * self.FAN_RADIUS * self.CARD_SPACING_MULTIPLIER
+            x_offset = math.tan(angle_rad) * current_radius * current_spacing
             x = center_x + x_offset - self.CARD_WIDTH // 2
             y = base_y + y_offset
 
@@ -450,18 +469,35 @@ class CardDeck:
         return positions
 
     def get_card_at_pos(self, mouse_x: int, mouse_y: int) -> Optional[int]:
+        """Obtém carta na posição com DETECÇÃO MELHORADA"""
         positions = self.get_card_positions()
 
         if not positions:
             return -1
 
+        # Área de clique um pouco maior (só para facilitar clique)
+        click_tolerance = 8
+
+        # Primeiro tenta pegar a carta que está com hover
+        if self.hovered_index >= 0:
+            for idx, x, y, card, rot in positions:
+                if idx == self.hovered_index:
+                    temp_rect = pygame.Rect(x - click_tolerance, y - click_tolerance,
+                                            self.CARD_WIDTH + click_tolerance * 2,
+                                            self.CARD_HEIGHT + click_tolerance * 2)
+                    if temp_rect.collidepoint(mouse_x, mouse_y):
+                        return idx
+                    break
+
+        # Se não, verifica todas na ordem correta
         click_order = self._get_fan_click_order(len(positions))
 
         for idx_in_order in click_order:
             for idx, x, y, card, rot in positions:
                 if idx == idx_in_order and card is not None:
-                    temp_rect = pygame.Rect(x, y, self.CARD_WIDTH, self.CARD_HEIGHT)
-                    temp_rect.inflate_ip(8, 8)
+                    temp_rect = pygame.Rect(x - 5, y - 5,
+                                            self.CARD_WIDTH + 10,
+                                            self.CARD_HEIGHT + 10)
                     if temp_rect.collidepoint(mouse_x, mouse_y):
                         return idx
         return -1

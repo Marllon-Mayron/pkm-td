@@ -260,11 +260,32 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
     def _get_pokemon_status(self, pokemon) -> Optional[StatusType]:
         """Retorna o status atual do Pokémon"""
-        if pokemon and pokemon.effect_manager:
+        if pokemon and hasattr(pokemon, 'effect_manager') and pokemon.effect_manager:
             status = pokemon.effect_manager.get_status(pokemon)
             if status:
-                return status.type
+                # Verifica se status tem o atributo 'type'
+                if hasattr(status, 'type'):
+                    return status.type
+                # Se status já é o enum diretamente
+                elif isinstance(status, StatusType):
+                    return status
         return None
+
+    def _get_pokemon_status_name(self, pokemon) -> str:
+        """Retorna o nome do status atual do Pokémon como string"""
+        status_type = self._get_pokemon_status(pokemon)
+        if not status_type:
+            return "none"
+
+        status_names = {
+            StatusType.POISON: "poison",
+            StatusType.PARALYSIS: "paralysis",
+            StatusType.SLEEP: "sleep",
+            StatusType.BURN: "burn",
+            StatusType.FREEZE: "freeze",
+            StatusType.NONE: "none"
+        }
+        return status_names.get(status_type, "none")
 
     def try_use_item(self, spot, item_data: dict) -> bool:
         """Tenta usar um item em um Pokémon no spot"""
@@ -299,7 +320,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
         item_name = item_data.get('id', 'item').upper()
 
         success = False
-        fail_reason = None
 
         if effect == 'heal':
             heal_amount = effect_value
@@ -318,16 +338,21 @@ class SurvivalMinigameScene(BaseMinigameScene):
         elif effect == 'cure_status':
             status_to_cure = effect_value  # "poison", "paralysis", etc.
 
-            # Verifica o status atual do Pokémon
-            current_status = self._get_pokemon_status(target_pokemon)
-
-            # Mapeia o status para o nome correto
+            # Mapeamento dos status
             status_map = {
                 "poison": StatusType.POISON,
                 "paralysis": StatusType.PARALYSIS,
                 "sleep": StatusType.SLEEP,
                 "burn": StatusType.BURN,
                 "freeze": StatusType.FREEZE
+            }
+
+            status_names = {
+                StatusType.POISON: "envenenado",
+                StatusType.PARALYSIS: "paralisado",
+                StatusType.SLEEP: "dormindo",
+                StatusType.BURN: "queimado",
+                StatusType.FREEZE: "congelado"
             }
 
             status_type = status_map.get(status_to_cure)
@@ -337,38 +362,37 @@ class SurvivalMinigameScene(BaseMinigameScene):
                               duration=1.5, pokemon=target_pokemon, portrait="sad")
                 return False
 
+            # ===== CORREÇÃO AQUI =====
+            # Pega o status atual como string para comparação
+            current_status_name = self._get_pokemon_status_name(target_pokemon)
+            needed_status_name = status_to_cure.lower()
+
+            print(f"[DEBUG] Item {item_name}: status_to_cure={needed_status_name}, current={current_status_name}")
+
             # Se não tem nenhum status
-            if not current_status or current_status.value == "none":
-                # Mostra mensagem específica baseada no tipo de cura
-                status_names = {
-                    StatusType.POISON: "envenenado",
-                    StatusType.PARALYSIS: "paralisado",
-                    StatusType.SLEEP: "dormindo",
-                    StatusType.BURN: "queimado",
-                    StatusType.FREEZE: "congelado"
-                }
-                needed_status = status_names.get(status_type, "afetado")
-                toast_warning(f"{target_pokemon.name} não está {needed_status}! {item_name} não pode ser usado.",
-                              duration=2.0, pokemon=target_pokemon, portrait="normal")
+            if current_status_name == "none":
+                needed_status_display = status_names.get(status_type, "afetado")
+                toast_warning(
+                    f"{target_pokemon.name} não está {needed_status_display}! {item_name} não pode ser usado.",
+                    duration=2.0, pokemon=target_pokemon, portrait="normal")
                 return False
 
             # Se tem o status correto, cura
-            if current_status == status_type:
-                target_pokemon.effect_manager.remove_status(target_pokemon)
-                toast_success(f"{item_name} usado! {target_pokemon.name} foi curado!",
-                              duration=2.0, pokemon=target_pokemon, portrait="happy")
-                success = True
+            if current_status_name == needed_status_name:
+                # Remove o status usando o effect_manager
+                if target_pokemon.effect_manager:
+                    target_pokemon.effect_manager.remove_status(target_pokemon)
+                    toast_success(f"{item_name} usado! {target_pokemon.name} foi curado!",
+                                  duration=2.0, pokemon=target_pokemon, portrait="happy")
+                    success = True
+                else:
+                    toast_warning(f"Não foi possível curar {target_pokemon.name}!",
+                                  duration=1.5, pokemon=target_pokemon, portrait="sad")
+                    return False
             else:
                 # Tem status diferente do que o item cura
-                status_names = {
-                    StatusType.POISON: "envenenado",
-                    StatusType.PARALYSIS: "paralisado",
-                    StatusType.SLEEP: "dormindo",
-                    StatusType.BURN: "queimado",
-                    StatusType.FREEZE: "congelado"
-                }
-                current_name = status_names.get(current_status, "afetado")
-                needed_name = status_names.get(status_type, "afetado")
+                current_name = status_names.get(status_map.get(current_status_name), current_status_name)
+                needed_name = status_names.get(status_type, needed_status_name)
                 toast_warning(f"{target_pokemon.name} está {current_name}! {item_name} cura {needed_name} apenas.",
                               duration=2.0, pokemon=target_pokemon, portrait="sad")
                 return False
@@ -403,16 +427,19 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 return False
 
         elif effect == 'cure_all_status':
-            current_status = self._get_pokemon_status(target_pokemon)
-            if not current_status or current_status.value == "none":
+            current_status_name = self._get_pokemon_status_name(target_pokemon)
+            if current_status_name == "none":
                 toast_warning(f"{target_pokemon.name} não tem nenhum status para curar!",
                               duration=1.5, pokemon=target_pokemon, portrait="normal")
                 return False
 
-            target_pokemon.effect_manager.remove_status(target_pokemon)
-            toast_success(f"{item_name} usado! Todos os status de {target_pokemon.name} foram curados!",
-                          duration=2.0, pokemon=target_pokemon, portrait="happy")
-            success = True
+            if target_pokemon.effect_manager:
+                target_pokemon.effect_manager.remove_status(target_pokemon)
+                toast_success(f"{item_name} usado! Todos os status de {target_pokemon.name} foram curados!",
+                              duration=2.0, pokemon=target_pokemon, portrait="happy")
+                success = True
+            else:
+                return False
 
         else:
             toast_warning(f"Item {item_name} não pode ser usado aqui!", duration=1.5)
