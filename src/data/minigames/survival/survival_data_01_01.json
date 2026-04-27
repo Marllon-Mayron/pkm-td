@@ -1,0 +1,69 @@
+
+{
+  "name": "Floresta Inicial",
+  "description": "Sobreviva aos pokémon selvagens da floresta",
+  "total_waves": 20,
+  "starting_lives": 5,
+  "starting_energy": 100,
+  "max_energy": 200,
+  "energy_regen_rate": 1.0,
+
+  "available_pokemon": [
+    {"id": 10, "cost": 25, "level": 5},
+    {"id": 13, "cost": 25, "level": 5},
+    {"id": 19, "cost": 75, "level": 5},
+    {"id": 16, "cost": 50, "level": 5},
+    {"id": 25, "cost": 100, "level": 5}
+  ],
+
+  "available_items": [
+    {
+      "id": "potion",
+      "cost": 30,
+      "effect": "heal",
+      "effect_value": 20
+    },
+    {
+      "id": "antidote",
+      "cost": 20,
+      "effect": "cure_status",
+      "effect_value": "poison"
+    },
+    {
+      "id": "superpotion",
+      "cost": 50,
+      "effect": "heal",
+      "effect_value": 50
+    }
+  ],
+
+  "waves": [
+    {"wave": 1, "enemies": [10, 13], "count": 3, "min_level": 3, "max_level": 5, "spawn_interval": 3.0},
+    {"wave": 2, "enemies": [13, 19], "count": 4, "min_level": 3, "max_level": 5, "spawn_interval": 2.8},
+    {"wave": 3, "enemies": [19, 16], "count": 5, "min_level": 4, "max_level": 5, "spawn_interval": 2.8},
+    {"wave": 4, "enemies": [16, 10], "count": 5, "min_level": 4, "max_level": 6, "spawn_interval": 2.5},
+    {"wave": 5, "enemies": [11], "count": 2, "min_level": 7, "max_level": 7, "spawn_interval": 0.1, "is_boss": true},
+    {"wave": 6, "enemies": [13, 19, 16], "count": 5, "min_level": 5, "max_level": 6, "spawn_interval": 2.5},
+    {"wave": 7, "enemies": [10, 13, 19], "count": 6, "min_level": 5, "max_level": 6, "spawn_interval": 2.5},
+    {"wave": 8, "enemies": [19, 16, 10], "count": 6, "min_level": 5, "max_level": 7, "spawn_interval": 2.3},
+    {"wave": 9, "enemies": [13, 10, 16], "count": 7, "min_level": 6, "max_level": 7, "spawn_interval": 2.3},
+    {"wave": 10, "enemies": [14], "count": 3, "min_level": 10, "max_level": 10, "spawn_interval": 0.1, "is_boss": true},
+    {"wave": 11, "enemies": [10, 13, 19, 16], "count": 7, "min_level": 6, "max_level": 8, "spawn_interval": 2.2},
+    {"wave": 12, "enemies": [19, 16, 10, 13], "count": 8, "min_level": 6, "max_level": 8, "spawn_interval": 2.2},
+    {"wave": 13, "enemies": [16, 19, 10], "count": 8, "min_level": 6, "max_level": 9, "spawn_interval": 2.0},
+    {"wave": 14, "enemies": [10, 13, 19, 16], "count": 9, "min_level": 7, "max_level": 9, "spawn_interval": 2.0},
+    {"wave": 15, "enemies": [12, 15], "count": 5, "min_level": 12, "max_level": 12, "spawn_interval": 0.1, "is_boss": true},
+    {"wave": 16, "enemies": [13, 19, 16, 10], "count": 9, "min_level": 7, "max_level": 10, "spawn_interval": 1.8},
+    {"wave": 17, "enemies": [19, 16, 10, 13], "count": 10, "min_level": 8, "max_level": 10, "spawn_interval": 1.8},
+    {"wave": 18, "enemies": [16, 19, 10, 13], "count": 12, "min_level": 8, "max_level": 11, "spawn_interval": 1.5},
+    {"wave": 19, "enemies": [10, 13, 19, 16], "count": 12, "min_level": 8, "max_level": 12, "spawn_interval": 1.5},
+    {"wave": 20, "enemies": [12, 15], "count": 7, "min_level": 15, "max_level": 15, "spawn_interval": 0.1, "is_boss": true}
+  ],
+
+  "rewards": {
+    "base_score": 500,
+    "score_per_wave": 25,
+    "score_per_boss": 100,
+    "energy_per_completed_wave": 30
+  }
+}

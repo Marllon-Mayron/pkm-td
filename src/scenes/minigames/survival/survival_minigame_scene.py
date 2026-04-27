@@ -6,7 +6,8 @@ Estilo Plants vs Zombies / Tower Defense com cards na esteira
 """
 import pygame
 import math
-import random
+import json
+import os
 from typing import List, Optional, Dict, Any
 
 from src.scenes.minigames.survival.components.pokemon_input_handler import PokemonInputHandler
@@ -17,36 +18,50 @@ from src.scenes.minigames.survival.components.placement_manager import SurvivalP
 from src.scenes.minigames.survival.components.wave_manager import SurvivalWaveManager
 from src.scenes.minigames.survival.components.ui.survival_ui import SurvivalUI
 from src.battle.battle_system import BattleSystem
+from src.battle.effects.status_effect import StatusType
+from src.config.paths import PROJECT_ROOT
+from src.data.pokedex import Pokedex
+from src.data.item_bag_catalog import item_bag_catalog
+from src.ui.toast_renderer import toast_battle, toast_info, toast_success, toast_warning, toast_error
 
 
 class SurvivalMinigameScene(BaseMinigameScene):
     """
     Minigame de sobrevivência estilo Plants vs Zombies.
-    - Esteira de cards (sempre 5 cartas visíveis)
+    - Esteira de cards (Pokémon e Itens)
     - Cartas vêm da direita para esquerda
     - Sistema de combate idêntico ao modo campanha
     """
 
-    # Constantes
     STARTING_LIVES = 5
     STARTING_ENERGY = 100
-    ENERGY_REGEN_RATE = 1.0  # Por segundo
+    ENERGY_REGEN_RATE = 1.0
     MAX_ENERGY = 200
 
     def __init__(self, game, chapter_id: int = 1, phase_number: int = 1):
         super().__init__(game, chapter_id, phase_number, minigame_folder="survival")
+
+        # ===== POKEDEX =====
+        self.pokedex = Pokedex()
+        self.item_catalog = item_bag_catalog
 
         # ===== ESTADO DO MINIGAME =====
         self.lives = self.STARTING_LIVES
         self.energy = self.STARTING_ENERGY
         self.score = 0
         self.wave_number = 1
-        self.game_state = "waiting"  # waiting, in_wave, game_over, completed
+        self.total_waves = 20
+        self.game_state = "waiting"
+
+        # ===== DADOS CARREGADOS DO JSON =====
+        self.survival_data = None
+        self.available_pokemon_cards = []
+        self.available_item_cards = []
 
         # ===== CONTROLE DE CÂMERA =====
         self.dragging_camera = False
         self.last_mouse_pos = None
-        # Inicializa câmera (se não existir)
+
         if not hasattr(self.game, 'camera') or self.game.camera is None:
             self.game.initialize_camera(self.world_width, self.world_height)
 
@@ -54,14 +69,14 @@ class SurvivalMinigameScene(BaseMinigameScene):
         self.camera.set_limits(-500, self.world_width + 500, -500, self.world_height + 500)
         self.camera.x = self.world_width / 2
         self.camera.y = self.world_height / 2
+
         # ===== ESTADO DE PAUSA =====
-        self.game_paused = False  # Para overlays
+        self.game_paused = False
 
         # ===== SISTEMA DE COMBATE =====
         self.battle_system = BattleSystem(self)
 
         # ===== COMPONENTES =====
-        self.card_deck = CardDeck(self)  # Já inicializa com 5 cartas!
         self.placement_manager = SurvivalPlacementManager(self)
         self.survival_ui = SurvivalUI(self)
         self.notification_manager = notification_manager
@@ -69,6 +84,10 @@ class SurvivalMinigameScene(BaseMinigameScene):
         self.move_select_overlay = None
         self.move_learn_overlay = None
         self.evolution_overlay = None
+        self.card_deck = None
+
+        # ===== CARREGA DADOS DO MINIGAME =====
+        self._load_survival_data()
 
         # ===== WAVE MANAGER =====
         self._init_survival_wave_manager()
@@ -79,6 +98,8 @@ class SurvivalMinigameScene(BaseMinigameScene):
         # ===== ESTADO DO CARD SELECIONADO =====
         self.selected_card = None
         self.selected_card_index = -1
+        self.selected_card_type = None
+        self.selected_card_sprite = None
 
         # ===== POKÉMON DO JOGADOR =====
         self.player_pokemon: List[Any] = []
@@ -95,30 +116,119 @@ class SurvivalMinigameScene(BaseMinigameScene):
         self.font_medium = pygame.font.Font(None, 32)
         self.font_small = pygame.font.Font(None, 24)
 
+    def _load_survival_data(self):
+        """Carrega os dados específicos do minigame survival"""
+        data_path = os.path.join(PROJECT_ROOT, "src", "data", "minigames", "survival",
+                                 f"survival_data_{self.chapter_id:02d}_{self.phase_number:02d}.json")
+
+        if not os.path.exists(data_path):
+            print(f"[Survival] ERRO: Arquivo de dados não encontrado: {data_path}")
+            self._load_default_data()
+            return
+
+        try:
+            with open(data_path, 'r', encoding='utf-8') as f:
+                self.survival_data = json.load(f)
+
+            print(f"[Survival] Dados carregados: {self.survival_data.get('name', 'Sem nome')}")
+
+            self.total_waves = self.survival_data.get("total_waves", 20)
+            self.STARTING_LIVES = self.survival_data.get("starting_lives", 5)
+            self.STARTING_ENERGY = self.survival_data.get("starting_energy", 100)
+            self.MAX_ENERGY = self.survival_data.get("max_energy", 200)
+            self.ENERGY_REGEN_RATE = self.survival_data.get("energy_regen_rate", 1.0)
+
+            self.available_pokemon_cards = self.survival_data.get("available_pokemon", [])
+            self.available_item_cards = self.survival_data.get("available_items", [])
+
+            for pokemon in self.available_pokemon_cards:
+                pokemon_id = pokemon["id"]
+                pokemon["name"] = self.pokedex.get_name(pokemon_id)
+                pokemon["types"] = self.pokedex.get_types(pokemon_id)
+                pokemon["type"] = pokemon["types"][0] if pokemon["types"] else "normal"
+
+            print(f"[Survival] {len(self.available_pokemon_cards)} Pokémon disponíveis")
+            for p in self.available_pokemon_cards:
+                print(f"  - {p['name']} (ID:{p['id']}) - Custo: {p['cost']}")
+
+            print(f"[Survival] {len(self.available_item_cards)} Itens disponíveis")
+            for i in self.available_item_cards:
+                print(f"  - {i['id']} - Custo: {i['cost']}")
+
+        except Exception as e:
+            print(f"[Survival] Erro ao carregar dados: {e}")
+            import traceback
+            traceback.print_exc()
+            self._load_default_data()
+
+    def _load_default_data(self):
+        """Carrega dados padrão (fallback)"""
+        self.total_waves = 20
+        self.STARTING_LIVES = 5
+        self.STARTING_ENERGY = 100
+        self.MAX_ENERGY = 200
+        self.ENERGY_REGEN_RATE = 1.0
+
+        self.available_pokemon_cards = [
+            {"id": 10, "cost": 30, "level": 5, "name": "Caterpie", "type": "bug"},
+            {"id": 13, "cost": 30, "level": 5, "name": "Weedle", "type": "bug"},
+            {"id": 19, "cost": 35, "level": 5, "name": "Rattata", "type": "normal"},
+            {"id": 16, "cost": 40, "level": 5, "name": "Pidgey", "type": "flying"},
+            {"id": 25, "cost": 60, "level": 5, "name": "Pikachu", "type": "electric"}
+        ]
+
+        self.available_item_cards = [
+            {"id": "potion", "cost": 30, "effect": "heal", "effect_value": 20},
+            {"id": "antidote", "cost": 20, "effect": "cure_status", "effect_value": "poison"},
+        ]
+
+        print(f"[Survival] Usando dados padrão (fallback)")
+
+    def _init_card_deck(self):
+        """Inicializa o deck de cartas com Pokémon e Itens"""
+        self.card_deck = CardDeck(self)
+
+        pokemon_cards = []
+        for pokemon in self.available_pokemon_cards:
+            pokemon_cards.append({
+                "id": pokemon["id"],
+                "cost": pokemon["cost"],
+                "level": pokemon.get("level", 5)
+            })
+
+        item_cards = []
+        for item in self.available_item_cards:
+            item_cards.append({
+                "id": item["id"],
+                "cost": item["cost"],
+                "effect": item["effect"],
+                "effect_value": item["effect_value"]
+            })
+
+        self.card_deck.set_card_pools(pokemon_cards, item_cards)
+
+        print(f"[Survival] Deck inicializado com {len(self.card_deck.card_pool)} cartas no pool")
+        print(f"[Survival] Cartas atuais no deck: {len(self.card_deck.cards)}")
+
     def _init_survival_wave_manager(self):
-        """Inicializa o wave manager customizado para survival"""
-        self.wave_manager = SurvivalWaveManager(self, self.chapter_id, self.phase_number)
+        """Inicializa o wave manager com os dados carregados"""
+        self.wave_manager = SurvivalWaveManager(self, self.chapter_id, self.phase_number, self.survival_data)
         self.wave_manager.set_paths(self.path_renderer.paths)
-        self.wave_manager.start_waves()
 
     def _start_game(self):
         """Inicia o minigame"""
         print(f"[Survival] Iniciando minigame - Fase {self.chapter_id}-{self.phase_number}")
+        print(f"[Survival] Total de waves: {self.total_waves}")
 
-        # Reseta estado
         self.lives = self.STARTING_LIVES
         self.energy = self.STARTING_ENERGY
         self.score = 0
         self.wave_number = 1
         self.game_state = "in_wave"
 
-        # Limpa Pokémon existentes
         self._clear_all_pokemon()
+        self._init_card_deck()
 
-        # Reinicia o deck (já tem 5 cartas)
-        self.card_deck = CardDeck(self)
-
-        # Reinicia waves
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.start_waves()
 
@@ -134,7 +244,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
         if pokemon in self.player_pokemon:
             self.player_pokemon.remove(pokemon)
 
-        # Libera o spot
         if hasattr(pokemon, 'placed_tile_x') and hasattr(pokemon, 'placed_tile_y'):
             for spot in self.spot_renderer.get_spots():
                 spot_tile_x = spot.x // self.placement_manager.tile_size
@@ -143,29 +252,196 @@ class SurvivalMinigameScene(BaseMinigameScene):
                     spot.occupied = False
                     break
 
-        # Remove do battle system
         if hasattr(self, 'battle_system') and self.battle_system:
             if hasattr(self.battle_system, 'effect_manager'):
                 self.battle_system.effect_manager.unregister_pokemon(pokemon)
 
         pokemon.is_placed = False
 
-    def try_place_pokemon(self, spot, pokemon_data: dict) -> bool:
-        """
-        Tenta colocar um Pokémon no spot
-        """
-        # Verifica se o spot está ocupado
-        if spot.occupied:
-            self.survival_ui.show_message("Spot ocupado!", (255, 100, 100))
+    def _get_pokemon_status(self, pokemon) -> Optional[StatusType]:
+        """Retorna o status atual do Pokémon"""
+        if pokemon and pokemon.effect_manager:
+            status = pokemon.effect_manager.get_status(pokemon)
+            if status:
+                return status.type
+        return None
+
+    def try_use_item(self, spot, item_data: dict) -> bool:
+        """Tenta usar um item em um Pokémon no spot"""
+        if not spot.occupied:
+            toast_warning("Nenhum Pokémon neste spot!", duration=1.5)
             return False
 
-        # Verifica energia
+        target_pokemon = None
+        for pokemon in self.player_pokemon:
+            if (hasattr(pokemon, 'placed_tile_x') and hasattr(pokemon, 'placed_tile_y') and
+                    pokemon.placed_tile_x == spot.x // self.placement_manager.tile_size and
+                    pokemon.placed_tile_y == spot.y // self.placement_manager.tile_size):
+                target_pokemon = pokemon
+                break
+
+        if not target_pokemon:
+            toast_warning("Pokémon não encontrado!", duration=1.5)
+            return False
+
+        if not target_pokemon.is_alive() or target_pokemon.is_defeated:
+            toast_warning(f"{target_pokemon.name} está derrotado!", duration=1.5, pokemon=target_pokemon,
+                          portrait="sad")
+            return False
+
+        cost = item_data.get('cost', 30)
+        if self.energy < cost:
+            toast_warning(f"Energia insuficiente! ({cost} necessário)", duration=1.5)
+            return False
+
+        effect = item_data.get('effect', '')
+        effect_value = item_data.get('effect_value')
+        item_name = item_data.get('id', 'item').upper()
+
+        success = False
+        fail_reason = None
+
+        if effect == 'heal':
+            heal_amount = effect_value
+            if target_pokemon.current_hp >= target_pokemon.max_hp:
+                toast_warning(f"{target_pokemon.name} já está com HP máximo!",
+                              duration=1.5, pokemon=target_pokemon, portrait="normal")
+                return False
+
+            old_hp = target_pokemon.current_hp
+            target_pokemon.current_hp = min(target_pokemon.max_hp, target_pokemon.current_hp + heal_amount)
+            healed = target_pokemon.current_hp - old_hp
+            toast_success(f"{item_name} usado! {target_pokemon.name} recuperou {healed} HP!",
+                          duration=2.0, pokemon=target_pokemon, portrait="happy")
+            success = True
+
+        elif effect == 'cure_status':
+            status_to_cure = effect_value  # "poison", "paralysis", etc.
+
+            # Verifica o status atual do Pokémon
+            current_status = self._get_pokemon_status(target_pokemon)
+
+            # Mapeia o status para o nome correto
+            status_map = {
+                "poison": StatusType.POISON,
+                "paralysis": StatusType.PARALYSIS,
+                "sleep": StatusType.SLEEP,
+                "burn": StatusType.BURN,
+                "freeze": StatusType.FREEZE
+            }
+
+            status_type = status_map.get(status_to_cure)
+
+            if not status_type:
+                toast_warning(f"Não foi possível usar {item_name} em {target_pokemon.name}!",
+                              duration=1.5, pokemon=target_pokemon, portrait="sad")
+                return False
+
+            # Se não tem nenhum status
+            if not current_status or current_status.value == "none":
+                # Mostra mensagem específica baseada no tipo de cura
+                status_names = {
+                    StatusType.POISON: "envenenado",
+                    StatusType.PARALYSIS: "paralisado",
+                    StatusType.SLEEP: "dormindo",
+                    StatusType.BURN: "queimado",
+                    StatusType.FREEZE: "congelado"
+                }
+                needed_status = status_names.get(status_type, "afetado")
+                toast_warning(f"{target_pokemon.name} não está {needed_status}! {item_name} não pode ser usado.",
+                              duration=2.0, pokemon=target_pokemon, portrait="normal")
+                return False
+
+            # Se tem o status correto, cura
+            if current_status == status_type:
+                target_pokemon.effect_manager.remove_status(target_pokemon)
+                toast_success(f"{item_name} usado! {target_pokemon.name} foi curado!",
+                              duration=2.0, pokemon=target_pokemon, portrait="happy")
+                success = True
+            else:
+                # Tem status diferente do que o item cura
+                status_names = {
+                    StatusType.POISON: "envenenado",
+                    StatusType.PARALYSIS: "paralisado",
+                    StatusType.SLEEP: "dormindo",
+                    StatusType.BURN: "queimado",
+                    StatusType.FREEZE: "congelado"
+                }
+                current_name = status_names.get(current_status, "afetado")
+                needed_name = status_names.get(status_type, "afetado")
+                toast_warning(f"{target_pokemon.name} está {current_name}! {item_name} cura {needed_name} apenas.",
+                              duration=2.0, pokemon=target_pokemon, portrait="sad")
+                return False
+
+        elif effect == 'revive':
+            if target_pokemon.is_alive():
+                toast_warning(f"{target_pokemon.name} já está vivo! Não pode usar revive.",
+                              duration=1.5, pokemon=target_pokemon, portrait="normal")
+                return False
+
+            revive_percent = effect_value or 0.5
+            target_pokemon.revive(heal_percentage=revive_percent)
+            toast_success(f"{item_name} usado! {target_pokemon.name} foi revivido!",
+                          duration=2.0, pokemon=target_pokemon, portrait="happy")
+            success = True
+
+        elif effect == 'pp_restore':
+            if target_pokemon.moves:
+                percentage = effect_value or 1.0
+                restored = target_pokemon.restore_pp(percentage=percentage)
+                if restored > 0:
+                    toast_success(f"{item_name} usado! PP restaurados para {target_pokemon.name}!",
+                                  duration=2.0, pokemon=target_pokemon, portrait="happy")
+                    success = True
+                else:
+                    toast_warning(f"{target_pokemon.name} já tem PP máximo!",
+                                  duration=1.5, pokemon=target_pokemon, portrait="normal")
+                    return False
+            else:
+                toast_warning(f"{target_pokemon.name} não tem moves para restaurar PP!",
+                              duration=1.5, pokemon=target_pokemon)
+                return False
+
+        elif effect == 'cure_all_status':
+            current_status = self._get_pokemon_status(target_pokemon)
+            if not current_status or current_status.value == "none":
+                toast_warning(f"{target_pokemon.name} não tem nenhum status para curar!",
+                              duration=1.5, pokemon=target_pokemon, portrait="normal")
+                return False
+
+            target_pokemon.effect_manager.remove_status(target_pokemon)
+            toast_success(f"{item_name} usado! Todos os status de {target_pokemon.name} foram curados!",
+                          duration=2.0, pokemon=target_pokemon, portrait="happy")
+            success = True
+
+        else:
+            toast_warning(f"Item {item_name} não pode ser usado aqui!", duration=1.5)
+            return False
+
+        if success:
+            self.energy -= cost
+            if self.selected_card_index >= 0:
+                self.card_deck.remove_card(self.selected_card_index)
+            self.card_deck.clear_selection()
+            self.selected_card = None
+            self.selected_card_index = -1
+            self.selected_card_type = None
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+            return True
+
+        return False
+
+    def try_place_pokemon(self, spot, pokemon_data: dict) -> bool:
+        """Tenta colocar um Pokémon no spot"""
+        if spot.occupied:
+            toast_warning("Spot ocupado!", duration=1.5)
+            return False
+
         cost = pokemon_data.get('cost', 50)
         if self.energy < cost:
-            self.survival_ui.show_message(f"Energia insuficiente! ({cost} necessário)", (255, 100, 100))
+            toast_warning(f"Energia insuficiente! ({cost} necessário)", duration=1.5)
             return False
 
-        # Cria o Pokémon
         from src.entities.pokemon import Pokemon
 
         tile_center_x = (
@@ -182,7 +458,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
             is_boss=False
         )
 
-        # Configura o Pokémon
         pokemon.is_placed = True
         pokemon.placed_tile_x = tile_center_x // self.placement_manager.tile_size
         pokemon.placed_tile_y = tile_center_y // self.placement_manager.tile_size
@@ -190,135 +465,117 @@ class SurvivalMinigameScene(BaseMinigameScene):
         pokemon.original_spot_y = tile_center_y
         pokemon.screen_manager = self.screen_manager
         pokemon.camera = self.camera
-        pokemon.game_scene = self  # CRUCIAL: Para overlays funcionarem!
+        pokemon.game_scene = self
 
-        # Configura battle system
         pokemon.set_battle_system(self.battle_system)
 
-        # Adiciona ao gerenciador
         self.placement_manager.add_pokemon(pokemon, spot)
         self.player_pokemon.append(pokemon)
         spot.occupied = True
 
-        # Consome energia
         self.energy -= cost
 
-        # ===== REMOVE A CARTA DA ESTEIRA =====
-        card_index = self.selected_card_index
-        if card_index >= 0:
-            self.card_deck.remove_card(card_index)
+        if self.selected_card_index >= 0:
+            self.card_deck.remove_card(self.selected_card_index)
 
-        # Limpa seleção
         self.card_deck.clear_selection()
         self.selected_card = None
         self.selected_card_index = -1
+        self.selected_card_type = None
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
+        toast_success(f"{pokemon.name} colocado!", duration=1.5, pokemon=pokemon, portrait="happy")
         print(f"[Survival] {pokemon.name} colocado! Energia: {self.energy}")
         return True
 
     def can_afford(self, cost: int) -> bool:
-        """Verifica se tem energia suficiente"""
         return self.energy >= cost
 
     def add_energy(self, amount: int):
-        """Adiciona energia"""
         self.energy = min(self.MAX_ENERGY, self.energy + amount)
 
     def add_score(self, amount: int):
-        """Adiciona pontos"""
         self.score += amount
 
     def lose_life(self, amount: int = 1):
         """Perde uma vida"""
-        self.lives -= amount
-        self.survival_ui.show_message(f"Perdeu uma vida! Restam: {self.lives}", (255, 100, 100))
+        # Impede múltiplas chamadas de game over
+        if self.game_state == "game_over":
+            return
 
-        if self.lives <= 0:
+        self.lives -= amount
+        toast_warning(f"Perdeu uma vida! Restam: {self.lives}",
+                      duration=2.0, portrait="sad")
+
+        if self.lives <= 0 and self.game_state != "game_over":
             self.game_over()
 
     def game_over(self):
-        """Fim de jogo"""
+        # Impede game over duplicado
+        if self.game_state == "game_over":
+            return
+
         self.game_state = "game_over"
         if self.wave_manager:
             self.wave_manager.paused = True
+        toast_error("GAME OVER!", duration=3.0)
         print(f"[Survival] GAME OVER! Score final: {self.score}")
 
-    def complete_wave(self):
-        """Completa uma wave com sucesso"""
-        self.wave_number += 1
-        self.add_energy(50)
-        self.survival_ui.show_message(f"ONDA {self.wave_number - 1} COMPLETA!", (100, 255, 100), duration=2.0)
+        # Impede que mais inimigos causem dano
+        if self.wave_manager:
+            self.wave_manager.active_enemies.clear()
 
-        # Verifica se acabaram as waves
-        if self.wave_manager and not self.wave_manager.has_more_waves():
-            self.game_state = "completed"
-            if self.wave_manager:
-                self.wave_manager.paused = True
-            print(f"[Survival] FASE COMPLETA! Score final: {self.score}")
+    def complete_game(self):
+        self.game_state = "completed"
+        if self.wave_manager:
+            self.wave_manager.paused = True
+        toast_success("FASE COMPLETA! PARABÉNS!", duration=3.0, portrait="happy")
+        print(f"[Survival] FASE COMPLETA! Score final: {self.score}")
 
-    # ===== MÉTODOS DE OVERLAY (IGUAL AO MODO CAMPANHA) =====
+    # ===== MÉTODOS DE OVERLAY =====
 
     def open_evolution_overlay(self, pokemon, evolution_data):
-        """Abre o overlay de evolução (igual ao game_scene)"""
         from src.scenes.game_scene.components.overlays.evolution_overlay import EvolutionOverlay
 
         self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data)
         self.evolution_overlay.active = True
-
-        # Pausa o jogo
         self.paused = True
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.paused = True
 
-        print(f"[SURVIVAL] Overlay de evolução aberto para {pokemon.name}")
-
     def close_evolution_overlay(self, cancel=False):
-        """Fecha o overlay de evolução"""
         from src.managers.sounds.sound_manager import sound_manager
-
         sound_manager.stop_effect("evolution")
 
         if hasattr(self, 'evolution_overlay'):
             self.evolution_overlay = None
 
-        # Despausa o jogo
         self.paused = False
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.paused = False
 
     def open_move_learn_overlay(self, pokemon, new_move_name):
-        """Abre o overlay de aprendizado de novo move (igual ao game_scene)"""
         from src.scenes.game_scene.components.overlays.move_learn_overlay import MoveLearnOverlay
 
         self.move_learn_overlay = MoveLearnOverlay(self, pokemon, new_move_name)
         self.move_learn_overlay.active = True
-
-        # Pausa o jogo
         self.paused = True
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.paused = True
 
-        print(f"[SURVIVAL] Overlay de aprendizado de move aberto para {pokemon.name} - {new_move_name}")
-
     def close_move_learn_overlay(self, cancel=False):
-        """Fecha o overlay de aprendizado de moves"""
         if self.move_learn_overlay:
             self.move_learn_overlay.active = False
             self.move_learn_overlay = None
 
-        # Se NÃO foi cancelado e temos dados pendentes de TM, aplica o aprendizado
         if not cancel and hasattr(self, 'pending_tm_data') and self.pending_tm_data:
-            print(f"[TM] {self.pending_tm_data['move_name']} aprendido com sucesso!")
             self.pending_tm_data = None
 
-        # Despausa o jogo
         self.paused = False
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.paused = False
 
     def open_move_select_overlay(self, pokemon):
-        """Abre o overlay de seleção de moves para um Pokémon"""
         from src.scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
 
         if not pokemon or not pokemon.moves:
@@ -326,21 +583,15 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
         self.move_select_overlay = MoveSelectOverlay(self, pokemon)
         self.move_select_overlay.active = True
-
-        # Pausa o jogo
         self.paused = True
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.paused = True
 
-        print(f"[SURVIVAL] Overlay de seleção de moves aberto para {pokemon.name}")
-
     def close_move_select_overlay(self):
-        """Fecha o overlay de seleção de moves"""
         if self.move_select_overlay:
             self.move_select_overlay.active = False
             self.move_select_overlay = None
 
-        # Despausa o jogo
         self.paused = False
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.paused = False
@@ -348,32 +599,24 @@ class SurvivalMinigameScene(BaseMinigameScene):
     # ===== MÉTODOS DE EVENTOS =====
 
     def handle_event(self, event):
-        """Processa eventos do minigame"""
-
-        # ===== OVERLAY DE EVOLUÇÃO =====
         if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
             self.evolution_overlay.handle_event(event)
             return
 
-        # ===== OVERLAY DE APRENDIZADO DE MOVES =====
         if self.move_learn_overlay and self.move_learn_overlay.active:
             self.move_learn_overlay.handle_event(event)
             return
 
-        # ===== OVERLAY DE SELEÇÃO DE MOVES =====
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.handle_event(event)
             return
 
-        # UI primeiro
         if self.survival_ui.handle_event(event):
             return
 
-        # ===== INPUT HANDLER PARA CLIQUE NOS POKÉMON =====
         if self.pokemon_input_handler.handle_event(event):
             return
 
-        # ===== MOUSE WHEEL PARA ZOOM =====
         if event.type == pygame.MOUSEWHEEL:
             if not self.paused and not self.dragging_camera:
                 mouse_pos = pygame.mouse.get_pos()
@@ -391,7 +634,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
                             self.camera._clamp_position()
             return
 
-        # ===== DRAG DA CÂMERA (BOTÃO DO MEIO) =====
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 2:
             mouse_pos = pygame.mouse.get_pos()
             if self.screen_manager.is_mouse_in_viewport(mouse_pos):
@@ -417,7 +659,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 self.last_mouse_pos = event.pos
                 return
 
-        # ===== TECLADO =====
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_p:
                 self.toggle_pause()
@@ -426,16 +667,26 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 self.show_debug = not self.show_debug
                 return
 
-        # Deck de cards
-        card_result = self.card_deck.handle_event(event)
-        if card_result:
-            if card_result.get('action') == 'card_selected':
-                self.selected_card = card_result
-                self.selected_card_index = card_result.get('index', -1)
-                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
-            return
+        if self.card_deck:
+            card_result = self.card_deck.handle_event(event)
+            if card_result:
+                if card_result.get('action') == 'card_selected':
+                    self.selected_card = card_result
+                    self.selected_card_index = card_result.get('index', -1)
+                    self.selected_card_type = card_result.get('card_type', 'pokemon')
 
-        # Card selecionado + clique no mapa
+                    # Carrega o sprite do item para preview
+                    if self.selected_card_type == 'item':
+                        item_id = self.selected_card.get('item_data', {}).get('id', '')
+                        self.selected_card_sprite = self.item_catalog.get_sprite(item_id, scaled=True)
+                        if self.selected_card_sprite:
+                            self.selected_card_sprite = pygame.transform.scale(self.selected_card_sprite, (48, 48))
+                    else:
+                        self.selected_card_sprite = None
+
+                    pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+                return
+
         if self.selected_card and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = pygame.mouse.get_pos()
 
@@ -444,29 +695,34 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 if world_pos:
                     spot = self.spot_renderer.get_spot_at_world_pos(world_pos[0], world_pos[1])
                     if spot:
-                        success = self.try_place_pokemon(spot, self.selected_card.get('pokemon_data', {}))
-                        if success:
-                            pass
+                        if self.selected_card_type == 'pokemon':
+                            self.try_place_pokemon(spot, self.selected_card.get('pokemon_data', {}))
+                        elif self.selected_card_type == 'item':
+                            self.try_use_item(spot, self.selected_card.get('item_data', {}))
                     else:
                         self.card_deck.clear_selection()
                         self.selected_card = None
                         self.selected_card_index = -1
+                        self.selected_card_type = None
+                        self.selected_card_sprite = None
                         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
-        # Clique direito cancela seleção
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
             if self.selected_card:
                 self.card_deck.clear_selection()
                 self.selected_card = None
                 self.selected_card_index = -1
+                self.selected_card_type = None
+                self.selected_card_sprite = None
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
-        # ESC cancela seleção ou fecha overlay ou volta ao menu
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             if self.selected_card:
                 self.card_deck.clear_selection()
                 self.selected_card = None
                 self.selected_card_index = -1
+                self.selected_card_type = None
+                self.selected_card_sprite = None
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
             elif self.move_select_overlay and self.move_select_overlay.active:
                 self.close_move_select_overlay()
@@ -482,9 +738,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
     # ===== MÉTODOS DE UPDATE =====
 
     def fixed_update(self, dt):
-        """Atualização lógica do minigame"""
-
-        # ===== OVERLAYS PRIORITÁRIOS =====
         if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
             self.evolution_overlay.update(dt)
             return
@@ -503,11 +756,9 @@ class SurvivalMinigameScene(BaseMinigameScene):
         if self.game_state in ["game_over", "completed"]:
             return
 
-        # Atualiza UI
         if hasattr(self, 'survival_ui'):
             self.survival_ui.update(dt)
 
-        # Regenera energia
         self.energy_regen_timer += dt
         if self.energy_regen_timer >= 1.0:
             regen_amount = int(self.energy_regen_timer * self.ENERGY_REGEN_RATE)
@@ -515,10 +766,9 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 self.energy = min(self.MAX_ENERGY, self.energy + regen_amount)
                 self.energy_regen_timer -= regen_amount / self.ENERGY_REGEN_RATE
 
-        # Atualiza deck
-        self.card_deck.update(dt)
+        if self.card_deck:
+            self.card_deck.update(dt)
 
-        # Wave manager
         if self.wave_manager:
             enemies_at_end = self.wave_manager.update(dt)
             for enemy in enemies_at_end:
@@ -527,7 +777,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
                         self.lose_life(1)
                         enemy._escaped_counted = True
 
-        # Combate: inimigos atacam aliados
         if self.wave_manager and self.wave_manager.active_enemies:
             for enemy in self.wave_manager.active_enemies[:]:
                 if not enemy.is_alive() or enemy.is_defeated:
@@ -565,21 +814,16 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
                 enemy.animation.update(dt)
 
-        # Battle system
         if hasattr(self, 'battle_system'):
             self.battle_system.update(dt)
 
-        # Effect manager
         if hasattr(self, 'battle_system') and self.battle_system:
             effect_mgr = self.battle_system.effect_manager
             if effect_mgr:
                 effect_mgr.update(dt)
 
-        # ===== POKÉMON DO JOGADOR - COM VERIFICAÇÃO DE EVOLUÇÃO E MOVES =====
-        # Guarda níveis antes do update para verificar mudanças
         old_levels = {id(pokemon): pokemon.level for pokemon in self.player_pokemon}
 
-        # Primeiro: atualiza todos os Pokémon
         for pokemon in self.player_pokemon[:]:
             if not pokemon.is_alive() or pokemon.is_defeated:
                 self._remove_pokemon(pokemon)
@@ -597,80 +841,56 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
             pokemon.animation.update(dt)
 
-        # ===== SEGUNDO: VERIFICA EVOLUÇÕES PARA POKÉMON QUE SUBIRAM DE NÍVEL =====
         from src.managers.evolution_manager import evolution_manager
 
         for pokemon in self.player_pokemon[:]:
             old_level = old_levels.get(id(pokemon), pokemon.level)
 
-            # Verifica se subiu de nível
             if pokemon.level > old_level:
                 print(f"[SURVIVAL] {pokemon.name} subiu do nível {old_level} para {pokemon.level}!")
 
-                # ===== VERIFICA EVOLUÇÃO =====
                 evolution = evolution_manager.check_evolution(pokemon.id, current_level=pokemon.level)
                 if evolution:
                     print(f"[SURVIVAL] {pokemon.name} pode evoluir! Abrindo overlay...")
                     self.open_evolution_overlay(pokemon, evolution)
-                    return  # Pausa o update até o overlay ser fechado
+                    return
 
-                # ===== VERIFICA MOVES PENDENTES =====
-                # Os moves aprendidos já foram processados no level_up
-                # Mas se tiver moves pendentes (precisa escolher substituição),
-                # o check_new_moves_on_level_up já chamou learn_move,
-                # que por sua vez chamou open_move_learn_overlay se game_scene existir
-                # O game_scene já foi setado no try_place_pokemon, então deve funcionar!
-
-        # Notification manager
         if hasattr(self, 'notification_manager'):
             self.notification_manager.update(dt)
 
     def toggle_pause(self):
-        """Alterna pausa do jogo"""
         self.paused = not self.paused
         if self.wave_manager:
             self.wave_manager.paused = self.paused
-        if self.paused:
-            print("[Survival] Jogo pausado")
-        else:
-            print("[Survival] Jogo continuando")
 
     # ===== MÉTODOS DE RENDER =====
 
     def render(self, screen):
-        """Renderiza o minigame"""
-        # Mapa
         self.map_renderer.render(screen, self.camera, self.screen_manager)
 
-        # Spots
         self.spot_renderer.render(
             screen, self.camera, self.screen_manager,
             highlight_spot=self._get_hovered_spot() if self.selected_card else None
         )
 
-        # Inimigos
         if self.wave_manager:
             for enemy in self.wave_manager.active_enemies:
                 enemy.render(screen, self.camera, show_hp=True)
 
-        # Pokémon do jogador
         for pokemon in self.player_pokemon:
             pokemon.render(screen, self.camera, show_hp=True)
             self._render_ally_name_and_level(screen, pokemon)
 
-        # Projéteis
         if hasattr(self, 'battle_system'):
             self.battle_system.render_projectiles(screen, self.camera, self.screen_manager)
 
-        # UI e Cards
         self.survival_ui.render(screen)
-        self.card_deck.render(screen)
+        if self.card_deck:
+            self.card_deck.render(screen)
 
-        # Preview do card selecionado
         if self.selected_card:
             self._render_selected_card_preview(screen)
 
-        # Overlays
         if self.game_state == "game_over":
             self._render_game_over(screen)
         elif self.game_state == "completed":
@@ -679,12 +899,10 @@ class SurvivalMinigameScene(BaseMinigameScene):
         if self.paused:
             self._render_pause_overlay(screen)
 
-        # Borda do viewport
         pygame.draw.rect(screen, (80, 80, 80),
                          (self.screen_manager.viewport_x, self.screen_manager.viewport_y,
                           self.screen_manager.viewport_width, self.screen_manager.viewport_height), 2)
 
-        # Renderiza overlays (por último, para ficar acima de tudo)
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.render(screen)
 
@@ -695,7 +913,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
             self.evolution_overlay.render(screen)
 
     def _get_hovered_spot(self):
-        """Retorna o spot sob o mouse"""
         mouse_pos = pygame.mouse.get_pos()
         if self.screen_manager.is_mouse_in_viewport(mouse_pos):
             world_pos = self.screen_manager.get_mouse_world_position(mouse_pos, self.camera)
@@ -704,7 +921,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
         return None
 
     def _render_ally_name_and_level(self, screen, pokemon):
-        """Renderiza nome e nível do Pokémon aliado"""
         if not pokemon or pokemon.is_defeated or not pokemon.is_alive():
             return
 
@@ -789,11 +1005,9 @@ class SurvivalMinigameScene(BaseMinigameScene):
         screen.blit(name_surface, (name_x, name_y))
         screen.blit(level_surface, (level_x, level_y))
 
-        # Barra de XP
         self._render_ally_xp_bar(screen, sprite_rect, pokemon, zoom_scale)
 
     def _render_ally_xp_bar(self, screen, sprite_rect, pokemon, zoom_scale):
-        """Renderiza a barra de XP abaixo da barra de HP"""
         sprite_height = sprite_rect.height
         hp_bar_y = sprite_rect.top + (-sprite_height * 0.35)
         hp_bar_width = 48
@@ -820,46 +1034,63 @@ class SurvivalMinigameScene(BaseMinigameScene):
         pygame.draw.rect(screen, (100, 100, 120), (bar_x, xp_bar_y, bar_width, xp_bar_height), 1, border_radius=2)
 
     def _render_selected_card_preview(self, screen):
-        """Renderiza preview do card selecionado seguindo o mouse"""
         mouse_pos = pygame.mouse.get_pos()
         if not self.screen_manager.is_mouse_in_viewport(mouse_pos):
             return
 
-        pokemon_data = self.selected_card.get('pokemon_data', {})
-        cost = pokemon_data.get('cost', 50)
-        can_afford = self.energy >= cost
+        if self.selected_card_type == 'pokemon':
+            pokemon_data = self.selected_card.get('pokemon_data', {})
+            cost = pokemon_data.get('cost', 50)
+            can_afford = self.energy >= cost
+
+            # Tenta pegar o sprite do Pokémon
+            sprite_to_draw = None
+            try:
+                pokedex = self.game.player.pokedex if self.game.player else None
+                if pokedex and pokemon_data:
+                    sprite = pokedex.get_sprite(pokemon_data['id'], "front", False)
+                    if sprite:
+                        sprite_to_draw = pygame.transform.scale(sprite, (48, 48))
+            except:
+                pass
+        else:
+            item_data = self.selected_card.get('item_data', {})
+            cost = item_data.get('cost', 30)
+            can_afford = self.energy >= cost
+            sprite_to_draw = self.selected_card_sprite
 
         preview_size = 64
         half = preview_size // 2
 
         preview_bg = pygame.Surface((preview_size, preview_size), pygame.SRCALPHA)
-        if can_afford:
-            preview_bg.fill((100, 200, 100, 180))
-        else:
-            preview_bg.fill((200, 100, 100, 180))
 
-        border_color = (0, 255, 0) if can_afford else (255, 0, 0)
+        if can_afford:
+            preview_bg.fill((100, 200, 100, 200))
+            border_color = (0, 255, 0)
+        else:
+            preview_bg.fill((200, 100, 100, 200))
+            border_color = (255, 0, 0)
+
         pygame.draw.rect(preview_bg, border_color, (0, 0, preview_size, preview_size), 3, border_radius=8)
 
-        try:
-            pokedex = self.game.player.pokedex if self.game.player else None
-            if pokedex:
-                sprite = pokedex.get_sprite(pokemon_data['id'], "front", False)
-                if sprite:
-                    scaled = pygame.transform.scale(sprite, (48, 48))
-                    preview_bg.blit(scaled, (8, 8))
-        except:
-            pass
+        # Desenha o sprite
+        if sprite_to_draw:
+            sprite_x = (preview_size - sprite_to_draw.get_width()) // 2
+            sprite_y = (preview_size - sprite_to_draw.get_height()) // 2
+            preview_bg.blit(sprite_to_draw, (sprite_x, sprite_y))
 
         cost_text = self.font_small.render(f"{cost}", True, (255, 255, 255))
+        cost_bg = pygame.Surface((cost_text.get_width() + 6, 18), pygame.SRCALPHA)
+        cost_bg.fill((0, 0, 0, 180))
 
         screen.blit(preview_bg, (mouse_pos[0] - half, mouse_pos[1] - half))
 
-        pygame.draw.circle(screen, (255, 200, 50), (mouse_pos[0] + half - 15, mouse_pos[1] - half + 15), 12)
+        # Círculo de energia
+        pygame.draw.circle(screen, (255, 200, 50), (mouse_pos[0] + half - 15, mouse_pos[1] - half + 15), 14)
+        screen.blit(cost_bg, (mouse_pos[0] + half - 15 - cost_text.get_width() // 2 - 3, mouse_pos[1] - half + 10))
         screen.blit(cost_text, (mouse_pos[0] + half - 15 - cost_text.get_width() // 2, mouse_pos[1] - half + 11))
 
     def _render_game_over(self, screen):
-        """Renderiza tela de game over"""
         overlay = pygame.Surface((self.screen_manager.viewport_width, self.screen_manager.viewport_height))
         overlay.set_alpha(200)
         overlay.fill((0, 0, 0))
@@ -886,7 +1117,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
         screen.blit(inst_text, (inst_x, inst_y))
 
     def _render_completed(self, screen):
-        """Renderiza tela de fase completa"""
         overlay = pygame.Surface((self.screen_manager.viewport_width, self.screen_manager.viewport_height))
         overlay.set_alpha(200)
         overlay.fill((0, 0, 0))
@@ -913,7 +1143,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
         screen.blit(inst_text, (inst_x, inst_y))
 
     def _render_pause_overlay(self, screen):
-        """Overlay de pausa"""
         overlay = pygame.Surface((self.screen_manager.viewport_width, self.screen_manager.viewport_height))
         overlay.set_alpha(180)
         overlay.fill((0, 0, 0))

@@ -182,7 +182,12 @@ class SurvivalUI:
         has_boss = False
         if hasattr(self.game_scene, 'wave_manager') and self.game_scene.wave_manager:
             config = getattr(self.game_scene.wave_manager, 'current_wave_config', None)
-            has_boss = config and config.has_boss if config else False
+            # CORREÇÃO: Verifica se é dicionário e acessa a chave 'has_boss'
+            if config:
+                if isinstance(config, dict):
+                    has_boss = config.get('has_boss', False)
+                else:
+                    has_boss = getattr(config, 'has_boss', False)
 
         # Texto
         if has_boss:
@@ -233,7 +238,11 @@ class SurvivalUI:
         if fill_width > 0:
             has_boss = False
             if wave_manager.current_wave_config:
-                has_boss = wave_manager.current_wave_config.has_boss
+                config = wave_manager.current_wave_config
+                if isinstance(config, dict):
+                    has_boss = config.get('has_boss', False)
+                else:
+                    has_boss = getattr(config, 'has_boss', False)
 
             color = self.COLORS['danger'] if has_boss else self.COLORS['primary']
             fill_rect = pygame.Rect(x, y, fill_width, bar_height)

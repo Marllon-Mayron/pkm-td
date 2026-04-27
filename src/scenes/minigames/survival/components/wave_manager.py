@@ -1,62 +1,27 @@
-# src/scenes/minigames/survival/components/wave_manager.py
+# src/scenes/minigames/survival/components/wave_manager.py (CORRIGIDO - COM DIREÇÃO)
+
 """
-Wave Manager para minigame Survival - Inimigos param para atacar
+Wave Manager para minigame Survival - Waves finitas configuradas via JSON
 """
 import math
 import random
-from typing import List, Optional, Dict, Any, Tuple
-from dataclasses import dataclass, field
+from typing import List, Optional, Tuple, Dict, Any
+from dataclasses import dataclass
 
 from src.entities.pokemon import Pokemon
 from src.data.pokedex import Pokedex
 from src.battle.attack_pattern import AttackPattern
-
-
-@dataclass
-class WaveConfig:
-    wave_number: int
-    total_enemies: int
-    spawn_interval: float
-    initial_delay: float
-    enemy_level_min: int
-    enemy_level_max: int
-    has_boss: bool
-    boss_at_end: bool = True
-    paths_available: List[int] = field(default_factory=list)
-    pokemon_pool: List[int] = field(default_factory=list)
+from src.ui.toast_renderer import toast_battle, toast_success, toast_warning
 
 
 class SurvivalWaveManager:
-    """
-    Wave Manager para minigame Survival.
-    Inimigos param para atacar (como Plants vs Zombies).
-    """
+    """Gerencia waves finitas do minigame Survival"""
 
-    # LISTA DE POKEMON QUE PODEM APARECER COMO INIMIGOS
-    ENEMY_POKEMON_POOL = [
-        16, 19, 21, 23, 25, 29, 32, 39, 41, 43, 46, 48, 50, 52, 54, 56, 58, 60, 63, 66, 69, 72,
-        74, 77, 79, 81, 84, 86, 88, 90, 92, 95, 96, 98, 100, 102, 104, 108, 109, 111, 114, 116,
-        118, 120, 123, 129, 133
-    ]
-
-    # BOSSES (pokemon mais fortes)
-    BOSS_POKEMON_POOL = [3, 6, 9, 18, 31, 34, 45, 59, 62, 65, 68, 76, 94, 106, 107, 108, 112, 130, 131, 149]
-
-    BASE_ENEMIES_PER_WAVE = 6
-    ENEMIES_INCREMENT_PER_WAVE = 1
-    MAX_ENEMIES_PER_WAVE = 20
-
-    BASE_SPAWN_INTERVAL = 3.0
-    MIN_SPAWN_INTERVAL = 1.0
-
-    BASE_LEVEL = 3
-    LEVEL_INCREMENT_PER_WAVE = 1
-    MAX_LEVEL = 50
-
-    def __init__(self, game_scene, chapter_id: int = 1, phase_number: int = 1):
+    def __init__(self, game_scene, chapter_id: int = 1, phase_number: int = 1, survival_data: dict = None):
         self.game_scene = game_scene
         self.chapter_id = chapter_id
         self.phase_number = phase_number
+        self.survival_data = survival_data
 
         self.paths = None
         self.pokedex = Pokedex()
@@ -65,9 +30,10 @@ class SurvivalWaveManager:
         self.active_enemies: List[Pokemon] = []
         self.paused = False
 
-        # Configuracao das waves
+        # Configuração das waves
         self.current_wave = 1
         self.total_waves = 0
+        self.waves_config = []
         self.enemies_spawned_in_wave = 0
         self.enemies_to_spawn = 0
         self.wave_active = False
@@ -76,18 +42,33 @@ class SurvivalWaveManager:
         self.between_waves_timer = 0.0
         self.between_waves_duration = 3.0
 
-        self.current_wave_config: Optional[WaveConfig] = None
+        self.current_wave_config = None
+        self.current_wave_enemies = []
+        self.current_wave_is_boss = False
 
         self.enemies_killed = 0
         self.enemies_escaped = 0
 
         self.available_paths: List[int] = []
-        self.pokemon_pool = self.ENEMY_POKEMON_POOL.copy()
+        self._wave_completed_announced = False
 
+        self._load_waves_from_data()
         self._load_minigame_config()
 
+    def _load_waves_from_data(self):
+        """Carrega as waves do survival_data"""
+        if self.survival_data and "waves" in self.survival_data:
+            self.waves_config = self.survival_data["waves"]
+            self.total_waves = len(self.waves_config)
+            print(f"[SurvivalWave] Carregadas {self.total_waves} waves")
+        else:
+            self.waves_config = [
+                {"wave": 1, "enemies": [10, 13], "count": 3, "min_level": 3, "max_level": 5, "spawn_interval": 3.0}]
+            self.total_waves = 1
+            print(f"[SurvivalWave] Usando wave fallback")
+
     def _load_minigame_config(self):
-        """Carrega configuracoes especificas do minigame survival"""
+        """Carrega configurações adicionais"""
         import json
         import os
         from src.config.paths import PROJECT_ROOT
@@ -103,16 +84,9 @@ class SurvivalWaveManager:
                 waves_data = data.get("waves", {})
                 if isinstance(waves_data, dict):
                     waves_list = waves_data.get("waves", [])
-                    if waves_list:
+                    if waves_list and self.waves_config:
                         wave_config = waves_list[0]
-                        self.BASE_ENEMIES_PER_WAVE = wave_config.get("wave_size", self.BASE_ENEMIES_PER_WAVE)
-                        self.BASE_SPAWN_INTERVAL = wave_config.get("spawn_interval", self.BASE_SPAWN_INTERVAL)
-                        self.BASE_LEVEL = wave_config.get("min_level", self.BASE_LEVEL)
-
-                custom_pool = data.get("pokemon_pool", [])
-                if custom_pool:
-                    self.pokemon_pool = custom_pool
-                    print(f"[SurvivalWave] Pokemon pool carregado: {len(self.pokemon_pool)} Pokemon")
+                        self.between_waves_duration = wave_config.get("initial_delay", 3.0)
 
             except Exception as e:
                 print(f"[SurvivalWave] Erro ao carregar config: {e}")
@@ -121,10 +95,7 @@ class SurvivalWaveManager:
         self.paths = paths
         if paths:
             self.available_paths = list(range(len(paths)))
-            print(f"[SurvivalWave] Paths disponiveis: {self.available_paths}")
-
-    def set_target_items(self, items):
-        pass
+            print(f"[SurvivalWave] Paths disponíveis: {self.available_paths}")
 
     def start_waves(self):
         self.current_wave = 1
@@ -132,66 +103,70 @@ class SurvivalWaveManager:
         self.enemies_escaped = 0
         self.wave_active = False
         self.between_waves_timer = 0
+        self._wave_completed_announced = False
         self._prepare_next_wave()
         self.wave_active = True
-        print(f"[SurvivalWave] Waves iniciadas! Wave 1 comecando...")
+        print(f"[SurvivalWave] Iniciando waves... Total: {self.total_waves}")
 
     def _prepare_next_wave(self):
-        wave_number = self.current_wave
+        """Prepara a próxima wave baseada na configuração"""
+        if self.current_wave > self.total_waves:
+            print(f"[SurvivalWave] Todas as waves completas! Fim do jogo.")
+            self.wave_active = False
+            if hasattr(self.game_scene, 'complete_game'):
+                self.game_scene.complete_game()
+            return
 
-        enemies_count = min(
-            self.MAX_ENEMIES_PER_WAVE,
-            self.BASE_ENEMIES_PER_WAVE + (wave_number - 1) * self.ENEMIES_INCREMENT_PER_WAVE
-        )
+        wave_config = self.waves_config[self.current_wave - 1]
 
-        spawn_interval = max(
-            self.MIN_SPAWN_INTERVAL,
-            self.BASE_SPAWN_INTERVAL - (wave_number - 1) * 0.1
-        )
-
-        initial_delay = max(0.5, 2.0 - (wave_number - 1) * 0.1)
-
-        level_min = self.BASE_LEVEL + (wave_number - 1) * self.LEVEL_INCREMENT_PER_WAVE
-        level_max = min(self.MAX_LEVEL, level_min + 2)
-
-        # Boss a cada 5 waves
-        has_boss = (wave_number % 5 == 0)
-
-        paths_available = self.available_paths.copy()
-        random.shuffle(paths_available)
-
-        self.current_wave_config = WaveConfig(
-            wave_number=wave_number,
-            total_enemies=enemies_count,
-            spawn_interval=spawn_interval,
-            initial_delay=initial_delay,
-            enemy_level_min=level_min,
-            enemy_level_max=level_max,
-            has_boss=has_boss,
-            paths_available=paths_available,
-            pokemon_pool=self.pokemon_pool.copy()
-        )
+        self.current_wave_is_boss = wave_config.get("is_boss", False)
+        self.current_wave_enemies = wave_config.get("enemies", [10, 13])
+        enemies_count = wave_config.get("count", 5)
+        spawn_interval = wave_config.get("spawn_interval", 3.0)
+        initial_delay = wave_config.get("initial_delay", 2.0)
+        min_level = wave_config.get("min_level", 3)
+        max_level = wave_config.get("max_level", 5)
 
         self.enemies_to_spawn = enemies_count
         self.enemies_spawned_in_wave = 0
         self.wave_timer = initial_delay
         self.spawn_timer = 0.0
+        self._wave_completed_announced = False
+
+        paths_available = self.available_paths.copy()
+        random.shuffle(paths_available)
+
+        self.current_wave_config = {
+            "wave_number": self.current_wave,
+            "total_enemies": enemies_count,
+            "spawn_interval": spawn_interval,
+            "initial_delay": initial_delay,
+            "enemy_level_min": min_level,
+            "enemy_level_max": max_level,
+            "has_boss": self.current_wave_is_boss,
+            "paths_available": paths_available,
+            "enemy_ids": self.current_wave_enemies
+        }
 
         self._announce_wave()
 
-        print(f"[SurvivalWave] WAVE {wave_number}: {enemies_count} inimigos, nivel {level_min}-{level_max}, boss={has_boss}")
+        print(
+            f"[SurvivalWave] WAVE {self.current_wave}/{self.total_waves}: {enemies_count} inimigos, boss={self.current_wave_is_boss}")
 
     def _announce_wave(self):
+        wave_text = f"ONDA {self.current_wave}"
+        if self.current_wave_is_boss:
+            wave_text = f"ONDA {self.current_wave} - CHEFE"
+
+        toast_battle(wave_text, duration=2.0)
+
         if hasattr(self.game_scene, 'survival_ui'):
-            wave_text = f"ONDA {self.current_wave}"
-            if self.current_wave_config and self.current_wave_config.has_boss:
-                wave_text = f"ONDA {self.current_wave} - CHEFE INIMIGO"
             self.game_scene.survival_ui.show_message(wave_text, (255, 215, 0), duration=2.0)
 
     def _get_random_path(self) -> Optional[int]:
-        if not self.current_wave_config or not self.current_wave_config.paths_available:
+        if not self.current_wave_config or not self.current_wave_config["paths_available"]:
             return 0 if self.available_paths else None
-        return random.choice(self.current_wave_config.paths_available)
+        return random.choice(self.current_wave_config["paths_available"])
 
     def _get_path_start_point(self, path_idx: int) -> Optional[Tuple[float, float]]:
         if not self.paths or path_idx >= len(self.paths):
@@ -226,7 +201,7 @@ class SurvivalWaveManager:
         return None
 
     def _create_enemy(self) -> Optional[Pokemon]:
-        """Cria um inimigo - RESPEITANDO STATS E COOLDOWN DO MODO CAMPANHA"""
+        """Cria um inimigo baseado na configuração da wave"""
         if not self.current_wave_config:
             return None
 
@@ -240,20 +215,20 @@ class SurvivalWaveManager:
 
         start_x, start_y = start_point
 
-        is_last = (self.enemies_spawned_in_wave + 1) >= self.current_wave_config.total_enemies
-        is_boss = is_last and self.current_wave_config.has_boss
+        is_last = (self.enemies_spawned_in_wave + 1) >= self.current_wave_config["total_enemies"]
 
-        if is_boss:
-            pokemon_pool = self.BOSS_POKEMON_POOL
-            level = self.current_wave_config.enemy_level_max + 2
+        enemies_list = self.current_wave_config["enemy_ids"]
+        pokemon_id = random.choice(enemies_list) if len(enemies_list) > 1 else enemies_list[0]
+
+        if is_last and self.current_wave_config["has_boss"]:
+            level = self.current_wave_config["enemy_level_max"] + 2
+            is_boss = True
         else:
-            pokemon_pool = self.current_wave_config.pokemon_pool
             level = random.randint(
-                self.current_wave_config.enemy_level_min,
-                self.current_wave_config.enemy_level_max
+                self.current_wave_config["enemy_level_min"],
+                self.current_wave_config["enemy_level_max"]
             )
-
-        pokemon_id = random.choice(pokemon_pool)
+            is_boss = False
 
         try:
             pokemon = Pokemon(
@@ -268,16 +243,13 @@ class SurvivalWaveManager:
             print(f"[SurvivalWave] Erro ao criar Pokemon {pokemon_id}: {e}")
             return None
 
-        # ===== CONFIGURA O INIMIGO COMO AGRESSIVO =====
         pokemon.attack_pattern = AttackPattern.AGGRESSIVE
         pokemon.combat_state = "attacking"
 
-        # Configura screen e camera
         if self.game_scene and hasattr(self.game_scene, 'screen_manager'):
             pokemon.screen_manager = self.game_scene.screen_manager
             pokemon.camera = self.game_scene.camera
 
-        # Atribui o path
         path_points = self._get_path_points(path_idx)
         if path_points:
             pokemon.path = path_points.copy()
@@ -286,53 +258,87 @@ class SurvivalWaveManager:
         else:
             return None
 
-        # ===== CRUCIAL: NÃO MODIFICA A VELOCIDADE MANUALMENTE! =====
-        # A velocidade JÁ É CALCULADA pelo stats do Pokémon baseada em:
-        # - Base speed do Pokémon
-        # - Level
-        # - IVs/EVs
-        # - Natureza
-        # - Status effects (paralisia, etc)
-        # - Shiny/Boss (já aplicado no __init__)
-
-        # OBS: O __init__ do Pokémon já calcula move_speed corretamente
-        # Não sobrescreva com valor fixo!
-
         pokemon._just_spawned = True
         pokemon._spawn_timer = 0.5
         pokemon._escaped_counted = False
 
-        # ===== GARANTE QUE O COOLDOWN ESTÁ CORRETO =====
-        # O __init__ do Pokémon já define charge_cooldown_max:
-        # - Boss: 1.2 segundos
-        # - Normal: 3.0 segundos
-        # Não precisa modificar!
+        # ===== CONFIGURA A DIREÇÃO INICIAL BASEADA NO MOVIMENTO =====
+        # Pega o primeiro e segundo ponto do path para determinar direção inicial
+        if len(path_points) >= 2:
+            dx = path_points[1][0] - path_points[0][0]
+            dy = path_points[1][1] - path_points[0][1]
+            self._update_direction_from_movement(pokemon, dx, dy)
 
-        print(
-            f"[SurvivalWave] {pokemon.name} criado - Speed: {pokemon.move_speed:.2f}, Cooldown: {pokemon.charge_cooldown_max:.1f}s")
-
+        print(f"[SurvivalWave] {pokemon.name} criado - Level {pokemon.level}")
         return pokemon
 
+    def _update_direction_from_movement(self, enemy: Pokemon, dx: float, dy: float):
+        """Atualiza a direção baseada no movimento (8 direções) - MESMA LÓGICA DO MODO CAMPANHA"""
+        if dx == 0 and dy == 0:
+            return
+
+        abs_dx = abs(dx)
+        abs_dy = abs(dy)
+
+        # Constante tan(22.5°)
+        THRESHOLD = 0.41421356
+
+        if abs_dx >= abs_dy:
+            # Movimento predominantemente horizontal
+            if dx > 0:
+                # Direita
+                if dy > 0 and abs_dy > abs_dx * THRESHOLD:
+                    enemy.current_direction = "down-right"
+                elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
+                    enemy.current_direction = "up-right"
+                else:
+                    enemy.current_direction = "right"
+            else:
+                # Esquerda
+                if dy > 0 and abs_dy > abs_dx * THRESHOLD:
+                    enemy.current_direction = "down-left"
+                elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
+                    enemy.current_direction = "up-left"
+                else:
+                    enemy.current_direction = "left"
+        else:
+            # Movimento predominantemente vertical
+            if dy > 0:
+                # Baixo
+                if dx > 0 and abs_dx > abs_dy * THRESHOLD:
+                    enemy.current_direction = "down-right"
+                elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
+                    enemy.current_direction = "down-left"
+                else:
+                    enemy.current_direction = "down"
+            else:
+                # Cima
+                if dx > 0 and abs_dx > abs_dy * THRESHOLD:
+                    enemy.current_direction = "up-right"
+                elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
+                    enemy.current_direction = "up-left"
+                else:
+                    enemy.current_direction = "up"
+
     def update(self, dt: float) -> List[Pokemon]:
-        """
-        Atualiza waves - APENAS MOVIMENTO.
-        O COMBATE É PROCESSADO PELO GAME_SCENE.
-        """
+        """Atualiza waves - APENAS MOVIMENTO"""
         if self.paused:
             return []
 
         enemies_at_end = []
 
-        # Entre waves
         if not self.wave_active:
-            if self.between_waves_timer <= 0:
-                self._prepare_next_wave()
-                self.wave_active = True
-            else:
+            if self.between_waves_timer > 0:
                 self.between_waves_timer -= dt
                 return []
 
-        # Delay inicial da wave
+            if self.current_wave <= self.total_waves:
+                self._prepare_next_wave()
+                self.wave_active = True
+                return []
+            else:
+                return []
+
         if self.wave_timer > 0:
             self.wave_timer -= dt
             if self.wave_timer > 0:
@@ -354,9 +360,9 @@ class SurvivalWaveManager:
                     print(
                         f"[SurvivalWave] Spawn #{self.enemies_spawned_in_wave}/{self.enemies_to_spawn}: {enemy.name} Lv.{enemy.level}")
 
-                    self.spawn_timer = self.current_wave_config.spawn_interval
+                    self.spawn_timer = self.current_wave_config["spawn_interval"]
 
-        # ===== APENAS MOVIMENTO - SEM COMBATE AQUI! =====
+        # Movimento dos inimigos
         enemies_to_remove = []
 
         for enemy in self.active_enemies[:]:
@@ -364,15 +370,13 @@ class SurvivalWaveManager:
                 if not hasattr(enemy, 'path') or not enemy.path:
                     continue
 
-                # Verifica se o inimigo está morto
                 if not enemy.is_alive() or enemy.is_defeated:
                     if not getattr(enemy, '_marked_for_removal', False):
                         self._handle_enemy_death(enemy)
                         enemies_to_remove.append(enemy)
                     continue
 
-                # ===== VERIFICA SE DEVE PARAR (TEM ALIADO NO RANGE) =====
-                # Isso é usado APENAS para decidir se move ou não
+                # Verifica se deve parar (tem aliado no range)
                 should_stop = False
                 if hasattr(self.game_scene, 'player_pokemon'):
                     for ally in self.game_scene.player_pokemon:
@@ -385,13 +389,10 @@ class SurvivalWaveManager:
                             should_stop = True
                             break
 
-                # Se tem aliado no range, NÃO MOVE (para de andar)
                 if should_stop:
-                    # Não atualiza movimento - fica parado
-                    # A animação será tratada pelo game_scene
                     continue
 
-                # ===== MOVIMENTO NORMAL (sem aliados no range) =====
+                # Chegou ao fim do path
                 if enemy.path_index >= len(enemy.path):
                     enemies_at_end.append(enemy)
                     continue
@@ -401,6 +402,10 @@ class SurvivalWaveManager:
                 dy = target_y - enemy.y
                 distance = math.hypot(dx, dy)
                 move_distance = enemy.move_speed * dt * 60
+
+                # ===== ATUALIZA DIREÇÃO BASEADA NO MOVIMENTO ANTES DE MOVER =====
+                if distance > 0:
+                    self._update_direction_from_movement(enemy, dx, dy)
 
                 if distance <= move_distance:
                     enemy.x, enemy.y = target_x, target_y
@@ -422,80 +427,38 @@ class SurvivalWaveManager:
                 print(f"[SurvivalWave] Erro ao processar inimigo: {e}")
                 continue
 
-        # Remove inimigos mortos
         for enemy in enemies_to_remove:
             if enemy in self.active_enemies:
                 self.active_enemies.remove(enemy)
 
-        # Remove inimigos que chegaram ao fim
         for enemy in enemies_at_end:
             if enemy in self.active_enemies:
                 self.active_enemies.remove(enemy)
 
         # Verifica se a wave terminou
-        if self.enemies_spawned_in_wave >= self.enemies_to_spawn and len(self.active_enemies) == 0:
+        wave_finished = (self.enemies_spawned_in_wave >= self.enemies_to_spawn and
+                         len(self.active_enemies) == 0)
+
+        if wave_finished and not self._wave_completed_announced:
+            self._wave_completed_announced = True
             self._complete_wave()
 
         return enemies_at_end
 
-    def _get_direction_from_movement(self, dx: float, dy: float) -> str:
-        """Retorna a direção baseada no movimento (8 direções)"""
-        if dx == 0 and dy == 0:
-            return "down"
-
-        abs_dx = abs(dx)
-        abs_dy = abs(dy)
-        THRESHOLD = 0.41421356
-
-        if abs_dx >= abs_dy:
-            if dx > 0:
-                if dy > 0 and abs_dy > abs_dx * THRESHOLD:
-                    return "down-right"
-                elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
-                    return "up-right"
-                else:
-                    return "right"
-            else:
-                if dy > 0 and abs_dy > abs_dx * THRESHOLD:
-                    return "down-left"
-                elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
-                    return "up-left"
-                else:
-                    return "left"
-        else:
-            if dy > 0:
-                if dx > 0 and abs_dx > abs_dy * THRESHOLD:
-                    return "down-right"
-                elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
-                    return "down-left"
-                else:
-                    return "down"
-            else:
-                if dx > 0 and abs_dx > abs_dy * THRESHOLD:
-                    return "up-right"
-                elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
-                    return "up-left"
-                else:
-                    return "up"
-
     def _handle_enemy_death(self, enemy: Pokemon):
-        """Processa morte de um inimigo e DA ENERGIA E XP"""
+        """Processa morte de um inimigo"""
         self.enemies_killed += 1
 
-        # ===== DISTRIBUI XP E EVS (COPIADO DO WAVE_MANAGER ORIGINAL) =====
         self._distribute_xp(enemy)
 
-        # ===== DA ENERGIA AO MATAR =====
         if hasattr(self.game_scene, 'add_energy'):
-            energy_gain = 15  # Energia base
+            energy_gain = 15
             if enemy.is_boss:
-                energy_gain = 60  # Boss da mais energia
+                energy_gain = 60
             elif enemy.is_shiny:
-                energy_gain = 30  # Shiny da um bonus
+                energy_gain = 30
             self.game_scene.add_energy(energy_gain)
-            print(f"[SurvivalWave] {enemy.name} derrotado! +{energy_gain} energia")
 
-        # ===== DA PONTOS =====
         if hasattr(self.game_scene, 'add_score'):
             score_gain = 10
             if enemy.is_boss:
@@ -503,44 +466,33 @@ class SurvivalWaveManager:
             elif enemy.is_shiny:
                 score_gain = 50
             self.game_scene.add_score(score_gain)
-            print(f"[SurvivalWave] +{score_gain} pontos")
 
-        # Marca para remocao
         enemy._marked_for_removal = True
         enemy.is_defeated = True
         enemy.current_hp = 0
 
-        # Limpa referencia de aliados
         if hasattr(self.game_scene, 'player_pokemon'):
             for ally in self.game_scene.player_pokemon:
                 if hasattr(ally, 'target') and ally.target == enemy:
                     ally.target = None
                     ally.combat_state = "idle"
 
-        # Remove do effect manager
         if hasattr(enemy, 'effect_manager') and enemy.effect_manager:
             try:
                 enemy.effect_manager.unregister_pokemon(enemy)
             except:
                 pass
 
-        print(f"[SurvivalWave] {enemy.name} removido do campo!")
-
     def _distribute_xp(self, defeated_enemy: 'Pokemon'):
-        """Distribui XP e EVs quando um inimigo é derrotado (COPIADO DO WAVE_MANAGER ORIGINAL)"""
+        """Distribui XP e EVs"""
         contributors = defeated_enemy.get_xp_contributors()
         if not contributors:
-            print(f"[XP] Nenhum contribuidor para {defeated_enemy.name}")
             return
 
-        # ===== BASE XP =====
         base_xp = 15 + (defeated_enemy.level * 5)
 
-        # Bônus para boss
         if defeated_enemy.is_boss:
             base_xp = int(base_xp * 3)
-            print(f"[XP] BOSS derrotado! XP base: {base_xp}")
-
         if defeated_enemy.is_shiny:
             base_xp = int(base_xp * 1.5)
 
@@ -548,14 +500,12 @@ class SurvivalWaveManager:
         if total_contribution <= 0:
             total_contribution = len(contributors)
 
-        # Obtém os EVs concedidos pelo inimigo derrotado
         pokedex = self.game_scene.game.player.pokedex if self.game_scene.game.player else None
         if not pokedex:
             return
 
         ev_yield = pokedex.get_ev_yield(defeated_enemy.id)
 
-        # Aplica multiplicadores para boss/shiny
         ev_multiplier = 1.0
         if defeated_enemy.is_boss:
             ev_multiplier *= 3
@@ -566,7 +516,6 @@ class SurvivalWaveManager:
             proportion = contribution / total_contribution
             xp_gained = int(base_xp * proportion)
 
-            # EVs são distribuídos proporcionalmente
             evs_gained = {}
             for stat, value in ev_yield.items():
                 if value > 0:
@@ -576,37 +525,22 @@ class SurvivalWaveManager:
             if xp_gained < 1 and contribution > 0:
                 xp_gained = 1
 
-            # Procura o Pokémon aliado que causou o dano
             for ally in self.game_scene.player_pokemon:
                 if id(ally) == attacker_id and ally.is_alive():
                     old_level = ally.level
                     ally.gain_xp(xp_gained)
 
-                    # Ganha EVs
                     if any(evs_gained.values()):
                         if ally.stats.can_gain_evs(evs_gained):
                             ally.stats.gain_evs(evs_gained)
-                            print(f"[XP] {ally.name} ganhou {xp_gained} XP e EVs: {evs_gained}")
-                        else:
-                            print(f"[XP] {ally.name} ganhou {xp_gained} XP (EVs bloqueados)")
-                    else:
-                        print(f"[XP] {ally.name} ganhou {xp_gained} XP")
-
-                    # Verifica level up
-                    if ally.level > old_level:
-                        print(f"[XP] {ally.name} subiu para o nível {ally.level}!")
                     break
 
     def _complete_wave(self):
         """Completa a wave atual e prepara a próxima"""
         print(f"[SurvivalWave] WAVE {self.current_wave} COMPLETA!")
 
-        # ===== NÃO PERDE VIDA AQUI! =====
-        # Apenas dá bônus
-
-        if hasattr(self.game_scene, 'add_energy'):
-            bonus = 50 + (self.current_wave - 1) * 10
-            self.game_scene.add_energy(bonus)
+        wave_complete_text = f"ONDA {self.current_wave} COMPLETA!"
+        toast_success(wave_complete_text, duration=2.0)
 
         if hasattr(self.game_scene, 'survival_ui'):
             self.game_scene.survival_ui.show_message(
@@ -615,9 +549,19 @@ class SurvivalWaveManager:
                 duration=2.0
             )
 
+        if hasattr(self.game_scene, 'add_energy'):
+            bonus = 30
+            self.game_scene.add_energy(bonus)
+
         self.current_wave += 1
         self.wave_active = False
         self.between_waves_timer = self.between_waves_duration
+
+        self.current_wave_config = None
+        self.enemies_to_spawn = 0
+        self.enemies_spawned_in_wave = 0
+
+        print(f"[SurvivalWave] Próxima wave: {self.current_wave}/{self.total_waves}")
 
     def remove_enemy(self, enemy: Pokemon):
         self._handle_enemy_death(enemy)
@@ -631,7 +575,7 @@ class SurvivalWaveManager:
             progress = self.enemies_spawned_in_wave / self.enemies_to_spawn
 
         name = f"Onda {self.current_wave}"
-        if self.current_wave_config and self.current_wave_config.has_boss:
+        if self.current_wave_is_boss:
             name += " (Chefe)"
 
         return {
@@ -645,11 +589,8 @@ class SurvivalWaveManager:
             "active_paths": len(self.available_paths)
         }
 
-    def is_wave_completely_finished(self) -> bool:
-        return not self.wave_active and self.between_waves_timer <= 0
-
     def has_more_waves(self) -> bool:
-        return True  # Survival infinito
+        return self.current_wave <= self.total_waves
 
     def has_active_waves(self) -> bool:
         return self.wave_active or self.enemies_spawned_in_wave > 0
