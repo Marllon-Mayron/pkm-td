@@ -1,9 +1,7 @@
-# src/scenes/minigames/survival/components/card_deck.py
+# card_deck.py
 
 """
-Sistema de deck estilo UNO - Suporta Pokémon e Itens
-SEM ESTEIRA - Cartas fixas no leque
-COM SISTEMA DE PESOS (WEIGHT) PARA RARIDADE
+Sistema de deck - Suporta Pokémon e Itens
 """
 import pygame
 import random
@@ -44,11 +42,13 @@ class CardDeck:
         self.pokedex = Pokedex()
         self.item_catalog = item_bag_catalog
 
-        # Pool de cartas (Pokémon e Itens)
-        self.pokemon_pool: List[Dict] = []
-        self.item_pool: List[Dict] = []
-        self.card_pool: List[Dict] = []
-        self.cards: List[Dict] = []
+        # POOL BASE (nunca é modificado) - Cartas disponíveis com seus pesos
+        self.pokemon_base_pool: List[Dict] = []
+        self.item_base_pool: List[Dict] = []
+
+        # POOL ATIVO (cópias que podem ser consumidas)
+        self.card_pool: List[Dict] = []  # Pool atual de cartas disponíveis
+        self.cards: List[Dict] = []  # Cartas atualmente na mão do jogador
         self.card_cooldowns: Dict[int, float] = {}
 
         # Progressão do deck
@@ -60,7 +60,7 @@ class CardDeck:
         self.recycle_cooldown_remaining = 0.0
         self.recycle_hovered = False
 
-        # Sistema de animação (apenas para subir/descer)
+        # Sistema de animação
         self.card_x_positions: List[float] = []
         self.target_x_positions: List[float] = []
         self.card_y_positions: List[float] = []
@@ -113,29 +113,35 @@ class CardDeck:
         self.DEFAULT_TYPE_COLOR = (100, 100, 140)
 
     def set_card_pools(self, pokemon_pool: List[Dict], item_pool: List[Dict]):
-        """Define os pools de Pokémon e Itens - PRESERVANDO OS WEIGHTS"""
-        self.pokemon_pool = pokemon_pool.copy()
-        self.item_pool = item_pool.copy()
-
-        self.card_pool = []
-        for p in self.pokemon_pool:
+        """
+        Define os pools BASE de Pokémon e Itens.
+        Os pesos devem estar entre 0.1 e 1.0
+        """
+        # Armazena os pools base (nunca modificados)
+        self.pokemon_base_pool = []
+        for p in pokemon_pool:
+            # Garante que o peso está entre 0.1 e 1.0
+            weight = max(0.1, min(1.0, p.get("weight", 0.5)))
             card = {
                 "type": "pokemon",
                 "data": {
                     "id": p["id"],
                     "cost": p["cost"],
                     "level": p.get("level", 5),
-                    "weight": p.get("weight", 1)
+                    "weight": weight
                 },
                 "name": self.pokedex.get_name(p["id"]),
                 "cost": p["cost"],
                 "level": p.get("level", 5),
                 "type_name": self.pokedex.get_types(p["id"])[0] if self.pokedex.get_types(p["id"]) else "normal",
-                "weight": p.get("weight", 1)
+                "weight": weight
             }
-            self.card_pool.append(card)
+            self.pokemon_base_pool.append(card)
 
-        for i in self.item_pool:
+        self.item_base_pool = []
+        for i in item_pool:
+            # Garante que o peso está entre 0.1 e 1.0
+            weight = max(0.1, min(1.0, i.get("weight", 0.5)))
             card = {
                 "type": "item",
                 "data": {
@@ -143,41 +149,80 @@ class CardDeck:
                     "cost": i["cost"],
                     "effect": i["effect"],
                     "effect_value": i["effect_value"],
-                    "weight": i.get("weight", 1)
+                    "weight": weight
                 },
                 "name": i["id"].upper(),
                 "cost": i["cost"],
                 "effect": i["effect"],
                 "effect_value": i["effect_value"],
-                "weight": i.get("weight", 1)
+                "weight": weight
             }
-            self.card_pool.append(card)
+            self.item_base_pool.append(card)
 
-        # Embaralha inicialmente apenas a ordem, os pesos serão usados no _refill_cards
-        random.shuffle(self.card_pool)
+        # Inicializa o pool ativo com cópias
+        self._rebuild_active_pool()
+
+        # Preenche as cartas iniciais
         self._refill_cards()
 
+    def _rebuild_active_pool(self):
+        """Reconstrói o pool ativo a partir dos pools base (cria cópias limpas)"""
+        self.card_pool = []
+
+        # Adiciona cópias de todos os Pokémon
+        for card in self.pokemon_base_pool:
+            # Cria uma cópia profunda da carta
+            card_copy = {
+                "type": card["type"],
+                "data": card["data"].copy(),
+                "name": card["name"],
+                "cost": card["cost"],
+                "level": card.get("level", 5),
+                "type_name": card.get("type_name", "normal"),
+                "weight": card["weight"]
+            }
+            self.card_pool.append(card_copy)
+
+        # Adiciona cópias de todos os Itens
+        for card in self.item_base_pool:
+            card_copy = {
+                "type": card["type"],
+                "data": card["data"].copy(),
+                "name": card["name"],
+                "cost": card["cost"],
+                "effect": card.get("effect", ""),
+                "effect_value": card.get("effect_value"),
+                "weight": card["weight"]
+            }
+            self.card_pool.append(card_copy)
+
+        # Embaralha o pool inicial
+        random.shuffle(self.card_pool)
+
     def _get_weighted_random_card(self, pool: List[Dict]) -> Optional[Dict]:
-        """Seleciona uma carta do pool usando os pesos (weight)"""
+        """
+        Seleciona uma carta do pool usando os pesos (weight).
+        Pesos menores = mais raro, pesos maiores = mais comum.
+        """
         if not pool:
             return None
 
         # Calcula pesos totais
-        total_weight = 0
+        total_weight = 0.0
         weights = []
 
         for card in pool:
-            weight = card.get("weight", 1)
+            weight = card.get("weight", 0.5)
             weights.append(weight)
             total_weight += weight
 
         if total_weight <= 0:
-            # Fallback: escolhe aleatoriamente sem pesos
+            # Fallback: escolhe aleatoriamente
             return random.choice(pool)
 
         # Seleção ponderada
         rand = random.uniform(0, total_weight)
-        cumulative = 0
+        cumulative = 0.0
 
         for i, weight in enumerate(weights):
             cumulative += weight
@@ -187,7 +232,10 @@ class CardDeck:
         return pool[-1]  # Fallback
 
     def _refill_cards(self):
-        """Preenche as cartas do deck atual usando pesos para raridade"""
+        """
+        Preenche as cartas do deck atual usando pesos para raridade.
+        SEMPRE usa seleção ponderada do pool ativo.
+        """
         self.cards = []
         self.card_cooldowns = {}
         self.card_x_positions = []
@@ -199,32 +247,34 @@ class CardDeck:
         self.card_selected_rise = []
         self.target_selected_rise = []
 
-        # Pega as primeiras current_deck_size cartas do pool usando pesos
-        if self.card_pool:
-            cards_to_take = min(self.current_deck_size, len(self.card_pool))
+        if not self.card_pool:
+            return
 
-            # Cria uma cópia temporária do pool para não modificar o original
-            temp_pool = self.card_pool.copy()
+        # Número de cartas a serem pegas
+        cards_to_take = min(self.current_deck_size, len(self.card_pool))
 
-            for i in range(cards_to_take):
-                # Seleciona carta usando pesos
-                card = self._get_weighted_random_card(temp_pool)
+        # Cria uma cópia temporária do pool para seleção sem reposição nesta mão
+        temp_pool = self.card_pool.copy()
 
-                if card:
-                    # Remove a carta selecionada do pool temporário (sem reposição)
-                    temp_pool.remove(card)
+        for i in range(cards_to_take):
+            # Seleciona carta usando pesos
+            card = self._get_weighted_random_card(temp_pool)
 
-                    # Cria uma cópia limpa da carta
-                    card_copy = card.copy()
-                    if card_copy["type"] == "pokemon":
-                        card_copy["data"]["portrait"] = self._get_portrait(card_copy["data"]["id"])
-                    self.cards.append(card_copy)
-                    self.card_cooldowns[i] = 0.0
-                    self.card_selected_rise.append(0.0)
-                    self.target_selected_rise.append(0.0)
+            if card:
+                # Remove a carta selecionada do pool temporário
+                temp_pool.remove(card)
+
+                # Cria uma cópia limpa da carta
+                card_copy = self._copy_card(card)
+
+                self.cards.append(card_copy)
+                self.card_cooldowns[i] = 0.0
+                self.card_selected_rise.append(0.0)
+                self.target_selected_rise.append(0.0)
 
         self._update_card_positions()
 
+        # Inicializa posições
         for i in range(len(self.cards)):
             if i < len(self.target_x_positions):
                 self.card_x_positions.append(self.target_x_positions[i])
@@ -234,6 +284,41 @@ class CardDeck:
                 self.card_x_positions.append(0)
                 self.card_y_positions.append(0)
                 self.card_rotations.append(0)
+
+    def _copy_card(self, card: Dict) -> Dict:
+        """Cria uma cópia independente de uma carta"""
+        if card["type"] == "pokemon":
+            copy = {
+                "type": "pokemon",
+                "data": {
+                    "id": card["data"]["id"],
+                    "cost": card["data"]["cost"],
+                    "level": card["data"]["level"],
+                    "weight": card["data"].get("weight", 0.5)
+                },
+                "name": card["name"],
+                "cost": card["cost"],
+                "level": card.get("level", 5),
+                "type_name": card.get("type_name", "normal"),
+                "weight": card.get("weight", 0.5)
+            }
+        else:
+            copy = {
+                "type": "item",
+                "data": {
+                    "id": card["data"]["id"],
+                    "cost": card["data"]["cost"],
+                    "effect": card["data"].get("effect", ""),
+                    "effect_value": card["data"].get("effect_value"),
+                    "weight": card["data"].get("weight", 0.5)
+                },
+                "name": card["name"],
+                "cost": card["cost"],
+                "effect": card.get("effect", ""),
+                "effect_value": card.get("effect_value"),
+                "weight": card.get("weight", 0.5)
+            }
+        return copy
 
     def _complete_deck_and_grow(self):
         """Completa o deck atual (todas cartas usadas), aumenta tamanho e dá recompensa"""
@@ -276,9 +361,19 @@ class CardDeck:
         self.selected_index = -1
 
     def remove_card(self, index: int):
-        """Remove uma carta - NÃO adiciona nova automaticamente"""
+        """Remove uma carta do deck atual"""
         if index < 0 or index >= len(self.cards):
             return
+
+        # Remove a carta do pool ativo (já foi usada)
+        removed_card = self.cards[index]
+
+        # Procura e remove uma carta equivalente do card_pool
+        for i, pool_card in enumerate(self.card_pool):
+            if (pool_card["type"] == removed_card["type"] and
+                    pool_card["data"]["id"] == removed_card["data"]["id"]):
+                self.card_pool.pop(i)
+                break
 
         if self.selected_index == index:
             self.clear_selection()
@@ -319,7 +414,7 @@ class CardDeck:
             self._complete_deck_and_grow()
             return
 
-        # Atualiza posições sem adicionar nova carta
+        # Atualiza posições
         self._update_card_positions()
 
         # Atualiza posições alvo
@@ -329,7 +424,7 @@ class CardDeck:
                 self.target_y_positions[i] = self.fan_positions[i][1]
                 self.target_rotations[i] = self.fan_positions[i][2]
 
-        # Smooth move para as posições atuais
+        # Smooth move
         for i in range(len(self.cards)):
             if i < len(self.card_x_positions) and i < len(self.target_x_positions):
                 self.card_x_positions[i] = self.target_x_positions[i]
@@ -337,37 +432,50 @@ class CardDeck:
                 self.card_rotations[i] = self.target_rotations[i]
 
     def recycle_deck(self):
-        """Recicla o deck - substitui todas as cartas atuais por novas e RESETA o tamanho do deck"""
+        """
+        RECICLA O DECK COMPLETAMENTE!
+        - Devolve cartas atuais ao pool
+        - RESETA o tamanho do deck para o valor inicial
+        - RECONSTRÓI o pool ativo com cópias frescas dos pools base
+        - Reembaralha tudo
+        - Gera nova mão usando pesos
+        """
         if self.recycle_cooldown_remaining > 0:
             return False
 
         if not self.cards:
             return False
 
-        # Devolve as cartas atuais para o pool (sem pesos duplicados)
+        # Devolve as cartas atuais para o pool (como cartas consumíveis)
         for card in self.cards:
-            clean_card = card.copy()
-            if "portrait" in clean_card.get("data", {}):
-                del clean_card["data"]["portrait"]
-            self.card_pool.append(clean_card)
-
-        # NÃO EMBARALHA AQUI - O _refill_cards já vai usar pesos
+            # Cria uma cópia limpa para devolver ao pool
+            recycled_card = self._copy_card(card)
+            self.card_pool.append(recycled_card)
 
         # RESETA O TAMANHO DO DECK PARA O VALOR INICIAL
         self.current_deck_size = self.STARTING_CARDS
         self.cards_used_in_current_deck = 0
         self.total_decks_completed = 0
 
+        # RECONSTRÓI O POOL ATIVO a partir dos pools base
+        # Isso garante que TODAS as cartas voltam a estar disponíveis
+        self._rebuild_active_pool()
+
+        # EMBARALHA COMPLETAMENTE o pool ativo
+        random.shuffle(self.card_pool)
+
         # Limpa seleção
         self.clear_selection()
 
-        # Recarrega as cartas com o tamanho resetado (usando pesos)
+        # Recarrega as cartas (usando pesos)
         self._refill_cards()
+
+        # Inicia o cooldown
         self.recycle_cooldown_remaining = self.RECYCLE_COOLDOWN
 
         if hasattr(self.game_scene, 'survival_ui'):
             self.game_scene.survival_ui.show_message(
-                "DECK RECICLADO! AGORA COM 3 CARTAS",
+                f"DECK RECICLADO! +{self.current_deck_size} CARTAS",
                 (100, 200, 255),
                 duration=1.5
             )
@@ -400,7 +508,7 @@ class CardDeck:
         return self.TYPE_COLORS.get(type_name.lower(), self.DEFAULT_TYPE_COLOR)
 
     def _calculate_fan_positions(self):
-        """Calcula posições em leque - espaçamento DINÂMICO baseado no número de cartas"""
+        """Calcula posições em leque - espaçamento DINÂMICO"""
         viewport = self.game_scene.screen_manager
         viewport_width = viewport.viewport_width
         viewport_height = viewport.viewport_height
@@ -419,21 +527,16 @@ class CardDeck:
         self.fan_positions = []
         num_cards = len(self.cards)
 
-        # Ajuste DINÂMICO apenas quando tem MUITAS cartas
-        # Poucas cartas (até 5) = valores originais bons
-        # Muitas cartas (6+) = aumenta espaçamento
+        # Ajuste dinâmico baseado no número de cartas
         if num_cards <= 5:
-            # Mantém os valores originais que já estavam bons
             current_angle = 35
             current_radius = 270
             current_spacing = 1.0
         elif num_cards <= 7:
-            # Aumenta um pouco para 6-7 cartas
             current_angle = 40
             current_radius = 300
             current_spacing = 1.3
         else:
-            # Aumenta mais para 8-10 cartas
             current_angle = 45
             current_radius = 330
             current_spacing = 1.5
@@ -454,7 +557,7 @@ class CardDeck:
 
             self.fan_positions.append((x, y, rotation))
 
-        # Ajusta para não ultrapassar as bordas
+        # Ajusta bordas
         if self.fan_positions:
             min_x = min(p[0] for p in self.fan_positions)
             max_x = max(p[0] + self.CARD_WIDTH for p in self.fan_positions)
@@ -467,7 +570,7 @@ class CardDeck:
                 self.fan_positions = [(x + shift, y, r) for x, y, r in self.fan_positions]
 
     def _update_card_positions(self):
-        """Atualiza as posições alvo das cartas baseado no número atual de cartas"""
+        """Atualiza as posições alvo das cartas"""
         self._calculate_fan_positions()
 
         self.target_x_positions = []
@@ -492,7 +595,7 @@ class CardDeck:
             if self.recycle_cooldown_remaining < 0:
                 self.recycle_cooldown_remaining = 0
 
-        # Animação de subida/descida da carta selecionada
+        # Animação de subida/descida
         for i in range(len(self.cards)):
             if i < len(self.card_selected_rise) and i < len(self.target_selected_rise):
                 diff = self.target_selected_rise[i] - self.card_selected_rise[i]
@@ -524,27 +627,13 @@ class CardDeck:
         return positions
 
     def get_card_at_pos(self, mouse_x: int, mouse_y: int) -> Optional[int]:
-        """Obtém carta na posição com DETECÇÃO MELHORADA"""
+        """Obtém carta na posição"""
         positions = self.get_card_positions()
 
         if not positions:
             return -1
 
-        # Área de clique um pouco maior (só para facilitar clique)
-        click_tolerance = 8
-
-        # Primeiro tenta pegar a carta que está com hover
-        if self.hovered_index >= 0:
-            for idx, x, y, card, rot in positions:
-                if idx == self.hovered_index:
-                    temp_rect = pygame.Rect(x - click_tolerance, y - click_tolerance,
-                                            self.CARD_WIDTH + click_tolerance * 2,
-                                            self.CARD_HEIGHT + click_tolerance * 2)
-                    if temp_rect.collidepoint(mouse_x, mouse_y):
-                        return idx
-                    break
-
-        # Se não, verifica todas na ordem correta
+        # Verifica na ordem do leque (central primeiro)
         click_order = self._get_fan_click_order(len(positions))
 
         for idx_in_order in click_order:
@@ -718,6 +807,7 @@ class CardDeck:
         can_afford = self.game_scene.can_afford(card["cost"])
         energy_insufficient = not can_afford
 
+        # Determina cor do card
         if card["type"] == "item":
             if energy_insufficient:
                 card_color = (60, 35, 35)
@@ -739,13 +829,16 @@ class CardDeck:
 
         card_surface = pygame.Surface((self.CARD_WIDTH, self.CARD_HEIGHT), pygame.SRCALPHA)
 
+        # Sombra
         shadow_surf = pygame.Surface((self.CARD_WIDTH, self.CARD_HEIGHT), pygame.SRCALPHA)
         shadow_surf.fill((0, 0, 0, 80))
         card_surface.blit(shadow_surf, (4, 4))
 
+        # Fundo
         card_rect = pygame.Rect(0, 0, self.CARD_WIDTH, self.CARD_HEIGHT)
         pygame.draw.rect(card_surface, card_color, card_rect, border_radius=10)
 
+        # Borda
         if card["type"] == "item":
             border_color = self.COLORS['item_border'] if not energy_insufficient else self.COLORS['energy_insufficient']
             pygame.draw.rect(card_surface, border_color, card_rect, 3, border_radius=10)
@@ -759,8 +852,9 @@ class CardDeck:
                 energy_overlay.fill((180, 50, 50, 100))
                 card_surface.blit(energy_overlay, (0, 0))
 
+        # Sprite
         if card["type"] == "pokemon":
-            portrait = card["data"].get("portrait")
+            portrait = self._get_portrait(card["data"]["id"])
             if portrait:
                 portrait_x = (self.CARD_WIDTH - 58) // 2
                 portrait_y = 8
@@ -772,6 +866,7 @@ class CardDeck:
                 sprite_y = 8
                 card_surface.blit(item_sprite, (sprite_x, sprite_y))
 
+        # Nome
         name_font = self._get_font(13, bold=True)
         name = card["name"]
         if len(name) > 10:
@@ -781,6 +876,7 @@ class CardDeck:
         name_y = self.CARD_HEIGHT - 50
         card_surface.blit(name_surf, (name_x, name_y))
 
+        # Tipo/Efeito
         type_font = self._get_font(10, bold=True)
         if card["type"] == "pokemon":
             type_name = card["type_name"].upper()
@@ -797,6 +893,7 @@ class CardDeck:
             effect_surf = type_font.render(effect_text, True, (255, 255, 255))
             card_surface.blit(effect_surf, (7, self.CARD_HEIGHT - 23))
 
+        # Level (apenas Pokémon)
         if card["type"] == "pokemon":
             level_font = self._get_font(14, bold=True)
             level_text = f"Lv {card['level']}"
@@ -808,6 +905,7 @@ class CardDeck:
             card_surface.blit(level_bg, (level_x - 3, level_y - 1))
             card_surface.blit(level_surf, (level_x, level_y))
 
+        # Custo
         cost_font = self._get_font(14, bold=True)
         cost_text = str(card['cost'])
         if energy_insufficient:
@@ -820,6 +918,7 @@ class CardDeck:
         cost_surf = cost_font.render(cost_text, True, cost_text_color)
         card_surface.blit(cost_surf, (20 - cost_surf.get_width() // 2, 15))
 
+        # Cooldown overlay
         if is_on_cooldown:
             overlay = pygame.Surface((self.CARD_WIDTH, self.CARD_HEIGHT), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 180))
@@ -835,6 +934,7 @@ class CardDeck:
             time_y = (self.CARD_HEIGHT - time_surf.get_height()) // 2
             card_surface.blit(time_surf, (time_x, time_y))
 
+        # Aviso de energia
         if energy_insufficient and not is_on_cooldown:
             warn_font = self._get_font(9, bold=True)
             warn_text = warn_font.render("ENERGIA", True, (255, 180, 180))
@@ -842,6 +942,7 @@ class CardDeck:
             warn_y = self.CARD_HEIGHT - 38
             card_surface.blit(warn_text, (warn_x, warn_y))
 
+        # Glow de seleção
         if is_selected:
             glow = pygame.Surface((self.CARD_WIDTH, self.CARD_HEIGHT), pygame.SRCALPHA)
             pulse = abs(math.sin(self.game_scene.survival_ui.wave_pulse)) * 0.3 + 0.4
@@ -853,6 +954,7 @@ class CardDeck:
             glow.fill((100, 150, 220, 40))
             card_surface.blit(glow, (0, 0))
 
+        # Rotação e render final
         final_rotation = 0 if is_selected else rotation
 
         if final_rotation != 0:

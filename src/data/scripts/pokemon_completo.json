@@ -627,7 +627,7 @@
                     "evolves_to_id": 11,
                     "evolves_to_name": "metapod",
                     "method": "level_up",
-                    "min_level": 7
+                    "min_level": 6
                 }
             ],
             "variants": [],

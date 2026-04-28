@@ -3,16 +3,16 @@
   "description": "Sobreviva aos pokémon selvagens da floresta",
   "total_waves": 20,
   "starting_lives": 5,
-  "starting_energy": 100,
-  "max_energy": 200,
+  "starting_energy": 150,
+  "max_energy": 300,
   "energy_regen_rate": 1.0,
 
   "available_pokemon": [
-    {"id": 10, "cost": 25, "level": 5, "weight": 80},
-    {"id": 13, "cost": 25, "level": 5, "weight": 80},
-    {"id": 19, "cost": 75, "level": 5, "weight": 40},
-    {"id": 16, "cost": 50, "level": 5, "weight": 60},
-    {"id": 25, "cost": 100, "level": 5, "weight": 20}
+    {"id": 10, "cost": 25, "level": 5, "weight": 1.0},
+    {"id": 13, "cost": 25, "level": 5, "weight": 1.0},
+    {"id": 19, "cost": 50, "level": 5, "weight": 0.7},
+    {"id": 16, "cost": 75, "level": 5, "weight": 0.5},
+    {"id": 25, "cost": 100, "level": 5, "weight": 0.3}
   ],
 
   "available_items": [
@@ -21,21 +21,21 @@
       "cost": 30,
       "effect": "heal",
       "effect_value": 20,
-      "weight": 80
+      "weight": 1.0
+    },
+    {
+      "id": "pp_up",
+      "cost": 25,
+      "effect": "pp_restore",
+      "effect_value": 0.2,
+      "weight": 0.7
     },
     {
       "id": "antidote",
       "cost": 20,
       "effect": "cure_status",
       "effect_value": "poison",
-      "weight": 60
-    },
-    {
-      "id": "superpotion",
-      "cost": 50,
-      "effect": "heal",
-      "effect_value": 50,
-      "weight": 30
+      "weight": 0.5
     }
   ],
 
