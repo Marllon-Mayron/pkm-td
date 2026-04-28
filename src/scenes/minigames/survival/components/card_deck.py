@@ -3,6 +3,7 @@
 """
 Sistema de deck estilo UNO - Suporta Pokémon e Itens
 SEM ESTEIRA - Cartas fixas no leque
+COM SISTEMA DE PESOS (WEIGHT) PARA RARIDADE
 """
 import pygame
 import random
@@ -112,7 +113,7 @@ class CardDeck:
         self.DEFAULT_TYPE_COLOR = (100, 100, 140)
 
     def set_card_pools(self, pokemon_pool: List[Dict], item_pool: List[Dict]):
-        """Define os pools de Pokémon e Itens"""
+        """Define os pools de Pokémon e Itens - PRESERVANDO OS WEIGHTS"""
         self.pokemon_pool = pokemon_pool.copy()
         self.item_pool = item_pool.copy()
 
@@ -120,30 +121,73 @@ class CardDeck:
         for p in self.pokemon_pool:
             card = {
                 "type": "pokemon",
-                "data": p,
+                "data": {
+                    "id": p["id"],
+                    "cost": p["cost"],
+                    "level": p.get("level", 5),
+                    "weight": p.get("weight", 1)
+                },
                 "name": self.pokedex.get_name(p["id"]),
                 "cost": p["cost"],
                 "level": p.get("level", 5),
-                "type_name": self.pokedex.get_types(p["id"])[0] if self.pokedex.get_types(p["id"]) else "normal"
+                "type_name": self.pokedex.get_types(p["id"])[0] if self.pokedex.get_types(p["id"]) else "normal",
+                "weight": p.get("weight", 1)
             }
             self.card_pool.append(card)
 
         for i in self.item_pool:
             card = {
                 "type": "item",
-                "data": i,
+                "data": {
+                    "id": i["id"],
+                    "cost": i["cost"],
+                    "effect": i["effect"],
+                    "effect_value": i["effect_value"],
+                    "weight": i.get("weight", 1)
+                },
                 "name": i["id"].upper(),
                 "cost": i["cost"],
                 "effect": i["effect"],
-                "effect_value": i["effect_value"]
+                "effect_value": i["effect_value"],
+                "weight": i.get("weight", 1)
             }
             self.card_pool.append(card)
 
+        # Embaralha inicialmente apenas a ordem, os pesos serão usados no _refill_cards
         random.shuffle(self.card_pool)
         self._refill_cards()
 
+    def _get_weighted_random_card(self, pool: List[Dict]) -> Optional[Dict]:
+        """Seleciona uma carta do pool usando os pesos (weight)"""
+        if not pool:
+            return None
+
+        # Calcula pesos totais
+        total_weight = 0
+        weights = []
+
+        for card in pool:
+            weight = card.get("weight", 1)
+            weights.append(weight)
+            total_weight += weight
+
+        if total_weight <= 0:
+            # Fallback: escolhe aleatoriamente sem pesos
+            return random.choice(pool)
+
+        # Seleção ponderada
+        rand = random.uniform(0, total_weight)
+        cumulative = 0
+
+        for i, weight in enumerate(weights):
+            cumulative += weight
+            if rand <= cumulative:
+                return pool[i]
+
+        return pool[-1]  # Fallback
+
     def _refill_cards(self):
-        """Preenche as cartas do deck atual - NÃO ADICIONA AUTOMATICAMENTE!"""
+        """Preenche as cartas do deck atual usando pesos para raridade"""
         self.cards = []
         self.card_cooldowns = {}
         self.card_x_positions = []
@@ -155,17 +199,29 @@ class CardDeck:
         self.card_selected_rise = []
         self.target_selected_rise = []
 
-        # Pega as primeiras current_deck_size cartas do pool
+        # Pega as primeiras current_deck_size cartas do pool usando pesos
         if self.card_pool:
             cards_to_take = min(self.current_deck_size, len(self.card_pool))
+
+            # Cria uma cópia temporária do pool para não modificar o original
+            temp_pool = self.card_pool.copy()
+
             for i in range(cards_to_take):
-                card = self.card_pool[i].copy()
-                if card["type"] == "pokemon":
-                    card["data"]["portrait"] = self._get_portrait(card["data"]["id"])
-                self.cards.append(card)
-                self.card_cooldowns[i] = 0.0
-                self.card_selected_rise.append(0.0)
-                self.target_selected_rise.append(0.0)
+                # Seleciona carta usando pesos
+                card = self._get_weighted_random_card(temp_pool)
+
+                if card:
+                    # Remove a carta selecionada do pool temporário (sem reposição)
+                    temp_pool.remove(card)
+
+                    # Cria uma cópia limpa da carta
+                    card_copy = card.copy()
+                    if card_copy["type"] == "pokemon":
+                        card_copy["data"]["portrait"] = self._get_portrait(card_copy["data"]["id"])
+                    self.cards.append(card_copy)
+                    self.card_cooldowns[i] = 0.0
+                    self.card_selected_rise.append(0.0)
+                    self.target_selected_rise.append(0.0)
 
         self._update_card_positions()
 
@@ -288,17 +344,16 @@ class CardDeck:
         if not self.cards:
             return False
 
-        # Devolve as cartas atuais para o pool
+        # Devolve as cartas atuais para o pool (sem pesos duplicados)
         for card in self.cards:
             clean_card = card.copy()
             if "portrait" in clean_card.get("data", {}):
                 del clean_card["data"]["portrait"]
             self.card_pool.append(clean_card)
 
-        # Embaralha o pool
-        random.shuffle(self.card_pool)
+        # NÃO EMBARALHA AQUI - O _refill_cards já vai usar pesos
 
-        # ===== RESETA O TAMANHO DO DECK PARA O VALOR INICIAL =====
+        # RESETA O TAMANHO DO DECK PARA O VALOR INICIAL
         self.current_deck_size = self.STARTING_CARDS
         self.cards_used_in_current_deck = 0
         self.total_decks_completed = 0
@@ -306,7 +361,7 @@ class CardDeck:
         # Limpa seleção
         self.clear_selection()
 
-        # Recarrega as cartas com o tamanho resetado
+        # Recarrega as cartas com o tamanho resetado (usando pesos)
         self._refill_cards()
         self.recycle_cooldown_remaining = self.RECYCLE_COOLDOWN
 
