@@ -865,27 +865,18 @@ class SurvivalMinigameScene(BaseMinigameScene):
         if self.card_deck:
             self.card_deck.update(dt)
 
-        # ===== ATUALIZA WAVES E CAPTURA INIMIGOS QUE CHEGARAM AO FIM =====
+        # ===== ATUALIZA WAVES =====
         if self.wave_manager:
             enemies_at_end = self.wave_manager.update(dt)
 
-            # ===== CORREÇÃO: FORÇA ALIADOS A PERDEREM ALVO QUANDO INIMIGO SAI DO MAPA =====
-            for enemy in enemies_at_end:
-                for ally in self.player_pokemon:
-                    if ally.target == enemy:
-                        print(f"[FIX] {ally.name} perdeu alvo {enemy.name} (inimigo saiu do mapa)")
-                        ally.target = None
-                        ally.combat_state = "returning"
-                        if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
-                            ally.set_animation("walk")
-
+            # Processa inimigos que chegaram ao fim
             for enemy in enemies_at_end:
                 if enemy.is_alive() and not enemy.is_defeated:
                     if not hasattr(enemy, '_escaped_counted') or not enemy._escaped_counted:
                         self.lose_life(1)
                         enemy._escaped_counted = True
 
-        # ===== LIMPA ALVOS INVÁLIDOS DE TODOS OS ALIADOS =====
+        # ===== LIMPA ALVOS INVÁLIDOS DOS ALIADOS =====
         for ally in self.player_pokemon:
             if ally.target and (not ally.target.is_alive() or ally.target.is_defeated):
                 print(f"[FIX] {ally.name} alvo inválido {ally.target.name} (morto), limpando")
@@ -894,7 +885,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
                     ally.set_animation("walk")
 
-        # ===== ATUALIZA COMBATE DOS INIMIGOS =====
+        # ===== ATUALIZA COMBATE DOS INIMIGOS (RESTAURADO) =====
         if self.wave_manager and self.wave_manager.active_enemies:
             for enemy in self.wave_manager.active_enemies[:]:
                 if not enemy.is_alive() or enemy.is_defeated:
@@ -929,24 +920,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
                         enemy.set_animation("walk")
 
                 enemy.animation.update(dt)
-        else:
-            # ===== SEM INIMIGOS ATIVOS: TODOS ALIADOS DEVEM VOLTAR AO SPOT =====
-            for ally in self.player_pokemon:
-                if ally.target:
-                    ally.target = None
-                if ally.combat_state != "returning" and ally.combat_state != "idle":
-                    # Verifica se já está no spot
-                    if hasattr(ally, 'original_spot_x') and hasattr(ally, 'original_spot_y'):
-                        dx = ally.original_spot_x - ally.x
-                        dy = ally.original_spot_y - ally.y
-                        if math.hypot(dx, dy) > 5:
-                            ally.combat_state = "returning"
-                            if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
-                                ally.set_animation("walk")
-                        else:
-                            ally.combat_state = "idle"
-                            if hasattr(ally, 'has_animation') and ally.has_animation("idle"):
-                                ally.set_animation("idle")
 
         if hasattr(self, 'battle_system'):
             self.battle_system.update(dt)
@@ -956,42 +929,58 @@ class SurvivalMinigameScene(BaseMinigameScene):
             if effect_mgr:
                 effect_mgr.update(dt)
 
+        # ===== ATUALIZA TODOS OS ALIADOS =====
+        # Primeiro, coleta apenas inimigos VIVOS
+        active_enemies = []
+        if self.wave_manager:
+            active_enemies = [e for e in self.wave_manager.active_enemies if e.is_alive() and not e.is_defeated]
+
         old_levels = {id(pokemon): pokemon.level for pokemon in self.player_pokemon}
 
-        # ===== ATUALIZA ALIADOS =====
         for pokemon in self.player_pokemon[:]:
             if not pokemon.is_alive() or pokemon.is_defeated:
                 self._remove_pokemon(pokemon)
                 continue
 
+            # Sempre atualiza o Pokémon (animação, etc)
             pokemon.update(dt)
 
-            # Só atualiza combate se houver inimigos
-            if self.wave_manager and self.wave_manager.active_enemies:
-                pokemon.update_combat(dt, self.wave_manager.active_enemies)
+            # ===== PARTE CRÍTICA: ATUALIZA COMBATE COM OS INIMIGOS =====
+            # Se há inimigos, atualiza combate normalmente
+            if active_enemies:
+                pokemon.update_combat(dt, active_enemies)
             else:
-                # ===== SEM INIMIGOS: FORÇA RETORNO AO SPOT =====
-                if pokemon.combat_state != "returning" and pokemon.combat_state != "idle":
+                # ===== SEM INIMIGOS: FORÇA O POKÉMON A VOLTAR AO SPOT =====
+                if pokemon.combat_state != "returning":
+                    if pokemon.target:
+                        pokemon.target = None
+
                     if hasattr(pokemon, 'original_spot_x') and hasattr(pokemon, 'original_spot_y'):
                         dx = pokemon.original_spot_x - pokemon.x
                         dy = pokemon.original_spot_y - pokemon.y
                         distance = math.hypot(dx, dy)
+
                         if distance > 5:
                             pokemon.combat_state = "returning"
                             if pokemon.has_animation("walk"):
                                 pokemon.set_animation("walk")
                         else:
-                            pokemon.combat_state = "idle"
-                            if pokemon.has_animation("idle"):
-                                pokemon.set_animation("idle")
+                            if pokemon.combat_state != "idle":
+                                pokemon.combat_state = "idle"
+                                if pokemon.has_animation("idle"):
+                                    pokemon.set_animation("idle")
                     else:
                         if pokemon.combat_state != "idle":
                             pokemon.combat_state = "idle"
                             if pokemon.has_animation("idle"):
                                 pokemon.set_animation("idle")
+                else:
+                    # Já está em returning, passa lista vazia
+                    pokemon.update_combat(dt, [])
 
             pokemon.animation.update(dt)
 
+        # ===== VERIFICA EVOLUÇÕES =====
         from src.managers.evolution_manager import evolution_manager
 
         for pokemon in self.player_pokemon[:]:
@@ -1027,10 +1016,15 @@ class SurvivalMinigameScene(BaseMinigameScene):
                     ally.combat_state = "returning"
                     if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
                         ally.set_animation("walk")
+                    print(f"[FORCE] {ally.name} voltando ao spot (distância: {distance:.1f})")
                 else:
                     ally.combat_state = "idle"
                     if hasattr(ally, 'has_animation') and ally.has_animation("idle"):
                         ally.set_animation("idle")
+            else:
+                ally.combat_state = "idle"
+                if hasattr(ally, 'has_animation') and ally.has_animation("idle"):
+                    ally.set_animation("idle")
 
     def toggle_pause(self):
         self.paused = not self.paused
