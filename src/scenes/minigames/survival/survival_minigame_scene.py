@@ -272,20 +272,37 @@ class SurvivalMinigameScene(BaseMinigameScene):
         return None
 
     def _get_pokemon_status_name(self, pokemon) -> str:
-        """Retorna o nome do status atual do Pokémon como string"""
-        status_type = self._get_pokemon_status(pokemon)
-        if not status_type:
-            return "none"
+        """Retorna o nome do status atual do Pokémon como string - USANDO BATTLE_SYSTEM"""
+        # ===== USA O EFFECT_MANAGER DO BATTLE_SYSTEM PRIMEIRO =====
+        if self.battle_system and self.battle_system.effect_manager:
+            status = self.battle_system.effect_manager.get_status(pokemon)
+            if status and status.type != StatusType.NONE:
+                # Mapeamento para string
+                status_map = {
+                    StatusType.POISON: "poison",
+                    StatusType.TOXIC_POISON: "poison",  # Toxic também é poison para cura
+                    StatusType.PARALYSIS: "paralysis",
+                    StatusType.SLEEP: "sleep",
+                    StatusType.BURN: "burn",
+                    StatusType.FREEZE: "freeze",
+                }
+                return status_map.get(status.type, "none")
 
-        status_names = {
-            StatusType.POISON: "poison",
-            StatusType.PARALYSIS: "paralysis",
-            StatusType.SLEEP: "sleep",
-            StatusType.BURN: "burn",
-            StatusType.FREEZE: "freeze",
-            StatusType.NONE: "none"
-        }
-        return status_names.get(status_type, "none")
+        # Fallback: tenta via effect_manager do Pokémon
+        if hasattr(pokemon, 'effect_manager') and pokemon.effect_manager:
+            status = pokemon.effect_manager.get_status(pokemon)
+            if status and status.type != StatusType.NONE:
+                status_map = {
+                    StatusType.POISON: "poison",
+                    StatusType.TOXIC_POISON: "poison",
+                    StatusType.PARALYSIS: "paralysis",
+                    StatusType.SLEEP: "sleep",
+                    StatusType.BURN: "burn",
+                    StatusType.FREEZE: "freeze",
+                }
+                return status_map.get(status.type, "none")
+
+        return "none"
 
     def try_use_item(self, spot, item_data: dict) -> bool:
         """Tenta usar um item em um Pokémon no spot"""
@@ -335,67 +352,119 @@ class SurvivalMinigameScene(BaseMinigameScene):
                           duration=2.0, pokemon=target_pokemon, portrait="happy")
             success = True
 
+
         elif effect == 'cure_status':
+
             status_to_cure = effect_value  # "poison", "paralysis", etc.
 
-            # Mapeamento dos status
+            # Mapeamento dos status (igual ao modo normal)
+
+            from src.battle.effects.status_effect import StatusType
+
             status_map = {
-                "poison": StatusType.POISON,
+
                 "paralysis": StatusType.PARALYSIS,
+
                 "sleep": StatusType.SLEEP,
+
+                "poison": StatusType.POISON,
+
                 "burn": StatusType.BURN,
-                "freeze": StatusType.FREEZE
+
+                "freeze": StatusType.FREEZE,
+
             }
 
             status_names = {
-                StatusType.POISON: "envenenado",
+
                 StatusType.PARALYSIS: "paralisado",
+
                 StatusType.SLEEP: "dormindo",
+
+                StatusType.POISON: "envenenado",
+
                 StatusType.BURN: "queimado",
+
                 StatusType.FREEZE: "congelado"
+
             }
 
-            status_type = status_map.get(status_to_cure)
+            status_type = status_map.get(status_to_cure.lower())
 
             if not status_type:
                 toast_warning(f"Não foi possível usar {item_name} em {target_pokemon.name}!",
+
                               duration=1.5, pokemon=target_pokemon, portrait="sad")
+
                 return False
 
-            # ===== CORREÇÃO AQUI =====
-            # Pega o status atual como string para comparação
-            current_status_name = self._get_pokemon_status_name(target_pokemon)
-            needed_status_name = status_to_cure.lower()
+            # ===== USA O EFFECT_MANAGER DO BATTLE_SYSTEM (IGUAL MODO NORMAL) =====
 
-            print(f"[DEBUG] Item {item_name}: status_to_cure={needed_status_name}, current={current_status_name}")
+            if self.battle_system and self.battle_system.effect_manager:
 
-            # Se não tem nenhum status
-            if current_status_name == "none":
-                needed_status_display = status_names.get(status_type, "afetado")
-                toast_warning(
-                    f"{target_pokemon.name} não está {needed_status_display}! {item_name} não pode ser usado.",
-                    duration=2.0, pokemon=target_pokemon, portrait="normal")
-                return False
+                current_status = self.battle_system.effect_manager.get_status(target_pokemon)
 
-            # Se tem o status correto, cura
-            if current_status_name == needed_status_name:
-                # Remove o status usando o effect_manager
-                if target_pokemon.effect_manager:
-                    target_pokemon.effect_manager.remove_status(target_pokemon)
+                if current_status and current_status.type == status_type:
+
+                    # Remove o status usando o effect_manager do battle_system
+
+                    self.battle_system.effect_manager.remove_status(target_pokemon)
+
                     toast_success(f"{item_name} usado! {target_pokemon.name} foi curado!",
+
                                   duration=2.0, pokemon=target_pokemon, portrait="happy")
+
                     success = True
+
                 else:
-                    toast_warning(f"Não foi possível curar {target_pokemon.name}!",
-                                  duration=1.5, pokemon=target_pokemon, portrait="sad")
+
+                    # Verifica se o Pokémon tem algum status
+
+                    if not current_status or current_status.type.value == "none":
+
+                        needed_status_display = status_names.get(status_type, status_to_cure)
+
+                        toast_warning(
+
+                            f"{target_pokemon.name} não está {needed_status_display}! {item_name} não pode ser usado.",
+
+                            duration=2.0, pokemon=target_pokemon, portrait="normal")
+
+                    else:
+
+                        current_name = status_names.get(current_status.type, current_status.type.value)
+
+                        needed_name = status_names.get(status_type, status_to_cure)
+
+                        toast_warning(
+
+                            f"{target_pokemon.name} está {current_name}! {item_name} cura {needed_name} apenas.",
+
+                            duration=2.0, pokemon=target_pokemon, portrait="sad")
+
                     return False
+
             else:
-                # Tem status diferente do que o item cura
-                current_name = status_names.get(status_map.get(current_status_name), current_status_name)
-                needed_name = status_names.get(status_type, needed_status_name)
-                toast_warning(f"{target_pokemon.name} está {current_name}! {item_name} cura {needed_name} apenas.",
-                              duration=2.0, pokemon=target_pokemon, portrait="sad")
-                return False
+
+                # Fallback: tenta usar o effect_manager do próprio Pokémon
+
+                if target_pokemon.effect_manager:
+
+                    target_pokemon.effect_manager.remove_status(target_pokemon)
+
+                    toast_success(f"{item_name} usado! {target_pokemon.name} foi curado!",
+
+                                  duration=2.0, pokemon=target_pokemon, portrait="happy")
+
+                    success = True
+
+                else:
+
+                    toast_warning(f"Não foi possível curar {target_pokemon.name}!",
+
+                                  duration=1.5, pokemon=target_pokemon, portrait="sad")
+
+                    return False
 
         elif effect == 'revive':
             if target_pokemon.is_alive():
@@ -796,14 +865,36 @@ class SurvivalMinigameScene(BaseMinigameScene):
         if self.card_deck:
             self.card_deck.update(dt)
 
+        # ===== ATUALIZA WAVES E CAPTURA INIMIGOS QUE CHEGARAM AO FIM =====
         if self.wave_manager:
             enemies_at_end = self.wave_manager.update(dt)
+
+            # ===== CORREÇÃO: FORÇA ALIADOS A PERDEREM ALVO QUANDO INIMIGO SAI DO MAPA =====
+            for enemy in enemies_at_end:
+                for ally in self.player_pokemon:
+                    if ally.target == enemy:
+                        print(f"[FIX] {ally.name} perdeu alvo {enemy.name} (inimigo saiu do mapa)")
+                        ally.target = None
+                        ally.combat_state = "returning"
+                        if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
+                            ally.set_animation("walk")
+
             for enemy in enemies_at_end:
                 if enemy.is_alive() and not enemy.is_defeated:
                     if not hasattr(enemy, '_escaped_counted') or not enemy._escaped_counted:
                         self.lose_life(1)
                         enemy._escaped_counted = True
 
+        # ===== LIMPA ALVOS INVÁLIDOS DE TODOS OS ALIADOS =====
+        for ally in self.player_pokemon:
+            if ally.target and (not ally.target.is_alive() or ally.target.is_defeated):
+                print(f"[FIX] {ally.name} alvo inválido {ally.target.name} (morto), limpando")
+                ally.target = None
+                ally.combat_state = "returning"
+                if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
+                    ally.set_animation("walk")
+
+        # ===== ATUALIZA COMBATE DOS INIMIGOS =====
         if self.wave_manager and self.wave_manager.active_enemies:
             for enemy in self.wave_manager.active_enemies[:]:
                 if not enemy.is_alive() or enemy.is_defeated:
@@ -827,10 +918,8 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 if target_ally:
                     enemy.target = target_ally
                     enemy.combat_state = "attacking"
-
                     if enemy.has_animation("idle") and enemy.current_animation != "idle":
                         enemy.set_animation("idle")
-
                     enemy.update_combat(dt, self.player_pokemon)
                 else:
                     if enemy.target:
@@ -840,6 +929,24 @@ class SurvivalMinigameScene(BaseMinigameScene):
                         enemy.set_animation("walk")
 
                 enemy.animation.update(dt)
+        else:
+            # ===== SEM INIMIGOS ATIVOS: TODOS ALIADOS DEVEM VOLTAR AO SPOT =====
+            for ally in self.player_pokemon:
+                if ally.target:
+                    ally.target = None
+                if ally.combat_state != "returning" and ally.combat_state != "idle":
+                    # Verifica se já está no spot
+                    if hasattr(ally, 'original_spot_x') and hasattr(ally, 'original_spot_y'):
+                        dx = ally.original_spot_x - ally.x
+                        dy = ally.original_spot_y - ally.y
+                        if math.hypot(dx, dy) > 5:
+                            ally.combat_state = "returning"
+                            if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
+                                ally.set_animation("walk")
+                        else:
+                            ally.combat_state = "idle"
+                            if hasattr(ally, 'has_animation') and ally.has_animation("idle"):
+                                ally.set_animation("idle")
 
         if hasattr(self, 'battle_system'):
             self.battle_system.update(dt)
@@ -851,6 +958,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
         old_levels = {id(pokemon): pokemon.level for pokemon in self.player_pokemon}
 
+        # ===== ATUALIZA ALIADOS =====
         for pokemon in self.player_pokemon[:]:
             if not pokemon.is_alive() or pokemon.is_defeated:
                 self._remove_pokemon(pokemon)
@@ -858,13 +966,29 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
             pokemon.update(dt)
 
+            # Só atualiza combate se houver inimigos
             if self.wave_manager and self.wave_manager.active_enemies:
                 pokemon.update_combat(dt, self.wave_manager.active_enemies)
             else:
-                if pokemon.combat_state != "idle":
-                    pokemon.combat_state = "idle"
-                    if pokemon.has_animation("idle"):
-                        pokemon.set_animation("idle")
+                # ===== SEM INIMIGOS: FORÇA RETORNO AO SPOT =====
+                if pokemon.combat_state != "returning" and pokemon.combat_state != "idle":
+                    if hasattr(pokemon, 'original_spot_x') and hasattr(pokemon, 'original_spot_y'):
+                        dx = pokemon.original_spot_x - pokemon.x
+                        dy = pokemon.original_spot_y - pokemon.y
+                        distance = math.hypot(dx, dy)
+                        if distance > 5:
+                            pokemon.combat_state = "returning"
+                            if pokemon.has_animation("walk"):
+                                pokemon.set_animation("walk")
+                        else:
+                            pokemon.combat_state = "idle"
+                            if pokemon.has_animation("idle"):
+                                pokemon.set_animation("idle")
+                    else:
+                        if pokemon.combat_state != "idle":
+                            pokemon.combat_state = "idle"
+                            if pokemon.has_animation("idle"):
+                                pokemon.set_animation("idle")
 
             pokemon.animation.update(dt)
 
@@ -884,6 +1008,29 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
         if hasattr(self, 'notification_manager'):
             self.notification_manager.update(dt)
+
+    def force_allies_return_to_spots(self):
+        """Força todos os aliados a voltarem para seus spots (útil após wave terminar)"""
+        for ally in self.player_pokemon:
+            if not ally.is_alive() or ally.is_defeated:
+                continue
+
+            ally.target = None
+
+            # Verifica se já está no spot
+            if hasattr(ally, 'original_spot_x') and hasattr(ally, 'original_spot_y'):
+                dx = ally.original_spot_x - ally.x
+                dy = ally.original_spot_y - ally.y
+                distance = math.hypot(dx, dy)
+
+                if distance > 5:
+                    ally.combat_state = "returning"
+                    if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
+                        ally.set_animation("walk")
+                else:
+                    ally.combat_state = "idle"
+                    if hasattr(ally, 'has_animation') and ally.has_animation("idle"):
+                        ally.set_animation("idle")
 
     def toggle_pause(self):
         self.paused = not self.paused

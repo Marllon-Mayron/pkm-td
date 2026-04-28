@@ -367,13 +367,15 @@ class SurvivalWaveManager:
 
         for enemy in self.active_enemies[:]:
             try:
-                if not hasattr(enemy, 'path') or not enemy.path:
-                    continue
-
+                # ===== CORREÇÃO: VERIFICA SE O INIMIGO ESTÁ MORTO ANTES DE PROCESSAR =====
                 if not enemy.is_alive() or enemy.is_defeated:
                     if not getattr(enemy, '_marked_for_removal', False):
+                        print(f"[SurvivalWave] {enemy.name} está morto, removendo...")
                         self._handle_enemy_death(enemy)
                         enemies_to_remove.append(enemy)
+                    continue
+
+                if not hasattr(enemy, 'path') or not enemy.path:
                     continue
 
                 # Verifica se deve parar (tem aliado no range)
@@ -403,7 +405,7 @@ class SurvivalWaveManager:
                 distance = math.hypot(dx, dy)
                 move_distance = enemy.move_speed * dt * 60
 
-                # ===== ATUALIZA DIREÇÃO BASEADA NO MOVIMENTO ANTES DE MOVER =====
+                # Atualiza direção baseada no movimento antes de mover
                 if distance > 0:
                     self._update_direction_from_movement(enemy, dx, dy)
 
@@ -427,6 +429,7 @@ class SurvivalWaveManager:
                 print(f"[SurvivalWave] Erro ao processar inimigo: {e}")
                 continue
 
+        # ===== REMOVE INIMIGOS MORTO =====
         for enemy in enemies_to_remove:
             if enemy in self.active_enemies:
                 self.active_enemies.remove(enemy)
@@ -548,6 +551,10 @@ class SurvivalWaveManager:
                 (100, 255, 100),
                 duration=2.0
             )
+
+        # ===== FORÇA TODOS OS ALIADOS A VOLTAREM AOS SPOTS =====
+        if hasattr(self.game_scene, 'force_allies_return_to_spots'):
+            self.game_scene.force_allies_return_to_spots()
 
         if hasattr(self.game_scene, 'add_energy'):
             bonus = 30

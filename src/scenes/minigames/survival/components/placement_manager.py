@@ -25,6 +25,25 @@ class SurvivalPlacementManager:
             self.placed_pokemon.remove(pokemon)
             print(f"[Placement] {pokemon.name} removido da lista")
 
+            # ===== CORREÇÃO: DESOCUPA O SPOT =====
+            if hasattr(pokemon, 'placed_tile_x') and hasattr(pokemon, 'placed_tile_y'):
+                pokemon_tile_x = pokemon.placed_tile_x
+                pokemon_tile_y = pokemon.placed_tile_y
+            else:
+                pokemon_tile_x = pokemon.x // self.tile_size
+                pokemon_tile_y = pokemon.y // self.tile_size
+
+            # Procura e desocupa o spot correspondente
+            if hasattr(self.game_scene, 'spot_renderer'):
+                for spot in self.game_scene.spot_renderer.get_spots():
+                    spot_tile_x = spot.x // self.tile_size
+                    spot_tile_y = spot.y // self.tile_size
+
+                    if spot_tile_x == pokemon_tile_x and spot_tile_y == pokemon_tile_y:
+                        spot.occupied = False
+                        print(f"[Placement] Spot ({spot.x}, {spot.y}) desocupado")
+                        break
+
     def get_pokemon_at_world_pos(self, world_x: float, world_y: float, tolerance: int = 20):
         """Retorna o Pokémon na posição do mundo"""
         tolerance_sq = tolerance * tolerance
