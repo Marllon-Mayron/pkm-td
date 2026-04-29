@@ -810,6 +810,22 @@ class SurvivalMinigameScene(BaseMinigameScene):
             elif event.key == pygame.K_F1:
                 self.show_debug = not self.show_debug
                 return
+            elif event.key == pygame.K_r:
+                # Recicla o deck (se disponível)
+                if self.card_deck and self.card_deck.recycle_cooldown_remaining <= 0:
+                    if self.card_deck.cards:
+                        self.card_deck.recycle_deck()
+                        self.card_deck.clear_selection()
+                        self.selected_card = None
+                        self.selected_card_index = -1
+                        self.selected_card_type = None
+                        self.selected_card_sprite = None
+                        pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+                        if hasattr(self, 'survival_ui'):
+                            self.survival_ui.show_message("DECK RECICLADO! (R)", (100, 200, 255), duration=1.0)
+                    else:
+                        self.card_deck.recycle_deck()
+                return
 
         if self.card_deck:
             card_result = self.card_deck.handle_event(event)
@@ -1164,6 +1180,29 @@ class SurvivalMinigameScene(BaseMinigameScene):
             sprite_rect = pygame.Rect(0, 0, size, size)
             sprite_rect.center = (int(screen_x), int(screen_y))
 
+        # ===== OBTÉM O MOVE ATUAL E SEU PP =====
+        current_move = pokemon.get_current_move()
+        pp_text = ""
+        pp_color = (100, 255, 100)  # Verde claro padrão
+
+        if current_move:
+            pp_current = current_move.current_pp
+            pp_max = current_move.max_pp
+            pp_text = f"PP: {pp_current:02d}/{pp_max:02d}"
+
+            # Cor baseada na porcentagem de PP
+            pp_percent = pp_current / pp_max if pp_max > 0 else 0
+            if pp_percent <= 0.25:
+                pp_color = (255, 100, 100)  # Vermelho - baixo
+            elif pp_percent <= 0.5:
+                pp_color = (255, 200, 100)  # Laranja - médio
+            else:
+                pp_color = (100, 255, 100)  # Verde - bom
+        else:
+            pp_text = "PP: --"
+            pp_color = (150, 150, 150)
+
+        # Nome e Level
         name_text = f"{pokemon.name} - "
         level_text = f"lv. {pokemon.level:02d}"
 
@@ -1177,20 +1216,31 @@ class SurvivalMinigameScene(BaseMinigameScene):
         else:
             level_color = (100, 255, 100)
 
+        # Tamanhos de fonte
         name_font_size = max(10, int(12 * zoom_scale))
         level_font_size = max(9, int(11 * zoom_scale))
+        pp_font_size = max(8, int(10 * zoom_scale))
 
         name_font = pygame.font.Font(None, name_font_size)
         level_font = pygame.font.Font(None, level_font_size)
+        pp_font = pygame.font.Font(None, pp_font_size)
 
+        # Renderiza textos
         name_surface = name_font.render(name_text, True, text_color)
         level_surface = level_font.render(level_text, True, level_color)
+        pp_surface = pp_font.render(pp_text, True, pp_color)
+
         name_outline = name_font.render(name_text, True, outline_color)
         level_outline = level_font.render(level_text, True, outline_color)
+        pp_outline = pp_font.render(pp_text, True, outline_color)
 
         name_width = name_surface.get_width()
         level_width = level_surface.get_width()
-        total_width = name_width + 2 + level_width
+        pp_width = pp_surface.get_width()
+
+        # Espaçamento entre elementos
+        spacing = 4
+        total_width = name_width + 2 + level_width + spacing + pp_width
 
         sprite_height = sprite_rect.height
         relative_offset = -sprite_height * 0.85
@@ -1198,17 +1248,25 @@ class SurvivalMinigameScene(BaseMinigameScene):
         start_x = sprite_rect.centerx - total_width // 2
         text_y = int(sprite_rect.top + relative_offset)
 
+        # Posições
         name_x, name_y = start_x, text_y
         level_x = start_x + name_width + 2
         level_y = text_y + (name_font_size - level_font_size)
+        pp_x = level_x + level_width + spacing
+        pp_y = text_y + (name_font_size - pp_font_size) - 2
 
+        # Desenha contornos
         for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
             screen.blit(name_outline, (name_x + dx, name_y + dy))
             screen.blit(level_outline, (level_x + dx, level_y + dy))
+            screen.blit(pp_outline, (pp_x + dx, pp_y + dy))
 
+        # Desenha textos principais
         screen.blit(name_surface, (name_x, name_y))
         screen.blit(level_surface, (level_x, level_y))
+        screen.blit(pp_surface, (pp_x, pp_y))
 
+        # Renderiza barra de XP
         self._render_ally_xp_bar(screen, sprite_rect, pokemon, zoom_scale)
 
     def _render_ally_xp_bar(self, screen, sprite_rect, pokemon, zoom_scale):

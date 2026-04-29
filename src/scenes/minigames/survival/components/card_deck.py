@@ -323,12 +323,27 @@ class CardDeck:
     def _complete_deck_and_grow(self):
         """Completa o deck atual (todas cartas usadas), aumenta tamanho e dá recompensa"""
         self.total_decks_completed += 1
-        self.current_deck_size = min(self.MAX_DECK_SIZE, self.current_deck_size + self.DECK_GROWTH_INCREMENT)
+
+        # ===== GARANTE QUE NÃO EXCEDE O LIMITE MÁXIMO =====
+        new_size = self.current_deck_size + self.DECK_GROWTH_INCREMENT
+        if new_size <= self.MAX_DECK_SIZE:
+            self.current_deck_size = new_size
+        else:
+            self.current_deck_size = self.MAX_DECK_SIZE
+
         self.cards_used_in_current_deck = 0
 
+        # ===== GARANTE QUE O POOL NÃO ESTÁ VAZIO =====
+        if not self.card_pool:
+            print("[CardDeck] Pool vazio! Recriando...")
+            self._rebuild_active_pool()
+            random.shuffle(self.card_pool)
+
+        # Recompensa de energia
         if hasattr(self.game_scene, 'add_energy'):
             self.game_scene.add_energy(self.ENERGY_REWARD)
 
+        # Mostra mensagem
         if hasattr(self.game_scene, 'survival_ui'):
             self.game_scene.survival_ui.show_message(
                 f"DECK EVOLUIU! +{self.ENERGY_REWARD} ENERGY",
@@ -341,6 +356,7 @@ class CardDeck:
                 duration=2.0
             )
 
+        # Recarrega as cartas
         self._refill_cards()
 
     def select_card(self, index: int):
@@ -409,12 +425,12 @@ class CardDeck:
         if index < len(self.target_selected_rise):
             self.target_selected_rise.pop(index)
 
-        # VERIFICA SE O DECK ACABOU
+        # ===== VERIFICA SE O DECK ACABOU =====
         if len(self.cards) == 0:
             self._complete_deck_and_grow()
             return
 
-        # Atualiza posições
+        # Atualiza posições (só executa se ainda tem cartas)
         self._update_card_positions()
 
         # Atualiza posições alvo

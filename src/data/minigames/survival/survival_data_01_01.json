@@ -40,8 +40,8 @@
   ],
 
   "waves": [
-    {"wave": 1, "enemies": [10, 13], "count": 3, "min_level": 3, "max_level": 5, "spawn_interval": 3.0},
-    {"wave": 2, "enemies": [13, 19], "count": 4, "min_level": 3, "max_level": 5, "spawn_interval": 2.8},
+    {"wave": 1, "enemies": [10, 13], "count": 3, "min_level": 3, "max_level": 5, "spawn_interval": 3.5},
+    {"wave": 2, "enemies": [13, 19], "count": 4, "min_level": 3, "max_level": 5, "spawn_interval": 3.0},
     {"wave": 3, "enemies": [19, 16], "count": 5, "min_level": 4, "max_level": 5, "spawn_interval": 2.8},
     {"wave": 4, "enemies": [16, 10], "count": 5, "min_level": 4, "max_level": 6, "spawn_interval": 2.5},
     {"wave": 5, "enemies": [11], "count": 2, "min_level": 7, "max_level": 7, "spawn_interval": 0.1, "is_boss": true},
@@ -54,12 +54,12 @@
     {"wave": 12, "enemies": [19, 16, 10, 13], "count": 8, "min_level": 6, "max_level": 8, "spawn_interval": 2.2},
     {"wave": 13, "enemies": [16, 19, 10], "count": 8, "min_level": 6, "max_level": 9, "spawn_interval": 2.0},
     {"wave": 14, "enemies": [10, 13, 19, 16], "count": 9, "min_level": 7, "max_level": 9, "spawn_interval": 2.0},
-    {"wave": 15, "enemies": [12, 15], "count": 3, "min_level": 12, "max_level": 12, "spawn_interval": 0.1, "is_boss": true},
+    {"wave": 15, "enemies": [12, 15], "count": 3, "min_level": 10, "max_level": 10, "spawn_interval": 0.1, "is_boss": true},
     {"wave": 16, "enemies": [13, 19, 16, 10], "count": 9, "min_level": 7, "max_level": 10, "spawn_interval": 1.8},
     {"wave": 17, "enemies": [19, 16, 10, 13], "count": 10, "min_level": 8, "max_level": 10, "spawn_interval": 1.8},
     {"wave": 18, "enemies": [16, 19, 10, 13], "count": 12, "min_level": 8, "max_level": 11, "spawn_interval": 1.5},
     {"wave": 19, "enemies": [10, 13, 19, 16], "count": 12, "min_level": 8, "max_level": 12, "spawn_interval": 1.5},
-    {"wave": 20, "enemies": [12, 15], "count": 5, "min_level": 15, "max_level": 15, "spawn_interval": 0.1, "is_boss": true}
+    {"wave": 20, "enemies": [12, 15], "count": 5, "min_level": 13, "max_level": 13, "spawn_interval": 0.1, "is_boss": true}
   ],
 
   "rewards": {
