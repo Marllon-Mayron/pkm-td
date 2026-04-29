@@ -9,59 +9,123 @@ class PlacementManager:
         self.placed_pokemon = []  # Lista de Pokémon no mapa
         self.tile_size = 24
 
+    def _check_combination_evolution_on_placement(self, pokemon, spot):
+        """
+        Verifica se o Pokémon que está sendo colocado pode evoluir
+        em combinação com algum Pokémon já existente no mapa.
+        Retorna True se evoluiu, False caso contrário.
+        """
+        if pokemon.is_wild:
+            return False
+
+        tile_center_x = (spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
+        tile_center_y = (spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
+
+        # Verifica TODOS os Pokémon já colocados
+        for placed in self.placed_pokemon:
+            if placed == pokemon:
+                continue
+            if not placed.is_alive() or placed.is_defeated:
+                continue
+
+            # Calcula distância entre os Pokémon
+            dx = abs(placed.x - tile_center_x)
+            dy = abs(placed.y - tile_center_y)
+            distance = (dx * dx + dy * dy) ** 0.5
+
+            # Se estiverem no mesmo tile ou muito próximos (menos de 30 pixels)
+            if distance < 30:
+                # Verifica se o novo Pokémon evolui com o existente
+                evolution_data = pokemon.evolution.check_combination_evolution(placed)
+
+                # Se não, verifica se o existente evolui com o novo
+                if not evolution_data:
+                    evolution_data = placed.evolution.check_combination_evolution(pokemon)
+
+                if evolution_data:
+                    print(f"[COMBINATION] Evolução detectada entre {pokemon.name} e {placed.name}!")
+
+                    # Determina qual vai evoluir (ambos podem evoluir em casos especiais)
+                    if evolution_data["evolve_to"] is not None:
+                        # Executa a evolução
+                        result = pokemon.evolution.perform_combination_evolution(evolution_data)
+                        return True
+
+                    # Se chegou aqui, não houve evolução
+                    return False
+
+        return False
 
     def add_pokemon(self, spot, pokemon):
-        """Adiciona um Pokémon no spot - USA O MESMO OBJETO"""
-        # Verifica se já tem Pokémon neste spot
+        """Adiciona um Pokémon no spot"""
+        # Verificações básicas
         existing = self.get_pokemon_at_spot(spot)
         if existing:
             print(f"[PLACEMENT] Spot já ocupado por {existing.name}")
             return None
 
-        # Verifica se o spot já está marcado como ocupado
         if spot.occupied:
             print(f"[PLACEMENT] Spot já marcado como ocupado")
             return None
 
-        # Verifica se o Pokémon já está no mapa
         if hasattr(pokemon, 'is_placed') and pokemon.is_placed:
             print(f"[PLACEMENT] {pokemon.name} já está no mapa!")
             return None
 
-        # Calcula o centro do tile para posicionar o Pokémon
-        tile_center_x = (spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
-        tile_center_y = (spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
+        # ===== VERIFICA EVOLUÇÃO POR COMBINAÇÃO ANTES DE COLOCAR =====
+        if self._check_combination_evolution_on_placement(pokemon, spot):
+            # Se evoluiu, o Pokémon original foi transformado/removido
+            # Não adiciona o Pokémon original ao spot (pois ele já evoluiu)
+            print(f"[COMBINATION] {pokemon.name} evoluiu durante o placement!")
 
-        # NÃO CRIAMOS MAIS UMA CÓPIA! Usamos o mesmo objeto
+            # Procura o Pokémon evoluído (agora está no placed_pokemon)
+            for placed in self.placed_pokemon:
+                if placed.id == pokemon.id and placed != pokemon:
+                    # Atualiza a posição do Pokémon evoluído para o spot correto
+                    tile_center_x = (spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
+                    tile_center_y = (spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
+                    placed.x = tile_center_x
+                    placed.y = tile_center_y
+                    placed.original_spot_x = tile_center_x
+                    placed.original_spot_y = tile_center_y
+                    placed.placed_tile_x = tile_center_x // self.tile_size
+                    placed.placed_tile_y = tile_center_y // self.tile_size
+                    placed.is_placed = True
+                    spot.occupied = True
+                    return placed
+
+            return None
+
+        # Se não evoluiu, coloca normalmente
+        return self._add_pokemon_to_spot(spot, pokemon)
+
+    def _add_pokemon_to_spot(self, spot, pokemon):
+        """Adiciona o Pokémon ao spot (lógica interna)"""
+        tile_size = self.tile_size
+
+        # Calcula o centro do tile
+        tile_center_x = (spot.x // tile_size) * tile_size + tile_size // 2
+        tile_center_y = (spot.y // tile_size) * tile_size + tile_size // 2
+
         pokemon.x = tile_center_x
         pokemon.y = tile_center_y
         pokemon.original_spot_x = tile_center_x
         pokemon.original_spot_y = tile_center_y
         pokemon.screen_manager = self.game.screen_manager
 
-        # Marca como colocado
         pokemon.is_placed = True
-        # ARMAZENA A POSIÇÃO DO TILE PARA REFERÊNCIA FUTURA
-        pokemon.placed_tile_x = tile_center_x // self.tile_size
-        pokemon.placed_tile_y = tile_center_y // self.tile_size
+        pokemon.placed_tile_x = tile_center_x // tile_size
+        pokemon.placed_tile_y = tile_center_y // tile_size
         pokemon.combat_state = "idle"
-
         pokemon.game_scene = self.game
-        # Marca o spot como ocupado
+
         spot.occupied = True
-
-        # Adiciona à lista de colocados
         self.placed_pokemon.append(pokemon)
-
-        print(
-            f"[PLACEMENT] {pokemon.name} colocado no spot ({spot.x}, {spot.y}) - "
-            f"Centro ({tile_center_x}, {tile_center_y}) - "
-            f"Tile ({pokemon.placed_tile_x}, {pokemon.placed_tile_y})"
-        )
 
         if hasattr(self.game, 'battle_system'):
             pokemon.set_battle_system(self.game.battle_system)
 
+        print(f"[PLACEMENT] {pokemon.name} colocado no spot ({spot.x}, {spot.y})")
         return pokemon
 
     def get_pokemon_at_world_pos(self, world_x, world_y, tolerance=20):

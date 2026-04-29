@@ -135,6 +135,16 @@ class TeamSelectScene(BaseScene):
         self.grid_items = self.layout_manager.grid_items
         self.total_pages = self.pokemon_manager.get_page_count(self.layout_manager.items_per_page)
 
+    def _refresh_all_pokemon_status(self):
+        """Força atualização do status is_in_team para todos os Pokémon"""
+        # Atualiza status dos Pokémon no time
+        for pokemon in self.game.player.team:
+            pokemon.is_in_team = True
+
+        # Atualiza status dos Pokémon na Box
+        for pokemon in self.game.player.pc_box:
+            pokemon.is_in_team = pokemon in self.game.player.team
+
     def handle_event(self, event):
         # Verifica se houve resize (NOVO)
         self._check_resize()
@@ -176,6 +186,8 @@ class TeamSelectScene(BaseScene):
                 slot.set_pokemon(self.game.player.team[i])
             else:
                 slot.set_pokemon(None)
+
+        self._refresh_all_pokemon_status()
 
         # Recria layout
         self.layout_initialized = False
@@ -357,3 +369,4 @@ class TeamSelectScene(BaseScene):
         # Modal
         if self.event_handler.modal and self.event_handler.modal.visible:
             self.event_handler.modal.render(screen)
+

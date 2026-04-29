@@ -576,6 +576,90 @@ class GameScene(BaseScene):
 
     # ===== MÉTODOS DE POSICIONAMENTO =====
 
+    def _process_evolution_drag(self, evolution_result):
+        """
+        Processa a evolução resultante de um drag and drop.
+        """
+        print(f"[EVOLUTION] Processando evolução via drag: {evolution_result}")
+
+        evolution_data = evolution_result['evolution_data']
+        drag_pokemon = evolution_result['drag_pokemon']  # Será consumido
+        target_pokemon = evolution_result['target_pokemon']  # Este evolui
+        drag_spot = evolution_result.get('drag_spot')
+        target_spot = evolution_result.get('target_spot')
+
+        # Verifica se a evolução é válida
+        evolution_data_for_target = target_pokemon.evolution.check_combination_evolution(drag_pokemon)
+
+        if not evolution_data_for_target:
+            print(f"[EVOLUTION] Erro: {target_pokemon.name} não pode evoluir com {drag_pokemon.name}")
+            return False
+
+        print(f"[EVOLUTION] {target_pokemon.name} vai evoluir, {drag_pokemon.name} será consumido!")
+
+        # Executa a evolução
+        result = target_pokemon.evolution.perform_combination_evolution(evolution_data_for_target)
+
+        if result:
+            # Limpeza adicional do drag_pokemon (garantia)
+
+            # Remove do placement_manager
+            if drag_pokemon in self.placement_manager.placed_pokemon:
+                self.placement_manager.placed_pokemon.remove(drag_pokemon)
+
+            # Remove do time
+            if drag_pokemon in self.player.team:
+                self.player.team.remove(drag_pokemon)
+                print(f"[EVOLUTION] {drag_pokemon.name} removido do time")
+
+            # Remove da Box
+            if drag_pokemon in self.player.pc_box:
+                self.player.pc_box.remove(drag_pokemon)
+                print(f"[EVOLUTION] {drag_pokemon.name} removido da Box ")
+
+            # Libera o spot do drag
+            if drag_spot:
+                drag_spot.occupied = False
+
+            # Atualiza a posição do Pokémon evoluído
+            if target_spot:
+                target_spot.occupied = True
+
+                tile_center_x = (
+                                            target_spot.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+                tile_center_y = (
+                                            target_spot.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+
+                target_pokemon.x = tile_center_x
+                target_pokemon.y = tile_center_y
+                target_pokemon.original_spot_x = tile_center_x
+                target_pokemon.original_spot_y = tile_center_y
+                target_pokemon.placed_tile_x = tile_center_x // self.placement_manager.tile_size
+                target_pokemon.placed_tile_y = tile_center_y // self.placement_manager.tile_size
+                target_pokemon.is_placed = True
+
+            # Recarrega os sprites
+            target_pokemon._load_sprites(target_pokemon.id, target_pokemon.is_shiny)
+
+            # ===== FORÇA ATUALIZAÇÃO DA UI DO TEAM_SELECT =====
+            # Se a tela de seleção de time estiver ativa, força recriação do layout
+            if hasattr(self.game, 'current_scene'):
+                from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
+                if isinstance(self.game.current_scene, TeamSelectScene):
+                    self.game.current_scene.layout_initialized = False
+
+            # Salva o jogo
+            self.player.auto_save()
+
+            return True
+
+        return False
+
+    def _on_pokemon_evolution(self, evolution_result):
+        """Callback para evolução via drag - chama o processador principal"""
+        self._process_evolution_drag(evolution_result)
+
+
     def _on_pokemon_placed(self, placement_data):
         """Callback quando um Pokémon é colocado no mapa OU movido"""
         action = placement_data.get('action', 'place')
@@ -720,7 +804,7 @@ class GameScene(BaseScene):
 
     def handle_event(self, event):
         """Processa eventos do jogo"""
-        # Cache de referências
+        # Cache de referências (já existente no seu código)
         overlay_active = self.overlay_manager.is_active
         drag_manager = self.item_drag_manager
         bag_renderer = self.item_bag_renderer
@@ -866,14 +950,20 @@ class GameScene(BaseScene):
         # ===== NOTIFICATION SCROLL =====
         if self.notification_manager.handle_event(event):
             return None
-        # ===== TEAM MANAGER =====
+
         if team_manager:
             result = team_manager.handle_event(
-                event, spot_renderer.get_spots(), camera,
+                event,
+                spot_renderer.get_spots(),
+                camera,
                 self._on_pokemon_placed,
-                self._on_pokemon_swap
+                self._on_pokemon_swap,
+                self._on_pokemon_evolution  # Callback de evolução
             )
             if result:
+                # Se for um dicionário com ação de evolução
+                if isinstance(result, dict) and result.get('action') == 'evolution':
+                    self._process_evolution_drag(result)
                 return None
 
         # ===== CÂMERA E REMOÇÃO =====
@@ -921,7 +1011,6 @@ class GameScene(BaseScene):
                     if world_pos:
                         self.hovered_spot = spot_renderer.get_spot_at_world_pos(world_pos[0], world_pos[1])
             return None
-
 
         return None
 

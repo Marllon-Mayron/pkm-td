@@ -148,7 +148,8 @@ class GameTeamManager:
     def is_dragging(self):
         return self.drag_manager.is_dragging
 
-    def handle_event(self, event, tower_spots, camera, on_place_callback=None, on_swap_callback=None):
+    def handle_event(self, event, tower_spots, camera, on_place_callback=None, on_swap_callback=None,
+                     on_evolution_callback=None):
         if not self.visible:
             return None
 
@@ -165,7 +166,12 @@ class GameTeamManager:
                     )
 
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                return self.drag_manager.stop_drag(tower_spots, on_place_callback, on_swap_callback)
+                return self.drag_manager.stop_drag(
+                    tower_spots,
+                    on_place_callback,
+                    on_swap_callback,
+                    on_evolution_callback
+                )
 
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 self.drag_manager.cancel_drag()

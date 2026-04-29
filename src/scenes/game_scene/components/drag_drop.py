@@ -1,4 +1,4 @@
-# src/scenes/game_scene/components/ui/drag_drop.py
+# src/scenes/game_scene/components/drag_drop.py
 
 import pygame
 import math
@@ -26,7 +26,7 @@ class DragDropManager:
 
         # Preview
         self.preview_surface = None
-        self.preview_size = 48  # Tamanho fixo para preview (2x o tamanho do tile)
+        self.preview_size = 48
         self.preview_scale = 2.0
 
         # Cursor personalizado
@@ -45,27 +45,21 @@ class DragDropManager:
         if cache_key in self._sprite_cache:
             return self._sprite_cache[cache_key]
 
-        # Tenta obter o sprite InMap
         inmap_frames = pokedex.get_inmap_animation(pokemon.id, pokemon.is_shiny)
 
         sprite = None
         if inmap_frames and "down" in inmap_frames and inmap_frames["down"]:
             sprite = inmap_frames["down"][0]
 
-        # Fallback: tenta o sprite frontal
         if sprite is None:
             sprite = pokedex.get_sprite(pokemon.id, "front", pokemon.is_shiny)
 
-        # Se ainda não tem, cria placeholder
         if sprite is None:
             sprite = self._create_preview_placeholder(pokemon)
 
-        # Calcula o tamanho original do sprite InMap (deve ser 24x24)
         orig_width = sprite.get_width()
         orig_height = sprite.get_height()
 
-        # Calcula a proporção para escalar mantendo a proporção
-        # Queremos que o maior lado caiba no preview_size (48)
         if orig_width > orig_height:
             target_width = self.preview_size
             target_height = int(orig_height * (self.preview_size / orig_width))
@@ -73,14 +67,11 @@ class DragDropManager:
             target_height = self.preview_size
             target_width = int(orig_width * (self.preview_size / orig_height))
 
-        # Escala mantendo a proporção
         scaled_sprite = pygame.transform.smoothscale(sprite, (target_width, target_height))
 
-        # Centraliza em uma superfície quadrada do tamanho preview_size
         final_surface = pygame.Surface((self.preview_size, self.preview_size), pygame.SRCALPHA)
         final_surface.fill((0, 0, 0, 0))
 
-        # Centraliza o sprite escalado
         offset_x = (self.preview_size - target_width) // 2
         offset_y = (self.preview_size - target_height) // 2
         final_surface.blit(scaled_sprite, (offset_x, offset_y))
@@ -92,7 +83,6 @@ class DragDropManager:
         """Cria um placeholder para preview quando não há sprite"""
         placeholder = pygame.Surface((self.preview_size, self.preview_size), pygame.SRCALPHA)
 
-        # Fundo baseado no ID
         colors = [
             (255, 99, 71), (135, 206, 235), (144, 238, 144),
             (255, 215, 0), (221, 160, 221), (255, 182, 193)
@@ -101,7 +91,6 @@ class DragDropManager:
         pygame.draw.rect(placeholder, color, (0, 0, self.preview_size, self.preview_size), border_radius=8)
         pygame.draw.rect(placeholder, (100, 100, 100), (0, 0, self.preview_size, self.preview_size), 2, border_radius=8)
 
-        # Primeira letra do nome
         font = pygame.font.Font(None, self.preview_size // 2)
         text = font.render(pokemon.name[0].upper(), True, (255, 255, 255))
         text_rect = text.get_rect(center=(self.preview_size // 2, self.preview_size // 2))
@@ -111,7 +100,6 @@ class DragDropManager:
 
     def start_drag(self, slot_index, pokemon, screen_pos, world_pos):
         """Inicia o arrasto de um Pokémon do time"""
-        # VALIDAÇÃO: Verifica se já está no mapa
         if hasattr(pokemon, 'is_placed') and pokemon.is_placed:
             print(f"[DRAG] BLOQUEADO: {pokemon.name} já está no mapa!")
             return False
@@ -124,13 +112,9 @@ class DragDropManager:
         self.drag_screen_pos = screen_pos
         self.drag_world_pos = world_pos
 
-        # Cria superfície de preview usando sprite InMap
         self.preview_surface = self._get_inmap_sprite_for_preview(pokemon)
-
-        # Adiciona efeito de brilho
         self._add_glow_effect()
 
-        # Muda cursor
         pygame.mouse.set_cursor(self.drag_cursor)
 
         print(f"[DRAG] Arrastando {pokemon.name} do slot {slot_index}")
@@ -146,13 +130,9 @@ class DragDropManager:
         self.drag_screen_pos = screen_pos
         self.drag_world_pos = world_pos
 
-        # Cria superfície de preview usando sprite InMap
         self.preview_surface = self._get_inmap_sprite_for_preview(pokemon)
-
-        # Adiciona efeito de brilho
         self._add_glow_effect()
 
-        # Muda cursor
         pygame.mouse.set_cursor(self.drag_cursor)
 
         print(f"[DRAG] Arrastando {pokemon.name} do spot ({spot.x // self.tile_size},{spot.y // self.tile_size})")
@@ -163,10 +143,7 @@ class DragDropManager:
         if not self.preview_surface:
             return
 
-        # Cria uma cópia com efeito de brilho
         glow_surface = pygame.Surface((self.preview_size, self.preview_size), pygame.SRCALPHA)
-
-        # Desenha círculos de brilho ao redor
         center = (self.preview_size // 2, self.preview_size // 2)
         radius = self.preview_size // 2
 
@@ -175,11 +152,9 @@ class DragDropManager:
             color = (100, 200, 255, alpha)
             pygame.draw.circle(glow_surface, color, center, radius + i * 4, 3)
 
-        # Combina com o sprite original
         final = self.preview_surface.copy()
         final.blit(glow_surface, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
 
-        # Adiciona uma borda branca se shiny
         if hasattr(self.drag_pokemon, 'is_shiny') and self.drag_pokemon.is_shiny:
             pygame.draw.rect(final, (255, 215, 0, 150), final.get_rect(), 3, border_radius=12)
         else:
@@ -195,11 +170,9 @@ class DragDropManager:
         self.drag_screen_pos = screen_pos
         self.drag_world_pos = world_pos
 
-        # Converte posição do mouse para tile
         mouse_tile_x = world_pos[0] // self.tile_size
         mouse_tile_y = world_pos[1] // self.tile_size
 
-        # Reseta hover
         self.hovered_spot = None
         self.hovered_pokemon = None
         self.valid_target = False
@@ -208,6 +181,8 @@ class DragDropManager:
         if placement_manager and self.drag_type == "placed":
             for pokemon in placed_pokemon:
                 if pokemon == self.drag_pokemon:
+                    continue
+                if not pokemon.is_alive() or pokemon.is_defeated:
                     continue
 
                 pokemon_tile_x = pokemon.x // self.tile_size
@@ -234,7 +209,7 @@ class DragDropManager:
                     )
                     self.drag_screen_pos = (screen_x, screen_y)
 
-                    print(f"[DRAG] Sobre Pokémon {pokemon.name} - pode trocar")
+                    print(f"[DRAG] Sobre Pokémon {pokemon.name} - pode evoluir ou trocar")
                     break
 
         # ===== SE NÃO ESTÁ SOBRE POKÉMON, VERIFICA SPOTS VAZIOS =====
@@ -260,17 +235,54 @@ class DragDropManager:
                     self.drag_screen_pos = (screen_x, screen_y)
                     break
 
-        # Anima o alpha do preview
         self.place_preview_alpha = min(255, self.place_preview_alpha + 15)
 
-    def stop_drag(self, tower_spots, on_place_callback=None, on_swap_callback=None):
+    def _check_evolution_between_pokemon(self, pokemon_a, pokemon_b):
+        """
+        Verifica se dois Pokémon podem evoluir por combinação.
+        Retorna os dados de evolução ou None.
+        """
+        # Tenta A evoluir com B
+        evolution_data = pokemon_a.evolution.check_combination_evolution(pokemon_b)
+
+        # Se não, tenta B evoluir com A
+        if not evolution_data:
+            evolution_data = pokemon_b.evolution.check_combination_evolution(pokemon_a)
+
+        return evolution_data
+
+    def stop_drag(self, tower_spots, on_place_callback=None, on_swap_callback=None, on_evolution_callback=None):
         """Finaliza o arrasto e tenta posicionar o Pokémon ou trocar com outro"""
         if not self.is_dragging:
             return None
 
         result = None
 
-        # ===== CASO 1: Troca com outro Pokémon =====
+        # ===== PRIORIDADE 1: VERIFICA EVOLUÇÃO =====
+        if self.valid_target and self.hovered_pokemon and self.drag_type == "placed":
+            evolution_data = self._check_evolution_between_pokemon(self.drag_pokemon, self.hovered_pokemon)
+
+            if evolution_data:
+                print(f"[DRAG] Evolução detectada entre {self.drag_pokemon.name} e {self.hovered_pokemon.name}!")
+
+                # CORRIGIDO: Quem evolui é o que está no SPOT (hovered_pokemon)
+                # O drag_pokemon é o que está sendo arrastado (será consumido)
+                result = {
+                    'action': 'evolution',
+                    'evolution_data': evolution_data,
+                    'drag_pokemon': self.drag_pokemon,  # Será consumido/removido
+                    'target_pokemon': self.hovered_pokemon,  # Este evolui
+                    'drag_spot': self.drag_source_spot,
+                    'target_spot': self.hovered_spot
+                }
+
+                if on_evolution_callback:
+                    on_evolution_callback(result)
+
+                self._reset_drag_state()
+                return result
+
+        # ===== PRIORIDADE 2: Troca com outro Pokémon (SÓ SE NÃO HOUVER EVOLUÇÃO) =====
         if self.valid_target and self.hovered_pokemon and self.drag_type == "placed":
             if (hasattr(self.drag_pokemon, 'is_placed') and self.drag_pokemon.is_placed and
                     hasattr(self.hovered_pokemon, 'is_placed') and self.hovered_pokemon.is_placed):
@@ -303,8 +315,8 @@ class DragDropManager:
                     self._reset_drag_state()
                     return result
 
-        # ===== CASO 2: Colocar em spot vazio (time -> mapa) =====
-        elif self.valid_target and self.hovered_spot and self.drag_pokemon and not self.drag_pokemon.is_placed:
+        # ===== PRIORIDADE 3: Colocar em spot vazio (time -> mapa) =====
+        if self.valid_target and self.hovered_spot and self.drag_pokemon and not self.drag_pokemon.is_placed:
             if not self.hovered_spot.occupied:
                 tile_center_x = (self.hovered_spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
                 tile_center_y = (self.hovered_spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
@@ -323,7 +335,7 @@ class DragDropManager:
                 if on_place_callback:
                     on_place_callback(result)
 
-        # ===== CASO 3: Mover Pokémon de um spot para outro spot vazio =====
+        # ===== PRIORIDADE 4: Mover Pokémon de um spot para outro spot vazio =====
         elif self.valid_target and self.hovered_spot and self.drag_type == "placed" and not self.hovered_spot.occupied:
             if hasattr(self.drag_pokemon, 'is_placed') and self.drag_pokemon.is_placed:
                 result = {
@@ -366,31 +378,26 @@ class DragDropManager:
         if not self.is_dragging or not self.preview_surface:
             return
 
-        # Se tem um spot hovered, desenha o preview no centro do tile
         if self.valid_target and (self.hovered_spot or self.hovered_pokemon):
             preview_rect = self.preview_surface.get_rect()
             preview_rect.center = (int(self.drag_screen_pos[0]), int(self.drag_screen_pos[1]) - 15)
         else:
-            # Segue o mouse
             mouse_x, mouse_y = pygame.mouse.get_pos()
             preview_rect = self.preview_surface.get_rect()
             preview_rect.center = (mouse_x, mouse_y - 20)
 
-        # Aplica transparência
         preview_with_alpha = self.preview_surface.copy()
         alpha = min(200, self.place_preview_alpha)
         preview_with_alpha.set_alpha(alpha)
 
         screen.blit(preview_with_alpha, preview_rect)
 
-        # Se tem um spot hovered ou Pokémon hovered, mostra indicador
         if self.valid_target:
             if self.hovered_pokemon:
                 self._render_swap_indicator(screen, camera)
             elif self.hovered_spot:
                 self._render_valid_indicator(screen, camera)
 
-        # Instruções
         self._render_drag_instructions(screen)
 
     def _render_swap_indicator(self, screen, camera):
@@ -477,7 +484,7 @@ class DragDropManager:
         if self.drag_type == "placed":
             instructions = [
                 "Arraste para outro spot para mover",
-                "Arraste sobre outro Pokémon para trocar",
+                "Arraste sobre outro Pokémon para trocar/evoluir",
                 "ESC para cancelar"
             ]
         else:
@@ -503,7 +510,9 @@ class DragDropManager:
 
         y = bg_y + 5
         for text in instructions:
-            if "trocar" in text or "mover" in text:
+            if "evoluir" in text:
+                color = (255, 100, 100)
+            elif "trocar" in text or "mover" in text:
                 color = (255, 215, 0)
             elif "spot" in text:
                 color = (0, 255, 100)
