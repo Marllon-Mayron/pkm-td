@@ -102,6 +102,112 @@ class PokemonCombat:
 
         return nearest
 
+    def find_nearest_enemy_in_path(self, all_entities: List, path_assignment=None) -> Optional['Pokemon']:
+        """
+        Encontra o inimigo mais próximo no MESMO PATH.
+        Usado APENAS no minigame Survival.
+
+        Args:
+            all_entities: Lista de entidades
+            path_assignment: PathAssignmentManager do minigame (opcional)
+        """
+        if not all_entities:
+            return None
+
+        # Se não tem path_assignment, fallback para comportamento normal
+        if path_assignment is None:
+            return self.find_nearest_enemy(all_entities)
+
+        # Obtém o path do Pokémon
+        pokemon_path = path_assignment.get_path_for_pokemon(self.pokemon)
+        if pokemon_path is None:
+            return self.find_nearest_enemy(all_entities)
+
+        nearest = None
+        min_distance = float('inf')
+        attack_range_sq = self.pokemon.attack_range * self.pokemon.attack_range
+
+        for entity in all_entities:
+            # ===== VERIFICA SE A ENTIDADE ESTÁ ATIVA NO MAPA =====
+            if not entity.is_wild:
+                if not hasattr(entity, 'is_placed') or not entity.is_placed:
+                    continue
+
+            if not entity.is_alive() or entity.is_defeated:
+                continue
+
+            # Determina se é alvo válido
+            is_valid_target = False
+            if self.pokemon.is_wild:
+                is_valid_target = not entity.is_wild
+            else:
+                is_valid_target = entity.is_wild
+
+            if is_valid_target:
+                # ===== VERIFICA SE ESTÁ NO MESMO PATH =====
+                enemy_path = path_assignment.get_path_for_enemy(entity)
+                if enemy_path != pokemon_path:
+                    continue
+
+                dx = self.pokemon.x - entity.x
+                dy = self.pokemon.y - entity.y
+                distance_sq = dx * dx + dy * dy
+
+                if distance_sq < attack_range_sq and distance_sq < min_distance:
+                    min_distance = distance_sq
+                    nearest = entity
+
+        return nearest
+
+    def find_nearest_enemy_in_path_for_enemy(self, all_entities: List, path_assignment=None) -> Optional['Pokemon']:
+        """
+        Encontra o ALIADO mais próximo no MESMO PATH.
+        Usado APENAS para INIMIGOS no minigame Survival.
+
+        Args:
+            all_entities: Lista de entidades (aliados)
+            path_assignment: PathAssignmentManager do minigame (opcional)
+        """
+        if not all_entities:
+            return None
+
+        # Se não tem path_assignment, fallback para comportamento normal
+        if path_assignment is None:
+            return self.find_nearest_enemy(all_entities)
+
+        # Obtém o path do INIMIGO (self.pokemon é o inimigo)
+        enemy_path = path_assignment.get_path_for_enemy(self.pokemon)
+        if enemy_path is None:
+            return self.find_nearest_enemy(all_entities)
+
+        nearest = None
+        min_distance = float('inf')
+        attack_range_sq = self.pokemon.attack_range * self.pokemon.attack_range
+
+        for entity in all_entities:
+            # Pula entidades mortas
+            if not entity.is_alive() or entity.is_defeated:
+                continue
+
+            # Verifica se é aliado (not wild)
+            is_valid_target = not entity.is_wild
+
+            if is_valid_target:
+                # ===== VERIFICA SE O ALIADO ESTÁ NO MESMO PATH =====
+                ally_path = path_assignment.get_path_for_pokemon(entity)
+                if ally_path != enemy_path:
+                    continue
+
+                dx = self.pokemon.x - entity.x
+                dy = self.pokemon.y - entity.y
+                distance_sq = dx * dx + dy * dy
+
+                if distance_sq < attack_range_sq and distance_sq < min_distance:
+                    min_distance = distance_sq
+                    nearest = entity
+
+        return nearest
+
     def is_target_in_range(self, target: 'Pokemon') -> bool:
         """
         Verifica se o alvo está dentro do range de ataque.
@@ -247,7 +353,22 @@ class PokemonCombat:
 
         # Se não tem alvo, procura um
         if not self.pokemon.target:
-            self.pokemon.target = self.find_nearest_enemy(all_entities)
+            # ===== VERIFICA SE TEM PATH_ASSIGNMENT TEMPORÁRIO (MINIGAME) =====
+            path_assignment = getattr(self.pokemon, '_temp_path_assignment', None)
+
+            if path_assignment is not None:
+                # Modo minigame: usa busca com restrição de path
+                if self.pokemon.is_wild:
+                    # INIMIGO: busca aliados no mesmo path
+                    self.pokemon.target = self.find_nearest_enemy_in_path_for_enemy(all_entities, path_assignment)
+                else:
+                    # ALIADO: busca inimigos no mesmo path
+                    self.pokemon.target = self.find_nearest_enemy_in_path(all_entities, path_assignment)
+            else:
+                # Modo normal: busca padrão
+                self.pokemon.target = self.find_nearest_enemy(all_entities)
+
+
             if self.pokemon.target:
                 print(f"[COMBAT] {self.pokemon.name} encontrou novo alvo: {self.pokemon.target.name}")
                 self.pokemon.combat_state = "attacking"

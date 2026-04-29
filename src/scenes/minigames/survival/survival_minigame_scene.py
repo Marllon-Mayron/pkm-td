@@ -90,6 +90,8 @@ class SurvivalMinigameScene(BaseMinigameScene):
         self._load_survival_data()
 
         # ===== WAVE MANAGER =====
+        from src.scenes.minigames.survival.components.path_assignment import PathAssignmentManager
+        self.path_assignment = PathAssignmentManager(self)
         self._init_survival_wave_manager()
 
         # ===== TIMERS =====
@@ -214,6 +216,18 @@ class SurvivalMinigameScene(BaseMinigameScene):
         """Inicializa o wave manager com os dados carregados"""
         self.wave_manager = SurvivalWaveManager(self, self.chapter_id, self.phase_number, self.survival_data)
         self.wave_manager.set_paths(self.path_renderer.paths)
+
+        # ===== CARREGA PATHS NO ASSIGNMENT MANAGER =====
+        if self.path_renderer and self.path_renderer.paths:
+            self.path_assignment.load_paths(self.path_renderer.paths)
+
+            # ===== REGISTRA TODOS OS SPOTS =====
+            if hasattr(self, 'spot_renderer') and self.spot_renderer:
+                for spot in self.spot_renderer.get_spots():
+                    self.path_assignment.register_spot(
+                        spot.x, spot.y,
+                        self.placement_manager.tile_size
+                    )
 
     def _start_game(self):
         """Inicia o minigame"""
@@ -889,6 +903,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
         if hasattr(self, 'survival_ui'):
             self.survival_ui.update(dt)
 
+        # ===== REGENERAÇÃO DE ENERGIA =====
         self.energy_regen_timer += dt
         if self.energy_regen_timer >= 1.0:
             regen_amount = int(self.energy_regen_timer * self.ENERGY_REGEN_RATE)
@@ -896,6 +911,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 self.energy = min(self.MAX_ENERGY, self.energy + regen_amount)
                 self.energy_regen_timer -= regen_amount / self.ENERGY_REGEN_RATE
 
+        # ===== ATUALIZA DECK DE CARTAS =====
         if self.card_deck:
             self.card_deck.update(dt)
 
@@ -919,56 +935,12 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
                     ally.set_animation("walk")
 
-        # ===== ATUALIZA COMBATE DOS INIMIGOS (RESTAURADO) =====
-        if self.wave_manager and self.wave_manager.active_enemies:
-            for enemy in self.wave_manager.active_enemies[:]:
-                if not enemy.is_alive() or enemy.is_defeated:
-                    continue
-
-                target_ally = None
-                min_distance = float('inf')
-
-                for ally in self.player_pokemon:
-                    if not ally.is_alive() or ally.is_defeated:
-                        continue
-
-                    dx = ally.x - enemy.x
-                    dy = ally.y - enemy.y
-                    distance = math.hypot(dx, dy)
-
-                    if distance < enemy.attack_range and distance < min_distance:
-                        min_distance = distance
-                        target_ally = ally
-
-                if target_ally:
-                    enemy.target = target_ally
-                    enemy.combat_state = "attacking"
-                    if enemy.has_animation("idle") and enemy.current_animation != "idle":
-                        enemy.set_animation("idle")
-                    enemy.update_combat(dt, self.player_pokemon)
-                else:
-                    if enemy.target:
-                        enemy.target = None
-                    enemy.combat_state = "idle"
-                    if enemy.has_animation("walk") and enemy.current_animation != "walk":
-                        enemy.set_animation("walk")
-
-                enemy.animation.update(dt)
-
-        if hasattr(self, 'battle_system'):
-            self.battle_system.update(dt)
-
-        if hasattr(self, 'battle_system') and self.battle_system:
-            effect_mgr = self.battle_system.effect_manager
-            if effect_mgr:
-                effect_mgr.update(dt)
-
-        # ===== ATUALIZA TODOS OS ALIADOS =====
-        # Primeiro, coleta apenas inimigos VIVOS
+        # ===== COLETA INIMIGOS VIVOS =====
         active_enemies = []
         if self.wave_manager:
             active_enemies = [e for e in self.wave_manager.active_enemies if e.is_alive() and not e.is_defeated]
 
+        # ===== ATUALIZA TODOS OS ALIADOS (POKÉMON DO JOGADOR) =====
         old_levels = {id(pokemon): pokemon.level for pokemon in self.player_pokemon}
 
         for pokemon in self.player_pokemon[:]:
@@ -979,10 +951,12 @@ class SurvivalMinigameScene(BaseMinigameScene):
             # Sempre atualiza o Pokémon (animação, etc)
             pokemon.update(dt)
 
-            # ===== PARTE CRÍTICA: ATUALIZA COMBATE COM OS INIMIGOS =====
-            # Se há inimigos, atualiza combate normalmente
+            # ===== ATUALIZA COMBATE COM RESTRIÇÃO DE PATH =====
             if active_enemies:
+                # Passa o path_assignment para o Pokémon (modo minigame)
+                pokemon._temp_path_assignment = self.path_assignment
                 pokemon.update_combat(dt, active_enemies)
+                pokemon._temp_path_assignment = None
             else:
                 # ===== SEM INIMIGOS: FORÇA O POKÉMON A VOLTAR AO SPOT =====
                 if pokemon.combat_state != "returning":
@@ -1009,10 +983,37 @@ class SurvivalMinigameScene(BaseMinigameScene):
                             if pokemon.has_animation("idle"):
                                 pokemon.set_animation("idle")
                 else:
-                    # Já está em returning, passa lista vazia
+                    # Já está em returning, passa lista vazia e path_assignment
+                    pokemon._temp_path_assignment = self.path_assignment
                     pokemon.update_combat(dt, [])
+                    pokemon._temp_path_assignment = None
 
+            # Atualiza animação do aliado
             pokemon.animation.update(dt)
+
+        # ===== ATUALIZA COMBATE DOS INIMIGOS COM RESTRIÇÃO DE PATH =====
+        if self.wave_manager and self.wave_manager.active_enemies:
+            for enemy in self.wave_manager.active_enemies[:]:
+                if not enemy.is_alive() or enemy.is_defeated:
+                    continue
+
+                # Passa o path_assignment para o inimigo (modo minigame)
+                enemy._temp_path_assignment = self.path_assignment
+                enemy.update_combat(dt, self.player_pokemon)
+                enemy._temp_path_assignment = None
+
+                # Atualiza animação do inimigo
+                enemy.animation.update(dt)
+
+        # ===== ATUALIZA SISTEMA DE COMBATE (PROJÉTEIS, ETC) =====
+        if hasattr(self, 'battle_system'):
+            self.battle_system.update(dt)
+
+        # ===== ATUALIZA EFFECT MANAGER =====
+        if hasattr(self, 'battle_system') and self.battle_system:
+            effect_mgr = self.battle_system.effect_manager
+            if effect_mgr:
+                effect_mgr.update(dt)
 
         # ===== VERIFICA EVOLUÇÕES =====
         from src.managers.evolution_manager import evolution_manager
@@ -1029,6 +1030,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
                     self.open_evolution_overlay(pokemon, evolution)
                     return
 
+        # ===== ATUALIZA NOTIFICAÇÕES =====
         if hasattr(self, 'notification_manager'):
             self.notification_manager.update(dt)
 

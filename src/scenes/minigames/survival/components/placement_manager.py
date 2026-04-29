@@ -14,9 +14,17 @@ class SurvivalPlacementManager:
         self.tile_size = 24
 
     def add_pokemon(self, pokemon, spot):
-        """Adiciona um Pokémon ao mapa"""
+        """Adiciona um Pokémon ao mapa e associa ao path correto"""
         if pokemon not in self.placed_pokemon:
             self.placed_pokemon.append(pokemon)
+
+            # ===== ASSOCIA AO PATH BASEADO NO SPOT =====
+            if hasattr(self.game_scene, 'path_assignment'):
+                path_idx = self.game_scene.path_assignment.get_path_for_spot(spot.x, spot.y, self.tile_size)
+                if path_idx is not None:
+                    pokemon.assigned_path_index = path_idx
+                    print(f"[Placement] {pokemon.name} associado ao path {path_idx}")
+
             print(f"[Placement] {pokemon.name} adicionado à lista")
 
     def remove_pokemon(self, pokemon):

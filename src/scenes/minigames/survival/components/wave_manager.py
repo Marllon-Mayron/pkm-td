@@ -1,4 +1,4 @@
-# src/scenes/minigames/survival/components/wave_manager.py (CORRIGIDO - COM DIREÇÃO)
+# src/scenes/minigames/survival/components/wave_manager.py
 
 """
 Wave Manager para minigame Survival - Waves finitas configuradas via JSON
@@ -209,6 +209,11 @@ class SurvivalWaveManager:
         if path_idx is None:
             return None
 
+        # ===== ASSOCIA O INIMIGO A ESTE PATH =====
+        if hasattr(self.game_scene, 'path_assignment'):
+            path_y = self.game_scene.path_assignment.path_y_coords[path_idx] if path_idx < len(self.game_scene.path_assignment.path_y_coords) else None
+            print(f"[SurvivalWave] Criando inimigo para path {path_idx} (Y={path_y})")
+
         start_point = self._get_path_start_point(path_idx)
         if not start_point:
             return None
@@ -246,6 +251,10 @@ class SurvivalWaveManager:
         pokemon.attack_pattern = AttackPattern.AGGRESSIVE
         pokemon.combat_state = "attacking"
 
+        # ===== ASSOCIA O PATH AO INIMIGO =====
+        pokemon._assigned_path_index = path_idx
+        print(f"[SurvivalWave] {pokemon.name} associado ao path {path_idx}")
+
         if self.game_scene and hasattr(self.game_scene, 'screen_manager'):
             pokemon.screen_manager = self.game_scene.screen_manager
             pokemon.camera = self.game_scene.camera
@@ -263,14 +272,21 @@ class SurvivalWaveManager:
         pokemon._escaped_counted = False
 
         # ===== CONFIGURA A DIREÇÃO INICIAL BASEADA NO MOVIMENTO =====
-        # Pega o primeiro e segundo ponto do path para determinar direção inicial
         if len(path_points) >= 2:
             dx = path_points[1][0] - path_points[0][0]
             dy = path_points[1][1] - path_points[0][1]
             self._update_direction_from_movement(pokemon, dx, dy)
 
-        print(f"[SurvivalWave] {pokemon.name} criado - Level {pokemon.level}")
+        print(f"[SurvivalWave] {pokemon.name} criado - Level {pokemon.level}, Path {path_idx}")
         return pokemon
+
+    def _get_random_path(self) -> Optional[int]:
+        """Retorna um índice de path aleatório dos disponíveis na wave atual"""
+        if not self.current_wave_config or not self.current_wave_config["paths_available"]:
+            if self.available_paths:
+                return random.choice(self.available_paths)
+            return 0
+        return random.choice(self.current_wave_config["paths_available"])
 
     def _update_direction_from_movement(self, enemy: Pokemon, dx: float, dy: float):
         """Atualiza a direção baseada no movimento (8 direções) - MESMA LÓGICA DO MODO CAMPANHA"""
@@ -378,12 +394,20 @@ class SurvivalWaveManager:
                 if not hasattr(enemy, 'path') or not enemy.path:
                     continue
 
-                # Verifica se deve parar (tem aliado no range)
+                # ===== VERIFICA SE DEVE PARAR (APENAS ALIADOS NO MESMO PATH) =====
                 should_stop = False
-                if hasattr(self.game_scene, 'player_pokemon'):
+                if hasattr(self.game_scene, 'player_pokemon') and hasattr(self.game_scene, 'path_assignment'):
+                    enemy_path = self.game_scene.path_assignment.get_path_for_enemy(enemy)
+
                     for ally in self.game_scene.player_pokemon:
                         if not ally.is_alive() or ally.is_defeated:
                             continue
+
+                        # ===== SÓ PARA SE O ALIADO ESTIVER NO MESMO PATH =====
+                        ally_path = self.game_scene.path_assignment.get_path_for_pokemon(ally)
+                        if ally_path != enemy_path:
+                            continue
+
                         dx = ally.x - enemy.x
                         dy = ally.y - enemy.y
                         distance = math.hypot(dx, dy)
@@ -392,6 +416,30 @@ class SurvivalWaveManager:
                             break
 
                 if should_stop:
+                    # Se está parado, ainda atualiza a direção para olhar para o alvo
+                    # Encontra o aliado mais próximo no mesmo path para olhar
+                    closest_ally = None
+                    min_dist = float('inf')
+                    enemy_path = self.game_scene.path_assignment.get_path_for_enemy(enemy)
+
+                    for ally in self.game_scene.player_pokemon:
+                        if not ally.is_alive() or ally.is_defeated:
+                            continue
+                        ally_path = self.game_scene.path_assignment.get_path_for_pokemon(ally)
+                        if ally_path != enemy_path:
+                            continue
+                        dx = ally.x - enemy.x
+                        dy = ally.y - enemy.y
+                        dist = math.hypot(dx, dy)
+                        if dist < min_dist:
+                            min_dist = dist
+                            closest_ally = ally
+
+                    if closest_ally:
+                        dx = closest_ally.x - enemy.x
+                        dy = closest_ally.y - enemy.y
+                        self._update_direction_from_movement(enemy, dx, dy)
+
                     continue
 
                 # Chegou ao fim do path
@@ -429,7 +477,7 @@ class SurvivalWaveManager:
                 print(f"[SurvivalWave] Erro ao processar inimigo: {e}")
                 continue
 
-        # ===== REMOVE INIMIGOS MORTO =====
+        # ===== REMOVE INIMIGOS MORTOS =====
         for enemy in enemies_to_remove:
             if enemy in self.active_enemies:
                 self.active_enemies.remove(enemy)
