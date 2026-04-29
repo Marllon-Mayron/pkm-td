@@ -674,10 +674,14 @@ class CardDeck:
         viewport_width = viewport.viewport_width
         viewport_height = viewport.viewport_height
 
-        x = viewport_width - self.RECYCLE_BUTTON_WIDTH - 20
-        y = viewport_height - self.CARD_HEIGHT - 25
+        # Botão maior: 140x50
+        button_width = 140
+        button_height = 50
 
-        return pygame.Rect(x, y, self.RECYCLE_BUTTON_WIDTH, self.RECYCLE_BUTTON_HEIGHT)
+        x = viewport_width - button_width - 20
+        y = viewport_height - self.CARD_HEIGHT - 30
+
+        return pygame.Rect(x, y, button_width, button_height)
 
     def handle_event(self, event) -> Optional[Dict]:
         if event.type == pygame.MOUSEMOTION:
@@ -788,7 +792,9 @@ class CardDeck:
         pygame.draw.rect(screen, color, btn_rect, border_radius=8)
         pygame.draw.rect(screen, border_color, btn_rect, 2, border_radius=8)
 
-        font = self._get_font(12, bold=True)
+        # Fonte maior: 16 (era 12)
+        font = self._get_font(16, bold=True)
+
         if not is_ready:
             text = f"{self.recycle_cooldown_remaining:.0f}s"
         else:
@@ -963,3 +969,18 @@ class CardDeck:
             screen.blit(rotated_surface, new_rect)
         else:
             screen.blit(card_surface, (x, y))
+
+    def on_resize(self):
+        """Chamado quando a tela é redimensionada - recalcula posições das cartas"""
+        if not self.cards:
+            return
+
+        # Recalcula todas as posições
+        self._update_card_positions()
+
+        # Atualiza posições atuais para as novas posições alvo
+        for i in range(len(self.cards)):
+            if i < len(self.target_x_positions):
+                self.card_x_positions[i] = self.target_x_positions[i]
+                self.card_y_positions[i] = self.target_y_positions[i]
+                self.card_rotations[i] = self.target_rotations[i]

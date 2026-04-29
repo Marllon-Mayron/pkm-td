@@ -565,6 +565,9 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
         pokemon.set_battle_system(self.battle_system)
 
+        # ===== MINIGAME SPECIFIC: Define range inicial baseado no move =====
+        self._update_pokemon_range_from_move(pokemon)
+
         self.placement_manager.add_pokemon(pokemon, spot)
         self.player_pokemon.append(pokemon)
         spot.occupied = True
@@ -581,7 +584,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
         toast_success(f"{pokemon.name} colocado!", duration=1.5, pokemon=pokemon, portrait="happy")
-        print(f"[Survival] {pokemon.name} colocado! Energia: {self.energy}")
+        print(f"[Survival] {pokemon.name} colocado! Range: {pokemon.attack_range}")
         return True
 
     def can_afford(self, cost: int) -> bool:
@@ -635,7 +638,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
         self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data)
         self.evolution_overlay.active = True
-        self.paused = True
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.paused = True
 
@@ -643,12 +645,19 @@ class SurvivalMinigameScene(BaseMinigameScene):
         from src.managers.sounds.sound_manager import sound_manager
         sound_manager.stop_effect("evolution")
 
+        # ===== CORREÇÃO: FECHA O OVERLAY IGUAL AO GAME_SCENE =====
         if hasattr(self, 'evolution_overlay'):
+            self.evolution_overlay.active = False
             self.evolution_overlay = None
 
+        # ===== DESPAUSA O JOGO =====
         self.paused = False
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.paused = False
+
+        # ===== SE CANCELOU, NÃO APLICA A EVOLUÇÃO =====
+        if cancel:
+            print(f"[EVOLUTION] Evolução cancelada para {self.pokemon.name if hasattr(self, 'pokemon') else '?'}")
 
     def open_move_learn_overlay(self, pokemon, new_move_name):
         from src.scenes.game_scene.components.overlays.move_learn_overlay import MoveLearnOverlay
@@ -684,13 +693,38 @@ class SurvivalMinigameScene(BaseMinigameScene):
             self.wave_manager.paused = True
 
     def close_move_select_overlay(self):
+        """Fecha o overlay de seleção de move (apenas minigame)"""
+        pokemon = None
         if self.move_select_overlay:
+            pokemon = self.move_select_overlay.pokemon if hasattr(self.move_select_overlay, 'pokemon') else None
             self.move_select_overlay.active = False
             self.move_select_overlay = None
+
+            # ===== MINIGAME SPECIFIC: Atualiza o range baseado no move =====
+            if pokemon and pokemon.is_placed and not pokemon.is_defeated:
+                self._update_pokemon_range_from_move(pokemon)
 
         self.paused = False
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.paused = False
+
+    def _update_pokemon_range_from_move(self, pokemon):
+        """
+        Atualiza o attack_range do Pokémon baseado no tipo do move atual.
+        Apenas para o minigame Survival.
+        Physical: 120
+        Special: 300
+        """
+        if not pokemon or pokemon.is_defeated or not pokemon.is_alive():
+            return
+
+        current_move = pokemon.get_current_move()
+        if current_move:
+            move_category = current_move.category.lower()
+            if move_category == "physical" or move_category == "status":
+                pokemon.attack_range = 150
+            elif move_category == "special":
+                pokemon.attack_range = 500
 
     # ===== MÉTODOS DE EVENTOS =====
 
@@ -1320,3 +1354,9 @@ class SurvivalMinigameScene(BaseMinigameScene):
         text_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - pause_text.get_width()) // 2
         text_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - pause_text.get_height()) // 2
         screen.blit(pause_text, (text_x, text_y))
+
+    def on_resize(self):
+        """Chamado quando a tela é redimensionada"""
+        # Recalcula posições do deck de cartas
+        if self.card_deck:
+            self.card_deck.on_resize()

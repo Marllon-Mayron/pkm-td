@@ -155,6 +155,9 @@ class BaseMinigameScene(BaseScene):
             if self.wave_manager:
                 pokemon.update_combat(dt, self.wave_manager.active_enemies)
 
+    def on_resize(self):
+        pass
+
     def render(self, screen):
         """Renderiza base"""
         # Renderiza mapa

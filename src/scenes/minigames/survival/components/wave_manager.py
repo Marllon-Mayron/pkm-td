@@ -492,7 +492,7 @@ class SurvivalWaveManager:
         if not contributors:
             return
 
-        base_xp = 15 + (defeated_enemy.level * 5)
+        base_xp = 25 + (defeated_enemy.level * 5)
 
         if defeated_enemy.is_boss:
             base_xp = int(base_xp * 3)

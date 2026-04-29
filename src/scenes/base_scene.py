@@ -28,6 +28,9 @@ class BaseScene(ABC):
         """Update fixo para lógica"""
         pass
 
+    def on_resize(self):
+        pass
+
     @abstractmethod
     def render(self, screen):
         """Renderiza a cena diretamente na tela"""
