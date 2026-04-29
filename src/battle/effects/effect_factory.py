@@ -9,7 +9,7 @@ class EffectFactory:
     # Configurações pré-definidas para moves comuns
     # src/battle/effects/effect_factory.py
 
-    MOVE_EFFECTS = {
+    MOVE_EFFECTS_GEN1 = {
         # Status moves - Stat Modifiers (4 segundos de duração)
         "string-shot": {
             "effect_type": "stat_mod",
@@ -203,7 +203,7 @@ class EffectFactory:
                 "stages": -1,
                 "duration": 8.0
             },
-            "description": "Reduz a Precisão do oponente",
+            "description": "Reduz a Precisão dos oponentes ao redor",
         },
         "flash": {
             "effect_type": "stat_mod",
@@ -549,19 +549,6 @@ class EffectFactory:
             "effect_type": "status_chance",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
-            "params": {
-                "status": "freeze",
-                "chance": 0.10,
-                "duration": None,
-                "overwrite": False
-            },
-            "description": "Pode congelar o oponente (10% de chance)"
-        },
-        "powder-snow": {
-            "effect_type": "status_chance",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.ON_HIT,
-            "is_area": True,
             "params": {
                 "status": "freeze",
                 "chance": 0.10,
@@ -1489,6 +1476,177 @@ class EffectFactory:
             "description": "Copies a move used by the foe."
         }
     }
+
+    MOVE_EFFECTS_GEN2 = {
+        # STATS MOVES
+        "cotton-spore": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,
+            "params": {
+                "stat": "speed",
+                "stages": -2,
+                "duration": 4.0
+            },
+            "description": "Reduz bastante a velocidade em área",
+        },
+        "scary-face": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "speed",
+                "stages": -2,
+                "duration": 4.0
+            },
+            "description": "Reduz bastante a velocidade do alvo",
+        },
+        "triple-kick": {
+            "effect_type": "triple_kick",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "hits": 3,
+                "base_power": 10,
+                "power_multiplier": [1, 2, 3],
+                "accuracy": 90,
+                "hit_interval": 0.15,
+            },
+            "description": "Ataque de 3 chutes com poder crescente. Se um errar, o ataque para."
+        },
+        # RESIDUAL EFFECTS
+        "nightmare": {
+            "effect_type": "nightmare",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "residual_type": "nightmare",
+                "duration": None,  # Duração indefinida (enquanto o alvo estiver dormindo)
+                "tick_interval": 1.5,  # Dano a cada SEGUNDOS
+                "damage_percentage": 0.25,  # 1/4 do HP máximo por tick
+            },
+            "description": "Apenas funciona em Pokémon dormindo. Causa pesadelo, drenando 1/4 do HP máximo a cada turno."
+        },
+        "curse": {
+            "effect_type": "curse",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                # Para Ghost-type
+                "ghost_hp_cost": 0.5,  # 50% do HP máximo
+                "curse_damage_percentage": 0.25,  # 1/4 do HP por turno
+                "curse_tick_interval": 2.0,
+                # Para não-Ghost
+                "non_ghost_stat_changes": {
+                    "attack": 1,
+                    "defense": 1,
+                    "speed": -1
+                },
+                "stat_duration": 6.0
+            },
+            "description": "Fantasma: sacrifica 50% HP para amaldiçoar o alvo (dano de 1/4 HP por turno). Não-Fantasma: +1 Atk/Def, -1 Speed."
+        },
+
+        # ===== QUEIMADURA (BURN) =====
+        "flame-wheel": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "burn",
+                "chance": 0.10,
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Ataque fisico com chance de queimar. (10% de chance)"
+        },
+        "snore": {
+            "effect_type": "snore",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "power": 50,
+                "accuracy": 100,
+                "flinch_chance": 0.30,  # 30% de chance de causar flinch
+            },
+            "description": "Só funciona enquanto dormindo. 30% de chance de fazer o oponente hesitar."
+        },
+        "flail": {
+            "effect_type": "flail",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "power_table": {
+                    "ranges": [
+                        {"max_hp_percent": 1, "power": 200},  # 0-1%
+                        {"max_hp_percent": 5, "power": 150},  # 2-5%
+                        {"max_hp_percent": 12, "power": 100},  # 6-12%
+                        {"max_hp_percent": 21, "power": 80},  # 13-21%
+                        {"max_hp_percent": 42, "power": 40},  # 22-42%
+                        {"max_hp_percent": 100, "power": 20}  # 43-100%
+                    ]
+                }
+            },
+            "description": "Quanto menos HP o usuário tem, mais forte é o ataque."
+        },
+        # ===== CONGELAMENTO (FREEZE) =====
+        "powder-snow": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,
+            "params": {
+                "status": "freeze",
+                "chance": 0.10,
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Pode congelar o oponente (10% de chance)"
+        },
+        # ===== CONFUSÕES (CONFUSION) =====
+        "sweet-kiss": {
+            "effect_type": "confusion",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "duration": None
+            },
+            "description": "Causa confusão no oponente com um doce beijo.",
+        },
+        # ===== DANOS COM EFEITOS DE STATS =====
+        "aeroblast": {
+            "effect_type": "high_crit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "crit_stage": 1
+            },
+            "description": "Alta taxa de acerto crítico"
+        },
+
+        "feint-attack": {
+            "effect_type": "never_miss",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "never_miss": True,
+            },
+            "description": "Ataque sombrio que nunca erra. Ignora modificadores de precisão e evasão."
+        },
+
+
+    }
+
+    MOVE_EFFECTS = {**MOVE_EFFECTS_GEN1, **MOVE_EFFECTS_GEN2}
+
+    # manter separados para organização
+    MOVE_EFFECTS_BY_GEN = {
+        1: MOVE_EFFECTS_GEN1,
+        2: MOVE_EFFECTS_GEN2,
+    }
+
+    MOVE_EFFECTS = MOVE_EFFECTS  # Referência para o dicionário unificado
 
     @classmethod
     def create_effect(cls, move_name: str) -> Optional[MoveEffect]:

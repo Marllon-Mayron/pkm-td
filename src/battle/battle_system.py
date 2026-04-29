@@ -44,6 +44,12 @@ class BattleSystem:
             still_active = self.active_multi_hit.update(dt)
             if not still_active:
                 self.active_multi_hit = None
+        # ===== ATUALIZA TRIPLE KICK =====
+        if hasattr(self, 'active_triple_kick') and self.active_triple_kick:
+            still_active = self.active_triple_kick.update(dt)
+            if not still_active:
+                self.active_triple_kick = None
+                print(f"[BATTLE] Triple Kick finalizado ou interrompido!")
 
         self.residual_effects.update(dt)
 

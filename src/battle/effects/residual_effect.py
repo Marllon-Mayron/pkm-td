@@ -4,9 +4,14 @@ from typing import Optional, Callable
 
 class ResidualEffectType(Enum):
     """Tipos de efeitos residuais (por turno)"""
+    # 1GEN
     LEECH_SEED = "leech_seed"
     WRAP = "wrap"
     BIND = "bind"
+    # 2GEN
+    NIGHTMARE = "nightmare"
+    CURSE = "curse"
+
     FIRE_SPIN = "fire_spin"
     WHIRLPOOL = "whirlpool"
     CLAMP = "clamp"
@@ -14,6 +19,7 @@ class ResidualEffectType(Enum):
     INFESTATION = "infestation"
     MAGMA_STORM = "magma_storm"
     SALT_CURE = "salt_cure"
+
 
 
 class ResidualEffect:

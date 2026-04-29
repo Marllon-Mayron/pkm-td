@@ -4,6 +4,7 @@ from typing import Optional, Callable
 from dataclasses import dataclass, field
 import random, math
 
+from src.battle.effects.especific_moves import TripleKickState
 from src.battle.effects import StatusType
 from src.battle.effects.residual_effect import ResidualEffect
 from src.battle.effects.residual_effect import ResidualEffectType, ResidualEffectManager
@@ -236,6 +237,17 @@ class MoveEffect:
             return self._apply_mimic(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "transform":
             return self._apply_transform(attacker, target, battle_system, effect_manager)
+        #GEN2
+        elif self.effect_type == "triple_kick":
+            return self._apply_triple_kick(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "nightmare":
+            return self._apply_nightmare(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "snore":
+            return self._apply_snore(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "curse":
+            return self._apply_curse(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "flail":
+            return self._apply_flail(attacker, target, battle_system, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -456,14 +468,22 @@ class MoveEffect:
         return True
 
     def _apply_flinch(self, attacker, target, effect_manager):
-        """Aplica flinch (hesitação)"""
+        """Aplica flinch (hesitação) - Reseta o cooldown do alvo"""
         chance = self.params.get('chance', 0.3)
 
-        if random.random() < chance:
-            # Adiciona efeito de flinch (não pode atacar no próximo turno)
-            effect_manager.add_status_text(target, f"{target.name} hesitou!")
+        if random.random() < chance and target.is_alive() and not target.is_defeated:
+            # Reseta o cooldown de ataque do alvo (faz perder o turno)
+            old_cooldown = target.attack_cooldown
+            target.attack_cooldown = max(0.5, 1.0 - (target.speed_stat / 500))
 
-            # TODO: Implementar flinch effect
+            effect_manager.add_status_text(
+                target,
+                f"{target.name} hesitou e perdeu o turno!",
+                duration=1.5
+            )
+
+            print(f"[FLINCH] {attacker.name} causou flinch em {target.name}! "
+                  f"Cooldown resetado de {old_cooldown:.2f} para {target.attack_cooldown:.2f}")
             return True
 
         return False
@@ -2905,3 +2925,653 @@ class MoveEffect:
 
         print(f"[FORCE_SWITCH] {target.name} retornou ao time com sucesso!")
         return True
+
+    #GEN2
+    def _apply_triple_kick(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito do Triple Kick - 3 hits com poder crescente
+        """
+        # Verifica se já tem um Triple Kick ativo
+        if hasattr(battle_system, 'active_triple_kick') and battle_system.active_triple_kick:
+            effect_manager.add_status_text(attacker, f"{attacker.name} já está realizando um Triple Kick!",
+                                           duration=1.0)
+            return False
+
+        # Verifica se o alvo está vivo
+        if target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
+        # Gasta PP (1 PP para todo o ataque)
+        current_move = attacker.get_current_move()
+        if current_move:
+            if current_move.current_pp <= 0:
+                effect_manager.add_status_text(attacker, f"Não há PP para {current_move.name}!", duration=1.0)
+                return False
+            current_move.current_pp -= 1
+            print(f"[TRIPLE_KICK] {attacker.name} gastou 1 PP (restante: {current_move.current_pp})")
+
+        # Cria o estado do Triple Kick
+        triple_kick_state = TripleKickState(
+            attacker=attacker,
+            target=target,
+            move=current_move,
+            battle_system=battle_system,
+            effect_manager=effect_manager
+        )
+
+        # Armazena no battle_system para processamento contínuo
+        battle_system.active_triple_kick = triple_kick_state
+
+        # Mensagem inicial
+        effect_manager.add_status_text(attacker, f"{attacker.name} começou um chute triplo!", duration=1.0)
+        print(f"[TRIPLE_KICK] {attacker.name} iniciou Triple Kick em {target.name}!")
+
+        # Toca som inicial do ataque
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound(current_move.sound_name)
+
+        return True
+
+    def _apply_nightmare(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Nightmare (Pesadelo)
+        - Só funciona se o alvo estiver dormindo
+        - Causa dano de 1/4 do HP máximo por turno
+        - Acaba quando o alvo acorda ou sai de campo
+        """
+        from src.battle.effects import StatusType
+        from src.battle.effects.residual_effect import ResidualEffect, ResidualEffectType
+
+        # ===== VERIFICA SE O ALVO ESTÁ DORMINDO =====
+        target_status = effect_manager.get_status(target)
+
+        if not target_status or target_status.type != StatusType.SLEEP:
+            # Falhou - alvo não está dormindo
+            effect_manager.add_status_text(
+                attacker,
+                f"Mas falhou! {target.name} não está dormindo!",
+                duration=1.5
+            )
+            print(f"[NIGHTMARE] {attacker.name} tentou usar Nightmare, mas {target.name} não está dormindo!")
+            return False
+
+        # ===== VERIFICA SE O ALVO JÁ TEM PESADELO =====
+        if hasattr(battle_system, 'residual_effects'):
+            existing = battle_system.residual_effects.get_effect_on_target(
+                target, ResidualEffectType.NIGHTMARE
+            )
+            if existing:
+                effect_manager.add_status_text(
+                    attacker,
+                    f"Mas {target.name} já está tendo um pesadelo!",
+                    duration=1.0
+                )
+                print(f"[NIGHTMARE] {target.name} já está com pesadelo ativo!")
+                return False
+
+        # ===== OBTÉM PARÂMETROS =====
+        tick_interval = self.params.get("tick_interval", 2.0)
+        damage_percentage = self.params.get("damage_percentage", 0.25)
+
+        # ===== CALLBACK DO TICK (DANO) =====
+        def on_tick(effect):
+            """Executado a cada tick do Nightmare"""
+            target = effect.target
+            source = effect.source
+
+            # Verifica se o alvo ainda está vivo
+            if target.is_defeated or not target.is_alive():
+                effect.remove()
+                return
+
+            # Verifica se o alvo AINDA ESTÁ DORMINDO
+            current_status = effect_manager.get_status(target)
+            if not current_status or current_status.type != StatusType.SLEEP:
+                # O alvo acordou! Remove o pesadelo
+                effect_manager.add_status_text(
+                    target,
+                    f"{target.name} acordou do pesadelo!",
+                    duration=1.5
+                )
+                print(f"[NIGHTMARE] {target.name} acordou! Pesadelo terminou.")
+                effect.remove()
+                return
+
+            # Calcula dano: 1/4 do HP máximo
+            damage = max(1, int(target.max_hp * damage_percentage))
+
+            # Aplica dano
+            old_hp = target.current_hp
+            target.take_damage(damage, attacker=source)
+            actual_damage = old_hp - target.current_hp
+
+            if actual_damage > 0:
+                effect_manager.add_status_text(
+                    target,
+                    f"{target.name} está tendo um pesadelo! -{actual_damage} HP",
+                    duration=1.5
+                )
+                print(f"[NIGHTMARE] {target.name} perdeu {actual_damage} HP por causa do pesadelo!")
+
+                # Toca som de dano
+                from src.managers.sounds.move_sound_manager import move_sound_manager
+                move_sound_manager.play_attack_sound("nightmare")
+
+                # Toca animação de hurt
+                if hasattr(target, 'play_hurt_animation'):
+                    target.play_hurt_animation()
+
+        # ===== CALLBACK DE REMOÇÃO =====
+        def on_remove(effect):
+            """Quando o pesadelo é removido"""
+            effect_manager.add_status_text(
+                effect.target,
+                f"O pesadelo de {effect.target.name} acabou!",
+                duration=1.5
+            )
+            print(f"[NIGHTMARE] Pesadelo removido de {effect.target.name}")
+
+        # ===== CRIA O EFEITO RESIDUAL =====
+        # Duração None porque o efeito dura enquanto o alvo estiver dormindo
+        effect = ResidualEffect(
+            effect_type=ResidualEffectType.NIGHTMARE,
+            source=attacker,
+            target=target,
+            duration=None,  # Duração indefinida (gerenciada pelo on_tick)
+            tick_interval=tick_interval,
+            on_tick_callback=on_tick,
+            on_remove_callback=on_remove
+        )
+
+        # Adiciona ao gerenciador de efeitos residuais
+        if not hasattr(battle_system, 'residual_effects'):
+            battle_system.residual_effects = ResidualEffectManager(battle_system)
+
+        battle_system.residual_effects.add_effect(effect)
+
+        # Mensagem de sucesso
+        effect_manager.add_status_text(
+            attacker,
+            f"{target.name} está tendo um pesadelo!",
+            duration=2.0
+        )
+
+        print(f"[NIGHTMARE] {attacker.name} causou pesadelo em {target.name}!")
+
+        return True
+
+    def _apply_snore(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Snore (Ronco)
+        - Só funciona se o atacante estiver dormindo
+        - Causa dano especial de 50 de poder
+        - 30% de chance de causar flinch (resetar cooldown do alvo)
+        - Não acorda o usuário
+        """
+        from src.battle.damage_calculator import DamageCalculator
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+        from src.battle.effects import StatusType
+        from src.battle.effects.move_effect import EffectTiming
+
+        # ===== VERIFICA SE O ATACANTE ESTÁ DORMINDO =====
+        attacker_status = effect_manager.get_status(attacker)
+
+        if not attacker_status or attacker_status.type != StatusType.SLEEP:
+            # Falhou - atacante não está dormindo
+            effect_manager.add_status_text(
+                attacker,
+                f"Mas falhou! {attacker.name} não está dormindo!",
+                duration=1.5
+            )
+            print(f"[SNORE] {attacker.name} tentou usar Snore, mas não está dormindo!")
+            return False
+
+        # ===== OBTÉM O MOVE ATUAL =====
+        current_move = attacker.get_current_move()
+        if not current_move:
+            print(f"[SNORE] {attacker.name} não tem move selecionado!")
+            return False
+
+        # Verifica PP
+        if current_move.current_pp <= 0:
+            effect_manager.add_status_text(attacker, f"Não há PP para {current_move.name}!", duration=1.0)
+            return False
+
+        # Gasta PP
+        current_move.current_pp -= 1
+
+        # ===== TOCA SOM DO RONCO =====
+        move_sound_manager.play_attack_sound(current_move.sound_name)
+
+        # ===== CALCULA ACERTO =====
+        from src.battle.effects.stat_modifier import StatType
+        hit_chance = current_move.accuracy / 100
+        accuracy_mult = effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)
+        evasion_mult = effect_manager.get_stat_multiplier(target, StatType.EVASION)
+        final_hit_chance = hit_chance * accuracy_mult / evasion_mult
+        final_hit_chance = max(0.01, min(1.0, final_hit_chance))
+
+        import random
+        will_hit = random.random() <= final_hit_chance
+
+        if not will_hit:
+            # Errou
+            effect_manager.add_status_text(attacker, f"{attacker.name} roncou, mas errou!", duration=1.0)
+            move_sound_manager.play_attack_sound("miss")
+
+            # Cooldown
+            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            return True
+
+        # ===== CALCULA DANO =====
+        damage_result = DamageCalculator.calculate_damage(attacker, target, current_move)
+
+        if not damage_result["hit"]:
+            # Move não afetou (imune, etc)
+            if damage_result.get("effectiveness", 1.0) == 0:
+                effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
+            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            return True
+
+        # ===== APLICA DANO =====
+        damage = damage_result["damage"]
+
+        if damage > 0:
+            target.take_damage(damage, attacker=attacker)
+
+            # Mostra mensagem de dano
+            effect_manager.add_status_text(target, f"-{damage} HP", duration=0.8)
+
+            # Mostra mensagem de crítico se houver
+            if damage_result.get("critical", False):
+                effect_manager.add_status_text(attacker, "Acerto Crítico!", duration=1.0)
+
+            # Mostra eficácia
+            effectiveness = damage_result.get("effectiveness", 1.0)
+            if effectiveness > 1.0:
+                effect_manager.add_status_text(attacker, "Super efetivo!", duration=0.8)
+            elif 0 < effectiveness < 1.0:
+                effect_manager.add_status_text(attacker, "Não é muito efetivo...", duration=0.8)
+
+            # Toca som de impacto
+            move_sound_manager.play_hit_sound(current_move.sound_name)
+
+            # Toca animação de hurt
+            if hasattr(target, 'play_hurt_animation'):
+                target.play_hurt_animation()
+
+            print(f"[SNORE] {attacker.name} (dormindo) causou {damage} de dano em {target.name}!")
+
+        # ===== APLICA FLINCH (30% DE CHANCE) - RESETA O COOLDOWN DO ALVO =====
+        flinch_chance = self.params.get("flinch_chance", 0.30)
+
+        if random.random() < flinch_chance and target.is_alive() and not target.is_defeated:
+            # FLINCH: Reseta o cooldown de ataque do alvo
+            old_cooldown = target.attack_cooldown
+            target.attack_cooldown = max(0.5, 1.0 - (target.speed_stat / 500))
+
+            effect_manager.add_status_text(
+                target,
+                f"{target.name} hesitou com o ronco alto e perdeu o turno!",
+                duration=1.5
+            )
+
+            print(
+                f"[SNORE] FLINCH! {target.name} cooldown resetado de {old_cooldown:.2f} para {target.attack_cooldown:.2f}")
+
+        # ===== COOLDOWN DO ATACANTE =====
+        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+        # Mensagem final
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} roncou enquanto dormia!",
+            duration=1.5
+        )
+
+        return True
+
+    def _apply_curse(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Curse (Maldiçao)
+
+        Ghost-type:
+        - Usuario perde 50% do HP maximo
+        - Alvo sofre 25% do HP maximo de dano por turno
+
+        Non-Ghost:
+        - +1 Ataque
+        - +1 Defesa
+        - -1 Velocidade
+        """
+        from src.battle.effects import StatusType
+        from src.battle.effects.stat_modifier import StatType
+        from src.battle.effects.residual_effect import ResidualEffect, ResidualEffectType
+
+        # ===== VERIFICA SE O USUÁRIO É DO TIPO FANTASMA =====
+        is_ghost = any(t.lower() == "ghost" for t in attacker.types)
+
+        if is_ghost:
+            # ===== EFEITO GHOST-TYPE =====
+            return self._apply_curse_ghost(attacker, target, battle_system, effect_manager)
+        else:
+            # ===== EFEITO NON-GHOST-TYPE =====
+            return self._apply_curse_non_ghost(attacker, target, battle_system, effect_manager)
+
+    def _apply_curse_ghost(self, attacker, target, battle_system, effect_manager):
+        """
+        Cursed Ghost: sacrifica HP para amaldiçoar o alvo
+        """
+        from src.battle.effects.residual_effect import ResidualEffect, ResidualEffectType
+
+        hp_cost_percentage = self.params.get("ghost_hp_cost", 0.5)
+        curse_damage = self.params.get("curse_damage_percentage", 0.25)
+        tick_interval = self.params.get("curse_tick_interval", 2.0)
+
+        # ===== VERIFICA SE O ALVO JÁ ESTÁ AMALDIÇOADO =====
+        if hasattr(battle_system, 'residual_effects'):
+            existing = battle_system.residual_effects.get_effect_on_target(
+                target, ResidualEffectType.CURSE
+            )
+            if existing:
+                effect_manager.add_status_text(
+                    attacker,
+                    f"Mas o alvo já está amaldiçoado!",
+                    duration=1.0
+                )
+                print(f"[CURSE] {target.name} já está amaldiçoado!")
+                return False
+
+        # ===== CALCULA O CUSTO DE HP =====
+        hp_cost = max(1, int(attacker.max_hp * hp_cost_percentage))
+
+        # Verifica se o atacante tem HP suficiente
+        if attacker.current_hp <= hp_cost:
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} não tem HP suficiente para amaldiçoar!",
+                duration=1.5
+            )
+            print(f"[CURSE] {attacker.name} não pode pagar {hp_cost} HP!")
+            return False
+
+        # ===== APLICA O CUSTO DE HP =====
+        attacker.take_damage(hp_cost, attacker=attacker)
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} sacrificou {hp_cost} HP para amaldiçoar!",
+            duration=1.5
+        )
+
+        # Toca animação de dano no atacante
+        if hasattr(attacker, 'play_hurt_animation'):
+            attacker.play_hurt_animation()
+
+        # ===== CALLBACK DO TICK (DANO DA MALDIÇÃO) =====
+        def on_tick(effect):
+            target = effect.target
+            source = effect.source
+
+            if target.is_defeated or not target.is_alive():
+                effect.remove()
+                return
+
+            # Calcula dano: 1/4 do HP máximo
+            damage = max(1, int(target.max_hp * curse_damage))
+
+            old_hp = target.current_hp
+            target.take_damage(damage, attacker=source)
+            actual_damage = old_hp - target.current_hp
+
+            if actual_damage > 0:
+                effect_manager.add_status_text(
+                    target,
+                    f"A maldição dói! -{actual_damage} HP",
+                    duration=1.5
+                )
+                print(f"[CURSE] {target.name} perdeu {actual_damage} HP pela maldição!")
+
+                from src.managers.sounds.move_sound_manager import move_sound_manager
+                move_sound_manager.play_attack_sound("curse")
+
+                if hasattr(target, 'play_hurt_animation'):
+                    target.play_hurt_animation()
+
+        def on_remove(effect):
+            effect_manager.add_status_text(
+                effect.target,
+                f"A maldição de {effect.target.name} desapareceu!",
+                duration=1.5
+            )
+
+        # ===== CRIA O EFEITO RESIDUAL =====
+        effect = ResidualEffect(
+            effect_type=ResidualEffectType.CURSE,
+            source=attacker,
+            target=target,
+            duration=None,  # Duração indefinida (vai até o fim da batalha ou remoção)
+            tick_interval=tick_interval,
+            on_tick_callback=on_tick,
+            on_remove_callback=on_remove
+        )
+
+        if not hasattr(battle_system, 'residual_effects'):
+            battle_system.residual_effects = ResidualEffectManager(battle_system)
+
+        battle_system.residual_effects.add_effect(effect)
+
+        effect_manager.add_status_text(
+            target,
+            f"{target.name} foi amaldiçoado!",
+            duration=2.0
+        )
+
+        print(f"[CURSE] {attacker.name} (Ghost) amaldiçoou {target.name}!")
+
+        return True
+
+    def _apply_curse_non_ghost(self, attacker, target, battle_system, effect_manager):
+        """
+        Curse para não-Fantasma: +1 Atk, +1 Def, -1 Speed
+        """
+        from src.battle.effects.stat_modifier import StatType
+
+        stat_changes = self.params.get("non_ghost_stat_changes", {
+            "attack": 1,
+            "defense": 1,
+            "speed": -1
+        })
+        duration = self.params.get("stat_duration", 6.0)
+
+        # Aplica modificadores de stat
+        stat_map = {
+            "attack": StatType.ATTACK,
+            "defense": StatType.DEFENSE,
+            "speed": StatType.SPEED,
+            "sp_attack": StatType.SP_ATTACK,
+            "sp_defense": StatType.SP_DEFENSE,
+            "accuracy": StatType.ACCURACY,
+            "evasion": StatType.EVASION
+        }
+
+        changes_applied = []
+
+        for stat_name, stages in stat_changes.items():
+            stat_type = stat_map.get(stat_name.lower())
+            if stat_type:
+                # Aplica o modificador (alvo = SELF)
+                effect_manager.add_stat_modifier(attacker, stat_type, stages, duration)
+
+                if stages > 0:
+                    changes_applied.append(f"+{stages} {stat_name}")
+                else:
+                    changes_applied.append(f"{stages} {stat_name}")
+
+        # Mensagem personalizada
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} amaldiçoou a si mesmo!",
+            duration=1.5
+        )
+
+        effect_manager.add_status_text(
+            attacker,
+            f"Ataque e Defesa aumentaram, mas Velocidade diminuiu!",
+            duration=2.0
+        )
+
+        print(f"[CURSE] {attacker.name} (não-Ghost): {', '.join(changes_applied)}")
+
+        return True
+
+    def _apply_flail(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Flail - poder aumenta com baixo HP
+
+        O poder é calculado baseado na porcentagem de HP restante do atacante
+        """
+        from src.battle.damage_calculator import DamageCalculator
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+
+        # ===== OBTÉM O MOVE ATUAL =====
+        current_move = attacker.get_current_move()
+        if not current_move:
+            print(f"[FLAIL] {attacker.name} não tem move selecionado!")
+            return False
+
+        # Verifica PP
+        if current_move.current_pp <= 0:
+            effect_manager.add_status_text(attacker, f"Não há PP para {current_move.name}!", duration=1.0)
+            return False
+
+        # Gasta PP
+        current_move.current_pp -= 1
+
+        # ===== CALCULA O PODOR BASEADO NO HP =====
+        original_power = current_move.power
+        flail_power = self._calculate_flail_power(attacker)
+
+        # Substitui o poder temporariamente
+        current_move.power = flail_power
+
+        print(
+            f"[FLAIL] HP de {attacker.name}: {attacker.current_hp}/{attacker.max_hp} ({attacker.current_hp / attacker.max_hp * 100:.1f}%) -> Poder: {flail_power}")
+
+        # ===== TOCA SOM =====
+        move_sound_manager.play_attack_sound(current_move.sound_name)
+
+        # ===== CALCULA ACERTO =====
+        from src.battle.effects.stat_modifier import StatType
+        hit_chance = current_move.accuracy / 100
+        accuracy_mult = effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)
+        evasion_mult = effect_manager.get_stat_multiplier(target, StatType.EVASION)
+        final_hit_chance = hit_chance * accuracy_mult / evasion_mult
+        final_hit_chance = max(0.01, min(1.0, final_hit_chance))
+
+        import random
+        will_hit = random.random() <= final_hit_chance
+
+        if not will_hit:
+            # Errou
+            effect_manager.add_status_text(attacker, f"{attacker.name} errou!", duration=1.0)
+            move_sound_manager.play_attack_sound("miss")
+
+            # Restaura poder original
+            current_move.power = original_power
+            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            return True
+
+        # ===== CALCULA DANO =====
+        damage_result = DamageCalculator.calculate_damage(attacker, target, current_move)
+
+        # Restaura poder original
+        current_move.power = original_power
+
+        if not damage_result["hit"]:
+            if damage_result.get("effectiveness", 1.0) == 0:
+                effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
+            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            return True
+
+        # ===== APLICA DANO =====
+        damage = damage_result["damage"]
+
+        # Mostra mensagem de poder alto se for o caso
+        if flail_power >= 150:
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} usou todo seu desespero! Poder {flail_power}!",
+                duration=1.0
+            )
+        elif flail_power >= 100:
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} está em apuros! Poder {flail_power}!",
+                duration=1.0
+            )
+
+        if damage > 0:
+            target.take_damage(damage, attacker=attacker)
+            effect_manager.add_status_text(target, f"-{damage} HP", duration=0.8)
+
+            if damage_result.get("critical", False):
+                effect_manager.add_status_text(attacker, "Acerto Crítico!", duration=1.0)
+
+            effectiveness = damage_result.get("effectiveness", 1.0)
+            if effectiveness > 1.0:
+                effect_manager.add_status_text(attacker, "Super efetivo!", duration=0.8)
+            elif 0 < effectiveness < 1.0:
+                effect_manager.add_status_text(attacker, "Não é muito efetivo...", duration=0.8)
+
+            move_sound_manager.play_hit_sound(current_move.sound_name)
+
+            if hasattr(target, 'play_hurt_animation'):
+                target.play_hurt_animation()
+
+            print(f"[FLAIL] {attacker.name} causou {damage} de dano em {target.name} (poder: {flail_power})!")
+
+        # Cooldown
+        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+        return True
+
+    def _calculate_flail_power(self, attacker) -> int:
+        """
+        Calcula o poder do Flail baseado na porcentagem de HP restante
+
+        Tabela baseada nos jogos Pokémon:
+        HP Restante | Poder
+        0% - 1%     | 200
+        2% - 5%     | 150
+        6% - 12%    | 100
+        13% - 21%   | 80
+        22% - 42%   | 40
+        43% - 100%  | 20
+        """
+        max_hp = attacker.max_hp
+        current_hp = attacker.current_hp
+
+        if max_hp <= 0:
+            return 20
+
+        # Calcula porcentagem de HP restante (0 a 100)
+        hp_percentage = (current_hp / max_hp) * 100
+
+        # Usa a tabela de ranges
+        power_table = self.params.get("power_table", {})
+        ranges = power_table.get("ranges", [
+            {"max_hp_percent": 1, "power": 200},
+            {"max_hp_percent": 5, "power": 150},
+            {"max_hp_percent": 12, "power": 100},
+            {"max_hp_percent": 21, "power": 80},
+            {"max_hp_percent": 42, "power": 40},
+            {"max_hp_percent": 100, "power": 20}
+        ])
+
+        for range_config in ranges:
+            if hp_percentage <= range_config["max_hp_percent"]:
+                return range_config["power"]
+
+        # Fallback
+        return 20
