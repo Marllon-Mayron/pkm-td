@@ -10,7 +10,6 @@ from src.scenes.base_scene import BaseScene
 from src.config.progress import progress_manager
 from src.config.phase_catalog import phase_catalog
 from src.scenes.shop_scene.shop_scene import ShopScene
-from src.scenes.minigame_select_scene import MinigameSelectScene
 
 
 class PhaseCard:
@@ -272,7 +271,7 @@ class PhaseSelectScene(BaseScene):
         button_spacing = 20
         total_width = button_width * 2 + button_spacing
         start_x = viewport_x + (viewport_width - total_width) // 2
-        bottom_y = viewport_y + viewport_height - 70
+        bottom_y = viewport_y + viewport_height - 90
 
         self.shop_button = pygame.Rect(start_x, bottom_y, button_width, button_height)
         self.minigame_button = pygame.Rect(start_x + button_width + button_spacing, bottom_y, button_width, button_height)
@@ -488,23 +487,20 @@ class PhaseSelectScene(BaseScene):
         self.game.shop_scene = ShopScene(self.game)
         self.game.shop_scene.on_close_callback = self._on_shop_closed
         self.game.current_scene = self.game.shop_scene
-        print("[PHASE SELECT] Indo para a loja...")
 
     def _open_minigames(self):
         """Abre a tela de minigames"""
-        print("[PHASE SELECT] Indo para os minigames...")
+        from scenes.minigame_select_scene.minigame_select_scene import MinigameSelectScene
         self.game.current_scene = MinigameSelectScene(self.game)
 
     def _on_shop_closed(self):
         self.layout_initialized = False
-        print("[PHASE SELECT] Voltando da loja...")
 
     def _debug_unlock_next(self):
         if self.phase_cards:
             for card in self.phase_cards:
                 if not card.unlocked:
                     self.progress.unlock_specific_phase(card.phase_id)
-                    print(f"Fase {card.phase_id} desbloqueada via debug!")
                     self._create_phase_cards()
                     break
             else:
@@ -515,7 +511,6 @@ class PhaseSelectScene(BaseScene):
                         first_phase = phases[0]
                         phase_id = f"{next_chapter}-{first_phase['number']}"
                         self.progress.unlock_specific_phase(phase_id)
-                        print(f"Fase {phase_id} desbloqueada via debug!")
                         self._create_phase_cards()
 
     def _debug_unlock_all(self):
@@ -524,7 +519,6 @@ class PhaseSelectScene(BaseScene):
             for phase in phases:
                 phase_id = f"{chapter_id}-{phase['number']}"
                 self.progress.unlock_specific_phase(phase_id)
-        print("Todas as fases desbloqueadas via debug!")
         self._create_phase_cards()
 
     def fixed_update(self, dt):

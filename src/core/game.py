@@ -44,7 +44,6 @@ class Game:
 
         print(f"Jogo inicializado - FPS alvo: {settings.target_fps}")
         print(f"Tick rate do jogo: {settings.game_tick_rate} updates/segundo")
-        print(f"Cena inicial: MenuScene")
 
     def initialize_camera(self, world_width, world_height):
         """Inicializa a câmera com o tamanho do mundo"""

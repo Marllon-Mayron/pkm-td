@@ -1,4 +1,4 @@
-# src/scenes/minigame_select_scene.py (versão atualizada)
+# src/scenes/minigame_select_scene/minigame_select_scene.py
 
 """
 Tela de Seleção de Minigames - Estilo Plants vs Zombies
@@ -331,12 +331,11 @@ class MinigameSelectScene(BaseScene):
                         self.selected_minigame_data = None
                         self.current_minigame_cards = []
                     else:
-                        self.game.current_scene = self.game.menu_scene
+                        from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
+                        self.game.current_scene = PhaseSelectScene(self.game)
                     return
 
                 if self.state == "select_minigame":
-                    # Clique em minigame (simplificado - sem scroll por enquanto)
-                    # Você pode adicionar uma grade de minigames aqui
                     pass
 
                 elif self.state == "select_level":

@@ -4,7 +4,6 @@ Cena de seleção de Pokémon inicial
 """
 import pygame
 from src.scenes.base_scene import BaseScene
-from src.entities.pokemon import Pokemon
 from src.data.pokedex import Pokedex
 
 
