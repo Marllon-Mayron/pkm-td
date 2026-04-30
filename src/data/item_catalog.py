@@ -97,6 +97,27 @@ class ItemCatalog:
         }
         items[7] = {
             "id": 7,
+            "name": "Insignia do pantano",
+            "sprite": badge_path / "marsh-badge.png",
+            "description": "Insignia 6",
+            "category": "badge"
+        }
+        items[8] = {
+            "id": 8,
+            "name": "Insignia do vulcao",
+            "sprite": badge_path / "volcano-badge.png",
+            "description": "Insignia 7",
+            "category": "badge"
+        }
+        items[9] = {
+            "id": 9,
+            "name": "Insignia da terra",
+            "sprite": badge_path / "earth-badge.png",
+            "description": "Insignia 9",
+            "category": "badge"
+        }
+        items[10] = {
+            "id": 10,
             "name": "Isca Safari",
             "sprite": medicine_path / "safari_bait.png",
             "description": "Isca para o safari",
