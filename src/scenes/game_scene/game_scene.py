@@ -4,7 +4,7 @@ Cena principal do jogo - COM NOVA ARQUITETURA DE WAVES
 """
 import pygame
 
-from battle.effects.specific.weather.weather_state import WeatherType
+from src.battle.effects.specific.weather.weather_state import WeatherType
 from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
 from src.core.performance_monitor import perf_monitor
@@ -123,7 +123,7 @@ class GameScene(BaseScene):
 
         # Inicia o jogo
         self._start_game()
-        self._start_test_weather()
+        #self._start_test_weather()
 
     def _start_test_weather(self):
         """

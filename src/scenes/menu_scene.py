@@ -185,7 +185,7 @@ class MenuScene(BaseScene):
 
         # Versão
         font_small = pygame.font.Font(None, 20)
-        version_text = font_small.render("v0.1.4 - Em desenvolvimento", True, (150, 150, 150))
+        version_text = font_small.render("v0.1.5 - Em desenvolvimento", True, (150, 150, 150))
         version_x = self.screen_manager.viewport_x + 10
         version_y = self.screen_manager.viewport_y + self.screen_manager.viewport_height - 25
         screen.blit(version_text, (version_x, version_y))

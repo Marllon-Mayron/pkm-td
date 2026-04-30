@@ -1206,7 +1206,7 @@ class MoveEffect:
         """
         Aplica modificador de estágio de crítico (Focus Energy)
         """
-        from battle.effects.critical_hit import CriticalHitSystem
+        from src.battle.effects.critical_hit import CriticalHitSystem
 
         stage_increase = self.params.get("stage_increase", 2)
         max_stage = self.params.get("max_stage", 4)
@@ -1241,7 +1241,7 @@ class MoveEffect:
                 f"[FOCUS_ENERGY] {target_entity.name} aumentou sua taxa de acerto crítico em {stage_increase} estágios!")
 
             # Mensagem adicional sobre a taxa
-            from battle.effects.critical_hit import CriticalHitSystem
+            from src.battle.effects.critical_hit import CriticalHitSystem
             new_chance = CriticalHitSystem.calculate_critical_chance(target_entity)
             effect_manager.add_status_text(target_entity, f"Taxa de crítico aumentada!", duration=1.0)
 
