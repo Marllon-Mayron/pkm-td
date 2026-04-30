@@ -629,7 +629,6 @@ class EffectFactory:
             },
             "description": "Causa dano a todos os inimigos próximos."
         },
-
         "surf": {
             "effect_type": "stat_mod",
             "target": EffectTarget.TARGET,
@@ -928,15 +927,6 @@ class EffectFactory:
             "description": "Cura metade do dano causado"
         },
         "mega-drain": {
-            "effect_type": "drain",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.AFTER_DAMAGE,
-            "params": {
-                "percentage": 0.5
-            },
-            "description": "Cura metade do dano causado"
-        },
-        "giga-drain": {
             "effect_type": "drain",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.AFTER_DAMAGE,
@@ -1502,6 +1492,30 @@ class EffectFactory:
             },
             "description": "Reduz bastante a velocidade do alvo",
         },
+        "charm": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "attack",
+                "stages": -2,
+                "duration": 6.0
+            },
+            "description": "Reduz bastante o Ataque do oponente"
+        },
+        "sweet-scent": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,
+            "params": {
+                "stat": "accuracy",
+                "stages": -1,
+                "duration": 8.0
+            },
+            "description": "Reduz a Precisão dos oponentes ao redor",
+        },
+
         "triple-kick": {
             "effect_type": "triple_kick",
             "target": EffectTarget.TARGET,
@@ -1547,7 +1561,19 @@ class EffectFactory:
             },
             "description": "Fantasma: sacrifica 50% HP para amaldiçoar o alvo (dano de 1/4 HP por turno). Não-Fantasma: +1 Atk/Def, -1 Speed."
         },
-
+        # ===== VENENO (POISON) =====
+        "sludge-bomb": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "poison",
+                "chance": 0.30,
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Ataque poderoso que pode causar envenenamento. (30% de chance)"
+        },
         # ===== QUEIMADURA (BURN) =====
         "flame-wheel": {
             "effect_type": "status_chance",
@@ -1561,6 +1587,19 @@ class EffectFactory:
             },
             "description": "Ataque fisico com chance de queimar. (10% de chance)"
         },
+        "sacred-fire": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "burn",
+                "chance": 0.5,
+                "duration": None,
+                "overwrite": False
+            },
+            "description": "Ataque fisico com chance de queimar. (50% de chance)"
+        },
+
         "snore": {
             "effect_type": "snore",
             "target": EffectTarget.TARGET,
@@ -1590,6 +1629,40 @@ class EffectFactory:
             },
             "description": "Quanto menos HP o usuário tem, mais forte é o ataque."
         },
+        # ===== PARALIZIA (PARALYZED) =====
+        "zap-cannon": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "paralysis",
+                "chance": 1,
+                "duration": None
+            },
+            "description": "Golpe que da muito dano e paraliza o oponente.",
+        },
+        "spark": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "paralysis",
+                "chance": 0.30,
+                "duration": None
+            },
+            "description": "Aplicadano e chance paraliza o oponente.(30%)",
+        },
+        "dragon-breath": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "paralysis",
+                "chance": 0.30,
+                "duration": None
+            },
+            "description": "Aplicadano e chance paraliza o oponente.(30%)",
+        },
         # ===== CONGELAMENTO (FREEZE) =====
         "powder-snow": {
             "effect_type": "status_chance",
@@ -1614,6 +1687,25 @@ class EffectFactory:
             },
             "description": "Causa confusão no oponente com um doce beijo.",
         },
+        "dynamic-punch": {
+            "effect_type": "damage_with_confusion_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "chance": 1.0
+            },
+            "description": "Dano alto no oponente, seguido de confusão"
+        },
+        # Flinch moves
+        "twister": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "chance": 0.2
+            },
+            "description": "Aplica dano e pode fazer o oponente hesitar (20%)"
+        },
         # ===== DANOS COM EFEITOS DE STATS =====
         "aeroblast": {
             "effect_type": "high_crit",
@@ -1624,7 +1716,143 @@ class EffectFactory:
             },
             "description": "Alta taxa de acerto crítico"
         },
-
+        "mud-slap": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "accuracy",
+                "stages": -1,
+                "chance": 1,
+                "duration": 8.0
+            },
+            "description": "Causa dano e reduz a precisão do oponente."
+        },
+        "octazooka": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "accuracy",
+                "stages": -1,
+                "chance": 0.85,
+                "duration": 8.0
+            },
+            "description": "Causa dano e com alta chance de reduzi a precisão do oponente. (85%)"
+        },
+        "icy-wind": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "speed",
+                "stages": -1,
+                "chance": 0.1,
+                "duration": 4.0
+            },
+            "description": "Causa dano e reduzir a Velocidade do oponente"
+        },
+        "steel-wing": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": -1,
+                "chance": 0.1,
+                "duration": 8.0
+            },
+            "description": "Causa dano e tem chance de reduzir defesa dos oponentes (10%)"
+        },
+        "iron-tail": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": -1,
+                "chance": 0.3,
+                "duration": 8.0
+            },
+            "description": "Causa dano e tem chance de reduzir defesa dos oponentes (30%)"
+        },
+        "cross-chop": {
+            "effect_type": "high_crit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "crit_stage": 1
+            },
+            "description": "Alta taxa de acerto crítico"
+        },
+        "crunch": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "sp_defense",
+                "stages": -1,
+                "chance": 0.2,
+                "duration": 8.0
+            },
+            "description": "Causa dano e tem chance de reduzir defesa dos oponentes (30%)"
+        },
+        "shadow-ball": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "sp_defense",
+                "stages": -1,
+                "chance": 0.2,
+                "duration": 8.0
+            },
+            "description": "Causa dano e tem chance de reduzir defesa dos oponentes (30%)"
+        },
+        "rock-smash": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": -1,
+                "chance": 0.5,
+                "duration": 8.0
+            },
+            "description": "Causa dano e tem chance de reduzir defesa dos oponentes (50%)"
+        },
+        # Multi-hit moves
+        "bone-rush": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "min_hits": 2,
+                "max_hits": 5
+            },
+            "description": "Ataque que acerta 2-5 vezes"
+        },
+        # ===== DRENAGEM DE VIDA (DRAIN) =====
+        "giga-drain": {
+            "effect_type": "drain",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "percentage": 0.5
+            },
+            "description": "Cura metade do dano causado"
+        },
+        # ===== CURA (HEAL) =====
+        "milk-drink": {
+            "effect_type": "heal",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "heal_percentage": 0.5,
+                "heal_formula": "max_hp_percentage",
+            },
+            "description": "Recupera metade do HP máximo do usuário"
+        },
         "feint-attack": {
             "effect_type": "never_miss",
             "target": EffectTarget.TARGET,
