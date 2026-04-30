@@ -248,6 +248,8 @@ class MoveEffect:
             return self._apply_curse(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "flail":
             return self._apply_flail(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "stat_mod_with_status":
+            return self._apply_stat_mod_with_status(attacker, target, effect_manager, damage)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -3575,3 +3577,178 @@ class MoveEffect:
 
         # Fallback
         return 20
+
+    def _apply_stat_mod_with_status(self, attacker, target, effect_manager, damage):
+        """
+        Aplica modificadores de stat e/ou status de forma genérica.
+
+        Suporta:
+        - Múltiplos stat mods (buff/debuff) com chances individuais
+        - Aplicação de status com chance
+        - Alvo pode ser SELF ou TARGET
+        """
+        from src.battle.effects.stat_modifier import StatType
+        from src.battle.effects.status_effect import StatusEffect, StatusType
+
+        params = self.params
+        stat_mods = params.get('stat_mods', [])
+        status_config = params.get('status', None)
+
+        # ===== DETERMINA O ALVO DOS EFETOS =====
+        # Para stat_mods e status, o alvo é o mesmo (definido pelo target do efeito)
+        target_entity = target if self.target == EffectTarget.TARGET else attacker
+
+        # ===== 1. APLICA MODIFICADORES DE STAT =====
+        stat_map = {
+            'attack': StatType.ATTACK,
+            'defense': StatType.DEFENSE,
+            'sp_attack': StatType.SP_ATTACK,
+            'sp_defense': StatType.SP_DEFENSE,
+            'speed': StatType.SPEED,
+            'accuracy': StatType.ACCURACY,
+            'evasion': StatType.EVASION
+        }
+
+        stat_display = {
+            StatType.ATTACK: "Ataque",
+            StatType.DEFENSE: "Defesa",
+            StatType.SP_ATTACK: "Ataque Especial",
+            StatType.SP_DEFENSE: "Defesa Especial",
+            StatType.SPEED: "Velocidade",
+            StatType.ACCURACY: "Precisão",
+            StatType.EVASION: "Evasão"
+        }
+
+        applied_stats = []
+
+        for stat_config in stat_mods:
+            stat_name = stat_config.get('stat', 'attack')
+            stages = stat_config.get('stages', 0)
+            duration = stat_config.get('duration', 6.0)
+            chance = stat_config.get('chance', 1.0)  # 1.0 = 100%
+
+            # Verifica chance
+            if random.random() > chance:
+                if chance < 1.0:
+                    print(f"[STAT_MOD] {self.name} falhou em modificar {stat_name} (chance: {chance * 100}%)")
+                continue
+
+            stat_type = stat_map.get(stat_name.lower())
+            if stat_type:
+                # Registra contribuição para XP
+                if self.target == EffectTarget.TARGET:
+                    target_entity.register_stat_modifier(attacker, stat_name, stages)
+                else:
+                    target_entity.register_buff_on_ally(attacker, target_entity, stat_name, stages)
+
+                # Aplica o modificador
+                effect_manager.add_stat_modifier(target_entity, stat_type, stages, duration)
+                applied_stats.append((stat_display.get(stat_type, stat_name), stages))
+
+                # Mensagem individual (opcional, pode ser consolidada depois)
+                if stages > 0:
+                    msg = f"{stat_display.get(stat_type, stat_name)} de {target_entity.name} aumentou!"
+                elif stages < 0:
+                    msg = f"{stat_display.get(stat_type, stat_name)} de {target_entity.name} diminuiu!"
+                else:
+                    msg = None
+
+                if msg:
+                    effect_manager.add_status_text(target_entity, msg, duration=1.0)
+
+        # Mostra mensagem consolidada se vários stats foram afetados
+        if len(applied_stats) > 1:
+            stat_names = [s[0] for s in applied_stats]
+            effect_type = "aumentaram" if any(s[1] > 0 for s in applied_stats) else "diminuíram"
+            effect_manager.add_status_text(
+                target_entity,
+                f"Os stats de {target_entity.name} {effect_type}!",
+                duration=1.5
+            )
+
+        # ===== 2. APLICA STATUS (se configurado) =====
+        if status_config:
+            status_type_str = status_config.get('type', '').upper()
+            status_chance = status_config.get('chance', 1.0)
+            status_duration = status_config.get('duration', None)
+
+            # Verifica chance do status
+            if random.random() < status_chance:
+                # Mapeia string para StatusType
+                status_map = {
+                    'POISON': StatusType.POISON,
+                    'TOXIC_POISON': StatusType.TOXIC_POISON,
+                    'BURN': StatusType.BURN,
+                    'PARALYSIS': StatusType.PARALYSIS,
+                    'SLEEP': StatusType.SLEEP,
+                    'FREEZE': StatusType.FREEZE,
+                    'CONFUSION': StatusType.CONFUSION
+                }
+
+                status_type = status_map.get(status_type_str)
+
+                if status_type:
+                    # Verifica se o alvo pode receber o status
+                    from src.battle.effects.status_effect import TypeImmunity
+
+                    if TypeImmunity.is_immune_to_status(target_entity, status_type):
+                        effect_manager.add_status_text(
+                            target_entity,
+                            TypeImmunity.get_immunity_message(target_entity, status_type),
+                            duration=1.5
+                        )
+                    else:
+                        # Para CONFUSION, usa o método específico
+                        if status_type == StatusType.CONFUSION:
+                            # Verifica se está dormindo ou congelado
+                            existing_status = effect_manager.get_status(target_entity)
+                            if existing_status and existing_status.type in [StatusType.SLEEP, StatusType.FREEZE]:
+                                effect_manager.add_status_text(
+                                    target_entity,
+                                    f"Mas {target_entity.name} está {existing_status.name.lower()}!",
+                                    duration=1.0
+                                )
+                            else:
+                                effect_manager.apply_confusion(target_entity, source=attacker)
+                                effect_manager.add_status_text(
+                                    target_entity,
+                                    f"{target_entity.name} ficou confuso!",
+                                    duration=1.5
+                                )
+                        else:
+                            # Status normais (poison, burn, etc)
+                            existing_status = effect_manager.get_status(target_entity)
+                            if existing_status and existing_status.type != StatusType.NONE:
+                                effect_manager.add_status_text(
+                                    target_entity,
+                                    f"Mas {target_entity.name} já está com {existing_status.name}!",
+                                    duration=1.0
+                                )
+                            else:
+                                status = StatusEffect(status_type, status_duration)
+                                effect_manager.apply_status(target_entity, status, attacker)
+
+                                # Registra contribuição
+                                target_entity.register_status_application(attacker, self.name)
+
+                                # Mensagens específicas
+                                status_messages = {
+                                    StatusType.POISON: f"{target_entity.name} foi envenenado!",
+                                    StatusType.TOXIC_POISON: f"{target_entity.name} foi gravemente envenenado!",
+                                    StatusType.BURN: f"{target_entity.name} foi queimado!",
+                                    StatusType.PARALYSIS: f"{target_entity.name} está paralisado!",
+                                    StatusType.SLEEP: f"{target_entity.name} caiu no sono!",
+                                    StatusType.FREEZE: f"{target_entity.name} está congelado!"
+                                }
+
+                                if status_type in status_messages:
+                                    effect_manager.add_status_text(
+                                        target_entity,
+                                        status_messages[status_type],
+                                        duration=1.5
+                                    )
+            else:
+                if status_chance < 1.0:
+                    print(f"[STATUS] {self.name} falhou em aplicar {status_type_str} (chance: {status_chance * 100}%)")
+
+        return True

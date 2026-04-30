@@ -1094,9 +1094,9 @@ class EffectFactory:
                 "stats": [
                     {"stat": "evasion", "stages": 2}
                 ],
-                "duration": 8.0,  # 8 segundos (ajuste conforme necessidade)
-                "visual_effect": "minimize",  # Efeito visual de diminuir tamanho
-                "sprite_scale": 0.70,  # Metade do tamanho
+                "duration": 8.0,
+                "visual_effect": "minimize",
+                "sprite_scale": 0.70,
             },
             "description": "Aumenta muito a Evasão e diminui o tamanho do Pokémon"
         },
@@ -1599,36 +1599,6 @@ class EffectFactory:
             },
             "description": "Ataque fisico com chance de queimar. (50% de chance)"
         },
-
-        "snore": {
-            "effect_type": "snore",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.ON_HIT,
-            "params": {
-                "power": 50,
-                "accuracy": 100,
-                "flinch_chance": 0.30,  # 30% de chance de causar flinch
-            },
-            "description": "Só funciona enquanto dormindo. 30% de chance de fazer o oponente hesitar."
-        },
-        "flail": {
-            "effect_type": "flail",
-            "target": EffectTarget.TARGET,
-            "timing": EffectTiming.ON_HIT,
-            "params": {
-                "power_table": {
-                    "ranges": [
-                        {"max_hp_percent": 1, "power": 200},  # 0-1%
-                        {"max_hp_percent": 5, "power": 150},  # 2-5%
-                        {"max_hp_percent": 12, "power": 100},  # 6-12%
-                        {"max_hp_percent": 21, "power": 80},  # 13-21%
-                        {"max_hp_percent": 42, "power": 40},  # 22-42%
-                        {"max_hp_percent": 100, "power": 20}  # 43-100%
-                    ]
-                }
-            },
-            "description": "Quanto menos HP o usuário tem, mais forte é o ataque."
-        },
         # ===== PARALIZIA (PARALYZED) =====
         "zap-cannon": {
             "effect_type": "status_chance",
@@ -1760,7 +1730,7 @@ class EffectFactory:
                 "stat": "defense",
                 "stages": -1,
                 "chance": 0.1,
-                "duration": 8.0
+                "duration": 6.0
             },
             "description": "Causa dano e tem chance de reduzir defesa dos oponentes (10%)"
         },
@@ -1772,9 +1742,21 @@ class EffectFactory:
                 "stat": "defense",
                 "stages": -1,
                 "chance": 0.3,
-                "duration": 8.0
+                "duration": 6.0
             },
             "description": "Causa dano e tem chance de reduzir defesa dos oponentes (30%)"
+        },
+        "metal-claw": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "stat": "attack",
+                "stages": 1,
+                "chance": 0.10,
+                "duration": 6.0
+            },
+            "description": "Causa dano e pode aumentar o Ataque do usuário (10% de chance)"
         },
         "cross-chop": {
             "effect_type": "high_crit",
@@ -1793,7 +1775,7 @@ class EffectFactory:
                 "stat": "sp_defense",
                 "stages": -1,
                 "chance": 0.2,
-                "duration": 8.0
+                "duration": 6.0
             },
             "description": "Causa dano e tem chance de reduzir defesa dos oponentes (30%)"
         },
@@ -1805,7 +1787,7 @@ class EffectFactory:
                 "stat": "sp_defense",
                 "stages": -1,
                 "chance": 0.2,
-                "duration": 8.0
+                "duration": 6.0
             },
             "description": "Causa dano e tem chance de reduzir defesa dos oponentes (30%)"
         },
@@ -1817,7 +1799,7 @@ class EffectFactory:
                 "stat": "defense",
                 "stages": -1,
                 "chance": 0.5,
-                "duration": 8.0
+                "duration": 6.0
             },
             "description": "Causa dano e tem chance de reduzir defesa dos oponentes (50%)"
         },
@@ -1861,6 +1843,47 @@ class EffectFactory:
                 "never_miss": True,
             },
             "description": "Ataque sombrio que nunca erra. Ignora modificadores de precisão e evasão."
+        },
+
+        "snore": {
+            "effect_type": "snore",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "power": 50,
+                "accuracy": 100,
+                "flinch_chance": 0.30,  # 30% de chance de causar flinch
+            },
+            "description": "Só funciona enquanto dormindo. 30% de chance de fazer o oponente hesitar."
+        },
+        "flail": {
+            "effect_type": "flail",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "power_table": {
+                    "ranges": [
+                        {"max_hp_percent": 1, "power": 200},  # 0-1%
+                        {"max_hp_percent": 5, "power": 150},  # 2-5%
+                        {"max_hp_percent": 12, "power": 100},  # 6-12%
+                        {"max_hp_percent": 21, "power": 80},  # 13-21%
+                        {"max_hp_percent": 42, "power": 40},  # 22-42%
+                        {"max_hp_percent": 100, "power": 20}  # 43-100%
+                    ]
+                }
+            },
+            "description": "Quanto menos HP o usuário tem, mais forte é o ataque."
+        },
+        "swagger": {
+            "effect_type": "stat_mod_with_status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat_mods": [
+                    {"stat": "attack", "stages": 2, "duration": 6.0}
+                ],
+                "status": {"type": "confusion", "chance": 1.0}
+            }
         },
 
 
