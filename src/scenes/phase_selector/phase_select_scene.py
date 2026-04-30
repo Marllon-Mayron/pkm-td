@@ -490,7 +490,7 @@ class PhaseSelectScene(BaseScene):
 
     def _open_minigames(self):
         """Abre a tela de minigames"""
-        from scenes.minigame_select_scene.minigame_select_scene import MinigameSelectScene
+        from src.scenes.minigame_select_scene.minigame_select_scene import MinigameSelectScene
         self.game.current_scene = MinigameSelectScene(self.game)
 
     def _on_shop_closed(self):
