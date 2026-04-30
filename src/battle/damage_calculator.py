@@ -5,6 +5,7 @@ Calculadora de dano baseada nos jogos Pokémon originais
 from typing import Dict
 import random
 
+from src.battle.effects.specific.weather.weather_state import WeatherType
 from src.battle.effects import StatusType
 from src.battle.effects.critical_hit import CriticalHitSystem
 
@@ -29,6 +30,7 @@ class DamageCalculator:
         ("fire", "rock"): 0.5,
         ("fire", "dragon"): 0.5,
         ("fire", "steel"): 2.0,
+        ("fire", "fairy"): 0.5,
 
         # WATER
         ("water", "fire"): 2.0,
@@ -42,10 +44,10 @@ class DamageCalculator:
         ("electric", "water"): 2.0,
         ("electric", "electric"): 0.5,
         ("electric", "grass"): 0.5,
-        ("electric", "ground"): 0,  # IMUNE
+        ("electric", "ground"): 0,
         ("electric", "flying"): 2.0,
         ("electric", "dragon"): 0.5,
-        ("electric", "rock"): 0.5,  # Rock NÃO é imune a elétrico, só resiste
+        ("electric", "rock"): 0.5,
 
         # GRASS
         ("grass", "fire"): 0.5,
@@ -88,6 +90,7 @@ class DamageCalculator:
         ("poison", "rock"): 0.5,
         ("poison", "ghost"): 0.5,
         ("poison", "steel"): 0,
+        ("poison", "fairy"): 2.0,
 
         # GROUND
         ("ground", "fire"): 2.0,
@@ -155,21 +158,15 @@ class DamageCalculator:
         ("steel", "fire"): 0.5,
         ("steel", "water"): 0.5,
         ("steel", "electric"): 0.5,
+        ("steel", "fairy"): 2.0,
 
-        # FAIRY (Gen 6+)
+        # FAIRY
         ("fairy", "fighting"): 2.0,
         ("fairy", "dragon"): 2.0,
         ("fairy", "dark"): 2.0,
         ("fairy", "fire"): 0.5,
         ("fairy", "poison"): 0.5,
         ("fairy", "steel"): 0.5,
-
-        # FIRE vs FAIRY
-        ("fire", "fairy"): 0.5,
-        # POISON vs FAIRY
-        ("poison", "fairy"): 2.0,
-        # STEEL vs FAIRY
-        ("steel", "fairy"): 2.0,
     }
 
     @classmethod
@@ -236,6 +233,30 @@ class DamageCalculator:
         # 5. STAB (Same Type Attack Bonus)
         stab = 1.5 if move.type in attacker.types else 1.0
 
+        # ===== NOVO: MODIFICADORES DE CLIMA =====
+        weather_multiplier = 1.0
+        weather = None
+
+        # Verifica se o atacante tem battle_system com clima
+        if hasattr(attacker, 'battle_system') and attacker.battle_system:
+            weather = attacker.battle_system.get_weather_type()
+
+            if weather == WeatherType.SUNNY:
+                if move.type.lower() == "fire":
+                    weather_multiplier = 1.5  # +50% para Fire
+                    print(f"[WEATHER] Sol forte: {move.name} +50% de dano!")
+                elif move.type.lower() == "water":
+                    weather_multiplier = 0.5  # -50% para Water
+                    print(f"[WEATHER] Sol forte: {move.name} -50% de dano!")
+
+            elif weather == WeatherType.RAIN:
+                if move.type.lower() == "water":
+                    weather_multiplier = 1.5  # +50% para Water
+                    print(f"[WEATHER] Chuva: {move.name} +50% de dano!")
+                elif move.type.lower() == "fire":
+                    weather_multiplier = 0.5  # -50% para Fire
+                    print(f"[WEATHER] Chuva: {move.name} -50% de dano!")
+
         # 6. Calcular stats de ataque/defesa
         if move.category == "physical":
             attack_stat = attacker.attack
@@ -275,7 +296,7 @@ class DamageCalculator:
         damage = ((2 * level / 5 + 2) * power * attack_stat / defense_stat) / 50 + 2
 
         # Aplicar STAB e eficácia
-        damage = damage * stab * effectiveness
+        damage = damage * stab * effectiveness * weather_multiplier
 
         # ===== VERIFICAÇÃO DE CRÍTICO =====
         is_critical = False

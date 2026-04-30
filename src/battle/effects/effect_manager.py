@@ -4,7 +4,7 @@ from .status_effect import StatusEffect, StatusType
 from .stat_modifier import StatModifier, StatType, StatStage
 import pygame
 
-from ...ui.toast_renderer import toast_battle
+from src.ui.toast_renderer import toast_battle
 
 
 class EffectManager:

@@ -8,14 +8,23 @@ Suporte para invalidação de códigos (eventos passados)
 
 # Estrutura dos códigos disponíveis
 MYSTERY_GIFT_CODES = {
-    "IJOHUFFZ": {  # ← Este é o código CRIPTOGRAFADO
+    "IJOHUFFZ": {
         "pokemon_id": 133,
         "pokemon_name": "Eevee",
         "description": "Eevee Especial Brilhante!",
         "is_shiny": True,
-        "invalid": False,
+        "invalid": True,
         "event_name": "Lançamento do sistema de MYSTERY GIFT",
-        "event_date": "2025-04-23"
+        "event_date": "2026-04-23"
+    },
+    "T2V8JUSX": {
+        "pokemon_id": 137,
+        "pokemon_name": "Porygon",
+        "description": "Porygon, o pokémon artificial",
+        "is_shiny": False,
+        "invalid": False,
+        "event_name": "Pokémon Secreto",
+        "event_date": "2026-04-30"
     }
 }
 

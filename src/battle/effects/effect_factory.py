@@ -1803,6 +1803,23 @@ class EffectFactory:
             },
             "description": "Causa dano e tem chance de reduzir defesa dos oponentes (50%)"
         },
+        "ancient-power": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "stats": [
+                    {"stat": "attack", "stages": 1},
+                    {"stat": "defense", "stages": 1},
+                    {"stat": "sp_attack", "stages": 1},
+                    {"stat": "sp_defense", "stages": 1},
+                    {"stat": "speed", "stages": 1}
+                ],
+                "chance": 0.10,
+                "duration": 6.0
+            },
+            "description": "Causa dano e tem 10% de chance de aumentar todos os stats"
+        },
         # Multi-hit moves
         "bone-rush": {
             "effect_type": "multi_hit",
@@ -1843,6 +1860,37 @@ class EffectFactory:
                 "never_miss": True,
             },
             "description": "Ataque sombrio que nunca erra. Ignora modificadores de precisão e evasão."
+        },
+        # ===== CLIMAS (WEATHER SYSTEM) =====
+        "sandstorm": {
+            "effect_type": "weather",
+            "target": EffectTarget.BOTH,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "weather_type": "sandstorm",
+                "duration": 10.0
+            },
+            "description": "Causa tempestade de areia por 5 turnos"
+        },
+        "rain-dance": {
+            "effect_type": "weather",
+            "target": EffectTarget.BOTH,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "weather_type": "rain",
+                "duration": 10.0
+            },
+            "description": "Faz chover por 5 turnos"
+        },
+        "sunny-day": {
+            "effect_type": "weather",
+            "target": EffectTarget.BOTH,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "weather_type": "sunny",
+                "duration": 10.0
+            },
+            "description": "Cria sol forte por 5 turnos"
         },
 
         "snore": {

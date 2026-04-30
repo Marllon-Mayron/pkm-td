@@ -1,6 +1,8 @@
 # src/battle/battle_system.py
 import random
 
+from src.battle.effects.specific.weather.weather_manager import WeatherManager
+from src.battle.effects.specific.weather.weather_state import WeatherType
 from src.battle.effects.residual_effect import ResidualEffectManager
 from src.battle.damage_calculator import DamageCalculator
 from src.battle.effects import EffectManager, EffectTiming, StatType, StatusType
@@ -21,6 +23,9 @@ class BattleSystem:
         self.active_multi_hit = None  # Estado do multi-hit ativo
         self.active_charge_move = None
         self.residual_effects = ResidualEffectManager(self)
+        # Weather system
+        self.weather_manager = WeatherManager(self)
+        self.weather_filter = None
 
     def set_effect_manager_for_pokemon(self, pokemon):
         """Vincula o effect_manager a um Pokémon e registra"""
@@ -38,13 +43,12 @@ class BattleSystem:
 
         # ===== ATUALIZA DISABLE =====
         self._update_disable(dt)
-
         # Atualiza multi-hit ativo
         if self.active_multi_hit:
             still_active = self.active_multi_hit.update(dt)
             if not still_active:
                 self.active_multi_hit = None
-        # ===== ATUALIZA TRIPLE KICK =====
+        # ===== ATUALIZA EFEITOS ESPECIFICOS =====
         if hasattr(self, 'active_triple_kick') and self.active_triple_kick:
             still_active = self.active_triple_kick.update(dt)
             if not still_active:
@@ -52,6 +56,8 @@ class BattleSystem:
                 print(f"[BATTLE] Triple Kick finalizado ou interrompido!")
 
         self.residual_effects.update(dt)
+        # ===== ATUALIZA CLIMA =====
+        self.weather_manager.update(dt)
 
     def attempt_attack(self, attacker: 'Pokemon', target: 'Pokemon') -> bool:
         """Tenta realizar um ataque com o move atual do atacante"""
@@ -964,3 +970,15 @@ class BattleSystem:
                 delattr(pokemon, '_disabled_original_pp')
             if hasattr(pokemon, '_disable_timer'):
                 delattr(pokemon, '_disable_timer')
+
+    def get_weather_type(self):
+        """Retorna o tipo de clima atual"""
+        if self.weather_manager and self.weather_manager.current_weather:
+            return self.weather_manager.current_weather.type
+        return None
+
+    def is_weather_active(self, weather_type: WeatherType = None) -> bool:
+        """Verifica se um clima está ativo"""
+        if not self.weather_manager:
+            return False
+        return self.weather_manager.is_weather_active(weather_type)

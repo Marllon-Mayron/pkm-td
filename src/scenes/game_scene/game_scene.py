@@ -4,6 +4,7 @@ Cena principal do jogo - COM NOVA ARQUITETURA DE WAVES
 """
 import pygame
 
+from battle.effects.specific.weather.weather_state import WeatherType
 from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
 from src.core.performance_monitor import perf_monitor
@@ -14,6 +15,7 @@ from src.scenes.game_scene.components.managers.overlay_manager import OverlayTyp
 from src.scenes.game_scene.components.managers.placement_manager import PlacementManager
 from src.scenes.game_scene.components.managers.item_drag_manager import ItemDragManager
 from src.scenes.game_scene.components.managers.target_item_manager import TargetItemManager
+from src.battle.effects.specific.weather.weather_filter import WeatherFilter
 from src.scenes.game_scene.components.managers.team_manager import GameTeamManager
 from src.scenes.game_scene.components.managers.wave_manager import WaveManager
 from src.scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
@@ -56,6 +58,9 @@ class GameScene(BaseScene):
         self.notification_manager = notification_manager
         self.target_item_manager = TargetItemManager(game)
         self.target_item_renderer = TargetItemRenderer()
+
+        # Weather filter
+        self.weather_filter = WeatherFilter()
 
         # CARREGA OS DADOS DA FASE
         self._load_phase_data()
@@ -118,6 +123,33 @@ class GameScene(BaseScene):
 
         # Inicia o jogo
         self._start_game()
+        self._start_test_weather()
+
+    def _start_test_weather(self):
+        """
+        Inicia um clima de teste automaticamente ao carregar a fase.
+        Para testar o filtro visual.
+        """
+        # Escolha um clima para teste: SANDSTORM, RAIN ou SUNNY
+        test_weather = WeatherType.SANDSTORM
+
+        # Duração: 30 segundos
+        duration = 30.0
+
+        # Aplica o clima
+        self.battle_system.weather_manager.set_weather(test_weather, duration, source=None)
+
+        # Mensagem no console
+        weather_names = {
+            WeatherType.SANDSTORM: "🌪️ TEMPESTADE DE AREIA (TESTE)",
+            WeatherType.RAIN: "🌧️ CHUVA (TESTE)",
+            WeatherType.SUNNY: "☀️ SOL FORTE (TESTE)"
+        }
+        print(f"\n{'=' * 50}")
+        print(f"[WEATHER TEST] {weather_names.get(test_weather, 'CLIMA')} iniciado!")
+        print(f"[WEATHER TEST] Duração: {duration}s")
+        print(f"[WEATHER TEST] Filtro visual deve aparecer na tela")
+        print(f"{'=' * 50}\n")
 
     def _get_ui_font(self, size=24):
         """Obtém fonte da UI com cache"""
@@ -1333,6 +1365,18 @@ class GameScene(BaseScene):
                          (screen_mgr.viewport_x, screen_mgr.viewport_y,
                           screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
         perf_monitor.end_section()
+
+        # ===== WEATHER FILTER =====
+        if hasattr(self, 'battle_system') and self.battle_system:
+            weather = self.battle_system.weather_manager.current_weather
+            if weather and weather.active:
+                viewport_rect = pygame.Rect(
+                    self.screen_manager.viewport_x,
+                    self.screen_manager.viewport_y,
+                    self.screen_manager.viewport_width,
+                    self.screen_manager.viewport_height
+                )
+                self.weather_filter.render(screen, weather, viewport_rect)
 
         # Pause overlay
         if self.paused and not self.game_paused:

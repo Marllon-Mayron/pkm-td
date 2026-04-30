@@ -250,6 +250,8 @@ class MoveEffect:
             return self._apply_flail(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "stat_mod_with_status":
             return self._apply_stat_mod_with_status(attacker, target, effect_manager, damage)
+        elif self.effect_type == "weather":
+            return self._apply_weather(attacker, target, battle_system, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -3750,5 +3752,45 @@ class MoveEffect:
             else:
                 if status_chance < 1.0:
                     print(f"[STATUS] {self.name} falhou em aplicar {status_type_str} (chance: {status_chance * 100}%)")
+
+        return True
+
+    def _apply_weather(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica efeito climático (Sandstorm, Rain Dance, Sunny Day)
+        """
+        from src.battle.effects.specific.weather.weather_state import WeatherType
+
+        weather_type_str = self.params.get('weather_type', 'none')
+        duration = self.params.get('duration', 10.0)
+
+        weather_map = {
+            'sandstorm': WeatherType.SANDSTORM,
+            'rain': WeatherType.RAIN,
+            'sunny': WeatherType.SUNNY,
+        }
+
+        weather_type = weather_map.get(weather_type_str.lower(), WeatherType.SANDSTORM)
+
+        # Aplica o clima
+        battle_system.weather_manager.set_weather(weather_type, duration, source=attacker)
+
+        # Mensagem específica
+        messages = {
+            WeatherType.SANDSTORM: "Uma tempestade de areia se formou!",
+            WeatherType.RAIN: "Começou a chover!",
+            WeatherType.SUNNY: "O sol está forte!",
+        }
+
+        if weather_type in messages:
+            effect_manager.add_status_text(attacker, messages[weather_type], duration=2.0)
+
+        # Gasta PP
+        current_move = attacker.get_current_move()
+        if current_move:
+            current_move.current_pp -= 1
+
+        # Cooldown do atacante
+        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
         return True
