@@ -12,11 +12,11 @@ from pathlib import Path
 from urllib.request import urlopen, urlretrieve
 from urllib.error import URLError
 import subprocess
+import re
 
 # CONFIGURAÇÃO DO GITHUB
 GITHUB_REPO = "Marllon-Mayron/pkm-td"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-
 
 class PokemonTDLauncher:
     def __init__(self):
@@ -44,20 +44,19 @@ class PokemonTDLauncher:
                 data = json.loads(response.read().decode())
 
                 version = data.get("tag_name", "0.0.0")
-                # Remove o 'v' se existir (v1.0.0 -> 1.0.0)
+                # Remove o 'v' se existir (v0.1.5 -> 0.1.5)
                 if version.startswith('v'):
                     version = version[1:]
 
-                # Pega a URL do zip da release
-                zip_url = None
+                # O GitHub sempre gera o Source code.zip
+                # A URL é sempre: https://github.com/Marllon-Mayron/pkm-td/archive/refs/tags/v0.1.5.zip
+                zip_url = f"https://github.com/{GITHUB_REPO}/archive/refs/tags/v{version}.zip"
+
+                # Tenta achar também nos assets
                 for asset in data.get("assets", []):
                     if asset["name"].endswith(".zip"):
                         zip_url = asset["browser_download_url"]
                         break
-
-                # Se não tiver asset, usa o source code
-                if not zip_url:
-                    zip_url = data.get("zipball_url")
 
                 # Pega as notas da versão
                 changelog = data.get("body", "Sem descrição")
@@ -79,14 +78,15 @@ class PokemonTDLauncher:
     def download_game(self, download_url):
         """Baixa o jogo do GitHub"""
         try:
-            print(f"\n📥 Baixando jogo...")
+            print(f"\n📥 Baixando jogo versão {self.latest_version}...")
 
             # Cria arquivo temporário
             temp_zip = tempfile.NamedTemporaryFile(suffix='.zip', delete=False)
             temp_zip.close()
 
             # Baixa o arquivo
-            print(f"   🔗 Baixando de: {download_url[:50]}...")
+            print(f"   🔗 URL: {download_url}")
+            print(f"   ⏳ Baixando... (pode levar alguns segundos)")
             urlretrieve(download_url, temp_zip.name)
 
             # Remove jogo antigo se existir
@@ -98,33 +98,54 @@ class PokemonTDLauncher:
 
             # Extrai o zip
             print("   📦 Extraindo arquivos...")
+            extracted_files = 0
+
             with zipfile.ZipFile(temp_zip.name, 'r') as zip_ref:
-                # GitHub adiciona uma pasta raiz, precisamos extrair o conteúdo
+                # O GitHub cria uma pasta tipo: pkm-td-0.1.5/
+                # Precisamos extrair o conteúdo dessa pasta
+
+                # Descobre o nome da pasta raiz no zip
+                root_folder = None
+                for name in zip_ref.namelist():
+                    if '/' in name:
+                        root_folder = name.split('/')[0]
+                        break
+
                 for member in zip_ref.namelist():
-                    # Pula arquivos de sistema do macOS
-                    if '__MACOSX' in member or member.startswith('.'):
+                    # Pula arquivos de sistema
+                    if '__MACOSX' in member or '.DS_Store' in member:
                         continue
 
-                    # Remove a primeira pasta do caminho (ex: Marllon-Mayron-pkm-td-abc123/src/main.py -> src/main.py)
-                    parts = Path(member).parts
-                    if len(parts) > 1:
-                        # Pula a primeira parte (nome da pasta raiz do zip)
-                        new_path = Path(*parts[1:])
-                    else:
-                        new_path = Path(member)
+                    # Remove a pasta raiz do caminho
+                    if root_folder and member.startswith(root_folder):
+                        # Pega o caminho relativo (remove a pasta raiz)
+                        relative_path = member[len(root_folder)+1:]
 
-                    if new_path.name == '':  # É uma pasta
-                        (self.game_dir / new_path).mkdir(parents=True, exist_ok=True)
-                    else:
-                        # Extrai o arquivo
-                        target = self.game_dir / new_path
-                        target.parent.mkdir(parents=True, exist_ok=True)
+                        if relative_path:  # Se não for vazio
+                            target_path = self.game_dir / relative_path
 
-                        with zip_ref.open(member) as source, open(target, 'wb') as target_file:
-                            shutil.copyfileobj(source, target_file)
+                            if member.endswith('/'):  # É pasta
+                                target_path.mkdir(parents=True, exist_ok=True)
+                            else:  # É arquivo
+                                target_path.parent.mkdir(parents=True, exist_ok=True)
+                                with zip_ref.open(member) as source, open(target_path, 'wb') as target:
+                                    shutil.copyfileobj(source, target)
+                                extracted_files += 1
 
             # Limpa o zip temporário
             os.unlink(temp_zip.name)
+
+            print(f"   ✅ {extracted_files} arquivos extraídos com sucesso!")
+
+            # Verifica se main.py existe
+            main_py = self.game_dir / "main.py"
+            if not main_py.exists():
+                # Tenta em src/main.py
+                main_py = self.game_dir / "src" / "main.py"
+                if main_py.exists():
+                    print("   ✅ Jogo encontrado em src/main.py")
+                else:
+                    print("   ⚠️  Aviso: main.py não encontrado, mas continuando...")
 
             return True
 
@@ -134,45 +155,58 @@ class PokemonTDLauncher:
 
     def launch_game(self):
         """Inicia o jogo"""
-        # Procura o main.py
-        main_py = self.game_dir / "main.py"
-        if not main_py.exists():
-            # Tenta em src/main.py
-            main_py = self.game_dir / "src" / "main.py"
+        # Procura o main.py em várias possíveis localizações
+        possible_paths = [
+            self.game_dir / "main.py",
+            self.game_dir / "src" / "main.py",
+            self.game_dir / "game" / "main.py",
+        ]
 
-        if not main_py.exists():
+        main_py = None
+        for path in possible_paths:
+            if path.exists():
+                main_py = path
+                break
+
+        if not main_py:
             print("\n❌ ERRO: Jogo não encontrado!")
+            print(f"   Procurado em: {self.game_dir}")
             print("   Tente executar o launcher novamente.")
             input("\nPressione ENTER para sair...")
             return False
 
         print(f"\n🎮 Iniciando Pokémon TD...")
+        print(f"   📂 {main_py}")
 
         # Muda para o diretório do jogo
         os.chdir(self.game_dir)
 
         # Executa o jogo
-        if sys.platform == "win32":
-            # Windows: abre sem console
-            subprocess.Popen([sys.executable, str(main_py)],
-                             creationflags=subprocess.CREATE_NO_WINDOW)
-        else:
-            # Linux/Mac
-            subprocess.Popen([sys.executable, str(main_py)])
+        try:
+            if sys.platform == "win32":
+                # Windows
+                subprocess.Popen([sys.executable, str(main_py)],
+                               creationflags=subprocess.CREATE_NO_WINDOW)
+            else:
+                # Linux/Mac
+                subprocess.Popen([sys.executable, str(main_py)])
 
-        return True
+            return True
+        except Exception as e:
+            print(f"   ❌ Erro ao iniciar: {e}")
+            return False
 
     def show_menu(self):
         """Mostra menu do launcher"""
-        print("\n" + "=" * 50)
+        print("\n" + "="*50)
         print("     🎮 POKEMON TD - LAUNCHER")
-        print("=" * 50)
+        print("="*50)
         print(f"   📍 Versão instalada: {self.current_version}")
         print()
         print("   [1] Jogar")
         print("   [2] Verificar atualizações")
         print("   [3] Sair")
-        print("=" * 50)
+        print("="*50)
 
         choice = input("   Escolha: ").strip()
         return choice
@@ -187,8 +221,12 @@ class PokemonTDLauncher:
                 release = self.get_latest_release()
 
                 if release and release["version"] > self.current_version:
+                    self.latest_version = release["version"]
                     print(f"\n✨ Nova versão disponível: {release['version']}")
                     print(f"   Versão atual: {self.current_version}")
+
+                    if release['changelog']:
+                        print(f"\n📝 Novidades:\n{release['changelog'][:200]}")
 
                     update = input("\n   Deseja atualizar agora? (S/N): ").upper().strip()
                     if update == "S":
@@ -202,10 +240,15 @@ class PokemonTDLauncher:
                             print("\n❌ Falha na atualização!")
                             input("\nPressione ENTER para continuar...")
                             continue
+                elif release:
+                    print(f"\n✅ Jogo atualizado! (versão {self.current_version})")
 
                 # Inicia o jogo
-                self.launch_game()
-                print("\n💡 Dica: Você já pode fechar este launcher!")
+                if self.launch_game():
+                    print("\n💡 Dica: Você já pode fechar este launcher!")
+                else:
+                    print("\n❌ Falha ao iniciar o jogo!")
+
                 input("\nPressione ENTER para sair...")
                 break
 
@@ -217,7 +260,8 @@ class PokemonTDLauncher:
 
                     if release["version"] > self.current_version:
                         print(f"\n✨ Atualização disponível!")
-                        print(f"\n📝 Novidades:\n{release['changelog'][:200]}")
+                        if release['changelog']:
+                            print(f"\n📝 Novidades:\n{release['changelog'][:300]}")
 
                         update = input("\n   Deseja atualizar? (S/N): ").upper().strip()
                         if update == "S":
@@ -231,7 +275,7 @@ class PokemonTDLauncher:
                     elif release["version"] == self.current_version:
                         print("\n✅ Já está na versão mais recente!")
                     else:
-                        print("\n🤔 Versão local é mais nova que a remota? (teste)")
+                        print("\n🤔 Versão local é mais nova que a remota?")
 
                     input("\nPressione ENTER para continuar...")
                 else:
@@ -245,7 +289,6 @@ class PokemonTDLauncher:
             else:
                 print("\n❌ Opção inválida!")
                 input("Pressione ENTER...")
-
 
 if __name__ == "__main__":
     launcher = PokemonTDLauncher()
