@@ -1,40 +1,39 @@
 @echo off
 chcp 65001 >nul
-title Gerando Launcher do Pokémon TD
+title Gerando Launcher Profissional
 
 echo ========================================
-echo    GERANDO LAUNCHER EXECUTÁVEL
+echo    GERANDO LAUNCHER POKEMON TD
 echo ========================================
 echo.
 
-REM Volta para a raiz do projeto
 cd ..
 
-REM Instala PyInstaller se não tiver
+echo [1/2] Instalando dependencias...
 python -m pip install pyinstaller
 
-REM Gera o launcher.exe
-echo Gerando launcher.exe...
-python -m PyInstaller --onefile --noconsole --name "PokemonTD_Launcher" --add-data "game_version.txt;." launcher/launcher.py
+echo.
+echo [2/2] Gerando executavel...
+python -m PyInstaller --onefile --console --name "PokemonTD_Launcher" launcher/launcher_pro.py
 
 if errorlevel 1 (
     echo.
-    echo ERRO: Falha ao gerar launcher!
+    echo ERRO na geracao!
     pause
     exit /b 1
 )
 
 echo.
 echo ========================================
-echo    SUCESSO!
+echo    SUCESSO
 echo ========================================
 echo.
-echo Launcher criado em: dist\PokemonTD_Launcher.exe
+echo Launcher criado: dist\PokemonTD_Launcher.exe
 echo.
-echo IMPORTANTE:
-echo 1. Copie este arquivo .exe para a pasta que vai distribuir
-echo 2. A primeira execução criará a pasta "PokemonTD"
-echo 3. O jogo será baixado automaticamente do GitHub
+echo Funcionalidades:
+echo   - Backup automatico de saves
+echo   - Multi-versoes
+echo   - Modo offline
+echo   - Interface profissional
 echo.
-
 pause

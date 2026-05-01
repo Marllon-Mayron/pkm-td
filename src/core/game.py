@@ -17,6 +17,7 @@ class Game:
         pygame.init()
         self.screen_manager = ScreenManager()
         self.running = True
+        self.current_version = ""
 
         # Cria o jogador primeiro
         self.player = Player(100, 100)

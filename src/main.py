@@ -23,6 +23,7 @@ def main():
     print(f"[MAIN] Diretório src: {Path(__file__).parent}")
     print(f"Pokémon TD - Versão {get_game_version()}")
     game = Game()
+    game.current_version = get_game_version()
     game.run()
 
 if __name__ == "__main__":
