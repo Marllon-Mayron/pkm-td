@@ -48,10 +48,16 @@ class Pokemon(Entity):
         self.is_boss = is_boss
 
         # ===== 2. STATUS E ATRIBUTOS BASE =====
+        self.custom_name = None
         self.is_placed = False
         self.spot_id = None
         self.types = self.pokemon_data["types"]
         self.base_stats = self.pokemon_data["base_stats"]
+
+        # Felicidade: 0-100
+        self.happiness = 50
+        self._max_happiness = 100
+        self._min_happiness = 0
 
         # Peso (kg) - com variação individual de ±10%
         base_weight = self.pokemon_data.get("weight_kg", 10.0)  # Fallback 10kg
@@ -742,6 +748,75 @@ class Pokemon(Entity):
         elif self.gender == "female":
             return "Fêmea"
         return "Sem gênero"
+
+    def get_display_name(self) -> str:
+        """Retorna o nome a ser exibido (personalizado ou padrão)"""
+        if self.custom_name and len(self.custom_name.strip()) > 0:
+            return self.custom_name.strip()
+        return self.name
+
+    def get_happiness(self) -> int:
+        return self.happiness
+
+    def get_happiness_percentage(self) -> float:
+        return self.happiness / self._max_happiness
+
+    def add_happiness(self, amount: int) -> int:
+        """Adiciona felicidade (pode ser negativo). Retorna o novo valor."""
+        old_happiness = self.happiness
+        self.happiness = max(self._min_happiness, min(self._max_happiness, self.happiness + amount))
+        gained = self.happiness - old_happiness
+
+        if gained != 0:
+            print(f"[HAPPINESS] {self.get_display_name()}: felicidade {gained:+d} → {self.happiness}/100")
+
+            # Mostra mensagem visual se tiver effect_manager
+            if hasattr(self, 'effect_manager') and self.effect_manager:
+                if gained > 0:
+                    self.effect_manager.add_status_text(self, f"Felicidade +{gained}!", duration=1.5,
+                                                        color=(100, 255, 100))
+                else:
+                    self.effect_manager.add_status_text(self, f"Felicidade {gained}!", duration=1.5,
+                                                        color=(255, 100, 100))
+
+        return self.happiness
+
+    def set_happiness(self, value: int) -> int:
+        """Define felicidade diretamente (0-100). Retorna o novo valor."""
+        self.happiness = max(self._min_happiness, min(self._max_happiness, value))
+        print(f"[HAPPINESS] {self.get_display_name()}: felicidade definida para {self.happiness}/100")
+        return self.happiness
+
+    def set_custom_name(self, new_name: str) -> bool:
+        """
+        Define um nome personalizado para o Pokémon.
+        Retorna True se o nome foi alterado, False se inválido.
+        """
+        # Remove espaços extras
+        new_name = new_name.strip()
+
+        # Verifica limites
+        if len(new_name) > 20:
+            print(f"[NAME] Nome muito longo: {len(new_name)}/20 caracteres")
+            return False
+
+        if len(new_name) == 0:
+            # Remove nome personalizado, volta ao padrão
+            self.custom_name = None
+            print(f"[NAME] {self.name}: nome personalizado removido")
+            return True
+
+        # Define novo nome personalizado
+        old_custom = self.custom_name
+        self.custom_name = new_name
+
+        # Notifica effect_manager (se existir) para mostrar mensagem
+        if hasattr(self, 'effect_manager') and self.effect_manager:
+            self.effect_manager.add_status_text(self, f"Chamando {self.get_display_name()}!", duration=2.0)
+
+        print(
+            f"[NAME] {self.name} renomeado de '{old_custom}' para '{new_name}' (exibe como '{self.get_display_name()}')")
+        return True
 
     def get_info_with_gender_weight(self) -> str:
         """Retorna string com informações incluindo peso, altura e sexo"""

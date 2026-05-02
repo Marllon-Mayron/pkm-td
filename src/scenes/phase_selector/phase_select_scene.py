@@ -225,7 +225,7 @@ class PhaseSelectScene(BaseScene):
 
         self.hover_changed = False
         self.shop_button_hovered = False
-        self.minigame_button_hovered = False  # NOVO
+        self.minigame_button_hovered = False
 
         self.refresh_data()
         self.dev_mode = False
@@ -408,7 +408,7 @@ class PhaseSelectScene(BaseScene):
                 self._debug_unlock_all()
             elif event.key == pygame.K_s:
                 self._open_shop()
-            elif event.key == pygame.K_m:  # NOVO: Tecla M para minigames
+            elif event.key == pygame.K_m:
                 self._open_minigames()
 
         elif event.type == pygame.VIDEORESIZE:

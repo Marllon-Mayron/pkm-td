@@ -7,7 +7,7 @@ from src.scenes.team_select_scene.utils.constants import COLORS
 
 
 class GameTeamSlot:
-    """Slot do time com visual melhorado para o jogo - OTIMIZADO"""
+    """Slot do time com visual"""
 
     # Cores e estilos (constantes de classe)
     COLORS = {
@@ -329,7 +329,12 @@ class GameTeamSlot:
 
         # Nome do Pokémon
         name_y = rect.y + 12
-        name_text = pokemon.name
+
+        if pokemon.custom_name:
+            name_text = pokemon.custom_name
+        else:
+            name_text = pokemon.name
+
         max_name_width = rect.width - level_bg_width - 30
 
         name_surf = self._name_font.render(name_text, True, self.COLORS['text'])

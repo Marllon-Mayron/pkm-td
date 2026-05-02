@@ -22,6 +22,8 @@ class MysteryGiftScene(BaseScene):
         self.error_message = ""
         self.success_message = ""
         self.redeemed_pokemon = None
+        self.redeemed_event_name = ""
+        self.redeemed_event_description = ""
         self.animation_timer = 0
         self.animation_scale = 1.0
 
@@ -338,6 +340,24 @@ class MysteryGiftScene(BaseScene):
             self.state = "success"
             self.success_message = message
             self.redeemed_pokemon = pokemon
+
+            # bsca informações do evento do código resgatado
+            from src.data.mystery_gift_data import get_code_info
+            from src.managers.mystery_gift_manager import MysteryGiftManager
+
+            # Criptografa o código para buscar no banco
+            from src.utils.crypto_utils import mystery_crypto
+            encrypted_code = mystery_crypto.encrypt_code(self.code_input, length=8)
+            code_info = get_code_info(encrypted_code)
+
+            if code_info:
+                self.redeemed_event_name = code_info.get("event_name", "Evento Especial")
+                self.redeemed_event_description = code_info.get("description",
+                                                                "Pokémon especial recebido via Mystery Gift!")
+            else:
+                self.redeemed_event_name = "Evento Especial"
+                self.redeemed_event_description = "Pokémon especial recebido via Mystery Gift!"
+
             self.success_timer = 5.0
             self._create_celebration_particles()
             self.animation_scale = 1.5
@@ -513,7 +533,7 @@ class MysteryGiftScene(BaseScene):
             self.redeem_button.render(screen, self._get_font(24))
 
     def _render_success_screen(self, screen):
-        """Renderiza a tela de sucesso"""
+        """Renderiza a tela de sucesso com informações do evento"""
         viewport_x = self.screen_manager.viewport_x
         viewport_y = self.screen_manager.viewport_y
         viewport_w = self.screen_manager.viewport_width
@@ -523,8 +543,9 @@ class MysteryGiftScene(BaseScene):
         overlay.fill((0, 200, 0, 30))
         screen.blit(overlay, (viewport_x, viewport_y))
 
-        container_width = 450
-        container_height = 420
+        # Aumentei a altura do container para acomodar as novas informações
+        container_width = 500
+        container_height = 520
         container_x = viewport_x + (viewport_w - container_width) // 2
         container_y = viewport_y + (viewport_h - container_height) // 2 - 50
 
@@ -538,10 +559,50 @@ class MysteryGiftScene(BaseScene):
         text_y = container_y + 20
         screen.blit(success_text, (text_x, text_y))
 
+        # Exibe o nome do evento (fonte maior)
+        event_name_font = self._get_font(20, bold=True)  # Aumentado de 18 para 20
+        event_name_text = event_name_font.render(f"Evento: {self.redeemed_event_name}", True, (255, 200, 100))
+        event_name_x = container_x + (container_width - event_name_text.get_width()) // 2
+        event_name_y = text_y + 45
+        screen.blit(event_name_text, (event_name_x, event_name_y))
+
+        # Exibe a descrição do evento (fonte maior)
+        desc_font = self._get_font(16)  # Aumentado de 14 para 16
+        # Quebra a descrição em múltiplas linhas se for muito longa
+        max_chars_per_line = 38  # Ajustado para fonte maior
+        desc_lines = []
+        current_line = ""
+
+        for word in self.redeemed_event_description.split():
+            if len(current_line) + len(word) + 1 <= max_chars_per_line:
+                if current_line:
+                    current_line += " " + word
+                else:
+                    current_line = word
+            else:
+                if current_line:
+                    desc_lines.append(current_line)
+                current_line = word
+        if current_line:
+            desc_lines.append(current_line)
+
+        line_y = event_name_y + 35  # Aumentado espaçamento
+        for line in desc_lines:
+            desc_text = desc_font.render(line, True, (200, 220, 200))
+            desc_x = container_x + (container_width - desc_text.get_width()) // 2
+            screen.blit(desc_text, (desc_x, line_y))
+            line_y += 26  # Aumentado espaçamento entre linhas
+
+        # Linha separadora
+        pygame.draw.line(screen, (255, 215, 0),
+                         (container_x + 30, line_y + 5),
+                         (container_x + container_width - 30, line_y + 5), 2)
+
+        # Mensagem padrão de sucesso
         msg_font = self._get_font(18)
         msg_text = msg_font.render(self.success_message, True, (200, 255, 200))
         msg_x = container_x + (container_width - msg_text.get_width()) // 2
-        msg_y = text_y + 45
+        msg_y = line_y + 20
         screen.blit(msg_text, (msg_x, msg_y))
 
         if self.redeemed_pokemon:
@@ -550,12 +611,13 @@ class MysteryGiftScene(BaseScene):
             )
 
             if sprite:
-                sprite_width = int(sprite.get_width() * self.animation_scale)
-                sprite_height = int(sprite.get_height() * self.animation_scale)
+
+                sprite_width = int(sprite.get_width() * 1.4)
+                sprite_height = int(sprite.get_height() * 1.4)
                 scaled_sprite = pygame.transform.scale(sprite, (sprite_width, sprite_height))
 
                 sprite_x = container_x + (container_width - scaled_sprite.get_width()) // 2
-                sprite_y = container_y + 100
+                sprite_y = msg_y + 80
                 screen.blit(scaled_sprite, (sprite_x, sprite_y))
 
                 name_font = self._get_font(24, bold=True)

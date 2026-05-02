@@ -25,6 +25,15 @@ MYSTERY_GIFT_CODES = {
         "invalid": False,
         "event_name": "Pokémon Secreto",
         "event_date": "2026-04-30"
+    },
+    "1NS5OPWV": {
+        "pokemon_id": 143,
+        "pokemon_name": "Snorlax",
+        "description": "Pokemon gordão pra o evento do gordão.",
+        "is_shiny": True,
+        "invalid": False,
+        "event_name": "100H DE SPIDIUM",
+        "event_date": "2026-05-02"
     }
 }
 

@@ -821,125 +821,303 @@ class PokemonModal:
                     screen.blit(empty_text, text_rect)
 
     def _render_info_page(self, screen, content_rect):
-        section_font = pygame.font.Font(None, 18)
-        info_title = section_font.render("INFORMACOES", True, self.colors['text_accent'])
+        """Renderiza página de informações - ORGANIZADA com Felicidade e Nome Personalizado"""
+
+        # ===== FONTES AUMENTADAS =====
+        title_font = pygame.font.Font(None, 28)  # Aumentado de 22 para 28
+        section_title_font = pygame.font.Font(None, 20)  # Aumentado de 16 para 20
+        label_font = pygame.font.Font(None, 16)  # Aumentado de 13 para 16
+        value_font = pygame.font.Font(None, 18)  # Aumentado de 15 para 18
+        type_font = pygame.font.Font(None, 13)  # Aumentado de 11 para 13
+
+        # Título da página
+        info_title = title_font.render("INFORMAÇÕES DETALHADAS", True, self.colors['text_accent'])
         info_title_x = content_rect.x + (content_rect.width - info_title.get_width()) // 2
         screen.blit(info_title, (info_title_x, content_rect.y))
 
-        pygame.draw.line(screen, self.colors['border'], (content_rect.x + 10, content_rect.y + 22),
-                         (content_rect.x + content_rect.width - 10, content_rect.y + 22), 1)
+        pygame.draw.line(screen, self.colors['border'],
+                         (content_rect.x + 10, content_rect.y + 34),
+                         (content_rect.x + content_rect.width - 10, content_rect.y + 34), 2)
 
-        card_width = (content_rect.width - 20) // 2
-        left_card = pygame.Rect(content_rect.x, content_rect.y + 45, card_width, content_rect.height - 55)
-        right_card = pygame.Rect(content_rect.x + card_width + 20, content_rect.y + 45, card_width,
-                                 content_rect.height - 55)
+        # Layout em 2 colunas
+        card_width = (content_rect.width - 25) // 2
+        card_height = content_rect.height - 55
 
-        self._draw_rounded_rect(screen, self.colors['bg_secondary'], left_card, radius=10)
-        self._draw_rounded_rect(screen, self.colors['border'], left_card, radius=10, border=1)
-        self._draw_rounded_rect(screen, self.colors['bg_secondary'], right_card, radius=10)
-        self._draw_rounded_rect(screen, self.colors['border'], right_card, radius=10, border=1)
+        left_card = pygame.Rect(content_rect.x, content_rect.y + 50, card_width, card_height)
+        right_card = pygame.Rect(content_rect.x + card_width + 15, content_rect.y + 50, card_width, card_height)
 
-        info_font = pygame.font.Font(None, 13)
-        value_font = pygame.font.Font(None, 15)
-        y_offset = left_card.y + 20
-        line_spacing = 50
+        # Fundo dos cards
+        self._draw_rounded_rect(screen, self.colors['bg_secondary'], left_card, radius=12)
+        self._draw_rounded_rect(screen, self.colors['border'], left_card, radius=12, border=1)
+        self._draw_rounded_rect(screen, self.colors['bg_secondary'], right_card, radius=12)
+        self._draw_rounded_rect(screen, self.colors['border'], right_card, radius=12, border=1)
 
-        left_items = [
-            ("EXPERIENCIA", f"{self.pokemon.xp} / {self.pokemon.xp_to_next}"),
-            ("PROXIMO NIVEL", f"{self.pokemon.xp_to_next - self.pokemon.xp} EXP"),
-            ("ID POKEDEX", f"#{self.pokemon.id:04d}"),
-        ]
+        # ===== COLUNA ESQUERDA: Identificação =====
+        left_title = section_title_font.render("IDENTIFICAÇÃO", True, self.colors['text_accent'])
+        screen.blit(left_title, (left_card.x + (left_card.width - left_title.get_width()) // 2, left_card.y + 12))
 
-        for label, value in left_items:
-            label_text = info_font.render(label, True, self.colors['text_secondary'])
+        pygame.draw.line(screen, self.colors['border'],
+                         (left_card.x + 15, left_card.y + 38),
+                         (left_card.x + left_card.width - 15, left_card.y + 38), 1)
+
+        y_offset = left_card.y + 60
+        line_spacing = 55
+
+        # ===== ESPÉCIE (nome verdadeiro do Pokémon) =====
+        label_text = label_font.render("ESPÉCIE", True, self.colors['text_secondary'])
+        screen.blit(label_text, (left_card.x + 20, y_offset))
+
+        # Exibe o nome da espécie (nome real do Pokémon)
+        species_name = self.pokemon.name
+        species_text = value_font.render(species_name, True, self.colors['text_primary'])
+        screen.blit(species_text, (left_card.x + 20, y_offset + 24))
+        y_offset += line_spacing
+
+        # ===== APELIDO (nome personalizado pelo jogador) =====
+        label_text = label_font.render("APELIDO", True, self.colors['text_secondary'])
+        screen.blit(label_text, (left_card.x + 20, y_offset))
+
+        if self.pokemon.custom_name:
+            nickname = self.pokemon.custom_name.strip()
+            nickname_text = value_font.render(f"{nickname}", True, self.colors['text_accent'])
+        else:
+            nickname_text = value_font.render("sem apelido", True, self.colors['text_secondary'])
+
+        screen.blit(nickname_text, (left_card.x + 20, y_offset + 24))
+        y_offset += line_spacing
+
+        # ===== ID POKÉDEX =====
+        label_text = label_font.render("ID POKÉDEX", True, self.colors['text_secondary'])
+        screen.blit(label_text, (left_card.x + 20, y_offset))
+
+        value_text = value_font.render(f"#{self.pokemon.id:04d}", True, self.colors['text_accent'])
+        screen.blit(value_text, (left_card.x + 20, y_offset + 24))
+        y_offset += line_spacing
+
+        # ===== LOCALIZAÇÃO =====
+        if hasattr(self.game.player, 'pc_box'):
+            label_text = label_font.render("LOCALIZAÇÃO", True, self.colors['text_secondary'])
             screen.blit(label_text, (left_card.x + 20, y_offset))
 
-            value_text = value_font.render(value, True, self.colors['text_accent'])
-            screen.blit(value_text, (left_card.x + 20, y_offset + 20))
+            if self.pokemon.is_in_team:
+                position = self.game.player.team.index(self.pokemon) + 1
+                location_text = f"No time (posição {position})"
+                location_color = self.colors['text_good']
+            else:
+                location_text = "Na box do PC"
+                location_color = self.colors['text_secondary']
+
+            value_text = value_font.render(location_text, True, location_color)
+            screen.blit(value_text, (left_card.x + 20, y_offset + 24))
             y_offset += line_spacing
 
-            if label == "EXPERIENCIA":
-                exp_percent = self.pokemon.xp / self.pokemon.xp_to_next if self.pokemon.xp_to_next > 0 else 0
-                exp_bar_width = left_card.width - 40
-                exp_bar_height = 10
-                exp_bar_x = left_card.x + 20
-                exp_bar_y = y_offset - 15
+        # ===== EXPERIÊNCIA =====
+        label_text = label_font.render("EXPERIÊNCIA", True, self.colors['text_secondary'])
+        screen.blit(label_text, (left_card.x + 20, y_offset))
 
-                pygame.draw.rect(screen, (45, 48, 55), (exp_bar_x, exp_bar_y, exp_bar_width, exp_bar_height),
-                                 border_radius=5)
-                pygame.draw.rect(screen, (100, 180, 100),
-                                 (exp_bar_x, exp_bar_y, int(exp_bar_width * exp_percent), exp_bar_height),
-                                 border_radius=5)
-                y_offset += 15
+        exp_text = f"{self.pokemon.xp} / {self.pokemon.xp_to_next}"
+        value_text = value_font.render(exp_text, True, self.colors['text_primary'])
+        screen.blit(value_text, (left_card.x + 20, y_offset + 24))
 
-        right_y = right_card.y + 20
+        # Barra de XP (SOMENTE A BARRA, SEM TEXTO DENTRO)
+        exp_percent = self.pokemon.xp / self.pokemon.xp_to_next if self.pokemon.xp_to_next > 0 else 0
+        bar_width = left_card.width - 40
+        bar_height = 12
+        bar_x = left_card.x + 20
+        bar_y = y_offset + 44
 
-        # ===== INFORMAÇÕES DO LADO DIREITO =====
-        right_items = [
-            ("TIPO 1", self.pokemon.types[0] if len(self.pokemon.types) > 0 else "???"),
-        ]
+        pygame.draw.rect(screen, (45, 48, 55), (bar_x, bar_y, bar_width, bar_height), border_radius=6)
+        if exp_percent > 0:
+            pygame.draw.rect(screen, (100, 180, 100),
+                             (bar_x, bar_y, int(bar_width * exp_percent), bar_height), border_radius=6)
+        y_offset += line_spacing
 
-        if len(self.pokemon.types) > 1:
-            right_items.append(("TIPO 2", self.pokemon.types[1]))
+        # ===== PRÓXIMO NÍVEL =====
+        label_text = label_font.render("PRÓXIMO NÍVEL", True, self.colors['text_secondary'])
+        screen.blit(label_text, (left_card.x + 20, y_offset + 10))
 
-        # ===== ALTURA =====
-        if hasattr(self.pokemon, 'height_m') and self.pokemon.height_m:
-            height_value = f"{self.pokemon.height_m:.2f} m"
-        else:
-            height_value = "??? m"
-        right_items.append(("ALTURA", height_value))
+        exp_needed = self.pokemon.xp_to_next - self.pokemon.xp
+        value_text = value_font.render(f"{exp_needed} EXP restantes", True, self.colors['text_good'])
+        screen.blit(value_text, (left_card.x + 20, y_offset + 34))
 
-        # ===== PESO =====
-        if hasattr(self.pokemon, 'weight_kg') and self.pokemon.weight_kg:
-            weight_value = f"{self.pokemon.weight_kg:.1f} kg"
-        else:
-            weight_value = "??? kg"
-        right_items.append(("PESO", weight_value))
+        # ===== COLUNA DIREITA: Características =====
+        right_title = section_title_font.render("CARACTERÍSTICAS", True, self.colors['text_accent'])
+        screen.blit(right_title, (right_card.x + (right_card.width - right_title.get_width()) // 2, right_card.y + 12))
+
+        pygame.draw.line(screen, self.colors['border'],
+                         (right_card.x + 15, right_card.y + 38),
+                         (right_card.x + right_card.width - 15, right_card.y + 38), 1)
+
+        right_y = right_card.y + 60
+        right_line_spacing = 55
+
+        # ===== TIPOS =====
+        label_text = label_font.render("TIPO(S)", True, self.colors['text_secondary'])
+        screen.blit(label_text, (right_card.x + 20, right_y))
+
+        # Renderiza badges de tipo
+        type_badge_x = right_card.x + 120
+        for i, type_name in enumerate(self.pokemon.types):
+            type_color = self._get_type_color(type_name)
+            type_badge = pygame.Rect(type_badge_x + (i * 80), right_y - 2, 72, 28)
+            self._draw_rounded_rect(screen, type_color, type_badge, radius=8)
+            type_text = type_font.render(type_name.upper(), True, (255, 255, 255))
+            screen.blit(type_text, (type_badge.centerx - type_text.get_width() // 2,
+                                    type_badge.centery - type_text.get_height() // 2))
+        right_y += right_line_spacing
+
+        # ===== NATUREZA =====
+        label_text = label_font.render("NATUREZA", True, self.colors['text_secondary'])
+        screen.blit(label_text, (right_card.x + 20, right_y))
+        value_text = value_font.render(self.pokemon.nature, True, self.colors['text_primary'])
+        screen.blit(value_text, (right_card.x + 20, right_y + 24))
+        right_y += right_line_spacing
 
         # ===== SEXO =====
+        label_text = label_font.render("SEXO", True, self.colors['text_secondary'])
+        screen.blit(label_text, (right_card.x + 20, right_y))
+
         if hasattr(self.pokemon, 'gender'):
             if self.pokemon.gender == "male":
-                gender_value = "Macho ♂"
-                gender_color = (70, 120, 200)  # Azul
+                gender_value = "MACHO"
+                gender_color = (70, 120, 200)
             elif self.pokemon.gender == "female":
-                gender_value = "Fêmea ♀"
-                gender_color = (230, 80, 120)  # Rosa
+                gender_value = "FÊMEA"
+                gender_color = (230, 80, 120)
             else:
-                gender_value = "Sem gênero"
+                gender_value = "SEM GÊNERO"
                 gender_color = self.colors['text_secondary']
         else:
-            gender_value = "??? gênero"
+            gender_value = "??? GÊNERO"
             gender_color = self.colors['text_secondary']
-        right_items.append(("SEXO", gender_value))
 
-        # ===== HABILIDADE =====
-        if hasattr(self.pokemon, 'ability') and self.pokemon.ability:
-            right_items.append(("HABILIDADE", self.pokemon.ability[:18]))
-        else:
-            right_items.append(("HABILIDADE", "Desconhecida"))
+        value_text = value_font.render(gender_value, True, gender_color)
+        screen.blit(value_text, (right_card.x + 20, right_y + 24))
+        right_y += right_line_spacing
 
-        if self.pokemon.is_boss:
-            right_items.append(("STATUS", "BOSS"))
+        # ===== ALTURA =====
+        label_text = label_font.render("ALTURA", True, self.colors['text_secondary'])
+        screen.blit(label_text, (right_card.x + 20, right_y))
 
-        for label, value in right_items:
-            label_text = info_font.render(label, True, self.colors['text_secondary'])
-            screen.blit(label_text, (right_card.x + 20, right_y))
-
-            if "TIPO" in label:
-                type_color = self._get_type_color(value)
-                type_badge = pygame.Rect(right_card.x + 100, right_y - 2, 70, 24)
-                self._draw_rounded_rect(screen, type_color, type_badge, radius=6)
-                type_text = pygame.font.Font(None, 11).render(value.upper(), True, (255, 255, 255))
-                screen.blit(type_text, (type_badge.centerx - type_text.get_width() // 2,
-                                        type_badge.centery - type_text.get_height() // 2))
-            elif label == "SEXO":
-                # Renderiza o sexo com cor especial
-                value_color = gender_color if 'gender_color' in dir() else self.colors['text_primary']
-                value_text = value_font.render(value, True, value_color)
-                screen.blit(value_text, (right_card.x + 20, right_y + 20))
+        if hasattr(self.pokemon, 'height_m') and self.pokemon.height_m:
+            height_value = f"{self.pokemon.height_m:.2f} m"
+            # Mostra categoria de tamanho
+            if self.pokemon.height_m < 0.5:
+                height_category = "Muito pequeno"
+            elif self.pokemon.height_m < 1.0:
+                height_category = "Pequeno"
+            elif self.pokemon.height_m < 1.5:
+                height_category = "Médio"
+            elif self.pokemon.height_m < 2.5:
+                height_category = "Grande"
             else:
-                value_color = self.colors['text_good'] if "BOSS" in value else self.colors['text_primary']
-                value_text = value_font.render(value, True, value_color)
-                screen.blit(value_text, (right_card.x + 20, right_y + 20))
+                height_category = "Muito grande"
+        else:
+            height_value = "??? m"
+            height_category = "Desconhecido"
 
-            right_y += line_spacing
+        value_text = value_font.render(height_value, True, self.colors['text_primary'])
+        screen.blit(value_text, (right_card.x + 20, right_y + 24))
+        category_text = label_font.render(f"({height_category})", True, self.colors['text_secondary'])
+        screen.blit(category_text, (right_card.x + 80, right_y + 26))
+        right_y += right_line_spacing
+
+        # ===== PESO =====
+        label_text = label_font.render("PESO", True, self.colors['text_secondary'])
+        screen.blit(label_text, (right_card.x + 20, right_y))
+
+        if hasattr(self.pokemon, 'weight_kg') and self.pokemon.weight_kg:
+            weight_value = f"{self.pokemon.weight_kg:.1f} kg"
+            if self.pokemon.weight_kg < 10:
+                weight_category = "Leve"
+            elif self.pokemon.weight_kg < 50:
+                weight_category = "Médio"
+            elif self.pokemon.weight_kg < 200:
+                weight_category = "Pesado"
+            else:
+                weight_category = "Muito pesado"
+        else:
+            weight_value = "??? kg"
+            weight_category = "Desconhecido"
+
+        value_text = value_font.render(weight_value, True, self.colors['text_primary'])
+        screen.blit(value_text, (right_card.x + 20, right_y + 24))
+        category_text = label_font.render(f"({weight_category})", True, self.colors['text_secondary'])
+        screen.blit(category_text, (right_card.x + 80, right_y + 26))
+        right_y += right_line_spacing
+
+        # ===== FELICIDADE =====
+        label_text = label_font.render("FELICIDADE", True, self.colors['text_secondary'])
+        screen.blit(label_text, (right_card.x + 20, right_y))
+
+        happiness = self.pokemon.get_happiness()
+        happiness_text = f"{happiness} / 100"
+
+        # Determina a cor baseada na felicidade
+        if happiness >= 80:
+            happiness_color = (255, 215, 0)  # Dourado
+        elif happiness >= 60:
+            happiness_color = (100, 220, 100)  # Verde
+        elif happiness >= 40:
+            happiness_color = (255, 220, 100)  # Amarelo
+        elif happiness >= 20:
+            happiness_color = (255, 150, 100)  # Laranja
+        else:
+            happiness_color = (255, 100, 100)  # Vermelho
+
+        # Mostra o valor numérico
+        value_text = value_font.render(happiness_text, True, happiness_color)
+        screen.blit(value_text, (right_card.x + 20 + 110, right_y + 2))
+
+        # Barra de felicidade
+        bar_width = right_card.width - 40
+        bar_height = 12
+        bar_x = right_card.x + 20
+        bar_y = right_y + 32
+
+        # Fundo da barra
+        pygame.draw.rect(screen, (45, 48, 55), (bar_x, bar_y, bar_width, bar_height), border_radius=6)
+
+        # Calcula largura da barra de felicidade
+        happiness_width = int(bar_width * (happiness / 100))
+
+        # Gradiente da barra (vermelho -> amarelo -> verde)
+        if happiness_width > 0:
+            if happiness <= 50:
+                r = 255
+                g = int(255 * (happiness / 50))
+                b = 0
+            else:
+                r = int(255 * (1 - ((happiness - 50) / 50)))
+                g = 255
+                b = 0
+
+            bar_color = (r, g, b)
+            pygame.draw.rect(screen, bar_color, (bar_x, bar_y, happiness_width, bar_height), border_radius=6)
+
+        # Borda da barra
+        pygame.draw.rect(screen, self.colors['border_light'], (bar_x, bar_y, bar_width, bar_height), 2, border_radius=6)
+
+        # Nível de felicidade em texto (SEM EMOJIS)
+        if happiness >= 80:
+            level_text = "Muito feliz!"
+        elif happiness >= 60:
+            level_text = "Feliz"
+        elif happiness >= 40:
+            level_text = "Normal"
+        elif happiness >= 20:
+            level_text = "Triste"
+        else:
+            level_text = "Muito triste!"
+
+        level_surf = label_font.render(level_text, True, happiness_color)
+        screen.blit(level_surf, (bar_x + bar_width - level_surf.get_width(), bar_y - 22))
+
+        # ===== EFEITO BOSS (se for boss) =====
+        if self.pokemon.is_boss:
+            badge_y = right_card.y + right_card.height - 50
+            boss_badge = pygame.Rect(right_card.x + 20, badge_y, right_card.width - 40, 40)
+            self._draw_rounded_rect(screen, (180, 60, 60), boss_badge, radius=10)
+            boss_text = pygame.font.Font(None, 16).render("⚡ POKÉMON CHEFE ⚡", True, (255, 255, 255))
+            screen.blit(boss_text, (boss_badge.centerx - boss_text.get_width() // 2,
+                                    boss_badge.centery - boss_text.get_height() // 2))

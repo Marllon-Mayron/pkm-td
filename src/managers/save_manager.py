@@ -7,8 +7,9 @@ import pickle
 from datetime import datetime
 from typing import Dict
 
-SAVE_FORMAT_VERSION = "0.1.2"  # Versão do FORMATO do save
-GAME_VERSION_COMPATIBLE = "0.1.2"  # Versão do jogo que usa este formato
+SAVE_FORMAT_VERSION = "0.1.3"  # Versão do FORMATO do save (ATUALIZADA)
+GAME_VERSION_COMPATIBLE = "0.1.7"  # Versão do jogo que usa este formato
+
 
 class SaveManager:
     """
@@ -43,10 +44,10 @@ class SaveManager:
             print(f"[SAVE] Pasta criada: {self.save_dir}")
 
     def _get_default_save_data(self) -> Dict:
-        """Retorna a estrutura padrão de save (versão 0.1.2)"""
+        """Retorna a estrutura padrão de save (versão 0.1.3)"""
         return {
             "meta": {
-                "version": SAVE_FORMAT_VERSION,  # Versão atualizada (APENAS PARA MUDANÇAS JSON)
+                "version": SAVE_FORMAT_VERSION,
                 "last_save": None,
                 "play_time": 0,
                 "save_name": "Novo Jogo"
@@ -144,8 +145,8 @@ class SaveManager:
                 "current_hp": save_hp,
                 "max_hp": original_max_hp,
                 "xp": pokemon.xp,
-                "ivs": pokemon.ivs,  # IVs são do Ditto original
-                "evs": pokemon.evs,  # EVs são do Ditto original
+                "ivs": pokemon.ivs,
+                "evs": pokemon.evs,
                 "nature": pokemon.nature,
                 "types": pokemon_types,
                 "attack": pokemon._original_attack if hasattr(pokemon, '_original_attack') else pokemon.attack,
@@ -158,10 +159,12 @@ class SaveManager:
                 "is_in_team": pokemon.is_in_team,
                 "is_placed": getattr(pokemon, 'is_placed', False),
                 "spot_id": getattr(pokemon, 'spot_id', None),
-                "moves": moves_data
+                "moves": moves_data,
+                # NOVOS CAMPOS para Ditto transformado (preservar nome/felicidade do Ditto original)
+                "custom_name": getattr(pokemon, 'custom_name', None),
+                "happiness": getattr(pokemon, 'happiness', 50),
             }
 
-            # NÃO salva transform_state - o Ditto sempre carrega normal
             return pokemon_dict
 
         # ===== POKÉMON NORMAL (não transformado) =====
@@ -198,17 +201,20 @@ class SaveManager:
             "weight_kg": pokemon.weight_kg,
             "height_m": pokemon.height_m,
             "gender": pokemon.gender,
+            # NOVOS CAMPOS
+            "custom_name": pokemon.custom_name,
+            "happiness": pokemon.happiness,
         }
 
         return pokemon_dict
 
     def _dict_to_pokemon(self, data: Dict):
-        """Converte dicionário para objeto Pokémon, incluindo moves"""
+        """Converte dicionário para objeto Pokémon, incluindo moves e novos atributos"""
         from src.entities.pokemon import Pokemon
 
         # Cria o Pokémon básico
         pokemon = Pokemon(
-            x=0, y=0,  # Posição será definida depois se necessário
+            x=0, y=0,
             pokemon_id=data["id"],
             level=data["level"],
             shiny=data["is_shiny"]
@@ -230,6 +236,12 @@ class SaveManager:
         pokemon.weight_kg = data.get("weight_kg", 10.0)
         pokemon.height_m = data.get("height_m", 1.0)
         pokemon.gender = data.get("gender")
+
+        # ===== NOVOS CAMPOS COM FALLBACK PARA SAVES ANTIGOS =====
+        pokemon.custom_name = data.get("custom_name")  # None se não existir
+        pokemon.happiness = data.get("happiness", 50)  # 50 se não existir
+        pokemon.happiness = max(0, min(100, pokemon.happiness))  # Garante limites
+
         # Restaura os moves
         moves_data = data.get("moves", [])
         if moves_data:
@@ -519,7 +531,7 @@ class SaveManager:
 
     def migrate_save_data(self, save_data: Dict, version: str) -> Dict:
         """
-        Migra dados de save de versões antigas para o formato atual
+        Migra dados de save de versões antigas para o formato atual (0.1.3)
         """
         import copy
         migrated = copy.deepcopy(save_data)
@@ -565,12 +577,40 @@ class SaveManager:
             if "history" not in migrated["player"]["mystery_gift"]:
                 migrated["player"]["mystery_gift"]["history"] = []
 
-            # Atualiza versão
-            migrated["meta"]["version"] = current_version
+            # Atualiza versão para 0.1.2
+            migrated["meta"]["version"] = "0.1.2"
+            version = "0.1.2"  # Atualiza para próxima etapa
+            print("[MIGRATE] Migração para 0.1.2 concluída")
 
-        # ===== FUTURAS MIGRAÇÕES =====
-        # if version == "0.1.2" and current_version == "0.1.3":
-        #     # migra para 0.1.3
+        # ===== MIGRAÇÃO DE 0.1.2 para 0.1.3 =====
+        # Atualiza Pokémon com campos de custom_name e happiness
+        if version in ["0.1.2"]:
+            # Migra a PC Box
+            pc_box = migrated.get("player", {}).get("pc_box", [])
+            for idx, pokemon_data in enumerate(pc_box):
+                if "custom_name" not in pokemon_data:
+                    pokemon_data["custom_name"] = None
+                    print(f"[MIGRATE] Pokémon {pokemon_data.get('name', 'Desconhecido')}: adicionado custom_name=None")
+                if "happiness" not in pokemon_data:
+                    pokemon_data["happiness"] = 50
+                    print(f"[MIGRATE] Pokémon {pokemon_data.get('name', 'Desconhecido')}: adicionado happiness=50")
+
+            # Migra o Team
+            team = migrated.get("player", {}).get("team", [])
+            for idx, pokemon_data in enumerate(team):
+                if "custom_name" not in pokemon_data:
+                    pokemon_data["custom_name"] = None
+                if "happiness" not in pokemon_data:
+                    pokemon_data["happiness"] = 50
+
+            # Atualiza versão no meta
+            migrated["meta"]["version"] = current_version
+            print(f"[MIGRATE] {len(pc_box)} Pokémon na box e {len(team)} no time migrados para 0.1.3")
+            print("[MIGRATE] Migração para 0.1.3 concluída: custom_name e happiness adicionados")
+
+        # ===== FUTURAS MIGRAÇÕES (adicionar aqui) =====
+        # if version == "0.1.3" and current_version == "0.1.4":
+        #     # migra para 0.1.4
         #     pass
 
         # ===== VALIDAÇÃO PÓS-MIGRAÇÃO =====
@@ -587,7 +627,7 @@ class SaveManager:
         if "caught_pokemon" not in migrated["player"]:
             migrated["player"]["caught_pokemon"] = []
 
-        print(f"[MIGRATE] Migração concluída! Versão: {migrated['meta']['version']}")
+        print(f"[MIGRATE] Migração concluída! Versão final: {migrated['meta']['version']}")
         return migrated
 
     def delete_save(self, slot=1):
@@ -622,7 +662,7 @@ class SaveManager:
                         "pokemon_count": len(data["player"]["pc_box"]),
                         "team_size": len(data["player"]["team"]),
                         "item_count": sum(data["player"]["bag"].values()),
-                        "settings": data.get("settings", {})  # Inclui settings na listagem
+                        "settings": data.get("settings", {})
                     })
                 except:
                     saves.append({
