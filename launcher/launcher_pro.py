@@ -1,6 +1,6 @@
 """
-LAUNCHER DEFINITIVO POKEMON TD - COM EXECUTAVEL
-Gera o executavel do jogo automaticamente, sem precisar de Python
+LAUNCHER POKEMON TD - ESPECIFICO PARA PYTHON 3.12
+Verifica, lista e instala Python 3.12 automaticamente
 """
 import os
 import sys
@@ -17,15 +17,20 @@ from tkinter import ttk, messagebox
 import threading
 from datetime import datetime
 import webbrowser
+import ctypes
+import re
 
 # Configuracao
 GITHUB_REPO = "Marllon-Mayron/pkm-td"
 GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 GITHUB_RELEASES = f"https://github.com/{GITHUB_REPO}/releases"
 
+# URL do Python 3.12 especifico
+PYTHON_312_URL = "https://www.python.org/ftp/python/3.12.0/python-3.12.0-amd64.exe"
+PYTHON_312_VERSION = "3.12.0"
+
 
 def center_window(window, width, height):
-    """Centraliza uma janela na tela"""
     screen_width = window.winfo_screenwidth()
     screen_height = window.winfo_screenheight()
     x = (screen_width - width) // 2
@@ -34,8 +39,6 @@ def center_window(window, width, height):
 
 
 class ModernDialog:
-    """Classe para criar dialogs padronizados"""
-
     @staticmethod
     def create(parent, title, width=500, height=400):
         dialog = tk.Toplevel(parent)
@@ -45,6 +48,105 @@ class ModernDialog:
         dialog.grab_set()
         dialog.configure(bg='#1e1e1e')
         center_window(dialog, width, height)
+        return dialog
+
+    @staticmethod
+    def show_python_selection_dialog(parent, python_versions, on_select):
+        dialog = ModernDialog.create(parent, "Selecionar Python", 500, 400)
+
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(main_frame, text="Versoes Python Encontradas",
+                 font=("Segoe UI", 14, "bold")).pack(pady=(0, 10))
+
+        ttk.Label(main_frame, text="Selecione qual versao Python 3.12 usar:",
+                 font=("Segoe UI", 10)).pack()
+
+        listbox_frame = ttk.Frame(main_frame)
+        listbox_frame.pack(fill=tk.BOTH, expand=True, pady=15)
+
+        listbox = tk.Listbox(listbox_frame, height=6, font=("Segoe UI", 11),
+                            bg='#252526', fg='#d4d4d4', selectbackground='#0078d4')
+        listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(listbox_frame, command=listbox.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        listbox.config(yscrollcommand=scrollbar.set)
+
+        for ver in python_versions:
+            listbox.insert(tk.END, ver)
+
+        ttk.Label(main_frame, text="NOTA: O jogo REQUER Python 3.12",
+                 font=("Segoe UI", 9), foreground="#ffcc66").pack(pady=5)
+
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(pady=15)
+
+        def use_selected():
+            selection = listbox.curselection()
+            if selection:
+                selected = listbox.get(selection[0])
+                parts = selected.split(' - ')
+                python_path = parts[0] if len(parts) > 1 else selected
+                dialog.destroy()
+                on_select(python_path)
+
+        ttk.Button(btn_frame, text="Usar Esta Versao", command=use_selected,
+                  width=18).pack(side=tk.LEFT, padx=5)
+
+        ttk.Button(btn_frame, text="Instalar Python 3.12",
+                  command=lambda: [dialog.destroy(), on_select("install")],
+                  width=18).pack(side=tk.LEFT, padx=5)
+
+        ttk.Button(btn_frame, text="Cancelar", command=sys.exit,
+                  width=18).pack(side=tk.LEFT, padx=5)
+
+        return dialog
+
+    @staticmethod
+    def show_install_dialog(parent, on_confirm):
+        dialog = ModernDialog.create(parent, "Instalacao Necessaria", 550, 400)
+
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(main_frame, text="Python 3.12 Necessario",
+                 font=("Segoe UI", 16, "bold")).pack(pady=(0, 10))
+
+        ttk.Label(main_frame, text="O Pokemon Tower Defense REQUER Python 3.12",
+                 font=("Segoe UI", 11), foreground="#ffcc66").pack()
+
+        ttk.Separator(main_frame, orient='horizontal').pack(fill=tk.X, pady=15)
+
+        info_frame = ttk.Frame(main_frame)
+        info_frame.pack(fill=tk.X, pady=10)
+
+        ttk.Label(info_frame, text="Vamos instalar:",
+                 font=("Segoe UI", 11, "bold")).pack(anchor=tk.W)
+
+        ttk.Label(info_frame, text="  • Python 3.12.0 (versao especifica do jogo)",
+                 font=("Segoe UI", 10)).pack(anchor=tk.W, pady=5)
+        ttk.Label(info_frame, text="  • Pygame (biblioteca do jogo)",
+                 font=("Segoe UI", 10)).pack(anchor=tk.W, pady=2)
+
+        ttk.Separator(main_frame, orient='horizontal').pack(fill=tk.X, pady=15)
+
+        ttk.Label(main_frame, text="A instalacao e automatica e necessaria apenas uma vez.",
+                 font=("Segoe UI", 9), foreground="#888888").pack()
+
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(pady=20)
+
+        def confirm():
+            dialog.destroy()
+            on_confirm()
+
+        ttk.Button(btn_frame, text="Instalar Python 3.12", command=confirm,
+                  width=22).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="Sair", command=sys.exit,
+                  width=15).pack(side=tk.LEFT, padx=5)
+
         return dialog
 
     @staticmethod
@@ -145,6 +247,109 @@ class ModernDialog:
         return dialog
 
 
+class DependencyInstaller:
+    """Gerencia instalacao de dependencias - FOCADO EM PYTHON 3.12"""
+
+    @staticmethod
+    def is_admin():
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        except:
+            return False
+
+    @staticmethod
+    def find_python_312_installations():
+        """Encontra todas instalacoes do Python 3.12"""
+        python_paths = []
+
+        # Procura no PATH
+        try:
+            result = subprocess.run(['where', 'python'], capture_output=True, text=True)
+            for line in result.stdout.splitlines():
+                path = Path(line.strip())
+                name = path.name.lower()
+                if 'python' in name:
+                    # Verifica versao
+                    try:
+                        ver_result = subprocess.run([str(path), '--version'], capture_output=True, text=True)
+                        if '3.12' in ver_result.stdout:
+                            python_paths.append(f"{path} - {ver_result.stdout.strip()}")
+                    except:
+                        pass
+        except:
+            pass
+
+        # Procura em locais comuns
+        common_paths = [
+            r"C:\Python312\python.exe",
+            r"C:\Program Files\Python312\python.exe",
+            r"C:\Program Files (x86)\Python312\python.exe",
+            os.path.expanduser(r"~\AppData\Local\Programs\Python\Python312\python.exe"),
+        ]
+
+        for path_str in common_paths:
+            path = Path(path_str)
+            if path.exists():
+                try:
+                    ver_result = subprocess.run([str(path), '--version'], capture_output=True, text=True)
+                    if '3.12' in ver_result.stdout:
+                        python_paths.append(f"{path} - {ver_result.stdout.strip()}")
+                except:
+                    pass
+
+        return python_paths
+
+    @staticmethod
+    def check_python_312():
+        """Verifica se Python 3.12 esta disponivel"""
+        paths = DependencyInstaller.find_python_312_installations()
+        return len(paths) > 0, paths
+
+    @staticmethod
+    def check_pygame(python_path):
+        """Verifica se Pygame esta instalado no Python especifico"""
+        try:
+            cmd = [str(python_path), '-c', 'import pygame; print(pygame.version.ver)']
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            return result.returncode == 0
+        except:
+            return False
+
+    @staticmethod
+    def install_python_312(progress_callback):
+        """Instala Python 3.12 silenciosamente"""
+        try:
+            progress_callback("Baixando Python 3.12...")
+            python_installer = Path(tempfile.gettempdir()) / "python_312_installer.exe"
+            urlretrieve(PYTHON_312_URL, python_installer)
+
+            progress_callback("Instalando Python 3.12...")
+            # Instalacao silenciosa, adiciona ao PATH
+            subprocess.run([str(python_installer), '/quiet', 'InstallAllUsers=1', 'PrependPath=1'],
+                          timeout=300)
+
+            python_installer.unlink()
+
+            # Aguarda instalacao completar
+            import time
+            time.sleep(2)
+
+            return True
+        except Exception as e:
+            return False
+
+    @staticmethod
+    def install_pygame(python_path, progress_callback):
+        """Instala pygame usando o Python especifico"""
+        try:
+            progress_callback("Instalando pygame...")
+            cmd = [str(python_path), '-m', 'pip', 'install', 'pygame']
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            return result.returncode == 0
+        except Exception as e:
+            return False
+
+
 class PokemonTDLauncher:
     def __init__(self):
         self.launcher_dir = Path(sys.argv[0]).parent
@@ -155,6 +360,8 @@ class PokemonTDLauncher:
         self.latest_release = None
         self.is_downloading = False
         self.saves_backup_temp = None
+        self.python_path = None
+        self.dependencies_ok = False
 
         # Interface
         self.root = None
@@ -169,7 +376,6 @@ class PokemonTDLauncher:
         self.offline_btn = None
 
     def add_log(self, message, level="INFO"):
-        """Adiciona mensagem ao console de logs"""
         timestamp = datetime.now().strftime("%H:%M:%S")
 
         color_tags = {
@@ -190,7 +396,6 @@ class PokemonTDLauncher:
         print(log_message.strip())
 
     def set_buttons_state(self, enabled):
-        """Habilita ou desabilita botoes durante download"""
         state = 'normal' if enabled else 'disabled'
         if self.play_btn:
             self.play_btn.config(state=state)
@@ -201,13 +406,118 @@ class PokemonTDLauncher:
         if self.offline_btn:
             self.offline_btn.config(state=state)
 
+    def update_progress_status(self, message):
+        self.root.after(0, lambda: self.progress_var.set(message))
+
+    def check_and_install_dependencies(self):
+        """Verifica Python 3.12 e Pygame"""
+        self.add_log("=== VERIFICANDO DEPENDENCIAS ===", "INFO")
+
+        has_python, python_paths = DependencyInstaller.check_python_312()
+
+        if not has_python:
+            self.add_log("Python 3.12 nao encontrado!", "WARNING")
+
+            def do_install():
+                self.install_python_312()
+
+            ModernDialog.show_install_dialog(self.root, do_install)
+            return False
+
+        # Mostra opcoes de Python 3.12 encontrados
+        if len(python_paths) == 1:
+            # So tem um, usa direto
+            self.python_path = python_paths[0].split(' - ')[0]
+            self.add_log(f"Python 3.12 encontrado: {self.python_path}", "SUCCESS")
+            return self.check_and_install_pygame()
+        else:
+            # Varios, deixa usuario escolher
+            def on_select(selection):
+                if selection == "install":
+                    self.install_python_312()
+                else:
+                    self.python_path = selection
+                    self.add_log(f"Python 3.12 selecionado: {self.python_path}", "SUCCESS")
+                    self.check_and_install_pygame()
+
+            ModernDialog.show_python_selection_dialog(self.root, python_paths, on_select)
+            return False
+
+    def check_and_install_pygame(self):
+        """Verifica e instala pygame no Python selecionado"""
+        if not self.python_path:
+            return False
+
+        if DependencyInstaller.check_pygame(self.python_path):
+            self.add_log("Pygame ja instalado!", "SUCCESS")
+            self.dependencies_ok = True
+            return True
+
+        self.add_log("Pygame nao encontrado. Instalando...", "WARNING")
+
+        def install_pygame():
+            self.set_buttons_state(False)
+            self.progress_var.set("Instalando pygame...")
+
+            if DependencyInstaller.install_pygame(self.python_path, self.update_progress_status):
+                self.add_log("Pygame instalado com sucesso!", "SUCCESS")
+                self.dependencies_ok = True
+                self.progress_var.set("Pronto")
+            else:
+                self.add_log("Falha ao instalar pygame!", "ERROR")
+                messagebox.showerror("Erro", "Falha ao instalar pygame!\n\nTente manualmente: pip install pygame")
+
+            self.set_buttons_state(True)
+
+        threading.Thread(target=install_pygame, daemon=True).start()
+        return False
+
+    def install_python_312(self):
+        """Instala Python 3.12"""
+        self.set_buttons_state(False)
+
+        def install_thread():
+            try:
+                self.add_log("Iniciando instalacao do Python 3.12...", "INFO")
+
+                if DependencyInstaller.install_python_312(self.update_progress_status):
+                    self.add_log("Python 3.12 instalado com sucesso!", "SUCCESS")
+                    self.progress_var.set("Python instalado!")
+
+                    # Re-verifica para pegar o novo Python
+                    has_python, python_paths = DependencyInstaller.check_python_312()
+                    if has_python and python_paths:
+                        self.python_path = python_paths[0].split(' - ')[0]
+                        self.add_log(f"Python 3.12 detectado: {self.python_path}", "SUCCESS")
+
+                        # Instala pygame no novo Python
+                        if DependencyInstaller.install_pygame(self.python_path, self.update_progress_status):
+                            self.add_log("Pygame instalado!", "SUCCESS")
+                            self.dependencies_ok = True
+                            self.progress_var.set("Pronto!")
+                            messagebox.showinfo("Sucesso", "Python 3.12 e Pygame instalados com sucesso!")
+                        else:
+                            self.add_log("Falha ao instalar pygame!", "ERROR")
+                    else:
+                        self.add_log("Falha ao detectar Python apos instalacao!", "ERROR")
+                        messagebox.showerror("Erro", "Python instalado mas nao detectado.\nReinicie o launcher.")
+                else:
+                    self.add_log("Falha na instalacao do Python!", "ERROR")
+                    messagebox.showerror("Erro", "Falha ao instalar Python!\n\nInstale manualmente em: python.org")
+
+            except Exception as e:
+                self.add_log(f"Erro: {e}", "ERROR")
+            finally:
+                self.set_buttons_state(True)
+                self.progress_var.set("Pronto")
+
+        threading.Thread(target=install_thread, daemon=True).start()
+
     def backup_saves_preserve(self):
-        """PRESERVA os saves do usuario"""
         saves_path = self.game_dir / "src" / "saves"
 
         if saves_path.exists() and any(saves_path.iterdir()):
-            save_files = list(saves_path.glob("*.json")) + list(saves_path.glob("*.dat")) + list(saves_path.rglob("*"))
-            save_count = len([f for f in save_files if f.is_file()])
+            save_count = len([f for f in saves_path.iterdir() if f.is_file()])
 
             import tempfile
             self.saves_backup_temp = tempfile.mkdtemp(prefix="pokemon_saves_")
@@ -217,16 +527,14 @@ class PokemonTDLauncher:
                 if file.is_file():
                     shutil.copy2(file, backup_path / file.name)
 
-            self.add_log(f"SAVES PRESERVADOS: {save_count} arquivos salvos", "SUCCESS")
+            self.add_log(f"SAVES PRESERVADOS: {save_count} arquivos", "SUCCESS")
             return True
 
-        self.add_log("Nenhum save encontrado para preservar", "INFO")
+        self.add_log("Nenhum save encontrado", "INFO")
         return False
 
     def restore_saves_preserve(self):
-        """RESTAURA os saves do usuario"""
         saves_path = self.game_dir / "src" / "saves"
-
         saves_path.mkdir(parents=True, exist_ok=True)
 
         if self.saves_backup_temp:
@@ -242,21 +550,19 @@ class PokemonTDLauncher:
                 shutil.rmtree(self.saves_backup_temp)
                 self.saves_backup_temp = None
 
-                self.add_log(f"SAVES RESTAURADOS: {restored_count} arquivos recuperados", "SUCCESS")
+                self.add_log(f"SAVES RESTAURADOS: {restored_count} arquivos", "SUCCESS")
                 return True
 
         self.add_log("Nenhum save para restaurar", "INFO")
         return False
 
     def get_local_version(self):
-        """Le a versao instalada localmente"""
         version_file = self.game_dir / "game_version.txt"
         if version_file.exists():
             return version_file.read_text().strip()
         return "0.0.0"
 
     def get_installed_versions(self):
-        """Lista todas as versoes instaladas disponiveis"""
         versions = []
         if self.versions_dir.exists():
             for version_dir in self.versions_dir.iterdir():
@@ -265,10 +571,8 @@ class PokemonTDLauncher:
         return sorted(versions, reverse=True)
 
     def get_latest_release(self):
-        """Pega informacoes da ultima release do GitHub"""
         try:
             self.add_log("Conectando ao GitHub...", "INFO")
-
             req = urlopen(GITHUB_API, timeout=10)
             data = json.loads(req.read().decode())
 
@@ -280,7 +584,6 @@ class PokemonTDLauncher:
             changelog = data.get("body", "Sem descricao")
 
             self.add_log(f"Versao remota: {version}", "INFO")
-
             return {
                 "version": version,
                 "download_url": zip_url,
@@ -295,88 +598,7 @@ class PokemonTDLauncher:
             self.add_log(f"Erro: {e}", "ERROR")
             return None
 
-    def build_executable(self, game_path):
-        """Compila o jogo em executavel usando PyInstaller"""
-        try:
-            self.add_log("Compilando executavel do jogo...", "INFO")
-            self.progress_var.set("Compilando executavel...")
-
-            # Salva diretorio atual
-            original_dir = os.getcwd()
-            os.chdir(game_path)
-
-            # Cria script batch para compilar
-            build_script = game_path / "compile_game.bat"
-            build_script.write_text(f"""@echo off
-chcp 65001 >nul
-echo Compilando Pokemon Tower Defense...
-echo.
-
-REM Instalar PyInstaller se necessario
-pip install pyinstaller >nul 2>&1
-
-REM Compilar o jogo
-python -m PyInstaller --onefile --noconsole --name "PokemonTowerDefense" --add-data "src;src" --add-data "res;res" --hidden-import pygame src/main.py
-
-if errorlevel 1 (
-    echo ERRO na compilacao
-    exit /b 1
-)
-
-echo SUCCESSO
-exit /b 0
-""")
-
-            # Executa a compilacao
-            result = subprocess.run(
-                ['cmd', '/c', str(build_script)],
-                capture_output=True,
-                text=True,
-                timeout=300
-            )
-
-            os.chdir(original_dir)
-
-            # Verifica se o executavel foi criado
-            exe_path = game_path / "dist" / "PokemonTowerDefense.exe"
-            if exe_path.exists():
-                # Move para a raiz do jogo
-                final_exe = game_path / "PokemonTowerDefense.exe"
-                if final_exe.exists():
-                    final_exe.unlink()
-                shutil.move(str(exe_path), str(final_exe))
-
-                # Limpa arquivos temporarios
-                for item in ["build", "dist", "compile_game.bat", "PokemonTowerDefense.spec"]:
-                    path = game_path / item
-                    if path.exists():
-                        if path.is_dir():
-                            shutil.rmtree(path)
-                        else:
-                            path.unlink()
-
-                self.add_log("Executavel criado com sucesso!", "SUCCESS")
-                return True
-
-            self.add_log("Falha ao criar executavel", "ERROR")
-            return False
-
-        except subprocess.TimeoutExpired:
-            self.add_log("Tempo esgotado na compilacao", "ERROR")
-            return False
-        except Exception as e:
-            self.add_log(f"Erro na compilacao: {e}", "ERROR")
-            return False
-
-    def find_executable(self):
-        """Procura o executavel do jogo"""
-        exe_path = self.game_dir / "PokemonTowerDefense.exe"
-        if exe_path.exists():
-            return exe_path
-        return None
-
     def download_version(self, version_info):
-        """Baixa uma versao especifica e compila o executavel"""
         try:
             self.is_downloading = True
             self.set_buttons_state(False)
@@ -441,22 +663,12 @@ exit /b 0
 
             os.unlink(temp_zip.name)
 
-            # COMPILAR EXECUTAVEL
-            self.add_log("Compilando executavel...", "INFO")
-            self.progress_var.set("Compilando executavel (pode levar alguns minutos)...")
-            self.progress_bar['value'] = 0
-
-            if not self.build_executable(version_path):
-                self.add_log("Falha na compilacao do executavel", "ERROR")
-                return False
-
-            # Salva informacoes da versao
             (version_path / "game_version.txt").write_text(version_info["version"])
 
             if version_info.get("changelog"):
                 (version_path / "changelog.txt").write_text(version_info["changelog"])
 
-            self.add_log("Download e compilacao concluidos", "SUCCESS")
+            self.add_log("Download concluido", "SUCCESS")
             self.progress_var.set("Pronto")
             return True
 
@@ -470,7 +682,6 @@ exit /b 0
             self.progress_bar['value'] = 0
 
     def set_current_version(self, version):
-        """Define a versao atual PRESERVANDO saves"""
         version_path = self.versions_dir / version
 
         if not version_path.exists():
@@ -491,63 +702,58 @@ exit /b 0
         if self.version_label:
             self.version_label.config(text=f"Versao: {self.current_version}")
 
-        self.add_log(f"Versao {version} carregada com seus saves!", "SUCCESS")
+        self.add_log(f"Versao {version} carregada", "SUCCESS")
         return True
 
-    def launch_game(self):
-        """Inicia o jogo usando o executavel compilado ou fallback"""
-        if self.is_downloading:
-            self.add_log("Aguarde o download terminar", "WARNING")
-            messagebox.showwarning("Download em andamento", "Aguarde o download terminar antes de jogar.")
-            return
-
-        # Primeiro tenta usar o executavel
-        exe_path = self.find_executable()
-
-        if exe_path and exe_path.exists():
-            self.add_log("Iniciando jogo (executavel)...", "INFO")
-            self.root.destroy()
-            subprocess.Popen([str(exe_path)], shell=True)
-            sys.exit(0)
-
-        # Fallback: tenta com Python (caso compilacao falhe)
-        main_py = self.find_main_py()
-        if main_py:
-            self.add_log("Executavel nao encontrado, tentando modo Python...", "WARNING")
-            self.add_log("Nota: Pode ser necessario ter Python instalado", "WARNING")
-
-            batch_file = self.launcher_dir / "run_game_temp.bat"
-            batch_content = f"""@echo off
-cd /d "{self.game_dir}"
-python "{main_py}"
-"""
-            batch_file.write_text(batch_content)
-
-            self.root.destroy()
-            subprocess.Popen([str(batch_file)], shell=True)
-            sys.exit(0)
-
-        self.add_log("Jogo nao encontrado", "ERROR")
-        messagebox.showerror("Erro", "Jogo nao encontrado!\nUse BAIXAR para instalar.")
-
     def find_main_py(self):
-        """Procura o arquivo principal do jogo (fallback)"""
         possible_paths = [
             self.game_dir / "src" / "main.py",
             self.game_dir / "main.py",
         ]
-
         for path in possible_paths:
             if path.exists():
                 return path
         return None
 
-    def check_for_updates(self):
-        """Apenas VERIFICA se tem atualizacao"""
+    def launch_game(self):
         if self.is_downloading:
             self.add_log("Aguarde o download terminar", "WARNING")
             messagebox.showwarning("Download em andamento", "Aguarde o download terminar.")
             return
+
+        if not self.dependencies_ok:
+            if not self.check_and_install_dependencies():
+                return
+
+        main_py = self.find_main_py()
+
+        if not main_py:
+            self.add_log("Jogo nao encontrado", "ERROR")
+            messagebox.showerror("Erro", "Jogo nao encontrado!\nUse BAIXAR para instalar.")
+            return
+
+        self.add_log("Iniciando jogo...", "INFO")
+        self.add_log(f"Usando Python: {self.python_path}", "INFO")
+
+        batch_file = self.launcher_dir / "run_game_temp.bat"
+        batch_content = f"""@echo off
+cd /d "{self.game_dir}"
+"{self.python_path}" "{main_py}"
+"""
+        batch_file.write_text(batch_content)
+
+        self.root.destroy()
+        subprocess.Popen([str(batch_file)], shell=True)
+        sys.exit(0)
+
+    def check_for_updates(self):
+        if self.is_downloading:
+            self.add_log("Aguarde o download terminar", "WARNING")
+            return
+
+        if not self.dependencies_ok:
+            if not self.check_and_install_dependencies():
+                return
 
         self.add_log("=== VERIFICANDO ATUALIZACOES ===", "INFO")
 
@@ -576,34 +782,34 @@ python "{main_py}"
             )
         else:
             self.add_log("Jogo atualizado", "SUCCESS")
-            if not self.find_executable() and not self.find_main_py():
-                self.add_log("Jogo nao encontrado! Use o botao BAIXAR.", "WARNING")
+            if not self.find_main_py():
+                self.add_log("Jogo nao encontrado! Use BAIXAR.", "WARNING")
                 messagebox.showwarning("Jogo nao encontrado",
                     "Nenhuma versao do jogo encontrada!\n\nClique em BAIXAR para instalar.")
             else:
                 messagebox.showinfo("Atualizado", f"Versao {self.current_version} esta atualizada!")
 
     def start_download(self):
-        """Inicia o download"""
         if self.is_downloading:
             return
-
         if self.latest_release:
             threading.Thread(target=self.perform_update, daemon=True).start()
 
     def force_download(self):
-        """FORCA o download da versao mais recente"""
         if self.is_downloading:
             self.add_log("Download em andamento", "WARNING")
-            messagebox.showwarning("Download em andamento", "Ja existe um download em andamento.")
             return
 
-        self.add_log("=== FORCANDO DOWNLOAD DA ULTIMA VERSAO ===", "INFO")
+        if not self.dependencies_ok:
+            if not self.check_and_install_dependencies():
+                return
+
+        self.add_log("=== FORCANDO DOWNLOAD ===", "INFO")
 
         release = self.get_latest_release()
 
         if not release:
-            self.add_log("Erro ao obter versao do GitHub", "ERROR")
+            self.add_log("Erro ao obter versao", "ERROR")
             messagebox.showerror("Erro", "Nao foi possivel obter informacoes do GitHub")
             return
 
@@ -617,7 +823,6 @@ python "{main_py}"
             threading.Thread(target=self.perform_update, daemon=True).start()
 
     def perform_update(self):
-        """Executa o download e compilacao"""
         if not self.latest_release:
             self.latest_release = self.get_latest_release()
             if not self.latest_release:
@@ -632,17 +837,15 @@ python "{main_py}"
             result = self.set_current_version(self.latest_release['version'])
             if result:
                 self.root.after(0, lambda: messagebox.showinfo("Sucesso",
-                    f"Versao {self.latest_release['version']} instalada!\n\nO jogo foi compilado e nao precisa de Python.\n\nSeus saves foram preservados!"))
-                self.add_log("Download e compilacao concluidos com sucesso", "SUCCESS")
+                    f"Versao {self.latest_release['version']} instalada!\n\nSeus saves foram preservados!"))
+                self.add_log("Atualizacao concluida", "SUCCESS")
             else:
                 self.root.after(0, lambda: messagebox.showerror("Erro", "Falha ao ativar versao"))
         else:
             self.root.after(0, lambda: messagebox.showerror("Erro", "Falha no download"))
 
     def show_offline_options(self):
-        """Mostra opcoes para modo offline"""
         if self.is_downloading:
-            self.add_log("Aguarde o download terminar", "WARNING")
             return
 
         installed_versions = self.get_installed_versions()
@@ -658,7 +861,7 @@ python "{main_py}"
                         self.backup_saves_preserve()
 
                     if self.set_current_version(version):
-                        messagebox.showinfo("Sucesso", f"Versao {version} carregada!\nSeus saves foram preservados!")
+                        messagebox.showinfo("Sucesso", f"Versao {version} carregada!")
                         self.launch_game()
                     else:
                         messagebox.showerror("Erro", "Falha ao carregar versao")
@@ -668,16 +871,13 @@ python "{main_py}"
             )
         else:
             self.add_log("Nenhuma versao instalada", "WARNING")
-            messagebox.showwarning("Sem Jogo",
-                "Nenhuma versao do jogo encontrada!\n\nConecte-se a internet e clique em BAIXAR.")
+            messagebox.showwarning("Sem Jogo", "Nenhuma versao encontrada!\nClique em BAIXAR.")
 
     def open_github(self):
-        """Abre pagina do GitHub"""
         webbrowser.open(GITHUB_RELEASES)
         self.add_log("Abrindo GitHub", "INFO")
 
     def create_gui(self):
-        """Cria a interface grafica"""
         self.root = tk.Tk()
         self.root.title("Pokemon Tower Defense - Launcher")
         self.root.geometry("900x750")
@@ -714,7 +914,7 @@ python "{main_py}"
                                font=("Segoe UI", 26, "bold"))
         title_label.pack()
 
-        subtitle_label = ttk.Label(header_frame, text="Launcher Oficial - Gerenciamento de Versoes",
+        subtitle_label = ttk.Label(header_frame, text="Launcher Oficial - Requer Python 3.12",
                                   font=("Segoe UI", 11))
         subtitle_label.pack(pady=(5, 0))
 
@@ -808,25 +1008,23 @@ python "{main_py}"
         info_bar = ttk.Frame(main_container)
         info_bar.pack(fill=tk.X, pady=(10, 0))
 
-        info_text = "Seus saves sao PRESERVADOS | O jogo e compilado em executavel (nao precisa de Python)"
+        info_text = "Seus saves sao PRESERVADOS | O jogo REQUER Python 3.12"
         info_label = ttk.Label(info_bar, text=info_text,
                               font=("Segoe UI", 9), foreground="#00cc66")
         info_label.pack()
 
         center_window(self.root, 900, 750)
 
-        # Logs iniciais
         self.add_log("Launcher inicializado", "INFO")
         self.add_log(f"Diretorio: {self.launcher_dir}", "INFO")
         self.add_log(f"Versao atual: {self.current_version}", "INFO")
         self.add_log("SISTEMA DE PRESERVACAO DE SAVES ATIVO", "SUCCESS")
-        self.add_log("O jogo sera compilado em executavel - NAO precisa de Python instalado", "SUCCESS")
+        self.add_log("REQUER Python 3.12 - O launcher instalara se necessario", "INFO")
 
-        if not self.find_executable() and not self.find_main_py():
-            self.add_log("Jogo nao encontrado. Clique em BAIXAR para instalar", "WARNING")
+        # Verifica dependencias ao iniciar
+        self.root.after(100, lambda: self.check_and_install_dependencies())
 
     def run(self):
-        """Inicia o launcher"""
         self.create_gui()
         self.root.mainloop()
 

@@ -19,6 +19,7 @@ class MoveLearnOverlay(BaseOverlay):
         self.selected_index = -1  # -1 = não substituir, 0-3 = substituir move específico
         self.hovered_index = -1
         self.animation_time = 0
+        self.confirm_button_rect = None  # Adiciona retângulo do botão confirmar
 
         # Adiciona MoveData como atributo
         self.move_data = MoveData()
@@ -149,6 +150,12 @@ class MoveLearnOverlay(BaseOverlay):
             self._update_hover(event.pos)
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Verifica se clicou no botão de confirmar
+            if self.confirm_button_rect and self.confirm_button_rect.collidepoint(event.pos):
+                self.confirm_selection()
+                return True
+
+            # Verifica se clicou em algum move
             if self.hovered_index >= 0:
                 self.selected_index = self.hovered_index
                 return True
@@ -399,6 +406,9 @@ class MoveLearnOverlay(BaseOverlay):
         # Grid de moves existentes
         self._render_moves_grid(screen, panel_rect)
 
+        # Botão de confirmar
+        self._render_confirm_button(screen, panel_rect)
+
         # Opção de não aprender
         self._render_cancel_option(screen, panel_rect)
 
@@ -464,17 +474,16 @@ class MoveLearnOverlay(BaseOverlay):
         power_surf = info_font.render(power_text, True, (255, 255, 255))
         screen.blit(power_surf, (info_x, new_move_rect.y + 50))
 
-        # PP do novo move - CORRIGIDO para usar current_pp e max_pp
+        # PP do novo move
         pp_text = f"PP: {self.new_move.current_pp}/{self.new_move.max_pp}"
         pp_surf = info_font.render(pp_text, True, self.colors.get('move_pp_text', (120, 180, 120)))
-        pp_x = info_x + 100  # Posiciona ao lado do power
+        pp_x = info_x + 100
         screen.blit(pp_surf, (pp_x, new_move_rect.y + 50))
 
-        # DESCRIÇÃO - LARGURA TOTAL disponível
+        # DESCRIÇÃO
         description = self._get_move_description(self.new_move.name)
 
         desc_font = self._get_font(14)
-        # Calcula quantos caracteres cabem na largura disponível
         max_desc_width = info_width
         desc_lines = []
         current_line = ""
@@ -492,7 +501,6 @@ class MoveLearnOverlay(BaseOverlay):
         if current_line:
             desc_lines.append(current_line)
 
-        # Mostra até 2 linhas
         desc_y = new_move_rect.y + 70
         for idx, line in enumerate(desc_lines[:2]):
             desc_surf = desc_font.render(line, True, (220, 220, 180))
@@ -575,13 +583,12 @@ class MoveLearnOverlay(BaseOverlay):
         power_surf = info_font.render(power_text, True, self.colors['text_dim'])
         screen.blit(power_surf, (info_x, rect.y + 44))
 
-        # Descrição do move - COR MAIS LEGÍVEL
+        # Descrição do move
         description = self._get_move_description(move.name)
         if len(description) > 38:
             description = description[:35] + "..."
 
         desc_font = self._get_font(12)
-        # Mudando para amarelo claro/bege para melhor contraste
         desc_surf = desc_font.render(description, True, (200, 200, 160))
         screen.blit(desc_surf, (info_x, rect.y + 62))
 
@@ -590,9 +597,51 @@ class MoveLearnOverlay(BaseOverlay):
             selected_rect = rect.inflate(-4, -4)
             pygame.draw.rect(screen, self.colors['accent'], selected_rect, 2, border_radius=10)
 
+    def _render_confirm_button(self, screen, panel_rect):
+        """Renderiza o botão de confirmar"""
+        button_width = 200
+        button_height = 50
+        button_x = panel_rect.x + (panel_rect.width - button_width) // 2
+        # Posiciona acima da opção "NÃO APRENDER"
+        button_y = panel_rect.y + 470
+
+        self.confirm_button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+
+        # Efeito de hover no botão
+        mouse_pos = pygame.mouse.get_pos()
+        is_hovered = self.confirm_button_rect.collidepoint(mouse_pos)
+
+        # Cor do botão
+        if is_hovered:
+            bg_color = self.colors['success']
+            border_color = self.colors['accent']
+        else:
+            bg_color = self.colors['secondary']
+            border_color = self.colors['primary']
+
+        # Sombra
+        shadow_rect = self.confirm_button_rect.copy()
+        shadow_rect.y += 3
+        pygame.draw.rect(screen, (0, 0, 0, 100), shadow_rect, border_radius=12)
+
+        # Fundo do botão
+        pygame.draw.rect(screen, bg_color, self.confirm_button_rect, border_radius=12)
+        pygame.draw.rect(screen, border_color, self.confirm_button_rect, 3, border_radius=12)
+
+        # Texto do botão
+        font = self._get_font(24, True)
+        text = font.render("CONFIRMAR", True, (255, 255, 255))
+        text_x = button_x + (button_width - text.get_width()) // 2
+        text_y = button_y + (button_height - text.get_height()) // 2
+        screen.blit(text, (text_x, text_y))
+
     def _render_cancel_option(self, screen, panel_rect):
         """Renderiza a opção de não aprender o novo move com legenda"""
+        # Ajusta a posição para ficar abaixo do botão de confirmar
         cancel_rect = self._get_cancel_rect(panel_rect)
+        # Move para baixo
+        cancel_rect.y = panel_rect.y + 540
+
         is_selected = (self.selected_index == -1)
 
         # Fundo
@@ -606,7 +655,7 @@ class MoveLearnOverlay(BaseOverlay):
         pygame.draw.rect(screen, bg_color, cancel_rect, border_radius=12)
         pygame.draw.rect(screen, border_color, cancel_rect, 2, border_radius=12)
 
-        # Texto principal - BRANCO para contraste
+        # Texto principal
         font = self._get_font(18, is_selected)
         text_color = (255, 255, 255) if is_selected else self.colors['text_dim']
         text = font.render("NÃO APRENDER ESTE ATAQUE", True, text_color)
@@ -614,7 +663,7 @@ class MoveLearnOverlay(BaseOverlay):
         text_y = cancel_rect.centery - 12
         screen.blit(text, (text_x, text_y))
 
-        # Legenda explicativa - COR MAIS CLARA
+        # Legenda explicativa
         legend_font = self._get_font(12)
         legend_text = "O Pokémon não aprenderá este novo ataque"
         legend_color = (200, 200, 160) if is_selected else (140, 140, 120)
@@ -634,7 +683,7 @@ class MoveLearnOverlay(BaseOverlay):
 
         instructions = [
             ("SETAS/CLICK", "SELECIONAR"),
-            ("ENTER", "CONFIRMAR"),
+            ("ENTER/CLICK", "CONFIRMAR"),
             ("ESC", "NÃO APRENDER")
         ]
 

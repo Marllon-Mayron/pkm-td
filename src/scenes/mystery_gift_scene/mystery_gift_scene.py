@@ -237,24 +237,81 @@ class MysteryGiftScene(BaseScene):
             self.back_button.handle_event(event)
             return
 
-        # Teclas de navegação
+        # Processa eventos de teclado para o input
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.go_back()
             elif event.key == pygame.K_RETURN and self.state == "input":
                 self.redeem_code()
             elif self.state == "input":
-                if event.key == pygame.K_BACKSPACE:
+                # Processa Ctrl+V (colar)
+                if event.mod & pygame.KMOD_CTRL and event.key == pygame.K_v:
+                    self._paste_from_clipboard()
+                # Backspace
+                elif event.key == pygame.K_BACKSPACE:
                     self.code_input = self.code_input[:-1]
+                # Caracteres normais
                 else:
                     char = event.unicode.upper()
-                    if char in string.ascii_uppercase + string.digits and len(self.code_input) < 20:
+                    # Permite letras (A-Z), números (0-9), hífen e underline
+                    if char in string.ascii_uppercase + string.digits + "-_" and len(self.code_input) < 20:
                         self.code_input += char
 
         # Botões
         self.back_button.handle_event(event)
         if self.redeem_button and self.state == "input":
             self.redeem_button.handle_event(event)
+
+    def _paste_from_clipboard(self):
+        """Pega o texto da área de transferência e cola no campo de código"""
+        clipboard_text = None
+
+        # Método 1: Usar tkinter (mais confiável no Windows)
+        try:
+            import tkinter as tk
+            root = tk.Tk()
+            root.withdraw()  # Esconde a janela
+            # Tenta pegar o texto do clipboard
+            clipboard_text = root.clipboard_get()
+            root.destroy()
+            if clipboard_text:
+                print("[MYSTERY_GIFT] Texto obtido via tkinter")
+        except Exception as e:
+            print(f"[MYSTERY_GIFT] Erro no tkinter: {e}")
+
+        # Método 2: Fallback usando pyperclip se disponível
+        if not clipboard_text:
+            try:
+                import pyperclip
+                clipboard_text = pyperclip.paste()
+                if clipboard_text:
+                    print("[MYSTERY_GIFT] Texto obtido via pyperclip")
+            except ImportError:
+                pass
+            except Exception as e:
+                print(f"[MYSTERY_GIFT] Erro no pyperclip: {e}")
+
+        # Processa o texto se conseguiu pegar algo
+        if clipboard_text and isinstance(clipboard_text, str):
+            # Limpa o texto (remove espaços, quebras de linha, etc)
+            clipboard_text = clipboard_text.strip().upper()
+
+            # Remove caracteres inválidos (só permite letras, números, hífen e underline)
+            valid_chars = set(string.ascii_uppercase + string.digits + "-_")
+            clean_code = ''.join(c for c in clipboard_text if c in valid_chars)
+
+            # Limita ao tamanho máximo
+            if len(clean_code) > 20:
+                clean_code = clean_code[:20]
+
+            # Atualiza o input
+            if clean_code:
+                self.code_input = clean_code
+                print(f"[MYSTERY_GIFT] Código colado com sucesso: {self.code_input}")
+            else:
+                print(f"[MYSTERY_GIFT] Clipboard continha apenas caracteres inválidos")
+        else:
+            print("[MYSTERY_GIFT] Não foi possível acessar a área de transferência ou o texto não é uma string válida")
 
     def redeem_code(self):
         """Tenta resgatar o código"""
@@ -413,6 +470,13 @@ class MysteryGiftScene(BaseScene):
         label_x = container_x + 20
         label_y = container_y + 20
         screen.blit(label_text, (label_x, label_y))
+
+        # Dica de colar
+        hint_font = self._get_font(12)
+        hint_text = hint_font.render("(Ctrl+V para colar)", True, (150, 150, 150))
+        hint_x = container_x + container_width - hint_text.get_width() - 20
+        hint_y = container_y + 25
+        screen.blit(hint_text, (hint_x, hint_y))
 
         input_width = container_width - 40
         input_height = 50
