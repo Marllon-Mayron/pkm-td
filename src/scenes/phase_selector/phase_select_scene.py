@@ -228,7 +228,7 @@ class PhaseSelectScene(BaseScene):
         self.minigame_button_hovered = False
 
         self.refresh_data()
-        self.dev_mode = False
+        self.dev_mode = True
 
     def _get_first_available_chapter(self):
         if not self.available_chapters:

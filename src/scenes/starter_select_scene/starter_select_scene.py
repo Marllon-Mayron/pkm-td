@@ -173,7 +173,7 @@ class StarterSelectScene(BaseScene):
             else:
                 # Permite letras, números, espaços e underscore
                 char = event.unicode
-                if char in string.ascii_letters + string.digits + " _-" and len(self.nickname_input) < 20:
+                if char in string.ascii_letters + string.digits + " _-" and len(self.nickname_input) < 12:
                     self.nickname_input += char
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -208,13 +208,17 @@ class StarterSelectScene(BaseScene):
         starter = self.STARTERS[self.selected_index]
         print(f"[STARTER_SELECT] Pokémon escolhido: {starter['name']} com apelido: {nickname}")
 
-        # Adiciona ao time do jogador com nickname
-        pokemon = self.game.player.add_starter(starter["id"], nickname=nickname)
+        # Adiciona ao time do jogador sem nickname primeiro
+        pokemon = self.game.player.add_starter(starter["id"])
+
+        # Aplica o nickname se foi fornecido
+        if pokemon and nickname:
+            pokemon.nickname = nickname
+            pokemon.name = nickname  # Atualiza o nome exibido
+            print(f"[STARTER_SELECT] Apelido aplicado: {nickname}")
 
         if pokemon:
             print(f"[STARTER_SELECT] {pokemon.name} adicionado ao time!")
-            if nickname:
-                print(f"[STARTER_SELECT] Apelido: {nickname}")
 
             # Salva o progresso inicial
             self.game.player.save_game(1)
@@ -434,7 +438,7 @@ class StarterSelectScene(BaseScene):
 
         # Limite de caracteres
         limit_font = self._get_font(int(self.nickname_input_rect.height * 0.25))
-        limit_text = limit_font.render(f"{len(self.nickname_input)}/20", True, (100, 100, 120))
+        limit_text = limit_font.render(f"{len(self.nickname_input)}/12", True, (100, 100, 120))
         limit_x = self.nickname_input_rect.x + self.nickname_input_rect.width - limit_text.get_width() - 10
         limit_y = self.nickname_input_rect.y + self.nickname_input_rect.height - limit_text.get_height() - 5
         screen.blit(limit_text, (limit_x, limit_y))
