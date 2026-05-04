@@ -1258,7 +1258,7 @@
                         "percentage": 1
                     }
                 ],
-                "min_level": 20,
+                "min_level": 19,
                 "max_level": 21,
                 "wave_size": 15,
                 "spawn_interval": 1.5,
@@ -1339,10 +1339,67 @@
     "target_items": {
         "grid_size": 16,
         "snap_to_grid": true,
-        "items": []
+        "items": [
+            {
+                "x": 216,
+                "y": 144,
+                "item_id": 1
+            },
+            {
+                "x": 216,
+                "y": 144,
+                "item_id": 1
+            },
+            {
+                "x": 216,
+                "y": 144,
+                "item_id": 1
+            },
+            {
+                "x": 216,
+                "y": 144,
+                "item_id": 1
+            },
+            {
+                "x": 216,
+                "y": 144,
+                "item_id": 1
+            },
+            {
+                "x": 408,
+                "y": 360,
+                "item_id": 1
+            },
+            {
+                "x": 408,
+                "y": 360,
+                "item_id": 1
+            },
+            {
+                "x": 408,
+                "y": 360,
+                "item_id": 1
+            },
+            {
+                "x": 408,
+                "y": 360,
+                "item_id": 1
+            },
+            {
+                "x": 408,
+                "y": 360,
+                "item_id": 1
+            }
+        ]
+    },
+    "events": {
+        "triggers": [],
+        "selected_trigger": 0
     },
     "rewards": {
         "money": 100,
         "experience": 50
-    }
+    },
+    "localization_type": "default",
+    "custom_folder": ""
 }

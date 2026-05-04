@@ -197,6 +197,8 @@ class MoveEffect:
             return self._apply_percent_damage(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "heal":
             return self._apply_heal(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "rest":
+            return self._apply_rest(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "remove_all_stat_mods":
             return self._apply_remove_all_stat_mods(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "critical_stage_mod":
@@ -557,6 +559,62 @@ class MoveEffect:
         # Toca som de cura (opcional - pode usar um som existente)
         from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("heal")  # Se não tiver, pode remover ou usar outro
+
+        return True
+
+    def _apply_rest(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Rest - Pokémon dorme por 2 turnos e cura todo HP
+        """
+        from src.battle.effects.status_effect import StatusEffect, StatusType
+        from src.ui.toast_renderer import toast_battle
+
+        # ===== VERIFICA SE JÁ ESTÁ DORMINDO =====
+        current_status = effect_manager.get_status(attacker)
+        if current_status and current_status.type == StatusType.SLEEP:
+            toast_battle(f"{attacker.name} já está dormindo!", duration=2.0, pokemon=attacker, portrait="sad")
+            return False
+
+        # ===== VERIFICA SE O POKÉMON PODE DORMIR (Insomnia, Vital Spirit, etc) =====
+        if hasattr(attacker, 'has_ability'):
+            if attacker.has_ability("Insomnia") or attacker.has_ability("Vital Spirit"):
+                toast_battle(f"{attacker.name} não pode dormir devido à sua habilidade!", duration=2.5,
+                             pokemon=attacker, portrait="sad")
+                return False
+
+        # ===== VERIFICA HP CHEIO =====
+        if attacker.current_hp >= attacker.max_hp:
+            toast_battle(f"{attacker.name} já está com HP cheio!", duration=2.0, pokemon=attacker, portrait="sad")
+            return False
+
+        # ===== CALCULA CURA =====
+        heal_amount = attacker.max_hp - attacker.current_hp
+
+        # ===== APLICA CURA TOTAL =====
+        attacker.current_hp = attacker.max_hp
+
+        # ===== REMOVE STATUS EXISTENTE =====
+        existing_status = effect_manager.get_status(attacker)
+        if existing_status and existing_status.type != StatusType.NONE:
+            effect_manager.remove_status(attacker)
+
+        # ===== APLICA SONO (2 TURNOS) =====
+        sleep_duration = 4.0  # 2 turnos de sono (2 segundos cada)
+        sleep_status = StatusEffect(StatusType.SLEEP, duration=sleep_duration)
+        sleep_status._sleep_timer = sleep_duration
+        sleep_status._sleep_check_timer = 0.0
+
+        effect_manager.apply_status(attacker, sleep_status, attacker)
+
+        # ===== MENSAGEM ÚNICA =====
+        toast_battle(
+            f"{attacker.name} usou Rest! (+{heal_amount} HP)",
+            duration=3.0,
+            pokemon=attacker,
+            portrait="happy"
+        )
+        # Cooldown do atacante
+        attacker.attack_cooldown = attacker.attack_cooldown_max
 
         return True
 
@@ -1937,7 +1995,7 @@ class MoveEffect:
                 effect_manager.add_status_text(attacker, f"{temp_move.name} errou!", duration=0.8)
 
         # Cooldown do ataque
-        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+        attacker.attack_cooldown = attacker.attack_cooldown_max
 
         return True
 
@@ -3165,7 +3223,7 @@ class MoveEffect:
             move_sound_manager.play_attack_sound("miss")
 
             # Cooldown
-            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            attacker.attack_cooldown = attacker.attack_cooldown_max
             return True
 
         # ===== CALCULA DANO =====
@@ -3175,7 +3233,7 @@ class MoveEffect:
             # Move não afetou (imune, etc)
             if damage_result.get("effectiveness", 1.0) == 0:
                 effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
-            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            attacker.attack_cooldown = attacker.attack_cooldown_max
             return True
 
         # ===== APLICA DANO =====
@@ -3225,7 +3283,7 @@ class MoveEffect:
                 f"[SNORE] FLINCH! {target.name} cooldown resetado de {old_cooldown:.2f} para {target.attack_cooldown:.2f}")
 
         # ===== COOLDOWN DO ATACANTE =====
-        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+        attacker.attack_cooldown = attacker.attack_cooldown_max
 
         # Mensagem final
         effect_manager.add_status_text(
@@ -3483,7 +3541,7 @@ class MoveEffect:
 
             # Restaura poder original
             current_move.power = original_power
-            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            attacker.attack_cooldown = attacker.attack_cooldown_max
             return True
 
         # ===== CALCULA DANO =====
@@ -3495,7 +3553,7 @@ class MoveEffect:
         if not damage_result["hit"]:
             if damage_result.get("effectiveness", 1.0) == 0:
                 effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
-            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            attacker.attack_cooldown = attacker.attack_cooldown_max
             return True
 
         # ===== APLICA DANO =====
@@ -3536,7 +3594,7 @@ class MoveEffect:
             print(f"[FLAIL] {attacker.name} causou {damage} de dano em {target.name} (poder: {flail_power})!")
 
         # Cooldown
-        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+        attacker.attack_cooldown = attacker.attack_cooldown_max
 
         return True
 
@@ -3791,6 +3849,6 @@ class MoveEffect:
             current_move.current_pp -= 1
 
         # Cooldown do atacante
-        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+        attacker.attack_cooldown = attacker.attack_cooldown_max
 
         return True

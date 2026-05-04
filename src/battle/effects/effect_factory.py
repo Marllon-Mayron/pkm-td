@@ -1147,6 +1147,16 @@ class EffectFactory:
             "description": "20% de chance de queimar, congelar ou paralisar o oponente"
         },
         # ===== CURA (HEAL) =====
+        "rest": {
+            "effect_type": "rest",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "heal_percentage": 1.0,
+                "sleep_turns": 2,
+            },
+            "description": "O usuário dorme e recupera totalmente o HP."
+        },
         "recover": {
             "effect_type": "heal",
             "target": EffectTarget.SELF,

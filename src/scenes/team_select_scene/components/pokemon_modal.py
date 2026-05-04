@@ -68,6 +68,32 @@ class PokemonModal:
             'iv_horrible': (160, 80, 200)
         }
 
+    NATURE_EFFECTS = {
+        # Nome: (aumento, diminuição, aumento_text, diminuicao_text)
+        "Hardy": (None, None, "", ""),
+        "Lonely": ("attack", "defense", "Atk", "Def"),
+        "Brave": ("attack", "speed", "Atk", "Spd"),
+        "Adamant": ("attack", "sp_attack", "Atk", "SpAtk"),
+        "Naughty": ("attack", "sp_defense", "Atk", "SpDef"),
+        "Bold": ("defense", "attack", "Def", "Atk"),
+        "Relaxed": ("defense", "speed", "Def", "Spd"),
+        "Impish": ("defense", "sp_attack", "Def", "SpAtk"),
+        "Lax": ("defense", "sp_defense", "Def", "SpDef"),
+        "Timid": ("speed", "attack", "Spd", "Atk"),
+        "Hasty": ("speed", "defense", "Spd", "Def"),
+        "Jolly": ("speed", "sp_attack", "Spd", "SpAtk"),
+        "Naive": ("speed", "sp_defense", "Spd", "SpDef"),
+        "Modest": ("sp_attack", "attack", "SpAtk", "Atk"),
+        "Mild": ("sp_attack", "defense", "SpAtk", "Def"),
+        "Quiet": ("sp_attack", "speed", "SpAtk", "Spd"),
+        "Rash": ("sp_attack", "sp_defense", "SpAtk", "SpDef"),
+        "Calm": ("sp_defense", "attack", "SpDef", "Atk"),
+        "Gentle": ("sp_defense", "defense", "SpDef", "Def"),
+        "Sassy": ("sp_defense", "speed", "SpDef", "Spd"),
+        "Careful": ("sp_defense", "sp_attack", "SpDef", "SpAtk"),
+        "Quirky": (None, None, "", ""),
+    }
+
     def _get_iv_rank(self, value):
         if value == 31:
             return "PERFEITO", self.colors['iv_perfect']
@@ -607,13 +633,69 @@ class PokemonModal:
                                      (bar_x, bar_y, int(bar_width * percent), bar_height), border_radius=4)
 
         nature_y = stat_start_y + (len(stats) * stat_spacing) + 5
-        if nature_y + 40 < left_col.bottom:
-            nature_card = pygame.Rect(left_col.x + 10, nature_y, left_col.width - 20, 40)
+        if nature_y + 50 < left_col.bottom:
+            nature_card = pygame.Rect(left_col.x + 10, nature_y, left_col.width - 20, 50)
             self._draw_rounded_rect(screen, self.colors['bg_tertiary'], nature_card, radius=8)
-            nature_text = pygame.font.Font(None, 16).render(f"NATUREZA: {self.pokemon.nature}", True,
-                                                            self.colors['text_secondary'])
-            screen.blit(nature_text, (nature_card.centerx - nature_text.get_width() // 2,
-                                      nature_card.centery - nature_text.get_height() // 2))
+
+            effects = self.NATURE_EFFECTS.get(self.pokemon.nature, (None, None, "", ""))
+
+            title_font = pygame.font.Font(None, 14)
+            text_font = pygame.font.Font(None, 16)
+
+            # "NATUREZA:" em text_accent
+            title_text = title_font.render("NATUREZA:", True, self.colors['text_accent'])
+
+            if effects[0] is not None:
+                boost_stat = effects[2]
+                reduce_stat = effects[3]
+
+                # Divide em partes para colorir
+                name_part = f" {self.pokemon.nature} ("
+                boost_part = f"+10% {boost_stat}"
+                slash_part = " / "
+                reduce_part = f"-10% {reduce_stat})"
+
+                name_text = text_font.render(name_part, True, self.colors['text_primary'])
+                boost_text = text_font.render(boost_part, True, (100, 255, 100))  # VERDE
+                slash_text = text_font.render(slash_part, True, self.colors['text_secondary'])
+                reduce_text = text_font.render(reduce_part, True, (255, 100, 100))  # VERMELHO
+
+                # Calcula larguras
+                name_w = name_text.get_width()
+                boost_w = boost_text.get_width()
+                slash_w = slash_text.get_width()
+                reduce_w = reduce_text.get_width()
+                total_w = title_text.get_width() + name_w + boost_w + slash_w + reduce_w
+
+                # Posição inicial centralizada
+                start_x = nature_card.centerx - total_w // 2
+                y_pos = nature_card.centery - name_text.get_height() // 2
+
+                # Renderiza sequencialmente
+                x_offset = start_x
+                screen.blit(title_text, (x_offset, y_pos))
+                x_offset += title_text.get_width()
+
+                screen.blit(name_text, (x_offset, y_pos))
+                x_offset += name_w
+
+                screen.blit(boost_text, (x_offset, y_pos))
+                x_offset += boost_w
+
+                screen.blit(slash_text, (x_offset, y_pos))
+                x_offset += slash_w
+
+                screen.blit(reduce_text, (x_offset, y_pos))
+
+            else:
+                # Nature neutra
+                value_text = text_font.render(f" {self.pokemon.nature}", True, self.colors['text_primary'])
+                total_w = title_text.get_width() + value_text.get_width()
+                start_x = nature_card.centerx - total_w // 2
+                y_pos = nature_card.centery - title_text.get_height() // 2
+
+                screen.blit(title_text, (start_x, y_pos))
+                screen.blit(value_text, (start_x + title_text.get_width(), y_pos))
 
         iv_title = section_font.render("VALORES INDIVIDUAIS", True, self.colors['text_accent'])
         iv_title_x = right_col.x + (right_col.width - iv_title.get_width()) // 2
@@ -969,8 +1051,41 @@ class PokemonModal:
         # ===== NATUREZA =====
         label_text = label_font.render("NATUREZA", True, self.colors['text_secondary'])
         screen.blit(label_text, (right_card.x + 20, right_y))
-        value_text = value_font.render(self.pokemon.nature, True, self.colors['text_primary'])
-        screen.blit(value_text, (right_card.x + 20, right_y + 24))
+
+        nature_name = self.pokemon.nature
+        effects = self.NATURE_EFFECTS.get(nature_name, (None, None, "", ""))
+
+        if effects[0] is not None:
+            # Divide em partes para colorir
+            boost_stat = effects[2]
+            reduce_stat = effects[3]
+
+            # Renderiza as partes com cores diferentes
+            name_part = f"{nature_name} ("
+            boost_part = f"+10% {boost_stat}"
+            slash_part = " / "
+            reduce_part = f"-10% {reduce_stat})"
+
+            name_text = value_font.render(name_part, True, self.colors['text_primary'])
+            boost_text = value_font.render(boost_part, True, (100, 255, 100))  # VERDE
+            slash_text = value_font.render(slash_part, True, self.colors['text_secondary'])
+            reduce_text = value_font.render(reduce_part, True, (255, 100, 100))  # VERMELHO
+
+            # Posiciona sequencialmente na mesma linha
+            start_x = right_card.x + 20
+            y_pos = right_y + 24
+
+            screen.blit(name_text, (start_x, y_pos))
+            screen.blit(boost_text, (start_x + name_text.get_width(), y_pos))
+            screen.blit(slash_text, (start_x + name_text.get_width() + boost_text.get_width(), y_pos))
+            screen.blit(reduce_text,
+                        (start_x + name_text.get_width() + boost_text.get_width() + slash_text.get_width(), y_pos))
+
+        else:
+            # Nature neutra (Hardy, Quirky)
+            value_text = value_font.render(nature_name, True, self.colors['text_primary'])
+            screen.blit(value_text, (right_card.x + 20, right_y + 24))
+
         right_y += right_line_spacing
 
         # ===== SEXO =====

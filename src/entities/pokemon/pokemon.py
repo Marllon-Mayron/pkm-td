@@ -181,7 +181,7 @@ class Pokemon(Entity):
         # ===== 15. COMBATE =====
         self.can_attack = True
         self.attack_cooldown = 0
-        self.attack_cooldown_max = 60
+        self.attack_cooldown_max = 1.2
         self.target = None
         self.has_no_pp = False
 
