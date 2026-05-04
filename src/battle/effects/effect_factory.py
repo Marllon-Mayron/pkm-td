@@ -1571,6 +1571,20 @@ class EffectFactory:
             },
             "description": "Fantasma: sacrifica 50% HP para amaldiçoar o alvo (dano de 1/4 HP por turno). Não-Fantasma: +1 Atk/Def, -1 Speed."
         },
+        "whirlpool": {
+            "effect_type": "residual",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "residual_type": "whirlpool",
+                "duration_min": 2,  # 2-5 turnos
+                "duration_max": 5,
+                "tick_interval": 2.0,
+                "damage_percentage": 1 / 16,
+                "trapping": True,
+            },
+            "description": "Prende o alvo por 2-5 turnos, causando dano de 1/16 do HP máximo por turno."
+        },
         # ===== VENENO (POISON) =====
         "sludge-bomb": {
             "effect_type": "status_chance",
@@ -1871,6 +1885,31 @@ class EffectFactory:
             },
             "description": "Ataque sombrio que nunca erra. Ignora modificadores de precisão e evasão."
         },
+        # ===== DANOS POR CARACTERISTICA =====
+        "return": {
+            "effect_type": "happiness_power",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "formula": "return",  # Quanto mais feliz, mais forte
+                "max_happiness": 255,  # Felicidade máxima
+                "min_power": 1,
+                "max_power": 102,
+            },
+            "description": "Ataca com poder baseado na felicidade do Pokémon. Máximo 102."
+        },
+        "frustration": {
+            "effect_type": "happiness_power",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "formula": "frustration",  # Quanto menos feliz, mais forte
+                "max_happiness": 255,
+                "min_power": 1,
+                "max_power": 102,
+            },
+            "description": "Ataca com poder baseado na falta de felicidade do Pokémon. Máximo 102."
+        },
         # ===== CLIMAS (WEATHER SYSTEM) =====
         "sandstorm": {
             "effect_type": "weather",
@@ -1903,6 +1942,15 @@ class EffectFactory:
             "description": "Cria sol forte por 5 turnos"
         },
 
+        "vital-throw": {
+            "effect_type": "never_miss",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "never_miss": True,
+            },
+            "description": "Ataque que nunca erra"
+        },
         "snore": {
             "effect_type": "snore",
             "target": EffectTarget.TARGET,
@@ -1915,20 +1963,20 @@ class EffectFactory:
             "description": "Só funciona enquanto dormindo. 30% de chance de fazer o oponente hesitar."
         },
         "flail": {
-            "effect_type": "flail",
+            "effect_type": "hp_power_move",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "params": {
-                "power_table": {
-                    "ranges": [
-                        {"max_hp_percent": 1, "power": 200},  # 0-1%
-                        {"max_hp_percent": 5, "power": 150},  # 2-5%
-                        {"max_hp_percent": 12, "power": 100},  # 6-12%
-                        {"max_hp_percent": 21, "power": 80},  # 13-21%
-                        {"max_hp_percent": 42, "power": 40},  # 22-42%
-                        {"max_hp_percent": 100, "power": 20}  # 43-100%
-                    ]
-                }
+                "move_variant": "flail",
+            },
+            "description": "Quanto menos HP o usuário tem, mais forte é o ataque."
+        },
+        "reversal": {
+            "effect_type": "hp_power_move",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "move_variant": "reversal",
             },
             "description": "Quanto menos HP o usuário tem, mais forte é o ataque."
         },
@@ -1943,7 +1991,171 @@ class EffectFactory:
                 "status": {"type": "confusion", "chance": 1.0}
             }
         },
-
+        "magnitude": {
+            "effect_type": "magnitude",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,
+            "params": {
+                "area": True,
+                "hit_all_in_range": True,
+                "use_normal_damage": False,
+            },
+            "description": "Ataque de Ground com poder aleatório baseado na magnitude. Afeta todos inimigos próximos.",
+            "min_distance": 0,
+        },
+        "mirror-coat": {
+            "effect_type": "mirror_coat",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "multiplier": 2.0,
+            },
+            "description": "Retorna o dobro do dano especial recebido."
+        },
+        "false-swipe": {
+            "effect_type": "false_swipe",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {},
+            "description": "Causa dano, mas nunca deixa o alvo com menos de 1 HP."
+        },
+        "heal-bell": {
+            "effect_type": "heal_bell",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,
+            "params": {
+                "heal_status": True,
+                "heal_confusion": True,
+            },
+            "description": "Cura todos os Pokémon do time de problemas de status e confusão."
+        },
+        "present": {
+            "effect_type": "present",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "effects": [
+                    {"power": 40, "chance": 40, "type": "damage"},
+                    {"power": 80, "chance": 30, "type": "damage"},
+                    {"power": 120, "chance": 10, "type": "damage"},
+                    {"heal_percentage": 0.25, "chance": 20, "type": "heal"}
+                ]
+            },
+            "description": "Um presente surpresa! Pode causar dano (40/80/120) ou curar 1/4 do HP do alvo."
+        },
+        "pain-split": {
+            "effect_type": "pain_split",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "ignore_accuracy": True,
+            },
+            "description": "Soma o HP do usuário e do alvo e divide igualmente entre os dois."
+        },
+        "fury-cutter": {
+            "effect_type": "fury_cutter",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "base_power": 40,
+                "multiplier_per_hit": 2,  # Dobra a cada acerto
+                "max_multiplier": 16,  # Máximo 16x (poder 640)
+                "reset_on_miss": True,  # Reseta se errar
+                "reset_on_switch": True,  # Reseta se trocar de Pokémon
+            },
+            "description": "Aumenta o poder a cada acerto consecutivo. Máximo 640."
+        },
+        "beat-up": {
+            "effect_type": "beat_up",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "typeless_damage": True,  # ignora resistências
+                "ignore_stat_modifiers": True,  # Usa stats base
+                "no_random_factor": True,  # Sem variação aleatória
+            },
+            "description": "Todos os Pokémon vivos do time atacam o mesmo alvo, ignorando resistências. "
+        },
+        "hidden-power": {
+            "effect_type": "hidden_power",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {},
+            "description": "Poder e tipo variam baseado nos IVs do Pokémon."
+        },
+        "destiny-bond": {
+            "effect_type": "destiny_bond",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "duration": 1,
+            },
+            "description": "Se o usuário desmaiar antes do próximo movimento, o atacante também desmaia."
+        },
+        "sketch": {
+            "effect_type": "sketch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "permanent": True,
+                "pp_on_copy": None,
+            },
+            "description": "Copia permanentemente o último movimento usado pelo alvo. Substitui o Sketch."
+        },
+        "belly-drum": {
+            "effect_type": "belly_drum",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "hp_cost_percentage": 0.5,  # 50% do HP máximo
+                "attack_stages": 6,  # Aumenta para +6 (máximo)
+                "max_stage": 6,  # Máximo permitido
+            },
+            "description": "Sacrifica metade do HP para maximizar o Ataque (+6 estágios) por 30s."
+        },
+        # ===== DANO NO ATACANTE =====
+        "outrage": {
+            "effect_type": "self_confusion_after_uses",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "required_uses": 2,
+                "random_duration": True,
+                "min_uses": 2,
+                "max_uses": 3,
+            },
+            "description": "Ataca por 2-3 turnos. Após o último ataque, o usuário fica confuso."
+        },
+        # ===== CURA PELO CLIMA =====
+        "morning-sun": {
+            "effect_type": "weather_heal",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "move_variant": "morning_sun",
+            },
+            "description": "Cura 50% do HP. No sol forte, cura 2/3. Em clima ruim, cura 1/4."
+        },
+        "synthesis": {
+            "effect_type": "weather_heal",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "move_variant": "synthesis",
+            },
+            "description": "Cura 50% do HP. No sol forte, cura 2/3. Em clima ruim, cura 1/4."
+        },
+        "moonlight": {
+            "effect_type": "weather_heal",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "move_variant": "moonlight",
+            },
+            "description": "Cura 50% do HP. No sol forte, cura 2/3. Em clima ruim, cura 1/4."
+        },
 
     }
 

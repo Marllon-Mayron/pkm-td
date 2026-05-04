@@ -691,7 +691,7 @@ class BattleSystem:
         print(f"[SOM] {move.name} - som do atacante: {move.sound_name}")
 
     def _apply_damage(self, attacker: 'Pokemon', target: 'Pokemon', damage_result: dict, move):
-        """Aplica dano a um alvo com rastreamento para Counter"""
+        """Aplica dano a um alvo com rastreamento para Counter e Mirror Coat"""
         damage = damage_result["damage"]
 
         # Verifica se o movimento é inefetivo (imune)
@@ -702,17 +702,21 @@ class BattleSystem:
 
         from src.managers.sounds.move_sound_manager import move_sound_manager
 
-        # Toca som do ataque (físico)
-        if move.category == "physical":
-            move_sound_manager.play_attack_sound(move.sound_name)
-            print(f"[SOM] {move.name} (físico) - som do atacante: {move.sound_name}")
+        # Toca som do ataque (físico ou especial)
+        move_sound_manager.play_attack_sound(move.sound_name)
+        print(f"[SOM] {move.name} - som do atacante: {move.sound_name}")
 
-            # ===== RASTREIA DANO FÍSICO PARA COUNTER =====
-            # Só rastreia se o alvo (quem tomou dano) estiver vivo e o dano for > 0
-            if damage > 0 and target.is_alive() and not target.is_defeated:
-                target._last_physical_damage_received = damage
-                target._last_physical_attacker = attacker
-                print(f"[COUNTER_TRACK] {target.name} registrou {damage} de dano físico de {attacker.name}")
+        # ===== RASTREIA DANO PARA COUNTER (FÍSICO) =====
+        if move.category == "physical" and damage > 0 and target.is_alive() and not target.is_defeated:
+            target._last_physical_damage_received = damage
+            target._last_physical_attacker = attacker
+            print(f"[COUNTER_TRACK] {target.name} registrou {damage} de dano FÍSICO de {attacker.name}")
+
+        # ===== RASTREIA DANO PARA MIRROR COAT (ESPECIAL) =====
+        if move.category == "special" and damage > 0 and target.is_alive() and not target.is_defeated:
+            target._last_special_damage_received = damage
+            target._last_special_attacker = attacker
+            print(f"[MIRROR_COAT_TRACK] {target.name} registrou {damage} de dano ESPECIAL de {attacker.name}")
 
         # Toca som de impacto
         move_sound_manager.play_hit_sound(move.sound_name)
@@ -885,11 +889,18 @@ class BattleSystem:
         return reduction
 
     def clear_counter_tracking(self, pokemon):
-        """Limpa os rastros de Counter de um Pokémon"""
+        """Limpa os rastros de Counter e Mirror Coat de um Pokémon"""
+        # Counter (físico)
         if hasattr(pokemon, '_last_physical_damage_received'):
             pokemon._last_physical_damage_received = 0
         if hasattr(pokemon, '_last_physical_attacker'):
             pokemon._last_physical_attacker = None
+
+        # Mirror Coat (especial)
+        if hasattr(pokemon, '_last_special_damage_received'):
+            pokemon._last_special_damage_received = 0
+        if hasattr(pokemon, '_last_special_attacker'):
+            pokemon._last_special_attacker = None
 
     def render_projectiles(self, screen, camera, screen_manager):
         """Renderiza projéteis"""

@@ -11,9 +11,9 @@ class ResidualEffectType(Enum):
     # 2GEN
     NIGHTMARE = "nightmare"
     CURSE = "curse"
+    WHIRLPOOL = "whirlpool"
 
     FIRE_SPIN = "fire_spin"
-    WHIRLPOOL = "whirlpool"
     CLAMP = "clamp"
     SAND_TOMB = "sand_tomb"
     INFESTATION = "infestation"

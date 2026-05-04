@@ -953,6 +953,35 @@ class Pokemon(Entity):
                 if hasattr(self, 'effect_manager') and self.effect_manager:
                     self.effect_manager.add_status_text(self, f"{self.name} voltou ao normal!", duration=1.0)
 
+        # ===== ATUALIZA DESTINY BOND =====
+        if hasattr(self, '_destiny_bond_active') and self._destiny_bond_active:
+            if hasattr(self, '_destiny_bond_turns_left'):
+                # A cada ~2 segundos (um turno), decrementa
+                if not hasattr(self, '_destiny_bond_timer'):
+                    self._destiny_bond_timer = 0.0
+
+                self._destiny_bond_timer += dt
+                if self._destiny_bond_timer >= 2.0:  # 2 segundos = 1 turno
+                    self._destiny_bond_timer = 0
+                    self._destiny_bond_turns_left -= 1
+
+                    if self._destiny_bond_turns_left <= 0:
+                        # Desativa Destiny Bond
+                        self._destiny_bond_active = False
+                        if hasattr(self, '_destiny_bond_turns_left'):
+                            delattr(self, '_destiny_bond_turns_left')
+                        if hasattr(self, '_destiny_bond_timer'):
+                            delattr(self, '_destiny_bond_timer')
+
+                        # Mostra mensagem (opcional)
+                        if hasattr(self, 'effect_manager') and self.effect_manager:
+                            self.effect_manager.add_status_text(
+                                self,
+                                f"O laço do destino de {self.name} se desfez!",
+                                duration=1.0
+                            )
+                        print(f"[DESTINY_BOND] {self.name} - efeito expirou!")
+
         # Atualiza timer de MISS
         if hasattr(self, 'miss_timer') and self.miss_timer > 0:
             self.miss_timer -= dt
@@ -1268,6 +1297,10 @@ class Pokemon(Entity):
         if hasattr(self, '_toxic_tick_count'):
             self._toxic_tick_count = 0
 
+        self.clear_fury_cutter()
+        self.clear_destiny_bond()
+        self.clear_disable()
+
         # Remove referência local ao status_effect se existir
         if hasattr(self, 'status_effect'):
             self.status_effect = None
@@ -1278,19 +1311,39 @@ class Pokemon(Entity):
 
         print(f"[STATUS_CLEAR] Todos os status de {self.name} foram removidos!")
 
+    def clear_fury_cutter(self):
+        """Reseta o contador do Fury Cutter"""
+        if hasattr(self, '_fury_cutter_hits'):
+            self._fury_cutter_hits = 0
+
+    def clear_destiny_bond(self):
+        """Remove Destiny Bond do Pokémon"""
+        if hasattr(self, '_destiny_bond_active'):
+            self._destiny_bond_active = False
+        if hasattr(self, '_destiny_bond_turns_left'):
+            delattr(self, '_destiny_bond_turns_left')
+        if hasattr(self, '_destiny_bond_timer'):
+            delattr(self, '_destiny_bond_timer')
+        if hasattr(self, '_destiny_bond_source'):
+            delattr(self, '_destiny_bond_source')
+
+    def clear_disable(self):
+        """Remove Destiny Bond do Pokémon"""
+        # ===== LIMPA DISABLE =====
+        if hasattr(self, '_disabled_move'):
+            delattr(self, '_disabled_move')
+        if hasattr(self, '_disabled_turns'):
+            delattr(self, '_disabled_turns')
+        if hasattr(self, '_disabled_original_pp'):
+            delattr(self, '_disabled_original_pp')
+        if hasattr(self, '_disable_timer'):
+            delattr(self, '_disable_timer')
+
     def set_defeated(self, defeated: bool):
         """Define se o Pokémon está derrotado"""
         self.is_defeated = defeated
         if defeated:
-            # ===== LIMPA DISABLE =====
-            if hasattr(self, '_disabled_move'):
-                delattr(self, '_disabled_move')
-            if hasattr(self, '_disabled_turns'):
-                delattr(self, '_disabled_turns')
-            if hasattr(self, '_disabled_original_pp'):
-                delattr(self, '_disabled_original_pp')
-            if hasattr(self, '_disable_timer'):
-                delattr(self, '_disable_timer')
+
 
             # ===== LIMPA TODOS OS STATUS EFFECTS =====
             self.clear_all_status()
@@ -1301,6 +1354,10 @@ class Pokemon(Entity):
                         self.battle_system.active_charge_move['attacker'] == self):
                     print(f"[TWO_TURN] Carga de {self.name} foi cancelada devido à derrota!")
                     self.battle_system.active_charge_move = None
+
+            self.clear_disable()
+            self.clear_fury_cutter()
+            self.clear_destiny_bond()
 
             # ===== REMOVE EFEITOS RESIDUAIS DO BATTLE_SYSTEM (apenas se existir) =====
             if hasattr(self, 'battle_system') and self.battle_system:
