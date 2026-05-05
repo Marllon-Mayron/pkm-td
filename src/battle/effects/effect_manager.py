@@ -174,8 +174,21 @@ class EffectManager:
         """Adiciona um modificador de stat a um Pokémon"""
         pokemon_id = id(pokemon)
 
+        # ===== VERIFICA FORESIGHT - IMPEDE AUMENTO DE EVASÃO =====
+        if stat_type == StatType.EVASION and stages > 0:  # Tentando aumentar evasão
+            if hasattr(pokemon, '_foresight_active') and pokemon._foresight_active:
+                # Impede o aumento
+                self.add_status_text(
+                    pokemon,
+                    f"Foresight impede o aumento de evasão de {pokemon.name}!",
+                    duration=1.0
+                )
+                print(f"[FORESIGHT] {pokemon.name} não pode aumentar evasão devido a Foresight!")
+                return False
+
         print(
             f"[EFFECT] Aplicando modificador em {pokemon.name}: {stat_type} {stages:+d} (duração: {duration if duration else 'permanente'})")
+
 
         # Inicializa stage se necessário
         if pokemon_id not in self.stat_stages:

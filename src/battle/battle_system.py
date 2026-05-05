@@ -334,11 +334,35 @@ class BattleSystem:
         # ===== VERIFICA SE O MOVE TEM EFEITO DE CRASH AO ERRAR =====
         has_crash_effect = effect and effect.effect_type == "crash_damage_on_miss"
 
-        # Calcular acerto
-        if never_miss:
-            # Sempre acerta (ignora accuracy/evasion)
+        # ===== VERIFICA MIND READER (garante acerto) =====
+        is_mind_reader_guaranteed = False
+
+        if (hasattr(attacker, '_mind_reader_active') and attacker._mind_reader_active and
+                hasattr(attacker, '_mind_reader_target') and attacker._mind_reader_target == target):
+
+            is_mind_reader_guaranteed = True
+
+            # Mostra mensagem
+            if move.name.lower() != "struggle":
+                self.effect_manager.add_status_text(
+                    attacker,
+                    f"{attacker.name} acertou com certeza!",
+                    duration=0.8
+                )
+
+            print(f"[MIND_READER] {attacker.name} tem acerto garantido em {target.name}!")
+
+            # ===== RESETA O MIND READER APÓS USAR (DUROU 1 ATAQUE) =====
+            attacker._mind_reader_active = False
+            attacker._mind_reader_target = None
+
+        # ===== CALCULAR ACERTO =====
+        never_miss = effect and effect.effect_type == "never_miss"
+
+        if never_miss or is_mind_reader_guaranteed:
+            # Sempre acerta
             will_hit = True
-            print(f"[BATTLE] {move.name} nunca erra!")
+            print(f"[BATTLE] {move.name} nunca erra! (ou Mind Reader ativo)")
         else:
             hit_chance = move.accuracy / 100
             accuracy_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)

@@ -217,7 +217,7 @@ class DamageCalculator:
             }
 
         # 4. Calcular multiplicador de tipo (inclui 4x e 0.25x)
-        effectiveness = cls._get_type_effectiveness(move.type, defender.types)
+        effectiveness = cls._get_type_effectiveness(move.type, defender.types, defender, attacker)
 
         # Se for imune (effectiveness = 0), retorna sem dano
         if effectiveness == 0:
@@ -333,13 +333,26 @@ class DamageCalculator:
         }
 
     @classmethod
-    def _get_type_effectiveness(cls, move_type: str, defender_types: list) -> float:
+    def _get_type_effectiveness(cls, move_type: str, defender_types: list, defender=None, attacker=None) -> float:
         """
         Calcula multiplicador de eficácia baseado nos tipos
         Suporta multiplicadores combinados (ex: 2x * 2x = 4x)
+
+        Com Foresight: Normal e Fighting acertam Ghost
         """
         multiplier = 1.0
         move_type_lower = move_type.lower()
+
+        # ===== VERIFICA FORESIGHT (Normal/Fighting vs Ghost) =====
+        is_ghost = any(t.lower() == "ghost" for t in defender_types)
+        is_normal_or_fighting = move_type_lower in ["normal", "fighting"]
+
+        if is_ghost and is_normal_or_fighting and defender:
+            # Verifica se o defensor está sob efeito de Foresight
+            if hasattr(defender, '_foresight_active') and defender._foresight_active:
+                # Normal/Fighting acertam Ghost (efetividade normal = 1.0)
+                print(f"[FORESIGHT] {move_type} acerta {defender.name} (Ghost) devido a Foresight!")
+                return 1.0  # Retorna neutro, não continua verificando outras imunidades
 
         for def_type in defender_types:
             def_type_lower = def_type.lower()
@@ -350,7 +363,6 @@ class DamageCalculator:
                 mult = cls.TYPE_CHART[key]
                 multiplier *= mult
             # Se não tem entrada, é neutro (1.0)
-            # else: multiplier *= 1.0
 
         return multiplier
 

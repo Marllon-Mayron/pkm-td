@@ -283,6 +283,12 @@ class MoveEffect:
             return self._apply_belly_drum(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "weather_heal":
             return self._apply_weather_heal(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "mind_reader":
+            return self._apply_mind_reader(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "rollout":
+            return self._apply_rollout(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "spite":
+            return self._apply_spite(attacker, target, battle_system, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -5014,7 +5020,7 @@ class MoveEffect:
         Aplica movimentos de cura baseados em clima.
         Morning Sun, Synthesis, Moonlight.
         """
-        from src.battle.effects.specific.weather_heal import MorningSun, Synthesis, Moonlight
+        from src.battle.effects.specific.weather_heal.weather_heal import MorningSun, Synthesis, Moonlight
 
         move_variant = self.params.get("move_variant", "morning_sun")
 
@@ -5028,3 +5034,348 @@ class MoveEffect:
             heal_move = MorningSun()
 
         return heal_move.execute(attacker, target, battle_system, effect_manager)
+
+    def _apply_mind_reader(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Mind Reader.
+
+        Mecânica:
+        - Garante que o PRÓXIMO ataque do usuário acertará o alvo
+        - Expira após o usuário executar um ataque
+        - Ignora accuracy/evasion do próximo ataque
+        """
+
+        # ===== VERIFICA SE O ALVO ESTÁ VIVO =====
+        if target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            print(f"[MIND_READER] {target.name} está derrotado!")
+            return False
+
+        # ===== VERIFICA SE JÁ ESTÁ ATIVO =====
+        if hasattr(attacker, '_mind_reader_active') and attacker._mind_reader_active:
+            effect_manager.add_status_text(attacker, f"Já está focado no alvo!", duration=1.0)
+            print(f"[MIND_READER] {attacker.name} já tem Mind Reader ativo!")
+            return False
+
+        # ===== ATIVA O MIND READER =====
+        attacker._mind_reader_active = True
+        attacker._mind_reader_target = target
+
+        # Mostra mensagem
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} leu a mente de {target.name}!",
+            duration=1.5
+        )
+
+        effect_manager.add_status_text(
+            attacker,
+            f"O próximo ataque com certeza acertará!",
+            duration=1.5
+        )
+
+        print(f"[MIND_READER] {attacker.name} garantiu o próximo ataque em {target.name}!")
+
+        # Toca som
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("mind-reader")
+
+        return True
+
+    def _apply_rollout(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Rollout (sem lock-in).
+
+        Mecânica:
+        - Poder dobra a cada acerto consecutivo
+        - Se errar, reseta o contador
+        - Defense Curl dobra o poder base
+        """
+        from src.battle.damage_calculator import DamageCalculator
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+        from src.battle.effects.stat_modifier import StatType
+        import random
+
+        # ===== OBTÉM O MOVE ATUAL =====
+        current_move = attacker.get_current_move()
+        if not current_move:
+            print(f"[ROLLOUT] {attacker.name} não tem move selecionado!")
+            return False
+
+        # Verifica PP
+        if current_move.current_pp <= 0:
+            effect_manager.add_status_text(attacker, f"Não há PP para {current_move.name}!", duration=1.0)
+            return False
+
+        # Gasta PP
+        current_move.current_pp -= 1
+
+        # ===== INICIALIZA CONTADOR SE NÃO EXISTIR =====
+        if not hasattr(attacker, '_rollout_hit_count'):
+            attacker._rollout_hit_count = 0
+            attacker._rollout_base_power = 0
+
+        # ===== CALCULA PODER BASE =====
+        base_power = self.params.get("base_power", 30)
+
+        # Verifica se usou Defense Curl
+        if hasattr(attacker, '_defense_curl_used') and attacker._defense_curl_used:
+            base_power *= self.params.get("defense_curl_boost", 2)
+            effect_manager.add_status_text(
+                attacker,
+                f"Defense Curl dobrou o poder!",
+                duration=1.0
+            )
+            print(f"[ROLLOUT] Defense Curl ativo! Poder base: {base_power}")
+
+        attacker._rollout_base_power = base_power
+
+        # ===== CALCULA PODER ATUAL =====
+        # Poder = base_power * (2 ^ hit_count), máximo 16x
+        power_multiplier = 2 ** attacker._rollout_hit_count
+        max_multiplier = self.params.get("max_multiplier", 16)
+        power_multiplier = min(power_multiplier, max_multiplier)
+        current_power = base_power * power_multiplier
+
+        # Mostra mensagem de acúmulo
+        if attacker._rollout_hit_count > 0:
+            effect_manager.add_status_text(
+                attacker,
+                f"Rolagem crescente! Poder {current_power}!",
+                duration=1.0
+            )
+
+        print(
+            f"[ROLLOUT] {attacker.name}: hits={attacker._rollout_hit_count}, mult={power_multiplier}x, power={current_power}")
+
+        # ===== SUBSTITUI O PODER TEMPORARIAMENTE =====
+        original_power = current_move.power
+        current_move.power = current_power
+
+        # ===== TOCA SOM =====
+        move_sound_manager.play_attack_sound(current_move.sound_name)
+
+        # ===== CALCULA ACERTO =====
+        hit_chance = current_move.accuracy / 100
+        accuracy_mult = effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)
+        evasion_mult = effect_manager.get_stat_multiplier(target, StatType.EVASION)
+        final_hit_chance = hit_chance * accuracy_mult / evasion_mult
+        final_hit_chance = max(0.01, min(1.0, final_hit_chance))
+
+        will_hit = random.random() <= final_hit_chance
+
+        if not will_hit:
+            # ===== ERROU - RESETA CONTADOR =====
+            effect_manager.add_status_text(attacker, f"{attacker.name} errou! A sequência foi quebrada!", duration=1.0)
+            move_sound_manager.play_attack_sound("miss")
+
+            # Reseta o contador
+            attacker._rollout_hit_count = 0
+            attacker._rollout_base_power = 0
+            print(f"[ROLLOUT] {attacker.name} errou! Sequência resetada.")
+
+            # Restaura poder original
+            current_move.power = original_power
+            attacker.attack_cooldown = attacker.attack_cooldown_max
+            return True
+
+        # ===== ACERTOU - CALCULA DANO =====
+        damage_result = DamageCalculator.calculate_damage(attacker, target, current_move)
+
+        # Restaura poder original
+        current_move.power = original_power
+
+        if not damage_result["hit"]:
+            if damage_result.get("effectiveness", 1.0) == 0:
+                effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
+                # Se for imune, também reseta
+                attacker._rollout_hit_count = 0
+                attacker._rollout_base_power = 0
+            attacker.attack_cooldown = attacker.attack_cooldown_max
+            return True
+
+        # ===== APLICA DANO =====
+        damage = damage_result["damage"]
+
+        if damage > 0:
+            target.take_damage(damage, attacker=attacker)
+
+
+            print(
+                f"[ROLLOUT] {attacker.name} causou {damage} de dano (poder: {current_power}, hits: {attacker._rollout_hit_count})")
+
+            # ===== INCREMENTA CONTADOR PARA PRÓXIMO USO =====
+            # Verifica se já atingiu o máximo de multiplicador
+            max_hits = 0
+            mult = 1
+            while mult < max_multiplier:
+                mult *= 2
+                max_hits += 1
+            # max_hits = 4 para 16x (1,2,4,8,16)
+
+            if attacker._rollout_hit_count < max_hits:
+                attacker._rollout_hit_count += 1
+            else:
+                # Já no máximo, não aumenta mais
+                if attacker._rollout_hit_count < max_hits + 1:
+                    attacker._rollout_hit_count += 1
+                print(f"[ROLLOUT] {attacker.name} atingiu o poder máximo!")
+
+        # Cooldown
+        attacker.attack_cooldown = attacker.attack_cooldown_max
+
+        return True
+
+    def _apply_foresight(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Foresight.
+
+        Mecânica:
+        - Reseta evasão do alvo para normal
+        - Impede aumentos de evasão enquanto ativo
+        - Permite ataques Normal/Fighting acertarem Fantasma
+        - Efeito dura até o alvo sair de campo
+        """
+        from src.battle.effects.stat_modifier import StatType
+
+        # ===== VERIFICA SE O ALVO ESTÁ VIVO =====
+        if target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            print(f"[FORESIGHT] {target.name} está derrotado!")
+            return False
+
+        # ===== RESETA A EVASÃO DO ALVO =====
+        pokemon_id = id(target)
+
+        if pokemon_id in effect_manager.stat_stages:
+            current_evasion = effect_manager.stat_stages[pokemon_id].get_stage(StatType.EVASION)
+
+            if current_evasion != 0:
+                # Reseta a evasão para 0
+                effect_manager.stat_stages[pokemon_id].modify(StatType.EVASION, -current_evasion)
+                print(f"[FORESIGHT] Evasão de {target.name} resetada de {current_evasion:+d} para 0")
+
+        # ===== MARCA O ALVO COMO "REVELADO" (Foresight) =====
+        # Isso permite ataques Normal/Fighting acertarem Fantasma
+        target._foresight_active = True
+        target._foresight_source = attacker
+
+        # ===== REMOVE QUALQUER MODIFICADOR DE EVASÃO ATIVO =====
+        if pokemon_id in effect_manager.stat_modifiers:
+            # Remove modificadores de evasão
+            modifiers_to_remove = []
+            for modifier in effect_manager.stat_modifiers[pokemon_id]:
+                if modifier.stat_type == StatType.EVASION:
+                    modifiers_to_remove.append(modifier)
+
+            for modifier in modifiers_to_remove:
+                effect_manager.stat_modifiers[pokemon_id].remove(modifier)
+                print(f"[FORESIGHT] Modificador de evasão removido de {target.name}")
+
+        # ===== MOSTRA MENSAGEM =====
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} identificou {target.name}!",
+            duration=1.5
+        )
+
+        effect_manager.add_status_text(
+            target,
+            f"{target.name} está agora sob efeito de Foresight!",
+            duration=1.5
+        )
+
+        # Se o alvo é Fantasma, mensagem adicional
+        if any(t.lower() == "ghost" for t in target.types):
+            effect_manager.add_status_text(
+                attacker,
+                f"Agora ataques Normais e Lutadores acertam {target.name}!",
+                duration=1.5
+            )
+
+        print(f"[FORESIGHT] {attacker.name} usou Foresight em {target.name}!")
+
+        return True
+
+    def _apply_spite(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Spite.
+
+        Mecânica:
+        - Reduz 4 PP do último movimento usado pelo alvo
+        - Se o movimento já tem menos de 4 PP, reduz até 0
+        - Falha se o alvo não usou nenhum movimento
+        - Falha se o último movimento já tem PP 0
+        """
+
+        # ===== VERIFICA SE O ALVO ESTÁ VIVO =====
+        if target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            print(f"[SPITE] {target.name} está derrotado!")
+            return False
+
+        # ===== VERIFICA SE O ALVO USOU ALGUM MOVIMENTO =====
+        if not hasattr(target, '_last_used_move') or not target._last_used_move:
+            effect_manager.add_status_text(
+                attacker,
+                f"Mas falhou! {target.name} não usou nenhum movimento!",
+                duration=1.5
+            )
+            print(f"[SPITE] {target.name} não usou nenhum movimento!")
+            return False
+
+        last_move_name = target._last_used_move
+
+        # ===== ENCONTRA O MOVE NO MOVESET DO ALVO =====
+        last_move = None
+        for move in target.moves:
+            if move.name == last_move_name:
+                last_move = move
+                break
+
+        if not last_move:
+            effect_manager.add_status_text(
+                attacker,
+                f"Mas falhou!",
+                duration=1.0
+            )
+            print(f"[SPITE] Não foi possível encontrar {last_move_name} em {target.name}!")
+            return False
+
+        # ===== VERIFICA SE O MOVE JÁ ESTÁ SEM PP =====
+        if last_move.current_pp <= 0:
+            effect_manager.add_status_text(
+                attacker,
+                f"Mas falhou! {last_move_name} de {target.name} já está sem PP!",
+                duration=1.5
+            )
+            print(f"[SPITE] {last_move_name} de {target.name} já está sem PP!")
+            return False
+
+        # ===== CALCULA A REDUÇÃO DE PP =====
+        pp_reduction = self.params.get("pp_reduction", 4)
+        old_pp = last_move.current_pp
+        new_pp = max(0, old_pp - pp_reduction)
+        actual_reduction = old_pp - new_pp
+
+        # Aplica a redução
+        last_move.current_pp = new_pp
+
+        # ===== MOSTRA MENSAGEM =====
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} usou Spite!",
+            duration=1.0
+        )
+
+        effect_manager.add_status_text(
+            target,
+            f"O PP de {last_move_name} reduziu em {actual_reduction}!",
+            duration=1.5
+        )
+
+        print(f"[SPITE] {attacker.name} reduziu {actual_reduction} PP de {last_move_name} em {target.name}")
+        print(f"[SPITE] {last_move_name}: {old_pp} → {new_pp} PP")
+
+
+        return True

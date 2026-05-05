@@ -1300,6 +1300,9 @@ class Pokemon(Entity):
         self.clear_fury_cutter()
         self.clear_destiny_bond()
         self.clear_disable()
+        self.clear_mind_reader()
+        self.clear_rollout()
+        self.clear_foresight()
 
         # Remove referência local ao status_effect se existir
         if hasattr(self, 'status_effect'):
@@ -1339,6 +1342,35 @@ class Pokemon(Entity):
         if hasattr(self, '_disable_timer'):
             delattr(self, '_disable_timer')
 
+    def clear_mind_reader(self):
+        """Remove o efeito Mind Reader do Pokémon (usado quando sai de campo)"""
+        if hasattr(self, '_mind_reader_active'):
+            self._mind_reader_active = False
+        if hasattr(self, '_mind_reader_target'):
+            self._mind_reader_target = None
+
+    def clear_rollout(self):
+        """Reseta o estado do Rollout"""
+        if hasattr(self, '_rollout_active'):
+            self._rollout_active = False
+        if hasattr(self, '_rollout_turns_left'):
+            self._rollout_turns_left = 0
+        if hasattr(self, '_rollout_hit_count'):
+            self._rollout_hit_count = 0
+        if hasattr(self, '_rollout_current_power'):
+            self._rollout_current_power = 0
+        if hasattr(self, '_rollout_base_power'):
+            self._rollout_base_power = 0
+        if hasattr(self, '_defense_curl_used'):
+            self._defense_curl_used = False
+
+    def clear_foresight(self):
+        """Remove o efeito Foresight do Pokémon"""
+        if hasattr(self, '_foresight_active'):
+            self._foresight_active = False
+        if hasattr(self, '_foresight_source'):
+            self._foresight_source = None
+
     def set_defeated(self, defeated: bool):
         """Define se o Pokémon está derrotado"""
         self.is_defeated = defeated
@@ -1354,10 +1386,6 @@ class Pokemon(Entity):
                         self.battle_system.active_charge_move['attacker'] == self):
                     print(f"[TWO_TURN] Carga de {self.name} foi cancelada devido à derrota!")
                     self.battle_system.active_charge_move = None
-
-            self.clear_disable()
-            self.clear_fury_cutter()
-            self.clear_destiny_bond()
 
             # ===== REMOVE EFEITOS RESIDUAIS DO BATTLE_SYSTEM (apenas se existir) =====
             if hasattr(self, 'battle_system') and self.battle_system:

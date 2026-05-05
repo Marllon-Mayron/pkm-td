@@ -2109,11 +2109,55 @@ class EffectFactory:
             "target": EffectTarget.SELF,
             "timing": EffectTiming.ON_HIT,
             "params": {
-                "hp_cost_percentage": 0.5,  # 50% do HP máximo
-                "attack_stages": 6,  # Aumenta para +6 (máximo)
-                "max_stage": 6,  # Máximo permitido
+                "hp_cost_percentage": 0.5,
+                "attack_stages": 6,
+                "max_stage": 6,
             },
             "description": "Sacrifica metade do HP para maximizar o Ataque (+6 estágios) por 30s."
+        },
+        "mind-reader": {
+            "effect_type": "mind_reader",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "duration_attacks": 1,  # Dura 1 ataque
+            },
+            "description": "Garante que o próximo ataque do usuário acertará o alvo."
+        },
+        "rollout": {
+    "effect_type": "rollout",
+    "target": EffectTarget.TARGET,
+    "timing": EffectTiming.ON_HIT,
+    "params": {
+        "base_power": 30,
+        "power_multiplier": 2,  # Dobra a cada acerto consecutivo
+        "max_multiplier": 16,   # Máximo 16x (poder 480)
+        "defense_curl_boost": 2,  # Defense Curl dobra poder base
+        "reset_on_miss": True,    # Reseta se errar
+    },
+    "description": "Poder dobra a cada acerto consecutivo. Máximo 480. Defense Curl dobra o poder base."
+},
+        "foresight": {
+            "effect_type": "foresight",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "reset_evasion": True,
+                "block_evasion_boosts": True,
+                "bypass_ghost_immunity": True,
+                "duration": None,  # Até o alvo sair de campo
+            },
+            "description": "Revela o alvo, cancelando imunidade de Fantasma e impedindo aumento de evasão."
+        },
+        "spite": {
+            "effect_type": "spite",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "pp_reduction": 4,
+                "min_pp": 0,
+            },
+            "description": "Reduz 4 PP do último movimento usado pelo alvo."
         },
         # ===== DANO NO ATACANTE =====
         "outrage": {
@@ -2156,6 +2200,7 @@ class EffectFactory:
             },
             "description": "Cura 50% do HP. No sol forte, cura 2/3. Em clima ruim, cura 1/4."
         },
+
 
     }
 
