@@ -1,7 +1,7 @@
 {
     "chapter": 5,
     "phase": 2,
-    "name": "Rota 12",
+    "name": "Rota 13",
     "map": {
         "width": 21,
         "height": 21,
@@ -1779,8 +1779,14 @@
             }
         ]
     },
+    "events": {
+        "triggers": [],
+        "selected_trigger": 0
+    },
     "rewards": {
         "money": 500,
         "experience": 300
-    }
+    },
+    "localization_type": "default",
+    "custom_folder": ""
 }
