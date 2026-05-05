@@ -283,12 +283,20 @@ class MoveEffect:
             return self._apply_belly_drum(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "weather_heal":
             return self._apply_weather_heal(attacker, target, battle_system, effect_manager)
-        elif self.effect_type == "mind_reader":
-            return self._apply_mind_reader(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "guaranteed_hit":
+            return self._apply_guaranteed_hit(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "rollout":
             return self._apply_rollout(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "spite":
             return self._apply_spite(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "protect":
+            return self._apply_protect(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "safeguard":
+            return self._apply_safeguard(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "sleep_talk":
+            return self._apply_sleep_talk(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "spider_web":
+            return self._apply_spider_web(attacker, target, battle_system, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -5035,9 +5043,9 @@ class MoveEffect:
 
         return heal_move.execute(attacker, target, battle_system, effect_manager)
 
-    def _apply_mind_reader(self, attacker, target, battle_system, effect_manager):
+    def _apply_guaranteed_hit(self, attacker, target, battle_system, effect_manager):
         """
-        Aplica o efeito Mind Reader.
+        Aplica o efeito de acerto garantido (Lock-On, Mind Reader).
 
         Mecânica:
         - Garante que o PRÓXIMO ataque do usuário acertará o alvo
@@ -5045,26 +5053,46 @@ class MoveEffect:
         - Ignora accuracy/evasion do próximo ataque
         """
 
+        effect_key = self.params.get("effect_key", "guaranteed_hit")
+
+        # Nomes para exibição
+        effect_names = {
+            "lock_on": "Lock-On",
+            "mind_reader": "Mind Reader",
+            "guaranteed_hit": "Foco"
+        }
+        effect_name = effect_names.get(effect_key, "Foco")
+
+        # Nome da flag que será armazenada no Pokémon
+        active_flag = f"_{effect_key}_active"
+        target_flag = f"_{effect_key}_target"
+
         # ===== VERIFICA SE O ALVO ESTÁ VIVO =====
         if target.is_defeated or not target.is_alive():
             effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
-            print(f"[MIND_READER] {target.name} está derrotado!")
+            print(f"[{effect_name.upper()}] {target.name} está derrotado!")
             return False
 
         # ===== VERIFICA SE JÁ ESTÁ ATIVO =====
-        if hasattr(attacker, '_mind_reader_active') and attacker._mind_reader_active:
+        if hasattr(attacker, active_flag) and getattr(attacker, active_flag):
             effect_manager.add_status_text(attacker, f"Já está focado no alvo!", duration=1.0)
-            print(f"[MIND_READER] {attacker.name} já tem Mind Reader ativo!")
+            print(f"[{effect_name.upper()}] {attacker.name} já tem {effect_name} ativo!")
             return False
 
-        # ===== ATIVA O MIND READER =====
-        attacker._mind_reader_active = True
-        attacker._mind_reader_target = target
+        # ===== ATIVA O EFEITO =====
+        setattr(attacker, active_flag, True)
+        setattr(attacker, target_flag, target)
 
         # Mostra mensagem
         effect_manager.add_status_text(
             attacker,
-            f"{attacker.name} leu a mente de {target.name}!",
+            f"{attacker.name} usou {effect_name}!",
+            duration=1.0
+        )
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} travou o alvo {target.name}!",
             duration=1.5
         )
 
@@ -5074,11 +5102,11 @@ class MoveEffect:
             duration=1.5
         )
 
-        print(f"[MIND_READER] {attacker.name} garantiu o próximo ataque em {target.name}!")
+        print(f"[{effect_name.upper()}] {attacker.name} garantiu o próximo ataque em {target.name}!")
 
         # Toca som
         from src.managers.sounds.move_sound_manager import move_sound_manager
-        move_sound_manager.play_attack_sound("mind-reader")
+        move_sound_manager.play_attack_sound(effect_key)
 
         return True
 
@@ -5377,5 +5405,315 @@ class MoveEffect:
         print(f"[SPITE] {attacker.name} reduziu {actual_reduction} PP de {last_move_name} em {target.name}")
         print(f"[SPITE] {last_move_name}: {old_pp} → {new_pp} PP")
 
+
+        return True
+
+    def _apply_perish_song(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Perish Song.
+
+        Mecânica:
+        - Todos os Pokémon em campo recebem um contador de 3
+        - Cada vez que o Pokémon ATACA, o contador diminui em 1
+        - Quando chega a 0, o Pokémon desmaia APÓS o ataque
+        """
+
+        # ===== COLETA TODOS OS POKÉMON EM CAMPO =====
+        all_pokemon_in_field = []
+
+        # Adiciona o atacante
+        all_pokemon_in_field.append(attacker)
+
+        # Adiciona o alvo (se diferente)
+        if target != attacker and target.is_alive() and not target.is_defeated:
+            all_pokemon_in_field.append(target)
+
+        # Adiciona aliados (placed_pokemon)
+        if battle_system.game_scene and hasattr(battle_system.game_scene, 'placement_manager'):
+            for pokemon in battle_system.game_scene.placement_manager.placed_pokemon:
+                if pokemon not in all_pokemon_in_field and pokemon.is_alive() and not pokemon.is_defeated:
+                    all_pokemon_in_field.append(pokemon)
+
+        # Adiciona inimigos (active_enemies)
+        if battle_system.game_scene and hasattr(battle_system.game_scene, 'wave_manager'):
+            for enemy in battle_system.game_scene.wave_manager.active_enemies:
+                if enemy not in all_pokemon_in_field and enemy.is_alive() and not enemy.is_defeated:
+                    all_pokemon_in_field.append(enemy)
+
+        # ===== VERIFICA SE ALGUÉM JÁ TEM PERISH SONG =====
+        for pokemon in all_pokemon_in_field:
+            if hasattr(pokemon, '_perish_song_active') and pokemon._perish_song_active:
+                effect_manager.add_status_text(
+                    attacker,
+                    f"Mas a Canção do Perecer já está ativa!",
+                    duration=1.5
+                )
+                return False
+
+        # ===== APLICA O EFEITO EM CADA POKÉMON =====
+        turns = self.params.get("turns", 3)
+
+        for pokemon in all_pokemon_in_field:
+            pokemon._perish_song_active = True
+            pokemon._perish_song_turns_left = turns
+
+            effect_manager.add_status_text(
+                pokemon,
+                f"{pokemon.name} ouviu a Canção do Perecer! ({turns} ataques restantes)",
+                duration=1.5
+            )
+
+            print(f"[PERISH_SONG] {pokemon.name} marcado! {turns} ataques restantes")
+
+        # Mensagem global
+        effect_manager.add_status_text(
+            attacker,
+            f"Uma canção sombria ecoou pelo campo!",
+            duration=2.0
+        )
+
+        return True
+
+    def _apply_protect(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Protect/Detect (proteção contra o próximo ataque).
+
+        Mecânica:
+        - Protege o usuário do PRÓXIMO ataque
+        - Após receber 1 ataque protegido, o efeito acaba
+        """
+
+        # ===== VERIFICA SE JÁ ESTÁ ATIVO =====
+        if hasattr(attacker, '_protected') and attacker._protected:
+            effect_manager.add_status_text(
+                attacker,
+                f"Mas já está protegido!",
+                duration=1.0
+            )
+            return False
+
+        # ===== ATIVA A PROTEÇÃO =====
+        duration_attacks = self.params.get("duration_attacks", 1)
+
+        attacker._protected = True
+        attacker._protection_remaining = duration_attacks
+        attacker._protection_source = self.name.lower()
+
+        # Mostra mensagem
+        move_name_display = "Protect" if self.name.lower() == "protect" else "Detect"
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} usou {move_name_display}!",
+            duration=1.5
+        )
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} está protegido contra o próximo ataque!",
+            duration=1.5
+        )
+
+        print(f"[PROTECT] {attacker.name} está protegido por {duration_attacks} ataque(s)!")
+
+        return True
+
+    def _apply_safeguard(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Safeguard (proteção contra status).
+
+        Mecânica:
+        - Protege o time de status problems pelos PRÓXIMOS 5 ATAQUES que cada um receber
+        - Cada Pokémon tem seu próprio contador
+        """
+
+        # ===== COLETA TODOS OS ALIADOS EM CAMPO =====
+        allies = []
+
+        if battle_system.game_scene:
+            if hasattr(battle_system.game_scene, 'placement_manager'):
+                for pokemon in battle_system.game_scene.placement_manager.placed_pokemon:
+                    if not pokemon.is_wild and pokemon.is_alive() and not pokemon.is_defeated:
+                        allies.append(pokemon)
+
+        # Garante que o atacante está na lista
+        if attacker not in allies and attacker.is_alive() and not attacker.is_defeated:
+            allies.append(attacker)
+
+        # ===== APLICA O SAFEGUARD EM CADA ALIADO =====
+        duration_attacks = self.params.get("duration_attacks", 5)
+
+        for pokemon in allies:
+            # Remove safeguard anterior se existir
+            if hasattr(pokemon, '_safeguard_active'):
+                pokemon._safeguard_active = False
+
+            # Ativa novo safeguard
+            pokemon._safeguard_active = True
+            pokemon._safeguard_remaining = duration_attacks
+
+            effect_manager.add_status_text(
+                pokemon,
+                f"{pokemon.name} está protegido contra status por {duration_attacks} ataques!",
+                duration=1.0
+            )
+
+            print(f"[SAFEGUARD] {pokemon.name} protegido por {duration_attacks} ataques!")
+
+        # Mensagem global
+        effect_manager.add_status_text(
+            attacker,
+            f"Uma barreira mística protege o time contra status!",
+            duration=2.0
+        )
+
+        return True
+
+    def _apply_sleep_talk(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Sleep Talk.
+
+        Mecânica:
+        - Só funciona se o atacante estiver DORMINDO
+        - Escolhe aleatoriamente um dos OUTROS movimentos do usuário
+        - Executa esse movimento imediatamente
+        - Não gasta PP do movimento escolhido (gasta apenas do Sleep Talk)
+        - Move escolhido não pode ser Sleep Talk
+        """
+        from src.battle.effects import StatusType
+        from src.battle.damage_calculator import DamageCalculator
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+        import random
+
+        # ===== VERIFICA SE O ATACANTE ESTÁ DORMINDO =====
+        status = effect_manager.get_status(attacker)
+
+        if not status or status.type != StatusType.SLEEP:
+            effect_manager.add_status_text(
+                attacker,
+                f"Mas falhou! {attacker.name} não está dormindo!",
+                duration=1.5
+            )
+            print(f"[SLEEP_TALK] {attacker.name} tentou usar Sleep Talk, mas não está dormindo!")
+            return False
+
+        # ===== OBTÉM O MOVE ATUAL =====
+        current_move = attacker.get_current_move()
+        if not current_move:
+            print(f"[SLEEP_TALK] {attacker.name} não tem move selecionado!")
+            return False
+
+        # Verifica PP do Sleep Talk
+        if current_move.current_pp <= 0:
+            effect_manager.add_status_text(attacker, f"Não há PP para {current_move.name}!", duration=1.0)
+            return False
+
+        # ===== FILTRA MOVES DISPONÍVEIS (EXCLUINDO SLEEP TALK) =====
+        available_moves = [m for m in attacker.moves if m.name.lower() != "sleep-talk" and m.current_pp > 0]
+
+        if not available_moves:
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} não tem outros movimentos para usar!",
+                duration=1.0
+            )
+            print(f"[SLEEP_TALK] {attacker.name} não tem outros moves com PP!")
+            return False
+
+        # ===== ESCOLHE UM MOVE ALEATÓRIO =====
+        chosen_move = random.choice(available_moves)
+
+        # Mostra mensagem
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} usou Sleep Talk!",
+            duration=1.0
+        )
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} usou {chosen_move.name} enquanto dormia!",
+            duration=1.5
+        )
+
+        print(f"[SLEEP_TALK] {attacker.name} (dormindo) usou {chosen_move.name}!")
+
+        # ===== GASTA PP DO SLEEP TALK =====
+        current_move.current_pp -= 1
+
+        # ===== EXECUTA O MOVE ESCOLHIDO =====
+        # Não gasta PP do move escolhido
+        # Salva PP original para restaurar depois
+        original_pp = chosen_move.current_pp
+
+        # Executa o ataque
+        success = battle_system.attempt_attack(attacker, target)
+
+        # Restaura PP (não gasta do move escolhido)
+        chosen_move.current_pp = original_pp
+
+        # Cooldown
+        attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+        # Registra o movimento usado (para Disable - foi Sleep Talk, não o move escolhido)
+        attacker._last_used_move = current_move.name
+
+        return success
+
+    def _apply_spider_web(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Spider Web.
+
+        Mecânica:
+        - Prende o alvo por 3 turnos (ataques)
+        - Enquanto preso:
+            - Inimigos: não se movem e não atacam
+            - Aliados: não podem ser removidos do spot (drag/drop bloqueado)
+        """
+
+        # ===== VERIFICA SE O ALVO ESTÁ VIVO =====
+        if target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            print(f"[SPIDER_WEB] {target.name} está derrotado!")
+            return False
+
+        # ===== VERIFICA SE JÁ ESTÁ PRESO =====
+        if hasattr(target, '_spider_web_active') and target._spider_web_active:
+            effect_manager.add_status_text(
+                attacker,
+                f"Mas {target.name} já está preso na teia!",
+                duration=1.0
+            )
+            print(f"[SPIDER_WEB] {target.name} já está preso!")
+            return False
+
+        # ===== ATIVA O EFEITO =====
+        duration_attacks = self.params.get("duration_attacks", 3)
+
+        target._spider_web_active = True
+        target._spider_web_remaining = duration_attacks
+        target._spider_web_source = attacker
+
+        # Salva a posição original (para garantir que não se mova)
+        target._spider_web_locked_x = target.x
+        target._spider_web_locked_y = target.y
+
+        # Mostra mensagem
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} usou Spider Web!",
+            duration=1.0
+        )
+
+        effect_manager.add_status_text(
+            target,
+            f"{target.name} ficou preso na teia! ({duration_attacks} turnos)",
+            duration=1.5
+        )
+
+        print(f"[SPIDER_WEB] {attacker.name} prendeu {target.name} por {duration_attacks} turnos!")
+
+        # Toca som
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound("spider-web")
 
         return True

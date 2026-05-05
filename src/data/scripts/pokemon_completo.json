@@ -9900,5 +9900,6303 @@
             "is_last_evolution": true,
             "evolution_methods_info": "Não evolui"
         }
+    },
+    {
+        "id": 152,
+        "name": "chikorita",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "grass"
+        ],
+        "base": {
+            "hp": 45,
+            "attack": 49,
+            "defense": 65,
+            "special-attack": 49,
+            "special-defense": 65,
+            "speed": 45
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 1,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "overgrow",
+            "leaf-guard"
+        ],
+        "hidden_ability": "leaf-guard",
+        "weight_kg": 6.4,
+        "height_m": 0.9,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 153,
+                    "evolves_to_name": "bayleef",
+                    "method": "level_up",
+                    "min_level": 16
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 152,
+                    "name": "chikorita"
+                },
+                {
+                    "id": 153,
+                    "name": "bayleef"
+                },
+                {
+                    "id": 154,
+                    "name": "meganium"
+                }
+            ],
+            "evolution_chain_id": 79,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 16"
+        }
+    },
+    {
+        "id": 153,
+        "name": "bayleef",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "grass"
+        ],
+        "base": {
+            "hp": 60,
+            "attack": 62,
+            "defense": 80,
+            "special-attack": 63,
+            "special-defense": 80,
+            "speed": 60
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 1,
+            "special-attack": 0,
+            "special-defense": 1,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "overgrow",
+            "leaf-guard"
+        ],
+        "hidden_ability": "leaf-guard",
+        "weight_kg": 15.8,
+        "height_m": 1.2,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": {
+                "id": 152,
+                "name": "chikorita"
+            },
+            "evolution_details": [
+                {
+                    "evolves_to_id": 154,
+                    "evolves_to_name": "meganium",
+                    "method": "level_up",
+                    "min_level": 32
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 152,
+                    "name": "chikorita"
+                },
+                {
+                    "id": 153,
+                    "name": "bayleef"
+                },
+                {
+                    "id": 154,
+                    "name": "meganium"
+                }
+            ],
+            "evolution_chain_id": 79,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 32"
+        }
+    },
+    {
+        "id": 154,
+        "name": "meganium",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "grass"
+        ],
+        "base": {
+            "hp": 80,
+            "attack": 82,
+            "defense": 100,
+            "special-attack": 83,
+            "special-defense": 100,
+            "speed": 80
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 1,
+            "special-attack": 0,
+            "special-defense": 2,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "overgrow",
+            "leaf-guard"
+        ],
+        "hidden_ability": "leaf-guard",
+        "weight_kg": 100.5,
+        "height_m": 1.8,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": {
+                "id": 153,
+                "name": "bayleef"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 152,
+                    "name": "chikorita"
+                },
+                {
+                    "id": 153,
+                    "name": "bayleef"
+                },
+                {
+                    "id": 154,
+                    "name": "meganium"
+                }
+            ],
+            "evolution_chain_id": 79,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 155,
+        "name": "cyndaquil",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fire"
+        ],
+        "base": {
+            "hp": 39,
+            "attack": 52,
+            "defense": 43,
+            "special-attack": 60,
+            "special-defense": 50,
+            "speed": 65
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "blaze",
+            "flash-fire"
+        ],
+        "hidden_ability": "flash-fire",
+        "weight_kg": 7.9,
+        "height_m": 0.5,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 156,
+                    "evolves_to_name": "quilava",
+                    "method": "level_up",
+                    "min_level": 14
+                },
+                {
+                    "evolves_to_id": 156,
+                    "evolves_to_name": "quilava",
+                    "method": "level_up",
+                    "min_level": 17
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 155,
+                    "name": "cyndaquil"
+                },
+                {
+                    "id": 156,
+                    "name": "quilava"
+                },
+                {
+                    "id": 157,
+                    "name": "typhlosion"
+                }
+            ],
+            "evolution_chain_id": 80,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 14 ou Nível 17"
+        }
+    },
+    {
+        "id": 156,
+        "name": "quilava",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fire"
+        ],
+        "base": {
+            "hp": 58,
+            "attack": 64,
+            "defense": 58,
+            "special-attack": 80,
+            "special-defense": 65,
+            "speed": 80
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "blaze",
+            "flash-fire"
+        ],
+        "hidden_ability": "flash-fire",
+        "weight_kg": 19.0,
+        "height_m": 0.9,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": {
+                "id": 155,
+                "name": "cyndaquil"
+            },
+            "evolution_details": [
+                {
+                    "evolves_to_id": 157,
+                    "evolves_to_name": "typhlosion",
+                    "method": "level_up",
+                    "min_level": 36
+                },
+                {
+                    "evolves_to_id": 157,
+                    "evolves_to_name": "typhlosion",
+                    "method": "level_up",
+                    "min_level": 36
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 155,
+                    "name": "cyndaquil"
+                },
+                {
+                    "id": 156,
+                    "name": "quilava"
+                },
+                {
+                    "id": 157,
+                    "name": "typhlosion"
+                }
+            ],
+            "evolution_chain_id": 80,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 36 ou Nível 36"
+        }
+    },
+    {
+        "id": 157,
+        "name": "typhlosion",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fire"
+        ],
+        "base": {
+            "hp": 78,
+            "attack": 84,
+            "defense": 78,
+            "special-attack": 109,
+            "special-defense": 85,
+            "speed": 100
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 3,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "blaze",
+            "flash-fire"
+        ],
+        "hidden_ability": "flash-fire",
+        "weight_kg": 79.5,
+        "height_m": 1.7,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": {
+                "id": 156,
+                "name": "quilava"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 155,
+                    "name": "cyndaquil"
+                },
+                {
+                    "id": 156,
+                    "name": "quilava"
+                },
+                {
+                    "id": 157,
+                    "name": "typhlosion"
+                }
+            ],
+            "evolution_chain_id": 80,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 158,
+        "name": "totodile",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water"
+        ],
+        "base": {
+            "hp": 50,
+            "attack": 65,
+            "defense": 64,
+            "special-attack": 44,
+            "special-defense": 48,
+            "speed": 43
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "torrent",
+            "sheer-force"
+        ],
+        "hidden_ability": "sheer-force",
+        "weight_kg": 9.5,
+        "height_m": 0.6,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 159,
+                    "evolves_to_name": "croconaw",
+                    "method": "level_up",
+                    "min_level": 18
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 158,
+                    "name": "totodile"
+                },
+                {
+                    "id": 159,
+                    "name": "croconaw"
+                },
+                {
+                    "id": 160,
+                    "name": "feraligatr"
+                }
+            ],
+            "evolution_chain_id": 81,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 18"
+        }
+    },
+    {
+        "id": 159,
+        "name": "croconaw",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water"
+        ],
+        "base": {
+            "hp": 65,
+            "attack": 80,
+            "defense": 80,
+            "special-attack": 59,
+            "special-defense": 63,
+            "speed": 58
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 1,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "torrent",
+            "sheer-force"
+        ],
+        "hidden_ability": "sheer-force",
+        "weight_kg": 25.0,
+        "height_m": 1.1,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": {
+                "id": 158,
+                "name": "totodile"
+            },
+            "evolution_details": [
+                {
+                    "evolves_to_id": 160,
+                    "evolves_to_name": "feraligatr",
+                    "method": "level_up",
+                    "min_level": 30
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 158,
+                    "name": "totodile"
+                },
+                {
+                    "id": 159,
+                    "name": "croconaw"
+                },
+                {
+                    "id": 160,
+                    "name": "feraligatr"
+                }
+            ],
+            "evolution_chain_id": 81,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 30"
+        }
+    },
+    {
+        "id": 160,
+        "name": "feraligatr",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water"
+        ],
+        "base": {
+            "hp": 85,
+            "attack": 105,
+            "defense": 100,
+            "special-attack": 79,
+            "special-defense": 83,
+            "speed": 78
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 2,
+            "defense": 1,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "torrent",
+            "sheer-force"
+        ],
+        "hidden_ability": "sheer-force",
+        "weight_kg": 88.8,
+        "height_m": 2.3,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": {
+                "id": 159,
+                "name": "croconaw"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 158,
+                    "name": "totodile"
+                },
+                {
+                    "id": 159,
+                    "name": "croconaw"
+                },
+                {
+                    "id": 160,
+                    "name": "feraligatr"
+                }
+            ],
+            "evolution_chain_id": 81,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 161,
+        "name": "sentret",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal"
+        ],
+        "base": {
+            "hp": 35,
+            "attack": 46,
+            "defense": 34,
+            "special-attack": 35,
+            "special-defense": 45,
+            "speed": 20
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 255,
+        "base_happiness": 70,
+        "abilities": [
+            "run-away",
+            "keen-eye",
+            "frisk"
+        ],
+        "hidden_ability": "frisk",
+        "weight_kg": 6.0,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 162,
+                    "evolves_to_name": "furret",
+                    "method": "level_up",
+                    "min_level": 15
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 161,
+                    "name": "sentret"
+                },
+                {
+                    "id": 162,
+                    "name": "furret"
+                }
+            ],
+            "evolution_chain_id": 82,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 15"
+        }
+    },
+    {
+        "id": 162,
+        "name": "furret",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal"
+        ],
+        "base": {
+            "hp": 85,
+            "attack": 76,
+            "defense": 64,
+            "special-attack": 45,
+            "special-defense": 55,
+            "speed": 90
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 2
+        },
+        "capture_rate": 90,
+        "base_happiness": 70,
+        "abilities": [
+            "run-away",
+            "keen-eye",
+            "frisk"
+        ],
+        "hidden_ability": "frisk",
+        "weight_kg": 32.5,
+        "height_m": 1.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 161,
+                "name": "sentret"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 161,
+                    "name": "sentret"
+                },
+                {
+                    "id": 162,
+                    "name": "furret"
+                }
+            ],
+            "evolution_chain_id": 82,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 163,
+        "name": "hoothoot",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal",
+            "flying"
+        ],
+        "base": {
+            "hp": 60,
+            "attack": 30,
+            "defense": 30,
+            "special-attack": 36,
+            "special-defense": 56,
+            "speed": 50
+        },
+        "ev": {
+            "hp": 1,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 255,
+        "base_happiness": 70,
+        "abilities": [
+            "insomnia",
+            "keen-eye",
+            "tinted-lens"
+        ],
+        "hidden_ability": "tinted-lens",
+        "weight_kg": 21.2,
+        "height_m": 0.7,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 164,
+                    "evolves_to_name": "noctowl",
+                    "method": "level_up",
+                    "min_level": 20
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 163,
+                    "name": "hoothoot"
+                },
+                {
+                    "id": 164,
+                    "name": "noctowl"
+                }
+            ],
+            "evolution_chain_id": 83,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 20"
+        }
+    },
+    {
+        "id": 164,
+        "name": "noctowl",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal",
+            "flying"
+        ],
+        "base": {
+            "hp": 100,
+            "attack": 50,
+            "defense": 50,
+            "special-attack": 86,
+            "special-defense": 96,
+            "speed": 70
+        },
+        "ev": {
+            "hp": 2,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 90,
+        "base_happiness": 70,
+        "abilities": [
+            "insomnia",
+            "keen-eye",
+            "tinted-lens"
+        ],
+        "hidden_ability": "tinted-lens",
+        "weight_kg": 40.8,
+        "height_m": 1.6,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 163,
+                "name": "hoothoot"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 163,
+                    "name": "hoothoot"
+                },
+                {
+                    "id": 164,
+                    "name": "noctowl"
+                }
+            ],
+            "evolution_chain_id": 83,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 165,
+        "name": "ledyba",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "bug",
+            "flying"
+        ],
+        "base": {
+            "hp": 40,
+            "attack": 20,
+            "defense": 30,
+            "special-attack": 40,
+            "special-defense": 80,
+            "speed": 55
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 1,
+            "speed": 0
+        },
+        "capture_rate": 255,
+        "base_happiness": 70,
+        "abilities": [
+            "swarm",
+            "early-bird",
+            "rattled"
+        ],
+        "hidden_ability": "rattled",
+        "weight_kg": 10.8,
+        "height_m": 1.0,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 166,
+                    "evolves_to_name": "ledian",
+                    "method": "level_up",
+                    "min_level": 18
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 165,
+                    "name": "ledyba"
+                },
+                {
+                    "id": 166,
+                    "name": "ledian"
+                }
+            ],
+            "evolution_chain_id": 84,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 18"
+        }
+    },
+    {
+        "id": 166,
+        "name": "ledian",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "bug",
+            "flying"
+        ],
+        "base": {
+            "hp": 55,
+            "attack": 35,
+            "defense": 50,
+            "special-attack": 55,
+            "special-defense": 110,
+            "speed": 85
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 2,
+            "speed": 0
+        },
+        "capture_rate": 90,
+        "base_happiness": 70,
+        "abilities": [
+            "swarm",
+            "early-bird",
+            "iron-fist"
+        ],
+        "hidden_ability": "iron-fist",
+        "weight_kg": 35.6,
+        "height_m": 1.4,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 165,
+                "name": "ledyba"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 165,
+                    "name": "ledyba"
+                },
+                {
+                    "id": 166,
+                    "name": "ledian"
+                }
+            ],
+            "evolution_chain_id": 84,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 167,
+        "name": "spinarak",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "bug",
+            "poison"
+        ],
+        "base": {
+            "hp": 40,
+            "attack": 60,
+            "defense": 40,
+            "special-attack": 40,
+            "special-defense": 40,
+            "speed": 30
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 255,
+        "base_happiness": 70,
+        "abilities": [
+            "swarm",
+            "insomnia",
+            "sniper"
+        ],
+        "hidden_ability": "sniper",
+        "weight_kg": 8.5,
+        "height_m": 0.5,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 168,
+                    "evolves_to_name": "ariados",
+                    "method": "level_up",
+                    "min_level": 22
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 167,
+                    "name": "spinarak"
+                },
+                {
+                    "id": 168,
+                    "name": "ariados"
+                }
+            ],
+            "evolution_chain_id": 85,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 22"
+        }
+    },
+    {
+        "id": 168,
+        "name": "ariados",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "bug",
+            "poison"
+        ],
+        "base": {
+            "hp": 70,
+            "attack": 90,
+            "defense": 70,
+            "special-attack": 60,
+            "special-defense": 70,
+            "speed": 40
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 2,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 90,
+        "base_happiness": 70,
+        "abilities": [
+            "swarm",
+            "insomnia",
+            "sniper"
+        ],
+        "hidden_ability": "sniper",
+        "weight_kg": 33.5,
+        "height_m": 1.1,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 167,
+                "name": "spinarak"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 167,
+                    "name": "spinarak"
+                },
+                {
+                    "id": 168,
+                    "name": "ariados"
+                }
+            ],
+            "evolution_chain_id": 85,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 169,
+        "name": "crobat",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "poison",
+            "flying"
+        ],
+        "base": {
+            "hp": 85,
+            "attack": 90,
+            "defense": 80,
+            "special-attack": 70,
+            "special-defense": 80,
+            "speed": 130
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 3
+        },
+        "capture_rate": 90,
+        "base_happiness": 70,
+        "abilities": [
+            "inner-focus",
+            "infiltrator"
+        ],
+        "hidden_ability": "infiltrator",
+        "weight_kg": 75.0,
+        "height_m": 1.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 42,
+                "name": "golbat"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 41,
+                    "name": "zubat"
+                },
+                {
+                    "id": 42,
+                    "name": "golbat"
+                },
+                {
+                    "id": 169,
+                    "name": "crobat"
+                }
+            ],
+            "evolution_chain_id": 17,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 170,
+        "name": "chinchou",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water",
+            "electric"
+        ],
+        "base": {
+            "hp": 75,
+            "attack": 38,
+            "defense": 38,
+            "special-attack": 56,
+            "special-defense": 56,
+            "speed": 67
+        },
+        "ev": {
+            "hp": 1,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 190,
+        "base_happiness": 70,
+        "abilities": [
+            "volt-absorb",
+            "illuminate",
+            "water-absorb"
+        ],
+        "hidden_ability": "water-absorb",
+        "weight_kg": 12.0,
+        "height_m": 0.5,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 171,
+                    "evolves_to_name": "lanturn",
+                    "method": "level_up",
+                    "min_level": 27
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 170,
+                    "name": "chinchou"
+                },
+                {
+                    "id": 171,
+                    "name": "lanturn"
+                }
+            ],
+            "evolution_chain_id": 86,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 27"
+        }
+    },
+    {
+        "id": 171,
+        "name": "lanturn",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water",
+            "electric"
+        ],
+        "base": {
+            "hp": 125,
+            "attack": 58,
+            "defense": 58,
+            "special-attack": 76,
+            "special-defense": 76,
+            "speed": 67
+        },
+        "ev": {
+            "hp": 2,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 75,
+        "base_happiness": 70,
+        "abilities": [
+            "volt-absorb",
+            "illuminate",
+            "water-absorb"
+        ],
+        "hidden_ability": "water-absorb",
+        "weight_kg": 22.5,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 170,
+                "name": "chinchou"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 170,
+                    "name": "chinchou"
+                },
+                {
+                    "id": 171,
+                    "name": "lanturn"
+                }
+            ],
+            "evolution_chain_id": 86,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 172,
+        "name": "pichu",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "electric"
+        ],
+        "base": {
+            "hp": 20,
+            "attack": 40,
+            "defense": 15,
+            "special-attack": 35,
+            "special-defense": 35,
+            "speed": 60
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 190,
+        "base_happiness": 70,
+        "abilities": [
+            "static",
+            "lightning-rod"
+        ],
+        "hidden_ability": "lightning-rod",
+        "weight_kg": 2.0,
+        "height_m": 0.3,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 25,
+                    "evolves_to_name": "pikachu",
+                    "method": "happiness",
+                    "min_happiness": 220
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 172,
+                    "name": "pichu"
+                },
+                {
+                    "id": 25,
+                    "name": "pikachu"
+                },
+                {
+                    "id": 26,
+                    "name": "raichu"
+                }
+            ],
+            "evolution_chain_id": 10,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Felicidade ≥ 220"
+        }
+    },
+    {
+        "id": 173,
+        "name": "cleffa",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fairy"
+        ],
+        "base": {
+            "hp": 50,
+            "attack": 25,
+            "defense": 28,
+            "special-attack": 45,
+            "special-defense": 55,
+            "speed": 15
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 1,
+            "speed": 0
+        },
+        "capture_rate": 150,
+        "base_happiness": 140,
+        "abilities": [
+            "cute-charm",
+            "magic-guard",
+            "friend-guard"
+        ],
+        "hidden_ability": "friend-guard",
+        "weight_kg": 3.0,
+        "height_m": 0.3,
+        "gender_ratio": 0.25,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 35,
+                    "evolves_to_name": "clefairy",
+                    "method": "happiness",
+                    "min_happiness": 160
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 173,
+                    "name": "cleffa"
+                },
+                {
+                    "id": 35,
+                    "name": "clefairy"
+                },
+                {
+                    "id": 36,
+                    "name": "clefable"
+                }
+            ],
+            "evolution_chain_id": 14,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Felicidade ≥ 160"
+        }
+    },
+    {
+        "id": 174,
+        "name": "igglybuff",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal",
+            "fairy"
+        ],
+        "base": {
+            "hp": 90,
+            "attack": 30,
+            "defense": 15,
+            "special-attack": 40,
+            "special-defense": 20,
+            "speed": 15
+        },
+        "ev": {
+            "hp": 1,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 170,
+        "base_happiness": 70,
+        "abilities": [
+            "cute-charm",
+            "competitive",
+            "friend-guard"
+        ],
+        "hidden_ability": "friend-guard",
+        "weight_kg": 1.0,
+        "height_m": 0.3,
+        "gender_ratio": 0.25,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 39,
+                    "evolves_to_name": "jigglypuff",
+                    "method": "happiness",
+                    "min_happiness": 160
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 174,
+                    "name": "igglybuff"
+                },
+                {
+                    "id": 39,
+                    "name": "jigglypuff"
+                },
+                {
+                    "id": 40,
+                    "name": "wigglytuff"
+                }
+            ],
+            "evolution_chain_id": 16,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Felicidade ≥ 160"
+        }
+    },
+    {
+        "id": 175,
+        "name": "togepi",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fairy"
+        ],
+        "base": {
+            "hp": 35,
+            "attack": 20,
+            "defense": 65,
+            "special-attack": 40,
+            "special-defense": 65,
+            "speed": 20
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 1,
+            "speed": 0
+        },
+        "capture_rate": 190,
+        "base_happiness": 70,
+        "abilities": [
+            "hustle",
+            "serene-grace",
+            "super-luck"
+        ],
+        "hidden_ability": "super-luck",
+        "weight_kg": 1.5,
+        "height_m": 0.3,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 176,
+                    "evolves_to_name": "togetic",
+                    "method": "happiness",
+                    "min_happiness": 160
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 175,
+                    "name": "togepi"
+                },
+                {
+                    "id": 176,
+                    "name": "togetic"
+                },
+                {
+                    "id": 468,
+                    "name": "togekiss"
+                }
+            ],
+            "evolution_chain_id": 87,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Felicidade ≥ 160"
+        }
+    },
+    {
+        "id": 176,
+        "name": "togetic",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fairy",
+            "flying"
+        ],
+        "base": {
+            "hp": 55,
+            "attack": 40,
+            "defense": 85,
+            "special-attack": 80,
+            "special-defense": 105,
+            "speed": 40
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 2,
+            "speed": 0
+        },
+        "capture_rate": 75,
+        "base_happiness": 70,
+        "abilities": [
+            "hustle",
+            "serene-grace",
+            "super-luck"
+        ],
+        "hidden_ability": "super-luck",
+        "weight_kg": 3.2,
+        "height_m": 0.6,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": {
+                "id": 175,
+                "name": "togepi"
+            },
+            "evolution_details": [
+                {
+                    "evolves_to_id": 468,
+                    "evolves_to_name": "togekiss",
+                    "method": "use_item",
+                    "item": "shiny-stone"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 175,
+                    "name": "togepi"
+                },
+                {
+                    "id": 176,
+                    "name": "togetic"
+                },
+                {
+                    "id": 468,
+                    "name": "togekiss"
+                }
+            ],
+            "evolution_chain_id": 87,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Usar shiny-stone"
+        }
+    },
+    {
+        "id": 177,
+        "name": "natu",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "psychic",
+            "flying"
+        ],
+        "base": {
+            "hp": 40,
+            "attack": 50,
+            "defense": 45,
+            "special-attack": 70,
+            "special-defense": 45,
+            "speed": 70
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 190,
+        "base_happiness": 70,
+        "abilities": [
+            "synchronize",
+            "early-bird",
+            "magic-bounce"
+        ],
+        "hidden_ability": "magic-bounce",
+        "weight_kg": 2.0,
+        "height_m": 0.2,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 178,
+                    "evolves_to_name": "xatu",
+                    "method": "level_up",
+                    "min_level": 25
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 177,
+                    "name": "natu"
+                },
+                {
+                    "id": 178,
+                    "name": "xatu"
+                }
+            ],
+            "evolution_chain_id": 88,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 25"
+        }
+    },
+    {
+        "id": 178,
+        "name": "xatu",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "psychic",
+            "flying"
+        ],
+        "base": {
+            "hp": 65,
+            "attack": 75,
+            "defense": 70,
+            "special-attack": 95,
+            "special-defense": 70,
+            "speed": 95
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 75,
+        "base_happiness": 70,
+        "abilities": [
+            "synchronize",
+            "early-bird",
+            "magic-bounce"
+        ],
+        "hidden_ability": "magic-bounce",
+        "weight_kg": 15.0,
+        "height_m": 1.5,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 177,
+                "name": "natu"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 177,
+                    "name": "natu"
+                },
+                {
+                    "id": 178,
+                    "name": "xatu"
+                }
+            ],
+            "evolution_chain_id": 88,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 179,
+        "name": "mareep",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "electric"
+        ],
+        "base": {
+            "hp": 55,
+            "attack": 40,
+            "defense": 40,
+            "special-attack": 65,
+            "special-defense": 45,
+            "speed": 35
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 235,
+        "base_happiness": 70,
+        "abilities": [
+            "static",
+            "plus"
+        ],
+        "hidden_ability": "plus",
+        "weight_kg": 7.8,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 180,
+                    "evolves_to_name": "flaaffy",
+                    "method": "level_up",
+                    "min_level": 15
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 179,
+                    "name": "mareep"
+                },
+                {
+                    "id": 180,
+                    "name": "flaaffy"
+                },
+                {
+                    "id": 181,
+                    "name": "ampharos"
+                }
+            ],
+            "evolution_chain_id": 89,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 15"
+        }
+    },
+    {
+        "id": 180,
+        "name": "flaaffy",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "electric"
+        ],
+        "base": {
+            "hp": 70,
+            "attack": 55,
+            "defense": 55,
+            "special-attack": 80,
+            "special-defense": 60,
+            "speed": 45
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 2,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 120,
+        "base_happiness": 70,
+        "abilities": [
+            "static",
+            "plus"
+        ],
+        "hidden_ability": "plus",
+        "weight_kg": 13.3,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 179,
+                "name": "mareep"
+            },
+            "evolution_details": [
+                {
+                    "evolves_to_id": 181,
+                    "evolves_to_name": "ampharos",
+                    "method": "level_up",
+                    "min_level": 30
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 179,
+                    "name": "mareep"
+                },
+                {
+                    "id": 180,
+                    "name": "flaaffy"
+                },
+                {
+                    "id": 181,
+                    "name": "ampharos"
+                }
+            ],
+            "evolution_chain_id": 89,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 30"
+        }
+    },
+    {
+        "id": 181,
+        "name": "ampharos",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "electric"
+        ],
+        "base": {
+            "hp": 90,
+            "attack": 75,
+            "defense": 85,
+            "special-attack": 115,
+            "special-defense": 90,
+            "speed": 55
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 3,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "static",
+            "plus"
+        ],
+        "hidden_ability": "plus",
+        "weight_kg": 61.5,
+        "height_m": 1.4,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 180,
+                "name": "flaaffy"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 179,
+                    "name": "mareep"
+                },
+                {
+                    "id": 180,
+                    "name": "flaaffy"
+                },
+                {
+                    "id": 181,
+                    "name": "ampharos"
+                }
+            ],
+            "evolution_chain_id": 89,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 182,
+        "name": "bellossom",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "grass"
+        ],
+        "base": {
+            "hp": 75,
+            "attack": 80,
+            "defense": 95,
+            "special-attack": 90,
+            "special-defense": 100,
+            "speed": 50
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 3,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "chlorophyll",
+            "healer"
+        ],
+        "hidden_ability": "healer",
+        "weight_kg": 5.8,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 44,
+                "name": "gloom"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 43,
+                    "name": "oddish"
+                },
+                {
+                    "id": 44,
+                    "name": "gloom"
+                },
+                {
+                    "id": 45,
+                    "name": "vileplume"
+                },
+                {
+                    "id": 182,
+                    "name": "bellossom"
+                }
+            ],
+            "evolution_chain_id": 18,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 183,
+        "name": "marill",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water",
+            "fairy"
+        ],
+        "base": {
+            "hp": 70,
+            "attack": 20,
+            "defense": 50,
+            "special-attack": 20,
+            "special-defense": 50,
+            "speed": 40
+        },
+        "ev": {
+            "hp": 2,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 190,
+        "base_happiness": 70,
+        "abilities": [
+            "thick-fat",
+            "huge-power",
+            "sap-sipper"
+        ],
+        "hidden_ability": "sap-sipper",
+        "weight_kg": 8.5,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 298,
+                "name": "azurill"
+            },
+            "evolution_details": [
+                {
+                    "evolves_to_id": 184,
+                    "evolves_to_name": "azumarill",
+                    "method": "level_up",
+                    "min_level": 18
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 298,
+                    "name": "azurill"
+                },
+                {
+                    "id": 183,
+                    "name": "marill"
+                },
+                {
+                    "id": 184,
+                    "name": "azumarill"
+                }
+            ],
+            "evolution_chain_id": 90,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 18"
+        }
+    },
+    {
+        "id": 184,
+        "name": "azumarill",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water",
+            "fairy"
+        ],
+        "base": {
+            "hp": 100,
+            "attack": 50,
+            "defense": 80,
+            "special-attack": 60,
+            "special-defense": 80,
+            "speed": 50
+        },
+        "ev": {
+            "hp": 3,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 75,
+        "base_happiness": 70,
+        "abilities": [
+            "thick-fat",
+            "huge-power",
+            "sap-sipper"
+        ],
+        "hidden_ability": "sap-sipper",
+        "weight_kg": 28.5,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 183,
+                "name": "marill"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 298,
+                    "name": "azurill"
+                },
+                {
+                    "id": 183,
+                    "name": "marill"
+                },
+                {
+                    "id": 184,
+                    "name": "azumarill"
+                }
+            ],
+            "evolution_chain_id": 90,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 185,
+        "name": "sudowoodo",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "rock"
+        ],
+        "base": {
+            "hp": 70,
+            "attack": 100,
+            "defense": 115,
+            "special-attack": 30,
+            "special-defense": 65,
+            "speed": 30
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 2,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 65,
+        "base_happiness": 70,
+        "abilities": [
+            "sturdy",
+            "rock-head",
+            "rattled"
+        ],
+        "hidden_ability": "rattled",
+        "weight_kg": 38.0,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 438,
+                "name": "bonsly"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 438,
+                    "name": "bonsly"
+                },
+                {
+                    "id": 185,
+                    "name": "sudowoodo"
+                }
+            ],
+            "evolution_chain_id": 91,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 186,
+        "name": "politoed",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water"
+        ],
+        "base": {
+            "hp": 90,
+            "attack": 75,
+            "defense": 75,
+            "special-attack": 90,
+            "special-defense": 100,
+            "speed": 70
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 3,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "water-absorb",
+            "damp",
+            "drizzle"
+        ],
+        "hidden_ability": "drizzle",
+        "weight_kg": 33.9,
+        "height_m": 1.1,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 61,
+                "name": "poliwhirl"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 60,
+                    "name": "poliwag"
+                },
+                {
+                    "id": 61,
+                    "name": "poliwhirl"
+                },
+                {
+                    "id": 62,
+                    "name": "poliwrath"
+                },
+                {
+                    "id": 186,
+                    "name": "politoed"
+                }
+            ],
+            "evolution_chain_id": 26,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 187,
+        "name": "hoppip",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "grass",
+            "flying"
+        ],
+        "base": {
+            "hp": 35,
+            "attack": 35,
+            "defense": 40,
+            "special-attack": 35,
+            "special-defense": 55,
+            "speed": 50
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 1,
+            "speed": 0
+        },
+        "capture_rate": 255,
+        "base_happiness": 70,
+        "abilities": [
+            "chlorophyll",
+            "leaf-guard",
+            "infiltrator"
+        ],
+        "hidden_ability": "infiltrator",
+        "weight_kg": 0.5,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 188,
+                    "evolves_to_name": "skiploom",
+                    "method": "level_up",
+                    "min_level": 18
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 187,
+                    "name": "hoppip"
+                },
+                {
+                    "id": 188,
+                    "name": "skiploom"
+                },
+                {
+                    "id": 189,
+                    "name": "jumpluff"
+                }
+            ],
+            "evolution_chain_id": 92,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 18"
+        }
+    },
+    {
+        "id": 188,
+        "name": "skiploom",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "grass",
+            "flying"
+        ],
+        "base": {
+            "hp": 55,
+            "attack": 45,
+            "defense": 50,
+            "special-attack": 45,
+            "special-defense": 65,
+            "speed": 80
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 2
+        },
+        "capture_rate": 120,
+        "base_happiness": 70,
+        "abilities": [
+            "chlorophyll",
+            "leaf-guard",
+            "infiltrator"
+        ],
+        "hidden_ability": "infiltrator",
+        "weight_kg": 1.0,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 187,
+                "name": "hoppip"
+            },
+            "evolution_details": [
+                {
+                    "evolves_to_id": 189,
+                    "evolves_to_name": "jumpluff",
+                    "method": "level_up",
+                    "min_level": 27
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 187,
+                    "name": "hoppip"
+                },
+                {
+                    "id": 188,
+                    "name": "skiploom"
+                },
+                {
+                    "id": 189,
+                    "name": "jumpluff"
+                }
+            ],
+            "evolution_chain_id": 92,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 27"
+        }
+    },
+    {
+        "id": 189,
+        "name": "jumpluff",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "grass",
+            "flying"
+        ],
+        "base": {
+            "hp": 75,
+            "attack": 55,
+            "defense": 70,
+            "special-attack": 55,
+            "special-defense": 95,
+            "speed": 110
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 3
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "chlorophyll",
+            "leaf-guard",
+            "infiltrator"
+        ],
+        "hidden_ability": "infiltrator",
+        "weight_kg": 3.0,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 188,
+                "name": "skiploom"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 187,
+                    "name": "hoppip"
+                },
+                {
+                    "id": 188,
+                    "name": "skiploom"
+                },
+                {
+                    "id": 189,
+                    "name": "jumpluff"
+                }
+            ],
+            "evolution_chain_id": 92,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 190,
+        "name": "aipom",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal"
+        ],
+        "base": {
+            "hp": 55,
+            "attack": 70,
+            "defense": 55,
+            "special-attack": 40,
+            "special-defense": 55,
+            "speed": 85
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "run-away",
+            "pickup",
+            "skill-link"
+        ],
+        "hidden_ability": "skill-link",
+        "weight_kg": 11.5,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 424,
+                    "evolves_to_name": "ambipom",
+                    "method": "move",
+                    "known_move": "double-hit"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 190,
+                    "name": "aipom"
+                },
+                {
+                    "id": 424,
+                    "name": "ambipom"
+                }
+            ],
+            "evolution_chain_id": 93,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Saber double-hit"
+        }
+    },
+    {
+        "id": 191,
+        "name": "sunkern",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "grass"
+        ],
+        "base": {
+            "hp": 30,
+            "attack": 30,
+            "defense": 30,
+            "special-attack": 30,
+            "special-defense": 30,
+            "speed": 30
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 235,
+        "base_happiness": 70,
+        "abilities": [
+            "chlorophyll",
+            "solar-power",
+            "early-bird"
+        ],
+        "hidden_ability": "early-bird",
+        "weight_kg": 1.8,
+        "height_m": 0.3,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 192,
+                    "evolves_to_name": "sunflora",
+                    "method": "use_item",
+                    "item": "sun-stone"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 191,
+                    "name": "sunkern"
+                },
+                {
+                    "id": 192,
+                    "name": "sunflora"
+                }
+            ],
+            "evolution_chain_id": 94,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Usar sun-stone"
+        }
+    },
+    {
+        "id": 192,
+        "name": "sunflora",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "grass"
+        ],
+        "base": {
+            "hp": 75,
+            "attack": 75,
+            "defense": 55,
+            "special-attack": 105,
+            "special-defense": 85,
+            "speed": 30
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 2,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 120,
+        "base_happiness": 70,
+        "abilities": [
+            "chlorophyll",
+            "solar-power",
+            "early-bird"
+        ],
+        "hidden_ability": "early-bird",
+        "weight_kg": 8.5,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 191,
+                "name": "sunkern"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 191,
+                    "name": "sunkern"
+                },
+                {
+                    "id": 192,
+                    "name": "sunflora"
+                }
+            ],
+            "evolution_chain_id": 94,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 193,
+        "name": "yanma",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "bug",
+            "flying"
+        ],
+        "base": {
+            "hp": 65,
+            "attack": 65,
+            "defense": 45,
+            "special-attack": 75,
+            "special-defense": 45,
+            "speed": 95
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 75,
+        "base_happiness": 70,
+        "abilities": [
+            "speed-boost",
+            "compound-eyes",
+            "frisk"
+        ],
+        "hidden_ability": "frisk",
+        "weight_kg": 38.0,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 469,
+                    "evolves_to_name": "yanmega",
+                    "method": "move",
+                    "known_move": "ancient-power"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 193,
+                    "name": "yanma"
+                },
+                {
+                    "id": 469,
+                    "name": "yanmega"
+                }
+            ],
+            "evolution_chain_id": 95,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Saber ancient-power"
+        }
+    },
+    {
+        "id": 194,
+        "name": "wooper",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water",
+            "ground"
+        ],
+        "base": {
+            "hp": 55,
+            "attack": 45,
+            "defense": 45,
+            "special-attack": 25,
+            "special-defense": 25,
+            "speed": 15
+        },
+        "ev": {
+            "hp": 1,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 255,
+        "base_happiness": 70,
+        "abilities": [
+            "damp",
+            "water-absorb",
+            "unaware"
+        ],
+        "hidden_ability": "unaware",
+        "weight_kg": 8.5,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 195,
+                    "evolves_to_name": "quagsire",
+                    "method": "level_up",
+                    "min_level": 20
+                },
+                {
+                    "evolves_to_id": 980,
+                    "evolves_to_name": "clodsire",
+                    "method": "level_up",
+                    "min_level": 20
+                }
+            ],
+            "variants": [
+                {
+                    "evolves_to_id": 195,
+                    "evolves_to_name": "quagsire",
+                    "method": "level_up",
+                    "min_level": 20
+                },
+                {
+                    "evolves_to_id": 980,
+                    "evolves_to_name": "clodsire",
+                    "method": "level_up",
+                    "min_level": 20
+                }
+            ],
+            "family_members": [
+                {
+                    "id": 194,
+                    "name": "wooper"
+                },
+                {
+                    "id": 195,
+                    "name": "quagsire"
+                },
+                {
+                    "id": 980,
+                    "name": "clodsire"
+                }
+            ],
+            "evolution_chain_id": 96,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 20 ou Nível 20 ou Nível 20 ou Nível 20"
+        }
+    },
+    {
+        "id": 195,
+        "name": "quagsire",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water",
+            "ground"
+        ],
+        "base": {
+            "hp": 95,
+            "attack": 85,
+            "defense": 85,
+            "special-attack": 65,
+            "special-defense": 65,
+            "speed": 35
+        },
+        "ev": {
+            "hp": 2,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 90,
+        "base_happiness": 70,
+        "abilities": [
+            "damp",
+            "water-absorb",
+            "unaware"
+        ],
+        "hidden_ability": "unaware",
+        "weight_kg": 75.0,
+        "height_m": 1.4,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 194,
+                "name": "wooper"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 194,
+                    "name": "wooper"
+                },
+                {
+                    "id": 195,
+                    "name": "quagsire"
+                },
+                {
+                    "id": 980,
+                    "name": "clodsire"
+                }
+            ],
+            "evolution_chain_id": 96,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 196,
+        "name": "espeon",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "psychic"
+        ],
+        "base": {
+            "hp": 65,
+            "attack": 65,
+            "defense": 60,
+            "special-attack": 130,
+            "special-defense": 95,
+            "speed": 110
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 2,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "synchronize",
+            "magic-bounce"
+        ],
+        "hidden_ability": "magic-bounce",
+        "weight_kg": 26.5,
+        "height_m": 0.9,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": {
+                "id": 133,
+                "name": "eevee"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": null,
+                    "name": "eevee"
+                },
+                {
+                    "id": 134,
+                    "name": "vaporeon"
+                },
+                {
+                    "id": 135,
+                    "name": "jolteon"
+                },
+                {
+                    "id": 136,
+                    "name": "flareon"
+                },
+                {
+                    "id": 196,
+                    "name": "espeon"
+                },
+                {
+                    "id": 197,
+                    "name": "umbreon"
+                },
+                {
+                    "id": 470,
+                    "name": "leafeon"
+                },
+                {
+                    "id": 471,
+                    "name": "glaceon"
+                },
+                {
+                    "id": 700,
+                    "name": "sylveon"
+                }
+            ],
+            "evolution_chain_id": 67,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 197,
+        "name": "umbreon",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "dark"
+        ],
+        "base": {
+            "hp": 95,
+            "attack": 65,
+            "defense": 110,
+            "special-attack": 60,
+            "special-defense": 130,
+            "speed": 65
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 2,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 35,
+        "abilities": [
+            "synchronize",
+            "inner-focus"
+        ],
+        "hidden_ability": "inner-focus",
+        "weight_kg": 27.0,
+        "height_m": 1.0,
+        "gender_ratio": 0.875,
+        "evolution": {
+            "evolves_from": {
+                "id": 133,
+                "name": "eevee"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 133,
+                    "name": "eevee"
+                },
+                {
+                    "id": 134,
+                    "name": "vaporeon"
+                },
+                {
+                    "id": 135,
+                    "name": "jolteon"
+                },
+                {
+                    "id": 136,
+                    "name": "flareon"
+                },
+                {
+                    "id": 196,
+                    "name": "espeon"
+                },
+                {
+                    "id": 197,
+                    "name": "umbreon"
+                },
+                {
+                    "id": 470,
+                    "name": "leafeon"
+                },
+                {
+                    "id": 471,
+                    "name": "glaceon"
+                },
+                {
+                    "id": 700,
+                    "name": "sylveon"
+                }
+            ],
+            "evolution_chain_id": 67,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 198,
+        "name": "murkrow",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "dark",
+            "flying"
+        ],
+        "base": {
+            "hp": 60,
+            "attack": 85,
+            "defense": 42,
+            "special-attack": 85,
+            "special-defense": 42,
+            "speed": 91
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 30,
+        "base_happiness": 35,
+        "abilities": [
+            "insomnia",
+            "super-luck",
+            "prankster"
+        ],
+        "hidden_ability": "prankster",
+        "weight_kg": 2.1,
+        "height_m": 0.5,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 430,
+                    "evolves_to_name": "honchkrow",
+                    "method": "use_item",
+                    "item": "dusk-stone"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 198,
+                    "name": "murkrow"
+                },
+                {
+                    "id": 430,
+                    "name": "honchkrow"
+                }
+            ],
+            "evolution_chain_id": 97,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Usar dusk-stone"
+        }
+    },
+    {
+        "id": 199,
+        "name": "slowking",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water",
+            "psychic"
+        ],
+        "base": {
+            "hp": 95,
+            "attack": 75,
+            "defense": 80,
+            "special-attack": 100,
+            "special-defense": 110,
+            "speed": 30
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 2,
+            "speed": 0
+        },
+        "capture_rate": 70,
+        "base_happiness": 70,
+        "abilities": [
+            "oblivious",
+            "own-tempo",
+            "regenerator"
+        ],
+        "hidden_ability": "regenerator",
+        "weight_kg": 79.5,
+        "height_m": 2.0,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 79,
+                "name": "slowpoke"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 79,
+                    "name": "slowpoke"
+                },
+                {
+                    "id": 80,
+                    "name": "slowbro"
+                },
+                {
+                    "id": 199,
+                    "name": "slowking"
+                }
+            ],
+            "evolution_chain_id": 33,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 200,
+        "name": "misdreavus",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "ghost"
+        ],
+        "base": {
+            "hp": 60,
+            "attack": 60,
+            "defense": 60,
+            "special-attack": 85,
+            "special-defense": 85,
+            "speed": 85
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 1,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 35,
+        "abilities": [
+            "levitate"
+        ],
+        "hidden_ability": null,
+        "weight_kg": 1.0,
+        "height_m": 0.7,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 429,
+                    "evolves_to_name": "mismagius",
+                    "method": "use_item",
+                    "item": "dusk-stone"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 200,
+                    "name": "misdreavus"
+                },
+                {
+                    "id": 429,
+                    "name": "mismagius"
+                }
+            ],
+            "evolution_chain_id": 98,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Usar dusk-stone"
+        }
+    },
+    {
+        "id": 201,
+        "name": "unown",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "psychic"
+        ],
+        "base": {
+            "hp": 48,
+            "attack": 72,
+            "defense": 48,
+            "special-attack": 72,
+            "special-defense": 48,
+            "speed": 48
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 225,
+        "base_happiness": 70,
+        "abilities": [
+            "levitate"
+        ],
+        "hidden_ability": null,
+        "weight_kg": 5.0,
+        "height_m": 0.5,
+        "gender_ratio": -1.0,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 201,
+                    "name": "unown"
+                }
+            ],
+            "evolution_chain_id": 99,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 202,
+        "name": "wobbuffet",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "psychic"
+        ],
+        "base": {
+            "hp": 190,
+            "attack": 33,
+            "defense": 58,
+            "special-attack": 33,
+            "special-defense": 58,
+            "speed": 33
+        },
+        "ev": {
+            "hp": 2,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "shadow-tag",
+            "telepathy"
+        ],
+        "hidden_ability": "telepathy",
+        "weight_kg": 28.5,
+        "height_m": 1.3,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 360,
+                "name": "wynaut"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 360,
+                    "name": "wynaut"
+                },
+                {
+                    "id": 202,
+                    "name": "wobbuffet"
+                }
+            ],
+            "evolution_chain_id": 100,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 203,
+        "name": "girafarig",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal",
+            "psychic"
+        ],
+        "base": {
+            "hp": 70,
+            "attack": 80,
+            "defense": 65,
+            "special-attack": 90,
+            "special-defense": 65,
+            "speed": 85
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 2,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 60,
+        "base_happiness": 70,
+        "abilities": [
+            "inner-focus",
+            "early-bird",
+            "sap-sipper"
+        ],
+        "hidden_ability": "sap-sipper",
+        "weight_kg": 41.5,
+        "height_m": 1.5,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 981,
+                    "evolves_to_name": "farigiraf",
+                    "method": "move",
+                    "known_move": "twin-beam"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 203,
+                    "name": "girafarig"
+                },
+                {
+                    "id": 981,
+                    "name": "farigiraf"
+                }
+            ],
+            "evolution_chain_id": 101,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Saber twin-beam"
+        }
+    },
+    {
+        "id": 204,
+        "name": "pineco",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "bug"
+        ],
+        "base": {
+            "hp": 50,
+            "attack": 65,
+            "defense": 90,
+            "special-attack": 35,
+            "special-defense": 35,
+            "speed": 15
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 1,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 190,
+        "base_happiness": 70,
+        "abilities": [
+            "sturdy",
+            "overcoat"
+        ],
+        "hidden_ability": "overcoat",
+        "weight_kg": 7.2,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 205,
+                    "evolves_to_name": "forretress",
+                    "method": "level_up",
+                    "min_level": 31
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 204,
+                    "name": "pineco"
+                },
+                {
+                    "id": 205,
+                    "name": "forretress"
+                }
+            ],
+            "evolution_chain_id": 102,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 31"
+        }
+    },
+    {
+        "id": 205,
+        "name": "forretress",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "bug",
+            "steel"
+        ],
+        "base": {
+            "hp": 75,
+            "attack": 90,
+            "defense": 140,
+            "special-attack": 60,
+            "special-defense": 60,
+            "speed": 40
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 2,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 75,
+        "base_happiness": 70,
+        "abilities": [
+            "sturdy",
+            "overcoat"
+        ],
+        "hidden_ability": "overcoat",
+        "weight_kg": 125.8,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 204,
+                "name": "pineco"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 204,
+                    "name": "pineco"
+                },
+                {
+                    "id": 205,
+                    "name": "forretress"
+                }
+            ],
+            "evolution_chain_id": 102,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 206,
+        "name": "dunsparce",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal"
+        ],
+        "base": {
+            "hp": 100,
+            "attack": 70,
+            "defense": 70,
+            "special-attack": 65,
+            "special-defense": 65,
+            "speed": 45
+        },
+        "ev": {
+            "hp": 1,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 190,
+        "base_happiness": 70,
+        "abilities": [
+            "serene-grace",
+            "run-away",
+            "rattled"
+        ],
+        "hidden_ability": "rattled",
+        "weight_kg": 14.0,
+        "height_m": 1.5,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": null,
+                    "evolves_to_name": "dudunsparce",
+                    "method": "move",
+                    "known_move": "hyper-drill"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 206,
+                    "name": "dunsparce"
+                },
+                {
+                    "id": null,
+                    "name": "dudunsparce"
+                }
+            ],
+            "evolution_chain_id": 103,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Saber hyper-drill"
+        }
+    },
+    {
+        "id": 207,
+        "name": "gligar",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "ground",
+            "flying"
+        ],
+        "base": {
+            "hp": 65,
+            "attack": 75,
+            "defense": 105,
+            "special-attack": 35,
+            "special-defense": 65,
+            "speed": 85
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 1,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 60,
+        "base_happiness": 70,
+        "abilities": [
+            "hyper-cutter",
+            "sand-veil",
+            "immunity"
+        ],
+        "hidden_ability": "immunity",
+        "weight_kg": 64.8,
+        "height_m": 1.1,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 472,
+                    "evolves_to_name": "gliscor",
+                    "method": "time_of_day",
+                    "time_of_day": "night"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 207,
+                    "name": "gligar"
+                },
+                {
+                    "id": 472,
+                    "name": "gliscor"
+                }
+            ],
+            "evolution_chain_id": 104,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Night"
+        }
+    },
+    {
+        "id": 208,
+        "name": "steelix",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "steel",
+            "ground"
+        ],
+        "base": {
+            "hp": 75,
+            "attack": 85,
+            "defense": 200,
+            "special-attack": 55,
+            "special-defense": 65,
+            "speed": 30
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 2,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 25,
+        "base_happiness": 70,
+        "abilities": [
+            "rock-head",
+            "sturdy",
+            "sheer-force"
+        ],
+        "hidden_ability": "sheer-force",
+        "weight_kg": 400.0,
+        "height_m": 9.2,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 95,
+                "name": "onix"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 95,
+                    "name": "onix"
+                },
+                {
+                    "id": 208,
+                    "name": "steelix"
+                }
+            ],
+            "evolution_chain_id": 41,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 209,
+        "name": "snubbull",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fairy"
+        ],
+        "base": {
+            "hp": 60,
+            "attack": 80,
+            "defense": 50,
+            "special-attack": 40,
+            "special-defense": 40,
+            "speed": 30
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 190,
+        "base_happiness": 70,
+        "abilities": [
+            "intimidate",
+            "run-away",
+            "rattled"
+        ],
+        "hidden_ability": "rattled",
+        "weight_kg": 7.8,
+        "height_m": 0.6,
+        "gender_ratio": 0.25,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 210,
+                    "evolves_to_name": "granbull",
+                    "method": "level_up",
+                    "min_level": 23
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 209,
+                    "name": "snubbull"
+                },
+                {
+                    "id": 210,
+                    "name": "granbull"
+                }
+            ],
+            "evolution_chain_id": 105,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 23"
+        }
+    },
+    {
+        "id": 210,
+        "name": "granbull",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fairy"
+        ],
+        "base": {
+            "hp": 90,
+            "attack": 120,
+            "defense": 75,
+            "special-attack": 60,
+            "special-defense": 60,
+            "speed": 45
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 2,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 75,
+        "base_happiness": 70,
+        "abilities": [
+            "intimidate",
+            "quick-feet",
+            "rattled"
+        ],
+        "hidden_ability": "rattled",
+        "weight_kg": 48.7,
+        "height_m": 1.4,
+        "gender_ratio": 0.25,
+        "evolution": {
+            "evolves_from": {
+                "id": 209,
+                "name": "snubbull"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 209,
+                    "name": "snubbull"
+                },
+                {
+                    "id": 210,
+                    "name": "granbull"
+                }
+            ],
+            "evolution_chain_id": 105,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 211,
+        "name": "qwilfish",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water",
+            "poison"
+        ],
+        "base": {
+            "hp": 65,
+            "attack": 95,
+            "defense": 85,
+            "special-attack": 55,
+            "special-defense": 55,
+            "speed": 85
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "poison-point",
+            "swift-swim",
+            "intimidate"
+        ],
+        "hidden_ability": "intimidate",
+        "weight_kg": 3.9,
+        "height_m": 0.5,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 904,
+                    "evolves_to_name": "overqwil",
+                    "method": "strong-style-move"
+                },
+                {
+                    "evolves_to_id": 904,
+                    "evolves_to_name": "overqwil",
+                    "method": "move",
+                    "known_move": "barb-barrage"
+                },
+                {
+                    "evolves_to_id": 904,
+                    "evolves_to_name": "overqwil",
+                    "method": "use-move"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 211,
+                    "name": "qwilfish"
+                },
+                {
+                    "id": 904,
+                    "name": "overqwil"
+                }
+            ],
+            "evolution_chain_id": 106,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Método especial ou Saber barb-barrage ou Método especial"
+        }
+    },
+    {
+        "id": 212,
+        "name": "scizor",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "bug",
+            "steel"
+        ],
+        "base": {
+            "hp": 70,
+            "attack": 130,
+            "defense": 100,
+            "special-attack": 55,
+            "special-defense": 80,
+            "speed": 65
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 2,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 25,
+        "base_happiness": 70,
+        "abilities": [
+            "swarm",
+            "technician",
+            "light-metal"
+        ],
+        "hidden_ability": "light-metal",
+        "weight_kg": 118.0,
+        "height_m": 1.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 123,
+                "name": "scyther"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 123,
+                    "name": "scyther"
+                },
+                {
+                    "id": 212,
+                    "name": "scizor"
+                },
+                {
+                    "id": 900,
+                    "name": "kleavor"
+                }
+            ],
+            "evolution_chain_id": 58,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 213,
+        "name": "shuckle",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "bug",
+            "rock"
+        ],
+        "base": {
+            "hp": 20,
+            "attack": 10,
+            "defense": 230,
+            "special-attack": 10,
+            "special-defense": 230,
+            "speed": 5
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 1,
+            "special-attack": 0,
+            "special-defense": 1,
+            "speed": 0
+        },
+        "capture_rate": 190,
+        "base_happiness": 70,
+        "abilities": [
+            "sturdy",
+            "gluttony",
+            "contrary"
+        ],
+        "hidden_ability": "contrary",
+        "weight_kg": 20.5,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 213,
+                    "name": "shuckle"
+                }
+            ],
+            "evolution_chain_id": 107,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 214,
+        "name": "heracross",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "bug",
+            "fighting"
+        ],
+        "base": {
+            "hp": 80,
+            "attack": 125,
+            "defense": 75,
+            "special-attack": 40,
+            "special-defense": 95,
+            "speed": 85
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 2,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "swarm",
+            "guts",
+            "moxie"
+        ],
+        "hidden_ability": "moxie",
+        "weight_kg": 54.0,
+        "height_m": 1.5,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 214,
+                    "name": "heracross"
+                }
+            ],
+            "evolution_chain_id": 108,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 215,
+        "name": "sneasel",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "dark",
+            "ice"
+        ],
+        "base": {
+            "hp": 55,
+            "attack": 95,
+            "defense": 55,
+            "special-attack": 35,
+            "special-defense": 75,
+            "speed": 115
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 60,
+        "base_happiness": 35,
+        "abilities": [
+            "inner-focus",
+            "keen-eye",
+            "pickpocket"
+        ],
+        "hidden_ability": "pickpocket",
+        "weight_kg": 28.0,
+        "height_m": 0.9,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 461,
+                    "evolves_to_name": "weavile",
+                    "method": "time_of_day",
+                    "time_of_day": "night"
+                },
+                {
+                    "evolves_to_id": 903,
+                    "evolves_to_name": "sneasler",
+                    "method": "time_of_day",
+                    "time_of_day": "day"
+                }
+            ],
+            "variants": [
+                {
+                    "evolves_to_id": 461,
+                    "evolves_to_name": "weavile",
+                    "method": "time_of_day",
+                    "time_of_day": "night"
+                },
+                {
+                    "evolves_to_id": 903,
+                    "evolves_to_name": "sneasler",
+                    "method": "time_of_day",
+                    "time_of_day": "day"
+                }
+            ],
+            "family_members": [
+                {
+                    "id": 215,
+                    "name": "sneasel"
+                },
+                {
+                    "id": 461,
+                    "name": "weavile"
+                },
+                {
+                    "id": 903,
+                    "name": "sneasler"
+                }
+            ],
+            "evolution_chain_id": 109,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Night ou Day ou Night ou Day"
+        }
+    },
+    {
+        "id": 216,
+        "name": "teddiursa",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal"
+        ],
+        "base": {
+            "hp": 60,
+            "attack": 80,
+            "defense": 50,
+            "special-attack": 50,
+            "special-defense": 50,
+            "speed": 40
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 120,
+        "base_happiness": 70,
+        "abilities": [
+            "pickup",
+            "quick-feet",
+            "honey-gather"
+        ],
+        "hidden_ability": "honey-gather",
+        "weight_kg": 8.8,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 217,
+                    "evolves_to_name": "ursaring",
+                    "method": "level_up",
+                    "min_level": 30
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 216,
+                    "name": "teddiursa"
+                },
+                {
+                    "id": 217,
+                    "name": "ursaring"
+                },
+                {
+                    "id": 901,
+                    "name": "ursaluna"
+                }
+            ],
+            "evolution_chain_id": 110,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 30"
+        }
+    },
+    {
+        "id": 217,
+        "name": "ursaring",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal"
+        ],
+        "base": {
+            "hp": 90,
+            "attack": 130,
+            "defense": 75,
+            "special-attack": 75,
+            "special-defense": 75,
+            "speed": 55
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 2,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 60,
+        "base_happiness": 70,
+        "abilities": [
+            "guts",
+            "quick-feet",
+            "unnerve"
+        ],
+        "hidden_ability": "unnerve",
+        "weight_kg": 125.8,
+        "height_m": 1.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 216,
+                "name": "teddiursa"
+            },
+            "evolution_details": [
+                {
+                    "evolves_to_id": 901,
+                    "evolves_to_name": "ursaluna",
+                    "method": "time_of_day",
+                    "item": "peat-block",
+                    "time_of_day": "full-moon"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 216,
+                    "name": "teddiursa"
+                },
+                {
+                    "id": 217,
+                    "name": "ursaring"
+                },
+                {
+                    "id": 901,
+                    "name": "ursaluna"
+                }
+            ],
+            "evolution_chain_id": 110,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Full-moon"
+        }
+    },
+    {
+        "id": 218,
+        "name": "slugma",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fire"
+        ],
+        "base": {
+            "hp": 40,
+            "attack": 40,
+            "defense": 40,
+            "special-attack": 70,
+            "special-defense": 40,
+            "speed": 20
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 190,
+        "base_happiness": 70,
+        "abilities": [
+            "magma-armor",
+            "flame-body",
+            "weak-armor"
+        ],
+        "hidden_ability": "weak-armor",
+        "weight_kg": 35.0,
+        "height_m": 0.7,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 219,
+                    "evolves_to_name": "magcargo",
+                    "method": "level_up",
+                    "min_level": 38
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 218,
+                    "name": "slugma"
+                },
+                {
+                    "id": 219,
+                    "name": "magcargo"
+                }
+            ],
+            "evolution_chain_id": 111,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 38"
+        }
+    },
+    {
+        "id": 219,
+        "name": "magcargo",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fire",
+            "rock"
+        ],
+        "base": {
+            "hp": 60,
+            "attack": 50,
+            "defense": 120,
+            "special-attack": 90,
+            "special-defense": 80,
+            "speed": 30
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 2,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 75,
+        "base_happiness": 70,
+        "abilities": [
+            "magma-armor",
+            "flame-body",
+            "weak-armor"
+        ],
+        "hidden_ability": "weak-armor",
+        "weight_kg": 55.0,
+        "height_m": 0.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 218,
+                "name": "slugma"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 218,
+                    "name": "slugma"
+                },
+                {
+                    "id": 219,
+                    "name": "magcargo"
+                }
+            ],
+            "evolution_chain_id": 111,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 220,
+        "name": "swinub",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "ice",
+            "ground"
+        ],
+        "base": {
+            "hp": 50,
+            "attack": 50,
+            "defense": 40,
+            "special-attack": 30,
+            "special-defense": 30,
+            "speed": 50
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 225,
+        "base_happiness": 70,
+        "abilities": [
+            "oblivious",
+            "snow-cloak",
+            "thick-fat"
+        ],
+        "hidden_ability": "thick-fat",
+        "weight_kg": 6.5,
+        "height_m": 0.4,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 221,
+                    "evolves_to_name": "piloswine",
+                    "method": "level_up",
+                    "min_level": 33
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 220,
+                    "name": "swinub"
+                },
+                {
+                    "id": 221,
+                    "name": "piloswine"
+                },
+                {
+                    "id": 473,
+                    "name": "mamoswine"
+                }
+            ],
+            "evolution_chain_id": 112,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 33"
+        }
+    },
+    {
+        "id": 221,
+        "name": "piloswine",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "ice",
+            "ground"
+        ],
+        "base": {
+            "hp": 100,
+            "attack": 100,
+            "defense": 80,
+            "special-attack": 60,
+            "special-defense": 60,
+            "speed": 50
+        },
+        "ev": {
+            "hp": 1,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 75,
+        "base_happiness": 70,
+        "abilities": [
+            "oblivious",
+            "snow-cloak",
+            "thick-fat"
+        ],
+        "hidden_ability": "thick-fat",
+        "weight_kg": 55.8,
+        "height_m": 1.1,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 220,
+                "name": "swinub"
+            },
+            "evolution_details": [
+                {
+                    "evolves_to_id": 473,
+                    "evolves_to_name": "mamoswine",
+                    "method": "move",
+                    "known_move": "ancient-power"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 220,
+                    "name": "swinub"
+                },
+                {
+                    "id": 221,
+                    "name": "piloswine"
+                },
+                {
+                    "id": 473,
+                    "name": "mamoswine"
+                }
+            ],
+            "evolution_chain_id": 112,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Saber ancient-power"
+        }
+    },
+    {
+        "id": 222,
+        "name": "corsola",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water",
+            "rock"
+        ],
+        "base": {
+            "hp": 65,
+            "attack": 55,
+            "defense": 95,
+            "special-attack": 65,
+            "special-defense": 95,
+            "speed": 35
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 1,
+            "special-attack": 0,
+            "special-defense": 1,
+            "speed": 0
+        },
+        "capture_rate": 60,
+        "base_happiness": 70,
+        "abilities": [
+            "hustle",
+            "natural-cure",
+            "regenerator"
+        ],
+        "hidden_ability": "regenerator",
+        "weight_kg": 5.0,
+        "height_m": 0.6,
+        "gender_ratio": 0.25,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 864,
+                    "evolves_to_name": "cursola",
+                    "method": "level_up",
+                    "min_level": 38
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 222,
+                    "name": "corsola"
+                },
+                {
+                    "id": 864,
+                    "name": "cursola"
+                }
+            ],
+            "evolution_chain_id": 113,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 38"
+        }
+    },
+    {
+        "id": 223,
+        "name": "remoraid",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water"
+        ],
+        "base": {
+            "hp": 35,
+            "attack": 65,
+            "defense": 35,
+            "special-attack": 65,
+            "special-defense": 35,
+            "speed": 65
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 190,
+        "base_happiness": 70,
+        "abilities": [
+            "hustle",
+            "sniper",
+            "moody"
+        ],
+        "hidden_ability": "moody",
+        "weight_kg": 12.0,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 224,
+                    "evolves_to_name": "octillery",
+                    "method": "level_up",
+                    "min_level": 25
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 223,
+                    "name": "remoraid"
+                },
+                {
+                    "id": 224,
+                    "name": "octillery"
+                }
+            ],
+            "evolution_chain_id": 114,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 25"
+        }
+    },
+    {
+        "id": 224,
+        "name": "octillery",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water"
+        ],
+        "base": {
+            "hp": 75,
+            "attack": 105,
+            "defense": 75,
+            "special-attack": 105,
+            "special-defense": 75,
+            "speed": 45
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 75,
+        "base_happiness": 70,
+        "abilities": [
+            "suction-cups",
+            "sniper",
+            "moody"
+        ],
+        "hidden_ability": "moody",
+        "weight_kg": 28.5,
+        "height_m": 0.9,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 223,
+                "name": "remoraid"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 223,
+                    "name": "remoraid"
+                },
+                {
+                    "id": 224,
+                    "name": "octillery"
+                }
+            ],
+            "evolution_chain_id": 114,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 225,
+        "name": "delibird",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "ice",
+            "flying"
+        ],
+        "base": {
+            "hp": 45,
+            "attack": 55,
+            "defense": 45,
+            "special-attack": 65,
+            "special-defense": 45,
+            "speed": 75
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "vital-spirit",
+            "hustle",
+            "insomnia"
+        ],
+        "hidden_ability": "insomnia",
+        "weight_kg": 16.0,
+        "height_m": 0.9,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 225,
+                    "name": "delibird"
+                }
+            ],
+            "evolution_chain_id": 115,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 226,
+        "name": "mantine",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water",
+            "flying"
+        ],
+        "base": {
+            "hp": 85,
+            "attack": 40,
+            "defense": 70,
+            "special-attack": 80,
+            "special-defense": 140,
+            "speed": 70
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 2,
+            "speed": 0
+        },
+        "capture_rate": 25,
+        "base_happiness": 70,
+        "abilities": [
+            "swift-swim",
+            "water-absorb",
+            "water-veil"
+        ],
+        "hidden_ability": "water-veil",
+        "weight_kg": 220.0,
+        "height_m": 2.1,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 458,
+                "name": "mantyke"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 458,
+                    "name": "mantyke"
+                },
+                {
+                    "id": 226,
+                    "name": "mantine"
+                }
+            ],
+            "evolution_chain_id": 116,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 227,
+        "name": "skarmory",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "steel",
+            "flying"
+        ],
+        "base": {
+            "hp": 65,
+            "attack": 80,
+            "defense": 140,
+            "special-attack": 40,
+            "special-defense": 70,
+            "speed": 70
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 2,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 25,
+        "base_happiness": 70,
+        "abilities": [
+            "keen-eye",
+            "sturdy",
+            "weak-armor"
+        ],
+        "hidden_ability": "weak-armor",
+        "weight_kg": 50.5,
+        "height_m": 1.7,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 227,
+                    "name": "skarmory"
+                }
+            ],
+            "evolution_chain_id": 117,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 228,
+        "name": "houndour",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "dark",
+            "fire"
+        ],
+        "base": {
+            "hp": 45,
+            "attack": 60,
+            "defense": 30,
+            "special-attack": 80,
+            "special-defense": 50,
+            "speed": 65
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 120,
+        "base_happiness": 35,
+        "abilities": [
+            "early-bird",
+            "flash-fire",
+            "unnerve"
+        ],
+        "hidden_ability": "unnerve",
+        "weight_kg": 10.8,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 229,
+                    "evolves_to_name": "houndoom",
+                    "method": "level_up",
+                    "min_level": 24
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 228,
+                    "name": "houndour"
+                },
+                {
+                    "id": 229,
+                    "name": "houndoom"
+                }
+            ],
+            "evolution_chain_id": 118,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 24"
+        }
+    },
+    {
+        "id": 229,
+        "name": "houndoom",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "dark",
+            "fire"
+        ],
+        "base": {
+            "hp": 75,
+            "attack": 90,
+            "defense": 50,
+            "special-attack": 110,
+            "special-defense": 80,
+            "speed": 95
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 2,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 35,
+        "abilities": [
+            "early-bird",
+            "flash-fire",
+            "unnerve"
+        ],
+        "hidden_ability": "unnerve",
+        "weight_kg": 35.0,
+        "height_m": 1.4,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 228,
+                "name": "houndour"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 228,
+                    "name": "houndour"
+                },
+                {
+                    "id": 229,
+                    "name": "houndoom"
+                }
+            ],
+            "evolution_chain_id": 118,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 230,
+        "name": "kingdra",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "water",
+            "dragon"
+        ],
+        "base": {
+            "hp": 75,
+            "attack": 95,
+            "defense": 95,
+            "special-attack": 95,
+            "special-defense": 95,
+            "speed": 85
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 1,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "swift-swim",
+            "sniper",
+            "damp"
+        ],
+        "hidden_ability": "damp",
+        "weight_kg": 152.0,
+        "height_m": 1.8,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 117,
+                "name": "seadra"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 116,
+                    "name": "horsea"
+                },
+                {
+                    "id": 117,
+                    "name": "seadra"
+                },
+                {
+                    "id": 230,
+                    "name": "kingdra"
+                }
+            ],
+            "evolution_chain_id": 54,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 231,
+        "name": "phanpy",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "ground"
+        ],
+        "base": {
+            "hp": 90,
+            "attack": 60,
+            "defense": 60,
+            "special-attack": 40,
+            "special-defense": 40,
+            "speed": 40
+        },
+        "ev": {
+            "hp": 1,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 120,
+        "base_happiness": 70,
+        "abilities": [
+            "pickup",
+            "sand-veil"
+        ],
+        "hidden_ability": "sand-veil",
+        "weight_kg": 33.5,
+        "height_m": 0.5,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 232,
+                    "evolves_to_name": "donphan",
+                    "method": "level_up",
+                    "min_level": 25
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 231,
+                    "name": "phanpy"
+                },
+                {
+                    "id": 232,
+                    "name": "donphan"
+                }
+            ],
+            "evolution_chain_id": 119,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 25"
+        }
+    },
+    {
+        "id": 232,
+        "name": "donphan",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "ground"
+        ],
+        "base": {
+            "hp": 90,
+            "attack": 120,
+            "defense": 120,
+            "special-attack": 60,
+            "special-defense": 60,
+            "speed": 50
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 1,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 60,
+        "base_happiness": 70,
+        "abilities": [
+            "sturdy",
+            "sand-veil"
+        ],
+        "hidden_ability": "sand-veil",
+        "weight_kg": 120.0,
+        "height_m": 1.1,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 231,
+                "name": "phanpy"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 231,
+                    "name": "phanpy"
+                },
+                {
+                    "id": 232,
+                    "name": "donphan"
+                }
+            ],
+            "evolution_chain_id": 119,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 233,
+        "name": "porygon2",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal"
+        ],
+        "base": {
+            "hp": 85,
+            "attack": 80,
+            "defense": 90,
+            "special-attack": 105,
+            "special-defense": 95,
+            "speed": 60
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 2,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "trace",
+            "download",
+            "analytic"
+        ],
+        "hidden_ability": "analytic",
+        "weight_kg": 32.5,
+        "height_m": 0.6,
+        "gender_ratio": -1.0,
+        "evolution": {
+            "evolves_from": {
+                "id": 137,
+                "name": "porygon"
+            },
+            "evolution_details": [
+                {
+                    "evolves_to_id": 474,
+                    "evolves_to_name": "porygon-z",
+                    "method": "trade"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 137,
+                    "name": "porygon"
+                },
+                {
+                    "id": 233,
+                    "name": "porygon2"
+                },
+                {
+                    "id": 474,
+                    "name": "porygon-z"
+                }
+            ],
+            "evolution_chain_id": 68,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Trocar"
+        }
+    },
+    {
+        "id": 234,
+        "name": "stantler",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal"
+        ],
+        "base": {
+            "hp": 73,
+            "attack": 95,
+            "defense": 62,
+            "special-attack": 85,
+            "special-defense": 65,
+            "speed": 85
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "intimidate",
+            "frisk",
+            "sap-sipper"
+        ],
+        "hidden_ability": "sap-sipper",
+        "weight_kg": 71.2,
+        "height_m": 1.4,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 899,
+                    "evolves_to_name": "wyrdeer",
+                    "method": "agile-style-move"
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 234,
+                    "name": "stantler"
+                },
+                {
+                    "id": 899,
+                    "name": "wyrdeer"
+                }
+            ],
+            "evolution_chain_id": 120,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Método especial"
+        }
+    },
+    {
+        "id": 235,
+        "name": "smeargle",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal"
+        ],
+        "base": {
+            "hp": 55,
+            "attack": 20,
+            "defense": 35,
+            "special-attack": 20,
+            "special-defense": 45,
+            "speed": 75
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "own-tempo",
+            "technician",
+            "moody"
+        ],
+        "hidden_ability": "moody",
+        "weight_kg": 58.0,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 235,
+                    "name": "smeargle"
+                }
+            ],
+            "evolution_chain_id": 121,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 236,
+        "name": "tyrogue",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fighting"
+        ],
+        "base": {
+            "hp": 35,
+            "attack": 35,
+            "defense": 35,
+            "special-attack": 35,
+            "special-defense": 35,
+            "speed": 35
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 75,
+        "base_happiness": 70,
+        "abilities": [
+            "guts",
+            "steadfast",
+            "vital-spirit"
+        ],
+        "hidden_ability": "vital-spirit",
+        "weight_kg": 21.0,
+        "height_m": 0.7,
+        "gender_ratio": 1.0,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 106,
+                    "evolves_to_name": "hitmonlee",
+                    "method": "level_up",
+                    "min_level": 20
+                },
+                {
+                    "evolves_to_id": 107,
+                    "evolves_to_name": "hitmonchan",
+                    "method": "level_up",
+                    "min_level": 20
+                },
+                {
+                    "evolves_to_id": 237,
+                    "evolves_to_name": "hitmontop",
+                    "method": "level_up",
+                    "min_level": 20
+                }
+            ],
+            "variants": [
+                {
+                    "evolves_to_id": 106,
+                    "evolves_to_name": "hitmonlee",
+                    "method": "level_up",
+                    "min_level": 20
+                },
+                {
+                    "evolves_to_id": 107,
+                    "evolves_to_name": "hitmonchan",
+                    "method": "level_up",
+                    "min_level": 20
+                },
+                {
+                    "evolves_to_id": 237,
+                    "evolves_to_name": "hitmontop",
+                    "method": "level_up",
+                    "min_level": 20
+                }
+            ],
+            "family_members": [
+                {
+                    "id": 236,
+                    "name": "tyrogue"
+                },
+                {
+                    "id": 106,
+                    "name": "hitmonlee"
+                },
+                {
+                    "id": 107,
+                    "name": "hitmonchan"
+                },
+                {
+                    "id": 237,
+                    "name": "hitmontop"
+                }
+            ],
+            "evolution_chain_id": 47,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 20 ou Nível 20 ou Nível 20 ou Nível 20 ou Nível 20 ou Nível 20"
+        }
+    },
+    {
+        "id": 237,
+        "name": "hitmontop",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fighting"
+        ],
+        "base": {
+            "hp": 50,
+            "attack": 95,
+            "defense": 95,
+            "special-attack": 35,
+            "special-defense": 110,
+            "speed": 70
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 2,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "intimidate",
+            "technician",
+            "steadfast"
+        ],
+        "hidden_ability": "steadfast",
+        "weight_kg": 48.0,
+        "height_m": 1.4,
+        "gender_ratio": 1.0,
+        "evolution": {
+            "evolves_from": {
+                "id": 236,
+                "name": "tyrogue"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 236,
+                    "name": "tyrogue"
+                },
+                {
+                    "id": 106,
+                    "name": "hitmonlee"
+                },
+                {
+                    "id": 107,
+                    "name": "hitmonchan"
+                },
+                {
+                    "id": 237,
+                    "name": "hitmontop"
+                }
+            ],
+            "evolution_chain_id": 47,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 238,
+        "name": "smoochum",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "ice",
+            "psychic"
+        ],
+        "base": {
+            "hp": 45,
+            "attack": 30,
+            "defense": 15,
+            "special-attack": 85,
+            "special-defense": 65,
+            "speed": 65
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "oblivious",
+            "forewarn",
+            "hydration"
+        ],
+        "hidden_ability": "hydration",
+        "weight_kg": 6.0,
+        "height_m": 0.4,
+        "gender_ratio": 0.0,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 124,
+                    "evolves_to_name": "jynx",
+                    "method": "level_up",
+                    "min_level": 30
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 238,
+                    "name": "smoochum"
+                },
+                {
+                    "id": 124,
+                    "name": "jynx"
+                }
+            ],
+            "evolution_chain_id": 59,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 30"
+        }
+    },
+    {
+        "id": 239,
+        "name": "elekid",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "electric"
+        ],
+        "base": {
+            "hp": 45,
+            "attack": 63,
+            "defense": 37,
+            "special-attack": 65,
+            "special-defense": 55,
+            "speed": 95
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "static",
+            "vital-spirit"
+        ],
+        "hidden_ability": "vital-spirit",
+        "weight_kg": 23.5,
+        "height_m": 0.6,
+        "gender_ratio": 0.75,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 125,
+                    "evolves_to_name": "electabuzz",
+                    "method": "level_up",
+                    "min_level": 30
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 239,
+                    "name": "elekid"
+                },
+                {
+                    "id": 125,
+                    "name": "electabuzz"
+                },
+                {
+                    "id": 466,
+                    "name": "electivire"
+                }
+            ],
+            "evolution_chain_id": 60,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 30"
+        }
+    },
+    {
+        "id": 240,
+        "name": "magby",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "fire"
+        ],
+        "base": {
+            "hp": 45,
+            "attack": 75,
+            "defense": 37,
+            "special-attack": 70,
+            "special-defense": 55,
+            "speed": 83
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 1
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "flame-body",
+            "vital-spirit"
+        ],
+        "hidden_ability": "vital-spirit",
+        "weight_kg": 21.4,
+        "height_m": 0.7,
+        "gender_ratio": 0.75,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 126,
+                    "evolves_to_name": "magmar",
+                    "method": "level_up",
+                    "min_level": 30
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 240,
+                    "name": "magby"
+                },
+                {
+                    "id": 126,
+                    "name": "magmar"
+                },
+                {
+                    "id": 467,
+                    "name": "magmortar"
+                }
+            ],
+            "evolution_chain_id": 61,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 30"
+        }
+    },
+    {
+        "id": 241,
+        "name": "miltank",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal"
+        ],
+        "base": {
+            "hp": 95,
+            "attack": 80,
+            "defense": 105,
+            "special-attack": 40,
+            "special-defense": 70,
+            "speed": 100
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 2,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 70,
+        "abilities": [
+            "thick-fat",
+            "scrappy",
+            "sap-sipper"
+        ],
+        "hidden_ability": "sap-sipper",
+        "weight_kg": 75.5,
+        "height_m": 1.2,
+        "gender_ratio": 0.0,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 241,
+                    "name": "miltank"
+                }
+            ],
+            "evolution_chain_id": 122,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 242,
+        "name": "blissey",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "normal"
+        ],
+        "base": {
+            "hp": 255,
+            "attack": 10,
+            "defense": 10,
+            "special-attack": 75,
+            "special-defense": 135,
+            "speed": 55
+        },
+        "ev": {
+            "hp": 3,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 30,
+        "base_happiness": 140,
+        "abilities": [
+            "natural-cure",
+            "serene-grace",
+            "healer"
+        ],
+        "hidden_ability": "healer",
+        "weight_kg": 46.8,
+        "height_m": 1.5,
+        "gender_ratio": 0.0,
+        "evolution": {
+            "evolves_from": {
+                "id": 113,
+                "name": "chansey"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 440,
+                    "name": "happiny"
+                },
+                {
+                    "id": 113,
+                    "name": "chansey"
+                },
+                {
+                    "id": 242,
+                    "name": "blissey"
+                }
+            ],
+            "evolution_chain_id": 51,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 243,
+        "name": "raikou",
+        "generation": 2,
+        "is_legendary": true,
+        "is_mythical": false,
+        "type": [
+            "electric"
+        ],
+        "base": {
+            "hp": 90,
+            "attack": 85,
+            "defense": 75,
+            "special-attack": 115,
+            "special-defense": 100,
+            "speed": 115
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 1,
+            "special-defense": 0,
+            "speed": 2
+        },
+        "capture_rate": 3,
+        "base_happiness": 35,
+        "abilities": [
+            "pressure",
+            "inner-focus"
+        ],
+        "hidden_ability": "inner-focus",
+        "weight_kg": 178.0,
+        "height_m": 1.9,
+        "gender_ratio": -1.0,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 243,
+                    "name": "raikou"
+                }
+            ],
+            "evolution_chain_id": 123,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 244,
+        "name": "entei",
+        "generation": 2,
+        "is_legendary": true,
+        "is_mythical": false,
+        "type": [
+            "fire"
+        ],
+        "base": {
+            "hp": 115,
+            "attack": 115,
+            "defense": 85,
+            "special-attack": 90,
+            "special-defense": 75,
+            "speed": 100
+        },
+        "ev": {
+            "hp": 1,
+            "attack": 2,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 3,
+        "base_happiness": 35,
+        "abilities": [
+            "pressure",
+            "inner-focus"
+        ],
+        "hidden_ability": "inner-focus",
+        "weight_kg": 198.0,
+        "height_m": 2.1,
+        "gender_ratio": -1.0,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 244,
+                    "name": "entei"
+                }
+            ],
+            "evolution_chain_id": 124,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 245,
+        "name": "suicune",
+        "generation": 2,
+        "is_legendary": true,
+        "is_mythical": false,
+        "type": [
+            "water"
+        ],
+        "base": {
+            "hp": 100,
+            "attack": 75,
+            "defense": 115,
+            "special-attack": 90,
+            "special-defense": 115,
+            "speed": 85
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 1,
+            "special-attack": 0,
+            "special-defense": 2,
+            "speed": 0
+        },
+        "capture_rate": 3,
+        "base_happiness": 35,
+        "abilities": [
+            "pressure",
+            "inner-focus"
+        ],
+        "hidden_ability": "inner-focus",
+        "weight_kg": 187.0,
+        "height_m": 2.0,
+        "gender_ratio": -1.0,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 245,
+                    "name": "suicune"
+                }
+            ],
+            "evolution_chain_id": 125,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 246,
+        "name": "larvitar",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "rock",
+            "ground"
+        ],
+        "base": {
+            "hp": 50,
+            "attack": 64,
+            "defense": 50,
+            "special-attack": 45,
+            "special-defense": 50,
+            "speed": 41
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 1,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 35,
+        "abilities": [
+            "guts",
+            "sand-veil"
+        ],
+        "hidden_ability": "sand-veil",
+        "weight_kg": 72.0,
+        "height_m": 0.6,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [
+                {
+                    "evolves_to_id": 247,
+                    "evolves_to_name": "pupitar",
+                    "method": "level_up",
+                    "min_level": 30
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 246,
+                    "name": "larvitar"
+                },
+                {
+                    "id": 247,
+                    "name": "pupitar"
+                },
+                {
+                    "id": 248,
+                    "name": "tyranitar"
+                }
+            ],
+            "evolution_chain_id": 126,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 30"
+        }
+    },
+    {
+        "id": 247,
+        "name": "pupitar",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "rock",
+            "ground"
+        ],
+        "base": {
+            "hp": 70,
+            "attack": 84,
+            "defense": 70,
+            "special-attack": 65,
+            "special-defense": 70,
+            "speed": 51
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 2,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 35,
+        "abilities": [
+            "shed-skin"
+        ],
+        "hidden_ability": null,
+        "weight_kg": 152.0,
+        "height_m": 1.2,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 246,
+                "name": "larvitar"
+            },
+            "evolution_details": [
+                {
+                    "evolves_to_id": 248,
+                    "evolves_to_name": "tyranitar",
+                    "method": "level_up",
+                    "min_level": 55
+                }
+            ],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 246,
+                    "name": "larvitar"
+                },
+                {
+                    "id": 247,
+                    "name": "pupitar"
+                },
+                {
+                    "id": 248,
+                    "name": "tyranitar"
+                }
+            ],
+            "evolution_chain_id": 126,
+            "is_last_evolution": false,
+            "evolution_methods_info": "Nível 55"
+        }
+    },
+    {
+        "id": 248,
+        "name": "tyranitar",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": false,
+        "type": [
+            "rock",
+            "dark"
+        ],
+        "base": {
+            "hp": 100,
+            "attack": 134,
+            "defense": 110,
+            "special-attack": 95,
+            "special-defense": 100,
+            "speed": 61
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 3,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 35,
+        "abilities": [
+            "sand-stream",
+            "unnerve"
+        ],
+        "hidden_ability": "unnerve",
+        "weight_kg": 202.0,
+        "height_m": 2.0,
+        "gender_ratio": 0.5,
+        "evolution": {
+            "evolves_from": {
+                "id": 247,
+                "name": "pupitar"
+            },
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 246,
+                    "name": "larvitar"
+                },
+                {
+                    "id": 247,
+                    "name": "pupitar"
+                },
+                {
+                    "id": 248,
+                    "name": "tyranitar"
+                }
+            ],
+            "evolution_chain_id": 126,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 249,
+        "name": "lugia",
+        "generation": 2,
+        "is_legendary": true,
+        "is_mythical": false,
+        "type": [
+            "psychic",
+            "flying"
+        ],
+        "base": {
+            "hp": 106,
+            "attack": 90,
+            "defense": 130,
+            "special-attack": 90,
+            "special-defense": 154,
+            "speed": 110
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 3,
+            "speed": 0
+        },
+        "capture_rate": 3,
+        "base_happiness": 0,
+        "abilities": [
+            "pressure",
+            "multiscale"
+        ],
+        "hidden_ability": "multiscale",
+        "weight_kg": 216.0,
+        "height_m": 5.2,
+        "gender_ratio": -1.0,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 249,
+                    "name": "lugia"
+                }
+            ],
+            "evolution_chain_id": 127,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 250,
+        "name": "ho-oh",
+        "generation": 2,
+        "is_legendary": true,
+        "is_mythical": false,
+        "type": [
+            "fire",
+            "flying"
+        ],
+        "base": {
+            "hp": 106,
+            "attack": 130,
+            "defense": 90,
+            "special-attack": 110,
+            "special-defense": 154,
+            "speed": 90
+        },
+        "ev": {
+            "hp": 0,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 3,
+            "speed": 0
+        },
+        "capture_rate": 3,
+        "base_happiness": 0,
+        "abilities": [
+            "pressure",
+            "regenerator"
+        ],
+        "hidden_ability": "regenerator",
+        "weight_kg": 199.0,
+        "height_m": 3.8,
+        "gender_ratio": -1.0,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 250,
+                    "name": "ho-oh"
+                }
+            ],
+            "evolution_chain_id": 128,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
+    },
+    {
+        "id": 251,
+        "name": "celebi",
+        "generation": 2,
+        "is_legendary": false,
+        "is_mythical": true,
+        "type": [
+            "psychic",
+            "grass"
+        ],
+        "base": {
+            "hp": 100,
+            "attack": 100,
+            "defense": 100,
+            "special-attack": 100,
+            "special-defense": 100,
+            "speed": 100
+        },
+        "ev": {
+            "hp": 3,
+            "attack": 0,
+            "defense": 0,
+            "special-attack": 0,
+            "special-defense": 0,
+            "speed": 0
+        },
+        "capture_rate": 45,
+        "base_happiness": 100,
+        "abilities": [
+            "natural-cure"
+        ],
+        "hidden_ability": null,
+        "weight_kg": 5.0,
+        "height_m": 0.6,
+        "gender_ratio": -1.0,
+        "evolution": {
+            "evolves_from": null,
+            "evolution_details": [],
+            "variants": [],
+            "family_members": [
+                {
+                    "id": 251,
+                    "name": "celebi"
+                }
+            ],
+            "evolution_chain_id": 129,
+            "is_last_evolution": true,
+            "evolution_methods_info": "Não evolui"
+        }
     }
 ]

@@ -7,12 +7,12 @@ from src.battle.effects import StatusType
 
 
 class PokemonCombat:
-    """Gerencia combate do Pokémon - UNIFICADO para aliados e inimigos"""
+    """Gerencia combate do Pokémon para aliados e inimigos"""
 
     def __init__(self, pokemon):
         self.pokemon = pokemon
 
-    # ===== MÉTODOS DE STATUS (mantidos iguais) =====
+    # ===== MÉTODOS DE STATUS =====
     def is_stunned(self) -> bool:
         if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
             status = self.pokemon.effect_manager.get_status(self.pokemon)
@@ -61,6 +61,29 @@ class PokemonCombat:
             if status and status.type == StatusType.FREEZE:
                 return status.thaw()
         return False
+
+    def _remove_spider_web(self):
+        """Remove o efeito Spider Web do Pokémon"""
+        if hasattr(self.pokemon, '_spider_web_active'):
+            self.pokemon._spider_web_active = False
+
+            if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+                self.pokemon.effect_manager.add_status_text(
+                    self.pokemon,
+                    f"{self.pokemon.name} se libertou da teia!",
+                    duration=1.0
+                )
+            print(f"[SPIDER_WEB] {self.pokemon.name} se libertou!")
+
+        # Limpa atributos
+        if hasattr(self.pokemon, '_spider_web_remaining'):
+            delattr(self.pokemon, '_spider_web_remaining')
+        if hasattr(self.pokemon, '_spider_web_source'):
+            delattr(self.pokemon, '_spider_web_source')
+        if hasattr(self.pokemon, '_spider_web_locked_x'):
+            delattr(self.pokemon, '_spider_web_locked_x')
+        if hasattr(self.pokemon, '_spider_web_locked_y'):
+            delattr(self.pokemon, '_spider_web_locked_y')
 
     # ===== MÉTODOS DE BUSCA DE ALVO =====
     def find_nearest_enemy(self, all_entities: List) -> Optional['Pokemon']:
@@ -431,6 +454,28 @@ class PokemonCombat:
                 self.pokemon.set_animation("idle")
             return
 
+        # ===== VERIFICA SE ESTÁ PRESO NA TEIA (SPIDER WEB) =====
+        if hasattr(self.pokemon, '_spider_web_active') and self.pokemon._spider_web_active:
+            if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+                self.pokemon.effect_manager.add_status_text(
+                    self.pokemon,
+                    f"{self.pokemon.name} está preso na teia e não pode atacar!",
+                    duration=1.0
+                )
+
+            # Decrementa o contador
+            self.pokemon._spider_web_remaining -= 1
+
+            print(f"[SPIDER_WEB] {self.pokemon.name} preso! Restam {self.pokemon._spider_web_remaining} turnos")
+
+            # Se acabou, liberta
+            if self.pokemon._spider_web_remaining <= 0:
+                self._remove_spider_web()
+
+            # Aplica cooldown
+            self.pokemon.attack_cooldown = max(0.3, 1.0 - (self.pokemon.speed_stat / 500))
+            return
+
         # ===== VERIFICA SE O ALVO AINDA ESTÁ NO RANGE DURANTE PERSEGUIÇÃO =====
         # Se for aliado e já está se movendo para o alvo, verifica se o alvo ainda está no range
         if not self.pokemon.is_wild and self.pokemon.combat_state == "moving_to_target":
@@ -776,6 +821,47 @@ class PokemonCombat:
 
         self.pokemon.charge_cooldown = self.pokemon.charge_cooldown_max
 
+        # ===== PERISH SONG: DECREMENTA CONTADOR APÓS ATACAR =====
+        if hasattr(self.pokemon, '_perish_song_active') and self.pokemon._perish_song_active:
+            self.pokemon._perish_song_turns_left -= 1
+
+            # Mostra mensagem
+            if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+                self.pokemon.effect_manager.add_status_text(
+                    self.pokemon,
+                    f"Canção do Perecer: {self.pokemon._perish_song_turns_left} ataques restantes!",
+                    duration=1.0
+                )
+
+            print(f"[PERISH_SONG] {self.pokemon.name} atacou! Restam {self.pokemon._perish_song_turns_left} ataques")
+
+            # ===== VERIFICA SE CHEGOU A 0 =====
+            if self.pokemon._perish_song_turns_left <= 0:
+                # Desmaia APÓS o ataque (mas antes de verificar se o alvo morreu)
+                if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+                    self.pokemon.effect_manager.add_status_text(
+                        self.pokemon,
+                        f"{self.pokemon.name} desmaiou pela Canção do Perecer!",
+                        duration=1.5
+                    )
+
+                print(f"[PERISH_SONG] {self.pokemon.name} desmaiou após atacar!")
+
+                # Marca como derrotado
+                self.pokemon.set_defeated(True)
+
+                # Remove o efeito
+                self.pokemon._perish_song_active = False
+
+                # Se for aliado, notifica
+                if not self.pokemon.is_wild:
+                    from src.ui.toast_renderer import toast_battle
+                    toast_battle(f"{self.pokemon.name} desmaiou pela Canção do Perecer!",
+                                 duration=3.0, pokemon=self.pokemon, portrait="dizzy")
+
+                # Não continua para verificar alvo (já vai desmaiar)
+                return
+
         # ===== VERIFICA SE O ALVO MORREU COM O ATAQUE =====
         target_is_dead_now = not target.is_alive() or target.is_defeated
 
@@ -940,6 +1026,20 @@ class PokemonCombat:
     # ===== MÉTODOS DE DANO =====
     def take_damage(self, damage, attacker=None):
         """Recebe dano"""
+        # ===== DECREMENTA SAFEGUARD AO RECEBER DANO =====
+        if hasattr(self.pokemon, '_safeguard_active') and self.pokemon._safeguard_active:
+            self.pokemon._safeguard_remaining -= 1
+            print(f"[SAFEGUARD] {self.pokemon.name} recebeu dano! Restam {self.pokemon._safeguard_remaining} proteções")
+
+            if self.pokemon._safeguard_remaining <= 0:
+                self.pokemon._safeguard_active = False
+                if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+                    self.pokemon.effect_manager.add_status_text(
+                        self.pokemon,
+                        f"O Safeguard de {self.pokemon.name} acabou!",
+                        duration=1.0
+                    )
+
         if self.pokemon.is_defeated:
             return self.pokemon.current_hp <= 0
 

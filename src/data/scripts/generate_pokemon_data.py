@@ -56,7 +56,7 @@ class PokemonCompleteGenerator:
     def get_pokemon_by_gen(self) -> List[int]:
         """Retorna a lista de IDs dos Pokémon baseado na geração"""
         start_id, end_id = self.gen_ranges[self.max_gen]
-        print(f"📊 Configurado para Geração {self.max_gen} (Pokémon #{start_id} até #{end_id})")
+        print(f"Configurado para Geração {self.max_gen} (Pokémon #{start_id} até #{end_id})")
         return list(range(start_id, end_id + 1))
 
     def convert_gender_to_male_ratio(self, api_gender_rate: int) -> float:
@@ -170,7 +170,7 @@ class PokemonCompleteGenerator:
             elif evolution_info.get('is_last_evolution'):
                 evo_text = " (Final)"
 
-            print(f"   📊 #{pokemon_info['id']:03d} {pokemon_info['name']}{evo_text}: "
+            print(f"   #{pokemon_info['id']:03d} {pokemon_info['name']}{evo_text}: "
                   f"Peso:{weight_kg}kg | Alt:{height_m}m | Gênero:{gender_text}")
 
             time.sleep(self.delay)
@@ -483,9 +483,9 @@ class PokemonCompleteGenerator:
 
         print(f"\n🎮 GERANDO POKÉMON DA {self.max_gen}ª GERAÇÃO")
         print("=" * 60)
-        print(f"📊 Total de Pokémon: {len(pokemon_ids)}")
-        print(f"⏱️  Delay entre requisições: {self.delay}s")
-        print(f"💾 Salvando a cada {save_every} Pokémon\n")
+        print(f"Total de Pokémon: {len(pokemon_ids)}")
+        print(f"Delay entre requisições: {self.delay}s")
+        print(f"Salvando a cada {save_every} Pokémon\n")
 
         for i, pokemon_id in enumerate(pokemon_ids, 1):
             print(f"🔄 [{i}/{len(pokemon_ids)}] Processando #{pokemon_id:03d}...", end=" ")
@@ -584,7 +584,7 @@ def main():
         print("   4ª Geração: Pokémon #387-493")
         print("   5ª Geração: Pokémon #494-649")
 
-        gen = int(input("\n📊 Qual geração você quer processar? (1-5): "))
+        gen = int(input("\n Qual geração você quer processar? (1-5): "))
 
         if gen < 1 or gen > 5:
             print("❌ Geração inválida! Usando 5ª geração como padrão.")

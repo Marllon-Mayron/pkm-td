@@ -334,35 +334,76 @@ class BattleSystem:
         # ===== VERIFICA SE O MOVE TEM EFEITO DE CRASH AO ERRAR =====
         has_crash_effect = effect and effect.effect_type == "crash_damage_on_miss"
 
-        # ===== VERIFICA MIND READER (garante acerto) =====
-        is_mind_reader_guaranteed = False
+        # ===== VERIFICA EFEITOS DE ACERTO GARANTIDO (Lock-On, Mind Reader) =====
+        is_guaranteed_hit = False
 
-        if (hasattr(attacker, '_mind_reader_active') and attacker._mind_reader_active and
-                hasattr(attacker, '_mind_reader_target') and attacker._mind_reader_target == target):
+        # Lista de possíveis efeitos de acerto garantido
+        guaranteed_hit_effects = ["lock_on", "mind_reader"]
 
-            is_mind_reader_guaranteed = True
+        for effect_key in guaranteed_hit_effects:
+            active_flag = f"_{effect_key}_active"
+            target_flag = f"_{effect_key}_target"
 
-            # Mostra mensagem
-            if move.name.lower() != "struggle":
+            if (hasattr(attacker, active_flag) and getattr(attacker, active_flag) and
+                    hasattr(attacker, target_flag) and getattr(attacker, target_flag) == target):
+
+                is_guaranteed_hit = True
+
+                # Mostra mensagem
+                if move.name.lower() != "struggle":
+                    self.effect_manager.add_status_text(
+                        attacker,
+                        f"{attacker.name} acertou com certeza!",
+                        duration=0.8
+                    )
+
+                effect_names = {"lock_on": "Lock-On", "mind_reader": "Mind Reader"}
+                effect_display = effect_names.get(effect_key, "Foco")
+                print(f"[{effect_display.upper()}] {attacker.name} tem acerto garantido em {target.name}!")
+
+                # Reseta o efeito após usar
+                setattr(attacker, active_flag, False)
+                setattr(attacker, target_flag, None)
+                break  # Só um efeito por vez
+
+        # ===== VERIFICA PROTEÇÃO DO ALVO (Protect/Detect) =====
+        if hasattr(target, '_protected') and target._protected:
+            self.effect_manager.add_status_text(
+                attacker,
+                f"{target.name} está protegido! O ataque não teve efeito!",
+                duration=1.5
+            )
+
+            # Decrementa o contador de proteção
+            target._protection_remaining -= 1
+
+            print(
+                f"[PROTECT] {attacker.name} atacou, mas {target.name} estava protegido! {target._protection_remaining} proteções restantes")
+
+            # Se acabaram as proteções, remove o efeito
+            if target._protection_remaining <= 0:
+                target._protected = False
                 self.effect_manager.add_status_text(
-                    attacker,
-                    f"{attacker.name} acertou com certeza!",
-                    duration=0.8
+                    target,
+                    f"A proteção de {target.name} acabou!",
+                    duration=1.0
                 )
+                print(f"[PROTECT] Proteção de {target.name} acabou!")
 
-            print(f"[MIND_READER] {attacker.name} tem acerto garantido em {target.name}!")
+            # Aplica cooldown
+            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
-            # ===== RESETA O MIND READER APÓS USAR (DUROU 1 ATAQUE) =====
-            attacker._mind_reader_active = False
-            attacker._mind_reader_target = None
+            # Registra o movimento usado (para Disable)
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+
+            return True
 
         # ===== CALCULAR ACERTO =====
-        never_miss = effect and effect.effect_type == "never_miss"
-
-        if never_miss or is_mind_reader_guaranteed:
+        if never_miss or is_guaranteed_hit:
             # Sempre acerta
             will_hit = True
-            print(f"[BATTLE] {move.name} nunca erra! (ou Mind Reader ativo)")
+            print(f"[BATTLE] {move.name} nunca erra! (ou acerto garantido ativo)")
         else:
             hit_chance = move.accuracy / 100
             accuracy_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)

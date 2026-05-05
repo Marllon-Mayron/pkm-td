@@ -1300,9 +1300,11 @@ class Pokemon(Entity):
         self.clear_fury_cutter()
         self.clear_destiny_bond()
         self.clear_disable()
-        self.clear_mind_reader()
+        self.clear_guaranteed_hit_effects()
         self.clear_rollout()
         self.clear_foresight()
+        self.clear_perish_song()
+        self.clear_protection_effects()
 
         # Remove referência local ao status_effect se existir
         if hasattr(self, 'status_effect'):
@@ -1342,12 +1344,18 @@ class Pokemon(Entity):
         if hasattr(self, '_disable_timer'):
             delattr(self, '_disable_timer')
 
-    def clear_mind_reader(self):
-        """Remove o efeito Mind Reader do Pokémon (usado quando sai de campo)"""
-        if hasattr(self, '_mind_reader_active'):
-            self._mind_reader_active = False
-        if hasattr(self, '_mind_reader_target'):
-            self._mind_reader_target = None
+    def clear_guaranteed_hit_effects(self):
+        """Remove todos os efeitos de acerto garantido (Lock-On, Mind Reader)"""
+        effects = ["lock_on", "mind_reader"]
+
+        for effect_key in effects:
+            active_flag = f"_{effect_key}_active"
+            target_flag = f"_{effect_key}_target"
+
+            if hasattr(self, active_flag):
+                setattr(self, active_flag, False)
+            if hasattr(self, target_flag):
+                setattr(self, target_flag, None)
 
     def clear_rollout(self):
         """Reseta o estado do Rollout"""
@@ -1370,6 +1378,26 @@ class Pokemon(Entity):
             self._foresight_active = False
         if hasattr(self, '_foresight_source'):
             self._foresight_source = None
+
+    def clear_perish_song(self):
+        """Remove o efeito Perish Song do Pokémon"""
+        if hasattr(self, '_perish_song_active'):
+            self._perish_song_active = False
+        if hasattr(self, '_perish_song_turns_left'):
+            delattr(self, '_perish_song_turns_left')
+
+    def clear_protection_effects(self):
+        """Remove todos os efeitos de proteção (Protect, Detect, Safeguard)"""
+        if hasattr(self, '_protected'):
+            self._protected = False
+        if hasattr(self, '_safeguard_active'):
+            self._safeguard_active = False
+        if hasattr(self, '_safeguard_turns_left'):
+            delattr(self, '_safeguard_turns_left')
+        if hasattr(self, '_safeguard_timer'):
+            delattr(self, '_safeguard_timer')
+        if hasattr(self, '_last_protect_used'):
+            self._last_protect_used = False
 
     def set_defeated(self, defeated: bool):
         """Define se o Pokémon está derrotado"""

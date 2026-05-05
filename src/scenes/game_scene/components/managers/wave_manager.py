@@ -163,8 +163,23 @@ class WaveManager:
             if not hasattr(enemy, 'path') or not enemy.path:
                 continue
 
+            # ===== VERIFICA SE ESTÁ PRESO NA TEIA (SPIDER WEB) =====
+            if hasattr(enemy, '_spider_web_active') and enemy._spider_web_active:
+                # Inimigo preso: NÃO se move, NÃO ataca
+                # Força a posição original (caso algo tente mover)
+                if hasattr(enemy, '_spider_web_locked_x'):
+                    enemy.x = enemy._spider_web_locked_x
+                    enemy.y = enemy._spider_web_locked_y
+                    enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
+
+                # Apenas atualiza animação (para não congelar visualmente)
+                self._update_animation(enemy, dt)
+
+                # Decrementa o contador do Spider Web (a cada atualização, mas limitado)
+                # Na verdade, decrementamos ao tentar atacar. Aqui só mantemos
+                continue
+
             # ===== VERIFICA SE DEVE IGNORAR O PATH (EM COMBATE) =====
-            # Se o inimigo está em combate e tem um alvo vivo, NÃO atualiza movimento do path
             should_skip_path = False
 
             if hasattr(enemy, 'target') and enemy.target and enemy.target.is_alive():
@@ -174,7 +189,19 @@ class WaveManager:
                 distance_to_target = math.hypot(dx, dy)
                 is_attacking = hasattr(enemy, '_attack_animation_active') and enemy._attack_animation_active
 
-                if distance_to_target < enemy.attack_range or is_attacking:
+                # Obtém o move atual para saber o range necessário
+                current_move = None
+                if hasattr(enemy, 'get_current_move_for_pattern'):
+                    current_move = enemy.get_current_move_for_pattern()
+                elif hasattr(enemy, 'get_current_move'):
+                    current_move = enemy.get_current_move()
+
+                if current_move and current_move.category == "physical":
+                    required_range = 25
+                else:
+                    required_range = enemy.attack_range
+
+                if distance_to_target < required_range or is_attacking:
                     should_skip_path = True
 
             # Se deve ignorar o path, apenas atualiza combate e continua

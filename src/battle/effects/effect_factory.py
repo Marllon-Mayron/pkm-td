@@ -2115,12 +2115,21 @@ class EffectFactory:
             },
             "description": "Sacrifica metade do HP para maximizar o Ataque (+6 estágios) por 30s."
         },
-        "mind-reader": {
-            "effect_type": "mind_reader",
+        "lock-on": {
+            "effect_type": "guaranteed_hit",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "params": {
-                "duration_attacks": 1,  # Dura 1 ataque
+                "effect_key": "lock_on",  # Identificador único
+            },
+            "description": "Garante que o próximo ataque do usuário acertará o alvo."
+        },
+        "mind-reader": {
+            "effect_type": "guaranteed_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "effect_key": "mind_reader",
             },
             "description": "Garante que o próximo ataque do usuário acertará o alvo."
         },
@@ -2158,6 +2167,34 @@ class EffectFactory:
                 "min_pp": 0,
             },
             "description": "Reduz 4 PP do último movimento usado pelo alvo."
+        },
+        "perish-song": {
+            "effect_type": "perish_song",
+            "target": EffectTarget.BOTH,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,
+            "params": {
+                "turns": 3,  # 3 ataques até desmaiar
+            },
+            "description": "Todos os Pokémon em campo desmaiam após 3 ataques."
+        },
+        "sleep-talk": {
+            "effect_type": "sleep_talk",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "requires_sleep": True,
+            },
+            "description": "Só funciona enquanto dormindo. Executa um movimento aleatório (exceto Sleep Talk)."
+        },
+        "spider-web": {
+            "effect_type": "spider_web",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "duration_attacks": 3,  # 3 turnos (ataques) preso
+            },
+            "description": "Prende o alvo na posição atual por 3 turnos. Não pode se mover ou atacar."
         },
         # ===== DANO NO ATACANTE =====
         "outrage": {
@@ -2200,7 +2237,39 @@ class EffectFactory:
             },
             "description": "Cura 50% do HP. No sol forte, cura 2/3. Em clima ruim, cura 1/4."
         },
-
+        # ===== PROTEÇÃO ======
+        "protect": {
+            "effect_type": "protect",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "protection": True,
+                "duration_attacks": 1,  # Protege contra 1 ataque
+            },
+            "description": "Protege o usuário do próximo ataque."
+        },
+        "detect": {
+            "effect_type": "protect",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "protection": True,
+                "duration_attacks": 1,
+            },
+            "description": "Protege o usuário do próximo ataque."
+        },
+        "safeguard": {
+            "effect_type": "safeguard",
+            "target": EffectTarget.SELF,
+            "is_area": True,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "duration_attacks": 5,  # Protege contra status pelos próximos 5 ataques
+                "prevents_status": True,
+                "prevents_confusion": True,
+            },
+            "description": "Protege o time de problemas de status pelos próximos 5 ataques."
+        },
 
     }
 

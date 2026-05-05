@@ -34,6 +34,15 @@ MYSTERY_GIFT_CODES = {
         "invalid": False,
         "event_name": "100H DE SPIDIUM",
         "event_date": "2026-05-02"
+    },
+    "IFZEKBUK": {
+        "pokemon_id": 175,
+        "pokemon_name": "Togepi",
+        "description": "De um ovo misterioso nasce um magnifico Togepi!",
+        "is_shiny": False,
+        "invalid": False,
+        "event_name": "Introdução 2 geração",
+        "event_date": "2026-05-07"
     }
 }
 

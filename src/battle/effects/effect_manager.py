@@ -39,6 +39,33 @@ class EffectManager:
         """Aplica um efeito de status a um Pokémon (com verificação de imunidade)"""
         from .status_effect import TypeImmunity
 
+        # ===== VERIFICA SAFEGUARD =====
+        if hasattr(pokemon, '_safeguard_active') and pokemon._safeguard_active:
+            # Safeguard previne status, exceto se for auto-aplicado (Rest, etc)
+            if source != pokemon:  # Não bloqueia status auto-aplicados
+                # Decrementa o contador
+                pokemon._safeguard_remaining -= 1
+
+                self.add_status_text(
+                    pokemon,
+                    f"O Safeguard protegeu {pokemon.name} de {status.name}! ({pokemon._safeguard_remaining} proteções restantes)",
+                    duration=1.5
+                )
+                print(
+                    f"[SAFEGUARD] {pokemon.name} está protegido contra {status.name}! Restam {pokemon._safeguard_remaining}")
+
+                # Se acabaram as proteções, remove o efeito
+                if pokemon._safeguard_remaining <= 0:
+                    pokemon._safeguard_active = False
+                    self.add_status_text(
+                        pokemon,
+                        f"O Safeguard de {pokemon.name} acabou!",
+                        duration=1.0
+                    )
+                    print(f"[SAFEGUARD] Proteção de {pokemon.name} acabou!")
+
+                return False
+
         pokemon_id = id(pokemon)
 
         # ===== VERIFICAÇÃO DE IMUNIDADE =====
