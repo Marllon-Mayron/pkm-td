@@ -3,6 +3,7 @@
 import math
 from typing import List, Optional
 
+from src.battle.attack_strategy import AttackPriority
 from src.battle.effects import StatusType
 
 
@@ -86,44 +87,62 @@ class PokemonCombat:
             delattr(self.pokemon, '_spider_web_locked_y')
 
     # ===== MÉTODOS DE BUSCA DE ALVO =====
-    def find_nearest_enemy(self, all_entities: List) -> Optional['Pokemon']:
-        """Encontra o inimigo mais próximo"""
+    def find_nearest_enemy(self, all_entities: List, attack_priority: Optional[AttackPriority] = None) -> Optional['Pokemon']:
+        """Encontra o inimigo mais próximo, considerando prioridade de ataque"""
         if not all_entities:
             return None
 
-        nearest = None
-        min_distance = float('inf')
+        valid_targets = []
         attack_range_sq = self.pokemon.attack_range * self.pokemon.attack_range
 
         for entity in all_entities:
-            # ===== VERIFICA SE A ENTIDADE ESTÁ ATIVA NO MAPA =====
-            # Para aliados (not wild): precisa estar placed
+            # Verifica se a entidade está ativa no mapa
             if not entity.is_wild:
                 if not hasattr(entity, 'is_placed') or not entity.is_placed:
                     continue
-            # Para inimigos (wild): sempre considerados (se vivos)
 
-            # Pula entidades mortas
             if not entity.is_alive() or entity.is_defeated:
                 continue
 
             # Determina se é alvo válido
             is_valid_target = False
             if self.pokemon.is_wild:
-                is_valid_target = not entity.is_wild  # Inimigo procura aliado
+                is_valid_target = not entity.is_wild
             else:
-                is_valid_target = entity.is_wild  # Aliado procura inimigo
+                is_valid_target = entity.is_wild
 
             if is_valid_target:
                 dx = self.pokemon.x - entity.x
                 dy = self.pokemon.y - entity.y
                 distance_sq = dx * dx + dy * dy
 
-                if distance_sq < attack_range_sq and distance_sq < min_distance:
-                    min_distance = distance_sq
-                    nearest = entity
+                if distance_sq < attack_range_sq:
+                    valid_targets.append((entity, distance_sq))
 
-        return nearest
+        if not valid_targets:
+            return None
+
+        # ===== SE TEM ESTRATÉGIA DE PRIORIDADE, ORDENA =====
+        if attack_priority and not self.pokemon.is_wild:  # Só para aliados
+            # Extrai apenas os Pokémon da lista
+            target_pokemon = [t[0] for t in valid_targets]
+            # Ordena pela prioridade
+            sorted_targets = attack_priority.sort_targets(target_pokemon)
+
+            # Agora encontra o primeiro que está no range
+            for target in sorted_targets:
+                # Verifica se ainda está no range
+                dx = self.pokemon.x - target.x
+                dy = self.pokemon.y - target.y
+                distance_sq = dx * dx + dy * dy
+                if distance_sq < attack_range_sq:
+                    return target
+
+            # Se nenhum dos ordenados está no range, pega o mais próximo
+            return min(valid_targets, key=lambda x: x[1])[0]
+        else:
+            # Fallback: pega o mais próximo
+            return min(valid_targets, key=lambda x: x[1])[0]
 
     def find_nearest_enemy_in_path(self, all_entities: List, path_assignment=None) -> Optional['Pokemon']:
         """
@@ -367,7 +386,6 @@ class PokemonCombat:
                     # Reseta cooldown
                     self.pokemon.charge_cooldown = 0
                     # Não retorna - continua para processar o movimento de retorno
-                    # return  # <-- REMOVA ESTE RETURN!
                 else:
                     self.pokemon.combat_state = "idle"
                     if self.pokemon.has_animation("idle"):
@@ -379,6 +397,11 @@ class PokemonCombat:
             # ===== VERIFICA SE TEM PATH_ASSIGNMENT TEMPORÁRIO (MINIGAME) =====
             path_assignment = getattr(self.pokemon, '_temp_path_assignment', None)
 
+            # ===== OBTÉM A ESTRATÉGIA DE PRIORIDADE (APENAS PARA ALIADOS) =====
+            attack_priority = None
+            if not self.pokemon.is_wild and hasattr(self.pokemon, 'attack_priority'):
+                attack_priority = self.pokemon.attack_priority
+
             if path_assignment is not None:
                 # Modo minigame: usa busca com restrição de path
                 if self.pokemon.is_wild:
@@ -388,12 +411,14 @@ class PokemonCombat:
                     # ALIADO: busca inimigos no mesmo path
                     self.pokemon.target = self.find_nearest_enemy_in_path(all_entities, path_assignment)
             else:
-                # Modo normal: busca padrão
-                self.pokemon.target = self.find_nearest_enemy(all_entities)
-
+                # Modo normal: busca padrão COM ESTRATÉGIA DE PRIORIDADE
+                self.pokemon.target = self.find_nearest_enemy(all_entities, attack_priority)
 
             if self.pokemon.target:
-                print(f"[COMBAT] {self.pokemon.name} encontrou novo alvo: {self.pokemon.target.name}")
+                priority_info = ""
+                if attack_priority:
+                    priority_info = f" (prioridade: {attack_priority.get_priority_name()})"
+                print(f"[COMBAT] {self.pokemon.name} encontrou novo alvo: {self.pokemon.target.name}{priority_info}")
                 self.pokemon.combat_state = "attacking"
             else:
                 # Sem alvos disponíveis

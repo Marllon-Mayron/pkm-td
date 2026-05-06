@@ -4,6 +4,7 @@ import uuid
 import random
 from typing import List, Dict, Optional
 
+from src.battle.attack_strategy import AttackPriority
 from src.battle.attack_pattern import AttackPattern, AttackPatternManager, AttackTypeCategory
 from src.entities.base import Entity
 from src.data.pokedex import Pokedex
@@ -184,6 +185,7 @@ class Pokemon(Entity):
         self.attack_cooldown_max = 1.2
         self.target = None
         self.has_no_pp = False
+        self.attack_priority = AttackPriority(self)  # Só será usado para aliados
 
         # ===== SISTEMA DE CONTRIBUIÇÃO =====
         self.damage_contributions = {}  # id do atacante -> dano causado

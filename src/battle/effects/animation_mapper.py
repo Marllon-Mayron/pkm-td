@@ -22,6 +22,9 @@ class AnimationMapper:
         "slash": "strike",
         "cut": "strike",
         "fury-swipes": "strike",
+        "stomp": "stomp",
+        "rollut": "tumble",
+
 
         # Golpes de soco
         "pound": "punch",
