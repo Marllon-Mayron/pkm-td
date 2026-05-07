@@ -198,7 +198,7 @@ class PokemonEvolution:
         return leveled_up
 
     def level_up(self):
-        """Sobe de nível"""
+        """Sobe de nível com curva de XP suavizada"""
         old_level = self.pokemon.level
         self.pokemon.xp -= self.pokemon.xp_to_next
         self.pokemon.level += 1

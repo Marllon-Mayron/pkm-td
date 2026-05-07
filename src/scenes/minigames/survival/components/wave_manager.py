@@ -52,6 +52,9 @@ class SurvivalWaveManager:
         self.available_paths: List[int] = []
         self._wave_completed_announced = False
 
+        # ===== NOVO: RASTREAMENTO DE PARTICIPANTES DA BATALHA =====
+        self.battle_participants: set = set()  # IDs dos Pokémon que participaram
+
         self._load_waves_from_data()
         self._load_minigame_config()
 
@@ -104,9 +107,16 @@ class SurvivalWaveManager:
         self.wave_active = False
         self.between_waves_timer = 0
         self._wave_completed_announced = False
+        self.battle_participants.clear()  # Limpa participantes
         self._prepare_next_wave()
         self.wave_active = True
         print(f"[SurvivalWave] Iniciando waves... Total: {self.total_waves}")
+
+    def register_participant(self, pokemon: Pokemon):
+        """Registra um Pokémon como participante da batalha"""
+        if pokemon and not pokemon.is_wild and pokemon.is_alive():
+            self.battle_participants.add(id(pokemon))
+            print(f"[XP_PARTICIPANT] {pokemon.name} registrado como participante")
 
     def _prepare_next_wave(self):
         """Prepara a próxima wave baseada na configuração"""
@@ -164,8 +174,11 @@ class SurvivalWaveManager:
             self.game_scene.survival_ui.show_message(wave_text, (255, 215, 0), duration=2.0)
 
     def _get_random_path(self) -> Optional[int]:
+        """Retorna um índice de path aleatório dos disponíveis na wave atual"""
         if not self.current_wave_config or not self.current_wave_config["paths_available"]:
-            return 0 if self.available_paths else None
+            if self.available_paths:
+                return random.choice(self.available_paths)
+            return 0
         return random.choice(self.current_wave_config["paths_available"])
 
     def _get_path_start_point(self, path_idx: int) -> Optional[Tuple[float, float]]:
@@ -211,7 +224,8 @@ class SurvivalWaveManager:
 
         # ===== ASSOCIA O INIMIGO A ESTE PATH =====
         if hasattr(self.game_scene, 'path_assignment'):
-            path_y = self.game_scene.path_assignment.path_y_coords[path_idx] if path_idx < len(self.game_scene.path_assignment.path_y_coords) else None
+            path_y = self.game_scene.path_assignment.path_y_coords[path_idx] if path_idx < len(
+                self.game_scene.path_assignment.path_y_coords) else None
             print(f"[SurvivalWave] Criando inimigo para path {path_idx} (Y={path_y})")
 
         start_point = self._get_path_start_point(path_idx)
@@ -279,14 +293,6 @@ class SurvivalWaveManager:
 
         print(f"[SurvivalWave] {pokemon.name} criado - Level {pokemon.level}, Path {path_idx}")
         return pokemon
-
-    def _get_random_path(self) -> Optional[int]:
-        """Retorna um índice de path aleatório dos disponíveis na wave atual"""
-        if not self.current_wave_config or not self.current_wave_config["paths_available"]:
-            if self.available_paths:
-                return random.choice(self.available_paths)
-            return 0
-        return random.choice(self.current_wave_config["paths_available"])
 
     def _update_direction_from_movement(self, enemy: Pokemon, dx: float, dy: float):
         """Atualiza a direção baseada no movimento (8 direções) - MESMA LÓGICA DO MODO CAMPANHA"""
@@ -500,7 +506,8 @@ class SurvivalWaveManager:
         """Processa morte de um inimigo"""
         self.enemies_killed += 1
 
-        self._distribute_xp(enemy)
+        # ===== NOVO SISTEMA DE XP: TO DOS PARTICIPANTES =====
+        self._distribute_xp_to_participants(enemy)
 
         if hasattr(self.game_scene, 'add_energy'):
             energy_gain = 15
@@ -534,57 +541,85 @@ class SurvivalWaveManager:
             except:
                 pass
 
-    def _distribute_xp(self, defeated_enemy: 'Pokemon'):
-        """Distribui XP e EVs"""
-        contributors = defeated_enemy.get_xp_contributors()
-        if not contributors:
+    def _distribute_xp_to_participants(self, defeated_enemy: Pokemon):
+        """Distribui XP para todos os participantes da batalha (XP dividido igualmente)"""
+        participants = []
+
+        # Obtém os Pokémon participantes pelo ID
+        for pokemon_id in self.battle_participants:
+            for ally in self.game_scene.player_pokemon:
+                if id(ally) == pokemon_id and ally.is_alive() and not ally.is_defeated:
+                    participants.append(ally)
+                    break
+
+        if not participants:
+            print(f"[XP] Nenhum participante registrado para {defeated_enemy.name}")
             return
 
-        base_xp = 25 + (defeated_enemy.level * 5)
+        # ===== CALCULA XP BASE (exponencial pelo nível) =====
+        # Fórmula: base_xp = 20 + (level^1.5) * 2
+        level = defeated_enemy.level
+        base_xp = 20 + int((level ** 1.5) * 2)
 
+        # Bônus para boss (3x)
         if defeated_enemy.is_boss:
             base_xp = int(base_xp * 3)
+            print(f"[XP] BOSS derrotado! XP base: {base_xp}")
+
+        # Bônus para shiny (1.5x)
         if defeated_enemy.is_shiny:
             base_xp = int(base_xp * 1.5)
 
-        total_contribution = defeated_enemy.get_total_contribution()
-        if total_contribution <= 0:
-            total_contribution = len(contributors)
+        # XP é dividido igualmente entre os participantes
+        xp_per_participant = max(1, base_xp // len(participants))
 
+        print(f"[XP] Distribuindo {xp_per_participant} XP para cada um dos {len(participants)} participantes")
+        print(f"[XP] XP base do inimigo (nível {level}): {base_xp}")
+
+        # Obtém EVs do inimigo
         pokedex = self.game_scene.game.player.pokedex if self.game_scene.game.player else None
-        if not pokedex:
-            return
+        ev_yield = {}
+        if pokedex:
+            ev_yield = pokedex.get_ev_yield(defeated_enemy.id)
 
-        ev_yield = pokedex.get_ev_yield(defeated_enemy.id)
-
+        # Multiplicador de EV para boss/shiny
         ev_multiplier = 1.0
         if defeated_enemy.is_boss:
             ev_multiplier *= 3
         if defeated_enemy.is_shiny:
             ev_multiplier *= 2
 
-        for attacker_id, contribution in contributors:
-            proportion = contribution / total_contribution
-            xp_gained = int(base_xp * proportion)
+        # Distribui XP e EVs para cada participante
+        for ally in participants:
+            # ===== APLICA XP =====
+            old_level = ally.level
+            ally.gain_xp(xp_per_participant)
 
-            evs_gained = {}
-            for stat, value in ev_yield.items():
-                if value > 0:
-                    ev_value = max(1, int(value * proportion * ev_multiplier))
-                    evs_gained[stat] = ev_value
+            # ===== DISTRIBUI EVs =====
+            if any(ev_yield.values()):
+                evs_gained = {}
+                for stat, value in ev_yield.items():
+                    if value > 0:
+                        ev_value = max(1, int(value * ev_multiplier))
+                        evs_gained[stat] = ev_value
 
-            if xp_gained < 1 and contribution > 0:
-                xp_gained = 1
+                if ally.stats.can_gain_evs(evs_gained):
+                    ally.stats.gain_evs(evs_gained)
+                    print(f"[XP] {ally.name} ganhou {xp_per_participant} XP e EVs: {evs_gained}")
+                else:
+                    print(f"[XP] {ally.name} ganhou {xp_per_participant} XP (EVs bloqueados)")
+            else:
+                print(f"[XP] {ally.name} ganhou {xp_per_participant} XP")
 
-            for ally in self.game_scene.player_pokemon:
-                if id(ally) == attacker_id and ally.is_alive():
-                    old_level = ally.level
-                    ally.gain_xp(xp_gained)
+        # Limpa participantes para a próxima batalha
+        self.battle_participants.clear()
 
-                    if any(evs_gained.values()):
-                        if ally.stats.can_gain_evs(evs_gained):
-                            ally.stats.gain_evs(evs_gained)
-                    break
+    def _distribute_xp(self, defeated_enemy: 'Pokemon'):
+        """
+        [DEPRECATED] Método antigo mantido por compatibilidade.
+        O novo sistema está em _distribute_xp_to_participants()
+        """
+        pass
 
     def _complete_wave(self):
         """Completa a wave atual e prepara a próxima"""
@@ -607,6 +642,9 @@ class SurvivalWaveManager:
         if hasattr(self.game_scene, 'add_energy'):
             bonus = 30
             self.game_scene.add_energy(bonus)
+
+        # ===== LIMPA PARTICIPANTES AO FINAL DA WAVE =====
+        self.battle_participants.clear()
 
         self.current_wave += 1
         self.wave_active = False

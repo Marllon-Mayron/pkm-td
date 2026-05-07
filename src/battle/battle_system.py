@@ -8,7 +8,7 @@ from src.battle.damage_calculator import DamageCalculator
 from src.battle.effects import EffectManager, EffectTiming, StatType, StatusType
 from src.battle.projectile import Projectile
 
-from typing import List
+from typing import List, Set
 
 from src.entities.pokemon import Pokemon
 
@@ -26,6 +26,9 @@ class BattleSystem:
         # Weather system
         self.weather_manager = WeatherManager(self)
         self.weather_filter = None
+
+        # ===== NOVO: RASTREAMENTO DE PARTICIPANTES DA BATALHA =====
+        self.battle_participants: Set[int] = set()  # IDs dos Pokémon que participaram
 
     def set_effect_manager_for_pokemon(self, pokemon):
         """Vincula o effect_manager a um Pokémon e registra"""
@@ -59,8 +62,109 @@ class BattleSystem:
         # ===== ATUALIZA CLIMA =====
         self.weather_manager.update(dt)
 
+    def register_participant(self, pokemon: 'Pokemon'):
+        """Registra um Pokémon como participante da batalha"""
+        if pokemon and not pokemon.is_wild and pokemon.is_alive():
+            self.battle_participants.add(id(pokemon))
+            print(f"[XP_PARTICIPANT] {pokemon.name} registrado como participante")
+
+    def clear_participants(self):
+        """Limpa a lista de participantes (chamado quando a wave termina)"""
+        self.battle_participants.clear()
+
+    def distribute_xp_for_defeated_enemy(self, defeated_enemy: 'Pokemon'):
+        """Distribui XP para todos os participantes quando um inimigo é derrotado"""
+        participants = []
+
+        for pokemon_id in self.battle_participants:
+            if self.game_scene and hasattr(self.game_scene, 'placement_manager'):
+                for ally in self.game_scene.placement_manager.placed_pokemon:
+                    if id(ally) == pokemon_id and ally.is_alive():
+                        participants.append(ally)
+                        break
+
+        if not participants:
+            print(f"[XP] Nenhum participante registrado para distribuir XP!")
+            return
+
+        # ===== NOVA FÓRMULA DE XP BASE: exponencial pelo nível do inimigo =====
+        # base_xp = 20 + (level^1.5) * 2
+        level = defeated_enemy.level
+        base_xp = 20 + int((level ** 1.5) * 2)
+
+        # Bônus para boss (3x)
+        if defeated_enemy.is_boss:
+            base_xp = int(base_xp * 3)
+            print(f"[XP] BOSS derrotado! XP base: {base_xp}")
+
+        # Bônus para shiny (1.5x)
+        if defeated_enemy.is_shiny:
+            base_xp = int(base_xp * 1.5)
+
+        # XP é dividido igualmente entre os participantes
+        xp_per_participant = max(1, base_xp // len(participants))
+
+        print(f"[XP] Distribuindo {xp_per_participant} XP para cada um dos {len(participants)} participantes")
+        print(f"[XP] XP base do inimigo (nível {level}): {base_xp}")
+
+        # Distribui o XP
+        for pokemon in participants:
+            self._give_xp_to_pokemon(pokemon, xp_per_participant, defeated_enemy)
+
+    def _give_xp_to_pokemon(self, pokemon: 'Pokemon', xp_amount: int, defeated_enemy: 'Pokemon'):
+        """Dá XP a um Pokémon individual"""
+        # Aplica multiplicador de Pay Day se houver
+        pay_day_xp_mult = 1.0
+
+        if hasattr(defeated_enemy, '_pay_day_hit') and defeated_enemy._pay_day_hit:
+            pay_day_xp_mult = getattr(defeated_enemy, '_pay_day_xp_multiplier', 1.5)
+            xp_amount = int(xp_amount * pay_day_xp_mult)
+            print(f"[PAY_DAY] Bônus XP! {pokemon.name} ganhou {xp_amount} XP (x{pay_day_xp_mult})")
+
+        old_level = pokemon.level
+        pokemon.gain_xp(xp_amount)
+
+        # Distribui EVs (agora também dividido igualmente)
+        ev_yield = self.game_scene.player.pokedex.get_ev_yield(defeated_enemy.id)
+
+        ev_multiplier = 1.0
+        if defeated_enemy.is_boss:
+            ev_multiplier *= 3
+        if defeated_enemy.is_shiny:
+            ev_multiplier *= 2
+        if pay_day_xp_mult > 1.0:
+            ev_multiplier *= pay_day_xp_mult
+
+        if any(ev_yield.values()):
+            evs_gained = {}
+            for stat, value in ev_yield.items():
+                if value > 0:
+                    evs_gained[stat] = max(1, int(value * ev_multiplier))
+
+            if pokemon.stats.can_gain_evs(evs_gained):
+                pokemon.stats.gain_evs(evs_gained)
+                print(f"[XP] {pokemon.name} ganhou {xp_amount} XP e EVs: {evs_gained}")
+            else:
+                print(f"[XP] {pokemon.name} ganhou {xp_amount} XP (EVs bloqueados)")
+        else:
+            print(f"[XP] {pokemon.name} ganhou {xp_amount} XP")
+
+        # Limpa as flags de Pay Day após distribuir
+        if hasattr(defeated_enemy, '_pay_day_hit'):
+            defeated_enemy._pay_day_hit = False
+            if hasattr(defeated_enemy, '_pay_day_hit_count'):
+                delattr(defeated_enemy, '_pay_day_hit_count')
+            if hasattr(defeated_enemy, '_pay_day_gold_multiplier'):
+                delattr(defeated_enemy, '_pay_day_gold_multiplier')
+            if hasattr(defeated_enemy, '_pay_day_xp_multiplier'):
+                delattr(defeated_enemy, '_pay_day_xp_multiplier')
+
     def attempt_attack(self, attacker: 'Pokemon', target: 'Pokemon') -> bool:
         """Tenta realizar um ataque com o move atual do atacante"""
+        # ===== REGISTRA PARTICIPANTE (APENAS ALIADOS E NÃO SELVAGENS) =====
+        if not attacker.is_wild:
+            self.register_participant(attacker)
+
         # ===== LIMPA RASTROS DE COUNTER DO ATACANTE ANTES DE ATACAR =====
         # Isso evita que o Pokémon use Counter duas vezes seguidas
         self.clear_counter_tracking(attacker)
@@ -976,6 +1080,7 @@ class BattleSystem:
         """Limpa todos os efeitos (usado quando batalha termina)"""
         self.residual_effects.clear_all()
         self.effect_manager.clear_all()
+        self.battle_participants.clear()  # Limpa participantes também
 
         # ===== LIMPA SCREENS =====
         if hasattr(self, 'active_screens'):

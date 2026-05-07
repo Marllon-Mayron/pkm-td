@@ -82,6 +82,11 @@ class WaveManager:
         if self.spawner.has_active_waves():
             return False
 
+        # ===== QUANDO A WAVE TERMINA, LIMPA OS PARTICIPANTES DA BATALHA =====
+        if self.game_scene and hasattr(self.game_scene, 'battle_system'):
+            self.game_scene.battle_system.clear_participants()
+            print(f"[XP] Participantes da batalha limpos ao final da wave")
+
         return True
 
     def get_current_wave_info(self) -> dict:
@@ -375,8 +380,9 @@ class WaveManager:
             gold_reward = int(gold_reward * pay_day_gold_mult)
             print(f"[PAY_DAY] Bônus de gold! {self.gold_per_defeat} -> {gold_reward} (x{pay_day_gold_mult})")
 
-        # Distribui XP (já com multiplicador de Pay Day)
-        self._distribute_xp(enemy)
+        # ===== NOVO SISTEMA DE XP: DISTRIBUI PARA TODOS OS PARTICIPANTES =====
+        if self.game_scene and hasattr(self.game_scene, 'battle_system'):
+            self.game_scene.battle_system.distribute_xp_for_defeated_enemy(enemy)
 
         # Adiciona gold (com multiplicador)
         self.total_gold_earned += gold_reward
@@ -469,102 +475,11 @@ class WaveManager:
             print(f"[WaveManager] {enemy.name} removido com sucesso")
 
     def _distribute_xp(self, defeated_enemy: 'Pokemon'):
-        """Distribui XP e EVs quando um inimigo é derrotado (COM SUPORTE A PAY DAY)"""
-        contributors = defeated_enemy.get_xp_contributors()
-        if not contributors:
-            return
-
-        # ===== BASE XP =====
-        base_xp = 15 + (defeated_enemy.level * 5)
-
-        # Bônus para boss
-        if defeated_enemy.is_boss:
-            base_xp = int(base_xp * 3)
-            print(f"[XP] BOSS derrotado! XP base: {base_xp}")
-
-        if defeated_enemy.is_shiny:
-            base_xp = int(base_xp * 1.5)
-
-        # ===== VERIFICA MULTIPLICADOR DE PAY DAY =====
-        pay_day_gold_mult = 1.0
-        pay_day_xp_mult = 1.0
-
-        if hasattr(defeated_enemy, '_pay_day_hit') and defeated_enemy._pay_day_hit:
-            pay_day_gold_mult = getattr(defeated_enemy, '_pay_day_gold_multiplier', 2.0)
-            pay_day_xp_mult = getattr(defeated_enemy, '_pay_day_xp_multiplier', 1.5)
-
-            # Aplica o multiplicador ao XP base
-            base_xp = int(base_xp * pay_day_xp_mult)
-
-            print(f"[PAY_DAY] Bônus aplicado! Gold x{pay_day_gold_mult}, XP x{pay_day_xp_mult}")
-
-            # Limpa as flags
-            defeated_enemy._pay_day_hit = False
-            if hasattr(defeated_enemy, '_pay_day_hit_count'):
-                delattr(defeated_enemy, '_pay_day_hit_count')
-            if hasattr(defeated_enemy, '_pay_day_gold_multiplier'):
-                delattr(defeated_enemy, '_pay_day_gold_multiplier')
-            if hasattr(defeated_enemy, '_pay_day_xp_multiplier'):
-                delattr(defeated_enemy, '_pay_day_xp_multiplier')
-
-        total_contribution = defeated_enemy.get_total_contribution()
-        if total_contribution <= 0:
-            total_contribution = len(contributors)
-
-        placement_manager = None
-        if self.game_scene and hasattr(self.game_scene, 'placement_manager'):
-            placement_manager = self.game_scene.placement_manager
-
-        if not placement_manager:
-            return
-
-        # Obtém os EVs concedidos pelo inimigo derrotado
-        ev_yield = self.game_scene.player.pokedex.get_ev_yield(defeated_enemy.id)
-
-        # Aplica multiplicadores para boss/shiny
-        ev_multiplier = 1.0
-        if defeated_enemy.is_boss:
-            ev_multiplier *= 3
-        if defeated_enemy.is_shiny:
-            ev_multiplier *= 2
-
-        # Aplica multiplicador de Pay Day aos EVs também
-        if pay_day_xp_mult > 1.0:
-            ev_multiplier *= pay_day_xp_mult
-
-        if ev_multiplier > 1:
-            print(f"[EVS] Multiplicador de EVs: {ev_multiplier:.1f}x")
-
-        for attacker_id, contribution in contributors:
-            proportion = contribution / total_contribution
-            xp_gained = int(base_xp * proportion)
-
-            # EVs são distribuídos proporcionalmente
-            evs_gained = {}
-            for stat, value in ev_yield.items():
-                if value > 0:
-                    ev_value = max(1, int(value * proportion * ev_multiplier))
-                    evs_gained[stat] = ev_value
-
-            if xp_gained < 1 and contribution > 0:
-                xp_gained = 1
-
-            for pokemon in placement_manager.placed_pokemon:
-                if id(pokemon) == attacker_id and pokemon.is_alive():
-                    # Ganha XP
-                    old_level = pokemon.level
-                    pokemon.gain_xp(xp_gained)
-
-                    # Ganha EVs
-                    if any(evs_gained.values()):
-                        if pokemon.stats.can_gain_evs(evs_gained):
-                            pokemon.stats.gain_evs(evs_gained)
-                            print(f"[DISTRIBUTE] {pokemon.name} ganhou {xp_gained} XP e EVs: {evs_gained}")
-                        else:
-                            print(f"[DISTRIBUTE] {pokemon.name} ganhou {xp_gained} XP (EVs bloqueados)")
-                    else:
-                        print(f"[DISTRIBUTE] {pokemon.name} ganhou {xp_gained} XP")
-                    break
+        """
+        [DEPRECATED] Método antigo mantido por compatibilidade, mas não usado.
+        O novo sistema está em battle_system.distribute_xp_for_defeated_enemy()
+        """
+        pass
 
     def _update_animation(self, enemy, dt):
         """Atualiza animação do inimigo"""

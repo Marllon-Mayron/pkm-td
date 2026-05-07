@@ -10,20 +10,15 @@ class PokemonStats:
     MAX_TOTAL_EVS = 1020  # Limite total (era 510) → 2x maior
     MAX_EV_PER_STAT = 504  # Limite por stat (1020/2 ≈ 510, 504 é múltiplo de 8)
 
-    # 504 / 8 = 63 pontos máximos por stat (MESMO bônus original!)
-
     def __init__(self, pokemon):
         self.pokemon = pokemon
 
     def calculate_stats(self):
         """Calcula stats baseado em level, IVs e EVs - SUPORTA TRANSFORM"""
 
-        # ===== VERIFICA SE ESTÁ TRANSFORMADO =====
         if hasattr(self.pokemon, '_is_transformed') and self.pokemon._is_transformed:
-            # Usa os base_stats copiados do oponente
             base_stats = self.pokemon.base_stats
         else:
-            # Usa os base_stats originais
             base_stats = self.pokemon.pokedex.get_pokemon(self.pokemon.id)["base_stats"]
 
         stats = self.pokemon.pokedex.calculate_stats_with_base(
@@ -40,7 +35,6 @@ class PokemonStats:
         self.pokemon.sp_defense = stats["special_defense"]
         self.pokemon.speed_stat = stats["speed"]
 
-        # Aplica modificadores de natureza (NÃO COPIA a natureza do oponente)
         if hasattr(self.pokemon, 'nature_multipliers'):
             mult = self.pokemon.nature_multipliers
             if mult["attack"] != 1.0:
@@ -55,7 +49,24 @@ class PokemonStats:
                 self.pokemon.speed_stat = int(self.pokemon.speed_stat * mult["speed"])
 
     def calculate_xp_needed(self) -> int:
-        return int(self.pokemon.level ** 3)
+        """
+        Calcula XP necessário para o próximo nível.
+
+        Fórmula: level² × 2
+
+        Resultado: nível 100 → 20,000 XP (metade do original que era 1,000,000)
+
+        Exemplos:
+        - Nível 1 → 2 XP
+        - Nível 5 → 50 XP
+        - Nível 10 → 200 XP
+        - Nível 20 → 800 XP
+        - Nível 30 → 1,800 XP
+        - Nível 40 → 3,200 XP
+        - Nível 50 → 5,000 XP
+        - Nível 100 → 20,000 XP
+        """
+        return (self.pokemon.level ** 2) * 2
 
     def calculate_attack_damage(self) -> float:
         return (self.pokemon.attack + self.pokemon.sp_attack) / 2
@@ -64,15 +75,12 @@ class PokemonStats:
         return (self.pokemon.defense + self.pokemon.sp_defense) / 2
 
     def calculate_wild_move_speed(self) -> float:
-        """Calcula velocidade de movimento com modificadores"""
         MIN_MOVE_SPEED = self.pokemon._MIN_MOVE_SPEED
         MAX_MOVE_SPEED = self.pokemon._MAX_MOVE_SPEED
 
         min_base = self.pokemon.pokedex.min_base_speed
         max_base = self.pokemon.pokedex.max_base_speed
         base_speed = self.pokemon.base_stats["speed"]
-
-        print(f"[SPEED_DEBUG] {self.pokemon.name}: base_speed={base_speed}, level={self.pokemon.level}")
 
         if max_base > min_base:
             base_norm = (base_speed - min_base) / (max_base - min_base)
@@ -103,33 +111,23 @@ class PokemonStats:
         move_speed = MIN_MOVE_SPEED + (MAX_MOVE_SPEED - MIN_MOVE_SPEED) * combined_norm
         move_speed *= level_factor
 
-        print(f"[SPEED_DEBUG] {self.pokemon.name}: speed antes dos efeitos = {move_speed:.2f}")
-
-        # Aplica modificador de velocidade dos efeitos
         speed_mult = 1.0
         if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
             try:
                 from src.battle.effects import StatType
-                # Tenta obter o multiplicador de velocidade do effect_manager
                 speed_mult = self.pokemon.effect_manager.get_stat_multiplier(self.pokemon, StatType.SPEED)
-                print(f"[SPEED_DEBUG] {self.pokemon.name}: speed_mult do effect_manager = {speed_mult:.2f}")
                 move_speed *= speed_mult
-            except Exception as e:
-                print(f"[SPEED_DEBUG] Erro ao obter modificador: {e}")
-        else:
-            print(f"[SPEED_DEBUG] {self.pokemon.name}: effect_manager não encontrado!")
+            except Exception:
+                pass
 
         if self.pokemon.is_shiny:
             move_speed *= 1.25
         if self.pokemon.is_boss:
             move_speed *= 0.7
 
-        final_speed = max(MIN_MOVE_SPEED, min(MAX_MOVE_SPEED, move_speed))
-        print(f"[SPEED_DEBUG] {self.pokemon.name}: velocidade final = {final_speed:.2f} (mult={speed_mult:.2f})")
-        return final_speed
+        return max(MIN_MOVE_SPEED, min(MAX_MOVE_SPEED, move_speed))
 
     def get_cached_move_speed(self):
-        """Obtém velocidade de movimento do cache"""
         cache_key = (self.pokemon.id, self.pokemon.level, self.pokemon.speed_stat,
                      self.pokemon.is_shiny, self.pokemon.is_boss)
 
@@ -170,13 +168,6 @@ class PokemonStats:
         return random.choice(natures)
 
     def gain_evs(self, ev_yield: dict, multiplier: float = 1.0):
-        """
-        Adiciona EVs ao Pokémon baseado no oponente derrotado
-
-        Args:
-            ev_yield: Dicionário com os EVs concedidos (ex: {"attack": 1, "speed": 1})
-            multiplier: Multiplicador (ex: 1.5 para Machado, 2 para itens Power)
-        """
         total_evs_before = sum(self.pokemon.evs.values())
         evs_gained = {}
 
@@ -184,13 +175,11 @@ class PokemonStats:
             if value <= 0:
                 continue
 
-            # Aplica multiplicador
             actual_gain = int(value * multiplier)
             if actual_gain <= 0:
                 continue
 
             current = self.pokemon.evs.get(stat, 0)
-            # NOVO LIMITE: 378 por stat (era 252)
             new_value = min(self.MAX_EV_PER_STAT, current + actual_gain)
             actual_gain = new_value - current
 
@@ -200,9 +189,7 @@ class PokemonStats:
 
         total_evs_after = sum(self.pokemon.evs.values())
 
-        # VERIFICA LIMITE TOTAL (765)
         if total_evs_after > self.MAX_TOTAL_EVS:
-            # Se excedeu, remove o excesso proporcionalmente
             excess = total_evs_after - self.MAX_TOTAL_EVS
             self._reduce_excess_evs(excess, evs_gained)
             total_evs_after = self.MAX_TOTAL_EVS
@@ -214,26 +201,21 @@ class PokemonStats:
             for stat, gain in evs_gained.items():
                 print(f"  └─ +{gain} {stat.upper()} (agora: {self.pokemon.evs[stat]}/{self.MAX_EV_PER_STAT})")
 
-            # Recalcula stats se os EVs mudaram
             old_max_hp = self.pokemon.max_hp
             self.calculate_stats()
 
-            # Cura o Pokémon se o HP máximo aumentou
             if self.pokemon.current_hp > 0:
                 hp_increase = self.pokemon.max_hp - old_max_hp
                 if hp_increase > 0:
                     self.pokemon.current_hp += hp_increase
-                    print(f"  └─ HP aumentou em {hp_increase} (agora: {self.pokemon.current_hp}/{self.pokemon.max_hp})")
 
         return evs_gained
 
     def _reduce_excess_evs(self, excess: int, last_gained: dict):
-        """Remove EVs em excesso quando passa do limite total"""
         total_evs = sum(self.pokemon.evs.values())
         if total_evs <= self.MAX_TOTAL_EVS:
             return
 
-        # Remove proporcionalmente das stats que ganharam EVs agora
         total_gained = sum(last_gained.values())
         if total_gained == 0:
             return
@@ -243,33 +225,23 @@ class PokemonStats:
                 reduction = int(gained * (excess / total_gained))
                 if reduction > 0:
                     self.pokemon.evs[stat] = max(0, self.pokemon.evs[stat] - reduction)
-                    print(f"  └─ Ajuste: -{reduction} {stat.upper()} (limite total {self.MAX_TOTAL_EVS} atingido)")
 
     def get_ev_total(self) -> int:
-        """Retorna o total de EVs acumulados"""
         return sum(self.pokemon.evs.values())
 
     def get_ev_percentage(self) -> float:
-        """Retorna a porcentagem de EVs usados (max 765)"""
         return min(1.0, self.get_ev_total() / self.MAX_TOTAL_EVS)
 
     def get_ev_bonus(self, stat: str) -> int:
-        """
-        Retorna o bônus de stat baseado nos EVs
-        NOVA FÓRMULA: A cada 6 EVs = +1 ponto na stat (no level 100)
-        """
         ev_value = self.pokemon.evs.get(stat, 0)
         return ev_value // self.EVS_PER_STAT_POINT
 
     def reset_evs(self):
-        """Reseta todos os EVs (útil para itens como Berry Redutor)"""
         for stat in self.pokemon.evs:
             self.pokemon.evs[stat] = 0
         self.calculate_stats()
-        print(f"[EVS] EVs de {self.pokemon.name} foram resetados!")
 
     def can_gain_evs(self, ev_yield: dict) -> bool:
-        """Verifica se o Pokémon pode ganhar os EVs propostos (não excede limites)"""
         total_after = self.get_ev_total() + sum(ev_yield.values())
         if total_after > self.MAX_TOTAL_EVS:
             return False
