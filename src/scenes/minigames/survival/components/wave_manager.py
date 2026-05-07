@@ -52,9 +52,6 @@ class SurvivalWaveManager:
         self.available_paths: List[int] = []
         self._wave_completed_announced = False
 
-        # ===== NOVO: RASTREAMENTO DE PARTICIPANTES DA BATALHA =====
-        self.battle_participants: set = set()  # IDs dos Pokémon que participaram
-
         self._load_waves_from_data()
         self._load_minigame_config()
 
@@ -107,16 +104,30 @@ class SurvivalWaveManager:
         self.wave_active = False
         self.between_waves_timer = 0
         self._wave_completed_announced = False
-        self.battle_participants.clear()  # Limpa participantes
         self._prepare_next_wave()
         self.wave_active = True
         print(f"[SurvivalWave] Iniciando waves... Total: {self.total_waves}")
 
-    def register_participant(self, pokemon: Pokemon):
-        """Registra um Pokémon como participante da batalha"""
-        if pokemon and not pokemon.is_wild and pokemon.is_alive():
-            self.battle_participants.add(id(pokemon))
-            print(f"[XP_PARTICIPANT] {pokemon.name} registrado como participante")
+    def register_attacker_for_enemy(self, attacker: Pokemon, enemy: Pokemon):
+        """Registra que um atacante atingiu um inimigo específico"""
+        if not attacker or not enemy:
+            return
+
+        # Pula se for selvagem (inimigo atacando aliado não ganha XP)
+        if attacker.is_wild:
+            return
+
+        # Pula se o inimigo já está morto
+        if enemy.is_defeated or not enemy.is_alive():
+            return
+
+        # Inicializa o set de atacantes para este inimigo se não existir
+        if not hasattr(enemy, '_attackers'):
+            enemy._attackers = set()
+
+        # Adiciona o ID do atacante
+        enemy._attackers.add(id(attacker))
+        print(f"[XP_TRACK] {attacker.name} atacou {enemy.name} - registrado")
 
     def _prepare_next_wave(self):
         """Prepara a próxima wave baseada na configuração"""
@@ -222,7 +233,6 @@ class SurvivalWaveManager:
         if path_idx is None:
             return None
 
-        # ===== ASSOCIA O INIMIGO A ESTE PATH =====
         if hasattr(self.game_scene, 'path_assignment'):
             path_y = self.game_scene.path_assignment.path_y_coords[path_idx] if path_idx < len(
                 self.game_scene.path_assignment.path_y_coords) else None
@@ -265,7 +275,6 @@ class SurvivalWaveManager:
         pokemon.attack_pattern = AttackPattern.AGGRESSIVE
         pokemon.combat_state = "attacking"
 
-        # ===== ASSOCIA O PATH AO INIMIGO =====
         pokemon._assigned_path_index = path_idx
         print(f"[SurvivalWave] {pokemon.name} associado ao path {path_idx}")
 
@@ -285,7 +294,6 @@ class SurvivalWaveManager:
         pokemon._spawn_timer = 0.5
         pokemon._escaped_counted = False
 
-        # ===== CONFIGURA A DIREÇÃO INICIAL BASEADA NO MOVIMENTO =====
         if len(path_points) >= 2:
             dx = path_points[1][0] - path_points[0][0]
             dy = path_points[1][1] - path_points[0][1]
@@ -295,20 +303,16 @@ class SurvivalWaveManager:
         return pokemon
 
     def _update_direction_from_movement(self, enemy: Pokemon, dx: float, dy: float):
-        """Atualiza a direção baseada no movimento (8 direções) - MESMA LÓGICA DO MODO CAMPANHA"""
+        """Atualiza a direção baseada no movimento (8 direções)"""
         if dx == 0 and dy == 0:
             return
 
         abs_dx = abs(dx)
         abs_dy = abs(dy)
-
-        # Constante tan(22.5°)
         THRESHOLD = 0.41421356
 
         if abs_dx >= abs_dy:
-            # Movimento predominantemente horizontal
             if dx > 0:
-                # Direita
                 if dy > 0 and abs_dy > abs_dx * THRESHOLD:
                     enemy.current_direction = "down-right"
                 elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
@@ -316,7 +320,6 @@ class SurvivalWaveManager:
                 else:
                     enemy.current_direction = "right"
             else:
-                # Esquerda
                 if dy > 0 and abs_dy > abs_dx * THRESHOLD:
                     enemy.current_direction = "down-left"
                 elif dy < 0 and abs_dy > abs_dx * THRESHOLD:
@@ -324,9 +327,7 @@ class SurvivalWaveManager:
                 else:
                     enemy.current_direction = "left"
         else:
-            # Movimento predominantemente vertical
             if dy > 0:
-                # Baixo
                 if dx > 0 and abs_dx > abs_dy * THRESHOLD:
                     enemy.current_direction = "down-right"
                 elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
@@ -334,7 +335,6 @@ class SurvivalWaveManager:
                 else:
                     enemy.current_direction = "down"
             else:
-                # Cima
                 if dx > 0 and abs_dx > abs_dy * THRESHOLD:
                     enemy.current_direction = "up-right"
                 elif dx < 0 and abs_dx > abs_dy * THRESHOLD:
@@ -367,7 +367,6 @@ class SurvivalWaveManager:
                 return []
             self.spawn_timer = 0
 
-        # Spawn de novos inimigos
         if self.enemies_spawned_in_wave < self.enemies_to_spawn:
             self.spawn_timer -= dt
 
@@ -376,6 +375,9 @@ class SurvivalWaveManager:
                 if enemy:
                     if hasattr(self.game_scene, 'battle_system'):
                         enemy.set_battle_system(self.game_scene.battle_system)
+                        # Conecta o wave_manager ao battle_system para registro de ataques
+                        if hasattr(self.game_scene.battle_system, 'set_wave_manager'):
+                            self.game_scene.battle_system.set_wave_manager(self)
 
                     self.active_enemies.append(enemy)
                     self.enemies_spawned_in_wave += 1
@@ -384,12 +386,10 @@ class SurvivalWaveManager:
 
                     self.spawn_timer = self.current_wave_config["spawn_interval"]
 
-        # Movimento dos inimigos
         enemies_to_remove = []
 
         for enemy in self.active_enemies[:]:
             try:
-                # ===== CORREÇÃO: VERIFICA SE O INIMIGO ESTÁ MORTO ANTES DE PROCESSAR =====
                 if not enemy.is_alive() or enemy.is_defeated:
                     if not getattr(enemy, '_marked_for_removal', False):
                         print(f"[SurvivalWave] {enemy.name} está morto, removendo...")
@@ -400,7 +400,6 @@ class SurvivalWaveManager:
                 if not hasattr(enemy, 'path') or not enemy.path:
                     continue
 
-                # ===== VERIFICA SE DEVE PARAR (APENAS ALIADOS NO MESMO PATH) =====
                 should_stop = False
                 if hasattr(self.game_scene, 'player_pokemon') and hasattr(self.game_scene, 'path_assignment'):
                     enemy_path = self.game_scene.path_assignment.get_path_for_enemy(enemy)
@@ -409,7 +408,6 @@ class SurvivalWaveManager:
                         if not ally.is_alive() or ally.is_defeated:
                             continue
 
-                        # ===== SÓ PARA SE O ALIADO ESTIVER NO MESMO PATH =====
                         ally_path = self.game_scene.path_assignment.get_path_for_pokemon(ally)
                         if ally_path != enemy_path:
                             continue
@@ -422,8 +420,6 @@ class SurvivalWaveManager:
                             break
 
                 if should_stop:
-                    # Se está parado, ainda atualiza a direção para olhar para o alvo
-                    # Encontra o aliado mais próximo no mesmo path para olhar
                     closest_ally = None
                     min_dist = float('inf')
                     enemy_path = self.game_scene.path_assignment.get_path_for_enemy(enemy)
@@ -448,7 +444,6 @@ class SurvivalWaveManager:
 
                     continue
 
-                # Chegou ao fim do path
                 if enemy.path_index >= len(enemy.path):
                     enemies_at_end.append(enemy)
                     continue
@@ -459,7 +454,6 @@ class SurvivalWaveManager:
                 distance = math.hypot(dx, dy)
                 move_distance = enemy.move_speed * dt * 60
 
-                # Atualiza direção baseada no movimento antes de mover
                 if distance > 0:
                     self._update_direction_from_movement(enemy, dx, dy)
 
@@ -483,7 +477,6 @@ class SurvivalWaveManager:
                 print(f"[SurvivalWave] Erro ao processar inimigo: {e}")
                 continue
 
-        # ===== REMOVE INIMIGOS MORTOS =====
         for enemy in enemies_to_remove:
             if enemy in self.active_enemies:
                 self.active_enemies.remove(enemy)
@@ -492,7 +485,6 @@ class SurvivalWaveManager:
             if enemy in self.active_enemies:
                 self.active_enemies.remove(enemy)
 
-        # Verifica se a wave terminou
         wave_finished = (self.enemies_spawned_in_wave >= self.enemies_to_spawn and
                          len(self.active_enemies) == 0)
 
@@ -506,8 +498,8 @@ class SurvivalWaveManager:
         """Processa morte de um inimigo"""
         self.enemies_killed += 1
 
-        # ===== NOVO SISTEMA DE XP: TO DOS PARTICIPANTES =====
-        self._distribute_xp_to_participants(enemy)
+        # ===== DISTRIBUI XP APENAS PARA QUEM ATACOU ESTE INIMIGO =====
+        self._distribute_xp_to_attackers(enemy)
 
         if hasattr(self.game_scene, 'add_energy'):
             energy_gain = 15
@@ -541,61 +533,56 @@ class SurvivalWaveManager:
             except:
                 pass
 
-    def _distribute_xp_to_participants(self, defeated_enemy: Pokemon):
-        """Distribui XP para todos os participantes da batalha (XP dividido igualmente)"""
-        participants = []
+        self._cleanup_enemy_attackers(enemy)
 
-        # Obtém os Pokémon participantes pelo ID
-        for pokemon_id in self.battle_participants:
-            for ally in self.game_scene.player_pokemon:
-                if id(ally) == pokemon_id and ally.is_alive() and not ally.is_defeated:
-                    participants.append(ally)
-                    break
+    def _distribute_xp_to_attackers(self, defeated_enemy: Pokemon):
+        """Distribui XP APENAS para os Pokémon que atacaram este inimigo específico"""
 
-        if not participants:
-            print(f"[XP] Nenhum participante registrado para {defeated_enemy.name}")
+        if not hasattr(defeated_enemy, '_attackers'):
+            print(f"[XP] Nenhum atacante registrado para {defeated_enemy.name}")
             return
 
-        # ===== CALCULA XP BASE (exponencial pelo nível) =====
-        # Fórmula: base_xp = 20 + (level^1.5) * 2
+        attackers = []
+        for attacker_id in defeated_enemy._attackers:
+            for ally in self.game_scene.player_pokemon:
+                if id(ally) == attacker_id and ally.is_alive() and not ally.is_defeated:
+                    attackers.append(ally)
+                    break
+
+        if not attackers:
+            print(f"[XP] Nenhum atacante encontrado vivo para {defeated_enemy.name}")
+            return
+
+        # ===== CALCULA XP BASE (exponencial pelo nível do inimigo) =====
         level = defeated_enemy.level
         base_xp = 20 + int((level ** 1.5) * 2)
 
-        # Bônus para boss (3x)
         if defeated_enemy.is_boss:
             base_xp = int(base_xp * 3)
             print(f"[XP] BOSS derrotado! XP base: {base_xp}")
 
-        # Bônus para shiny (1.5x)
         if defeated_enemy.is_shiny:
             base_xp = int(base_xp * 1.5)
 
-        # XP é dividido igualmente entre os participantes
-        xp_per_participant = max(1, base_xp // len(participants))
+        xp_per_attacker = max(1, base_xp // len(attackers))
 
-        print(f"[XP] Distribuindo {xp_per_participant} XP para cada um dos {len(participants)} participantes")
-        print(f"[XP] XP base do inimigo (nível {level}): {base_xp}")
+        print(f"[XP] {defeated_enemy.name} (nível {level}) foi atacado por {len(attackers)} Pokémon")
+        print(f"[XP] Distribuindo {xp_per_attacker} XP para cada atacante")
 
-        # Obtém EVs do inimigo
         pokedex = self.game_scene.game.player.pokedex if self.game_scene.game.player else None
         ev_yield = {}
         if pokedex:
             ev_yield = pokedex.get_ev_yield(defeated_enemy.id)
 
-        # Multiplicador de EV para boss/shiny
         ev_multiplier = 1.0
         if defeated_enemy.is_boss:
             ev_multiplier *= 3
         if defeated_enemy.is_shiny:
             ev_multiplier *= 2
 
-        # Distribui XP e EVs para cada participante
-        for ally in participants:
-            # ===== APLICA XP =====
-            old_level = ally.level
-            ally.gain_xp(xp_per_participant)
+        for ally in attackers:
+            ally.gain_xp(xp_per_attacker)
 
-            # ===== DISTRIBUI EVs =====
             if any(ev_yield.values()):
                 evs_gained = {}
                 for stat, value in ev_yield.items():
@@ -605,21 +592,16 @@ class SurvivalWaveManager:
 
                 if ally.stats.can_gain_evs(evs_gained):
                     ally.stats.gain_evs(evs_gained)
-                    print(f"[XP] {ally.name} ganhou {xp_per_participant} XP e EVs: {evs_gained}")
+                    print(f"[XP] {ally.name} ganhou {xp_per_attacker} XP e EVs: {evs_gained}")
                 else:
-                    print(f"[XP] {ally.name} ganhou {xp_per_participant} XP (EVs bloqueados)")
+                    print(f"[XP] {ally.name} ganhou {xp_per_attacker} XP (EVs bloqueados)")
             else:
-                print(f"[XP] {ally.name} ganhou {xp_per_participant} XP")
+                print(f"[XP] {ally.name} ganhou {xp_per_attacker} XP")
 
-        # Limpa participantes para a próxima batalha
-        self.battle_participants.clear()
-
-    def _distribute_xp(self, defeated_enemy: 'Pokemon'):
-        """
-        [DEPRECATED] Método antigo mantido por compatibilidade.
-        O novo sistema está em _distribute_xp_to_participants()
-        """
-        pass
+    def _cleanup_enemy_attackers(self, enemy: Pokemon):
+        """Limpa a lista de atacantes do inimigo"""
+        if hasattr(enemy, '_attackers'):
+            enemy._attackers.clear()
 
     def _complete_wave(self):
         """Completa a wave atual e prepara a próxima"""
@@ -635,16 +617,12 @@ class SurvivalWaveManager:
                 duration=2.0
             )
 
-        # ===== FORÇA TODOS OS ALIADOS A VOLTAREM AOS SPOTS =====
         if hasattr(self.game_scene, 'force_allies_return_to_spots'):
             self.game_scene.force_allies_return_to_spots()
 
         if hasattr(self.game_scene, 'add_energy'):
             bonus = 30
             self.game_scene.add_energy(bonus)
-
-        # ===== LIMPA PARTICIPANTES AO FINAL DA WAVE =====
-        self.battle_participants.clear()
 
         self.current_wave += 1
         self.wave_active = False

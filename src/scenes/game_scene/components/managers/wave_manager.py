@@ -380,7 +380,7 @@ class WaveManager:
             gold_reward = int(gold_reward * pay_day_gold_mult)
             print(f"[PAY_DAY] Bônus de gold! {self.gold_per_defeat} -> {gold_reward} (x{pay_day_gold_mult})")
 
-        # ===== NOVO SISTEMA DE XP: DISTRIBUI PARA TODOS OS PARTICIPANTES =====
+        # ===== NOVO SISTEMA DE XP: SÓ QUEM ATACOU ESTE INIMIGO =====
         if self.game_scene and hasattr(self.game_scene, 'battle_system'):
             self.game_scene.battle_system.distribute_xp_for_defeated_enemy(enemy)
 

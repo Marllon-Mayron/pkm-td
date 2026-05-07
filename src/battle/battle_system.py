@@ -73,22 +73,17 @@ class BattleSystem:
         self.battle_participants.clear()
 
     def distribute_xp_for_defeated_enemy(self, defeated_enemy: 'Pokemon'):
-        """Distribui XP para todos os participantes quando um inimigo é derrotado"""
-        participants = []
+        """Distribui XP APENAS para os Pokémon que atacaram este inimigo específico"""
 
-        for pokemon_id in self.battle_participants:
-            if self.game_scene and hasattr(self.game_scene, 'placement_manager'):
-                for ally in self.game_scene.placement_manager.placed_pokemon:
-                    if id(ally) == pokemon_id and ally.is_alive():
-                        participants.append(ally)
-                        break
+        # ===== OBTÉM OS ATACANTES QUE ATINGIRAM ESTE INIMIGO =====
+        attackers = self.get_attackers_for_enemy(defeated_enemy)
 
-        if not participants:
-            print(f"[XP] Nenhum participante registrado para distribuir XP!")
+        if not attackers:
+            print(f"[XP] Nenhum atacante registrado para {defeated_enemy.name}")
+            self.clear_enemy_attackers(defeated_enemy)
             return
 
-        # ===== NOVA FÓRMULA DE XP BASE: exponencial pelo nível do inimigo =====
-        # base_xp = 20 + (level^1.5) * 2
+        # ===== CALCULA XP BASE (exponencial pelo nível do inimigo) =====
         level = defeated_enemy.level
         base_xp = 20 + int((level ** 1.5) * 2)
 
@@ -101,15 +96,56 @@ class BattleSystem:
         if defeated_enemy.is_shiny:
             base_xp = int(base_xp * 1.5)
 
-        # XP é dividido igualmente entre os participantes
-        xp_per_participant = max(1, base_xp // len(participants))
+        # ===== XP DIVIDIDO IGUALMENTE ENTRE OS ATACANTES =====
+        xp_per_attacker = max(1, base_xp // len(attackers))
 
-        print(f"[XP] Distribuindo {xp_per_participant} XP para cada um dos {len(participants)} participantes")
-        print(f"[XP] XP base do inimigo (nível {level}): {base_xp}")
+        print(f"[XP] {defeated_enemy.name} (nível {level}) foi atacado por {len(attackers)} Pokémon")
+        print(f"[XP] Distribuindo {xp_per_attacker} XP para cada atacante")
 
-        # Distribui o XP
-        for pokemon in participants:
-            self._give_xp_to_pokemon(pokemon, xp_per_participant, defeated_enemy)
+        # Obtém EVs do inimigo
+        ev_yield = {}
+        if self.game_scene and hasattr(self.game_scene, 'player'):
+            ev_yield = self.game_scene.player.pokedex.get_ev_yield(defeated_enemy.id)
+
+        # Multiplicador de EV para boss/shiny
+        ev_multiplier = 1.0
+        if defeated_enemy.is_boss:
+            ev_multiplier *= 3
+        if defeated_enemy.is_shiny:
+            ev_multiplier *= 2
+
+        # Aplica multiplicador de Pay Day se houver
+        pay_day_xp_mult = 1.0
+        if hasattr(defeated_enemy, '_pay_day_hit') and defeated_enemy._pay_day_hit:
+            pay_day_xp_mult = getattr(defeated_enemy, '_pay_day_xp_multiplier', 1.5)
+            xp_per_attacker = int(xp_per_attacker * pay_day_xp_mult)
+            ev_multiplier *= pay_day_xp_mult
+            print(f"[PAY_DAY] Bônus XP! Multiplicador x{pay_day_xp_mult}")
+
+        # Distribui XP e EVs para cada atacante
+        for attacker in attackers:
+            # Ganha XP
+            old_level = attacker.level
+            attacker.gain_xp(xp_per_attacker)
+
+            # Ganha EVs
+            if any(ev_yield.values()):
+                evs_gained = {}
+                for stat, value in ev_yield.items():
+                    if value > 0:
+                        ev_value = max(1, int(value * ev_multiplier))
+                        evs_gained[stat] = ev_value
+
+                if attacker.stats.can_gain_evs(evs_gained):
+                    attacker.stats.gain_evs(evs_gained)
+                    print(f"[XP] {attacker.name} ganhou {xp_per_attacker} XP e EVs: {evs_gained}")
+                else:
+                    print(f"[XP] {attacker.name} ganhou {xp_per_attacker} XP (EVs bloqueados)")
+            else:
+                print(f"[XP] {attacker.name} ganhou {xp_per_attacker} XP")
+
+        # ===== LIMPA OS ATACANTES DO INIMIGO =====
+        self.clear_enemy_attackers(defeated_enemy)
 
     def _give_xp_to_pokemon(self, pokemon: 'Pokemon', xp_amount: int, defeated_enemy: 'Pokemon'):
         """Dá XP a um Pokémon individual"""
@@ -161,12 +197,19 @@ class BattleSystem:
 
     def attempt_attack(self, attacker: 'Pokemon', target: 'Pokemon') -> bool:
         """Tenta realizar um ataque com o move atual do atacante"""
-        # ===== REGISTRA PARTICIPANTE (APENAS ALIADOS E NÃO SELVAGENS) =====
+
+        # ===== REGISTRA ATACANTE COMO PARTICIPANTE (antes de qualquer verificação) =====
+        # Isso garante que mesmo moves que "falham" ou são bloqueados ainda contam como participação
         if not attacker.is_wild:
-            self.register_participant(attacker)
+            # Registra que este Pokémon está atacando (para o sistema de XP)
+            # O target pode ser None para moves que não têm alvo (ex: Harden)
+            if target:
+                self.register_attacker_for_enemy(attacker, target)
+            else:
+                # Para moves sem alvo (buffs em si mesmo), registra como participação genérica
+                self.register_participant(attacker)
 
         # ===== LIMPA RASTROS DE COUNTER DO ATACANTE ANTES DE ATACAR =====
-        # Isso evita que o Pokémon use Counter duas vezes seguidas
         self.clear_counter_tracking(attacker)
 
         # Se já tem um multi-hit ativo, não permite novo ataque
@@ -179,7 +222,6 @@ class BattleSystem:
             move_name = self.active_charge_move['move_name']
             charged_target = self.active_charge_move['target']
 
-            # Verifica se o alvo ainda existe e está vivo
             if not charged_target or charged_target.is_defeated or not charged_target.is_alive():
                 print(f"[TWO_TURN] Alvo {charged_target.name if charged_target else '?'} não está mais disponível!")
                 self.active_charge_move = None
@@ -189,7 +231,6 @@ class BattleSystem:
 
             print(f"[TWO_TURN] {attacker.name} está liberando {move_name}!")
 
-            # Obtém o movimento real
             move = None
             for m in attacker.moves:
                 if m.name.lower() == move_name.lower():
@@ -201,25 +242,20 @@ class BattleSystem:
                 self.active_charge_move = None
                 return False
 
-            # ===== EXECUTA O ATAQUE UMA ÚNICA VEZ =====
             success = self._execute_two_turn_attack(attacker, charged_target, move)
             self.active_charge_move = None
-
-            # ===== NÃO CHAMA MAIS NADA! =====
             return success
 
         # ===== FLUXO NORMAL =====
-        # Se o atacante está derrotado, não ataca
         if attacker.is_defeated:
             print(f"[BATTLE] {attacker.name} está derrotado e não pode atacar!")
             return False
 
-        # Se o alvo está derrotado, não pode ser atacado
-        if target.is_defeated:
+        if target and target.is_defeated:
             print(f"[BATTLE] {target.name} está derrotado e não pode ser atacado!")
             return False
 
-        # ===== VERIFICA SE O MOVE DO ATACANTE ESTÁ DESABILITADO (DISABLE) =====
+        # ===== VERIFICA DISABLE =====
         current_move = attacker.get_current_move()
         if current_move and hasattr(attacker, '_disabled_move') and attacker._disabled_move:
             if current_move.name == attacker._disabled_move:
@@ -232,19 +268,16 @@ class BattleSystem:
                 attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
                 return True
 
-        # ===== VERIFICA SE O ATACANTE TEM PP EM ALGUM MOVE =====
-        # Primeiro, verifica se tem algum move com PP (exceto Struggle)
+        # ===== VERIFICA PP =====
         has_pp = False
         for m in attacker.moves:
             if m.current_pp > 0:
                 has_pp = True
                 break
 
-        # Se não tem PP em nenhum move, usa Struggle (instância temporária)
         if not has_pp:
             print(f"[BATTLE] {attacker.name} está sem PP em todos os moves! Usando Struggle!")
 
-            # Cria Struggle temporário
             from src.entities.move import Move
             struggle_info = {
                 "name": "Struggle",
@@ -259,23 +292,19 @@ class BattleSystem:
             move = Move("struggle", struggle_info)
             move.current_pp = 1
 
-            # Mostra mensagem uma vez
             if not hasattr(attacker, '_struggle_message_shown') or not attacker._struggle_message_shown:
                 self.effect_manager.add_status_text(attacker, f"{attacker.name} não tem PP! Usou Struggle!",
                                                     duration=2.0)
                 attacker._struggle_message_shown = True
 
-            # Executa Struggle diretamente
             result = self._attempt_struggle(attacker, target, move)
 
-            # Registra o movimento usado (para Disable)
             if move.name.lower() != "struggle":
                 attacker._last_used_move = move.name
                 print(f"[TRACK] {attacker.name} usou {move.name}")
 
             return result
 
-        # Usa o padrão de ataque do Pokémon (se existir)
         if hasattr(attacker, 'get_current_move_for_pattern'):
             move = attacker.get_current_move_for_pattern()
         else:
@@ -285,19 +314,16 @@ class BattleSystem:
             print(f"[BATTLE] {attacker.name} não tem move selecionado!")
             return False
 
-        # ===== VERIFICA EFEITO DO MOVE =====
         from src.battle.effects import EffectFactory
         effect = EffectFactory.create_effect(move.name)
 
-        # ===== VERIFICA SE O MOVE É DE ÁREA (PELA FLAG is_area) =====
+        # ===== VERIFICA SE O MOVE É DE ÁREA =====
         if effect and effect.is_area:
             print(f"[BATTLE_DEBUG] {move.name} é ataque em área (is_area=True)!")
-            # Verifica PP
             if move.current_pp <= 0:
                 print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
                 return False
 
-            # Executa o efeito de área
             result = effect.execute(attacker, target, self, self.effect_manager)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
@@ -305,7 +331,6 @@ class BattleSystem:
             move_sound_manager.play_attack_sound(move.sound_name)
             print(f"[SOM] {move.name} (área) - som do atacante: {move.sound_name}")
 
-            # Registra o movimento usado (para Disable)
             if move.name.lower() != "struggle":
                 attacker._last_used_move = move.name
                 print(f"[TRACK] {attacker.name} usou {move.name}")
@@ -314,24 +339,20 @@ class BattleSystem:
 
         # ===== VERIFICA SE É GOLPE DE 2 TURNOS =====
         if effect and effect.effect_type == "two_turn_attack":
-            # Verifica se tem PP
             if move.current_pp <= 0:
                 print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
                 return False
 
-            # Executa o efeito (vai gastar 1 PP e iniciar carga)
             result = effect.execute(attacker, target, self, self.effect_manager)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
-            # Registra o movimento usado (para Disable)
             if move.name.lower() != "struggle":
                 attacker._last_used_move = move.name
                 print(f"[TRACK] {attacker.name} usou {move.name}")
 
             return result
 
-        # ===== MOVIMENTOS NORMAIS (continuam o fluxo) =====
-        # Verificar PP
+        # ===== MOVIMENTOS NORMAIS =====
         if move.current_pp <= 0:
             print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
             attacker.has_no_pp = True
@@ -339,45 +360,39 @@ class BattleSystem:
 
         attacker.has_no_pp = False
 
-        # ===== VERIFICA CONFUSÃO ANTES DE ATACAR =====
-        # A confusão é verificada ANTES de qualquer outra condição
+        # ===== VERIFICA CONFUSÃO =====
         if self.effect_manager.is_confused(attacker):
             confusion = self.effect_manager.get_confusion(attacker)
             result = confusion.before_attack(attacker, target, self, self.effect_manager)
 
             if result == "self":
-                # Ataca a si mesmo
                 self._apply_confusion_self_damage(attacker, confusion)
                 attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
-                # Registra o movimento usado (para Disable)
                 if move.name.lower() != "struggle":
                     attacker._last_used_move = move.name
                     print(f"[TRACK] {attacker.name} tentou usar {move.name} mas se machucou")
 
                 return True
 
-            # Se confusão acabou durante before_attack, remove automaticamente
             if not confusion.is_active():
                 self.effect_manager.remove_confusion(attacker)
 
         # ===== DESCONGELAMENTO POR ATAQUES DE FOGO =====
-        target_status = self.effect_manager.get_status(target)
-        if target_status and target_status.type == StatusType.FREEZE:
-            if move.type.lower() == "fire":
-                # Ataque de fogo descongela o alvo
-                target_status.thaw()
-                self.effect_manager.add_status_text(target, f"{target.name} descongelou com o calor!")
-                print(f"[FREEZE] {target.name} descongelou devido ao ataque de fogo {move.name}!")
+        if target:
+            target_status = self.effect_manager.get_status(target)
+            if target_status and target_status.type == StatusType.FREEZE:
+                if move.type.lower() == "fire":
+                    target_status.thaw()
+                    self.effect_manager.add_status_text(target, f"{target.name} descongelou com o calor!")
+                    print(f"[FREEZE] {target.name} descongelou devido ao ataque de fogo {move.name}!")
 
         # ===== VERIFICA SE O ATACANTE PODE AGIR =====
         status = self.effect_manager.get_status(attacker)
 
-        # Atualiza o estado de paralisia antes de verificar
         if status and status.type == StatusType.PARALYSIS:
             status.update_paralysis(0)
 
-        # Verifica se o atacante está impossibilitado de agir
         if status and not status.can_attack():
             if status.type == StatusType.PARALYSIS:
                 print(f"[BATTLE] {attacker.name} está paralisado e não consegue se mover!")
@@ -389,59 +404,66 @@ class BattleSystem:
                 print(f"[BATTLE] {attacker.name} está {status.name.lower()} e não pode atacar!")
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
-            # Registra a tentativa de movimento (para Disable)
             if move.name.lower() != "struggle":
                 attacker._last_used_move = move.name
                 print(f"[TRACK] {attacker.name} tentou usar {move.name} mas falhou devido a status")
 
             return True
 
-        # ===== VERIFICAÇÃO ESPECÍFICA PARA STATUS MOVES =====
+        # ===== MOVES DE STATUS (SEM DANO) =====
         if move.category == "status":
-            target_status = self.effect_manager.get_status(target)
+            print(f"[BATTLE] {attacker.name} usou {move.name}! (Move de status)")
 
-            is_status_applying_move = self._is_status_applying_move(move.name)
+            from src.managers.sounds.move_sound_manager import move_sound_manager
+            move_sound_manager.play_attack_sound(move.sound_name)
 
-            if is_status_applying_move and target_status and target_status.type != StatusType.NONE:
-                move.current_pp -= 1
-                attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+            move.current_pp -= 1
+            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+            # Verifica acerto para moves de status (quando aplicam no alvo)
+            will_hit = True
+            if target and move.accuracy:
+                hit_chance = move.accuracy / 100
+                accuracy_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)
+                evasion_mult = self.effect_manager.get_stat_multiplier(target, StatType.EVASION)
+                hit_chance = hit_chance * accuracy_mult / evasion_mult
+                hit_chance = max(0.01, min(1.0, hit_chance))
+                will_hit = random.random() <= hit_chance
+
+            if not will_hit and target:
+                print(f"[BATTLE] {move.name} errou!")
                 self._show_miss_on_attacker(attacker)
+            else:
+                # Aplica o efeito do move de status
+                from src.battle.effects import EffectFactory
+                effect = EffectFactory.create_effect(move.name)
+                if effect:
+                    effect.execute(attacker, target, self, self.effect_manager)
+                else:
+                    self.effect_manager.add_status_text(attacker, f"{attacker.name} usou {move.name}!", duration=1.0)
 
-                # Registra o movimento usado (para Disable)
-                if move.name.lower() != "struggle":
-                    attacker._last_used_move = move.name
-                    print(f"[TRACK] {attacker.name} usou {move.name}")
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} usou {move.name}")
 
-                return True
+            return True
 
-        # ===== VERIFICAÇÃO ESPECIAL PARA DREAM EATER =====
-        if move.name.lower() == "dream-eater":
-            target_status = self.effect_manager.get_status(target)
-            if not target_status or target_status.type != StatusType.SLEEP:
-                # Falha - alvo não está dormindo
-                print(f"[BATTLE] {move.name} falhou! {target.name} não está dormindo!")
-                self.effect_manager.add_status_text(attacker, f"Mas falhou! {target.name} não está dormindo!",
-                                                    duration=1.5)
-                move.current_pp -= 1
-                attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+        # ===== MOVES COM POWER NULL =====
+        if move.power is None or move.power == 0:
+            result = self._handle_special_damage_move(attacker, target, move)
 
-                # Registra o movimento usado (para Disable)
-                if move.name.lower() != "struggle":
-                    attacker._last_used_move = move.name
-                    print(f"[TRACK] {attacker.name} usou {move.name}")
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} usou {move.name}")
 
-                return True
+            return result
 
-        # ===== MOVIMENTOS QUE NUNCA ERRAM (Swift, Aerial Ace, etc) =====
+        # ===== MOVES QUE NUNCA ERRAM =====
         never_miss = effect and effect.effect_type == "never_miss"
-
-        # ===== VERIFICA SE O MOVE TEM EFEITO DE CRASH AO ERRAR =====
         has_crash_effect = effect and effect.effect_type == "crash_damage_on_miss"
 
-        # ===== VERIFICA EFEITOS DE ACERTO GARANTIDO (Lock-On, Mind Reader) =====
+        # ===== VERIFICA EFEITOS DE ACERTO GARANTIDO =====
         is_guaranteed_hit = False
-
-        # Lista de possíveis efeitos de acerto garantido
         guaranteed_hit_effects = ["lock_on", "mind_reader"]
 
         for effect_key in guaranteed_hit_effects:
@@ -453,7 +475,6 @@ class BattleSystem:
 
                 is_guaranteed_hit = True
 
-                # Mostra mensagem
                 if move.name.lower() != "struggle":
                     self.effect_manager.add_status_text(
                         attacker,
@@ -465,26 +486,23 @@ class BattleSystem:
                 effect_display = effect_names.get(effect_key, "Foco")
                 print(f"[{effect_display.upper()}] {attacker.name} tem acerto garantido em {target.name}!")
 
-                # Reseta o efeito após usar
                 setattr(attacker, active_flag, False)
                 setattr(attacker, target_flag, None)
-                break  # Só um efeito por vez
+                break
 
-        # ===== VERIFICA PROTEÇÃO DO ALVO (Protect/Detect) =====
-        if hasattr(target, '_protected') and target._protected:
+        # ===== VERIFICA PROTEÇÃO DO ALVO =====
+        if target and hasattr(target, '_protected') and target._protected:
             self.effect_manager.add_status_text(
                 attacker,
                 f"{target.name} está protegido! O ataque não teve efeito!",
                 duration=1.5
             )
 
-            # Decrementa o contador de proteção
             target._protection_remaining -= 1
 
             print(
                 f"[PROTECT] {attacker.name} atacou, mas {target.name} estava protegido! {target._protection_remaining} proteções restantes")
 
-            # Se acabaram as proteções, remove o efeito
             if target._protection_remaining <= 0:
                 target._protected = False
                 self.effect_manager.add_status_text(
@@ -494,10 +512,8 @@ class BattleSystem:
                 )
                 print(f"[PROTECT] Proteção de {target.name} acabou!")
 
-            # Aplica cooldown
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
-            # Registra o movimento usado (para Disable)
             if move.name.lower() != "struggle":
                 attacker._last_used_move = move.name
 
@@ -505,7 +521,6 @@ class BattleSystem:
 
         # ===== CALCULAR ACERTO =====
         if never_miss or is_guaranteed_hit:
-            # Sempre acerta
             will_hit = True
             print(f"[BATTLE] {move.name} nunca erra! (ou acerto garantido ativo)")
         else:
@@ -516,99 +531,64 @@ class BattleSystem:
             hit_chance = max(0.01, min(1.0, hit_chance))
             will_hit = random.random() <= hit_chance
 
-        # Ataques de status (que aplicam efeitos como veneno, queimadura, etc)
-        if move.category == "status":
-            print(f"[BATTLE] {attacker.name} usou {move.name}! (Efeito de status)")
+        # ===== VERIFICA SE É MOVE ESPECIAL =====
+        if move.category == "special" and move.power > 0:
+            print(f"[BATTLE] {attacker.name} usou {move.name}! (Ataque especial)")
 
-            from src.managers.sounds.move_sound_manager import move_sound_manager
-            move_sound_manager.play_attack_sound(move.sound_name)
+            # ===== REGISTRA ATACANTE PARA O ALVO =====
+            if target:
+                self.register_attacker_for_enemy(attacker, target)
 
             move.current_pp -= 1
-            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
             if will_hit:
-                self._apply_status_effect(attacker, target, move)
+                damage_result = self._calculate_move_damage(attacker, target, move)
             else:
-                print(f"[BATTLE] {move.name} errou!")
-                self._show_miss_on_attacker(attacker)
-
-                # ===== APLICA DANO DE COLISÃO SE O MOVE TEM ESSE EFEITO =====
+                damage_result = {
+                    "damage": 0,
+                    "effectiveness": 1.0,
+                    "hit": False,
+                    "message": f"O ataque errou!",
+                    "stab": False,
+                    "critical": False
+                }
                 if has_crash_effect:
                     self._apply_crash_damage(attacker, move, effect)
 
-            # Registra o movimento usado (para Disable)
-            if move.name.lower() != "struggle":
-                attacker._last_used_move = move.name
-                print(f"[TRACK] {attacker.name} usou {move.name}")
-
-            return True
-
-        # ===== MOVIMENTOS COM POWER NULL (Super Fang, Seismic Toss, etc) =====
-        if move.power is None or move.power == 0:
-            result = self._handle_special_damage_move(attacker, target, move)
-
-            # Registra o movimento usado (para Disable)
-            if move.name.lower() != "struggle":
-                attacker._last_used_move = move.name
-                print(f"[TRACK] {attacker.name} usou {move.name}")
-
-            return result
-
-        # Calcular dano para movimentos normais
-        if will_hit:
-            damage_result = self._calculate_move_damage(attacker, target, move)
-        else:
-            damage_result = {
-                "damage": 0,
-                "effectiveness": 1.0,
-                "hit": False,
-                "message": f"O ataque errou!",
-                "stab": False,
-                "critical": False
-            }
-
-            # ===== APLICA DANO DE COLISÃO SE O MOVE TEM ESSE EFEITO =====
-            if has_crash_effect:
-                self._apply_crash_damage(attacker, move, effect)
-
-        # Ataques especiais (usam projétil)
-        if move.category == "special" and move.power > 0:
-            print(f"[BATTLE] {attacker.name} usou {move.name}! (Ataque especial)")
-            move.current_pp -= 1
-
-            # Cria o projétil e passa o efeito para ser aplicado no impacto
             self._create_projectile(attacker, target, move, damage_result, will_hit)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
-            # Registra o movimento usado (para Disable)
             if move.name.lower() != "struggle":
                 attacker._last_used_move = move.name
                 print(f"[TRACK] {attacker.name} usou {move.name}")
 
             return True
 
-        # Ataques físicos
+        # ===== ATAQUES FÍSICOS =====
         elif move.category == "physical" and move.power > 0:
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Ataque físico)")
+
+            # ===== REGISTRA ATACANTE PARA O ALVO =====
+            if target:
+                self.register_attacker_for_enemy(attacker, target)
 
             from src.managers.sounds.move_sound_manager import move_sound_manager
             move_sound_manager.play_attack_sound(move.sound_name)
 
             move.current_pp -= 1
+
             if will_hit:
+                damage_result = self._calculate_move_damage(attacker, target, move)
                 self._apply_damage(attacker, target, damage_result, move)
-                # Aplica efeitos do move APÓS o dano
                 self._apply_move_effect(attacker, target, move, damage_result["damage"])
             else:
                 print(f"[BATTLE] {move.name} errou!")
                 self._show_miss_on_attacker(attacker)
-
-                # ===== SE TEM CRASH EFFECT, JÁ APLICAMOS O DANO ACIMA =====
-                # Não precisa fazer nada extra aqui
+                if has_crash_effect:
+                    self._apply_crash_damage(attacker, move, effect)
 
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
-            # Registra o movimento usado (para Disable)
             if move.name.lower() != "struggle":
                 attacker._last_used_move = move.name
                 print(f"[TRACK] {attacker.name} usou {move.name}")
@@ -618,10 +598,14 @@ class BattleSystem:
         # Fallback
         else:
             print(f"[BATTLE] {attacker.name} usou {move.name}!")
+
+            # ===== REGISTRA ATACANTE PARA O ALVO =====
+            if target:
+                self.register_attacker_for_enemy(attacker, target)
+
             move.current_pp -= 1
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
-            # Registra o movimento usado (para Disable)
             if move.name.lower() != "struggle":
                 attacker._last_used_move = move.name
                 print(f"[TRACK] {attacker.name} usou {move.name}")
@@ -1163,3 +1147,46 @@ class BattleSystem:
         if not self.weather_manager:
             return False
         return self.weather_manager.is_weather_active(weather_type)
+
+    def register_attacker_for_enemy(self, attacker: 'Pokemon', enemy: 'Pokemon'):
+        """Registra que um atacante atingiu um inimigo específico"""
+        if not attacker or not enemy:
+            return
+
+        # Pula se for selvagem (inimigo atacando aliado não ganha XP)
+        if attacker.is_wild:
+            return
+
+        # Pula se o inimigo já está morto
+        if enemy.is_defeated or not enemy.is_alive():
+            return
+
+        # Inicializa o set de atacantes para este inimigo se não existir
+        if not hasattr(enemy, '_attackers'):
+            enemy._attackers = set()
+
+        # Adiciona o ID do atacante
+        enemy._attackers.add(id(attacker))
+        print(f"[XP_TRACK] {attacker.name} atacou {enemy.name} - registrado")
+
+    def get_attackers_for_enemy(self, enemy: 'Pokemon') -> list:
+        """Retorna a lista de atacantes que atingiram este inimigo"""
+        if not hasattr(enemy, '_attackers'):
+            return []
+
+        attackers = []
+        for attacker_id in enemy._attackers:
+            # Procura o Pokémon no time
+            if hasattr(self, 'game_scene') and self.game_scene:
+                if hasattr(self.game_scene, 'placement_manager'):
+                    for ally in self.game_scene.placement_manager.placed_pokemon:
+                        if id(ally) == attacker_id and ally.is_alive():
+                            attackers.append(ally)
+                            break
+
+        return attackers
+
+    def clear_enemy_attackers(self, enemy: 'Pokemon'):
+        """Limpa a lista de atacantes de um inimigo"""
+        if hasattr(enemy, '_attackers'):
+            enemy._attackers.clear()
