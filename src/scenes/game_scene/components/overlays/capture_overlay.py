@@ -306,7 +306,7 @@ class CaptureOverlay(BaseOverlay):
         pygame.draw.rect(screen, border_color, self.close_button_rect, 1, border_radius=8)
 
         font = self._get_font(22, True)
-        x_text = font.render("x", True, self.colors['text_dim'])
+        x_text = font.render("X", True, self.colors['text_dim'])
         text_x = x + (size - x_text.get_width()) // 2
         text_y = y + (size - x_text.get_height()) // 2
         screen.blit(x_text, (text_x, text_y))
