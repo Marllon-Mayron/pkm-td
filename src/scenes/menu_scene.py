@@ -90,6 +90,7 @@ class MenuScene(BaseScene):
                    (100, 50, 100), (150, 80, 150), self.open_mystery_gift, None),
             Button(0.3, 0.7, 0.4, 0.08, "Sair",
                   (100, 0, 0), (150, 0, 0), self.quit_game, None)
+
         ]
 
         # Partículas

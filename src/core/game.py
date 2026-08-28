@@ -34,6 +34,7 @@ class Game:
         self.menu_scene = MenuScene(self)
 
         # Referências para cenas (serão inicializadas quando necessárias)
+        self.pokedex_scene = None
         self.starter_select_scene = None
         self.phase_select_scene = None
         self.team_select_scene = None

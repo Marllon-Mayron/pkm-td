@@ -1,0 +1,1 @@
+from src.scenes.pokedex_scene.pokedex_scene import PokedexScene

@@ -140,7 +140,6 @@ class Pokedex:
                         "lvlMin": evolution_level if evolution_level is not None else "none",
                         "method": evolution_method
                     },
-                    # ===== NOVOS CAMPOS =====
                     "weight_kg": pokemon.get("weight_kg", 10.0),
                     "height_m": pokemon.get("height_m", 1.0),
                     "gender_ratio": pokemon.get("gender_ratio", 0.5),
