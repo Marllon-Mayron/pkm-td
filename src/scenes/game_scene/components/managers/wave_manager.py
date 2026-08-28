@@ -368,7 +368,7 @@ class WaveManager:
             self._remove_enemy(enemy)
 
     def _handle_enemy_death(self, enemy: 'Pokemon'):
-        """Processa morte de um inimigo (inclui boss!) COM SUPORTE A PAY DAY"""
+        """Processa morte de um inimigo (inclui boss!) """
         print(f"[WaveManager] {enemy.name} (BOSS={enemy.is_boss}) MORREU em batalha!")
 
         # ===== VERIFICA MULTIPLICADOR DE PAY DAY PARA GOLD =====
@@ -378,9 +378,9 @@ class WaveManager:
         if hasattr(enemy, '_pay_day_hit') and enemy._pay_day_hit:
             pay_day_gold_mult = getattr(enemy, '_pay_day_gold_multiplier', 2.0)
             gold_reward = int(gold_reward * pay_day_gold_mult)
-            print(f"[PAY_DAY] Bônus de gold! {self.gold_per_defeat} -> {gold_reward} (x{pay_day_gold_mult})")
+            print(f"[PAY_DAY] Bonus de gold! {self.gold_per_defeat} -> {gold_reward} (x{pay_day_gold_mult})")
 
-        # ===== NOVO SISTEMA DE XP: SÓ QUEM ATACOU ESTE INIMIGO =====
+        # ===== NOVO SISTEMA DE XP: SO QUEM ATACOU ESTE INIMIGO =====
         if self.game_scene and hasattr(self.game_scene, 'battle_system'):
             self.game_scene.battle_system.distribute_xp_for_defeated_enemy(enemy)
 
@@ -391,12 +391,22 @@ class WaveManager:
         if enemy.is_carrying is not None:
             try:
                 item_name = enemy.is_carrying.item_name
-                print(f"[ITEM] {enemy.name} morreu carregando {item_name} - item será dropado")
+                print(f"[ITEM] {enemy.name} morreu carregando {item_name} - item sera dropado")
                 enemy.is_carrying.reset_capture()
                 enemy.is_carrying = None
             except Exception as e:
                 print(f"[ERROR] Falha ao processar item de {enemy.name}: {e}")
                 enemy.is_carrying = None
+
+        # ===== CONQUISTAS: Boss Derrotado (SOMENTE AQUI, QUANDO MORRE) =====
+        if enemy.is_boss:
+            if self.game_scene and hasattr(self.game_scene, 'player'):
+                player = self.game_scene.player
+                if hasattr(player, 'achievement_manager'):
+                    phase_id = f"{self.game_scene.chapter_id}-{self.game_scene.phase_number}"
+                    player.achievement_manager.increment_counter("boss_defeated_count")
+                    player.achievement_manager.check_and_unlock("boss_defeated", phase_id)
+                    print(f"[ACHIEVEMENT] Boss {enemy.name} derrotado! Verificando conquistas...")
 
         self._remove_enemy(enemy)
         self.game_scene.player.auto_save()

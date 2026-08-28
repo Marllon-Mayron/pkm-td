@@ -7,7 +7,7 @@ import pickle
 from datetime import datetime
 from typing import Dict
 
-SAVE_FORMAT_VERSION = "0.1.3"  # Versão do FORMATO do save (ATUALIZADA)
+SAVE_FORMAT_VERSION = "0.1.4"  # Versão do FORMATO do save (ATUALIZADA)
 GAME_VERSION_COMPATIBLE = "0.1.9"  # Versão do jogo que usa este formato
 
 
@@ -44,7 +44,7 @@ class SaveManager:
             print(f"[SAVE] Pasta criada: {self.save_dir}")
 
     def _get_default_save_data(self) -> Dict:
-        """Retorna a estrutura padrão de save (versão 0.1.3)"""
+        """Retorna a estrutura padrão de save (versão 0.1.4)"""
         return {
             "meta": {
                 "version": SAVE_FORMAT_VERSION,
@@ -64,6 +64,11 @@ class SaveManager:
                 "mystery_gift": {
                     "redeemed_codes": {},
                     "history": []
+                },
+                "achievements": {
+                    "unlocked": [],
+                    "counters": {},
+                    "unlocked_data": {}  # NOVO: {"ach_id": {"unlocked_at": "...", "unlocked_phase": "1-3"}}
                 }
             },
             "game_state": {
@@ -252,7 +257,6 @@ class SaveManager:
     def save_game(self, player, game_state=None, save_name="save", slot=1) -> bool:
         """
         Salva o estado completo do jogo
-        CORRIGIDO: SEMPRE carrega o save existente primeiro
         """
         import os
 
@@ -284,15 +288,11 @@ class SaveManager:
         existing_data["meta"]["last_save"] = datetime.now().isoformat()
         existing_data["meta"]["save_name"] = save_name
 
-        # ===== ATUALIZA DADOS DO JOGADOR (PRESERVANDO ESTRUTURA) =====
+        # ===== ATUALIZA DADOS DO JOGADOR =====
         existing_data["player"]["money"] = player.money
         existing_data["player"]["score"] = player.score
         existing_data["player"]["position"] = {"x": player.x, "y": player.y}
-
-        # ===== PRESERVA A BAG (itens da mochila) =====
         existing_data["player"]["bag"] = dict(player.bag.items)
-
-        # ===== PRESERVA POKÉDEX =====
         existing_data["player"]["seen_pokemon"] = list(player.seen_pokemon)
         existing_data["player"]["caught_pokemon"] = list(player.caught_pokemon)
 
@@ -302,7 +302,22 @@ class SaveManager:
             "history": getattr(player, 'mystery_gift_history', [])
         }
 
-        # ===== SALVA POKÉMONS (PRESERVANDO OS EXISTENTES) =====
+        # ===== SALVA ACHIEVEMENTS =====
+        if hasattr(player, 'achievements'):
+            existing_data["player"]["achievements"] = {
+                "unlocked": list(player.achievements.get("unlocked", [])),
+                "counters": dict(player.achievements.get("counters", {})),
+                "unlocked_data": dict(player.achievements.get("unlocked_data", {}))
+            }
+            print(f"[SAVE] Achievements salvos: {len(player.achievements.get('unlocked', []))} desbloqueadas")
+        else:
+            existing_data["player"]["achievements"] = {
+                "unlocked": [],
+                "counters": {},
+                "unlocked_data": {}
+            }
+
+        # ===== SALVA POKÉMONS =====
         box_ids = set()
         unique_box = []
 
@@ -334,7 +349,7 @@ class SaveManager:
             for key, value in game_state.items():
                 existing_data["game_state"][key] = value
 
-        # ===== SALVA CONFIGURAÇÕES ATUAIS =====
+        # ===== SALVA CONFIGURAÇÕES =====
         from src.config.settings import settings
         existing_data["settings"] = {
             "sfx_volume": settings.sfx_volume,
@@ -354,9 +369,9 @@ class SaveManager:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(self.save_data, f, indent=2, ensure_ascii=False)
             print(f"[SAVE] Jogo salvo em {filepath}")
-            print(f"[SAVE] Box: {len(unique_box)} Pokémon | Time: {len(player.team)} Pokémon")
+            print(f"[SAVE] Box: {len(unique_box)} Pokemon | Time: {len(player.team)} Pokemon")
             print(f"[SAVE] Itens salvos: {self.save_data['player']['bag']}")
-            print(f"[SAVE] Mystery Gift: {len(getattr(player, 'redeemed_codes', {}))} códigos resgatados")
+            print(f"[SAVE] Achievements: {len(self.save_data['player']['achievements']['unlocked'])} desbloqueadas")
             return True
         except Exception as e:
             print(f"[ERRO] Falha ao salvar: {e}")
@@ -493,6 +508,27 @@ class SaveManager:
                 else:
                     sound_manager.set_sfx_volume(0)
 
+                # ===== CARREGA ACHIEVEMENTS =====
+                achievements_data = player_data.get("achievements", {})
+
+                # Garante que a estrutura existe no player
+                if not hasattr(player, 'achievements'):
+                    player.achievements = {
+                        "unlocked": [],
+                        "counters": {},
+                        "unlocked_data": {}
+                    }
+
+                # Carrega os dados
+                player.achievements["unlocked"] = list(achievements_data.get("unlocked", []))
+                player.achievements["counters"] = dict(achievements_data.get("counters", {}))
+                player.achievements["unlocked_data"] = dict(achievements_data.get("unlocked_data", {}))
+
+                # ===== RECARREGA O ACHIEVEMENT_MANAGER =====
+                if hasattr(player, 'achievement_manager'):
+                    player.achievement_manager.load_from_player()
+                    print(f"[SAVE] Achievements carregados: {len(player.achievements['unlocked'])} desbloqueadas")
+
             print(f"[SAVE] Jogo carregado de {filepath}")
             return True
 
@@ -531,7 +567,7 @@ class SaveManager:
 
     def migrate_save_data(self, save_data: Dict, version: str) -> Dict:
         """
-        Migra dados de save de versões antigas para o formato atual (0.1.3)
+        Migra dados de save de versões antigas para o formato atual (0.1.4)
         """
         import copy
         migrated = copy.deepcopy(save_data)
@@ -559,7 +595,7 @@ class SaveManager:
                         if isinstance(value, str):
                             new_codes[code] = {
                                 "pokemon_id": 0,
-                                "pokemon_name": "Pokémon Antigo",
+                                "pokemon_name": "Pokemon Antigo",
                                 "date": value,
                                 "timestamp": 0,
                                 "event_name": "Evento Anterior",
@@ -568,7 +604,7 @@ class SaveManager:
                         else:
                             new_codes[code] = value
                     migrated["player"]["mystery_gift"]["redeemed_codes"] = new_codes
-                    print(f"[MIGRATE] Convertidos {len(new_codes)} códigos resgatados antigos")
+                    print(f"[MIGRATE] Convertidos {len(new_codes)} codigos resgatados antigos")
 
                 # Remove o campo antigo
                 del migrated["player"]["redeemed_codes"]
@@ -579,23 +615,18 @@ class SaveManager:
 
             # Atualiza versão para 0.1.2
             migrated["meta"]["version"] = "0.1.2"
-            version = "0.1.2"  # Atualiza para próxima etapa
-            print("[MIGRATE] Migração para 0.1.2 concluída")
+            version = "0.1.2"
+            print("[MIGRATE] Migracao para 0.1.2 concluida")
 
         # ===== MIGRAÇÃO DE 0.1.2 para 0.1.3 =====
-        # Atualiza Pokémon com campos de custom_name e happiness
         if version in ["0.1.2"]:
-            # Migra a PC Box
             pc_box = migrated.get("player", {}).get("pc_box", [])
             for idx, pokemon_data in enumerate(pc_box):
                 if "custom_name" not in pokemon_data:
                     pokemon_data["custom_name"] = None
-                    print(f"[MIGRATE] Pokémon {pokemon_data.get('name', 'Desconhecido')}: adicionado custom_name=None")
                 if "happiness" not in pokemon_data:
                     pokemon_data["happiness"] = 50
-                    print(f"[MIGRATE] Pokémon {pokemon_data.get('name', 'Desconhecido')}: adicionado happiness=50")
 
-            # Migra o Team
             team = migrated.get("player", {}).get("team", [])
             for idx, pokemon_data in enumerate(team):
                 if "custom_name" not in pokemon_data:
@@ -603,18 +634,35 @@ class SaveManager:
                 if "happiness" not in pokemon_data:
                     pokemon_data["happiness"] = 50
 
-            # Atualiza versão no meta
-            migrated["meta"]["version"] = current_version
-            print(f"[MIGRATE] {len(pc_box)} Pokémon na box e {len(team)} no time migrados para 0.1.3")
-            print("[MIGRATE] Migração para 0.1.3 concluída: custom_name e happiness adicionados")
+            migrated["meta"]["version"] = "0.1.3"
+            version = "0.1.3"
+            print("[MIGRATE] Migracao para 0.1.3 concluida")
 
-        # ===== FUTURAS MIGRAÇÕES (adicionar aqui) =====
-        # if version == "0.1.3" and current_version == "0.1.4":
-        #     # migra para 0.1.4
+        # ===== MIGRAÇÃO DE 0.1.3 para 0.1.4 (ACHIEVEMENTS) =====
+        if version in ["0.1.3"]:
+            # Adiciona estrutura de conquistas
+            if "achievements" not in migrated.get("player", {}):
+                migrated["player"]["achievements"] = {
+                    "unlocked": [],
+                    "counters": {},
+                    "unlocked_data": {}  # NOVO: dados de data/hora e fase
+                }
+                print("[MIGRATE] Estrutura de conquistas adicionada")
+            else:
+                # Se já existe, garante que tem unlocked_data
+                if "unlocked_data" not in migrated["player"]["achievements"]:
+                    migrated["player"]["achievements"]["unlocked_data"] = {}
+                    print("[MIGRATE] Campo unlocked_data adicionado as conquistas")
+
+            # Atualiza versão
+            migrated["meta"]["version"] = current_version
+            print("[MIGRATE] Migracao para 0.1.4 concluida: conquistas adicionadas")
+
+        # ===== FUTURAS MIGRAÇÕES =====
+        # if version == "0.1.4" and current_version == "0.1.5":
         #     pass
 
         # ===== VALIDAÇÃO PÓS-MIGRAÇÃO =====
-        # Garante campos obrigatórios
         if "player" not in migrated:
             migrated["player"] = {}
 
@@ -627,7 +675,7 @@ class SaveManager:
         if "caught_pokemon" not in migrated["player"]:
             migrated["player"]["caught_pokemon"] = []
 
-        print(f"[MIGRATE] Migração concluída! Versão final: {migrated['meta']['version']}")
+        print(f"[MIGRATE] Migracao concluida! Versao final: {migrated['meta']['version']}")
         return migrated
 
     def delete_save(self, slot=1):

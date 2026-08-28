@@ -526,7 +526,7 @@ class GameScene(BaseScene):
             print(f"[CAPTURE] {enemy.name} escapou! Pokébola foi consumida.")
 
     def _perform_capture(self, enemy):
-        """Executa a captura de um Pokémon (código extraído para reuso)"""
+        """Executa a captura de um Pokémon - COM SISTEMA DE CONQUISTAS"""
         carried_item = enemy.is_carrying
         if carried_item:
             enemy.drop_item()
@@ -560,17 +560,28 @@ class GameScene(BaseScene):
         self.player.register_seen(enemy.id)
         self.player.auto_save()
 
+        # ===== CONQUISTAS: Captura =====
+        if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+            phase_id = f"{self.chapter_id}-{self.phase_number}"
+
+            # Incrementa contador de capturas
+            self.player.achievement_manager.increment_counter("capture_count")
+
+            # Verifica conquistas de captura (passando a fase atual)
+            self.player.achievement_manager.check_and_unlock("first_capture", phase_id)
+            self.player.achievement_manager.check_and_unlock("capture_10", phase_id)
+            self.player.achievement_manager.check_and_unlock("capture_50", phase_id)
+
         self.show_capture_overlay(caught, is_to_team)
 
     @staticmethod
     def use_medicine(pokemon, item_data):
-        """Usa poção ou revive em um Pokémon aliado"""
+        """Usa poção ou revive em um Pokémon aliado - COM SISTEMA DE CONQUISTAS"""
         effect = item_data.get("effect", "heal")
         item_id = item_data.get("id", "")
 
         # ===== REVIVE =====
         if effect == "revive" or "revive" in item_id:
-            # Verifica se o Pokémon está VIVO (não pode usar revive em vivo)
             if pokemon.is_alive():
                 print(f"[MEDICINE] {pokemon.name} já está vivo! Revive não pode ser usado.")
                 return False
@@ -578,21 +589,44 @@ class GameScene(BaseScene):
             revive_percentage = item_data.get("effect_value", 0.5)
             toast_battle(f"{pokemon.name} foi revivido!", duration=4.0, pokemon=pokemon, portrait="happy")
             pokemon.revive(heal_percentage=revive_percentage)
+
+            # ===== CONQUISTAS: Cura (Revive também conta) =====
+            game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
+            if game_scene and hasattr(game_scene, 'player'):
+                player = game_scene.player
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                if hasattr(player, 'achievement_manager'):
+                    # Incrementa contador de curas
+                    player.achievement_manager.increment_counter("heal_count")
+                    # Verifica conquistas de cura (passando a fase atual)
+                    player.achievement_manager.check_and_unlock("heal_5", phase_id)
+                    player.achievement_manager.check_and_unlock("heal_100", phase_id)
+
             return True
 
         # ===== POÇÕES E CURAS =====
-        # CRUCIAL: Verifica se o Pokémon está VIVO
         if not pokemon.is_alive():
             print(f"[MEDICINE] {pokemon.name} está derrotado! Use um Revive primeiro.")
             toast_warning(f"{pokemon.name} está derrotado! Use um Revive primeiro.", duration=2.0)
             return False
 
-        # Cura completa
         heal_amount = item_data.get("effect_value", 0)
 
+        # Cura completa (-1 = Full Heal)
         if heal_amount == -1:
             pokemon.heal()
             toast_battle(f"{pokemon.name} foi completamente curado!", duration=4.0, pokemon=pokemon, portrait="happy")
+
+            # ===== CONQUISTAS: Cura =====
+            game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
+            if game_scene and hasattr(game_scene, 'player'):
+                player = game_scene.player
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                if hasattr(player, 'achievement_manager'):
+                    player.achievement_manager.increment_counter("heal_count")
+                    player.achievement_manager.check_and_unlock("heal_5", phase_id)
+                    player.achievement_manager.check_and_unlock("heal_100", phase_id)
+
             return True
 
         # Cura parcial
@@ -600,8 +634,19 @@ class GameScene(BaseScene):
             old_hp = pokemon.current_hp
             pokemon.current_hp = min(pokemon.max_hp, pokemon.current_hp + heal_amount)
             healed = pokemon.current_hp - old_hp
-            toast_battle(f"{pokemon.name} recuperou {healed} HP! ({pokemon.current_hp}/{pokemon.max_hp})", duration=4.0,
-                         pokemon=pokemon, portrait="happy")
+            toast_battle(f"{pokemon.name} recuperou {healed} HP! ({pokemon.current_hp}/{pokemon.max_hp})",
+                         duration=4.0, pokemon=pokemon, portrait="happy")
+
+            # ===== CONQUISTAS: Cura =====
+            game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
+            if game_scene and hasattr(game_scene, 'player'):
+                player = game_scene.player
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                if hasattr(player, 'achievement_manager'):
+                    player.achievement_manager.increment_counter("heal_count")
+                    player.achievement_manager.check_and_unlock("heal_5", phase_id)
+                    player.achievement_manager.check_and_unlock("heal_100", phase_id)
+
             return True
 
         return False
@@ -1201,7 +1246,7 @@ class GameScene(BaseScene):
         perf_monitor.end_frame()
 
     def _complete_phase(self):
-        """Marca a fase como completada e dá as recompensas - INCLUI RESET DOS DITTOS"""
+        """Marca a fase como completada e dá as recompensas"""
         from src.config.progress import progress_manager
 
         self._stop_battle_music(fade_ms=1000)
@@ -1216,8 +1261,18 @@ class GameScene(BaseScene):
         stolen_items = self.target_item_manager.items_stolen
 
         bonus_amount = 0
+        perfect_run = False
+
         if stolen_items == 0 and total_items > 0:
             bonus_amount = int(gold_from_defeats * 0.3)
+            perfect_run = True
+
+            # ===== CONQUISTAS: Fase Perfeita =====
+            if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+                phase_id = f"{self.chapter_id}-{self.phase_number}"
+                self.player.achievement_manager.increment_counter("perfect_phase_count")
+                self.player.achievement_manager.check_and_unlock("perfect_phase", phase_id)
+                print(f"[ACHIEVEMENT] Fase perfeita! Verificando conquistas...")
 
         gold_total = base_reward + gold_from_defeats + bonus_amount
 
@@ -1242,7 +1297,7 @@ class GameScene(BaseScene):
             "bonus_amount": bonus_amount,
             "gold_total": gold_total,
             "total_xp": self.phase_rewards['experience'],
-            "perfect_run": stolen_items == 0 and total_items > 0,
+            "perfect_run": perfect_run,
             "stars": stars
         }
 

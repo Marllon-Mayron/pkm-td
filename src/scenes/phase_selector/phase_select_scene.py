@@ -11,6 +11,7 @@ from src.config.progress import progress_manager
 from src.config.phase_catalog import phase_catalog
 from src.scenes.shop_scene.shop_scene import ShopScene
 from src.scenes.pokedex_scene import PokedexScene
+from src.scenes.achievement_scene.achievement_scene import AchievementScene
 
 
 class PhaseCard:
@@ -207,7 +208,8 @@ class PhaseSelectScene(BaseScene):
         self.back_button = None
         self.shop_button = None
         self.minigame_button = None
-        self.pokedex_button = None  # NOVO - Botão da Pokédex
+        self.pokedex_button = None
+        self.achievement_button = None  # NOVO - Botão de Conquistas
 
         self.scroll_y = 0
         self.scroll_target = 0
@@ -228,7 +230,8 @@ class PhaseSelectScene(BaseScene):
         self.hover_changed = False
         self.shop_button_hovered = False
         self.minigame_button_hovered = False
-        self.pokedex_button_hovered = False  # NOVO
+        self.pokedex_button_hovered = False
+        self.achievement_button_hovered = False  # NOVO
 
         self.refresh_data()
         self.dev_mode = True
@@ -268,11 +271,11 @@ class PhaseSelectScene(BaseScene):
             back_size
         )
 
-        # Botoes inferiores (loja, minigames e pokedex lado a lado)
-        button_width = 150
+        # Botoes inferiores (loja, minigames, pokedex e conquistas lado a lado)
+        button_width = 130
         button_height = 50
-        button_spacing = 15
-        total_width = button_width * 3 + button_spacing * 2
+        button_spacing = 10
+        total_width = button_width * 4 + button_spacing * 3
         start_x = viewport_x + (viewport_width - total_width) // 2
         bottom_y = viewport_y + viewport_height - 90
 
@@ -287,9 +290,17 @@ class PhaseSelectScene(BaseScene):
             button_height
         )
 
-        # Botão POKÉDEX (NOVO)
+        # Botão POKÉDEX
         self.pokedex_button = pygame.Rect(
             start_x + (button_width + button_spacing) * 2,
+            bottom_y,
+            button_width,
+            button_height
+        )
+
+        # Botão CONQUISTAS (NOVO)
+        self.achievement_button = pygame.Rect(
+            start_x + (button_width + button_spacing) * 3,
             bottom_y,
             button_width,
             button_height
@@ -429,8 +440,10 @@ class PhaseSelectScene(BaseScene):
                 self._open_shop()
             elif event.key == pygame.K_m:
                 self._open_minigames()
-            elif event.key == pygame.K_x:  # NOVO - Tecla para abrir Pokédex
+            elif event.key == pygame.K_x:
                 self._open_pokedex()
+            elif event.key == pygame.K_c:  # NOVO - Tecla para abrir Conquistas
+                self._open_achievements()
 
         elif event.type == pygame.VIDEORESIZE:
             self.layout_initialized = False
@@ -450,8 +463,10 @@ class PhaseSelectScene(BaseScene):
                 self.shop_button_hovered = self.shop_button.collidepoint(event.pos)
             if self.minigame_button:
                 self.minigame_button_hovered = self.minigame_button.collidepoint(event.pos)
-            if self.pokedex_button:  # NOVO
+            if self.pokedex_button:
                 self.pokedex_button_hovered = self.pokedex_button.collidepoint(event.pos)
+            if self.achievement_button:  # NOVO
+                self.achievement_button_hovered = self.achievement_button.collidepoint(event.pos)
 
             if self.dragging_scroll:
                 dy = event.pos[1] - self.last_mouse_y
@@ -474,8 +489,12 @@ class PhaseSelectScene(BaseScene):
                     self._open_minigames()
                     return
 
-                if self.pokedex_button and self.pokedex_button.collidepoint(event.pos):  # NOVO
+                if self.pokedex_button and self.pokedex_button.collidepoint(event.pos):
                     self._open_pokedex()
+                    return
+
+                if self.achievement_button and self.achievement_button.collidepoint(event.pos):  # NOVO
+                    self._open_achievements()
                     return
 
                 for tab in self.chapter_tabs:
@@ -520,10 +539,15 @@ class PhaseSelectScene(BaseScene):
         from src.scenes.minigame_select_scene.minigame_select_scene import MinigameSelectScene
         self.game.current_scene = MinigameSelectScene(self.game)
 
-    def _open_pokedex(self):  # NOVO
+    def _open_pokedex(self):
         """Abre a Pokédex"""
         self.game.pokedex_scene = PokedexScene(self.game)
         self.game.current_scene = self.game.pokedex_scene
+
+    def _open_achievements(self):  # NOVO
+        """Abre a tela de conquistas"""
+        self.game.achievement_scene = AchievementScene(self.game)
+        self.game.current_scene = self.game.achievement_scene
 
     def _on_shop_closed(self):
         self.layout_initialized = False
@@ -655,7 +679,7 @@ class PhaseSelectScene(BaseScene):
             text_rect = minigame_text.get_rect(center=self.minigame_button.center)
             screen.blit(minigame_text, text_rect)
 
-        # Botao Pokédex (NOVO)
+        # Botao Pokédex
         if self.pokedex_button:
             if self.pokedex_button_hovered:
                 bg_color = (80, 60, 100)
@@ -673,10 +697,32 @@ class PhaseSelectScene(BaseScene):
             pygame.draw.rect(screen, bg_color, self.pokedex_button, border_radius=10)
             pygame.draw.rect(screen, border_color, self.pokedex_button, 3, border_radius=10)
 
-            # Ícone da Pokédex (texto com emoji ou símbolo)
             pokedex_text = self.button_font.render("POKÉDEX", True, text_color)
             text_rect = pokedex_text.get_rect(center=self.pokedex_button.center)
             screen.blit(pokedex_text, text_rect)
+
+        # Botao Conquistas (NOVO)
+        if self.achievement_button:
+            if self.achievement_button_hovered:
+                bg_color = (100, 80, 60)
+                border_color = (255, 215, 0)
+                text_color = (255, 255, 255)
+            else:
+                bg_color = (70, 55, 40)
+                border_color = (180, 150, 100)
+                text_color = (220, 220, 200)
+
+            shadow_rect = self.achievement_button.copy()
+            shadow_rect.x += 4
+            shadow_rect.y += 4
+            pygame.draw.rect(screen, (15, 15, 15), shadow_rect, border_radius=10)
+            pygame.draw.rect(screen, bg_color, self.achievement_button, border_radius=10)
+            pygame.draw.rect(screen, border_color, self.achievement_button, 3, border_radius=10)
+
+            # Ícone de troféu + texto
+            achievement_text = self.button_font.render("CONQUISTAS", True, text_color)
+            text_rect = achievement_text.get_rect(center=self.achievement_button.center)
+            screen.blit(achievement_text, text_rect)
 
         # Abas
         for tab in self.chapter_tabs:
@@ -723,7 +769,7 @@ class PhaseSelectScene(BaseScene):
 
         # Instrucoes
         font_small = pygame.font.Font(None, 18)
-        inst_text = "< >  NAVEGAR  |  CLIQUE NA FASE  |  S  LOJA  |  M  MINIGAMES  |  X  POKÉDEX  |  ESC  VOLTAR"
+        inst_text = "< >  NAVEGAR  |  CLIQUE NA FASE  |  S  LOJA  |  M  MINIGAMES  |  X  POKÉDEX  |  C  CONQUISTAS  |  ESC  VOLTAR"
         if self.dev_mode:
             inst_text += "  |  [U] proxima fase  |  [A] todas"
         inst = font_small.render(inst_text, True, (120, 120, 130))

@@ -4,6 +4,7 @@ from src.entities.base import Entity
 from src.data.pokedex import Pokedex
 from src.managers.bag_manager import BagManager
 from src.managers.save_manager import SaveManager
+from src.managers.achievement_manager import AchievementManager
 
 
 class Player(Entity):
@@ -30,6 +31,20 @@ class Player(Entity):
         # PC Box (armazenamento)
         self.pc_box = []
 
+        # Lista de conquistas do jogador
+        self.achievements = {
+            "unlocked": [],
+            "counters": {}
+        }
+
+        self.achievement_manager = AchievementManager(self)
+
+        self._heal_count = 0
+        self._capture_count = 0
+        self._badge_count = 0
+        self._boss_defeated_count = 0
+        self._perfect_phase_count = 0
+
         # Slot selecionado
         self.selected_slot = 0
 
@@ -45,6 +60,7 @@ class Player(Entity):
         self.mystery_gift_history = []
 
         self.save_manager = SaveManager()
+
 
 
     def add_to_team(self, pokemon, slot=None):
