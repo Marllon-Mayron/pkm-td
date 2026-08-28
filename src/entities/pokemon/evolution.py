@@ -24,6 +24,7 @@ class PokemonEvolution:
     def _perform_evolution(self, new_id):
         """Realiza a evolução mantendo os moves compatíveis"""
         old_name = self.pokemon.name
+        custom_name = self.pokemon.custom_name
         old_level = self.pokemon.level
 
         new_pokemon_data = self.pokemon.pokedex.get_pokemon(new_id)
@@ -48,6 +49,7 @@ class PokemonEvolution:
         for move_name in moves_to_learn:
             self.pokemon._learn_move_without_replacement(move_name)
 
+        self.pokemon.custom_name = custom_name
         print(f"[EVOLUÇÃO] ✓ {old_name} (Lv.{old_level}) evoluiu para {self.pokemon.name}!")
         print(f"[EVOLUÇÃO] Moves atuais: {[m.name for m in self.pokemon.moves]}")
 
