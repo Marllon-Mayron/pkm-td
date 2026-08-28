@@ -331,9 +331,13 @@ class EnemySpawner:
 
         # Garante que o inimigo está vivo
         pokemon.current_hp = pokemon.max_hp
+
+        # ===== REGISTRA O POKÉMON COMO VISTO =====
+        self._register_enemy_as_seen(pokemon)
+
         if pokemon.is_shiny:
             sound_manager.play_effect(SoundEffect.SHINY)
-            toast_battle(f"{pokemon.name} shiny apareceu!)", duration=4.0, pokemon=pokemon, portrait="angry")
+            toast_battle(f"{pokemon.name} shiny apareceu!", duration=4.0, pokemon=pokemon, portrait="angry")
 
         return pokemon
 
@@ -355,3 +359,38 @@ class EnemySpawner:
                 return enemy
 
         return enemies[-1]
+
+    def _register_enemy_as_seen(self, pokemon):
+        """
+        Registra o Pokémon como visto na Pokédex do jogador
+        Só registra se ainda não foi visto antes
+        """
+        try:
+            if not hasattr(self.wave_manager, 'game_scene') or not self.wave_manager.game_scene:
+                return
+
+            player = self.wave_manager.game_scene.player
+            if not player:
+                return
+
+            pokemon_id = pokemon.id
+
+            # Só registra se ainda não foi visto
+            if pokemon_id not in player.seen_pokemon:
+                player.register_seen(pokemon_id)
+
+                from src.data.pokedex import Pokedex
+                pokedex = Pokedex()
+                pokemon_name = pokedex.get_name(pokemon_id)
+                print(f"[Spawner] Novo Pokémon visto: {pokemon_name} (ID: {pokemon_id})")
+
+                # Opcional: exibe um toast para o jogador
+                from src.ui.toast_renderer import toast_battle
+                toast_battle(f"Novo Pokémon avistado: {pokemon_name}!", duration=3.0)
+
+                if pokemon.is_shiny:
+                    print(f"[Spawner] ✨ Shiny {pokemon_name} visto pela primeira vez!")
+                    toast_battle(f"✨ Shiny {pokemon_name} avistado!", duration=4.0)
+
+        except Exception as e:
+            print(f"[Spawner] Erro ao registrar Pokémon visto: {e}")
