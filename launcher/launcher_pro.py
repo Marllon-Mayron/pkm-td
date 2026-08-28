@@ -1,6 +1,6 @@
 """
 LAUNCHER POKEMON TD - ESPECIFICO PARA PYTHON 3.12
-Verifica, lista e instala Python 3.12 automaticamente
+Com preservação de saves e feedback melhorado
 """
 import os
 import sys
@@ -19,6 +19,7 @@ from datetime import datetime
 import webbrowser
 import ctypes
 import re
+import time
 
 # Configuracao
 GITHUB_REPO = "Marllon-Mayron/pkm-td"
@@ -246,6 +247,38 @@ class ModernDialog:
 
         return dialog
 
+    @staticmethod
+    def show_download_progress_dialog(parent, on_cancel):
+        """Mostra um diálogo de progresso durante o download"""
+        dialog = ModernDialog.create(parent, "Baixando Jogo", 500, 250)
+
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(main_frame, text="Download em andamento...",
+                 font=("Segoe UI", 16, "bold")).pack(pady=(0, 15))
+
+        status_label = ttk.Label(main_frame, text="Iniciando download...",
+                                font=("Segoe UI", 11))
+        status_label.pack(pady=5)
+
+        progress_bar = ttk.Progressbar(main_frame, mode='determinate', length=450)
+        progress_bar.pack(pady=10)
+
+        detail_label = ttk.Label(main_frame, text="",
+                                font=("Segoe UI", 9), foreground="#888888")
+        detail_label.pack(pady=5)
+
+        btn_frame = ttk.Frame(main_frame)
+        btn_frame.pack(pady=15)
+
+        cancel_btn = ttk.Button(btn_frame, text="Cancelar", 
+                               command=lambda: [dialog.destroy(), on_cancel()],
+                               width=15)
+        cancel_btn.pack()
+
+        return dialog, status_label, progress_bar, detail_label, cancel_btn
+
 
 class DependencyInstaller:
     """Gerencia instalacao de dependencias - FOCADO EM PYTHON 3.12"""
@@ -362,6 +395,8 @@ class PokemonTDLauncher:
         self.saves_backup_temp = None
         self.python_path = None
         self.dependencies_ok = False
+        self.download_cancelled = False
+        self.download_progress_dialog = None
 
         # Interface
         self.root = None
@@ -408,6 +443,88 @@ class PokemonTDLauncher:
 
     def update_progress_status(self, message):
         self.root.after(0, lambda: self.progress_var.set(message))
+        if self.download_progress_dialog:
+            try:
+                self.download_progress_dialog[1].config(text=message)
+            except:
+                pass
+
+    def backup_saves_preserve(self):
+        """Faz backup de TODOS os arquivos de save (JSON e outros)"""
+        saves_path = self.game_dir / "src" / "saves"
+        
+        if saves_path.exists():
+            # Encontra TODOS os arquivos na pasta saves (qualquer extensão)
+            all_files = []
+            for file in saves_path.rglob("*"):
+                if file.is_file():
+                    all_files.append(file)
+            
+            if all_files:
+                import tempfile
+                self.saves_backup_temp = tempfile.mkdtemp(prefix="pokemon_saves_")
+                backup_path = Path(self.saves_backup_temp)
+                
+                save_count = 0
+                for file in all_files:
+                    # Mantém a estrutura de pastas relativa
+                    relative_path = file.relative_to(saves_path)
+                    dest_file = backup_path / relative_path
+                    dest_file.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(file, dest_file)
+                    save_count += 1
+                    
+                    # Mostra detalhe de cada arquivo salvo
+                    file_type = file.suffix.upper() if file.suffix else "SEM EXTENSÃO"
+                    self.add_log(f"  • Salvo: {relative_path} ({file_type})", "INFO")
+                
+                self.add_log(f"SAVES PRESERVADOS: {save_count} arquivos", "SUCCESS")
+                return True
+            else:
+                self.add_log("Nenhum arquivo de save encontrado", "INFO")
+                return False
+        else:
+            self.add_log("Pasta saves não existe", "INFO")
+            return False
+
+    def restore_saves_preserve(self):
+        """Restaura TODOS os arquivos de save (JSON e outros)"""
+        saves_path = self.game_dir / "src" / "saves"
+        saves_path.mkdir(parents=True, exist_ok=True)
+        
+        if self.saves_backup_temp:
+            backup_path = Path(self.saves_backup_temp)
+            if backup_path.exists():
+                # Encontra TODOS os arquivos no backup
+                all_files = []
+                for file in backup_path.rglob("*"):
+                    if file.is_file():
+                        all_files.append(file)
+                
+                restored_count = 0
+                for file in all_files:
+                    relative_path = file.relative_to(backup_path)
+                    dest_file = saves_path / relative_path
+                    dest_file.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(file, dest_file)
+                    restored_count += 1
+                    
+                    # Mostra detalhe de cada arquivo restaurado
+                    file_type = file.suffix.upper() if file.suffix else "SEM EXTENSÃO"
+                    self.add_log(f"  • Restaurado: {relative_path} ({file_type})", "INFO")
+                
+                # Remove a pasta temporária
+                try:
+                    shutil.rmtree(self.saves_backup_temp)
+                except:
+                    pass
+                self.saves_backup_temp = None
+                
+                self.add_log(f"SAVES RESTAURADOS: {restored_count} arquivos", "SUCCESS")
+                return True
+        
+        self.add_log("Nenhum save para restaurar", "INFO")
+        return False
 
     def check_and_install_dependencies(self):
         """Verifica Python 3.12 e Pygame"""
@@ -513,49 +630,6 @@ class PokemonTDLauncher:
 
         threading.Thread(target=install_thread, daemon=True).start()
 
-    def backup_saves_preserve(self):
-        saves_path = self.game_dir / "src" / "saves"
-
-        if saves_path.exists() and any(saves_path.iterdir()):
-            save_count = len([f for f in saves_path.iterdir() if f.is_file()])
-
-            import tempfile
-            self.saves_backup_temp = tempfile.mkdtemp(prefix="pokemon_saves_")
-            backup_path = Path(self.saves_backup_temp)
-
-            for file in saves_path.iterdir():
-                if file.is_file():
-                    shutil.copy2(file, backup_path / file.name)
-
-            self.add_log(f"SAVES PRESERVADOS: {save_count} arquivos", "SUCCESS")
-            return True
-
-        self.add_log("Nenhum save encontrado", "INFO")
-        return False
-
-    def restore_saves_preserve(self):
-        saves_path = self.game_dir / "src" / "saves"
-        saves_path.mkdir(parents=True, exist_ok=True)
-
-        if self.saves_backup_temp:
-            backup_path = Path(self.saves_backup_temp)
-            if backup_path.exists():
-                restored_count = 0
-                for file in backup_path.iterdir():
-                    if file.is_file():
-                        dest = saves_path / file.name
-                        shutil.copy2(file, dest)
-                        restored_count += 1
-
-                shutil.rmtree(self.saves_backup_temp)
-                self.saves_backup_temp = None
-
-                self.add_log(f"SAVES RESTAURADOS: {restored_count} arquivos", "SUCCESS")
-                return True
-
-        self.add_log("Nenhum save para restaurar", "INFO")
-        return False
-
     def get_local_version(self):
         version_file = self.game_dir / "game_version.txt"
         if version_file.exists():
@@ -599,38 +673,95 @@ class PokemonTDLauncher:
             return None
 
     def download_version(self, version_info):
+        """Download com feedback detalhado e barra de progresso"""
         try:
             self.is_downloading = True
+            self.download_cancelled = False
             self.set_buttons_state(False)
+
+            # Cria diálogo de progresso
+            dialog, status_label, progress_bar, detail_label, cancel_btn = ModernDialog.show_download_progress_dialog(
+                self.root, self.cancel_download
+            )
+            self.download_progress_dialog = (dialog, status_label, progress_bar, detail_label, cancel_btn)
 
             self.add_log(f"Baixando versao {version_info['version']}...", "INFO")
 
+            # Backup dos saves
             if self.game_dir.exists():
+                self.add_log("Fazendo backup dos saves...", "INFO")
+                status_label.config(text="Fazendo backup dos saves...")
                 self.backup_saves_preserve()
 
-            self.progress_bar['value'] = 0
-            self.progress_var.set("Baixando...")
+            # Configuração do progresso
+            progress_bar['value'] = 0
+            status_label.config(text="Preparando download...")
+            detail_label.config(text="Conectando ao servidor...")
 
+            # Download do arquivo
             temp_zip = tempfile.NamedTemporaryFile(suffix='.zip', delete=False)
             temp_zip.close()
 
+            self.add_log(f"URL do download: {version_info['download_url']}", "INFO")
+
             def report_progress(block_num, block_size, total_size):
+                if self.download_cancelled:
+                    raise Exception("Download cancelado pelo usuário")
+                    
                 if total_size > 0:
                     progress = (block_num * block_size) / total_size * 100
-                    self.progress_bar['value'] = progress
-                    self.progress_var.set(f"Baixando: {progress:.1f}%")
-                    self.root.update()
+                    current_mb = (block_num * block_size) / (1024 * 1024)
+                    total_mb = total_size / (1024 * 1024)
+                    
+                    # Atualiza interfaces
+                    self.root.after(0, lambda: progress_bar.config(value=min(progress, 100)))
+                    self.root.after(0, lambda: status_label.config(
+                        text=f"Baixando: {progress:.1f}%"
+                    ))
+                    self.root.after(0, lambda: detail_label.config(
+                        text=f"{current_mb:.1f} MB / {total_mb:.1f} MB"
+                    ))
+                    self.root.after(0, lambda: self.progress_var.set(f"Baixando: {progress:.1f}%"))
+                    self.root.after(0, lambda: self.progress_bar.config(value=min(progress, 100)))
+                    
+                    # Log a cada 10%
+                    if int(progress) % 10 == 0 and int(progress) > 0:
+                        self.add_log(f"Download: {progress:.1f}% completo", "INFO")
 
-            urlretrieve(version_info["download_url"], temp_zip.name, reporthook=report_progress)
+            self.add_log("Iniciando download do arquivo...", "INFO")
+            status_label.config(text="Baixando arquivo...")
+            detail_label.config(text="Aguardando resposta do servidor...")
 
+            # Faz o download com retry
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    urlretrieve(version_info["download_url"], temp_zip.name, reporthook=report_progress)
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1 and not self.download_cancelled:
+                        self.add_log(f"Tentativa {attempt + 1} falhou, tentando novamente...", "WARNING")
+                        status_label.config(text=f"Tentativa {attempt + 1} falhou, tentando novamente...")
+                        time.sleep(2)
+                    else:
+                        raise
+
+            if self.download_cancelled:
+                self.add_log("Download cancelado pelo usuário", "WARNING")
+                status_label.config(text="Download cancelado")
+                return False
+
+            status_label.config(text="Download concluído! Extraindo...")
+            detail_label.config(text="Extraindo arquivos...")
+            self.add_log("Download concluído, extraindo arquivos...", "INFO")
+
+            # Extração com progresso
             version_path = self.versions_dir / version_info["version"]
             if version_path.exists():
                 shutil.rmtree(version_path)
             version_path.mkdir(parents=True)
 
-            self.add_log("Extraindo arquivos...", "INFO")
             self.progress_var.set("Extraindo arquivos...")
-            self.progress_bar['value'] = 0
 
             with zipfile.ZipFile(temp_zip.name, 'r') as zip_ref:
                 root_folder = None
@@ -641,8 +772,12 @@ class PokemonTDLauncher:
 
                 files = zip_ref.namelist()
                 total_files = len(files)
+                self.add_log(f"Extraindo {total_files} arquivos...", "INFO")
 
                 for i, member in enumerate(files):
+                    if self.download_cancelled:
+                        raise Exception("Download cancelado pelo usuário")
+                        
                     if '__MACOSX' in member or '.DS_Store' in member:
                         continue
 
@@ -658,28 +793,62 @@ class PokemonTDLauncher:
                                     shutil.copyfileobj(src, dst)
 
                     progress = (i / total_files) * 100
-                    self.progress_bar['value'] = progress
-                    self.root.update()
+                    self.root.after(0, lambda p=progress: progress_bar.config(value=p))
+                    self.root.after(0, lambda p=progress: detail_label.config(
+                        text=f"Extraindo: {i+1}/{total_files} arquivos"
+                    ))
+                    
+                    # Log a cada 100 arquivos
+                    if i % 100 == 0 and i > 0:
+                        self.add_log(f"Extraídos {i+1}/{total_files} arquivos", "INFO")
 
             os.unlink(temp_zip.name)
 
-            (version_path / "game_version.txt").write_text(version_info["version"])
+            if self.download_cancelled:
+                self.add_log("Download cancelado pelo usuário", "WARNING")
+                shutil.rmtree(version_path, ignore_errors=True)
+                return False
 
+            # Salva informações da versão
+            (version_path / "game_version.txt").write_text(version_info["version"])
             if version_info.get("changelog"):
                 (version_path / "changelog.txt").write_text(version_info["changelog"])
 
-            self.add_log("Download concluido", "SUCCESS")
+            self.add_log(f"Download da versão {version_info['version']} concluído", "SUCCESS")
+            status_label.config(text="Download concluído com sucesso!")
+            detail_label.config(text="Pronto!")
             self.progress_var.set("Pronto")
+            
+            # Fecha o diálogo após um tempo
+            self.root.after(2000, dialog.destroy)
+            
             return True
 
         except Exception as e:
-            self.add_log(f"Erro no download: {e}", "ERROR")
-            self.progress_var.set("Erro no download")
-            return False
+            error_msg = str(e)
+            if "cancelado" in error_msg:
+                self.add_log("Download cancelado pelo usuário", "WARNING")
+                return False
+            else:
+                self.add_log(f"Erro no download: {error_msg}", "ERROR")
+                self.progress_var.set("Erro no download")
+                if self.download_progress_dialog:
+                    try:
+                        self.download_progress_dialog[1].config(text=f"Erro: {error_msg}")
+                    except:
+                        pass
+                return False
         finally:
             self.is_downloading = False
+            self.download_progress_dialog = None
             self.set_buttons_state(True)
-            self.progress_bar['value'] = 0
+            if not self.download_cancelled:
+                self.progress_bar['value'] = 0
+
+    def cancel_download(self):
+        """Cancela o download em andamento"""
+        self.download_cancelled = True
+        self.add_log("Cancelando download...", "WARNING")
 
     def set_current_version(self, version):
         version_path = self.versions_dir / version
@@ -695,6 +864,7 @@ class PokemonTDLauncher:
 
         shutil.copytree(version_path, self.game_dir)
 
+        # Restaura os saves após copiar a nova versão
         self.restore_saves_preserve()
 
         self.current_version = version
@@ -833,7 +1003,7 @@ cd /d "{self.game_dir}"
 
         success = self.download_version(self.latest_release)
 
-        if success:
+        if success and not self.download_cancelled:
             result = self.set_current_version(self.latest_release['version'])
             if result:
                 self.root.after(0, lambda: messagebox.showinfo("Sucesso",
@@ -841,6 +1011,8 @@ cd /d "{self.game_dir}"
                 self.add_log("Atualizacao concluida", "SUCCESS")
             else:
                 self.root.after(0, lambda: messagebox.showerror("Erro", "Falha ao ativar versao"))
+        elif self.download_cancelled:
+            self.root.after(0, lambda: messagebox.showinfo("Cancelado", "Download cancelado pelo usuário"))
         else:
             self.root.after(0, lambda: messagebox.showerror("Erro", "Falha no download"))
 
