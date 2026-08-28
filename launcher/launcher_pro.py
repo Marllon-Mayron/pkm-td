@@ -1,6 +1,7 @@
+
 """
-LAUNCHER POKEMON TD - ESPECIFICO PARA PYTHON 3.12
-Com preservação de saves e feedback melhorado
+LAUNCHER POKEMON TD - PRESERVAÇÃO GARANTIDA DE SAVES v3
+Corrige o caminho dos saves (agora em PokemonTD/saves)
 """
 import os
 import sys
@@ -392,7 +393,7 @@ class PokemonTDLauncher:
         self.offline_mode = False
         self.latest_release = None
         self.is_downloading = False
-        self.saves_backup_temp = None
+        self.saves_backup_path = None  # Path para backup dos saves
         self.python_path = None
         self.dependencies_ok = False
         self.download_cancelled = False
@@ -449,82 +450,110 @@ class PokemonTDLauncher:
             except:
                 pass
 
-    def backup_saves_preserve(self):
-        """Faz backup de TODOS os arquivos de save (JSON e outros)"""
-        saves_path = self.game_dir / "src" / "saves"
-        
-        if saves_path.exists():
-            # Encontra TODOS os arquivos na pasta saves (qualquer extensão)
-            all_files = []
-            for file in saves_path.rglob("*"):
-                if file.is_file():
-                    all_files.append(file)
-            
-            if all_files:
-                import tempfile
-                self.saves_backup_temp = tempfile.mkdtemp(prefix="pokemon_saves_")
-                backup_path = Path(self.saves_backup_temp)
-                
-                save_count = 0
-                for file in all_files:
-                    # Mantém a estrutura de pastas relativa
-                    relative_path = file.relative_to(saves_path)
-                    dest_file = backup_path / relative_path
-                    dest_file.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(file, dest_file)
-                    save_count += 1
-                    
-                    # Mostra detalhe de cada arquivo salvo
-                    file_type = file.suffix.upper() if file.suffix else "SEM EXTENSÃO"
-                    self.add_log(f"  • Salvo: {relative_path} ({file_type})", "INFO")
-                
-                self.add_log(f"SAVES PRESERVADOS: {save_count} arquivos", "SUCCESS")
-                return True
-            else:
-                self.add_log("Nenhum arquivo de save encontrado", "INFO")
-                return False
-        else:
-            self.add_log("Pasta saves não existe", "INFO")
-            return False
+    def get_saves_path(self, base_dir=None):
+        """
+        Retorna o caminho correto da pasta de saves
+        O jogo salva em: PokemonTD/saves (NÃO em src/saves)
+        """
+        if base_dir is None:
+            base_dir = self.game_dir
+        return base_dir / "saves"
 
-    def restore_saves_preserve(self):
-        """Restaura TODOS os arquivos de save (JSON e outros)"""
-        saves_path = self.game_dir / "src" / "saves"
+    def backup_saves_preserve(self, source_dir=None):
+        """
+        FAZ BACKUP COMPLETO DOS SAVES
+        Salva TODOS os arquivos JSON da pasta saves em um local temporário
+        
+        Args:
+            source_dir: Diretório de origem (se None, usa game_dir)
+        """
+        if source_dir is None:
+            source_dir = self.game_dir
+            
+        saves_path = self.get_saves_path(source_dir)
+        
+        if not saves_path.exists():
+            self.add_log(f"Pasta saves não existe em: {saves_path}", "INFO")
+            return False
+        
+        # Encontra TODOS os arquivos JSON na pasta saves e subpastas
+        json_files = list(saves_path.rglob("*.json"))
+        
+        if not json_files:
+            self.add_log("Nenhum arquivo JSON de save encontrado", "INFO")
+            return False
+        
+        # Cria pasta de backup
+        import tempfile
+        self.saves_backup_path = Path(tempfile.mkdtemp(prefix="pokemon_saves_backup_"))
+        backup_path = self.saves_backup_path
+        
+        self.add_log(f"Backup criado em: {backup_path}", "INFO")
+        
+        save_count = 0
+        for file in json_files:
+            # Mantém a estrutura de pastas relativa
+            relative_path = file.relative_to(saves_path)
+            dest_file = backup_path / relative_path
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(file, dest_file)
+            save_count += 1
+            
+            # Mostra detalhe de cada arquivo salvo
+            self.add_log(f"  • Salvo: {relative_path}", "INFO")
+        
+        self.add_log(f"SAVES PRESERVADOS: {save_count} arquivos JSON", "SUCCESS")
+        return True
+
+    def restore_saves_preserve(self, target_dir=None):
+        """
+        RESTAURA OS SAVES DO BACKUP
+        Copia todos os arquivos JSON do backup para a pasta saves
+        
+        Args:
+            target_dir: Diretório de destino (se None, usa game_dir)
+        """
+        if target_dir is None:
+            target_dir = self.game_dir
+            
+        saves_path = self.get_saves_path(target_dir)
         saves_path.mkdir(parents=True, exist_ok=True)
         
-        if self.saves_backup_temp:
-            backup_path = Path(self.saves_backup_temp)
-            if backup_path.exists():
-                # Encontra TODOS os arquivos no backup
-                all_files = []
-                for file in backup_path.rglob("*"):
-                    if file.is_file():
-                        all_files.append(file)
-                
-                restored_count = 0
-                for file in all_files:
-                    relative_path = file.relative_to(backup_path)
-                    dest_file = saves_path / relative_path
-                    dest_file.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(file, dest_file)
-                    restored_count += 1
-                    
-                    # Mostra detalhe de cada arquivo restaurado
-                    file_type = file.suffix.upper() if file.suffix else "SEM EXTENSÃO"
-                    self.add_log(f"  • Restaurado: {relative_path} ({file_type})", "INFO")
-                
-                # Remove a pasta temporária
-                try:
-                    shutil.rmtree(self.saves_backup_temp)
-                except:
-                    pass
-                self.saves_backup_temp = None
-                
-                self.add_log(f"SAVES RESTAURADOS: {restored_count} arquivos", "SUCCESS")
-                return True
+        if not self.saves_backup_path or not self.saves_backup_path.exists():
+            self.add_log("Nenhum backup de save encontrado", "INFO")
+            return False
         
-        self.add_log("Nenhum save para restaurar", "INFO")
-        return False
+        backup_path = self.saves_backup_path
+        
+        # Encontra TODOS os arquivos JSON no backup
+        json_files = list(backup_path.rglob("*.json"))
+        
+        if not json_files:
+            self.add_log("Nenhum arquivo JSON encontrado no backup", "INFO")
+            return False
+        
+        restored_count = 0
+        for file in json_files:
+            relative_path = file.relative_to(backup_path)
+            dest_file = saves_path / relative_path
+            dest_file.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(file, dest_file)
+            restored_count += 1
+            
+            self.add_log(f"  • Restaurado: {relative_path}", "INFO")
+        
+        self.add_log(f"SAVES RESTAURADOS: {restored_count} arquivos JSON", "SUCCESS")
+        return True
+
+    def clean_backup(self):
+        """Remove a pasta de backup temporária"""
+        if self.saves_backup_path and self.saves_backup_path.exists():
+            try:
+                shutil.rmtree(self.saves_backup_path)
+                self.add_log("Backup removido", "INFO")
+            except:
+                pass
+            self.saves_backup_path = None
 
     def check_and_install_dependencies(self):
         """Verifica Python 3.12 e Pygame"""
@@ -687,11 +716,12 @@ class PokemonTDLauncher:
 
             self.add_log(f"Baixando versao {version_info['version']}...", "INFO")
 
-            # Backup dos saves
+            # ===== PASSO 1: FAZ BACKUP DOS SAVES =====
             if self.game_dir.exists():
-                self.add_log("Fazendo backup dos saves...", "INFO")
+                self.add_log("=== FAZENDO BACKUP DOS SAVES ===", "INFO")
                 status_label.config(text="Fazendo backup dos saves...")
-                self.backup_saves_preserve()
+                if not self.backup_saves_preserve():
+                    self.add_log("ATENÇÃO: Nenhum save encontrado para backup", "WARNING")
 
             # Configuração do progresso
             progress_bar['value'] = 0
@@ -755,7 +785,7 @@ class PokemonTDLauncher:
             detail_label.config(text="Extraindo arquivos...")
             self.add_log("Download concluído, extraindo arquivos...", "INFO")
 
-            # Extração com progresso
+            # ===== PASSO 2: EXTRAI A NOVA VERSÃO =====
             version_path = self.versions_dir / version_info["version"]
             if version_path.exists():
                 shutil.rmtree(version_path)
@@ -809,12 +839,38 @@ class PokemonTDLauncher:
                 shutil.rmtree(version_path, ignore_errors=True)
                 return False
 
+            # ===== PASSO 3: TRANSFERE OS SAVES PARA A NOVA VERSÃO =====
+            if self.saves_backup_path and self.saves_backup_path.exists():
+                self.add_log("=== TRANSFERINDO SAVES PARA NOVA VERSÃO ===", "INFO")
+                
+                new_saves_path = self.get_saves_path(version_path)
+                new_saves_path.mkdir(parents=True, exist_ok=True)
+                
+                # Copia todos os JSONs do backup para a nova versão
+                backup_saves = list(self.saves_backup_path.rglob("*.json"))
+                restored_count = 0
+                for save_file in backup_saves:
+                    relative_path = save_file.relative_to(self.saves_backup_path)
+                    dest_file = new_saves_path / relative_path
+                    dest_file.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(save_file, dest_file)
+                    restored_count += 1
+                    self.add_log(f"  • Transferido: {relative_path}", "INFO")
+                
+                self.add_log(f"SAVES TRANSFERIDOS: {restored_count} arquivos para nova versão", "SUCCESS")
+            else:
+                self.add_log("Nenhum save para transferir", "INFO")
+
             # Salva informações da versão
             (version_path / "game_version.txt").write_text(version_info["version"])
             if version_info.get("changelog"):
                 (version_path / "changelog.txt").write_text(version_info["changelog"])
 
             self.add_log(f"Download da versão {version_info['version']} concluído", "SUCCESS")
+            
+            # Limpa o backup
+            self.clean_backup()
+
             status_label.config(text="Download concluído com sucesso!")
             detail_label.config(text="Pronto!")
             self.progress_var.set("Pronto")
@@ -851,6 +907,9 @@ class PokemonTDLauncher:
         self.add_log("Cancelando download...", "WARNING")
 
     def set_current_version(self, version):
+        """
+        Troca para uma versão específica PRESERVANDO OS SAVES
+        """
         version_path = self.versions_dir / version
 
         if not version_path.exists():
@@ -859,20 +918,44 @@ class PokemonTDLauncher:
 
         self.add_log(f"Trocando para versao {version}...", "INFO")
 
+        # ===== PASSO 1: FAZ BACKUP DOS SAVES DA VERSÃO ATUAL =====
         if self.game_dir.exists():
+            self.add_log("Fazendo backup dos saves da versão atual...", "INFO")
+            if not self.backup_saves_preserve():
+                self.add_log("Nenhum save encontrado na versão atual", "WARNING")
+
+        # ===== PASSO 2: REMOVE A VERSÃO ATUAL =====
+        if self.game_dir.exists():
+            self.add_log("Removendo versão atual...", "INFO")
             shutil.rmtree(self.game_dir)
 
+        # ===== PASSO 3: COPIA A NOVA VERSÃO =====
+        self.add_log(f"Copiando versão {version}...", "INFO")
         shutil.copytree(version_path, self.game_dir)
 
-        # Restaura os saves após copiar a nova versão
-        self.restore_saves_preserve()
+        # ===== PASSO 4: RESTAURA OS SAVES NA NOVA VERSÃO =====
+        if self.saves_backup_path and self.saves_backup_path.exists():
+            self.add_log("Restaurando saves na nova versão...", "INFO")
+            self.restore_saves_preserve()
+            self.clean_backup()
+        else:
+            # Tenta restaurar da versão baixada (fallback)
+            self.add_log("Tentando restaurar saves da versão baixada...", "INFO")
+            saves_from_version = self.get_saves_path(version_path)
+            saves_in_game = self.get_saves_path(self.game_dir)
+            
+            if saves_from_version.exists():
+                self.add_log(f"Copiando saves de {saves_from_version}", "INFO")
+                saves_in_game.mkdir(parents=True, exist_ok=True)
+                shutil.copytree(saves_from_version, saves_in_game, dirs_exist_ok=True)
+                self.add_log("Saves restaurados da versão baixada", "SUCCESS")
 
         self.current_version = version
 
         if self.version_label:
             self.version_label.config(text=f"Versao: {self.current_version}")
 
-        self.add_log(f"Versao {version} carregada", "SUCCESS")
+        self.add_log(f"Versao {version} carregada com saves preservados!", "SUCCESS")
         return True
 
     def find_main_py(self):
