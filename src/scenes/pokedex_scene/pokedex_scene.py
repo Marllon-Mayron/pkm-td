@@ -298,7 +298,7 @@ class PokedexScene(BaseScene):
 
         # Estatísticas
         stats_text = f"Total: {self.total_pokemon}  |  Vistos: {self.total_seen}  |  Capturados: {self.total_caught}"
-        stats_font = pygame.font.Font(None, 14)
+        stats_font = pygame.font.Font(None, 24)
         stats_surf = stats_font.render(stats_text, True, COLORS['text_secondary'])
         stats_x = vx + vw - SIZES['padding'] - stats_surf.get_width()
         stats_y = vy + SIZES['padding'] + 8

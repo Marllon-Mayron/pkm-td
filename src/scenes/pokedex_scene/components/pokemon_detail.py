@@ -5,7 +5,7 @@ from src.scenes.pokedex_scene.utils.constants import COLORS, TYPE_COLORS, SIZES
 
 
 class PokemonDetail:
-    """Painel de detalhes do Pokemon """
+    """Painel de detalhes do Pokemon - LAYOUT ORGANIZADO"""
 
     def __init__(self, x, y, width, height):
         self.rect = pygame.Rect(x, y, width, height)
@@ -22,26 +22,24 @@ class PokemonDetail:
         self.direction_index = 0
         self.directions = ["down", "right", "up", "left"]
         self.direction_change_timer = 0
-        self.direction_change_interval = 1.5  # Muda de direcao a cada 1.5 segundos
+        self.direction_change_interval = 1.5
 
-        # Botoes (apenas navegacao de Pokemon)
+        # Botoes
         self.prev_button = None
         self.next_button = None
         self.toggle_view_button = None
 
-        # Remove botoes de direcao
-        self.dir_left_button = None
-        self.dir_right_button = None
-
         self.hover_prev = False
         self.hover_next = False
         self.hover_toggle = False
-        self.hover_dir_left = False
-        self.hover_dir_right = False
 
-        # Cache para o numero de frames da animacao atual
+        # Cache
         self._current_frame_count = 0
         self._cached_frames = {}
+        self._sprite_size_cache = {}
+
+        # ===== MULTIPLICADOR PARA O TAMANHO DO SPRITE INMAP =====
+        self.inmap_scale_multiplier = 4.0  # Multiplica o tamanho original por 4
 
     def set_pokemon(self, pokemon_id, pokemon_data, is_caught, is_seen):
         self.pokemon_id = pokemon_id
@@ -54,6 +52,7 @@ class PokemonDetail:
         self.direction_change_timer = 0
         self._current_frame_count = 0
         self._cached_frames = {}
+        self._sprite_size_cache = {}
 
     def _get_animation_frames(self, pokedex, direction):
         """Obtem os frames da animacao para uma direcao especifica com cache"""
@@ -62,11 +61,9 @@ class PokemonDetail:
         if cache_key in self._cached_frames:
             return self._cached_frames[cache_key]
 
-        # Tenta pegar os frames da animacao InMap
         anim = pokedex.get_inmap_animation(self.pokemon_id, shiny=False)
         frames = anim.get(direction, [])
 
-        # Se nao encontrar, tenta outras direcoes como fallback
         if not frames:
             for fallback_dir in ["down", "right", "left", "up"]:
                 frames = anim.get(fallback_dir, [])
@@ -75,6 +72,47 @@ class PokemonDetail:
 
         self._cached_frames[cache_key] = frames
         return frames
+
+    def _get_sprite_size(self, pokedex) -> int:
+        """
+        Obtem o tamanho real do sprite InMap do Pokemon.
+        USA O MESMO METODO QUE O JOGO USA NO MAPA, MAS MULTIPLICA POR 4.
+
+        No jogo: self.map_sprite_size = self.pokedex.get_map_sprite_size(pokemon_id, shiny)
+        """
+        cache_key = f"{self.pokemon_id}_size"
+
+        if cache_key in self._sprite_size_cache:
+            return self._sprite_size_cache[cache_key]
+
+        # ===== USA O MESMO METODO DO JOGO =====
+        try:
+            size = pokedex.get_map_sprite_size(self.pokemon_id, shiny=False)
+            if size > 0:
+                # ===== MULTIPLICA POR 4 PARA FICAR MAIOR NA POKEDEX =====
+                scaled_size = int(size * self.inmap_scale_multiplier)
+                self._sprite_size_cache[cache_key] = scaled_size
+                return scaled_size
+        except:
+            pass
+
+        # Fallback: tenta obter de um frame real
+        for d in ["down", "right", "left", "up"]:
+            frames = self._get_animation_frames(pokedex, d)
+            if frames and len(frames) > 0:
+                frame = frames[0]
+                if frame:
+                    width, height = frame.get_width(), frame.get_height()
+                    size = max(width, height)
+                    # ===== MULTIPLICA POR 4 =====
+                    scaled_size = int(size * self.inmap_scale_multiplier)
+                    self._sprite_size_cache[cache_key] = scaled_size
+                    return scaled_size
+
+        # Fallback final: tamanho padrao * 4
+        default_size = 32 * int(self.inmap_scale_multiplier)
+        self._sprite_size_cache[cache_key] = default_size
+        return default_size
 
     def update(self, dt):
         """Atualiza a animacao com loop continuo e rotacao automatica"""
@@ -87,12 +125,9 @@ class PokemonDetail:
         # ===== ATUALIZA O TIMER DE MUDANCA DE DIRECAO =====
         self.direction_change_timer += dt
 
-        # Muda de direcao a cada intervalo (sentido horario)
         if self.direction_change_timer >= self.direction_change_interval:
             self.direction_change_timer = 0
-            # Avanca para a proxima direcao (sentido horario)
             self.direction_index = (self.direction_index + 1) % len(self.directions)
-            # Reseta o frame ao mudar de direcao
             self.inmap_frame = 0
             self.inmap_timer = 0
 
@@ -101,19 +136,15 @@ class PokemonDetail:
         frames = self._get_animation_frames(pokedex, direction)
         frame_count = len(frames)
 
-        # Atualiza o cache do numero de frames
         self._current_frame_count = frame_count
 
-        # Se nao tem frames ou so tem 1, nao anima
         if frame_count <= 1:
             return
 
-        # Atualiza o frame com loop
         self.inmap_timer += dt
 
         if self.inmap_timer >= self.animation_speed:
             self.inmap_timer = 0
-            # LOOP INFINITO: incrementa e reseta usando modulo
             self.inmap_frame = (self.inmap_frame + 1) % frame_count
 
     def handle_event(self, event, pokedex):
@@ -126,7 +157,6 @@ class PokemonDetail:
             self.hover_toggle = self.toggle_view_button and self.toggle_view_button.collidepoint(event.pos)
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # Botao anterior (Pokemon)
             if self.prev_button and self.prev_button.collidepoint(event.pos):
                 all_ids = sorted(pokedex.pokemon_data.keys())
                 current_idx = all_ids.index(self.pokemon_id) if self.pokemon_id in all_ids else -1
@@ -134,7 +164,6 @@ class PokemonDetail:
                     prev_id = all_ids[current_idx - 1]
                     return {"action": "navigate", "pokemon_id": prev_id}
 
-            # Botao proximo (Pokemon)
             if self.next_button and self.next_button.collidepoint(event.pos):
                 all_ids = sorted(pokedex.pokemon_data.keys())
                 current_idx = all_ids.index(self.pokemon_id) if self.pokemon_id in all_ids else -1
@@ -142,7 +171,6 @@ class PokemonDetail:
                     next_id = all_ids[current_idx + 1]
                     return {"action": "navigate", "pokemon_id": next_id}
 
-            # Botao toggle (InMap/Sprite)
             if self.toggle_view_button and self.toggle_view_button.collidepoint(event.pos):
                 if self.is_seen or self.is_caught:
                     self.show_inmap = not self.show_inmap
@@ -186,7 +214,10 @@ class PokemonDetail:
                     )
                     if sprite:
                         break
-            return sprite, SIZES['inmap_sprite_size']
+
+            # ===== OBTEM O TAMANHO REAL DO SPRITE (MULTIPLICADO POR 4) =====
+            sprite_size = self._get_sprite_size(pokedex)
+            return sprite, sprite_size
         else:
             sprite = pokedex.get_sprite(self.pokemon_id, "front", shiny=False)
             return sprite, SIZES['sprite_size']
@@ -219,15 +250,36 @@ class PokemonDetail:
         sprite, sprite_size = self._get_sprite(pokedex)
 
         if sprite:
-            scaled_sprite = pygame.transform.scale(sprite, (sprite_size, sprite_size))
-            sprite_x = sprite_area.centerx - sprite_size // 2
-            sprite_y = sprite_area.centery - sprite_size // 2
+            # ===== USA O TAMANHO MULTIPLICADO POR 4 =====
+            max_display_size = min(sprite_area.width - 20, sprite_area.height - 20)
+
+            # Se o sprite for maior que a area, escala proporcionalmente
+            if sprite_size > max_display_size:
+                scale_factor = max_display_size / sprite_size
+                display_size = int(sprite_size * scale_factor)
+            else:
+                display_size = sprite_size
+
+            # Escala o sprite mantendo proporcao
+            scaled_sprite = pygame.transform.scale(sprite, (display_size, display_size))
+
+            # Centraliza na area
+            sprite_x = sprite_area.centerx - display_size // 2
+            sprite_y = sprite_area.centery - display_size // 2
             screen.blit(scaled_sprite, (sprite_x, sprite_y))
 
             if self.is_caught and self.pokemon_data.get("is_shiny_available", False):
-                glow = pygame.Surface((sprite_size, sprite_size), pygame.SRCALPHA)
+                glow = pygame.Surface((display_size, display_size), pygame.SRCALPHA)
                 glow.fill((255, 215, 0, 40))
                 screen.blit(glow, (sprite_x, sprite_y))
+
+            # ===== MOSTRA INFO DO TAMANHO (DEBUG) =====
+            if self.show_inmap:
+                info_font = pygame.font.Font(None, 12)
+                original_size = int(sprite_size / self.inmap_scale_multiplier)
+                size_text = info_font.render(f"{original_size}x{original_size} (x{self.inmap_scale_multiplier:.0f})",
+                                             True, COLORS['text_secondary'])
+                screen.blit(size_text, (sprite_area.x + 8, sprite_area.y + 8))
         else:
             placeholder_font = pygame.font.Font(None, 60)
             placeholder = placeholder_font.render("?", True, COLORS['text_secondary'])
@@ -235,12 +287,10 @@ class PokemonDetail:
 
         # ===== INFORMACOES DA ANIMACAO (MODO AUTOMATICO) =====
         if self.show_inmap:
-            info_font = pygame.font.Font(None, 11)
+            info_font = pygame.font.Font(None, 16)
 
-            # Mostra direcao atual e progresso da rotacao
             current_dir = self._get_direction().upper()
 
-            # Calcula progresso da rotacao
             progress = self.direction_change_timer / self.direction_change_interval
             progress_bar = int(progress * 20)
             bar = "[" + "-" * progress_bar + " " * (20 - progress_bar) + "]"
@@ -249,7 +299,6 @@ class PokemonDetail:
             dir_surf = info_font.render(dir_text, True, COLORS['text_accent'])
             screen.blit(dir_surf, (sprite_area.x + 8, sprite_area.bottom - 18))
 
-            # Mostra frame atual
             if self._current_frame_count > 0:
                 frame_text = f"Frame: {self.inmap_frame + 1}/{self._current_frame_count}"
                 frame_surf = info_font.render(frame_text, True, COLORS['text_secondary'])
@@ -257,11 +306,8 @@ class PokemonDetail:
 
             # ===== INDICADOR VISUAL DE ROTACAO AUTOMATICA =====
             dir_font = pygame.font.Font(None, 14)
-
-            # Mostra todas as direcoes com a atual destacada
             direction_names = ["DOWN", "RIGHT", "UP", "LEFT"]
 
-            # Renderiza cada direcao com a atual destacada
             current_x = sprite_area.centerx - 60
 
             for i, d in enumerate(direction_names):
@@ -276,8 +322,7 @@ class PokemonDetail:
                 screen.blit(text_surf, (current_x, sprite_area.bottom + 4))
                 current_x += text_surf.get_width() + 8
 
-            # Texto "AUTO ROTATE" abaixo
-            auto_font = pygame.font.Font(None, 10)
+            auto_font = pygame.font.Font(None, 12)
             auto_text = auto_font.render("AUTO ROTATE", True, COLORS['text_secondary'])
             screen.blit(auto_text, (sprite_area.centerx - auto_text.get_width() // 2, sprite_area.bottom + 22))
 
@@ -305,7 +350,7 @@ class PokemonDetail:
         screen.blit(toggle_surf, toggle_surf.get_rect(center=toggle_rect.center))
 
         # Informacoes do Pokemon
-        info_y = sprite_area.bottom + padding + 10  # Mais espaco para o indicador
+        info_y = sprite_area.bottom + padding + 10
 
         # Nome e ID
         if self.is_caught:
@@ -372,11 +417,9 @@ class PokemonDetail:
                 if stat_key in base_stats:
                     value = base_stats[stat_key]
 
-                    # Nome do stat
                     name_surf = fonts['small'].render(stat_name, True, COLORS['text_secondary'])
                     screen.blit(name_surf, (self.rect.x + padding, info_y))
 
-                    # Barra
                     bar_x = self.rect.x + padding + 55
                     bar_width = self.rect.width - padding * 2 - 85
                     bar_y = info_y + 2
@@ -386,7 +429,6 @@ class PokemonDetail:
 
                     percent = value / max_stat if max_stat > 0 else 0
                     if percent > 0:
-                        # Cor baseada no valor
                         if percent > 0.7:
                             bar_color = (100, 200, 100)
                         elif percent > 0.4:
@@ -398,7 +440,6 @@ class PokemonDetail:
                                          (bar_x, bar_y, int(bar_width * percent), stat_height),
                                          border_radius=3)
 
-                    # Valor
                     value_surf = fonts['small'].render(str(value), True, COLORS['text_primary'])
                     screen.blit(value_surf, (self.rect.right - padding - 20, info_y))
 
