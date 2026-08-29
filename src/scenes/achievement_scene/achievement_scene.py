@@ -19,7 +19,7 @@ class AchievementScene(BaseScene):
         self.card_height = 90
         self.card_spacing = 10
         self.padding = 20
-        self.top_margin = 140
+        self.top_margin = 140  # Aumentado para dar espaço aos filtros
 
         # Scroll
         self.scroll_offset = 0
@@ -77,8 +77,8 @@ class AchievementScene(BaseScene):
             'input_active': (80, 120, 200),
             'scroll_bg': (20, 24, 42),
             'scroll_thumb': (60, 80, 140),
-            'filter_active': (50, 70, 120),  # COR ADICIONADA
-            'scroll_thumb_hover': (80, 110, 180),  # COR ADICIONADA
+            'filter_active': (50, 70, 120),
+            'scroll_thumb_hover': (80, 110, 180),
         }
 
         # Cache
@@ -145,7 +145,8 @@ class AchievementScene(BaseScene):
 
         # Calcula scroll maximo
         total_height = len(self.achievements) * (self.card_height + self.card_spacing)
-        visible_height = self.game.screen_manager.window_height - self.top_margin - 40
+        clip_rect = self._get_clip_rect()
+        visible_height = clip_rect.height
         self.max_scroll = max(0, total_height - visible_height)
         self.scroll_offset = min(self.scroll_offset, self.max_scroll)
 
@@ -162,7 +163,8 @@ class AchievementScene(BaseScene):
 
     def _get_clip_rect(self):
         """Retorna a area de clipping para a lista de conquistas"""
-        start_y = self.top_margin
+        # O topo começa depois dos filtros (linha separadora)
+        start_y = 80 + 38 + 14 + 10  # y dos filtros + altura do input + espaçamento + padding
         return pygame.Rect(
             20, start_y,
             self.game.screen_manager.window_width - 50,
@@ -335,7 +337,7 @@ class AchievementScene(BaseScene):
         # ===== FILTROS =====
         self._render_filters(screen)
 
-        # ===== LISTA DE CONQUISTAS =====
+        # ===== LISTA DE CONQUISTAS (com clipping) =====
         if self.achievements:
             self._render_achievement_list(screen)
         else:
@@ -478,14 +480,15 @@ class AchievementScene(BaseScene):
         text_y = self.filter_input_rect.centery - text_surf.get_height() // 2
         screen.blit(text_surf, (text_x, text_y))
 
-        # Linha separadora
+        # Linha separadora - AGORA ELA FICA ACIMA DA LISTA
         filter_y = y + search_height + 14
         pygame.draw.line(screen, self.colors['border'],
                          (20, filter_y), (self.game.screen_manager.window_width - 20, filter_y), 1)
 
     def _render_empty_message(self, screen):
         """Renderiza mensagem quando nao ha conquistas"""
-        y = self.top_margin + 60
+        clip_rect = self._get_clip_rect()
+        y = clip_rect.y + 60
 
         font = self._get_font(26)
         if self.filter_text or self.selected_rarity_index > 0:
@@ -497,7 +500,7 @@ class AchievementScene(BaseScene):
         screen.blit(text, (text_x, y))
 
     def _render_achievement_list(self, screen):
-        """Renderiza a lista de conquistas com scroll"""
+        """Renderiza a lista de conquistas com scroll e clipping"""
         clip_rect = self._get_clip_rect()
 
         # Cria superficie para renderizar com scroll
@@ -510,12 +513,22 @@ class AchievementScene(BaseScene):
             self._render_achievement_card(surface, card_rect, achievement)
             y += self.card_height + self.card_spacing
 
-        # Aplica scroll
+        # Aplica scroll e CLIPPING
         scroll_y = int(self.scroll_offset)
-        screen.blit(surface, (clip_rect.x, clip_rect.y - scroll_y),
-                    area=pygame.Rect(0, scroll_y, clip_rect.width, clip_rect.height))
 
-        # Barra de scroll
+        # Salva o clip atual
+        old_clip = screen.get_clip()
+
+        # Aplica o clip para a área da lista
+        screen.set_clip(clip_rect)
+
+        # Desenha a superficie com a posição scrollada
+        screen.blit(surface, (clip_rect.x, clip_rect.y - scroll_y))
+
+        # Restaura o clip
+        screen.set_clip(old_clip)
+
+        # Barra de scroll (desenhada fora do clip)
         if self.max_scroll > 0:
             self._render_scrollbar(screen, clip_rect)
 
