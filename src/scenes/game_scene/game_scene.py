@@ -28,6 +28,9 @@ from src.scenes.game_scene.components.renderer.pokemon_spot_renderer import Poke
 from src.scenes.game_scene.components.renderer.target_item_renderer import TargetItemRenderer
 from src.managers.notification_manager import notification_manager
 from src.ui.toast_renderer import toast_info, toast_warning, toast_battle
+from src.battle.effects.specific.day_night.day_night_filter import DayNightFilter
+from src.battle.effects.specific.day_night.day_night_state import DayNightType
+from src.scenes.game_scene.components.day_night_weather_system import DayNightWeatherSystem
 
 class GameScene(BaseScene):
     def __init__(self, game, chapter_id=1, phase_number=1):
@@ -103,6 +106,16 @@ class GameScene(BaseScene):
         self.game_state = "waiting"
         self.between_waves_timer = 3.0
         self.show_debug = False
+
+        # Weather filter
+        self.weather_filter = WeatherFilter()
+
+        # Day/Night filter
+        self.day_night_filter = DayNightFilter()
+
+        # ===== SISTEMA DIA/NOITE E CLIMA =====
+        self.day_night_weather = DayNightWeatherSystem(self)
+        self.day_night_weather.initialize()  # Inicializa com valores aleatórios
 
         # Fontes cacheadas
         self._debug_font = pygame.font.Font(None, 18)
@@ -821,6 +834,12 @@ class GameScene(BaseScene):
         """Limpa o estado da fase antes de sair - INCLUI RESET DOS DITTOS"""
         self._stop_battle_music(fade_ms=500)
 
+        # ===== LIMPA DIA/NOITE E CLIMA =====
+        self.day_night_filter.clear()
+        self.weather_filter.clear()
+        if hasattr(self, 'day_night_weather'):
+            self.day_night_weather._initialized = False
+
         # ===== RESETA TODOS OS DITTOS TRANSFORMADOS =====
         self.reset_all_transformed_dittos()
 
@@ -1147,6 +1166,11 @@ class GameScene(BaseScene):
         perf_monitor.start_section("BATTLE_SYSTEM")
         if hasattr(self, 'battle_system'):
             self.battle_system.update(dt)
+
+        # ===== DIA/NOITE E CLIMA =====
+        if hasattr(self, 'day_night_weather'):
+            self.day_night_weather.update(dt)
+
         perf_monitor.end_section()
 
         # Bag Renderer
@@ -1391,6 +1415,32 @@ class GameScene(BaseScene):
             placement_mgr.render_hp(screen, camera)
         perf_monitor.end_section()
 
+        # ===== RENDERIZAÇÃO DOS FILTROS DE CLIMA E DIA/NOITE =====
+        # IMPORTANTE: A ORDEM É: 1. CLIMA, 2. DIA/NOITE
+        perf_monitor.start_section("RENDER_WEATHER_AND_DAYNIGHT")
+
+        viewport_rect = pygame.Rect(
+            self.screen_manager.viewport_x,
+            self.screen_manager.viewport_y,
+            self.screen_manager.viewport_width,
+            self.screen_manager.viewport_height
+        )
+
+        # ===== 1. FILTRO DE CLIMA (CHUVA, AREIA, SOL) =====
+        if hasattr(self, 'battle_system') and self.battle_system:
+            weather = self.battle_system.weather_manager.current_weather
+            if weather and weather.active:
+                print(f"[GAME_SCENE] Renderizando clima: {weather.type.value}")
+                self.weather_filter.render(screen, weather, viewport_rect)
+
+        # ===== 2. FILTRO DE DIA/NOITE (POR CIMA DO CLIMA) =====
+        if hasattr(self, 'day_night_weather'):
+            day_night = self.day_night_weather.day_night_state
+            if day_night and day_night.active:
+                self.day_night_filter.render(screen, day_night, viewport_rect)
+
+        perf_monitor.end_section()
+
         # UI do jogo
         perf_monitor.start_section("RENDER_GAME_UI")
         self._render_game_ui(screen)
@@ -1420,18 +1470,6 @@ class GameScene(BaseScene):
                          (screen_mgr.viewport_x, screen_mgr.viewport_y,
                           screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
         perf_monitor.end_section()
-
-        # ===== WEATHER FILTER =====
-        if hasattr(self, 'battle_system') and self.battle_system:
-            weather = self.battle_system.weather_manager.current_weather
-            if weather and weather.active:
-                viewport_rect = pygame.Rect(
-                    self.screen_manager.viewport_x,
-                    self.screen_manager.viewport_y,
-                    self.screen_manager.viewport_width,
-                    self.screen_manager.viewport_height
-                )
-                self.weather_filter.render(screen, weather, viewport_rect)
 
         # Pause overlay
         if self.paused and not self.game_paused:
@@ -1492,7 +1530,7 @@ class GameScene(BaseScene):
         viewport_x = screen_mgr.viewport_x
         viewport_y = screen_mgr.viewport_y
 
-        ui_bg = pygame.Surface((400, 150))
+        ui_bg = pygame.Surface((400, 180))  # Aumentado para acomodar clima
         ui_bg.set_alpha(180)
         ui_bg.fill((20, 20, 30))
         screen.blit(ui_bg, (viewport_x + 10, viewport_y + 10))
@@ -1503,6 +1541,32 @@ class GameScene(BaseScene):
         screen.blit(phase_text, (viewport_x + 15, y_offset))
         y_offset += 25
 
+        # ===== PERIODO (DIA/NOITE) =====
+        if hasattr(self, 'day_night_weather'):
+            day_night = self.day_night_weather.day_night_state
+            if day_night:
+                period_text = day_night.get_display_name()
+                period_color = (255, 200, 100) if day_night.is_day() else (100, 150, 255)
+                period_display = font_small.render(f"Periodo: {period_text}", True, period_color)
+                screen.blit(period_display, (viewport_x + 15, y_offset))
+                y_offset += 20
+
+        # ===== CLIMA =====
+        if hasattr(self, 'battle_system') and self.battle_system:
+            weather = self.battle_system.weather_manager.current_weather
+            if weather and weather.active:
+                weather_name = weather.get_display_name()
+                weather_color = {
+                    "sandstorm": (194, 178, 128),
+                    "rain": (100, 150, 255),
+                    "sunny": (255, 215, 0)
+                }.get(weather.type.value, (200, 200, 200))
+
+                weather_display = font_small.render(f"Clima: {weather_name}", True, weather_color)
+                screen.blit(weather_display, (viewport_x + 15, y_offset))
+                y_offset += 20
+
+        # ===== ITENS =====
         items_color = (100, 255, 100) if target_mgr.items_protected > 0 else (255, 100, 100)
         items_text = font_small.render(
             f"Itens: {target_mgr.items_protected} protegidos | {target_mgr.items_stolen} levados",
@@ -1511,8 +1575,9 @@ class GameScene(BaseScene):
         screen.blit(items_text, (viewport_x + 15, y_offset))
         y_offset += 20
 
+        # ===== ESTADO DO JOGO =====
         if self.game_state == "waiting":
-            state_text = font_small.render("Aguardando início...", True, (200, 200, 200))
+            state_text = font_small.render("Aguardando inicio...", True, (200, 200, 200))
             screen.blit(state_text, (viewport_x + 15, y_offset))
 
         elif self.game_state == "in_wave":
@@ -1528,6 +1593,7 @@ class GameScene(BaseScene):
             screen.blit(wave_text, (viewport_x + 15, y_offset))
             y_offset += 20
 
+            # ===== BARRA DE PROGRESSO =====
             bar_x = viewport_x + 15
             bar_y = y_offset
             bar_width = 370
@@ -1546,6 +1612,7 @@ class GameScene(BaseScene):
 
             y_offset += 25
 
+            # ===== INIMIGOS VIVOS =====
             enemies_color = (255, 100, 100) if wave_mgr.active_enemies else (100, 255, 100)
             enemies_text = font_small.render(
                 f"Inimigos vivos: {len(wave_mgr.active_enemies)}",

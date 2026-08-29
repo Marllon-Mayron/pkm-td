@@ -958,14 +958,27 @@ class BattleSystem:
         if move.category == "physical":
             atk_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.ATTACK)
             def_mult = self.effect_manager.get_stat_multiplier(target, StatType.DEFENSE)
-            print(f"[DAMAGE] {attacker.name} atk_mult={atk_mult:.2f}, {target.name} def_mult={def_mult:.2f}")
             damage_result["damage"] = int(damage_result["damage"] * atk_mult / def_mult)
         else:
             sp_atk_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.SP_ATTACK)
             sp_def_mult = self.effect_manager.get_stat_multiplier(target, StatType.SP_DEFENSE)
-            print(
-                f"[DAMAGE] {attacker.name} sp_atk_mult={sp_atk_mult:.2f}, {target.name} sp_def_mult={sp_def_mult:.2f}")
             damage_result["damage"] = int(damage_result["damage"] * sp_atk_mult / sp_def_mult)
+
+        # ===== APLICA EFEITOS DO CLIMA =====
+        move_info = {
+            'type': move.type,
+            'category': move.category,
+            'power': move.power
+        }
+        weather_effects = self.apply_weather_effects(attacker, target, move_info)
+
+        if weather_effects['damage_multiplier'] != 1.0:
+            old_damage = damage_result["damage"]
+            damage_result["damage"] = int(damage_result["damage"] * weather_effects['damage_multiplier'])
+            if weather_effects['message']:
+                self.effect_manager.add_status_text(attacker, weather_effects['message'], duration=1.0)
+            print(
+                f"[WEATHER] Dano ajustado: {old_damage} -> {damage_result['damage']} (x{weather_effects['damage_multiplier']})")
 
         # ===== APLICA REDUÇÃO DE SCREENS =====
         screen_reduction = self.get_screen_damage_reduction(target, move.category)
@@ -1147,6 +1160,61 @@ class BattleSystem:
         if not self.weather_manager:
             return False
         return self.weather_manager.is_weather_active(weather_type)
+
+    def apply_weather_effects(self, attacker, defender, move_info) -> dict:
+        """
+        Aplica os efeitos do clima no movimento.
+        Retorna um dicionário com modificadores.
+        """
+        effects = {
+            'damage_multiplier': 1.0,
+            'accuracy_modifier': 1.0,
+            'heal_modifier': 1.0,
+            'is_immune': False,
+            'message': None
+        }
+
+        if not self.weather_manager:
+            return effects
+
+        weather = self.weather_manager.current_weather
+        if not weather or not weather.active:
+            return effects
+
+        move_type = move_info.get('type', '').lower()
+
+        # ===== RAIN =====
+        if weather.type.value == "rain":
+            if move_type == 'water':
+                effects['damage_multiplier'] = 1.5
+                effects['message'] = "A chuva fortaleceu o ataque!"
+            elif move_type == 'fire':
+                effects['damage_multiplier'] = 0.5
+                effects['message'] = "A chuva enfraqueceu o ataque!"
+            elif move_type in ['solar_beam', 'solar_blade']:
+                effects['damage_multiplier'] = 0.5
+                effects['message'] = "A chuva enfraqueceu o ataque!"
+
+        # ===== SUNNY =====
+        elif weather.type.value == "sunny":
+            if move_type == 'fire':
+                effects['damage_multiplier'] = 1.5
+                effects['message'] = "O sol forte fortaleceu o ataque!"
+            elif move_type == 'water':
+                effects['damage_multiplier'] = 0.5
+                effects['message'] = "O sol forte enfraqueceu o ataque!"
+            elif move_type in ['solar_beam', 'solar_blade']:
+                effects['damage_multiplier'] = 1.5
+                effects['message'] = "O sol forte carregou o ataque!"
+
+        # ===== SANDSTORM =====
+        elif weather.type.value == "sandstorm":
+            # Pokémon de tipos Rock, Ground, Steel são imunes a dano
+            if move_type in ['rock', 'ground', 'steel']:
+                effects['damage_multiplier'] = 1.3
+                effects['message'] = "A tempestade de areia fortaleceu o ataque!"
+
+        return effects
 
     def register_attacker_for_enemy(self, attacker: 'Pokemon', enemy: 'Pokemon'):
         """Registra que um atacante atingiu um inimigo específico"""

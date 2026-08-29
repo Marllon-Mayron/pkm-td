@@ -3772,7 +3772,7 @@ class MoveEffect:
 
     def _apply_weather(self, attacker, target, battle_system, effect_manager):
         """
-        Aplica efeito climático (Sandstorm, Rain Dance, Sunny Day)
+        Aplica efeito climático TEMPORÁRIO (Sandstorm, Rain Dance, Sunny Day)
         """
         from src.battle.effects.specific.weather.weather_state import WeatherType
 
@@ -3787,7 +3787,33 @@ class MoveEffect:
 
         weather_type = weather_map.get(weather_type_str.lower(), WeatherType.SANDSTORM)
 
-        # Aplica o clima
+        # ===== BLOQUEIO: SUNNY DAY NÃO FUNCIONA À NOITE =====
+        if weather_type == WeatherType.SUNNY:
+            # Verifica se é noite
+            is_night = False
+            if hasattr(battle_system, 'game_scene'):
+                game_scene = battle_system.game_scene
+                if hasattr(game_scene, 'day_night_weather'):
+                    is_night = game_scene.day_night_weather.is_night()
+
+            if is_night:
+                effect_manager.add_status_text(
+                    attacker,
+                    f"Mas não há sol durante a noite!",
+                    duration=2.0
+                )
+                print(f"[SUNNY_DAY] {attacker.name} tentou usar Sunny Day, mas é NOITE! Bloqueado.")
+
+                # Gasta PP mesmo assim (o jogador perdeu o turno)
+                current_move = attacker.get_current_move()
+                if current_move:
+                    current_move.current_pp -= 1
+
+                # Cooldown do atacante
+                attacker.attack_cooldown = attacker.attack_cooldown_max
+                return False
+
+        # ===== APLICA O CLIMA TEMPORÁRIO COM SOURCE = ATTACKER =====
         battle_system.weather_manager.set_weather(weather_type, duration, source=attacker)
 
         # Mensagem específica

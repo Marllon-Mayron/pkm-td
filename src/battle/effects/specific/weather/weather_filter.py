@@ -12,6 +12,7 @@ class WeatherFilter:
     def __init__(self):
         self.surface = None
         self.last_size = None
+        self._debug_counter = 0
 
     def render(self, screen, weather_state, viewport_rect):
         """
@@ -25,9 +26,16 @@ class WeatherFilter:
         if not weather_state or not weather_state.active:
             return
 
-        # Obtém a cor do filtro
-        color = weather_state.get_filter_color()
+        # DEBUG
+        self._debug_counter += 1
+        print(f"[WEATHER_FILTER] Render chamado #{self._debug_counter} - Clima: {weather_state.type.value}")
+
+        # Obtém a cor do filtro baseado no tipo de clima
+        color = self._get_filter_color(weather_state)
+        print(f"[WEATHER_FILTER] Cor: {color}")
+
         if color[3] <= 0:
+            print(f"[WEATHER_FILTER] Opacidade zero, ignorando")
             return
 
         # Cria ou recria a superfície se o tamanho mudou
@@ -35,6 +43,7 @@ class WeatherFilter:
         if self.last_size != current_size or self.surface is None:
             self.surface = pygame.Surface(current_size, pygame.SRCALPHA)
             self.last_size = current_size
+            print(f"[WEATHER_FILTER] Superfície criada: {current_size}")
 
         # Limpa a superfície
         self.surface.fill((0, 0, 0, 0))
@@ -42,23 +51,46 @@ class WeatherFilter:
         # Desenha o filtro
         pygame.draw.rect(self.surface, color, self.surface.get_rect())
 
-        # Intensidade baseada no progresso (fade in/out)
-        progress = weather_state.get_progress()
-
-        # Fade in no início, fade out no final
-        if progress < 0.2:
-            alpha_factor = progress / 0.2
-        elif progress > 0.8:
-            alpha_factor = (1.0 - progress) / 0.2
+        # ===== CORREÇÃO: Para clima base, sempre usa opacidade total =====
+        if weather_state.is_base_weather:
+            # Clima base: opacidade total SEM fade
+            final_alpha = color[3]
+            print(f"[WEATHER_FILTER] Clima BASE - Alpha final: {final_alpha}")
         else:
-            alpha_factor = 1.0
+            # Clima temporário: com fade in/out
+            progress = weather_state.get_progress()
 
-        # Aplica a opacidade final
-        final_alpha = int(color[3] * alpha_factor)
+            if progress < 0.2:
+                alpha_factor = progress / 0.2
+            elif progress > 0.8:
+                alpha_factor = (1.0 - progress) / 0.2
+            else:
+                alpha_factor = 1.0
+
+            final_alpha = int(color[3] * alpha_factor)
+            print(f"[WEATHER_FILTER] Clima temporário - Alpha final: {final_alpha} (progress: {progress:.2f})")
+
         self.surface.set_alpha(final_alpha)
 
         # Renderiza na posição da viewport
         screen.blit(self.surface, (viewport_rect.x, viewport_rect.y))
+        print(f"[WEATHER_FILTER] Blit em ({viewport_rect.x}, {viewport_rect.y}) com alpha {final_alpha}")
+
+    def _get_filter_color(self, weather_state) -> tuple:
+        """
+        Retorna a cor do filtro com opacidade baseado no tipo de clima.
+        """
+        weather_type = weather_state.type.value
+
+        if weather_type == "sandstorm":
+            return (194, 178, 128, 110)  # Marrom/areia
+        elif weather_type == "rain":
+            return (100, 100, 200, 110)  # Azul (chuva)
+        elif weather_type == "sunny":
+            return (255, 200, 100, 110)  # Amarelo (sol)
+        else:
+            print(f"[WEATHER_FILTER] Tipo não reconhecido: {weather_type}")
+            return (255, 0, 0, 110)  # Vermelho (fallback)
 
     def clear(self):
         """Limpa o cache"""
