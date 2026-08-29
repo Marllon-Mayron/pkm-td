@@ -1720,8 +1720,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 39,
-                "max_level": 39,
+                "min_level": 52,
+                "max_level": 52,
                 "wave_size": 1,
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
@@ -1739,8 +1739,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 39,
-                "max_level": 39,
+                "min_level": 52,
+                "max_level": 52,
                 "wave_size": 1,
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
@@ -1758,8 +1758,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 44,
-                "max_level": 44,
+                "min_level": 56,
+                "max_level": 56,
                 "wave_size": 1,
                 "spawn_interval": 3.0,
                 "initial_delay": 20.0,
@@ -1777,8 +1777,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 44,
-                "max_level": 5,
+                "min_level": 56,
+                "max_level": 56,
                 "wave_size": 1,
                 "spawn_interval": 3.0,
                 "initial_delay": 20.0,
@@ -1786,7 +1786,7 @@
                 "repeat_count": 1
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 3
     },
     "tower_spots": {
         "spot_size": 24,

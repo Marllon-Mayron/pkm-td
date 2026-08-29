@@ -665,8 +665,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 15,
-                "max_level": 15,
+                "min_level": 18,
+                "max_level": 18,
                 "wave_size": 1,
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
@@ -684,7 +684,7 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 19,
+                "min_level": 22,
                 "max_level": 19,
                 "wave_size": 1,
                 "spawn_interval": 3.0,
@@ -737,8 +737,14 @@
             }
         ]
     },
+    "events": {
+        "triggers": [],
+        "selected_trigger": 0
+    },
     "rewards": {
         "money": 200,
         "experience": 0
-    }
+    },
+    "localization_type": "default",
+    "custom_folder": ""
 }

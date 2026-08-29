@@ -85,11 +85,11 @@ class BattleSystem:
 
         # ===== CALCULA XP BASE (exponencial pelo nível do inimigo) =====
         level = defeated_enemy.level
-        base_xp = 20 + int((level ** 1.5) * 2)
+        base_xp = 5 + int((level ** 1.5) * 2)
 
-        # Bônus para boss (3x)
+        # Bônus para boss (2x)
         if defeated_enemy.is_boss:
-            base_xp = int(base_xp * 3)
+            base_xp = int(base_xp * 2)
             print(f"[XP] BOSS derrotado! XP base: {base_xp}")
 
         # Bônus para shiny (1.5x)
