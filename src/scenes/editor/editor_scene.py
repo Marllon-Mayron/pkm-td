@@ -55,6 +55,9 @@ class EditorScene(BaseScene):
         self.camera.x = 0
         self.camera.y = 0
 
+        self.day_night_mode = "random"  # "random", "day", "night"
+        self.base_weather = "random"  # "random", "none", "sunny", "rain"
+
         # Gerenciadores
         self.layer_manager = LayerManager()
         self.path_manager = PathManager()
@@ -350,14 +353,10 @@ class EditorScene(BaseScene):
         current_layer = self.layer_manager.get_current_layer()
         if current_layer:
             dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
-            dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 350) // 2
-
-            # Pega valores atuais de desbloqueio (para minigames)
-            unlock_chapter = getattr(self, 'unlock_chapter', 1)
-            unlock_phase = getattr(self, 'unlock_phase', 1)
+            dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 450) // 2
 
             self.map_config_dialog = MapConfigDialog(
-                dialog_x, dialog_y, 400, 350,
+                dialog_x, dialog_y, 450, 450,  # Aumentei a largura e altura
                 current_layer.width,
                 current_layer.height,
                 self.current_chapter,
@@ -365,8 +364,10 @@ class EditorScene(BaseScene):
                 self.phase_name,
                 self.localization_type,
                 self.custom_folder,
-                unlock_chapter,
-                unlock_phase
+                getattr(self, 'unlock_chapter', 1),
+                getattr(self, 'unlock_phase', 1),
+                self.day_night_mode,
+                self.base_weather
             )
 
     def _open_load_phase_dialog(self):
@@ -472,6 +473,9 @@ class EditorScene(BaseScene):
             self.phase_name = result['name']
             self.localization_type = result.get('localization_type', 'default')
             self.custom_folder = result.get('custom_folder', '')
+
+            self.day_night_mode = result.get('day_night_mode', 'random')
+            self.base_weather = result.get('base_weather', 'random')
 
             # Salva requisitos de desbloqueio para minigames
             if self.localization_type == "custom":
@@ -599,7 +603,9 @@ class EditorScene(BaseScene):
             "events": self.event_manager.to_dict(),
             "rewards": self.phase_rewards,
             "unlock_chapter": getattr(self, 'unlock_chapter', 1),
-            "unlock_phase": getattr(self, 'unlock_phase', 1)
+            "unlock_phase": getattr(self, 'unlock_phase', 1),
+            "day_night_mode": self.day_night_mode,
+            "base_weather": self.base_weather,
         }
 
         self.exporter.export_phase(
@@ -721,6 +727,9 @@ class EditorScene(BaseScene):
                 # Compatibilidade com fases antigas
                 self.localization_type = "default"
                 self.custom_folder = ""
+            #Carrega informações de clima/dia
+            self.day_night_mode = phase_data.get("day_night_mode", "random")
+            self.base_weather = phase_data.get("base_weather", "random")
 
             # Carrega requisito de desbloqueio para minigames
             if self.localization_type == "custom" and "unlock_requirement" in phase_data:

@@ -65,14 +65,23 @@ class GameScene(BaseScene):
         # Weather filter
         self.weather_filter = WeatherFilter()
 
-        # CARREGA OS DADOS DA FASE
-        self._load_phase_data()
+        # CARREGA OS DADOS DA FASE (inclui _phase_data)
+        self._load_phase_data()  # <--- PRIMEIRO CARREGA OS DADOS
+
+        # ===== AGORA CARREGA AS CONFIGURAÇÕES =====
+        self.day_night_mode = "random"
+        self.base_weather = "random"
+
+        if hasattr(self, '_phase_data') and self._phase_data:
+            self.day_night_mode = self._phase_data.get("day_night_mode", "random")
+            self.base_weather = self._phase_data.get("base_weather", "random")
+            print(f"[GAME_SCENE] Configurações da fase: Dia/Noite={self.day_night_mode}, Clima={self.base_weather}")
 
         # Cria o overlay_manager
         self.overlay_manager = OverlayManager(self)
 
         self.wave_manager = WaveManager(phase_loader, self)
-        self.wave_manager.set_paths(self.path_renderer.paths)  # Define os paths
+        self.wave_manager.set_paths(self.path_renderer.paths)
 
         # Vincula os itens alvo
         self.wave_manager.set_target_items(self.target_item_manager.items)
@@ -136,7 +145,6 @@ class GameScene(BaseScene):
 
         # Inicia o jogo
         self._start_game()
-        #self._start_test_weather()
 
     def _start_test_weather(self):
         """
@@ -206,6 +214,9 @@ class GameScene(BaseScene):
     def _load_phase_data(self):
         """Carrega os dados da fase do disco"""
         data = phase_loader.load_phase(self.chapter_id, self.phase_number)
+
+        # ===== ARMAZENA OS DADOS DA FASE =====
+        self._phase_data = data  # <--- ADICIONE ESTA LINHA
 
         if not data:
             self.phase_rewards = {"money": 0, "experience": 0}

@@ -149,7 +149,9 @@ class PhaseExporter:
                 "experience": 50
             }),
             "localization_type": localization_type,
-            "custom_folder": custom_folder if localization_type == "custom" else ""
+            "custom_folder": custom_folder if localization_type == "custom" else "",
+            "day_night_mode": phase_data.get("day_night_mode", "random"),
+            "base_weather": phase_data.get("base_weather", "random"),
         }
 
         # Adiciona requisito de desbloqueio para minigames

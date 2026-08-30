@@ -9,16 +9,9 @@ class DayNightWeatherSystem:
     """
     Sistema que gerencia o dia/noite e clima da fase.
 
-    Probabilidades:
-    - Dia: 80%
-    - Noite: 20%
-
-    Clima BASE da fase (permanente até ser alterado por move):
-    - Sem clima: 90%
-    - Sunny Day: 5%
-    - Chuva: 5%
-
-    REGRA: Sunny Day NÃO pode ocorrer durante a NOITE.
+    Suporta configurações do editor:
+    - day_night_mode: "random", "day", "night"
+    - base_weather: "random", "none", "sunny", "rain"
     """
 
     def __init__(self, game_scene):
@@ -27,39 +20,56 @@ class DayNightWeatherSystem:
         self._initialized = False
 
         # ===== CLIMAS DISPONÍVEIS PARA O MAPA =====
-        # 90% Sem clima, 5% Sunny, 5% Rain
         self.MAP_WEATHER_TYPES = [
             None, None, None, None, None, None, None, None, None,  # 90%
             WeatherType.SUNNY,  # 5%
-            WeatherType.RAIN,   # 5%
+            WeatherType.RAIN,  # 5%
         ]
 
     def initialize(self):
-        """Inicializa o sistema com valores aleatórios para a fase"""
+        """Inicializa o sistema com valores baseados nas configurações da fase"""
         if self._initialized:
             return
 
-        # ===== DIA/NOITE ALEATÓRIO =====
-        # 80% chance de dia, 20% de noite
-        period_type = random.choices(
-            [DayNightType.DAY, DayNightType.NIGHT],
-            weights=[0.8, 0.2]
-        )[0]
+        # ===== OBTÉM CONFIGURAÇÕES DO EDITOR =====
+        day_night_mode = "random"
+        base_weather = "random"
+
+        # Tenta obter do game_scene
+        if hasattr(self.game_scene, 'day_night_mode'):
+            day_night_mode = self.game_scene.day_night_mode
+        if hasattr(self.game_scene, 'base_weather'):
+            base_weather = self.game_scene.base_weather
+
+        print(f"[DAY/NIGHT] Configuração do editor: Dia/Noite={day_night_mode}, Clima={base_weather}")
+
+        # ===== DIA/NOITE =====
+        if day_night_mode == "day":
+            period_type = DayNightType.DAY
+            print(f"[DAY/NIGHT] Forçando DIA (configuração do editor)")
+        elif day_night_mode == "night":
+            period_type = DayNightType.NIGHT
+            print(f"[DAY/NIGHT] Forçando NOITE (configuração do editor)")
+        else:  # "random"
+            period_type = random.choices(
+                [DayNightType.DAY, DayNightType.NIGHT],
+                weights=[0.8, 0.2]
+            )[0]
+            print(f"[DAY/NIGHT] Período aleatório: {period_type.value}")
 
         duration = random.uniform(30.0, 90.0)
         self.day_night_state = DayNightState(period_type, duration)
 
-        print(f"[DAY/NIGHT] Período: {self.day_night_state.get_display_name()} por {duration:.1f}s")
-
-        # ===== CLIMA BASE DA FASE (COM VALIDAÇÃO) =====
-        weather_type = self._get_valid_base_weather()
+        # ===== CLIMA BASE DA FASE =====
+        weather_type = self._get_weather_from_config(base_weather)
 
         if weather_type:
             weather_names = {
                 WeatherType.SUNNY: "Sol Forte",
                 WeatherType.RAIN: "Chuva",
             }
-            print(f"[WEATHER_BASE] Clima BASE da fase: {weather_names.get(weather_type, weather_type.value)} (PERMANENTE)")
+            print(
+                f"[WEATHER_BASE] Clima BASE da fase: {weather_names.get(weather_type, weather_type.value)} (PERMANENTE)")
 
             if hasattr(self.game_scene, 'battle_system'):
                 self.game_scene.battle_system.weather_manager.set_base_weather(weather_type)
@@ -68,33 +78,32 @@ class DayNightWeatherSystem:
 
         self._initialized = True
 
-    def _get_valid_base_weather(self):
+    def _get_weather_from_config(self, base_weather):
         """
-        Retorna um clima válido para a fase, respeitando as regras:
-        - Sunny Day NÃO pode ocorrer durante a NOITE
+        Retorna o WeatherType baseado na configuração do editor.
         """
-        # Verifica se é noite
-        is_night = self.is_night()
+        if base_weather == "sunny":
+            # Verifica se é noite (Sunny Day não funciona à noite)
+            if self.day_night_state and self.day_night_state.is_night():
+                print(f"[WEATHER_BASE] Sunny Day bloqueado (é noite) - usando Normal")
+                return None
+            return WeatherType.SUNNY
+        elif base_weather == "rain":
+            return WeatherType.RAIN
+        elif base_weather == "none":
+            return None
+        else:  # "random"
+            # Escolhe aleatoriamente, mas respeitando a regra de Sunny Day à noite
+            is_night = self.day_night_state and self.day_night_state.is_night()
 
-        # Tenta escolher um clima aleatório até encontrar um válido
-        attempts = 0
-        max_attempts = 10
+            # Tenta até 10 vezes
+            for _ in range(10):
+                weather_type = random.choice(self.MAP_WEATHER_TYPES)
+                if weather_type == WeatherType.SUNNY and is_night:
+                    continue
+                return weather_type
 
-        while attempts < max_attempts:
-            weather_type = random.choice(self.MAP_WEATHER_TYPES)
-
-            # ===== REGRA: Sunny Day NÃO funciona à noite =====
-            if weather_type == WeatherType.SUNNY and is_night:
-                print(f"[WEATHER_BASE] Sunny Day bloqueado (é noite) - tentando novamente...")
-                attempts += 1
-                continue
-
-            # Clima válido encontrado
-            return weather_type
-
-        # Fallback: se não encontrar clima válido, retorna None (sem clima)
-        print(f"[WEATHER_BASE] Nenhum clima válido encontrado após {max_attempts} tentativas - usando Normal")
-        return None
+            return None
 
     def update(self, dt: float):
         """Atualiza o sistema de dia/noite"""
@@ -108,16 +117,22 @@ class DayNightWeatherSystem:
                 self._change_period()
 
     def _change_period(self):
-        """Alterna entre dia e noite (mantendo as probabilidades)"""
+        """Alterna entre dia e noite (respeitando a configuração do editor)"""
         if not self.day_night_state:
             return
 
-        # Escolhe novo período com as mesmas probabilidades
-        # 80% dia, 20% noite
-        period_type = random.choices(
-            [DayNightType.DAY, DayNightType.NIGHT],
-            weights=[0.8, 0.2]
-        )[0]
+        # Verifica se a fase é fixa (day ou night)
+        day_night_mode = getattr(self.game_scene, 'day_night_mode', 'random')
+
+        if day_night_mode == "day":
+            period_type = DayNightType.DAY
+        elif day_night_mode == "night":
+            period_type = DayNightType.NIGHT
+        else:  # "random"
+            period_type = random.choices(
+                [DayNightType.DAY, DayNightType.NIGHT],
+                weights=[0.8, 0.2]
+            )[0]
 
         duration = random.uniform(30.0, 90.0)
         self.day_night_state = DayNightState(period_type, duration)
@@ -129,34 +144,24 @@ class DayNightWeatherSystem:
             self._validate_weather_on_night()
 
     def _validate_weather_on_night(self):
-        """
-        Quando a noite começa, verifica se o clima atual é Sunny Day.
-        Se for, remove o clima (volta para Normal).
-        """
+        """Quando a noite começa, verifica se o clima atual é Sunny Day."""
         if not hasattr(self.game_scene, 'battle_system'):
             return
 
         weather_mgr = self.game_scene.battle_system.weather_manager
         current_weather = weather_mgr.current_weather
 
-        # Verifica se o clima atual é Sunny Day (base ou temporário)
         if current_weather and current_weather.type == WeatherType.SUNNY:
-            # Se for clima base, remove e volta para Normal
             if current_weather.is_base_weather:
                 print(f"[WEATHER_BASE] Sunny Day removido porque a NOITE chegou!")
-                # Remove o clima base
                 weather_mgr.base_weather = None
                 weather_mgr.current_weather = None
-                # Mostra mensagem
                 if weather_mgr.battle_system and weather_mgr.battle_system.effect_manager:
                     weather_mgr.battle_system.effect_manager.add_status_text(
                         None,
                         "O sol se pôs! O clima voltou ao normal.",
                         duration=2.0
                     )
-            else:
-                # Se for clima temporário de move, ele vai expirar normalmente
-                print(f"[WEATHER_BASE] Sunny Day temporário ainda ativo, mas a noite chegou. Aguardando expirar...")
 
     def get_day_night_type(self) -> DayNightType:
         if self.day_night_state:
