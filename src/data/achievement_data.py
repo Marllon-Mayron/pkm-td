@@ -53,6 +53,7 @@ class Achievement:
 
 # ===== CATALOGO DE CONQUISTAS =====
 ACHIEVEMENTS: Dict[str, Achievement] = {
+    # ===== CONQUISTAS EXISTENTES =====
     "first_capture": Achievement(
         id="first_capture",
         title="Primeiro Passo",
@@ -108,6 +109,36 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         description="Derrote seu primeiro chefe",
         rarity=AchievementRarity.RARE,
         rewards={"gold": 300, "xp": 150}
+    ),
+
+    # ===== CONQUISTAS DE CLIMA =====
+    "first_weather_change": Achievement(
+        id="first_weather_change",
+        title="Mestre do Clima Iniciante",
+        description="Mude o clima pela primeira vez usando um movimento",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 50, "xp": 25}
+    ),
+    "weather_change_50": Achievement(
+        id="weather_change_50",
+        title="Mestre do Clima Intermediario",
+        description="Mude o clima 50 vezes usando movimentos",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 300, "xp": 150}
+    ),
+    "weather_change_100": Achievement(
+        id="weather_change_100",
+        title="Mestre do Clima Absoluto",
+        description="Mude o clima 100 vezes usando movimentos",
+        rarity=AchievementRarity.EPIC,
+        rewards={"gold": 800, "xp": 400}
+    ),
+    "first_weather_boosted_attack": Achievement(
+        id="first_weather_boosted_attack",
+        title="Poder do Clima",
+        description="Tenha seu primeiro ataque fortalecido pelo clima",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 50, "xp": 20}
     ),
 }
 

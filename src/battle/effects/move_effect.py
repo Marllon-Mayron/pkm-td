@@ -3789,7 +3789,6 @@ class MoveEffect:
 
         # ===== BLOQUEIO: SUNNY DAY NÃO FUNCIONA À NOITE =====
         if weather_type == WeatherType.SUNNY:
-            # Verifica se é noite
             is_night = False
             if hasattr(battle_system, 'game_scene'):
                 game_scene = battle_system.game_scene
@@ -3804,17 +3803,33 @@ class MoveEffect:
                 )
                 print(f"[SUNNY_DAY] {attacker.name} tentou usar Sunny Day, mas é NOITE! Bloqueado.")
 
-                # Gasta PP mesmo assim (o jogador perdeu o turno)
                 current_move = attacker.get_current_move()
                 if current_move:
                     current_move.current_pp -= 1
 
-                # Cooldown do atacante
                 attacker.attack_cooldown = attacker.attack_cooldown_max
                 return False
 
         # ===== APLICA O CLIMA TEMPORÁRIO COM SOURCE = ATTACKER =====
         battle_system.weather_manager.set_weather(weather_type, duration, source=attacker)
+
+        # ===== CONQUISTAS: Incrementa contador de mudanças de clima =====
+        if hasattr(battle_system, 'game_scene') and battle_system.game_scene:
+            game_scene = battle_system.game_scene
+            if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+                player = game_scene.player
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+
+                # Incrementa contador de mudanças de clima
+                player.achievement_manager.increment_counter("weather_change_count")
+
+                # Verifica conquistas relacionadas
+                player.achievement_manager.check_and_unlock("first_weather_change", phase_id)
+                player.achievement_manager.check_and_unlock("weather_change_50", phase_id)
+                player.achievement_manager.check_and_unlock("weather_change_100", phase_id)
+
+                print(
+                    f"[ACHIEVEMENT] Mudança de clima #{player.achievement_manager.get_counter('weather_change_count')}")
 
         # Mensagem específica
         messages = {

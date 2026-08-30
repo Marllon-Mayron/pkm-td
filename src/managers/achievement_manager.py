@@ -151,7 +151,7 @@ class AchievementManager:
         if self.is_unlocked(achievement_id):
             return False
 
-        # Verifica condicoes especificas
+        # ===== CONQUISTAS EXISTENTES =====
         if achievement_id == "first_capture":
             if self.get_counter("capture_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
@@ -184,6 +184,23 @@ class AchievementManager:
             if self.get_counter("boss_defeated_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
 
+        # ===== NOVAS CONQUISTAS DE CLIMA =====
+        elif achievement_id == "first_weather_change":
+            if self.get_counter("weather_change_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "weather_change_50":
+            if self.get_counter("weather_change_count") >= 50:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "weather_change_100":
+            if self.get_counter("weather_change_count") >= 100:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "first_weather_boosted_attack":
+            if self.get_counter("weather_boosted_attack_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
         return False
 
     def check_all_counters(self, phase_id: Optional[str] = None):
@@ -205,6 +222,11 @@ class AchievementManager:
             "capture_50": ("capture_count", 50),
             "perfect_phase": ("perfect_phase_count", 1),
             "boss_defeated": ("boss_defeated_count", 1),
+            # NOVOS
+            "first_weather_change": ("weather_change_count", 1),
+            "weather_change_50": ("weather_change_count", 50),
+            "weather_change_100": ("weather_change_count", 100),
+            "first_weather_boosted_attack": ("weather_boosted_attack_count", 1),
         }
 
         if achievement_id in progress_map:

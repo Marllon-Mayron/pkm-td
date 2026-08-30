@@ -1182,12 +1182,14 @@ class BattleSystem:
             return effects
 
         move_type = move_info.get('type', '').lower()
+        weather_boosted = False
 
         # ===== RAIN =====
         if weather.type.value == "rain":
             if move_type == 'water':
                 effects['damage_multiplier'] = 1.5
                 effects['message'] = "A chuva fortaleceu o ataque!"
+                weather_boosted = True
             elif move_type == 'fire':
                 effects['damage_multiplier'] = 0.5
                 effects['message'] = "A chuva enfraqueceu o ataque!"
@@ -1200,19 +1202,37 @@ class BattleSystem:
             if move_type == 'fire':
                 effects['damage_multiplier'] = 1.5
                 effects['message'] = "O sol forte fortaleceu o ataque!"
+                weather_boosted = True
             elif move_type == 'water':
                 effects['damage_multiplier'] = 0.5
                 effects['message'] = "O sol forte enfraqueceu o ataque!"
             elif move_type in ['solar_beam', 'solar_blade']:
                 effects['damage_multiplier'] = 1.5
                 effects['message'] = "O sol forte carregou o ataque!"
+                weather_boosted = True
 
         # ===== SANDSTORM =====
         elif weather.type.value == "sandstorm":
-            # Pokémon de tipos Rock, Ground, Steel são imunes a dano
             if move_type in ['rock', 'ground', 'steel']:
                 effects['damage_multiplier'] = 1.3
                 effects['message'] = "A tempestade de areia fortaleceu o ataque!"
+                weather_boosted = True
+
+        # ===== CONQUISTAS: Ataque buffado pelo clima =====
+        if weather_boosted and hasattr(self, 'game_scene') and self.game_scene:
+            game_scene = self.game_scene
+            if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+                player = game_scene.player
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+
+                # Incrementa contador de ataques buffados pelo clima
+                player.achievement_manager.increment_counter("weather_boosted_attack_count")
+
+                # Verifica conquista
+                player.achievement_manager.check_and_unlock("first_weather_boosted_attack", phase_id)
+
+                print(
+                    f"[ACHIEVEMENT] Ataque buffado pelo clima #{player.achievement_manager.get_counter('weather_boosted_attack_count')}")
 
         return effects
 
