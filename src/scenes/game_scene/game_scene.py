@@ -1557,7 +1557,16 @@ class GameScene(BaseScene):
             day_night = self.day_night_weather.day_night_state
             if day_night:
                 period_text = day_night.get_display_name()
-                period_color = (255, 200, 100) if day_night.is_day() else (100, 150, 255)
+                # Cores específicas para cada tipo
+                period_colors = {
+                    "Dia": (255, 200, 100),
+                    "Noite": (100, 150, 255),
+                    "Entardecer": (255, 180, 80),
+                    "Amanhecer": (255, 200, 200),
+                    "Caverna": (150, 150, 150),
+                    "Fundo do Mar": (80, 180, 255),
+                }
+                period_color = period_colors.get(period_text, (255, 200, 100))
                 period_display = font_small.render(f"Periodo: {period_text}", True, period_color)
                 screen.blit(period_display, (viewport_x + 15, y_offset))
                 y_offset += 20

@@ -35,7 +35,6 @@ class DayNightWeatherSystem:
         day_night_mode = "random"
         base_weather = "random"
 
-        # Tenta obter do game_scene
         if hasattr(self.game_scene, 'day_night_mode'):
             day_night_mode = self.game_scene.day_night_mode
         if hasattr(self.game_scene, 'base_weather'):
@@ -44,16 +43,23 @@ class DayNightWeatherSystem:
         print(f"[DAY/NIGHT] Configuração do editor: Dia/Noite={day_night_mode}, Clima={base_weather}")
 
         # ===== DIA/NOITE =====
-        if day_night_mode == "day":
-            period_type = DayNightType.DAY
-            print(f"[DAY/NIGHT] Forçando DIA (configuração do editor)")
-        elif day_night_mode == "night":
-            period_type = DayNightType.NIGHT
-            print(f"[DAY/NIGHT] Forçando NOITE (configuração do editor)")
+        # Mapeia os modos para os tipos DayNightType
+        mode_map = {
+            "day": DayNightType.DAY,
+            "night": DayNightType.NIGHT,
+            "dusk": DayNightType.DUSK,
+            "dawn": DayNightType.DAWN,
+            "cave": DayNightType.CAVE,
+            "deep": DayNightType.DEEP,
+        }
+
+        if day_night_mode in mode_map:
+            period_type = mode_map[day_night_mode]
+            print(f"[DAY/NIGHT] Forçando {period_type.value.upper()} (configuração do editor)")
         else:  # "random"
             period_type = random.choices(
-                [DayNightType.DAY, DayNightType.NIGHT],
-                weights=[0.8, 0.2]
+                [DayNightType.DAY, DayNightType.NIGHT, DayNightType.DUSK, DayNightType.DAWN],
+                weights=[0.6, 0.25, 0.075, 0.075]  # 60% dia, 25% noite, 7.5% cada transição
             )[0]
             print(f"[DAY/NIGHT] Período aleatório: {period_type.value}")
 
@@ -77,6 +83,28 @@ class DayNightWeatherSystem:
             print(f"[WEATHER_BASE] Clima BASE da fase: Normal (PERMANENTE)")
 
         self._initialized = True
+
+    def _get_weather_from_config(self, base_weather):
+        """Retorna o WeatherType baseado na configuração do editor."""
+        if base_weather == "sunny":
+            if self.day_night_state and self.day_night_state.is_night():
+                print(f"[WEATHER_BASE] Sunny Day bloqueado (é noite/caverna/profundo) - usando Normal")
+                return None
+            return WeatherType.SUNNY
+        elif base_weather == "rain":
+            return WeatherType.RAIN
+        elif base_weather == "none":
+            return None
+        else:  # "random"
+            is_night = self.day_night_state and self.day_night_state.is_night()
+
+            for _ in range(10):
+                weather_type = random.choice(self.MAP_WEATHER_TYPES)
+                if weather_type == WeatherType.SUNNY and is_night:
+                    continue
+                return weather_type
+
+            return None
 
     def _get_weather_from_config(self, base_weather):
         """

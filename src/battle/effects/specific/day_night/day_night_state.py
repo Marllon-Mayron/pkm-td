@@ -5,16 +5,18 @@ import random
 
 
 class DayNightType(Enum):
-    """Tipos de período do dia"""
+    """Tipos de período do dia/ambiente"""
     DAY = "day"
     NIGHT = "night"
-    DUSK = "dusk"  # Opcional: pôr do sol
-    DAWN = "dawn"  # Opcional: amanhecer
+    DUSK = "dusk"      # Entardecer
+    DAWN = "dawn"      # Amanhecer
+    CAVE = "cave"      # Caverna (escuro)
+    DEEP = "deep"      # Fundo do mar (azul profundo)
 
 
 class DayNightState:
     """
-    Estado do período do dia na batalha/fase.
+    Estado do período do dia/ambiente na batalha/fase.
     """
 
     def __init__(self, period_type: DayNightType = None, duration: float = 60.0):
@@ -54,8 +56,10 @@ class DayNightState:
         names = {
             DayNightType.DAY: "Dia",
             DayNightType.NIGHT: "Noite",
-            DayNightType.DUSK: "Crepúsculo",
-            DayNightType.DAWN: "Amanhecer"
+            DayNightType.DUSK: "Entardecer",
+            DayNightType.DAWN: "Amanhecer",
+            DayNightType.CAVE: "Caverna",
+            DayNightType.DEEP: "Fundo do Mar",
         }
         return names.get(self.type, "Dia")
 
@@ -68,15 +72,20 @@ class DayNightState:
             # Dia: sem filtro (transparente)
             return (0, 0, 0, 0)
         elif self.type == DayNightType.NIGHT:
-            # ===== NOITE: Filtro mais escuro com tom azulado profundo =====
-            # Aumentei a opacidade e deixei mais azul/escuro
-            return (5, 10, 35, 200)  # Azul escuro profundo com alta opacidade
+            # Noite: filtro escuro com tom azulado profundo
+            return (5, 10, 35, 200)
         elif self.type == DayNightType.DUSK:
-            # Crepúsculo: tons alaranjados
-            return (200, 120, 50, 80)
+            # Entardecer: tons alaranjados/quentes
+            return (200, 120, 50, 100)
         elif self.type == DayNightType.DAWN:
-            # Amanhecer: tons rosados
-            return (255, 180, 150, 60)
+            # Amanhecer: tons rosados/azuis claros
+            return (255, 180, 150, 70)
+        elif self.type == DayNightType.CAVE:
+            # Caverna: escuro com tom acinzentado/verde
+            return (20, 25, 30, 220)
+        elif self.type == DayNightType.DEEP:
+            # Fundo do Mar: azul profundo com tons verdes
+            return (0, 30, 60, 200)
 
         return (0, 0, 0, 0)
 
@@ -88,17 +97,37 @@ class DayNightState:
         if self.type == DayNightType.DAY:
             return 1.0
         elif self.type == DayNightType.NIGHT:
-            return 0.15  # Mais escuro (antes era 0.2)
+            return 0.15
         elif self.type == DayNightType.DUSK:
             return 0.5
         elif self.type == DayNightType.DAWN:
             return 0.6
+        elif self.type == DayNightType.CAVE:
+            return 0.1
+        elif self.type == DayNightType.DEEP:
+            return 0.2
         return 1.0
 
     def is_night(self) -> bool:
-        """Verifica se é noite"""
-        return self.type == DayNightType.NIGHT
+        """Verifica se é noite (inclui caverna e fundo do mar)"""
+        return self.type in [DayNightType.NIGHT, DayNightType.CAVE, DayNightType.DEEP]
 
     def is_day(self) -> bool:
         """Verifica se é dia"""
         return self.type == DayNightType.DAY
+
+    def is_cave(self) -> bool:
+        """Verifica se é caverna"""
+        return self.type == DayNightType.CAVE
+
+    def is_deep(self) -> bool:
+        """Verifica se é fundo do mar"""
+        return self.type == DayNightType.DEEP
+
+    def is_dusk(self) -> bool:
+        """Verifica se é entardecer"""
+        return self.type == DayNightType.DUSK
+
+    def is_dawn(self) -> bool:
+        """Verifica se é amanhecer"""
+        return self.type == DayNightType.DAWN

@@ -11,17 +11,16 @@ class MapConfigDialog:
                  current_unlock_chapter=1, current_unlock_phase=1,
                  current_day_night_mode="random", current_base_weather="random"):
 
-        # ===== DIMENSÕES DO DIÁLOGO =====
+        # ===== DIMENSOES DO DIALOGO =====
         self.rect = pygame.Rect(x, y, width, height)
         self.visible = True
         self.focused = True
 
-        # ===== MARGENS E ESPAÇAMENTOS =====
+        # ===== MARGENS E ESPACAMENTOS =====
         self.margin = 20
-        self.label_width = 130
-        self.input_width = 150
+        self.label_width = 120
         self.row_height = 32
-        self.section_spacing = 10
+        self.section_spacing = 8
 
         # ===== VALORES ATUAIS =====
         self.current_width = current_width
@@ -36,7 +35,7 @@ class MapConfigDialog:
         self.current_day_night_mode = current_day_night_mode
         self.current_base_weather = current_base_weather
 
-        # ===== VALORES TEMPORÁRIOS =====
+        # ===== VALORES TEMPORARIOS =====
         self.temp_width = str(current_width)
         self.temp_height = str(current_height)
         self.temp_chapter = str(current_chapter)
@@ -51,20 +50,48 @@ class MapConfigDialog:
 
         self.active_input = "name"
 
-        # ===== CALCULA POSIÇÕES =====
-        self._calculate_positions()
+        # ===== DROPDOWN CONFIGURACOES =====
+        # Opcoes de Ambiente
+        self.environment_options = [
+            {"id": "random", "label": "Aleatorio"},
+            {"id": "day", "label": "Dia"},
+            {"id": "night", "label": "Noite"},
+            {"id": "dusk", "label": "Entardecer"},
+            {"id": "dawn", "label": "Amanhecer"},
+            {"id": "cave", "label": "Caverna"},
+            {"id": "deep", "label": "Fundo do Mar"},
+        ]
+        self.environment_selected_index = 0
+        self.environment_dropdown_open = False
+        self.environment_hovered_index = -1
+        self.environment_list_rect = None  # Guarda o rect da lista aberta
 
-        # ===== BOTÕES =====
+        # Opcoes de Clima
+        self.weather_options = [
+            {"id": "random", "label": "Aleatorio"},
+            {"id": "none", "label": "Normal"},
+            {"id": "sunny", "label": "Sol Forte"},
+            {"id": "rain", "label": "Chuva"},
+        ]
+        self.weather_selected_index = 0
+        self.weather_dropdown_open = False
+        self.weather_hovered_index = -1
+        self.weather_list_rect = None  # Guarda o rect da lista aberta
+
+        # Sincroniza indices com valores atuais
+        self._sync_dropdown_indices()
+
+        # ===== BOTOES =====
         button_width = 90
         button_height = 32
         total_buttons_width = button_width * 2 + 15
-        button_x = self.rect.x + (self.rect.width - total_buttons_width) // 2
-        button_y = self.rect.y + self.rect.height - 55
+        button_x = x + (width - total_buttons_width) // 2
+        button_y = y + height - 55
 
         self.confirm_rect = pygame.Rect(button_x, button_y, button_width, button_height)
         self.cancel_rect = pygame.Rect(button_x + button_width + 15, button_y, button_width, button_height)
 
-        # ===== VARIÁVEIS DE UI =====
+        # ===== VARIAVEIS DE UI =====
         self.dragging = False
         self.drag_offset_x = 0
         self.drag_offset_y = 0
@@ -77,9 +104,11 @@ class MapConfigDialog:
         self.colors = {
             'bg': (45, 48, 60),
             'bg_input': (55, 58, 72),
+            'bg_dropdown': (50, 53, 68),
+            'bg_dropdown_hover': (65, 70, 90),
             'border': (80, 85, 105),
             'border_active': (100, 150, 255),
-            'border_hover': (120, 170, 255),
+            'border_dropdown': (90, 95, 115),
             'text': (235, 235, 245),
             'text_dim': (180, 185, 200),
             'text_muted': (130, 135, 155),
@@ -89,10 +118,26 @@ class MapConfigDialog:
             'danger': (200, 60, 60),
             'radio_selected': (100, 150, 255),
             'radio_unselected': (80, 85, 105),
+            'dropdown_item_hover': (65, 75, 100),
         }
 
+        # ===== INICIALIZA POSICOES =====
+        self._calculate_positions()
+
+    def _sync_dropdown_indices(self):
+        """Sincroniza os indices dos dropdowns com os valores atuais"""
+        for i, opt in enumerate(self.environment_options):
+            if opt["id"] == self.temp_day_night_mode:
+                self.environment_selected_index = i
+                break
+
+        for i, opt in enumerate(self.weather_options):
+            if opt["id"] == self.temp_base_weather:
+                self.weather_selected_index = i
+                break
+
     def _get_font(self, size, bold=False):
-        """Obtém fonte do cache"""
+        """Obtem fonte do cache"""
         key = (size, bold)
         if key not in self._font_cache:
             font = pygame.font.Font(None, size)
@@ -102,102 +147,89 @@ class MapConfigDialog:
         return self._font_cache[key]
 
     def _calculate_positions(self):
-        """Calcula posições de todos os elementos baseado no tamanho do diálogo"""
+        """Calcula posicoes de todos os elementos"""
         x, y, w, h = self.rect
         m = self.margin
         label_w = self.label_width
-        input_w = self.input_width
 
-        # Altura disponível para conteúdo (excluindo título e botões)
+        # Ajusta altura disponivel
         content_top = y + 50
         content_bottom = y + h - 60
-        content_height = content_bottom - content_top
+
+        row_height = self.row_height
+        spacing = self.section_spacing
 
         # ===== LINHA 1: Nome =====
         row1_y = content_top
-        self.name_label_rect = pygame.Rect(x + m, row1_y, label_w, self.row_height)
-        self.name_input_rect = pygame.Rect(x + m + label_w + 5, row1_y, w - m * 2 - label_w - 5, self.row_height)
+        self.name_label_rect = pygame.Rect(x + m, row1_y, label_w, row_height)
+        self.name_input_rect = pygame.Rect(x + m + label_w + 5, row1_y, w - m * 2 - label_w - 5, row_height)
 
-        # ===== LINHA 2: Largura e Altura (lado a lado) =====
-        row2_y = row1_y + self.row_height + 8
+        # ===== LINHA 2: Largura e Altura =====
+        row2_y = row1_y + row_height + spacing
         half_width = (w - m * 2 - 10) // 2
 
-        self.width_label_rect = pygame.Rect(x + m, row2_y, 80, self.row_height)
-        self.width_input_rect = pygame.Rect(x + m + 85, row2_y, 70, self.row_height)
+        self.width_label_rect = pygame.Rect(x + m, row2_y, 80, row_height)
+        self.width_input_rect = pygame.Rect(x + m + 85, row2_y, 70, row_height)
 
-        self.height_label_rect = pygame.Rect(x + m + half_width, row2_y, 80, self.row_height)
-        self.height_input_rect = pygame.Rect(x + m + half_width + 85, row2_y, 70, self.row_height)
+        self.height_label_rect = pygame.Rect(x + m + half_width, row2_y, 80, row_height)
+        self.height_input_rect = pygame.Rect(x + m + half_width + 85, row2_y, 70, row_height)
 
-        # ===== LINHA 3: Capítulo e Fase (lado a lado) =====
-        row3_y = row2_y + self.row_height + 8
+        # ===== LINHA 3: Capitulo e Fase =====
+        row3_y = row2_y + row_height + spacing
 
-        self.chapter_label_rect = pygame.Rect(x + m, row3_y, 80, self.row_height)
-        self.chapter_input_rect = pygame.Rect(x + m + 85, row3_y, 70, self.row_height)
+        self.chapter_label_rect = pygame.Rect(x + m, row3_y, 80, row_height)
+        self.chapter_input_rect = pygame.Rect(x + m + 85, row3_y, 70, row_height)
 
-        self.phase_label_rect = pygame.Rect(x + m + half_width, row3_y, 80, self.row_height)
-        self.phase_input_rect = pygame.Rect(x + m + half_width + 85, row3_y, 70, self.row_height)
+        self.phase_label_rect = pygame.Rect(x + m + half_width, row3_y, 80, row_height)
+        self.phase_input_rect = pygame.Rect(x + m + half_width + 85, row3_y, 70, row_height)
 
-        # ===== LINHA 4: Localização (radio buttons) =====
-        row4_y = row3_y + self.row_height + 12
+        # ===== LINHA 4: Localizacao =====
+        row4_y = row3_y + row_height + spacing
+        self.loc_label_rect = pygame.Rect(x + m, row4_y, label_w, row_height)
 
-        self.loc_label_rect = pygame.Rect(x + m, row4_y, self.label_width, self.row_height)
-
-        # Radio buttons na mesma linha
         radio_y = row4_y + 4
         radio_size = 18
 
-        self.default_radio_rect = pygame.Rect(x + m + self.label_width + 5, radio_y, radio_size, radio_size)
-        self.custom_radio_rect = pygame.Rect(x + m + self.label_width + 120, radio_y, radio_size, radio_size)
+        self.default_radio_rect = pygame.Rect(x + m + label_w + 5, radio_y, radio_size, radio_size)
+        self.custom_radio_rect = pygame.Rect(x + m + label_w + 120, radio_y, radio_size, radio_size)
 
-        # ===== LINHA 5: Pasta Custom (aparece apenas se custom) =====
-        row5_y = row4_y + self.row_height + 6
+        # ===== LINHA 5: Pasta Custom =====
+        row5_y = row4_y + row_height + spacing
+        self.folder_label_rect = pygame.Rect(x + m, row5_y, 60, row_height)
+        self.folder_input_rect = pygame.Rect(x + m + 65, row5_y, 230, row_height)
+        self.browse_button_rect = pygame.Rect(x + m + 300, row5_y, 40, row_height)
 
-        self.folder_label_rect = pygame.Rect(x + m, row5_y, 60, self.row_height)
-        self.folder_input_rect = pygame.Rect(x + m + 65, row5_y, 230, self.row_height)
-        self.browse_button_rect = pygame.Rect(x + m + 300, row5_y, 40, self.row_height)
+        # ===== LINHA 6: Unlock =====
+        row6_y = row5_y + row_height + spacing
+        self.unlock_label_rect = pygame.Rect(x + m, row6_y, 110, row_height)
+        self.unlock_chapter_label_rect = pygame.Rect(x + m + 115, row6_y, 60, row_height)
+        self.unlock_chapter_input_rect = pygame.Rect(x + m + 180, row6_y, 50, row_height)
+        self.unlock_phase_label_rect = pygame.Rect(x + m + 240, row6_y, 50, row_height)
+        self.unlock_phase_input_rect = pygame.Rect(x + m + 295, row6_y, 50, row_height)
 
-        # ===== LINHA 6: Unlock (aparece apenas se custom) =====
-        row6_y = row5_y + self.row_height + 6
+        # ===== LINHA 7: Ambiente (Dropdown) =====
+        row7_y = row6_y + row_height + spacing
+        self.environment_label_rect = pygame.Rect(x + m, row7_y, label_w, row_height)
 
-        self.unlock_label_rect = pygame.Rect(x + m, row6_y, 110, self.row_height)
+        dropdown_width = 200
+        self.environment_dropdown_rect = pygame.Rect(
+            x + m + label_w + 5, row7_y + 2, dropdown_width, row_height - 4
+        )
 
-        # Capítulo unlock
-        self.unlock_chapter_label_rect = pygame.Rect(x + m + 115, row6_y, 60, self.row_height)
-        self.unlock_chapter_input_rect = pygame.Rect(x + m + 180, row6_y, 50, self.row_height)
+        # ===== LINHA 8: Clima (Dropdown) =====
+        row8_y = row7_y + row_height + spacing
+        self.weather_label_rect = pygame.Rect(x + m, row8_y, label_w, row_height)
 
-        # Fase unlock
-        self.unlock_phase_label_rect = pygame.Rect(x + m + 240, row6_y, 50, self.row_height)
-        self.unlock_phase_input_rect = pygame.Rect(x + m + 295, row6_y, 50, self.row_height)
+        self.weather_dropdown_rect = pygame.Rect(
+            x + m + label_w + 5, row8_y + 2, dropdown_width, row_height - 4
+        )
 
-        # ===== LINHA 7: Dia/Noite =====
-        row7_y = row6_y + self.row_height + 12
-
-        self.day_night_label_rect = pygame.Rect(x + m, row7_y, 90, self.row_height)
-
-        # Radio buttons de dia/noite na mesma linha
-        dn_radio_y = row7_y + 4
-        dn_spacing = 90
-
-        self.day_night_random_rect = pygame.Rect(x + m + 95, dn_radio_y, radio_size, radio_size)
-        self.day_night_day_rect = pygame.Rect(x + m + 95 + dn_spacing, dn_radio_y, radio_size, radio_size)
-        self.day_night_night_rect = pygame.Rect(x + m + 95 + dn_spacing * 2, dn_radio_y, radio_size, radio_size)
-
-        # ===== LINHA 8: Clima Base =====
-        row8_y = row7_y + self.row_height + 6
-
-        self.weather_label_rect = pygame.Rect(x + m, row8_y, 90, self.row_height)
-
-        # Radio buttons de clima na mesma linha
-        w_radio_y = row8_y + 4
-        w_spacing = 80
-
-        self.weather_random_rect = pygame.Rect(x + m + 95, w_radio_y, radio_size, radio_size)
-        self.weather_none_rect = pygame.Rect(x + m + 95 + w_spacing, w_radio_y, radio_size, radio_size)
-        self.weather_sunny_rect = pygame.Rect(x + m + 95 + w_spacing * 2, w_radio_y, radio_size, radio_size)
-        self.weather_rain_rect = pygame.Rect(x + m + 95 + w_spacing * 3, w_radio_y, radio_size, radio_size)
+        # ===== LINHA 9: Espaco extra =====
+        self._last_row_y = row8_y
+        self._dropdown_max_height = 180
 
     def _update_button_positions(self):
-        """Atualiza posições dos botões após arrastar"""
+        """Atualiza posicoes dos botoes apos arrastar"""
         button_width = 90
         button_height = 32
         total_buttons_width = button_width * 2 + 15
@@ -209,17 +241,58 @@ class MapConfigDialog:
         self.cancel_rect.x = button_x + button_width + 15
         self.cancel_rect.y = button_y
 
+    def _get_dropdown_list_rect(self, dropdown_rect, num_items):
+        """Calcula o rect da lista do dropdown"""
+        item_height = 28
+        list_height = min(num_items * item_height + 4, self._dropdown_max_height)
+
+        list_rect = pygame.Rect(
+            dropdown_rect.x,
+            dropdown_rect.bottom + 2,
+            dropdown_rect.width,
+            list_height
+        )
+
+        # Verifica se cabe para baixo
+        if list_rect.bottom > self.rect.bottom - 60:
+            list_rect.y = dropdown_rect.top - list_height - 2
+            if list_rect.top < self.rect.top + 50:
+                list_rect.y = dropdown_rect.bottom + 2
+                list_rect.height = min(list_height, self.rect.bottom - 60 - list_rect.y)
+
+        return list_rect
+
     def handle_event(self, event):
-        """Processa eventos do diálogo"""
+        """Processa eventos do dialogo"""
         if not self.visible:
             return None
+
+        # ===== DROPDOWN DE AMBIENTE =====
+        if self.environment_dropdown_open:
+            result = self._handle_dropdown_event(
+                event, self.environment_options,
+                self.environment_dropdown_rect,
+                "environment"
+            )
+            if result is not None:
+                return result
+
+        # ===== DROPDOWN DE CLIMA =====
+        if self.weather_dropdown_open:
+            result = self._handle_dropdown_event(
+                event, self.weather_options,
+                self.weather_dropdown_rect,
+                "weather"
+            )
+            if result is not None:
+                return result
 
         if event.type == pygame.KEYDOWN:
             return self._handle_keydown(event)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 return self._handle_mousedown(event)
-            elif event.button == 2:  # Middle click - arrastar
+            elif event.button == 2:
                 mouse_pos = pygame.mouse.get_pos()
                 if self.rect.collidepoint(mouse_pos):
                     self.dragging = True
@@ -239,13 +312,88 @@ class MapConfigDialog:
                 self._update_button_positions()
                 return None
 
-            # Atualiza hover dos botões
+            # Atualiza hover
             mouse_pos = pygame.mouse.get_pos()
             self.hovered_button = None
+
             if self.confirm_rect.collidepoint(mouse_pos):
                 self.hovered_button = "confirm"
             elif self.cancel_rect.collidepoint(mouse_pos):
                 self.hovered_button = "cancel"
+            elif self.browse_button_rect.collidepoint(mouse_pos):
+                self.hovered_button = "browse"
+
+        return None
+
+    def _handle_dropdown_event(self, event, options, dropdown_rect, dropdown_type):
+        """Processa eventos de um dropdown"""
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mouse_pos = pygame.mouse.get_pos()
+
+            # Obtem o rect da lista
+            list_rect = self._get_dropdown_list_rect(dropdown_rect, len(options))
+
+            # Verifica se clicou em um item da lista
+            if list_rect.collidepoint(mouse_pos):
+                item_height = 28
+                relative_y = mouse_pos[1] - list_rect.y - 2
+                index = int(relative_y // item_height)
+
+                if 0 <= index < len(options):
+                    if dropdown_type == "environment":
+                        self.environment_selected_index = index
+                        self.temp_day_night_mode = options[index]["id"]
+                        self.environment_dropdown_open = False
+                    else:
+                        self.weather_selected_index = index
+                        self.temp_base_weather = options[index]["id"]
+                        self.weather_dropdown_open = False
+                    return None
+
+            # Fecha dropdown se clicar fora do botao ou da lista
+            if not dropdown_rect.collidepoint(mouse_pos):
+                if dropdown_type == "environment":
+                    self.environment_dropdown_open = False
+                else:
+                    self.weather_dropdown_open = False
+                return None
+
+            # Fecha dropdown se clicar no botao novamente
+            if dropdown_rect.collidepoint(mouse_pos):
+                if dropdown_type == "environment":
+                    self.environment_dropdown_open = False
+                else:
+                    self.weather_dropdown_open = False
+                return None
+
+        elif event.type == pygame.MOUSEMOTION:
+            list_rect = self._get_dropdown_list_rect(dropdown_rect, len(options))
+            if list_rect.collidepoint(event.pos):
+                item_height = 28
+                relative_y = event.pos[1] - list_rect.y - 2
+                index = int(relative_y // item_height)
+                if 0 <= index < len(options):
+                    if dropdown_type == "environment":
+                        self.environment_hovered_index = index
+                    else:
+                        self.weather_hovered_index = index
+                else:
+                    if dropdown_type == "environment":
+                        self.environment_hovered_index = -1
+                    else:
+                        self.weather_hovered_index = -1
+            else:
+                if dropdown_type == "environment":
+                    self.environment_hovered_index = -1
+                else:
+                    self.weather_hovered_index = -1
+
+        elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            if dropdown_type == "environment":
+                self.environment_dropdown_open = False
+            else:
+                self.weather_dropdown_open = False
+            return None
 
         return None
 
@@ -254,6 +402,12 @@ class MapConfigDialog:
         if event.key == pygame.K_RETURN:
             return self.confirm()
         elif event.key == pygame.K_ESCAPE:
+            if self.environment_dropdown_open:
+                self.environment_dropdown_open = False
+                return None
+            if self.weather_dropdown_open:
+                self.weather_dropdown_open = False
+                return None
             self.visible = False
             return None
         elif event.key == pygame.K_TAB:
@@ -307,7 +461,7 @@ class MapConfigDialog:
         """Processa clique do mouse"""
         mouse_pos = pygame.mouse.get_pos()
 
-        # ===== BOTÕES DE AÇÃO =====
+        # ===== BOTOES =====
         if self.confirm_rect.collidepoint(mouse_pos):
             return self.confirm()
         if self.cancel_rect.collidepoint(mouse_pos):
@@ -331,7 +485,7 @@ class MapConfigDialog:
             self.active_input = "phase"
             return None
 
-        # ===== LOCALIZAÇÃO =====
+        # ===== LOCALIZACAO =====
         if self.default_radio_rect.collidepoint(mouse_pos):
             self.temp_localization_type = "default"
             self.temp_custom_folder = ""
@@ -356,7 +510,7 @@ class MapConfigDialog:
             self.active_input = "custom_folder"
             return None
 
-        # ===== UNLOCK (SÓ SE CUSTOM) =====
+        # ===== UNLOCK =====
         if self.temp_localization_type == "custom":
             if self.unlock_chapter_input_rect.collidepoint(mouse_pos):
                 self.active_input = "unlock_chapter"
@@ -365,32 +519,19 @@ class MapConfigDialog:
                 self.active_input = "unlock_phase"
                 return None
 
-        # ===== DIA/NOITE =====
-        if self.day_night_random_rect.collidepoint(mouse_pos):
-            self.temp_day_night_mode = "random"
-            return None
-        if self.day_night_day_rect.collidepoint(mouse_pos):
-            self.temp_day_night_mode = "day"
-            return None
-        if self.day_night_night_rect.collidepoint(mouse_pos):
-            self.temp_day_night_mode = "night"
+        # ===== DROPDOWN AMBIENTE =====
+        if self.environment_dropdown_rect.collidepoint(mouse_pos):
+            self.environment_dropdown_open = not self.environment_dropdown_open
+            self.weather_dropdown_open = False
             return None
 
-        # ===== CLIMA =====
-        if self.weather_random_rect.collidepoint(mouse_pos):
-            self.temp_base_weather = "random"
-            return None
-        if self.weather_none_rect.collidepoint(mouse_pos):
-            self.temp_base_weather = "none"
-            return None
-        if self.weather_sunny_rect.collidepoint(mouse_pos):
-            self.temp_base_weather = "sunny"
-            return None
-        if self.weather_rain_rect.collidepoint(mouse_pos):
-            self.temp_base_weather = "rain"
+        # ===== DROPDOWN CLIMA =====
+        if self.weather_dropdown_rect.collidepoint(mouse_pos):
+            self.weather_dropdown_open = not self.weather_dropdown_open
+            self.environment_dropdown_open = False
             return None
 
-        # Clicou fora do diálogo
+        # Clicou fora do dialogo
         if not self.rect.collidepoint(mouse_pos):
             self.visible = False
             return None
@@ -398,7 +539,7 @@ class MapConfigDialog:
         return None
 
     def confirm(self):
-        """Confirma a operação e retorna os novos valores"""
+        """Confirma a operacao e retorna os novos valores"""
         try:
             new_width = max(5, min(500, int(self.temp_width) if self.temp_width else 10))
             new_height = max(5, min(500, int(self.temp_height) if self.temp_height else 10))
@@ -451,7 +592,7 @@ class MapConfigDialog:
             return None
 
     def render(self, screen):
-        """Renderiza o diálogo"""
+        """Renderiza o dialogo"""
         if not self.visible:
             return
 
@@ -465,13 +606,12 @@ class MapConfigDialog:
         pygame.draw.rect(screen, self.colors['bg'], self.rect, border_radius=12)
         pygame.draw.rect(screen, self.colors['border'], self.rect, 2, border_radius=12)
 
-        # ===== BARRA DE TÍTULO =====
+        # ===== BARRA DE TITULO =====
         title_bar = pygame.Rect(self.rect.x, self.rect.y, self.rect.width, 38)
         pygame.draw.rect(screen, (55, 58, 72), title_bar, border_top_left_radius=12, border_top_right_radius=12)
 
-        # Título
         font_title = self._get_font(22, True)
-        title = font_title.render("Configurações do Mapa", True, self.colors['title'])
+        title = font_title.render("Configuracoes do Mapa", True, self.colors['title'])
         screen.blit(title, (self.rect.x + self.margin, self.rect.y + 10))
 
         # ===== LINHA 1: Nome =====
@@ -485,32 +625,29 @@ class MapConfigDialog:
         self._render_label(screen, self.height_label_rect, "Altura:", self.colors['text_dim'])
         self._render_input(screen, self.height_input_rect, self.temp_height, "height", self.active_input == "height")
 
-        # ===== LINHA 3: Capítulo e Fase =====
-        self._render_label(screen, self.chapter_label_rect, "Capítulo:", self.colors['text_dim'])
+        # ===== LINHA 3: Capitulo e Fase =====
+        self._render_label(screen, self.chapter_label_rect, "Capitulo:", self.colors['text_dim'])
         self._render_input(screen, self.chapter_input_rect, self.temp_chapter, "chapter",
                            self.active_input == "chapter")
 
         self._render_label(screen, self.phase_label_rect, "Fase:", self.colors['text_dim'])
         self._render_input(screen, self.phase_input_rect, self.temp_phase, "phase", self.active_input == "phase")
 
-        # ===== LINHA 4: Localização =====
-        self._render_label(screen, self.loc_label_rect, "Localização:", self.colors['text_dim'])
+        # ===== LINHA 4: Localizacao =====
+        self._render_label(screen, self.loc_label_rect, "Localizacao:", self.colors['text_dim'])
 
-        # Radio Default
         self._render_radio(screen, self.default_radio_rect, self.temp_localization_type == "default")
         default_text = self._get_font(16).render("Default", True, self.colors['text'])
         screen.blit(default_text, (self.default_radio_rect.right + 6, self.default_radio_rect.y - 1))
 
-        # Radio Custom
         self._render_radio(screen, self.custom_radio_rect, self.temp_localization_type == "custom")
         custom_text = self._get_font(16).render("Custom", True, self.colors['text'])
         screen.blit(custom_text, (self.custom_radio_rect.right + 6, self.custom_radio_rect.y - 1))
 
-        # ===== LINHA 5: Pasta Custom (só se custom) =====
+        # ===== LINHA 5: Pasta Custom =====
         if self.temp_localization_type == "custom":
             self._render_label(screen, self.folder_label_rect, "Pasta:", self.colors['text_dim'])
 
-            # Input da pasta
             color = self.colors['border_active'] if self.active_input == "custom_folder" else self.colors['border']
             pygame.draw.rect(screen, self.colors['bg_input'], self.folder_input_rect, border_radius=6)
             pygame.draw.rect(screen, color, self.folder_input_rect, 2, border_radius=6)
@@ -519,13 +656,12 @@ class MapConfigDialog:
             text_color = self.colors['text'] if self.temp_custom_folder else self.colors['text_muted']
             folder_surf = self._get_font(16).render(display_text, True, text_color)
 
-            # Corta texto se necessário
             if folder_surf.get_width() > self.folder_input_rect.width - 10:
                 folder_surf = self._get_font(14).render(display_text[:20] + "...", True, text_color)
 
             screen.blit(folder_surf, (self.folder_input_rect.x + 8, self.folder_input_rect.y + 6))
 
-            # Botão Browse
+            # Botao Browse
             hover = self.hovered_button == "browse"
             browse_color = self.colors['accent'] if hover else (70, 80, 110)
             pygame.draw.rect(screen, browse_color, self.browse_button_rect, border_radius=6)
@@ -536,7 +672,7 @@ class MapConfigDialog:
             browse_y = self.browse_button_rect.y + (self.browse_button_rect.height - browse_text.get_height()) // 2
             screen.blit(browse_text, (browse_x, browse_y))
 
-            # ===== LINHA 6: Unlock (só se custom) =====
+            # ===== LINHA 6: Unlock =====
             self._render_label(screen, self.unlock_label_rect, "Desbloqueio:", self.colors['text_dim'])
 
             self._render_label(screen, self.unlock_chapter_label_rect, "Cap:", self.colors['text_muted'])
@@ -547,49 +683,31 @@ class MapConfigDialog:
             self._render_input(screen, self.unlock_phase_input_rect, self.temp_unlock_phase, "unlock_phase",
                                self.active_input == "unlock_phase", small=True)
 
-        # ===== LINHA 7: Dia/Noite =====
-        self._render_label(screen, self.day_night_label_rect, "Período:", self.colors['text_dim'])
+        # ===== LINHA 7: Ambiente (Dropdown) =====
+        self._render_label(screen, self.environment_label_rect, "Ambiente:", self.colors['text_dim'])
+        self._render_dropdown(
+            screen,
+            self.environment_dropdown_rect,
+            self.environment_options,
+            self.environment_selected_index,
+            self.environment_dropdown_open,
+            self.environment_hovered_index,
+            "environment"
+        )
 
-        # Radio Random
-        self._render_radio(screen, self.day_night_random_rect, self.temp_day_night_mode == "random")
-        random_text = self._get_font(15).render("Aleatório", True, self.colors['text'])
-        screen.blit(random_text, (self.day_night_random_rect.right + 5, self.day_night_random_rect.y - 1))
+        # ===== LINHA 8: Clima (Dropdown) =====
+        self._render_label(screen, self.weather_label_rect, "Clima:", self.colors['text_dim'])
+        self._render_dropdown(
+            screen,
+            self.weather_dropdown_rect,
+            self.weather_options,
+            self.weather_selected_index,
+            self.weather_dropdown_open,
+            self.weather_hovered_index,
+            "weather"
+        )
 
-        # Radio Dia
-        self._render_radio(screen, self.day_night_day_rect, self.temp_day_night_mode == "day")
-        day_text = self._get_font(15).render("Dia", True, self.colors['text'])
-        screen.blit(day_text, (self.day_night_day_rect.right + 5, self.day_night_day_rect.y - 1))
-
-        # Radio Noite
-        self._render_radio(screen, self.day_night_night_rect, self.temp_day_night_mode == "night")
-        night_text = self._get_font(15).render("Noite", True, self.colors['text'])
-        screen.blit(night_text, (self.day_night_night_rect.right + 5, self.day_night_night_rect.y - 1))
-
-        # ===== LINHA 8: Clima Base =====
-        self._render_label(screen, self.weather_label_rect, "Clima Base:", self.colors['text_dim'])
-
-        # Radio Random
-        self._render_radio(screen, self.weather_random_rect, self.temp_base_weather == "random")
-        random_text = self._get_font(15).render("Aleatório", True, self.colors['text'])
-        screen.blit(random_text, (self.weather_random_rect.right + 5, self.weather_random_rect.y - 1))
-
-        # Radio Normal
-        self._render_radio(screen, self.weather_none_rect, self.temp_base_weather == "none")
-        none_text = self._get_font(15).render("Normal", True, self.colors['text'])
-        screen.blit(none_text, (self.weather_none_rect.right + 5, self.weather_none_rect.y - 1))
-
-        # Radio Sol
-        self._render_radio(screen, self.weather_sunny_rect, self.temp_base_weather == "sunny")
-        sunny_text = self._get_font(15).render("Sol", True, self.colors['text'])
-        screen.blit(sunny_text, (self.weather_sunny_rect.right + 5, self.weather_sunny_rect.y - 1))
-
-        # Radio Chuva
-        self._render_radio(screen, self.weather_rain_rect, self.temp_base_weather == "rain")
-        rain_text = self._get_font(15).render("Chuva", True, self.colors['text'])
-        screen.blit(rain_text, (self.weather_rain_rect.right + 5, self.weather_rain_rect.y - 1))
-
-        # ===== BOTÕES =====
-        # Confirmar
+        # ===== BOTOES =====
         confirm_color = self.colors['success'] if self.hovered_button == "confirm" else (40, 140, 40)
         pygame.draw.rect(screen, confirm_color, self.confirm_rect, border_radius=8)
         pygame.draw.rect(screen, (255, 255, 255), self.confirm_rect, 1, border_radius=8)
@@ -598,7 +716,6 @@ class MapConfigDialog:
         confirm_y = self.confirm_rect.y + (self.confirm_rect.height - confirm_text.get_height()) // 2
         screen.blit(confirm_text, (confirm_x, confirm_y))
 
-        # Cancelar
         cancel_color = self.colors['danger'] if self.hovered_button == "cancel" else (160, 40, 40)
         pygame.draw.rect(screen, cancel_color, self.cancel_rect, border_radius=8)
         pygame.draw.rect(screen, (255, 255, 255), self.cancel_rect, 1, border_radius=8)
@@ -607,12 +724,81 @@ class MapConfigDialog:
         cancel_y = self.cancel_rect.y + (self.cancel_rect.height - cancel_text.get_height()) // 2
         screen.blit(cancel_text, (cancel_x, cancel_y))
 
-        # ===== INFORMAÇÃO =====
+        # ===== INFORMACAO =====
         info_font = self._get_font(13)
         info = info_font.render("TAB para alternar campos | Min: 5, Max: 500 tiles", True, self.colors['text_muted'])
         info_x = self.rect.x + (self.rect.width - info.get_width()) // 2
         info_y = self.rect.y + self.rect.height - 32
         screen.blit(info, (info_x, info_y))
+
+    def _render_dropdown(self, screen, rect, options, selected_index, is_open, hover_index, dropdown_type):
+        """Renderiza um dropdown"""
+        # Botao do dropdown
+        bg_color = self.colors['bg_input']
+        border_color = self.colors['border_active'] if is_open else self.colors['border']
+
+        pygame.draw.rect(screen, bg_color, rect, border_radius=6)
+        pygame.draw.rect(screen, border_color, rect, 2, border_radius=6)
+
+        # Texto selecionado
+        selected_text = options[selected_index]["label"]
+        text_surf = self._get_font(16).render(selected_text, True, self.colors['text'])
+        screen.blit(text_surf, (rect.x + 8, rect.y + (rect.height - text_surf.get_height()) // 2))
+
+        # Seta
+        arrow = "▼" if not is_open else "▲"
+        arrow_surf = self._get_font(14).render(arrow, True, self.colors['text_muted'])
+        screen.blit(arrow_surf, (rect.right - 22, rect.y + (rect.height - arrow_surf.get_height()) // 2))
+
+        # ===== DROPDOWN ABERTO =====
+        if is_open:
+            item_height = 28
+            list_rect = self._get_dropdown_list_rect(rect, len(options))
+
+            # Guarda o rect para deteccao de clique
+            if dropdown_type == "environment":
+                self.environment_list_rect = list_rect
+            else:
+                self.weather_list_rect = list_rect
+
+            # Fundo da lista
+            pygame.draw.rect(screen, self.colors['bg_dropdown'], list_rect, border_radius=6)
+            pygame.draw.rect(screen, self.colors['border_dropdown'], list_rect, 1, border_radius=6)
+
+            # Itens visiveis
+            visible_items = min(len(options), list_rect.height // item_height)
+
+            for i in range(visible_items):
+                item_rect = pygame.Rect(
+                    list_rect.x + 4,
+                    list_rect.y + 2 + i * item_height,
+                    list_rect.width - 8,
+                    item_height - 2
+                )
+
+                is_selected = (i == selected_index)
+                is_hovered = (i == hover_index)
+
+                if is_selected:
+                    bg_item = self.colors['accent']
+                elif is_hovered:
+                    bg_item = self.colors['dropdown_item_hover']
+                else:
+                    bg_item = self.colors['bg_dropdown']
+
+                pygame.draw.rect(screen, bg_item, item_rect, border_radius=4)
+
+                # Texto do item
+                item_color = self.colors['text'] if is_selected or is_hovered else self.colors['text_dim']
+                item_surf = self._get_font(15).render(options[i]["label"], True, item_color)
+                screen.blit(item_surf,
+                            (item_rect.x + 8, item_rect.y + (item_rect.height - item_surf.get_height()) // 2))
+
+                # Checkmark no selecionado
+                if is_selected:
+                    check_surf = self._get_font(14).render("X", True, self.colors['radio_selected'])
+                    screen.blit(check_surf,
+                                (item_rect.right - 22, item_rect.y + (item_rect.height - check_surf.get_height()) // 2))
 
     def _render_label(self, screen, rect, text, color):
         """Renderiza um label"""
@@ -631,7 +817,6 @@ class MapConfigDialog:
         display_text = text
         text_surf = self._get_font(font_size).render(display_text, True, self.colors['text'])
 
-        # Corta se necessário
         if text_surf.get_width() > rect.width - 12:
             display_text = display_text[:8] + "..."
             text_surf = self._get_font(font_size).render(display_text, True, self.colors['text'])
@@ -645,7 +830,6 @@ class MapConfigDialog:
         center = (rect.centerx, rect.centery)
         radius = rect.width // 2
 
-        # Fundo
         color = self.colors['radio_selected'] if selected else self.colors['radio_unselected']
         pygame.draw.circle(screen, color, center, radius)
         pygame.draw.circle(screen, (255, 255, 255), center, radius - 2)
