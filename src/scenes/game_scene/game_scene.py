@@ -190,6 +190,8 @@ class GameScene(BaseScene):
 
         self._start_battle_music()
 
+        self.wave_manager.initialize_condition()
+
         for pokemon in self.player.team:
             pokemon.reset(self)
 

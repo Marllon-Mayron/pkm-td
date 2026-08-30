@@ -58,6 +58,19 @@ class WaveManager:
         """Reseta o ouro acumulado"""
         self.total_gold_earned = 0
 
+    def initialize_condition(self):
+        """Inicializa a condição atual baseada no estado dia/noite da fase"""
+        if self.game_scene and hasattr(self.game_scene, 'day_night_weather'):
+            day_night = self.game_scene.day_night_weather.day_night_state
+            if day_night and day_night.active:
+                condition = day_night.type.value
+                self.spawner.set_condition(condition)
+                print(f"[WaveManager] Condição inicializada: {condition}")
+                return
+        # Fallback para "any"
+        self.spawner.set_condition("any")
+        print("[WaveManager] Condição inicializada: any (fallback)")
+
     def start_all_waves(self):
         """Inicia todas as waves de todos os paths"""
         return self.spawner.start_all_waves()
@@ -123,6 +136,12 @@ class WaveManager:
         """
         if self.paused:
             return []
+
+        if self.game_scene and hasattr(self.game_scene, 'day_night_weather'):
+            day_night = self.game_scene.day_night_weather.day_night_state
+            if day_night:
+                condition = day_night.type.value
+                self.spawner.set_condition(condition)
 
         enemies_at_end = []
         enemies_at_start = []

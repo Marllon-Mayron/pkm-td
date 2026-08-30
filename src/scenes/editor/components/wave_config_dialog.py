@@ -1,40 +1,22 @@
 # src/scenes/editor/components/wave_config_dialog.py
 
 import pygame
-from src.editor.wave_config import WaveEnemy
+import random
+from src.editor.wave_config import WaveEnemy, WaveTemplate, WaveVariant, WaveTemplateManager
 
 
 class WaveConfigDialog:
     """Diálogo para configurar waves de inimigos"""
 
-    # Cores padronizadas
-    COLORS = {
-        'bg': (40, 40, 50),
-        'bg_light': (50, 50, 60),
-        'bg_dark': (30, 30, 40),
-        'border': (255, 215, 0),
-        'border_light': (80, 80, 90),
-        'text': (255, 255, 255),
-        'text_dim': (200, 200, 200),
-        'text_dark': (150, 150, 150),
-        'accent': (80, 100, 120),
-        'accent_hover': (100, 120, 140),
-        'input_bg': (50, 50, 60),
-        'input_border': (80, 80, 90),
-        'input_active': (100, 150, 255),
-        'success': (0, 120, 0),
-        'danger': (120, 0, 0),
-        'warning': (120, 120, 0),
-    }
-
     def __init__(self, x, y, width, height, wave_manager, path_manager, pokedex):
-        self.rect = pygame.Rect(x, y, width, height)
+        # Dimensões do diálogo
+        self.rect = pygame.Rect(x, y, max(width, 820), max(height, 640))
         self.visible = True
         self.wave_manager = wave_manager
         self.path_manager = path_manager
         self.pokedex = pokedex
 
-        # Estado da UI
+        self.margin = 20
         self.selected_wave_index = wave_manager.selected_wave
         self.selected_tab = "waves"
         self.dragging = False
@@ -42,401 +24,372 @@ class WaveConfigDialog:
         self.drag_offset_y = 0
         self.hovered_button = None
 
-        # Fontes
-        self.font_title = pygame.font.Font(None, 24)
-        self.font = pygame.font.Font(None, 20)
-        self.font_small = pygame.font.Font(None, 16)
-
-        # Campos de entrada ativos
         self.active_input = None
         self.input_texts = {}
         self.input_errors = {}
 
-        # Seletor de Pokémon
+        # Opções de template
+        self.template_options = []
+        self.template_selected_index = 0
+        self.template_dropdown_open = False
+        self.template_hovered_index = -1
+
+        # Opções de condição (período)
+        self.condition_options = [
+            {"id": "any", "label": "Qualquer"},
+            {"id": "day", "label": "Dia"},
+            {"id": "night", "label": "Noite"},
+            {"id": "dusk", "label": "Entardecer"},
+            {"id": "dawn", "label": "Amanhecer"},
+            {"id": "cave", "label": "Caverna"},
+            {"id": "deep", "label": "Fundo do Mar"},
+        ]
+        self.condition_selected_index = 0
+        self.condition_dropdown_open = False
+        self.condition_hovered_index = -1
+
+        # Editores
+        self.template_editor_open = False
+        self.editing_template_id = None
+
+        self.selected_variant_index = -1
+        self.variant_editor_open = False
+        self.editing_variant_index = -1
+
+        # ===== NOVO SELETOR DE POKÉMON =====
         self.showing_pokemon_selector = False
-        self.pokemon_selector_enemy_index = 0
+        self.pokemon_selector_target = None      # "enemy", "variant", "template"
+        self.pokemon_selector_index = 0          # índice do inimigo na lista
         self.pokemon_selector_scroll = 0
         self.pokemon_search = ""
+
+        # Controles de arraste para scroll
+        self.pokemon_dragging_scroll = False
+        self.pokemon_drag_start_y = 0
+        self.pokemon_drag_start_scroll = 0
+
+        # Scroll na barra (arraste do thumb)
+        self.pokemon_dragging_thumb = False
+        self.pokemon_thumb_start_y = 0
+        self.pokemon_thumb_start_scroll = 0
 
         # Scroll
         self.waves_scroll = 0
         self.enemies_scroll = 0
+        self.variants_scroll = 0
+        self.templates_scroll = 0
 
-        # Items por página
-        self.waves_per_page = 6
-        self.wave_item_height = 35
+        self.waves_per_page = 5
+        self.wave_item_height = 32
         self.enemies_per_page = 4
-        self.enemy_item_height = 70
+        self.enemy_item_height = 56
+        self.variants_per_page = 3
+        self.variant_item_height = 65
+        self.templates_per_page = 3
+        self.template_item_height = 55
 
-        # Carrega lista completa de Pokémon
         self.available_pokemon_ids = self.pokedex.get_all_ids()
-
-        # Cache de sprites
         self.sprite_cache = {}
+        self._font_cache = {}
 
-        # Inicializa UI
-        self._init_ui()
+        # Paleta de cores
+        self.colors = {
+            'bg': (30, 33, 42),
+            'bg_light': (40, 44, 55),
+            'bg_dark': (25, 28, 36),
+            'bg_input': (45, 49, 60),
+            'bg_dropdown': (35, 39, 50),
+            'bg_dropdown_hover': (50, 55, 70),
+            'border': (60, 65, 80),
+            'border_light': (75, 80, 95),
+            'border_active': (100, 160, 255),
+            'border_dropdown': (70, 75, 90),
+            'text': (235, 238, 245),
+            'text_dim': (180, 185, 200),
+            'text_muted': (120, 125, 145),
+            'title': (255, 215, 0),
+            'accent': (70, 110, 190),
+            'success': (70, 190, 70),
+            'danger': (210, 70, 70),
+            'warning': (210, 180, 70),
+            'info': (70, 160, 210),
+            'radio_selected': (100, 160, 255),
+            'radio_unselected': (70, 75, 90),
+            'dropdown_item_hover': (55, 60, 80),
+            'tab_active': (70, 110, 190),
+            'tab_inactive': (40, 44, 55),
+            'separator': (50, 55, 70),
+            'editor_bg': (20, 22, 30, 200),
+            'scrollbar_bg': (50, 50, 60),
+            'scrollbar_thumb': (100, 150, 255),
+            'selector_bg': (25, 28, 36, 230),
+        }
 
-    def _init_ui(self):
-        """Inicializa todos os elementos da UI com posições centralizadas"""
+        self._sync_template_dropdown()
+        self._calculate_positions()
+        self._update_template_options()
+
+    # --- Fontes ---
+    def _get_font(self, size, bold=False):
+        key = (size, bold)
+        if key not in self._font_cache:
+            font = pygame.font.Font(None, size)
+            if bold:
+                font.set_bold(True)
+            self._font_cache[key] = font
+        return self._font_cache[key]
+
+    # --- Sincronização ---
+    def _sync_template_dropdown(self):
+        wave = self.wave_manager.get_current_wave()
+        if wave and wave.template_id:
+            templates = WaveTemplateManager.get_all_templates()
+            for i, t in enumerate(templates):
+                if t.template_id == wave.template_id:
+                    self.template_selected_index = i + 1
+                    return
+        self.template_selected_index = 0
+
+    def _update_template_options(self):
+        self.template_options = [{"id": None, "label": "Nenhum"}]
+        for t in WaveTemplateManager.get_all_templates():
+            self.template_options.append({"id": t.template_id, "label": t.name})
+
+    # --- Cálculo de posições ---
+    def _calculate_positions(self):
         x, y, w, h = self.rect
+        m = self.margin
+        content_top = y + 50
 
-        # Margens internas
-        margin = 20
-        content_width = w - (margin * 2)
-        content_x = x + margin
-        content_y = y + 45  # Espaço para título e abas
-
-        # Abas - centralizadas
-        tab_width = 100
-        tab_spacing = 10
-        tabs_total_width = (tab_width * 3) + (tab_spacing * 2)
+        # Abas
+        tab_width = 105
+        tab_spacing = 6
+        tabs_total_width = (tab_width * 4) + (tab_spacing * 3)
         tabs_start_x = x + (w - tabs_total_width) // 2
-
         self.tab_buttons = []
-        for i in range(3):
+        tab_names = ["Waves", "Composicao", "Variants", "Templates"]
+        for i, name in enumerate(tab_names):
             self.tab_buttons.append(pygame.Rect(
                 tabs_start_x + i * (tab_width + tab_spacing),
                 y + 45,
                 tab_width,
-                25
+                30
             ))
 
-        # Botões de ação (Salvar/Cancelar) - centralizados
-        button_width = 80
-        button_spacing = 15
-        buttons_total_width = (button_width * 2) + button_spacing
-        buttons_start_x = x + (w - buttons_total_width) // 2
+        # Botões Salvar/Cancelar
+        button_width = 95
+        button_height = 32
+        total_buttons_width = button_width * 2 + 15
+        button_x = x + (w - total_buttons_width) // 2
+        button_y = y + h - 55
+        self.save_button = pygame.Rect(button_x, button_y, button_width, button_height)
+        self.cancel_button = pygame.Rect(button_x + button_width + 15, button_y, button_width, button_height)
 
-        self.save_button = pygame.Rect(buttons_start_x, y + h - 40, button_width, 30)
-        self.cancel_button = pygame.Rect(buttons_start_x + button_width + button_spacing, y + h - 40, button_width, 30)
-
-        # Elementos da aba Waves - CENTRALIZADOS
-        # Calcula largura da lista de waves para centralizar
-        waves_list_width = 300
-        waves_list_x = x + (w - waves_list_width) // 2
-
-        self.add_wave_button = pygame.Rect(waves_list_x, content_y + 30, 90, 25)
-        self.remove_wave_button = pygame.Rect(waves_list_x + 100, content_y + 30, 90, 25)
-
+        # Waves
+        waves_y = content_top + 10
+        self.waves_label = pygame.Rect(x + m, waves_y, 200, 22)
+        btn_y = waves_y + 28
+        self.add_wave_button = pygame.Rect(x + m, btn_y, 85, 26)
+        self.remove_wave_button = pygame.Rect(x + m + 95, btn_y, 85, 26)
+        self.duplicate_wave_button = pygame.Rect(x + m + 190, btn_y, 95, 26)
+        list_y = btn_y + 34
         self.waves_list_area = pygame.Rect(
-            waves_list_x,
-            content_y + 65,
-            waves_list_width,
-            self.waves_per_page * self.wave_item_height + 5
+            x + m,
+            list_y,
+            w - m * 2,
+            self.waves_per_page * self.wave_item_height + 4
         )
 
-        # Elementos da aba Composition
-        self.add_enemy_button = pygame.Rect(content_x, y + h - 90, 140, 25)
-        self.equalize_button = pygame.Rect(content_x + 150, y + h - 90, 120, 25)
-
+        # Composição
+        comp_y = content_top + 10
+        self.comp_info_rect = pygame.Rect(x + m, comp_y, w - m * 2, 22)
+        btn_y = comp_y + 28
+        self.add_enemy_button = pygame.Rect(x + m, btn_y, 130, 26)
+        self.equalize_button = pygame.Rect(x + m + 140, btn_y, 110, 26)
+        self.clear_enemies_button = pygame.Rect(x + m + 260, btn_y, 95, 26)
+        list_y = btn_y + 34
         self.enemies_list_area = pygame.Rect(
-            content_x,
-            content_y + 35,
-            content_width,
-            self.enemies_per_page * self.enemy_item_height + 5
+            x + m,
+            list_y,
+            w - m * 2,
+            self.enemies_per_page * self.enemy_item_height + 4
+        )
+        self.total_rect = pygame.Rect(x + m, self.enemies_list_area.bottom + 6, 200, 22)
+
+        # Variants
+        var_y = content_top + 10
+        self.variant_info_rect = pygame.Rect(x + m, var_y, w - m * 2, 28)
+        btn_y = var_y + 34
+        self.add_variant_button = pygame.Rect(x + m, btn_y, 120, 26)
+        self.remove_variant_button = pygame.Rect(x + m + 130, btn_y, 95, 26)
+        self.edit_variant_button = pygame.Rect(x + m + 235, btn_y, 110, 26)
+        list_y = btn_y + 34
+        self.variants_list_area = pygame.Rect(
+            x + m,
+            list_y,
+            w - m * 2,
+            self.variants_per_page * self.variant_item_height + 4
         )
 
-        # Elementos da aba Settings - Organizados em grid padronizado
-        self._init_settings_ui(content_x, content_y, content_width)
-
-    def _init_settings_ui(self, content_x, content_y, content_width):
-        """Inicializa elementos da aba Settings em grid padronizado"""
-        x, y, w = content_x, content_y, content_width
-
-        # Configuração do grid padronizado
-        label_width = 100  # Largura fixa para labels
-        input_width = 80  # Largura fixa para inputs
-        spacing = 20  # Espaçamento entre colunas
-        row_height = 35  # Altura fixa por linha
-
-        # Colunas
-        col1_x = x
-        col2_x = x + (w // 2) + spacing
-
-        # Altura inicial
-        start_y = y + 35
-
-        # LINHA 0: Nome da Wave (ocupa largura total)
-        name_label_rect = pygame.Rect(col1_x, start_y, label_width, 25)
-        self.name_label = name_label_rect
-        self.name_input = pygame.Rect(col1_x + label_width + 5, start_y, w - label_width - 5, 25)
-
-        # LINHA 1: Path
-        path_label_rect = pygame.Rect(col1_x, start_y + row_height, label_width, 25)
-        self.path_label = path_label_rect
-
-        # Área do path com botões
-        path_value_x = col1_x + label_width + 5
-        self.path_text_rect = pygame.Rect(path_value_x, start_y + row_height, 80, 25)
-        self.path_prev_button = pygame.Rect(path_value_x + 85, start_y + row_height, 25, 25)
-        self.path_next_button = pygame.Rect(path_value_x + 115, start_y + row_height, 25, 25)
-
-        # LINHA 2: Tamanho
-        size_label_rect = pygame.Rect(col1_x, start_y + row_height * 2, label_width, 25)
-        self.size_label = size_label_rect
-        self.size_input = pygame.Rect(col1_x + label_width + 5, start_y + row_height * 2, input_width, 25)
-
-        # LINHA 3: Nível Mínimo
-        min_label_rect = pygame.Rect(col1_x, start_y + row_height * 3, label_width, 25)
-        self.min_label = min_label_rect
-        self.min_level_input = pygame.Rect(col1_x + label_width + 5, start_y + row_height * 3, input_width, 25)
-
-        # LINHA 4: Nível Máximo
-        max_label_rect = pygame.Rect(col1_x, start_y + row_height * 4, label_width, 25)
-        self.max_label = max_label_rect
-        self.max_level_input = pygame.Rect(col1_x + label_width + 5, start_y + row_height * 4, input_width, 25)
-
-        # COLUNA 2 - LINHA 1: Intervalo
-        interval_label_rect = pygame.Rect(col2_x, start_y + row_height, label_width, 25)
-        self.interval_label = interval_label_rect
-        self.interval_input = pygame.Rect(col2_x + label_width + 5, start_y + row_height, input_width, 25)
-
-        # COLUNA 2 - LINHA 2: Delay
-        delay_label_rect = pygame.Rect(col2_x, start_y + row_height * 2, label_width, 25)
-        self.delay_label = delay_label_rect
-        self.delay_input = pygame.Rect(col2_x + label_width + 5, start_y + row_height * 2, input_width, 25)
-
-        # COLUNA 2 - LINHA 3: Repeat
-        repeat_label_rect = pygame.Rect(col2_x, start_y + row_height * 3, label_width, 25)
-        self.repeat_label = repeat_label_rect
-        self.repeat_checkbox = pygame.Rect(col2_x + label_width + 5, start_y + row_height * 3, 18, 18)
-
-        # COLUNA 2 - LINHA 4: Repeat Count
-        repeat_count_label_rect = pygame.Rect(col2_x, start_y + row_height * 4, label_width, 25)
-        self.repeat_count_label = repeat_count_label_rect
-
-        repeat_count_value_x = col2_x + label_width + 5
-        self.repeat_count_text = pygame.Rect(repeat_count_value_x, start_y + row_height * 4, 30, 25)
-        self.repeat_minus_button = pygame.Rect(repeat_count_value_x + 35, start_y + row_height * 4, 25, 25)
-        self.repeat_plus_button = pygame.Rect(repeat_count_value_x + 65, start_y + row_height * 4, 25, 25)
+        # Templates
+        temp_y = content_top + 10
+        self.template_info_rect = pygame.Rect(x + m, temp_y, w - m * 2, 28)
+        btn_y = temp_y + 34
+        self.new_template_button = pygame.Rect(x + m, btn_y, 130, 26)
+        self.delete_template_button = pygame.Rect(x + m + 140, btn_y, 95, 26)
+        self.edit_template_button = pygame.Rect(x + m + 245, btn_y, 110, 26)
+        list_y = btn_y + 34
+        self.templates_list_area = pygame.Rect(
+            x + m,
+            list_y,
+            w - m * 2,
+            self.templates_per_page * self.template_item_height + 4
+        )
 
     def _update_button_positions(self):
-        """Atualiza posições dos botões após arrastar"""
-        x, y, w, h = self.rect
-        margin = 20
-        content_x = x + margin
-        content_y = y + 45
+        self._calculate_positions()
 
-        # Abas - centralizadas
-        tab_width = 100
-        tab_spacing = 10
-        tabs_total_width = (tab_width * 3) + (tab_spacing * 2)
-        tabs_start_x = x + (w - tabs_total_width) // 2
-
-        for i, button in enumerate(self.tab_buttons):
-            button.x = tabs_start_x + i * (tab_width + tab_spacing)
-            button.y = y + 45
-
-        # Botões de ação - centralizados
-        button_width = 80
-        button_spacing = 15
-        buttons_total_width = (button_width * 2) + button_spacing
-        buttons_start_x = x + (w - buttons_total_width) // 2
-
-        self.save_button.x = buttons_start_x
-        self.save_button.y = y + h - 40
-        self.cancel_button.x = buttons_start_x + button_width + button_spacing
-        self.cancel_button.y = y + h - 40
-
-        # Waves tab - centralizada
-        waves_list_width = 300
-        waves_list_x = x + (w - waves_list_width) // 2
-
-        self.add_wave_button.x = waves_list_x
-        self.add_wave_button.y = content_y + 30
-        self.remove_wave_button.x = waves_list_x + 100
-        self.remove_wave_button.y = content_y + 30
-        self.waves_list_area.x = waves_list_x
-        self.waves_list_area.y = content_y + 65
-
-        # Composition tab
-        self.add_enemy_button.x = content_x
-        self.add_enemy_button.y = y + h - 90
-        self.equalize_button.x = content_x + 150
-        self.equalize_button.y = y + h - 90
-        self.enemies_list_area.x = content_x
-        self.enemies_list_area.y = content_y + 35
-
-        # Settings tab - atualiza todas as posições
-        self._init_settings_ui(content_x, content_y, w - (margin * 2))
-
-    def _get_pokemon_sprite(self, pokemon_id, size=32, expression="normal"):
-        """
-        Obtém o sprite/retrato do Pokémon.
-        Prioriza o retrato (portrait), fallback para InMap, depois frontal.
-
-        Args:
-            pokemon_id: ID do Pokémon
-            size: Tamanho desejado (largura e altura)
-            expression: "normal", "happy", "angry" (usado apenas para retratos)
-        """
+    # --- Sprites de Pokémon ---
+    def _get_pokemon_sprite(self, pokemon_id, size=32):
         try:
             pokemon_id = int(pokemon_id)
-        except (ValueError, TypeError):
+        except:
             pokemon_id = 1
 
-        cache_key = (pokemon_id, size, expression, "portrait")  # Inclui expression no cache
-
+        cache_key = (pokemon_id, size)
         if cache_key in self.sprite_cache:
             return self.sprite_cache[cache_key]
 
         sprite = None
-
-        # ===== TENTA PRIMEIRO CARREGAR RETRATO (PORTRAIT) =====
         try:
-            # Tenta carregar o retrato com a expressão solicitada
-            portrait = self.pokedex.get_portrait(pokemon_id, expression, shiny=False)
+            portrait = self.pokedex.get_portrait(pokemon_id, "normal", shiny=False)
             if portrait:
                 sprite = portrait
-                print(f"[WAVE_CONFIG] Retrato carregado: #{pokemon_id} ({expression})")
-        except Exception as e:
-            print(f"[WAVE_CONFIG] Erro ao carregar retrato: {e}")
+        except:
+            pass
 
-        # ===== SE NÃO TEM RETRATO, TENTA INMAP =====
         if sprite is None:
             try:
-                inmap_frames = self.pokedex.get_inmap_animation(pokemon_id, shiny=False)
-                if inmap_frames and "down" in inmap_frames and inmap_frames["down"]:
-                    sprite = inmap_frames["down"][0]
-                    print(f"[WAVE_CONFIG] Fallback InMap: #{pokemon_id}")
-            except Exception as e:
-                print(f"[WAVE_CONFIG] Erro ao carregar InMap: {e}")
+                inmap = self.pokedex.get_inmap_animation(pokemon_id, shiny=False)
+                if inmap and "down" in inmap and inmap["down"]:
+                    sprite = inmap["down"][0]
+            except:
+                pass
 
-        # ===== SE NÃO TEM INMAP, TENTA FRONTAL =====
         if sprite is None:
             try:
                 sprite = self.pokedex.get_sprite(pokemon_id, "front", shiny=False)
-                if sprite:
-                    print(f"[WAVE_CONFIG] Fallback front: #{pokemon_id}")
-            except Exception as e:
-                print(f"[WAVE_CONFIG] Erro ao carregar front: {e}")
+            except:
+                pass
 
-        # ===== SE NADA FUNCIONOU, CRIA PLACEHOLDER =====
         if sprite is None:
-            print(f"[WAVE_CONFIG] Criando placeholder para #{pokemon_id}")
-            sprite = self._create_pokemon_placeholder(pokemon_id, size)
+            sprite = self._create_placeholder(pokemon_id, size)
 
-        # Escala mantendo proporção
-        orig_width = sprite.get_width()
-        orig_height = sprite.get_height()
-
-        # Calcula a escala mantendo a proporção
-        if orig_width > orig_height:
-            target_width = size
-            target_height = int(orig_height * (size / orig_width))
+        orig_w, orig_h = sprite.get_width(), sprite.get_height()
+        if orig_w > orig_h:
+            target_w, target_h = size, int(orig_h * (size / orig_w))
         else:
-            target_height = size
-            target_width = int(orig_width * (size / orig_height))
+            target_h, target_w = size, int(orig_w * (size / orig_h))
 
-        # Escala suavemente
-        if target_width > 0 and target_height > 0:
-            scaled_sprite = pygame.transform.smoothscale(sprite, (target_width, target_height))
-
-            # Centraliza em uma superfície quadrada
-            final_surface = pygame.Surface((size, size), pygame.SRCALPHA)
-            final_surface.fill((0, 0, 0, 0))
-            offset_x = (size - target_width) // 2
-            offset_y = (size - target_height) // 2
-            final_surface.blit(scaled_sprite, (offset_x, offset_y))
-            sprite = final_surface
+        if target_w > 0 and target_h > 0:
+            scaled = pygame.transform.smoothscale(sprite, (target_w, target_h))
+            final = pygame.Surface((size, size), pygame.SRCALPHA)
+            final.fill((0, 0, 0, 0))
+            final.blit(scaled, ((size - target_w) // 2, (size - target_h) // 2))
+            sprite = final
 
         self.sprite_cache[cache_key] = sprite
         return sprite
 
-    def _create_pokemon_placeholder(self, pokemon_id, size):
-        """Cria um placeholder para Pokémon sem sprite"""
+    def _create_placeholder(self, pokemon_id, size):
         placeholder = pygame.Surface((size, size), pygame.SRCALPHA)
-
-        # Cores baseadas no ID
-        colors = [
-            (255, 99, 71),  # Tomato
-            (135, 206, 235),  # Sky Blue
-            (144, 238, 144),  # Light Green
-            (255, 215, 0),  # Gold
-            (221, 160, 221),  # Plum
-            (255, 182, 193),  # Light Pink
-            (176, 224, 230),  # Powder Blue
-            (255, 228, 181),  # Moccasin
-        ]
+        colors = [(255, 99, 71), (135, 206, 235), (144, 238, 144), (255, 215, 0)]
         color = colors[pokemon_id % len(colors)]
-
-        # Fundo
         pygame.draw.rect(placeholder, color, (0, 0, size, size), border_radius=8)
         pygame.draw.rect(placeholder, (100, 100, 100), (0, 0, size, size), 2, border_radius=8)
-
-        # Primeira letra do nome
-        try:
-            pokemon_name = self.pokedex.get_name(pokemon_id)
-            first_letter = pokemon_name[0].upper() if pokemon_name else "?"
-        except:
-            first_letter = "?"
-
-        font_size = max(12, size // 2)
-        font = pygame.font.Font(None, font_size)
-        text = font.render(first_letter, True, (255, 255, 255))
-        text_rect = text.get_rect(center=(size // 2, size // 2))
-        placeholder.blit(text, text_rect)
-
-        # ID pequeno no canto
-        small_font = pygame.font.Font(None, max(8, size // 4))
-        id_text = small_font.render(f"#{pokemon_id}", True, (200, 200, 200))
-        id_rect = id_text.get_rect(bottomright=(size - 3, size - 3))
-        placeholder.blit(id_text, id_rect)
-
         return placeholder
 
-    def _get_pokemon_sprite_with_expression(self, pokemon_id, size=32, expression="normal"):
-        """
-        Obtém sprite do Pokémon com expressão específica.
-        Útil para mostrar diferentes emoções no diálogo.
-        """
-        return self._get_pokemon_sprite(pokemon_id, size, expression)
-
+    # --- Eventos principais ---
     def handle_event(self, event):
-        """Processa eventos do diálogo"""
         if not self.visible:
             return False
 
         mouse_pos = pygame.mouse.get_pos()
         mouse_x, mouse_y = mouse_pos
 
-        # Reset hover
-        self.hovered_button = None
-
-        # Se clicou fora do diálogo, fecha
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if not self.rect.collidepoint(mouse_x, mouse_y) and not self.showing_pokemon_selector:
-                self.visible = False
-                return True
-
-        # Seletor de Pokémon tem prioridade
+        # Prioridade 1: Seletor de Pokémon (consome TODOS os eventos)
         if self.showing_pokemon_selector:
-            return self._handle_pokemon_selector_event(event, mouse_x, mouse_y)
+            self._handle_pokemon_selector_event(event, mouse_x, mouse_y)
+            return True  # Evento sempre consumido
 
-        # Atualiza hover dos botões
+        # Prioridade 2: Editores abertos
+        if self.variant_editor_open:
+            result = self._handle_variant_editor_event(event, mouse_x, mouse_y)
+            if result is not None:
+                return result
+
+        if self.template_editor_open:
+            result = self._handle_template_editor_event(event, mouse_x, mouse_y)
+            if result is not None:
+                return result
+
+        # Eventos gerais
         if event.type == pygame.MOUSEMOTION:
             self._update_hover(mouse_x, mouse_y)
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                return self._handle_left_click(mouse_x, mouse_y)
-            elif event.button == 4:  # Scroll up
-                return self._handle_scroll(-1)
-            elif event.button == 5:  # Scroll down
-                return self._handle_scroll(1)
-
-        elif event.type == pygame.MOUSEBUTTONUP:
-            if event.button == 1:
-                self.dragging = False
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if not self.rect.collidepoint(mouse_x, mouse_y):
+                self.visible = False
                 return True
 
-        elif event.type == pygame.MOUSEMOTION:
-            if self.dragging:
-                self.rect.x = mouse_x - self.drag_offset_x
-                self.rect.y = mouse_y - self.drag_offset_y
-                self._update_button_positions()
+            # Arrastar pela barra de título
+            title_rect = pygame.Rect(self.rect.x, self.rect.y, self.rect.width, 30)
+            if title_rect.collidepoint(mouse_x, mouse_y):
+                self.dragging = True
+                self.drag_offset_x = mouse_x - self.rect.x
+                self.drag_offset_y = mouse_y - self.rect.y
                 return True
+
+            if self.save_button.collidepoint(mouse_x, mouse_y):
+                self.visible = False
+                return "saved"
+            if self.cancel_button.collidepoint(mouse_x, mouse_y):
+                self.visible = False
+                return True
+
+            # Abas
+            for i, tab_button in enumerate(self.tab_buttons):
+                if tab_button.collidepoint(mouse_x, mouse_y):
+                    tabs = ["waves", "composition", "variants", "templates"]
+                    self.selected_tab = tabs[i]
+                    self.variant_editor_open = False
+                    self.template_editor_open = False
+                    self.condition_dropdown_open = False
+                    return True
+
+            # Clique na aba atual
+            if self.selected_tab == "waves":
+                return self._handle_waves_tab_click(mouse_x, mouse_y)
+            elif self.selected_tab == "composition":
+                return self._handle_composition_tab_click(mouse_x, mouse_y)
+            elif self.selected_tab == "variants":
+                return self._handle_variants_tab_click(mouse_x, mouse_y)
+            elif self.selected_tab == "templates":
+                return self._handle_templates_tab_click(mouse_x, mouse_y)
+
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button in (4, 5):
+            direction = -1 if event.button == 4 else 1
+            return self._handle_scroll(direction)
+
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            self.dragging = False
+            return True
+
+        elif event.type == pygame.MOUSEMOTION and self.dragging:
+            self.rect.x = mouse_x - self.drag_offset_x
+            self.rect.y = mouse_y - self.drag_offset_y
+            self._update_button_positions()
+            return True
 
         elif event.type == pygame.KEYDOWN:
             if self.active_input:
@@ -448,287 +401,846 @@ class WaveConfigDialog:
         return True
 
     def _update_hover(self, mouse_x, mouse_y):
-        """Atualiza estado de hover dos botões"""
         buttons = [
             (self.save_button, "save"),
             (self.cancel_button, "cancel"),
             (self.add_wave_button, "add_wave"),
             (self.remove_wave_button, "remove_wave"),
+            (self.duplicate_wave_button, "duplicate_wave"),
             (self.add_enemy_button, "add_enemy"),
             (self.equalize_button, "equalize"),
-            (self.path_prev_button, "path_prev"),
-            (self.path_next_button, "path_next"),
-            (self.repeat_minus_button, "repeat_minus"),
-            (self.repeat_plus_button, "repeat_plus"),
+            (self.clear_enemies_button, "clear_enemies"),
+            (self.add_variant_button, "add_variant"),
+            (self.remove_variant_button, "remove_variant"),
+            (self.edit_variant_button, "edit_variant"),
+            (self.new_template_button, "new_template"),
+            (self.delete_template_button, "delete_template"),
+            (self.edit_template_button, "edit_template"),
         ]
-
         for button, name in buttons:
             if button.collidepoint(mouse_x, mouse_y):
                 self.hovered_button = name
                 return
+        self.hovered_button = None
 
-    def _handle_left_click(self, mouse_x, mouse_y):
-        """Processa clique esquerdo"""
-        # Título para arrastar
-        title_rect = pygame.Rect(self.rect.x, self.rect.y, self.rect.width, 30)
-        if title_rect.collidepoint(mouse_x, mouse_y):
-            self.dragging = True
-            self.drag_offset_x = mouse_x - self.rect.x
-            self.drag_offset_y = mouse_y - self.rect.y
-            return True
-
-        # Botões Salvar/Cancelar
-        if self.save_button.collidepoint(mouse_x, mouse_y):
-            # Valida total de % antes de salvar
-            if self.selected_tab == "composition":
-                wave = self.wave_manager.get_current_wave()
-                if wave:
-                    total = sum(e.percentage for e in wave.enemies)
-                    if total != 100:
-                        self.input_errors["total"] = f"Total deve ser 100% (atual: {total}%)"
-                        return True
-                    elif not wave.enemies:
-                        self.input_errors["total"] = "Adicione pelo menos um Pokémon"
-                        return True
-
-            self.visible = False
-            return "saved"
-
-        if self.cancel_button.collidepoint(mouse_x, mouse_y):
-            self.visible = False
-            return True
-
-        # Abas
-        for i, tab_button in enumerate(self.tab_buttons):
-            if tab_button.collidepoint(mouse_x, mouse_y):
-                tabs = ["waves", "composition", "settings"]
-                self.selected_tab = tabs[i]
-                return True
-
-        # Processa baseado na aba
-        if self.selected_tab == "waves":
-            return self._handle_waves_tab_click(mouse_x, mouse_y)
-        elif self.selected_tab == "composition":
-            return self._handle_composition_tab_click(mouse_x, mouse_y)
-        elif self.selected_tab == "settings":
-            return self._handle_settings_tab_click(mouse_x, mouse_y)
-
-        return True
-
+    # --- Manipuladores de abas ---
     def _handle_waves_tab_click(self, mouse_x, mouse_y):
-        """Processa cliques na aba de waves"""
         if self.add_wave_button.collidepoint(mouse_x, mouse_y):
             self.wave_manager.add_wave()
             self.selected_wave_index = self.wave_manager.selected_wave
-            self.enemies_scroll = 0
-            self.input_errors.pop("total", None)
+            self._sync_template_dropdown()
             return True
-
         if self.remove_wave_button.collidepoint(mouse_x, mouse_y):
             if self.wave_manager.waves:
                 self.wave_manager.remove_wave(self.selected_wave_index)
                 self.selected_wave_index = self.wave_manager.selected_wave
-                self.enemies_scroll = 0
-                self.input_errors.pop("total", None)
+                self._sync_template_dropdown()
             return True
-
-        # Seleção de wave na lista
+        if self.duplicate_wave_button.collidepoint(mouse_x, mouse_y):
+            wave = self.wave_manager.get_current_wave()
+            if wave:
+                self.wave_manager.add_wave()
+                new_wave = self.wave_manager.get_current_wave()
+                if new_wave:
+                    new_wave.path_index = wave.path_index
+                    new_wave.name = f"{wave.name} (copia)"
+                    new_wave.enemies = [WaveEnemy(e.pokemon_id, e.percentage) for e in wave.enemies]
+                    new_wave.min_level = wave.min_level
+                    new_wave.max_level = wave.max_level
+                    new_wave.wave_size = wave.wave_size
+                    new_wave.spawn_interval = wave.spawn_interval
+                    new_wave.initial_delay = wave.initial_delay
+                    new_wave.repeat_wave = wave.repeat_wave
+                    new_wave.repeat_count = wave.repeat_count
+                    new_wave.template_id = wave.template_id
+                    new_wave.use_variants = wave.use_variants
+                    new_wave.variants = []
+                    for v in wave.variants:
+                        new_v = WaveVariant(v.condition, [WaveEnemy(e.pokemon_id, e.percentage) for e in v.enemies])
+                        new_v.min_level = v.min_level
+                        new_v.max_level = v.max_level
+                        new_wave.variants.append(new_v)
+                    self.selected_wave_index = len(self.wave_manager.waves) - 1
+                    self.wave_manager.selected_wave = self.selected_wave_index
+                    self._sync_template_dropdown()
+            return True
         if self.waves_list_area.collidepoint(mouse_x, mouse_y):
             relative_y = mouse_y - self.waves_list_area.y
             item_index = (relative_y // self.wave_item_height) + self.waves_scroll
-
             if 0 <= item_index < len(self.wave_manager.waves):
                 self.selected_wave_index = item_index
                 self.wave_manager.selected_wave = item_index
+                self._sync_template_dropdown()
                 self.enemies_scroll = 0
-                self.input_errors.pop("total", None)
                 return True
-
         return True
 
     def _handle_composition_tab_click(self, mouse_x, mouse_y):
-        """Processa cliques na aba de composição"""
         wave = self.wave_manager.get_current_wave()
         if not wave:
             return True
+        if wave.template_id:
+            return True
 
-        # Botão adicionar inimigo
         if self.add_enemy_button.collidepoint(mouse_x, mouse_y):
             if len(wave.enemies) < 12:
                 first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
-                wave.enemies.append(WaveEnemy(first_id, 0))
-                self.input_errors.pop("total", None)
+                wave.enemies.append(WaveEnemy(first_id, 0.0))
             return True
-
-        # Botão distribuir igualmente
         if self.equalize_button.collidepoint(mouse_x, mouse_y) and wave.enemies:
-            equal_percent = 100 // len(wave.enemies)
-            remainder = 100 - (equal_percent * len(wave.enemies))
-            for i, enemy in enumerate(wave.enemies):
-                enemy.percentage = equal_percent + (1 if i < remainder else 0)
+            equal_percent = 100.0 / len(wave.enemies)
+            for enemy in wave.enemies:
+                enemy.percentage = equal_percent
+            total = sum(e.percentage for e in wave.enemies)
+            if abs(total - 100.0) > 0.01:
+                wave.enemies[-1].percentage += (100.0 - total)
+            self._check_total_percentage(wave)
+            return True
+        if self.clear_enemies_button.collidepoint(mouse_x, mouse_y):
+            wave.enemies.clear()
             self.input_errors.pop("total", None)
             return True
 
-        # Cliques na lista de inimigos
         if self.enemies_list_area.collidepoint(mouse_x, mouse_y):
             relative_y = mouse_y - self.enemies_list_area.y
             item_index = (relative_y // self.enemy_item_height) + self.enemies_scroll
-
-            print(f"DEBUG: Clicou na área da lista, relative_y={relative_y}, item_index={item_index}")
-
             if 0 <= item_index < len(wave.enemies):
                 enemy = wave.enemies[item_index]
-
-                # Calcula posição do item na tela (considerando scroll)
                 item_y = self.enemies_list_area.y + 2 + (item_index - self.enemies_scroll) * self.enemy_item_height
 
-                # Calcula posição do botão remover
-                remove_rect = pygame.Rect(self.enemies_list_area.right - 30, item_y + 5, 20, 20)
-
-                # Verifica se clicou no botão remover
+                remove_rect = pygame.Rect(self.enemies_list_area.right - 28, item_y + 4, 18, 18)
                 if remove_rect.collidepoint(mouse_x, mouse_y):
-                    print(f"DEBUG: Clicou no botão remover do inimigo {item_index}")
                     del wave.enemies[item_index]
-                    total = sum(e.percentage for e in wave.enemies)
-                    if total != 100 and wave.enemies:
-                        self.input_errors["total"] = f"Total deve ser 100% (atual: {total}%)"
-                    elif not wave.enemies:
-                        self.input_errors["total"] = "Adicione pelo menos um Pokémon"
-                    else:
-                        self.input_errors.pop("total", None)
+                    self._check_total_percentage(wave)
                     return True
 
-                # Área do Pokémon (para selecionar)
-                pokemon_rect = pygame.Rect(self.enemies_list_area.x + 40, item_y + 5, 150, 25)
+                pokemon_rect = pygame.Rect(self.enemies_list_area.x + 38, item_y + 4, 120, 22)
                 if pokemon_rect.collidepoint(mouse_x, mouse_y):
-                    print(f"DEBUG: Clicou na área do Pokémon {item_index}")
                     self.showing_pokemon_selector = True
-                    self.pokemon_selector_enemy_index = item_index
+                    self.pokemon_selector_target = "enemy"
+                    self.pokemon_selector_index = item_index
                     self.pokemon_selector_scroll = 0
                     self.pokemon_search = ""
                     return True
 
-                # Campo de porcentagem - CORRIGIDO
-                percent_rect = pygame.Rect(self.enemies_list_area.right - 90, item_y + 10, 45, 22)
-                print(
-                    f"DEBUG: Verificando campo % em ({percent_rect.x}, {percent_rect.y}) - mouse em ({mouse_x}, {mouse_y})")
-
+                percent_rect = pygame.Rect(self.enemies_list_area.right - 88, item_y + 8, 50, 20)
                 if percent_rect.collidepoint(mouse_x, mouse_y):
-                    print(f"DEBUG: Clicou no campo % do inimigo {item_index}")
                     self.active_input = f"percent_{item_index}"
-                    self.input_texts[self.active_input] = str(enemy.percentage)
+                    self.input_texts[self.active_input] = f"{enemy.percentage:.1f}"
                     return True
-                else:
-                    print(f"DEBUG: Mouse NÃO está sobre o campo % (x: {mouse_x}, y: {mouse_y})")
-            else:
-                print(f"DEBUG: item_index {item_index} fora do range (0-{len(wave.enemies) - 1})")
-
         return True
 
-    def _handle_settings_tab_click(self, mouse_x, mouse_y):
-        """Processa cliques na aba de configurações"""
+    def _handle_variants_tab_click(self, mouse_x, mouse_y):
         wave = self.wave_manager.get_current_wave()
         if not wave:
             return True
 
-        # Campo nome
-        if self.name_input.collidepoint(mouse_x, mouse_y):
-            self.active_input = "wave_name"
-            self.input_texts["wave_name"] = wave.name
+        if self.add_variant_button.collidepoint(mouse_x, mouse_y):
+            if len(wave.variants) < 6:
+                new_variant = WaveVariant("any", [])
+                new_variant.min_level = wave.min_level
+                new_variant.max_level = wave.max_level
+                wave.variants.append(new_variant)
+                wave.use_variants = True
+                self.selected_variant_index = len(wave.variants) - 1
+                self.variant_editor_open = True
+                self.editing_variant_index = self.selected_variant_index
+                for i, opt in enumerate(self.condition_options):
+                    if opt["id"] == "any":
+                        self.condition_selected_index = i
+                        break
             return True
 
-        # Botões de path
-        if self.path_prev_button.collidepoint(mouse_x, mouse_y):
-            wave.path_index = max(0, wave.path_index - 1)
+        if self.remove_variant_button.collidepoint(mouse_x, mouse_y):
+            if self.selected_variant_index >= 0 and self.selected_variant_index < len(wave.variants):
+                del wave.variants[self.selected_variant_index]
+                self.selected_variant_index = -1
+                self.variant_editor_open = False
+                if not wave.variants:
+                    wave.use_variants = False
             return True
 
-        if self.path_next_button.collidepoint(mouse_x, mouse_y):
-            max_path = max(0, len(self.path_manager.paths) - 1)
-            wave.path_index = min(max_path, wave.path_index + 1)
+        if self.edit_variant_button.collidepoint(mouse_x, mouse_y):
+            if self.selected_variant_index >= 0 and self.selected_variant_index < len(wave.variants):
+                self.variant_editor_open = True
+                self.editing_variant_index = self.selected_variant_index
+                variant = wave.variants[self.selected_variant_index]
+                for i, opt in enumerate(self.condition_options):
+                    if opt["id"] == variant.condition:
+                        self.condition_selected_index = i
+                        break
             return True
 
-        # Input fields
-        fields = [
-            (self.size_input, "wave_size"),
-            (self.min_level_input, "min_level"),
-            (self.max_level_input, "max_level"),
-            (self.interval_input, "spawn_interval"),
-            (self.delay_input, "initial_delay"),
-        ]
-
-        for rect, field_name in fields:
-            if rect.collidepoint(mouse_x, mouse_y):
-                self.active_input = field_name
-                current_value = getattr(wave, field_name)
-                self.input_texts[field_name] = str(current_value)
-                return True
-
-        # Checkbox repeat
-        if self.repeat_checkbox.collidepoint(mouse_x, mouse_y):
-            wave.repeat_wave = not wave.repeat_wave
-            return True
-
-        # Botões de repeat count
-        if wave.repeat_wave:
-            if self.repeat_minus_button.collidepoint(mouse_x, mouse_y):
-                wave.repeat_count = max(1, wave.repeat_count - 1)
-                return True
-
-            if self.repeat_plus_button.collidepoint(mouse_x, mouse_y):
-                wave.repeat_count = min(10, wave.repeat_count + 1)
+        if self.variants_list_area.collidepoint(mouse_x, mouse_y):
+            relative_y = mouse_y - self.variants_list_area.y
+            item_index = (relative_y // self.variant_item_height) + self.variants_scroll
+            if 0 <= item_index < len(wave.variants):
+                self.selected_variant_index = item_index
                 return True
 
         return True
 
-    def _handle_pokemon_selector_event(self, event, mouse_x, mouse_y):
-        """Processa eventos do seletor de Pokémon"""
-        selector_rect = pygame.Rect(
-            self.rect.x + 80,
-            self.rect.y + 120,
-            440,
-            360
+    def _handle_templates_tab_click(self, mouse_x, mouse_y):
+        if self.new_template_button.collidepoint(mouse_x, mouse_y):
+            wave = self.wave_manager.get_current_wave()
+            if wave and wave.enemies:
+                template_id = f"template_{random.randint(1000, 9999)}"
+                template = WaveTemplate(template_id, f"Template {len(WaveTemplateManager.get_all_templates()) + 1}")
+                template.enemies = [WaveEnemy(e.pokemon_id, e.percentage) for e in wave.enemies]
+                template.min_level = wave.min_level
+                template.max_level = wave.max_level
+                WaveTemplateManager.add_template(template)
+                self._update_template_options()
+                self._sync_template_dropdown()
+                self.template_selected_index = len(WaveTemplateManager.get_all_templates())
+            return True
+
+        if self.delete_template_button.collidepoint(mouse_x, mouse_y):
+            if self.template_selected_index > 0:
+                templates = WaveTemplateManager.get_all_templates()
+                if self.template_selected_index - 1 < len(templates):
+                    template = templates[self.template_selected_index - 1]
+                    WaveTemplateManager.remove_template(template.template_id)
+                    self.template_selected_index = 0
+                    self._update_template_options()
+                    self._sync_template_dropdown()
+            return True
+
+        if self.edit_template_button.collidepoint(mouse_x, mouse_y):
+            if self.template_selected_index > 0:
+                self.template_editor_open = True
+            return True
+
+        if self.templates_list_area.collidepoint(mouse_x, mouse_y):
+            relative_y = mouse_y - self.templates_list_area.y
+            item_index = (relative_y // self.template_item_height) + self.templates_scroll
+            templates = WaveTemplateManager.get_all_templates()
+            if 0 <= item_index < len(templates):
+                self.template_selected_index = item_index + 1
+                wave = self.wave_manager.get_current_wave()
+                if wave:
+                    wave.template_id = templates[item_index].template_id
+                self._sync_template_dropdown()
+                return True
+        return True
+
+    # --- Editor de Variant ---
+    def _handle_variant_editor_event(self, event, mouse_x, mouse_y):
+        wave = self.wave_manager.get_current_wave()
+        if not wave or self.editing_variant_index < 0 or self.editing_variant_index >= len(wave.variants):
+            self.variant_editor_open = False
+            return None
+
+        variant = wave.variants[self.editing_variant_index]
+        editor_rect = pygame.Rect(
+            self.rect.x + 50,
+            self.rect.y + 100,
+            self.rect.width - 100,
+            self.rect.height - 160
         )
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                # Clique fora do seletor
-                if not selector_rect.collidepoint(mouse_x, mouse_y):
-                    self.showing_pokemon_selector = False
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if not editor_rect.collidepoint(mouse_x, mouse_y):
+                self.variant_editor_open = False
+                self.condition_dropdown_open = False
+                return True
+
+            # Fechar
+            close_rect = pygame.Rect(editor_rect.right - 35, editor_rect.y + 8, 28, 28)
+            if close_rect.collidepoint(mouse_x, mouse_y):
+                self.variant_editor_open = False
+                self.condition_dropdown_open = False
+                return True
+
+            # Dropdown de condição
+            cond_rect = pygame.Rect(editor_rect.x + 140, editor_rect.y + 50, 180, 26)
+            if self.condition_dropdown_open:
+                list_rect = self._get_dropdown_list_rect(cond_rect, self.condition_options)
+                if list_rect.collidepoint(mouse_x, mouse_y):
+                    relative_y = mouse_y - list_rect.y - 2
+                    index = int(relative_y // 26)
+                    if 0 <= index < len(self.condition_options):
+                        variant.condition = self.condition_options[index]["id"]
+                        self.condition_selected_index = index
+                        self.condition_dropdown_open = False
+                        return True
+                self.condition_dropdown_open = False
+                if cond_rect.collidepoint(mouse_x, mouse_y):
+                    self.condition_dropdown_open = True
                     return True
+                return True
 
-                # Campo de busca
-                search_rect = pygame.Rect(selector_rect.x + 10, selector_rect.y + 40, 250, 25)
-                if search_rect.collidepoint(mouse_x, mouse_y):
-                    self.active_input = "pokemon_search"
-                    return True
+            if cond_rect.collidepoint(mouse_x, mouse_y):
+                self.condition_dropdown_open = not self.condition_dropdown_open
+                return True
 
-                # Lista de Pokémon
-                list_area = pygame.Rect(selector_rect.x + 5, selector_rect.y + 75, selector_rect.width - 10, 240)
-                if list_area.collidepoint(mouse_x, mouse_y):
-                    relative_y = mouse_y - list_area.y
-                    item_index = (relative_y // 35) + self.pokemon_selector_scroll
+            # Adicionar inimigo
+            add_enemy_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 88, 120, 26)
+            if add_enemy_rect.collidepoint(mouse_x, mouse_y):
+                if len(variant.enemies) < 8:
+                    first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
+                    variant.enemies.append(WaveEnemy(first_id, 0.0))
+                return True
 
-                    filtered_ids = self._filter_pokemon()
-                    if 0 <= item_index < len(filtered_ids):
-                        wave = self.wave_manager.get_current_wave()
-                        if wave and self.pokemon_selector_enemy_index < len(wave.enemies):
-                            wave.enemies[self.pokemon_selector_enemy_index].pokemon_id = filtered_ids[item_index]
-                            cache_key = (filtered_ids[item_index], 32)
-                            if cache_key in self.sprite_cache:
-                                del self.sprite_cache[cache_key]
-                            self.showing_pokemon_selector = False
+            # Lista de inimigos
+            list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
+            if list_rect.collidepoint(mouse_x, mouse_y):
+                relative_y = mouse_y - list_rect.y
+                item_index = int(relative_y // 32)
+                if 0 <= item_index < len(variant.enemies):
+                    enemy = variant.enemies[item_index]
+                    item_y = list_rect.y + item_index * 32
+
+                    remove_rect = pygame.Rect(list_rect.right - 28, item_y + 4, 18, 18)
+                    if remove_rect.collidepoint(mouse_x, mouse_y):
+                        del variant.enemies[item_index]
                         return True
 
-            elif event.button == 4:  # Scroll up
-                self.pokemon_selector_scroll = max(0, self.pokemon_selector_scroll - 1)
-                return True
-            elif event.button == 5:  # Scroll down
-                filtered_count = len(self._filter_pokemon())
-                max_scroll = max(0, filtered_count - 7)
-                self.pokemon_selector_scroll = min(max_scroll, self.pokemon_selector_scroll + 1)
+                    pokemon_rect = pygame.Rect(list_rect.x + 38, item_y + 4, 120, 22)
+                    if pokemon_rect.collidepoint(mouse_x, mouse_y):
+                        self.showing_pokemon_selector = True
+                        self.pokemon_selector_target = "variant"
+                        self.pokemon_selector_index = item_index
+                        self.pokemon_selector_scroll = 0
+                        self.pokemon_search = ""
+                        return True
+
+                    percent_rect = pygame.Rect(list_rect.right - 85, item_y + 4, 50, 20)
+                    if percent_rect.collidepoint(mouse_x, mouse_y):
+                        self.active_input = f"variant_percent_{item_index}"
+                        self.input_texts[self.active_input] = f"{enemy.percentage:.1f}"
+                        return True
+
+        if event.type == pygame.MOUSEMOTION and self.condition_dropdown_open:
+            cond_rect = pygame.Rect(editor_rect.x + 140, editor_rect.y + 50, 180, 26)
+            list_rect = self._get_dropdown_list_rect(cond_rect, self.condition_options)
+            if list_rect.collidepoint(mouse_x, mouse_y):
+                relative_y = mouse_y - list_rect.y - 2
+                index = int(relative_y // 26)
+                if 0 <= index < len(self.condition_options):
+                    self.condition_hovered_index = index
+                else:
+                    self.condition_hovered_index = -1
+            else:
+                self.condition_hovered_index = -1
+
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.variant_editor_open = False
+            self.condition_dropdown_open = False
+            return True
+
+        return None
+
+    def _render_variant_editor(self, screen):
+        wave = self.wave_manager.get_current_wave()
+        if not wave or self.editing_variant_index < 0 or self.editing_variant_index >= len(wave.variants):
+            return
+
+        variant = wave.variants[self.editing_variant_index]
+        editor_rect = pygame.Rect(
+            self.rect.x + 50,
+            self.rect.y + 100,
+            self.rect.width - 100,
+            self.rect.height - 160
+        )
+
+        # Sombra
+        shadow = pygame.Surface((editor_rect.width + 10, editor_rect.height + 10), pygame.SRCALPHA)
+        shadow.fill((0, 0, 0, 120))
+        screen.blit(shadow, (editor_rect.x - 5, editor_rect.y - 5))
+
+        # Fundo
+        pygame.draw.rect(screen, self.colors['bg_light'], editor_rect, border_radius=10)
+        pygame.draw.rect(screen, self.colors['border_active'], editor_rect, 2, border_radius=10)
+
+        # Título
+        title = self._get_font(18, True).render("Editor de Variant", True, self.colors['title'])
+        screen.blit(title, (editor_rect.x + 20, editor_rect.y + 10))
+
+        # Fechar
+        close_rect = pygame.Rect(editor_rect.right - 35, editor_rect.y + 8, 28, 28)
+        pygame.draw.rect(screen, self.colors['danger'], close_rect, border_radius=6)
+        close_text = self._get_font(18).render("X", True, self.colors['text'])
+        screen.blit(close_text, (close_rect.x + 8, close_rect.y + 4))
+
+        # Condição
+        cond_label = self._get_font(14).render("Período:", True, self.colors['text_dim'])
+        screen.blit(cond_label, (editor_rect.x + 20, editor_rect.y + 52))
+
+        cond_rect = pygame.Rect(editor_rect.x + 140, editor_rect.y + 50, 180, 26)
+        cond_border = self.colors['border_active'] if self.condition_dropdown_open else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], cond_rect, border_radius=5)
+        pygame.draw.rect(screen, cond_border, cond_rect, 1, border_radius=5)
+
+        cond_labels = {c["id"]: c["label"] for c in self.condition_options}
+        cond_text = self._get_font(14).render(cond_labels.get(variant.condition, "Qualquer"), True, self.colors['text'])
+        screen.blit(cond_text, (cond_rect.x + 8, cond_rect.y + 3))
+        arrow = self._get_font(14).render("▼" if not self.condition_dropdown_open else "▲", True, self.colors['text_muted'])
+        screen.blit(arrow, (cond_rect.right - 20, cond_rect.y + 3))
+
+        # Lista de inimigos
+        list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
+        pygame.draw.rect(screen, self.colors['bg_dark'], list_rect, border_radius=6)
+
+        old_clip = screen.get_clip()
+        screen.set_clip(list_rect)
+
+        for i, enemy in enumerate(variant.enemies):
+            item_y = list_rect.y + i * 32
+            if item_y + 32 < list_rect.y or item_y > list_rect.y + list_rect.height:
+                continue
+
+            item_rect = pygame.Rect(list_rect.x + 4, item_y, list_rect.width - 8, 32)
+            bg_color = self.colors['bg_light'] if i % 2 == 0 else self.colors['bg_dark']
+            pygame.draw.rect(screen, bg_color, item_rect)
+
+            sprite = self._get_pokemon_sprite(enemy.pokemon_id, 22)
+            screen.blit(sprite, (item_rect.x + 2, item_rect.y + 5))
+
+            name = self.pokedex.get_name(enemy.pokemon_id)
+            name_text = self._get_font(13).render(name, True, self.colors['text'])
+            screen.blit(name_text, (item_rect.x + 28, item_rect.y + 8))
+
+            # Campo de percentual
+            percent_rect = pygame.Rect(list_rect.right - 78, item_y + 6, 45, 20)
+            is_active = self.active_input == f"variant_percent_{i}"
+            border = self.colors['border_active'] if is_active else self.colors['border']
+            pygame.draw.rect(screen, self.colors['bg_input'], percent_rect, border_radius=3)
+            pygame.draw.rect(screen, border, percent_rect, 1, border_radius=3)
+
+            display = self.input_texts.get(f"variant_percent_{i}", f"{enemy.percentage:.1f}") if is_active else f"{enemy.percentage:.1f}"
+            pct_text = self._get_font(12).render(display, True, self.colors['text'])
+            screen.blit(pct_text, (percent_rect.x + 3, percent_rect.y + 3))
+            pct_symbol = self._get_font(10).render("%", True, self.colors['text_muted'])
+            screen.blit(pct_symbol, (percent_rect.right + 2, percent_rect.y + 3))
+
+            # Botão remover
+            remove_rect = pygame.Rect(list_rect.right - 22, item_y + 7, 14, 14)
+            pygame.draw.rect(screen, self.colors['danger'], remove_rect, border_radius=3)
+            pygame.draw.line(screen, self.colors['text'],
+                             (remove_rect.x + 3, remove_rect.y + 3),
+                             (remove_rect.right - 3, remove_rect.bottom - 3), 2)
+            pygame.draw.line(screen, self.colors['text'],
+                             (remove_rect.right - 3, remove_rect.y + 3),
+                             (remove_rect.x + 3, remove_rect.bottom - 3), 2)
+
+        screen.set_clip(old_clip)
+
+        # Dropdown de condição (sobreposto)
+        if self.condition_dropdown_open:
+            list_rect_drop = self._get_dropdown_list_rect(cond_rect, self.condition_options)
+            # Reposiciona se invadir a lista
+            if list_rect_drop.bottom > list_rect.y and list_rect_drop.y < list_rect.bottom:
+                list_rect_drop.y = cond_rect.top - list_rect_drop.height - 2
+                if list_rect_drop.top < editor_rect.top:
+                    list_rect_drop.y = cond_rect.bottom + 2
+
+            pygame.draw.rect(screen, self.colors['bg_dropdown'], list_rect_drop, border_radius=5)
+            pygame.draw.rect(screen, self.colors['border_dropdown'], list_rect_drop, 1, border_radius=5)
+
+            for i, opt in enumerate(self.condition_options):
+                item_rect = pygame.Rect(list_rect_drop.x + 4, list_rect_drop.y + 2 + i * 26, list_rect_drop.width - 8, 22)
+                is_hover = (i == self.condition_hovered_index)
+                is_sel = opt["id"] == variant.condition
+
+                bg = self.colors['dropdown_item_hover'] if is_hover else self.colors['bg_dropdown']
+                if is_sel:
+                    bg = self.colors['accent']
+                pygame.draw.rect(screen, bg, item_rect, border_radius=4)
+
+                text = self._get_font(13).render(opt["label"], True, self.colors['text'])
+                screen.blit(text, (item_rect.x + 8, item_rect.y + 3))
+                if is_sel:
+                    check = self._get_font(13).render("✓", True, self.colors['radio_selected'])
+                    screen.blit(check, (item_rect.right - 20, item_rect.y + 3))
+
+        # Botão adicionar
+        add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 88, 120, 26)
+        self._render_button(screen, add_rect, "variant_add_enemy", "+ Adicionar")
+
+        # Total
+        total = sum(e.percentage for e in variant.enemies)
+        color = (100, 255, 100) if abs(total - 100.0) < 0.01 else (255, 100, 100)
+        total_text = self._get_font(13).render(f"Total: {total:.1f}%", True, color)
+        screen.blit(total_text, (list_rect.x, list_rect.bottom + 6))
+
+    # --- Editor de Template ---
+    def _handle_template_editor_event(self, event, mouse_x, mouse_y):
+        templates = WaveTemplateManager.get_all_templates()
+        if self.template_selected_index <= 0 or self.template_selected_index - 1 >= len(templates):
+            self.template_editor_open = False
+            return None
+
+        template = templates[self.template_selected_index - 1]
+        editor_rect = pygame.Rect(
+            self.rect.x + 50,
+            self.rect.y + 100,
+            self.rect.width - 100,
+            self.rect.height - 160
+        )
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if not editor_rect.collidepoint(mouse_x, mouse_y):
+                self.template_editor_open = False
                 return True
 
-        elif event.type == pygame.KEYDOWN:
+            # Fechar
+            close_rect = pygame.Rect(editor_rect.right - 35, editor_rect.y + 8, 28, 28)
+            if close_rect.collidepoint(mouse_x, mouse_y):
+                self.template_editor_open = False
+                return True
+
+            # Nome
+            name_rect = pygame.Rect(editor_rect.x + 140, editor_rect.y + 15, 200, 26)
+            if name_rect.collidepoint(mouse_x, mouse_y):
+                self.active_input = "template_name"
+                self.input_texts["template_name"] = template.name
+                return True
+
+            # Adicionar inimigo
+            add_enemy_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 52, 120, 26)
+            if add_enemy_rect.collidepoint(mouse_x, mouse_y):
+                if len(template.enemies) < 8:
+                    first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
+                    template.enemies.append(WaveEnemy(first_id, 0.0))
+                return True
+
+            # Lista de inimigos
+            list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 86, editor_rect.width - 40, 200)
+            if list_rect.collidepoint(mouse_x, mouse_y):
+                relative_y = mouse_y - list_rect.y
+                item_index = int(relative_y // 32)
+                if 0 <= item_index < len(template.enemies):
+                    enemy = template.enemies[item_index]
+                    item_y = list_rect.y + item_index * 32
+
+                    remove_rect = pygame.Rect(list_rect.right - 28, item_y + 4, 18, 18)
+                    if remove_rect.collidepoint(mouse_x, mouse_y):
+                        del template.enemies[item_index]
+                        return True
+
+                    pokemon_rect = pygame.Rect(list_rect.x + 38, item_y + 4, 120, 22)
+                    if pokemon_rect.collidepoint(mouse_x, mouse_y):
+                        self.showing_pokemon_selector = True
+                        self.pokemon_selector_target = "template"
+                        self.pokemon_selector_index = item_index
+                        self.pokemon_selector_scroll = 0
+                        self.pokemon_search = ""
+                        return True
+
+                    percent_rect = pygame.Rect(list_rect.right - 85, item_y + 4, 50, 20)
+                    if percent_rect.collidepoint(mouse_x, mouse_y):
+                        self.active_input = f"template_percent_{item_index}"
+                        self.input_texts[self.active_input] = f"{enemy.percentage:.1f}"
+                        return True
+
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.template_editor_open = False
+            return True
+
+        return None
+
+    def _render_template_editor(self, screen):
+        templates = WaveTemplateManager.get_all_templates()
+        if self.template_selected_index <= 0 or self.template_selected_index - 1 >= len(templates):
+            return
+
+        template = templates[self.template_selected_index - 1]
+
+        editor_rect = pygame.Rect(
+            self.rect.x + 50,
+            self.rect.y + 100,
+            self.rect.width - 100,
+            self.rect.height - 160
+        )
+
+        shadow = pygame.Surface((editor_rect.width + 10, editor_rect.height + 10), pygame.SRCALPHA)
+        shadow.fill((0, 0, 0, 120))
+        screen.blit(shadow, (editor_rect.x - 5, editor_rect.y - 5))
+
+        pygame.draw.rect(screen, self.colors['bg_light'], editor_rect, border_radius=10)
+        pygame.draw.rect(screen, self.colors['border_active'], editor_rect, 2, border_radius=10)
+
+        title = self._get_font(18, True).render("Editor de Template", True, self.colors['title'])
+        screen.blit(title, (editor_rect.x + 20, editor_rect.y + 10))
+
+        close_rect = pygame.Rect(editor_rect.right - 35, editor_rect.y + 8, 28, 28)
+        pygame.draw.rect(screen, self.colors['danger'], close_rect, border_radius=6)
+        close_text = self._get_font(18).render("X", True, self.colors['text'])
+        screen.blit(close_text, (close_rect.x + 8, close_rect.y + 4))
+
+        # Nome
+        name_label = self._get_font(14).render("Nome:", True, self.colors['text_dim'])
+        screen.blit(name_label, (editor_rect.x + 20, editor_rect.y + 52))
+
+        name_rect = pygame.Rect(editor_rect.x + 140, editor_rect.y + 50, 200, 26)
+        is_active = self.active_input == "template_name"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], name_rect, border_radius=5)
+        pygame.draw.rect(screen, border, name_rect, 1, border_radius=5)
+
+        display = self.input_texts.get("template_name", template.name) if is_active else template.name
+        name_text = self._get_font(14).render(display, True, self.colors['text'])
+        screen.blit(name_text, (name_rect.x + 8, name_rect.y + 3))
+
+        # Botão adicionar
+        add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 88, 120, 26)
+        self._render_button(screen, add_rect, "template_add_enemy", "+ Adicionar")
+
+        # Lista
+        list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
+        pygame.draw.rect(screen, self.colors['bg_dark'], list_rect, border_radius=6)
+
+        old_clip = screen.get_clip()
+        screen.set_clip(list_rect)
+
+        for i, enemy in enumerate(template.enemies):
+            item_y = list_rect.y + i * 32
+            if item_y + 32 < list_rect.y or item_y > list_rect.y + list_rect.height:
+                continue
+
+            item_rect = pygame.Rect(list_rect.x + 4, item_y, list_rect.width - 8, 32)
+            bg_color = self.colors['bg_light'] if i % 2 == 0 else self.colors['bg_dark']
+            pygame.draw.rect(screen, bg_color, item_rect)
+
+            sprite = self._get_pokemon_sprite(enemy.pokemon_id, 22)
+            screen.blit(sprite, (item_rect.x + 2, item_rect.y + 5))
+
+            name = self.pokedex.get_name(enemy.pokemon_id)
+            name_text = self._get_font(13).render(name, True, self.colors['text'])
+            screen.blit(name_text, (item_rect.x + 28, item_rect.y + 8))
+
+            percent_rect = pygame.Rect(list_rect.right - 78, item_y + 6, 45, 20)
+            is_active = self.active_input == f"template_percent_{i}"
+            border = self.colors['border_active'] if is_active else self.colors['border']
+            pygame.draw.rect(screen, self.colors['bg_input'], percent_rect, border_radius=3)
+            pygame.draw.rect(screen, border, percent_rect, 1, border_radius=3)
+
+            display = self.input_texts.get(f"template_percent_{i}", f"{enemy.percentage:.1f}") if is_active else f"{enemy.percentage:.1f}"
+            pct_text = self._get_font(12).render(display, True, self.colors['text'])
+            screen.blit(pct_text, (percent_rect.x + 3, percent_rect.y + 3))
+            pct_symbol = self._get_font(10).render("%", True, self.colors['text_muted'])
+            screen.blit(pct_symbol, (percent_rect.right + 2, percent_rect.y + 3))
+
+            remove_rect = pygame.Rect(list_rect.right - 22, item_y + 7, 14, 14)
+            pygame.draw.rect(screen, self.colors['danger'], remove_rect, border_radius=3)
+            pygame.draw.line(screen, self.colors['text'],
+                             (remove_rect.x + 3, remove_rect.y + 3),
+                             (remove_rect.right - 3, remove_rect.bottom - 3), 2)
+            pygame.draw.line(screen, self.colors['text'],
+                             (remove_rect.right - 3, remove_rect.y + 3),
+                             (remove_rect.x + 3, remove_rect.bottom - 3), 2)
+
+        screen.set_clip(old_clip)
+
+        total = sum(e.percentage for e in template.enemies)
+        color = (100, 255, 100) if abs(total - 100.0) < 0.01 else (255, 100, 100)
+        total_text = self._get_font(13).render(f"Total: {total:.1f}%", True, color)
+        screen.blit(total_text, (list_rect.x, list_rect.bottom + 6))
+
+    # --- Utilitários ---
+    def _get_dropdown_list_rect(self, dropdown_rect, options):
+        item_height = 28
+        list_height = min(len(options) * item_height + 4, 180)
+        return pygame.Rect(
+            dropdown_rect.x,
+            dropdown_rect.bottom + 2,
+            dropdown_rect.width,
+            list_height
+        )
+
+    def _check_total_percentage(self, wave):
+        total = sum(e.percentage for e in wave.enemies)
+        if abs(total - 100.0) > 0.01:
+            self.input_errors["total"] = f"Total deve ser 100% (atual: {total:.1f}%)"
+        else:
+            self.input_errors.pop("total", None)
+
+    def _handle_keydown(self, event):
+        if event.key == pygame.K_RETURN:
+            return self._apply_input()
+        elif event.key == pygame.K_ESCAPE:
+            self.active_input = None
+            return True
+        elif event.key == pygame.K_BACKSPACE:
+            if self.active_input in self.input_texts:
+                self.input_texts[self.active_input] = self.input_texts[self.active_input][:-1]
+            return True
+        elif event.unicode in "0123456789." or (
+                self.active_input in ["template_name", "wave_name"] and event.unicode.isprintable()):
+            if self.active_input in self.input_texts:
+                self.input_texts[self.active_input] += event.unicode
+            return True
+        return False
+
+    def _apply_input(self):
+        wave = self.wave_manager.get_current_wave()
+        if not wave or not self.active_input:
+            return False
+
+        try:
+            value = self.input_texts.get(self.active_input, "")
+
+            if self.active_input.startswith("percent_"):
+                index = int(self.active_input.split("_")[1])
+                if 0 <= index < len(wave.enemies):
+                    new_percent = float(value) if value else 0.0
+                    new_percent = max(0.0, min(100.0, new_percent))
+                    wave.enemies[index].percentage = new_percent
+                    self._check_total_percentage(wave)
+
+            elif self.active_input == "wave_name":
+                wave.name = value
+
+            elif self.active_input == "wave_size":
+                wave.wave_size = max(1, int(float(value)) if value else 1)
+
+            elif self.active_input.startswith("variant_percent_"):
+                index = int(self.active_input.split("_")[2])
+                if self.editing_variant_index >= 0:
+                    variant = wave.variants[self.editing_variant_index]
+                    if 0 <= index < len(variant.enemies):
+                        new_percent = float(value) if value else 0.0
+                        new_percent = max(0.0, min(100.0, new_percent))
+                        variant.enemies[index].percentage = new_percent
+
+            elif self.active_input.startswith("template_percent_"):
+                index = int(self.active_input.split("_")[2])
+                templates = WaveTemplateManager.get_all_templates()
+                if self.template_selected_index > 0 and self.template_selected_index - 1 < len(templates):
+                    template = templates[self.template_selected_index - 1]
+                    if 0 <= index < len(template.enemies):
+                        new_percent = float(value) if value else 0.0
+                        new_percent = max(0.0, min(100.0, new_percent))
+                        template.enemies[index].percentage = new_percent
+
+            elif self.active_input == "template_name":
+                templates = WaveTemplateManager.get_all_templates()
+                if self.template_selected_index > 0 and self.template_selected_index - 1 < len(templates):
+                    templates[self.template_selected_index - 1].name = value
+                    self._update_template_options()
+
+            self.active_input = None
+            return True
+
+        except ValueError:
+            self.active_input = None
+            return False
+
+    def _handle_scroll(self, direction):
+        if self.selected_tab == "waves":
+            max_scroll = max(0, len(self.wave_manager.waves) - self.waves_per_page)
+            self.waves_scroll = max(0, min(max_scroll, self.waves_scroll + direction))
+            return True
+        elif self.selected_tab == "composition":
+            wave = self.wave_manager.get_current_wave()
+            if wave:
+                max_scroll = max(0, len(wave.enemies) - self.enemies_per_page)
+                self.enemies_scroll = max(0, min(max_scroll, self.enemies_scroll + direction))
+            return True
+        elif self.selected_tab == "variants":
+            wave = self.wave_manager.get_current_wave()
+            if wave:
+                max_scroll = max(0, len(wave.variants) - self.variants_per_page)
+                self.variants_scroll = max(0, min(max_scroll, self.variants_scroll + direction))
+            return True
+        elif self.selected_tab == "templates":
+            templates = WaveTemplateManager.get_all_templates()
+            max_scroll = max(0, len(templates) - self.templates_per_page)
+            self.templates_scroll = max(0, min(max_scroll, self.templates_scroll + direction))
+            return True
+        return False
+
+    # ========================================================================
+    # NOVO SELETOR DE POKÉMON (totalmente reformulado)
+    # ========================================================================
+
+    def _handle_pokemon_selector_event(self, event, mouse_x, mouse_y):
+        """Processa eventos exclusivamente do seletor de Pokémon."""
+        selector_rect = self._get_selector_rect()
+        list_area = pygame.Rect(
+            selector_rect.x + 10,
+            selector_rect.y + 70,
+            selector_rect.width - 30,
+            selector_rect.height - 110
+        )
+        ITEM_HEIGHT = 36
+        filtered = self._filter_pokemon()
+        max_scroll = max(0, len(filtered) - (list_area.height // ITEM_HEIGHT))
+
+        # --- MOUSEWHEEL ---
+        if event.type == pygame.MOUSEWHEEL:
+            if selector_rect.collidepoint(mouse_x, mouse_y):
+                self.pokemon_selector_scroll = max(0, min(max_scroll, self.pokemon_selector_scroll - event.y))
+                return
+
+        # --- MOUSEBUTTONDOWN ---
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Clicou fora do seletor? Fecha.
+            if not selector_rect.collidepoint(mouse_x, mouse_y):
+                self.showing_pokemon_selector = False
+                return
+
+            # Campo de busca
+            search_rect = pygame.Rect(selector_rect.x + 10, selector_rect.y + 40, 200, 26)
+            if search_rect.collidepoint(mouse_x, mouse_y):
+                self.active_input = "pokemon_search"
+                return
+
+            # Área da lista (inicia arraste)
+            if list_area.collidepoint(mouse_x, mouse_y):
+                self.pokemon_dragging_scroll = True
+                self.pokemon_drag_start_y = mouse_y
+                self.pokemon_drag_start_scroll = self.pokemon_selector_scroll
+                return
+
+            # Barra de rolagem (arraste do thumb)
+            if self._scrollbar_rect(selector_rect).collidepoint(mouse_x, mouse_y):
+                self.pokemon_dragging_thumb = True
+                self.pokemon_thumb_start_y = mouse_y
+                self.pokemon_thumb_start_scroll = self.pokemon_selector_scroll
+                return
+
+            # ===== CLIQUE EM ITEM DA LISTA (CORRIGIDO) =====
+            # Calcula a posição relativa ao início da lista (incluindo a margem de 4px)
+            relative_y = mouse_y - list_area.y - 4  # margem superior de 4px
+            if relative_y >= 0:
+                item_index = (relative_y // ITEM_HEIGHT) + self.pokemon_selector_scroll
+                if 0 <= item_index < len(filtered):
+                    self._select_pokemon(filtered[item_index])
+                    self.showing_pokemon_selector = False
+                    return
+
+        # --- MOUSEMOTION (arraste) ---
+        if event.type == pygame.MOUSEMOTION:
+            if self.pokemon_dragging_scroll:
+                delta_y = mouse_y - self.pokemon_drag_start_y
+                scroll_delta = delta_y // ITEM_HEIGHT
+                new_scroll = self.pokemon_drag_start_scroll + scroll_delta
+                self.pokemon_selector_scroll = max(0, min(max_scroll, new_scroll))
+                return
+
+            if self.pokemon_dragging_thumb:
+                delta_y = mouse_y - self.pokemon_thumb_start_y
+                scrollbar_height = list_area.height - 20
+                if scrollbar_height > 0:
+                    thumb_ratio = list_area.height / (len(filtered) * ITEM_HEIGHT) if filtered else 1
+                    thumb_height = max(20, int(scrollbar_height * thumb_ratio))
+                    max_thumb_y = scrollbar_height - thumb_height
+                    if max_thumb_y > 0:
+                        scroll_delta = (delta_y / max_thumb_y) * max_scroll
+                        new_scroll = self.pokemon_thumb_start_scroll + int(scroll_delta)
+                        self.pokemon_selector_scroll = max(0, min(max_scroll, new_scroll))
+                return
+
+        # --- MOUSEBUTTONUP ---
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            self.pokemon_dragging_scroll = False
+            self.pokemon_dragging_thumb = False
+            return
+
+        # --- KEYDOWN ---
+        if event.type == pygame.KEYDOWN:
             if self.active_input == "pokemon_search":
                 if event.key == pygame.K_BACKSPACE:
                     self.pokemon_search = self.pokemon_search[:-1]
@@ -740,582 +1252,537 @@ class WaveConfigDialog:
                 elif event.unicode.isprintable():
                     self.pokemon_search += event.unicode
                     self.pokemon_selector_scroll = 0
-                return True
+                return
             elif event.key == pygame.K_ESCAPE:
                 self.showing_pokemon_selector = False
-                return True
+                return
 
-        return True
+    def _select_pokemon(self, pokemon_id):
+        """Aplica a seleção do Pokémon ao alvo correspondente."""
+        wave = self.wave_manager.get_current_wave()
+
+        if self.pokemon_selector_target == "enemy":
+            if wave and self.pokemon_selector_index < len(wave.enemies):
+                wave.enemies[self.pokemon_selector_index].pokemon_id = pokemon_id
+
+        elif self.pokemon_selector_target == "variant":
+            if wave and self.editing_variant_index >= 0 and self.editing_variant_index < len(wave.variants):
+                variant = wave.variants[self.editing_variant_index]
+                if self.pokemon_selector_index < len(variant.enemies):
+                    variant.enemies[self.pokemon_selector_index].pokemon_id = pokemon_id
+
+        elif self.pokemon_selector_target == "template":
+            templates = WaveTemplateManager.get_all_templates()
+            if self.template_selected_index > 0 and self.template_selected_index - 1 < len(templates):
+                template = templates[self.template_selected_index - 1]
+                if self.pokemon_selector_index < len(template.enemies):
+                    template.enemies[self.pokemon_selector_index].pokemon_id = pokemon_id
+
+    def _get_selector_rect(self):
+        """Retorna o retângulo do seletor, centralizado no diálogo."""
+        sel_w, sel_h = 500, 420
+        x = self.rect.x + (self.rect.width - sel_w) // 2
+        y = self.rect.y + (self.rect.height - sel_h) // 2
+        return pygame.Rect(x, y, sel_w, sel_h)
+
+    def _scrollbar_rect(self, selector_rect):
+        """Retorna o retângulo da barra de rolagem."""
+        return pygame.Rect(
+            selector_rect.right - 18,
+            selector_rect.y + 70,
+            12,
+            selector_rect.height - 110
+        )
 
     def _filter_pokemon(self):
-        """Filtra Pokémon por busca"""
         if not self.pokemon_search:
             return self.available_pokemon_ids
-
         search_lower = self.pokemon_search.lower()
         filtered = []
-
         for pid in self.available_pokemon_ids:
             name = self.pokedex.get_name(pid).lower()
             if search_lower in str(pid) or search_lower in name:
                 filtered.append(pid)
-
         return filtered
 
-    def _handle_keydown(self, event):
-        """Processa teclas pressionadas em inputs"""
-        if event.key == pygame.K_RETURN:
-            return self._apply_input()
-        elif event.key == pygame.K_ESCAPE:
-            self.active_input = None
-            return True
-        elif event.key == pygame.K_BACKSPACE:
-            if self.active_input in self.input_texts:
-                self.input_texts[self.active_input] = self.input_texts[self.active_input][:-1]
-            return True
-        elif event.unicode.isdigit() or event.unicode == '.' or (
-                self.active_input == "wave_name" and event.unicode.isprintable()):
-            if self.active_input in self.input_texts:
-                self.input_texts[self.active_input] += event.unicode
-            return True
-        return False
+    def _render_pokemon_selector(self, screen):
+        selector_rect = self._get_selector_rect()
+        list_area = pygame.Rect(
+            selector_rect.x + 10,
+            selector_rect.y + 70,
+            selector_rect.width - 30,
+            selector_rect.height - 110
+        )
+        ITEM_HEIGHT = 36
+        filtered = self._filter_pokemon()
+        max_scroll = max(0, len(filtered) - (list_area.height // ITEM_HEIGHT))
+        self.pokemon_selector_scroll = max(0, min(max_scroll, self.pokemon_selector_scroll))
 
-    def _apply_input(self):
-        """Aplica o valor do input atual"""
-        wave = self.wave_manager.get_current_wave()
-        if not wave or not self.active_input:
-            return False
+        # --- Fundo semi-transparente (overlay) ---
+        overlay = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        screen.blit(overlay, (0, 0))
 
-        try:
-            value = self.input_texts.get(self.active_input, "")
+        # --- Fundo do seletor ---
+        pygame.draw.rect(screen, self.colors['bg_light'], selector_rect, border_radius=12)
+        pygame.draw.rect(screen, self.colors['border_active'], selector_rect, 2, border_radius=12)
 
-            # Nome da wave
-            if self.active_input == "wave_name":
-                wave.name = value
+        # Título
+        title = self._get_font(20, True).render("Selecionar Pokémon", True, self.colors['title'])
+        screen.blit(title, (selector_rect.x + 10, selector_rect.y + 8))
 
-            # Porcentagem dos inimigos
-            elif self.active_input.startswith("percent_"):
-                index = int(self.active_input.split("_")[1])
-                if 0 <= index < len(wave.enemies):
-                    new_percent = int(float(value)) if value else 0
-                    new_percent = max(0, min(100, new_percent))
-                    wave.enemies[index].percentage = new_percent
+        # Botão fechar (X)
+        close_rect = pygame.Rect(selector_rect.right - 35, selector_rect.y + 8, 28, 28)
+        pygame.draw.rect(screen, self.colors['danger'], close_rect, border_radius=6)
+        close_text = self._get_font(18).render("X", True, self.colors['text'])
+        screen.blit(close_text, (close_rect.x + 8, close_rect.y + 4))
 
-                    total = sum(e.percentage for e in wave.enemies)
-                    if total != 100:
-                        self.input_errors["total"] = f"Total deve ser 100% (atual: {total}%)"
-                    else:
-                        self.input_errors.pop("total", None)
+        # Campo de busca
+        search_rect = pygame.Rect(selector_rect.x + 10, selector_rect.y + 40, 200, 26)
+        is_search_active = (self.active_input == "pokemon_search")
+        border = self.colors['border_active'] if is_search_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], search_rect, border_radius=5)
+        pygame.draw.rect(screen, border, search_rect, 1, border_radius=5)
 
-            # Campos numéricos
-            elif self.active_input == "wave_size":
-                wave.wave_size = max(1, int(float(value)) if value else 1)
-            elif self.active_input == "min_level":
-                wave.min_level = max(1, int(float(value)) if value else 1)
-            elif self.active_input == "max_level":
-                new_max = int(float(value)) if value else wave.min_level
-                wave.max_level = max(wave.min_level, new_max)
-            elif self.active_input == "spawn_interval":
-                wave.spawn_interval = max(0.1, float(value) if value else 0.1)
-            elif self.active_input == "initial_delay":
-                wave.initial_delay = max(0, float(value) if value else 0)
+        display = self.pokemon_search if self.pokemon_search else "Buscar..."
+        color = self.colors['text'] if self.pokemon_search else self.colors['text_muted']
+        search_text = self._get_font(14).render(display, True, color)
+        screen.blit(search_text, (search_rect.x + 8, search_rect.y + 4))
 
-            self.active_input = None
-            return True
+        # Contador
+        counter = self._get_font(13).render(f"{len(filtered)} Pokémon", True, self.colors['text_dim'])
+        screen.blit(counter, (selector_rect.right - 110, selector_rect.y + 44))
 
-        except ValueError:
-            self.active_input = None
-            return False
+        # --- Lista ---
+        pygame.draw.rect(screen, self.colors['bg_dark'], list_area, border_radius=6)
 
-    def _handle_scroll(self, direction):
-        """Processa scroll do mouse"""
-        if self.selected_tab == "waves":
-            max_scroll = max(0, len(self.wave_manager.waves) - self.waves_per_page)
-            self.waves_scroll = max(0, min(max_scroll, self.waves_scroll + direction))
-            return True
-        elif self.selected_tab == "composition":
-            wave = self.wave_manager.get_current_wave()
-            if wave:
-                max_scroll = max(0, len(wave.enemies) - self.enemies_per_page)
-                self.enemies_scroll = max(0, min(max_scroll, self.enemies_scroll + direction))
-            return True
-        return False
+        old_clip = screen.get_clip()
+        screen.set_clip(list_area)
 
+        list_x = list_area.x + 4
+        list_start_y = list_area.y + 4 - self.pokemon_selector_scroll * ITEM_HEIGHT
+
+        for i, pid in enumerate(filtered):
+            item_y = list_start_y + i * ITEM_HEIGHT
+            if item_y + ITEM_HEIGHT < list_area.y or item_y > list_area.y + list_area.height:
+                continue
+
+            item_rect = pygame.Rect(list_x, item_y, list_area.width - 8, ITEM_HEIGHT - 2)
+            bg_color = self.colors['bg_light'] if i % 2 == 0 else self.colors['bg_dark']
+            pygame.draw.rect(screen, bg_color, item_rect)
+
+            # Sprite
+            sprite = self._get_pokemon_sprite(pid, 24)
+            screen.blit(sprite, (item_rect.x + 2, item_rect.y + 4))
+
+            # Nome e ID
+            name = self.pokedex.get_name(pid)
+            text = self._get_font(15).render(f"#{pid:03d} {name}", True, self.colors['text'])
+            screen.blit(text, (item_rect.x + 32, item_rect.y + 6))
+
+        screen.set_clip(old_clip)
+
+        # --- Barra de rolagem ---
+        total_items = len(filtered)
+        visible_items = list_area.height // ITEM_HEIGHT
+        if total_items > visible_items:
+            scrollbar_rect = self._scrollbar_rect(selector_rect)
+            # Fundo
+            pygame.draw.rect(screen, self.colors['scrollbar_bg'], scrollbar_rect, border_radius=4)
+
+            # Thumb
+            thumb_ratio = visible_items / total_items
+            thumb_height = max(20, int(scrollbar_rect.height * thumb_ratio))
+            max_scroll = max(0, total_items - visible_items)
+            scroll_ratio = self.pokemon_selector_scroll / max_scroll if max_scroll > 0 else 0
+            thumb_y = scrollbar_rect.y + int(scroll_ratio * (scrollbar_rect.height - thumb_height))
+            thumb_rect = pygame.Rect(scrollbar_rect.x, thumb_y, scrollbar_rect.width, thumb_height)
+            pygame.draw.rect(screen, self.colors['scrollbar_thumb'], thumb_rect, border_radius=4)
+
+        # Instruções
+        info = self._get_font(12).render("Roda do mouse para rolar | Clique no Pokémon para selecionar", True, self.colors['text_muted'])
+        screen.blit(info, (selector_rect.x + 10, selector_rect.bottom - 22))
+
+    # --- Render principal ---
     def render(self, screen):
-        """Renderiza o diálogo"""
         if not self.visible:
             return
 
-        # Overlay
-        overlay = pygame.Surface((screen.get_width(), screen.get_height()))
-        overlay.set_alpha(180)
-        overlay.fill((0, 0, 0))
-        screen.blit(overlay, (0, 0))
+        # Overlay escuro fora do diálogo (já feito no seletor, mas mantido para consistência)
+        if not self.showing_pokemon_selector:
+            overlay = pygame.Surface((screen.get_width(), screen.get_height()))
+            overlay.set_alpha(180)
+            overlay.fill((0, 0, 0))
+            screen.blit(overlay, (0, 0))
 
-        # Fundo da janela
-        pygame.draw.rect(screen, self.COLORS['bg'], self.rect, border_radius=10)
-        pygame.draw.rect(screen, self.COLORS['border'], self.rect, 2, border_radius=10)
+        pygame.draw.rect(screen, self.colors['bg'], self.rect, border_radius=12)
+        pygame.draw.rect(screen, self.colors['border'], self.rect, 2, border_radius=12)
 
-        # Título (arrastável)
-        title_bar = pygame.Rect(self.rect.x, self.rect.y, self.rect.width, 30)
-        pygame.draw.rect(screen, self.COLORS['bg_light'], title_bar, border_top_left_radius=10,
-                         border_top_right_radius=10)
+        title_bar = pygame.Rect(self.rect.x, self.rect.y, self.rect.width, 38)
+        pygame.draw.rect(screen, self.colors['bg_light'], title_bar, border_top_left_radius=12,
+                         border_top_right_radius=12)
 
-        title = self.font_title.render("Configuração de Waves", True, self.COLORS['text'])
-        screen.blit(title, (self.rect.x + 10, self.rect.y + 8))
+        title = self._get_font(22, True).render("Configuração de Waves", True, self.colors['title'])
+        screen.blit(title, (self.rect.x + self.margin, self.rect.y + 10))
 
         # Abas
-        tabs = ["Waves", "Composição", "Configurações"]
-        for i, tab_name in enumerate(tabs):
+        tab_names = ["Waves", "Composição", "Variants", "Templates"]
+        for i, name in enumerate(tab_names):
             tab_button = self.tab_buttons[i]
+            is_active = self.selected_tab == ["waves", "composition", "variants", "templates"][i]
 
-            if (i == 0 and self.selected_tab == "waves") or \
-                    (i == 1 and self.selected_tab == "composition") or \
-                    (i == 2 and self.selected_tab == "settings"):
-                color = self.COLORS['accent']
-                border = self.COLORS['border']
+            if is_active:
+                color = self.colors['tab_active']
+                border = self.colors['border_active']
             else:
-                color = self.COLORS['bg_light']
-                border = self.COLORS['border_light']
+                color = self.colors['tab_inactive']
+                border = self.colors['border']
 
-            pygame.draw.rect(screen, color, tab_button, border_radius=5)
-            pygame.draw.rect(screen, border, tab_button, 1, border_radius=5)
+            pygame.draw.rect(screen, color, tab_button, border_radius=6)
+            pygame.draw.rect(screen, border, tab_button, 1, border_radius=6)
 
-            tab_text = self.font_small.render(tab_name, True, self.COLORS['text'])
-            text_x = tab_button.x + (tab_button.width - tab_text.get_width()) // 2
-            text_y = tab_button.y + (tab_button.height - tab_text.get_height()) // 2
-            screen.blit(tab_text, (text_x, text_y))
+            text = self._get_font(15).render(name, True, self.colors['text'])
+            text_x = tab_button.x + (tab_button.width - text.get_width()) // 2
+            text_y = tab_button.y + (tab_button.height - text.get_height()) // 2
+            screen.blit(text, (text_x, text_y))
 
-        # Renderiza aba atual
+        # Conteúdo da aba
         if self.selected_tab == "waves":
             self._render_waves_tab(screen)
         elif self.selected_tab == "composition":
             self._render_composition_tab(screen)
-        elif self.selected_tab == "settings":
-            self._render_settings_tab(screen)
+        elif self.selected_tab == "variants":
+            self._render_variants_tab(screen)
+        elif self.selected_tab == "templates":
+            self._render_templates_tab(screen)
 
-        # Seletor de Pokémon
+        # Editores (por cima)
+        if self.variant_editor_open:
+            self._render_variant_editor(screen)
+        if self.template_editor_open:
+            self._render_template_editor(screen)
+
+        # Seletor de Pokémon (por cima de TUDO)
         if self.showing_pokemon_selector:
             self._render_pokemon_selector(screen)
 
         # Botões Salvar/Cancelar
-        # Salvar
-        save_color = self.COLORS['success'] if self.hovered_button == "save" else (0, 100, 0)
-        pygame.draw.rect(screen, save_color, self.save_button, border_radius=5)
-        pygame.draw.rect(screen, self.COLORS['text'], self.save_button, 1, border_radius=5)
-        save_text = self.font.render("Salvar", True, self.COLORS['text'])
-        save_x = self.save_button.x + (self.save_button.width - save_text.get_width()) // 2
-        save_y = self.save_button.y + (self.save_button.height - save_text.get_height()) // 2
-        screen.blit(save_text, (save_x, save_y))
+        self._render_buttons(screen)
 
-        # Cancelar
-        cancel_color = self.COLORS['danger'] if self.hovered_button == "cancel" else (100, 0, 0)
-        pygame.draw.rect(screen, cancel_color, self.cancel_button, border_radius=5)
-        pygame.draw.rect(screen, self.COLORS['text'], self.cancel_button, 1, border_radius=5)
-        cancel_text = self.font.render("Cancelar", True, self.COLORS['text'])
-        cancel_x = self.cancel_button.x + (self.cancel_button.width - cancel_text.get_width()) // 2
-        cancel_y = self.cancel_button.y + (self.cancel_button.height - cancel_text.get_height()) // 2
-        screen.blit(cancel_text, (cancel_x, cancel_y))
-
-        # Mensagem de erro
-        if "total" in self.input_errors and self.selected_tab == "composition":
-            error_text = self.font_small.render(self.input_errors["total"], True, (255, 100, 100))
+        if "total" in self.input_errors:
+            error_text = self._get_font(14).render(self.input_errors["total"], True, (255, 100, 100))
             screen.blit(error_text, (self.rect.x + 20, self.rect.bottom - 60))
 
+    # --- Render de abas (já existentes, mantidas) ---
+    def _render_buttons(self, screen):
+        color = self.colors['success'] if self.hovered_button == "save" else (50, 150, 50)
+        pygame.draw.rect(screen, color, self.save_button, border_radius=8)
+        pygame.draw.rect(screen, (255, 255, 255), self.save_button, 1, border_radius=8)
+        text = self._get_font(18).render("Salvar", True, (255, 255, 255))
+        text_x = self.save_button.x + (self.save_button.width - text.get_width()) // 2
+        text_y = self.save_button.y + (self.save_button.height - text.get_height()) // 2
+        screen.blit(text, (text_x, text_y))
+
+        color = self.colors['danger'] if self.hovered_button == "cancel" else (180, 50, 50)
+        pygame.draw.rect(screen, color, self.cancel_button, border_radius=8)
+        pygame.draw.rect(screen, (255, 255, 255), self.cancel_button, 1, border_radius=8)
+        text = self._get_font(18).render("Cancelar", True, (255, 255, 255))
+        text_x = self.cancel_button.x + (self.cancel_button.width - text.get_width()) // 2
+        text_y = self.cancel_button.y + (self.cancel_button.height - text.get_height()) // 2
+        screen.blit(text, (text_x, text_y))
+
+    def _render_button(self, screen, rect, button_id, label, disabled=False):
+        is_hovered = self.hovered_button == button_id
+        if disabled:
+            color = (50, 50, 60)
+            text_color = self.colors['text_muted']
+        else:
+            color = self.colors['bg_light'] if is_hovered else self.colors['bg_dark']
+            text_color = self.colors['text']
+
+        pygame.draw.rect(screen, color, rect, border_radius=5)
+        pygame.draw.rect(screen, self.colors['border'], rect, 1, border_radius=5)
+
+        text = self._get_font(13).render(label, True, text_color)
+        text_x = rect.x + (rect.width - text.get_width()) // 2
+        text_y = rect.y + (rect.height - text.get_height()) // 2
+        screen.blit(text, (text_x, text_y))
+
     def _render_waves_tab(self, screen):
-        """Renderiza a aba de lista de waves - CENTRALIZADA"""
-        # Botões centralizados
-        add_color = self.COLORS['success'] if self.hovered_button == "add_wave" else (0, 80, 0)
-        pygame.draw.rect(screen, add_color, self.add_wave_button, border_radius=5)
-        add_text = self.font_small.render("+ Nova", True, self.COLORS['text'])
-        add_text_x = self.add_wave_button.x + (self.add_wave_button.width - add_text.get_width()) // 2
-        add_text_y = self.add_wave_button.y + (self.add_wave_button.height - add_text.get_height()) // 2
-        screen.blit(add_text, (add_text_x, add_text_y))
+        label = self._get_font(15).render("Lista de Waves:", True, self.colors['text_dim'])
+        screen.blit(label, (self.waves_label.x, self.waves_label.y))
 
-        remove_color = self.COLORS['danger'] if self.hovered_button == "remove_wave" else (80, 0, 0)
-        pygame.draw.rect(screen, remove_color, self.remove_wave_button, border_radius=5)
-        remove_text = self.font_small.render("- Remover", True, self.COLORS['text'])
-        remove_text_x = self.remove_wave_button.x + (self.remove_wave_button.width - remove_text.get_width()) // 2
-        remove_text_y = self.remove_wave_button.y + (self.remove_wave_button.height - remove_text.get_height()) // 2
-        screen.blit(remove_text, (remove_text_x, remove_text_y))
+        self._render_button(screen, self.add_wave_button, "add_wave", "+ Nova")
+        self._render_button(screen, self.remove_wave_button, "remove_wave", "- Remover")
+        self._render_button(screen, self.duplicate_wave_button, "duplicate_wave", "Duplicar")
 
-        # Área da lista
-        pygame.draw.rect(screen, self.COLORS['bg_dark'], self.waves_list_area, border_radius=5)
+        pygame.draw.rect(screen, self.colors['bg_dark'], self.waves_list_area, border_radius=6)
 
-        # Clipping
         old_clip = screen.get_clip()
         screen.set_clip(self.waves_list_area)
 
-        list_x = self.waves_list_area.x + 5
+        list_x = self.waves_list_area.x + 4
         list_start_y = self.waves_list_area.y + 2 - self.waves_scroll * self.wave_item_height
 
         for i, wave in enumerate(self.wave_manager.waves):
             item_y = list_start_y + i * self.wave_item_height
-
-            if item_y + self.wave_item_height < self.waves_list_area.y or item_y > self.waves_list_area.y + self.waves_list_area.height:
+            if item_y + self.wave_item_height < self.waves_list_area.y or \
+                    item_y > self.waves_list_area.y + self.waves_list_area.height:
                 continue
 
-            item_rect = pygame.Rect(list_x, item_y, self.waves_list_area.width - 10, self.wave_item_height - 4)
-
-            # Cor de fundo
+            item_rect = pygame.Rect(list_x, item_y, self.waves_list_area.width - 8, self.wave_item_height - 2)
             is_selected = (i == self.selected_wave_index)
-            if is_selected:
-                bg_color = self.COLORS['accent']
-            else:
-                bg_color = self.COLORS['bg_light'] if i % 2 == 0 else self.COLORS['bg']
+            bg_color = self.colors['accent'] if is_selected else \
+                (self.colors['bg_light'] if i % 2 == 0 else self.colors['bg_dark'])
 
             pygame.draw.rect(screen, bg_color, item_rect)
-
             if is_selected:
-                pygame.draw.rect(screen, self.COLORS['border'], item_rect, 1)
+                pygame.draw.rect(screen, self.colors['border_active'], item_rect, 1)
 
-            # Nome da wave
-            wave_name = f"{wave.name} (P{wave.path_index + 1})"
-            if not wave.enabled:
-                wave_name = f"[X] {wave_name}"
+            wave_name = wave.name
+            indicators = []
+            if wave.template_id:
+                indicators.append("[T]")
+            if wave.use_variants and wave.variants:
+                indicators.append("[V]")
+            if indicators:
+                wave_name += " " + " ".join(indicators)
 
-            name_text = self.font_small.render(wave_name, True, self.COLORS['text'])
-            screen.blit(name_text, (item_rect.x + 5, item_rect.y + 7))
+            name_text = self._get_font(14).render(wave_name, True, self.colors['text'])
+            screen.blit(name_text, (item_rect.x + 5, item_rect.y + 2))
 
-            # Quantidade
-            count_text = self.font_small.render(f"{wave.wave_size}", True, self.COLORS['text_dim'])
-            screen.blit(count_text, (item_rect.right - 25, item_rect.y + 7))
+            info = f"Path {wave.path_index + 1} | {wave.wave_size} inim | Lv.{wave.min_level}-{wave.max_level}"
+            info_text = self._get_font(12).render(info, True, self.colors['text_dim'])
+            screen.blit(info_text, (item_rect.x + 5, item_rect.y + 17))
 
         screen.set_clip(old_clip)
 
-        # Scroll indicator
         if len(self.wave_manager.waves) > self.waves_per_page:
-            scroll_text = self.font_small.render(
-                f"{self.waves_scroll + 1}-{min(self.waves_scroll + self.waves_per_page, len(self.wave_manager.waves))} de {len(self.wave_manager.waves)}",
-                True, self.COLORS['text_dark']
-            )
-            text_x = self.waves_list_area.x + (self.waves_list_area.width - scroll_text.get_width()) // 2
-            screen.blit(scroll_text, (text_x, self.waves_list_area.bottom + 5))
+            info = f"{self.waves_scroll + 1}-{min(self.waves_scroll + self.waves_per_page, len(self.wave_manager.waves))} de {len(self.wave_manager.waves)}"
+            text = self._get_font(12).render(info, True, self.colors['text_muted'])
+            text_x = self.waves_list_area.x + (self.waves_list_area.width - text.get_width()) // 2
+            screen.blit(text, (text_x, self.waves_list_area.bottom + 4))
 
     def _render_composition_tab(self, screen):
-        """Renderiza a aba de composição"""
         wave = self.wave_manager.get_current_wave()
         if not wave:
-            no_wave_text = self.font.render("Selecione uma wave na aba 'Waves'", True, self.COLORS['text_dim'])
-            text_x = self.rect.x + (self.rect.width - no_wave_text.get_width()) // 2
+            no_text = self._get_font(18).render("Selecione uma wave na aba Waves", True, self.colors['text_dim'])
+            text_x = self.rect.x + (self.rect.width - no_text.get_width()) // 2
             text_y = self.rect.y + 250
-            screen.blit(no_wave_text, (text_x, text_y))
+            screen.blit(no_text, (text_x, text_y))
             return
 
-        # Título da wave
-        title = self.font.render(f"Composição: {wave.name}", True, self.COLORS['border'])
-        screen.blit(title, (self.rect.x + 20, self.rect.y + 80))
+        info_text = ""
+        if wave.template_id:
+            template = WaveTemplateManager.get_template(wave.template_id)
+            template_name = template.name if template else "desconhecido"
+            info_text = f"Usando template: {template_name}"
+            color = self.colors['warning']
+        elif wave.use_variants and wave.variants:
+            info_text = "Usando Variants"
+            color = self.colors['info']
+        else:
+            info_text = "Composição própria"
+            color = self.colors['text_dim']
 
-        # Área da lista
-        pygame.draw.rect(screen, self.COLORS['bg_dark'], self.enemies_list_area, border_radius=5)
+        info = self._get_font(13).render(info_text, True, color)
+        screen.blit(info, (self.comp_info_rect.x, self.comp_info_rect.y + 2))
 
-        # Clipping
+        can_edit = not wave.template_id
+        self._render_button(screen, self.add_enemy_button, "add_enemy", "+ Adicionar", not can_edit)
+        self._render_button(screen, self.equalize_button, "equalize", "Distribuir", not can_edit)
+        self._render_button(screen, self.clear_enemies_button, "clear_enemies", "Limpar", not can_edit)
+
+        pygame.draw.rect(screen, self.colors['bg_dark'], self.enemies_list_area, border_radius=6)
+
         old_clip = screen.get_clip()
         screen.set_clip(self.enemies_list_area)
 
-        list_x = self.enemies_list_area.x + 5
+        list_x = self.enemies_list_area.x + 4
         list_start_y = self.enemies_list_area.y + 2 - self.enemies_scroll * self.enemy_item_height
 
-        for i, enemy in enumerate(wave.enemies):
-            item_y = list_start_y + i * self.enemy_item_height
+        enemies = wave.enemies if not wave.template_id else []
 
-            if item_y + self.enemy_item_height < self.enemies_list_area.y or item_y > self.enemies_list_area.y + self.enemies_list_area.height:
+        for i, enemy in enumerate(enemies):
+            item_y = list_start_y + i * self.enemy_item_height
+            if item_y + self.enemy_item_height < self.enemies_list_area.y or \
+                    item_y > self.enemies_list_area.y + self.enemies_list_area.height:
                 continue
 
-            item_rect = pygame.Rect(list_x, item_y, self.enemies_list_area.width - 10, self.enemy_item_height - 4)
-
-            # Fundo
-            bg_color = self.COLORS['bg_light'] if i % 2 == 0 else self.COLORS['bg']
+            item_rect = pygame.Rect(list_x, item_y, self.enemies_list_area.width - 8, self.enemy_item_height - 2)
+            bg_color = self.colors['bg_light'] if i % 2 == 0 else self.colors['bg_dark']
             pygame.draw.rect(screen, bg_color, item_rect)
-            pygame.draw.rect(screen, self.COLORS['border_light'], item_rect, 1)
+            pygame.draw.rect(screen, self.colors['border_light'], item_rect, 1)
 
-            # ===== SPRITE DO POKÉMON (USANDO RETRATO) =====
-            # Usa o retrato com expressão normal (pode ser "normal", "happy", "angry")
-            sprite = self._get_pokemon_sprite(enemy.pokemon_id, 32, "normal")
-            screen.blit(sprite, (item_rect.x + 5, item_rect.y + 5))
+            sprite = self._get_pokemon_sprite(enemy.pokemon_id, 28)
+            screen.blit(sprite, (item_rect.x + 4, item_rect.y + 2))
 
-            # Nome
-            pokemon_name = self.pokedex.get_name(enemy.pokemon_id)
-            name_text = self.font_small.render(pokemon_name, True, self.COLORS['text'])
-            screen.blit(name_text, (item_rect.x + 42, item_rect.y + 8))
+            name = self.pokedex.get_name(enemy.pokemon_id)
+            name_text = self._get_font(14).render(name, True, self.colors['text'])
+            screen.blit(name_text, (item_rect.x + 36, item_rect.y + 2))
 
-            # Tipos
-            types = self.pokedex.get_types(enemy.pokemon_id)
-            if types:
-                type_text = self.font_small.render("/".join(types), True, self.COLORS['text_dim'])
-                screen.blit(type_text, (item_rect.x + 42, item_rect.y + 24))
+            id_text = self._get_font(11).render(f"#{enemy.pokemon_id}", True, self.colors['text_muted'])
+            screen.blit(id_text, (item_rect.x + 36, item_rect.y + 20))
 
-            # Botão remover
-            remove_rect = pygame.Rect(self.enemies_list_area.right - 30, item_y + 5, 20, 20)
-            pygame.draw.rect(screen, self.COLORS['danger'], remove_rect)
-            pygame.draw.line(screen, self.COLORS['text'],
-                             (remove_rect.x + 5, remove_rect.y + 5),
-                             (remove_rect.right - 5, remove_rect.bottom - 5), 1)
-            pygame.draw.line(screen, self.COLORS['text'],
-                             (remove_rect.right - 5, remove_rect.y + 5),
-                             (remove_rect.x + 5, remove_rect.bottom - 5), 1)
+            percent_rect = pygame.Rect(self.enemies_list_area.right - 88, item_y + 8, 50, 20)
+            is_active = self.active_input == f"percent_{i}"
+            border = self.colors['border_active'] if is_active else self.colors['border']
+            pygame.draw.rect(screen, self.colors['bg_input'], percent_rect, border_radius=4)
+            pygame.draw.rect(screen, border, percent_rect, 1, border_radius=4)
 
-            # Campo de porcentagem
-            percent_rect = pygame.Rect(self.enemies_list_area.right - 90, item_y + 10, 45, 22)
+            display = self.input_texts.get(f"percent_{i}", f"{enemy.percentage:.1f}") if is_active else f"{enemy.percentage:.1f}"
+            pct_text = self._get_font(13).render(display, True, self.colors['text'])
+            screen.blit(pct_text, (percent_rect.x + 4, percent_rect.y + 2))
 
-            if self.active_input == f"percent_{i}":
-                border_color = self.COLORS['input_active']
-                display_text = self.input_texts.get(f"percent_{i}", str(enemy.percentage))
-            else:
-                border_color = self.COLORS['input_border']
-                display_text = str(enemy.percentage)
+            pct_symbol = self._get_font(11).render("%", True, self.colors['text_muted'])
+            screen.blit(pct_symbol, (percent_rect.right + 2, percent_rect.y + 3))
 
-            pygame.draw.rect(screen, self.COLORS['input_bg'], percent_rect)
-            pygame.draw.rect(screen, border_color, percent_rect, 1)
-
-            percent_text = self.font_small.render(display_text, True, self.COLORS['text'])
-            screen.blit(percent_text, (percent_rect.x + 5, percent_rect.y + 4))
-
-            # Símbolo %
-            percent_symbol = self.font_small.render("%", True, self.COLORS['text_dim'])
-            screen.blit(percent_symbol, (percent_rect.right + 2, percent_rect.y + 4))
+            if can_edit:
+                remove_rect = pygame.Rect(self.enemies_list_area.right - 28, item_y + 4, 18, 18)
+                pygame.draw.rect(screen, self.colors['danger'], remove_rect, border_radius=4)
+                pygame.draw.line(screen, self.colors['text'],
+                                 (remove_rect.x + 4, remove_rect.y + 4),
+                                 (remove_rect.right - 4, remove_rect.bottom - 4), 2)
+                pygame.draw.line(screen, self.colors['text'],
+                                 (remove_rect.right - 4, remove_rect.y + 4),
+                                 (remove_rect.x + 4, remove_rect.bottom - 4), 2)
 
         screen.set_clip(old_clip)
 
-        # Scroll indicator
-        if len(wave.enemies) > self.enemies_per_page:
-            scroll_text = self.font_small.render(
-                f"{self.enemies_scroll + 1}-{min(self.enemies_scroll + self.enemies_per_page, len(wave.enemies))} de {len(wave.enemies)}",
-                True, self.COLORS['text_dark']
-            )
-            screen.blit(scroll_text, (self.enemies_list_area.x + 10, self.enemies_list_area.bottom + 5))
+        if not wave.template_id:
+            total = sum(e.percentage for e in wave.enemies)
+            is_valid = abs(total - 100.0) < 0.01
+            color = (100, 255, 100) if is_valid else (255, 100, 100)
+            total_text = self._get_font(14).render(f"Total: {total:.1f}%", True, color)
+            screen.blit(total_text, (self.total_rect.x, self.total_rect.y))
 
-        # Botões de ação
-        add_color = self.COLORS['success'] if self.hovered_button == "add_enemy" else (0, 80, 0)
-        pygame.draw.rect(screen, add_color, self.add_enemy_button, border_radius=5)
-        add_text = self.font_small.render("+ Adicionar", True, self.COLORS['text'])
-        add_text_x = self.add_enemy_button.x + (self.add_enemy_button.width - add_text.get_width()) // 2
-        add_text_y = self.add_enemy_button.y + (self.add_enemy_button.height - add_text.get_height()) // 2
-        screen.blit(add_text, (add_text_x, add_text_y))
+            if not is_valid:
+                warn = self._get_font(12).render("(Deve ser 100%)", True, (255, 100, 100))
+                screen.blit(warn, (self.total_rect.x + 120, self.total_rect.y))
 
-        if wave.enemies:
-            eq_color = self.COLORS['warning'] if self.hovered_button == "equalize" else (80, 80, 0)
-            pygame.draw.rect(screen, eq_color, self.equalize_button, border_radius=5)
-            equalize_text = self.font_small.render("Distribuir", True, self.COLORS['text'])
-            eq_text_x = self.equalize_button.x + (self.equalize_button.width - equalize_text.get_width()) // 2
-            eq_text_y = self.equalize_button.y + (self.equalize_button.height - equalize_text.get_height()) // 2
-            screen.blit(equalize_text, (eq_text_x, eq_text_y))
-
-        # Total
-        total = sum(e.percentage for e in wave.enemies)
-        total_color = (100, 255, 100) if total == 100 else (255, 100, 100)
-        total_text = self.font.render(f"Total: {total}%", True, total_color)
-        screen.blit(total_text, (self.rect.x + 320, self.rect.y + 435))
-
-    def _render_settings_tab(self, screen):
-        """Renderiza a aba de configurações em grid padronizado"""
+    def _render_variants_tab(self, screen):
         wave = self.wave_manager.get_current_wave()
         if not wave:
-            no_wave_text = self.font.render("Selecione uma wave na aba 'Waves'", True, self.COLORS['text_dim'])
-            text_x = self.rect.x + (self.rect.width - no_wave_text.get_width()) // 2
+            no_text = self._get_font(18).render("Selecione uma wave na aba Waves", True, self.colors['text_dim'])
+            text_x = self.rect.x + (self.rect.width - no_text.get_width()) // 2
             text_y = self.rect.y + 250
-            screen.blit(no_wave_text, (text_x, text_y))
+            screen.blit(no_text, (text_x, text_y))
             return
 
-        # LINHA 0: Nome da Wave
-        name_label = self.font_small.render("Nome:", True, self.COLORS['text_dim'])
-        screen.blit(name_label, (self.name_label.x, self.name_label.y))
+        info_lines = [
+            "Variants: Versões diferentes da wave para cada período.",
+            "Crie uma variant e edite para configurar os Pokémon."
+        ]
+        for i, line in enumerate(info_lines):
+            color = self.colors['text_dim'] if i == 0 else self.colors['text_muted']
+            text = self._get_font(12).render(line, True, color)
+            screen.blit(text, (self.variant_info_rect.x, self.variant_info_rect.y + i * 16))
 
-        pygame.draw.rect(screen, self.COLORS['input_bg'], self.name_input)
-        border_color = self.COLORS['input_active'] if self.active_input == "wave_name" else self.COLORS['input_border']
-        pygame.draw.rect(screen, border_color, self.name_input, 1)
+        self._render_button(screen, self.add_variant_button, "add_variant", "+ Nova Variant")
+        self._render_button(screen, self.remove_variant_button, "remove_variant", "- Remover")
+        self._render_button(screen, self.edit_variant_button, "edit_variant", "Editar")
 
-        display_text = self.input_texts.get("wave_name", wave.name) if self.active_input == "wave_name" else wave.name
-        name_text = self.font_small.render(display_text, True, self.COLORS['text'])
-        screen.blit(name_text, (self.name_input.x + 5, self.name_input.y + 4))
+        status_text = "ATIVO" if wave.use_variants else "INATIVO"
+        color = self.colors['success'] if wave.use_variants else self.colors['text_muted']
+        status = self._get_font(14).render(f"Status: {status_text}", True, color)
+        screen.blit(status, (self.rect.x + self.margin, self.variants_list_area.bottom + 6))
 
-        # LINHA 1: Path
-        path_label = self.font_small.render("Path:", True, self.COLORS['text_dim'])
-        screen.blit(path_label, (self.path_label.x, self.path_label.y))
+        pygame.draw.rect(screen, self.colors['bg_dark'], self.variants_list_area, border_radius=6)
 
-        # Texto do path
-        path_text = self.font_small.render(f"Path {wave.path_index + 1}", True, self.COLORS['text'])
-        screen.blit(path_text, (self.path_text_rect.x, self.path_text_rect.y + 4))
-
-        # Botões path
-        prev_color = self.COLORS['bg_light'] if self.hovered_button == "path_prev" else (60, 60, 70)
-        next_color = self.COLORS['bg_light'] if self.hovered_button == "path_next" else (60, 60, 70)
-
-        pygame.draw.rect(screen, prev_color, self.path_prev_button)
-        pygame.draw.rect(screen, next_color, self.path_next_button)
-        pygame.draw.rect(screen, self.COLORS['border_light'], self.path_prev_button, 1)
-        pygame.draw.rect(screen, self.COLORS['border_light'], self.path_next_button, 1)
-
-        prev_text = self.font_small.render("<", True, self.COLORS['text'])
-        next_text = self.font_small.render(">", True, self.COLORS['text'])
-        prev_text_x = self.path_prev_button.x + (self.path_prev_button.width - prev_text.get_width()) // 2
-        prev_text_y = self.path_prev_button.y + (self.path_prev_button.height - prev_text.get_height()) // 2
-        next_text_x = self.path_next_button.x + (self.path_next_button.width - next_text.get_width()) // 2
-        next_text_y = self.path_next_button.y + (self.path_next_button.height - next_text.get_height()) // 2
-        screen.blit(prev_text, (prev_text_x, prev_text_y))
-        screen.blit(next_text, (next_text_x, next_text_y))
-
-        # LINHA 2: Tamanho
-        size_label = self.font_small.render("Tamanho:", True, self.COLORS['text_dim'])
-        screen.blit(size_label, (self.size_label.x, self.size_label.y))
-        self._render_input_field(screen, "wave_size", str(wave.wave_size), self.size_input)
-
-        # LINHA 3: Nível Mínimo
-        min_label = self.font_small.render("Nível Mín:", True, self.COLORS['text_dim'])
-        screen.blit(min_label, (self.min_label.x, self.min_label.y))
-        self._render_input_field(screen, "min_level", str(wave.min_level), self.min_level_input)
-
-        # LINHA 4: Nível Máximo
-        max_label = self.font_small.render("Nível Máx:", True, self.COLORS['text_dim'])
-        screen.blit(max_label, (self.max_label.x, self.max_label.y))
-        self._render_input_field(screen, "max_level", str(wave.max_level), self.max_level_input)
-
-        # COLUNA 2 - LINHA 1: Intervalo
-        interval_label = self.font_small.render("Intervalo (s):", True, self.COLORS['text_dim'])
-        screen.blit(interval_label, (self.interval_label.x, self.interval_label.y))
-        self._render_input_field(screen, "spawn_interval", f"{wave.spawn_interval:.1f}", self.interval_input)
-
-        # COLUNA 2 - LINHA 2: Delay
-        delay_label = self.font_small.render("Delay (s):", True, self.COLORS['text_dim'])
-        screen.blit(delay_label, (self.delay_label.x, self.delay_label.y))
-        self._render_input_field(screen, "initial_delay", f"{wave.initial_delay:.1f}", self.delay_input)
-
-        # COLUNA 2 - LINHA 3: Repeat
-        repeat_label = self.font_small.render("Repetir:", True, self.COLORS['text_dim'])
-        screen.blit(repeat_label, (self.repeat_label.x, self.repeat_label.y))
-
-        # Checkbox
-        if wave.repeat_wave:
-            pygame.draw.rect(screen, self.COLORS['success'], self.repeat_checkbox)
-            check_text = self.font_small.render("✓", True, self.COLORS['text'])
-            check_text_x = self.repeat_checkbox.x + (self.repeat_checkbox.width - check_text.get_width()) // 2
-            check_text_y = self.repeat_checkbox.y + (self.repeat_checkbox.height - check_text.get_height()) // 2
-            screen.blit(check_text, (check_text_x, check_text_y))
-        else:
-            pygame.draw.rect(screen, self.COLORS['input_bg'], self.repeat_checkbox)
-        pygame.draw.rect(screen, self.COLORS['border_light'], self.repeat_checkbox, 1)
-
-        # COLUNA 2 - LINHA 4: Repeat Count
-        if wave.repeat_wave:
-            count_label = self.font_small.render("Vezes:", True, self.COLORS['text_dim'])
-            screen.blit(count_label, (self.repeat_count_label.x, self.repeat_count_label.y))
-
-            # Texto do contador
-            count_text = self.font_small.render(str(wave.repeat_count), True, self.COLORS['text'])
-            screen.blit(count_text, (self.repeat_count_text.x, self.repeat_count_text.y + 4))
-
-            # Botões +/-
-            minus_color = self.COLORS['bg_light'] if self.hovered_button == "repeat_minus" else (60, 60, 70)
-            plus_color = self.COLORS['bg_light'] if self.hovered_button == "repeat_plus" else (60, 60, 70)
-
-            pygame.draw.rect(screen, minus_color, self.repeat_minus_button)
-            pygame.draw.rect(screen, plus_color, self.repeat_plus_button)
-            pygame.draw.rect(screen, self.COLORS['border_light'], self.repeat_minus_button, 1)
-            pygame.draw.rect(screen, self.COLORS['border_light'], self.repeat_plus_button, 1)
-
-            minus_text = self.font_small.render("-", True, self.COLORS['text'])
-            plus_text = self.font_small.render("+", True, self.COLORS['text'])
-            minus_text_x = self.repeat_minus_button.x + (self.repeat_minus_button.width - minus_text.get_width()) // 2
-            minus_text_y = self.repeat_minus_button.y + (self.repeat_minus_button.height - minus_text.get_height()) // 2
-            plus_text_x = self.repeat_plus_button.x + (self.repeat_plus_button.width - plus_text.get_width()) // 2
-            plus_text_y = self.repeat_plus_button.y + (self.repeat_plus_button.height - plus_text.get_height()) // 2
-            screen.blit(minus_text, (minus_text_x, minus_text_y))
-            screen.blit(plus_text, (plus_text_x, plus_text_y))
-
-    def _render_input_field(self, screen, field_name, value, rect):
-        """Renderiza um campo de input"""
-        if self.active_input == field_name:
-            border_color = self.COLORS['input_active']
-            display_text = self.input_texts.get(field_name, value)
-        else:
-            border_color = self.COLORS['input_border']
-            display_text = value
-
-        pygame.draw.rect(screen, self.COLORS['input_bg'], rect)
-        pygame.draw.rect(screen, border_color, rect, 1)
-
-        text = self.font_small.render(display_text, True, self.COLORS['text'])
-        screen.blit(text, (rect.x + 5, rect.y + 4))
-
-    def _render_pokemon_selector(self, screen):
-        """Renderiza o seletor de Pokémon"""
-        selector_rect = pygame.Rect(
-            self.rect.x + 80,
-            self.rect.y + 120,
-            440,
-            360
-        )
-
-        # Fundo
-        pygame.draw.rect(screen, self.COLORS['bg_light'], selector_rect, border_radius=10)
-        pygame.draw.rect(screen, self.COLORS['border'], selector_rect, 2, border_radius=10)
-
-        # Título
-        title = self.font_title.render("Selecionar Pokémon", True, self.COLORS['text'])
-        screen.blit(title, (selector_rect.x + 10, selector_rect.y + 10))
-
-        # Campo de busca
-        search_rect = pygame.Rect(selector_rect.x + 10, selector_rect.y + 40, 250, 25)
-
-        if self.active_input == "pokemon_search":
-            border_color = self.COLORS['input_active']
-            search_display = self.pokemon_search
-        else:
-            border_color = self.COLORS['input_border']
-            search_display = self.pokemon_search if self.pokemon_search else "Buscar..."
-
-        pygame.draw.rect(screen, self.COLORS['input_bg'], search_rect)
-        pygame.draw.rect(screen, border_color, search_rect, 1)
-
-        search_color = self.COLORS['text'] if self.pokemon_search else self.COLORS['text_dark']
-        search_text = self.font_small.render(search_display, True, search_color)
-        screen.blit(search_text, (search_rect.x + 5, search_rect.y + 5))
-
-        # Contador
-        count_text = self.font_small.render(f"{len(self.available_pokemon_ids)} disponíveis", True,
-                                            self.COLORS['text_dark'])
-        screen.blit(count_text, (selector_rect.x + 270, selector_rect.y + 45))
-
-        # Área da lista
-        list_area = pygame.Rect(selector_rect.x + 5, selector_rect.y + 75, selector_rect.width - 10, 240)
-        pygame.draw.rect(screen, self.COLORS['bg_dark'], list_area)
-
-        # Clipping
         old_clip = screen.get_clip()
-        screen.set_clip(list_area)
+        screen.set_clip(self.variants_list_area)
 
-        list_x = list_area.x + 5
-        list_start_y = list_area.y + 2 - self.pokemon_selector_scroll * 35
+        list_x = self.variants_list_area.x + 4
+        list_start_y = self.variants_list_area.y + 2 - self.variants_scroll * self.variant_item_height
 
-        filtered_ids = self._filter_pokemon()
+        cond_labels = {c["id"]: c["label"] for c in self.condition_options}
 
-        for i, pokemon_id in enumerate(filtered_ids):
-            item_y = list_start_y + i * 35
-
-            if item_y + 35 < list_area.y or item_y > list_area.y + list_area.height:
+        for i, variant in enumerate(wave.variants):
+            item_y = list_start_y + i * self.variant_item_height
+            if item_y + self.variant_item_height < self.variants_list_area.y or \
+                    item_y > self.variants_list_area.y + self.variants_list_area.height:
                 continue
 
-            item_rect = pygame.Rect(list_x, item_y, list_area.width - 10, 31)
+            item_rect = pygame.Rect(list_x, item_y, self.variants_list_area.width - 8, self.variant_item_height - 2)
+            is_selected = (i == self.selected_variant_index)
+            bg_color = self.colors['accent'] if is_selected else \
+                (self.colors['bg_light'] if i % 2 == 0 else self.colors['bg_dark'])
 
-            # Fundo alternado
-            bg_color = self.COLORS['bg_light'] if i % 2 == 0 else self.COLORS['bg']
             pygame.draw.rect(screen, bg_color, item_rect)
+            if is_selected:
+                pygame.draw.rect(screen, self.colors['border_active'], item_rect, 1)
 
-            # Sprite
-            sprite = self._get_pokemon_sprite(pokemon_id, 24)
-            screen.blit(sprite, (item_rect.x + 2, item_rect.y + 3))
+            cond_label = cond_labels.get(variant.condition, "Qualquer")
+            cond_text = self._get_font(14).render(f"Período: {cond_label}", True, self.colors['text'])
+            screen.blit(cond_text, (item_rect.x + 5, item_rect.y + 3))
 
-            # ID e nome
-            pokemon_name = self.pokedex.get_name(pokemon_id)
-            text = self.font_small.render(f"#{pokemon_id:03d} {pokemon_name}", True, self.COLORS['text'])
-            screen.blit(text, (item_rect.x + 30, item_rect.y + 8))
+            enemy_count = len(variant.enemies)
+            info = f"{enemy_count} Pokémon | Nível: {variant.min_level}-{variant.max_level}"
+            info_text = self._get_font(12).render(info, True, self.colors['text_dim'])
+            screen.blit(info_text, (item_rect.x + 5, item_rect.y + 22))
 
         screen.set_clip(old_clip)
 
-        # Scroll info
-        if len(filtered_ids) > 7:
-            scroll_text = self.font_small.render(
-                f"{self.pokemon_selector_scroll + 1}-{min(self.pokemon_selector_scroll + 7, len(filtered_ids))} de {len(filtered_ids)}",
-                True, self.COLORS['text_dark']
-            )
-            screen.blit(scroll_text, (selector_rect.x + 10, selector_rect.bottom - 20))
+        if len(wave.variants) > self.variants_per_page:
+            info = f"{self.variants_scroll + 1}-{min(self.variants_scroll + self.variants_per_page, len(wave.variants))} de {len(wave.variants)}"
+            text = self._get_font(12).render(info, True, self.colors['text_muted'])
+            text_x = self.variants_list_area.x + (self.variants_list_area.width - text.get_width()) // 2
+            screen.blit(text, (text_x, self.variants_list_area.bottom + 4))
+
+    def _render_templates_tab(self, screen):
+        templates = WaveTemplateManager.get_all_templates()
+
+        info_lines = [
+            "Templates: Listas de Pokémon reutilizáveis.",
+            "Crie um template e use em qualquer wave."
+        ]
+        for i, line in enumerate(info_lines):
+            color = self.colors['text_dim'] if i == 0 else self.colors['text_muted']
+            text = self._get_font(12).render(line, True, color)
+            screen.blit(text, (self.template_info_rect.x, self.template_info_rect.y + i * 16))
+
+        self._render_button(screen, self.new_template_button, "new_template", "+ Novo Template")
+        self._render_button(screen, self.delete_template_button, "delete_template", "- Remover")
+        self._render_button(screen, self.edit_template_button, "edit_template", "Editar")
+
+        total_text = self._get_font(13).render(f"Templates: {len(templates)}", True, self.colors['text_dim'])
+        screen.blit(total_text, (self.rect.x + self.margin, self.templates_list_area.bottom + 6))
+
+        pygame.draw.rect(screen, self.colors['bg_dark'], self.templates_list_area, border_radius=6)
+
+        old_clip = screen.get_clip()
+        screen.set_clip(self.templates_list_area)
+
+        list_x = self.templates_list_area.x + 4
+        list_start_y = self.templates_list_area.y + 2 - self.templates_scroll * self.template_item_height
+
+        for i, template in enumerate(templates):
+            item_y = list_start_y + i * self.template_item_height
+            if item_y + self.template_item_height < self.templates_list_area.y or \
+                    item_y > self.templates_list_area.y + self.templates_list_area.height:
+                continue
+
+            item_rect = pygame.Rect(list_x, item_y, self.templates_list_area.width - 8, self.template_item_height - 2)
+            is_selected = (i + 1 == self.template_selected_index)
+            bg_color = self.colors['accent'] if is_selected else \
+                (self.colors['bg_light'] if i % 2 == 0 else self.colors['bg_dark'])
+
+            pygame.draw.rect(screen, bg_color, item_rect)
+            if is_selected:
+                pygame.draw.rect(screen, self.colors['border_active'], item_rect, 1)
+
+            name_text = self._get_font(14).render(template.name, True, self.colors['text'])
+            screen.blit(name_text, (item_rect.x + 5, item_rect.y + 2))
+
+            enemy_count = len(template.enemies)
+            info = f"{enemy_count} Pokémon | Nível: {template.min_level}-{template.max_level}"
+            info_text = self._get_font(12).render(info, True, self.colors['text_dim'])
+            screen.blit(info_text, (item_rect.x + 5, item_rect.y + 20))
+
+        screen.set_clip(old_clip)
+
+        if len(templates) > self.templates_per_page:
+            info = f"{self.templates_scroll + 1}-{min(self.templates_scroll + self.templates_per_page, len(templates))} de {len(templates)}"
+            text = self._get_font(12).render(info, True, self.colors['text_muted'])
+            text_x = self.templates_list_area.x + (self.templates_list_area.width - text.get_width()) // 2
+            screen.blit(text, (text_x, self.templates_list_area.bottom + 4))

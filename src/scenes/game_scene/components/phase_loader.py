@@ -98,7 +98,7 @@ class PhaseLoader:
         return self.current_phase_data.get("tower_spots", {})
 
     def get_waves_data(self) -> list:
-        """Retorna dados das waves como lista"""
+        """Retorna dados das waves como lista (compatível com novo formato)"""
         if not self.current_phase_data:
             print("[PhaseLoader] Sem dados da fase carregados")
             return []
@@ -107,13 +107,26 @@ class PhaseLoader:
 
         print(f"\n=== PHASE LOADER DEBUG ===")
         print(f"Tipo de waves_data: {type(waves_data)}")
-        print(f"Conteúdo de waves_data: {waves_data}")
         print("==========================\n")
 
-        # CASO 1: É um dicionário com chave "waves" (formato atual do editor)
+        # CASO 1: É um dicionário com chave "waves" (formato atual)
         if isinstance(waves_data, dict) and "waves" in waves_data:
             waves_list = waves_data["waves"]
             print(f"[PhaseLoader] Encontrou {len(waves_list)} waves no formato dict['waves']")
+
+            # ===== VERIFICA SE TEM TEMPLATES E VARIANTS =====
+            templates = waves_data.get("templates", {})
+            if templates.get("templates"):
+                print(f"[PhaseLoader] Encontrou {len(templates.get('templates', []))} templates")
+
+            # ===== VERIFICA SE TEM VARIANTS NAS WAVES =====
+            for wave in waves_list:
+                if wave.get("use_variants", False):
+                    variants = wave.get("variants", [])
+                    print(f"[PhaseLoader] Wave {wave.get('wave_index', 0)} tem {len(variants)} variants")
+                if wave.get("template_id"):
+                    print(f"[PhaseLoader] Wave {wave.get('wave_index', 0)} usa template {wave.get('template_id')}")
+
             return waves_list
 
         # CASO 2: É uma lista direta (formato antigo)
