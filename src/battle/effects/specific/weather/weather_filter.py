@@ -12,7 +12,6 @@ class WeatherFilter:
     def __init__(self):
         self.surface = None
         self.last_size = None
-        self._debug_counter = 0
 
     def render(self, screen, weather_state, viewport_rect):
         """
@@ -26,13 +25,8 @@ class WeatherFilter:
         if not weather_state or not weather_state.active:
             return
 
-        # DEBUG
-        self._debug_counter += 1
-        print(f"[WEATHER_FILTER] Render chamado #{self._debug_counter} - Clima: {weather_state.type.value}")
-
         # Obtém a cor do filtro baseado no tipo de clima
         color = self._get_filter_color(weather_state)
-        print(f"[WEATHER_FILTER] Cor: {color}")
 
         if color[3] <= 0:
             print(f"[WEATHER_FILTER] Opacidade zero, ignorando")
@@ -55,7 +49,6 @@ class WeatherFilter:
         if weather_state.is_base_weather:
             # Clima base: opacidade total SEM fade
             final_alpha = color[3]
-            print(f"[WEATHER_FILTER] Clima BASE - Alpha final: {final_alpha}")
         else:
             # Clima temporário: com fade in/out
             progress = weather_state.get_progress()
@@ -68,13 +61,11 @@ class WeatherFilter:
                 alpha_factor = 1.0
 
             final_alpha = int(color[3] * alpha_factor)
-            print(f"[WEATHER_FILTER] Clima temporário - Alpha final: {final_alpha} (progress: {progress:.2f})")
 
         self.surface.set_alpha(final_alpha)
 
         # Renderiza na posição da viewport
         screen.blit(self.surface, (viewport_rect.x, viewport_rect.y))
-        print(f"[WEATHER_FILTER] Blit em ({viewport_rect.x}, {viewport_rect.y}) com alpha {final_alpha}")
 
     def _get_filter_color(self, weather_state) -> tuple:
         """

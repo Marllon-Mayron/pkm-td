@@ -46,10 +46,8 @@ class Slider:
         self.value = self.min_val + ratio * (self.max_val - self.min_val)
 
     def render(self, screen, font):
-        # Fundo do slider (trilho)
         pygame.draw.rect(screen, (25, 25, 35), self.rect, border_radius=4)
 
-        # Barra preenchida
         fill_width = int(self.rect.width * ((self.value - self.min_val) / (self.max_val - self.min_val)))
         if fill_width > 0:
             fill_rect = pygame.Rect(self.rect.x, self.rect.y, fill_width, self.rect.height)
@@ -69,7 +67,6 @@ class Slider:
 
         pygame.draw.rect(screen, (80, 80, 100), self.rect, 2, border_radius=4)
 
-        # Thumb
         thumb_x = self.rect.x + fill_width - 6
         thumb_rect = pygame.Rect(thumb_x, self.rect.y - 3, 12, self.rect.height + 6)
         thumb_color = (220, 220, 240) if self.dragging else (180, 180, 210)
@@ -83,7 +80,7 @@ class Slider:
 
 
 class SettingsScene(BaseScene):
-    def __init__(self, game):
+    def __init__(self, game, on_back_callback=None):
         super().__init__(game)
 
         self.title_font = None
@@ -96,18 +93,15 @@ class SettingsScene(BaseScene):
         self.apply_button = None
         self.reset_button = None
 
-        # Posições relativas (porcentagens da viewport)
-        self.left_col_x = 0.12  # 12% da largura para coluna esquerda
-        self.right_col_x = 0.62  # 62% da largura para coluna direita
+        self.left_col_x = 0.12
+        self.right_col_x = 0.62
 
-        # Alturas relativas (porcentagens da altura do viewport)
-        self.row_height = 0.12  # Cada item ocupa 12% da altura
-        self.label_y_offset = 0.05  # Offset para labels dentro da linha
-        self.checkbox_y_offset = 0.055  # Offset para checkboxes
-        self.slider_y_offset = 0.09  # Offset para sliders
-        self.hint_y_offset = 0.115  # Offset para hints
+        self.row_height = 0.12
+        self.label_y_offset = 0.05
+        self.checkbox_y_offset = 0.055
+        self.slider_y_offset = 0.09
+        self.hint_y_offset = 0.115
 
-        # Rects (serão calculados em _update_rects)
         self.music_label_rect = None
         self.music_checkbox_rect = None
         self.music_hint_rect = None
@@ -127,11 +121,12 @@ class SettingsScene(BaseScene):
         self.audio_category_rect = None
         self.video_category_rect = None
 
-        # Sliders
         self.music_slider = None
         self.sfx_slider = None
 
-        # ===== VERIFICA SE HÁ SAVE =====
+        # ===== CALLBACK =====
+        self._on_back_callback = on_back_callback
+
         self.has_save = self._check_any_save_exists()
         self.state = "normal" if self.has_save else "blocked"
 
@@ -142,7 +137,6 @@ class SettingsScene(BaseScene):
         else:
             self._load_default_settings()
 
-        # Hover states
         self.hover_back = False
         self.hover_apply = False
         self.hover_reset = False
@@ -226,7 +220,6 @@ class SettingsScene(BaseScene):
         return max(int(base_size * self.screen_manager.viewport_height / 720), 12)
 
     def _create_layout(self):
-        """Cria o layout usando porcentagens"""
         vx = self.screen_manager.viewport_x
         vy = self.screen_manager.viewport_y
         vw = self.screen_manager.viewport_width
@@ -238,74 +231,48 @@ class SettingsScene(BaseScene):
         self.hint_font = pygame.font.Font(None, self._get_font_size(18))
         self.category_font = pygame.font.Font(None, self._get_font_size(22))
 
-        # Botão voltar
         back_size = int(min(vw * 0.045, vh * 0.065, 40))
         self.back_button = pygame.Rect(vx + 20, vy + 20, back_size, back_size)
 
-        # Painel principal
         panel_width = int(vw * 0.75)
         panel_height = int(vh * 0.7)
         panel_x = vx + (vw - panel_width) // 2
         panel_y = vy + int(vh * 0.12)
         self.panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
 
-        # Categorias
         category_y = panel_y + int(panel_height * 0.03)
         self.audio_category_rect = pygame.Rect(panel_x + 20, category_y, 100, 30)
         self.video_category_rect = pygame.Rect(panel_x + panel_width // 2 + 20, category_y, 100, 30)
 
-        # Atualizar todos os rects baseados em porcentagens
         self._update_rects(vx, vy, vw, vh, panel_y, panel_height)
 
     def _update_rects(self, vx, vy, vw, vh, panel_y, panel_height):
-        """Atualiza todos os rects baseados em porcentagens"""
+        item_height = panel_height * 0.12
+        start_y = panel_y + panel_height * 0.12
 
-        # Altura base para os itens (em pixels)
-        item_height = panel_height * 0.12  # Cada item ocupa 12% da altura do painel
-        start_y = panel_y + panel_height * 0.12  # Começa após 12% do painel
-
-        # Posições X (porcentagens da viewport)
         left_x = vx + vw * self.left_col_x
         right_x = vx + vw * self.right_col_x
 
-        # Tamanhos
         label_width = int(vw * 0.1)
         checkbox_size = int(vh * 0.033)
         hint_width = int(vw * 0.2)
         slider_width = vw * 0.3
-        slider_height = 24
 
-        # === LINHA 1: MUSIC ===
         row_y = start_y
 
-        # Label (no topo)
         self.music_label_rect = pygame.Rect(left_x, row_y, label_width, int(item_height * 0.3))
-
-        # Checkbox (mesma linha do label)
         self.music_checkbox_rect = pygame.Rect(
             left_x + label_width + 10,
             row_y + (int(item_height * 0.3) - checkbox_size) // 2,
             checkbox_size, checkbox_size
         )
 
-        # Hint (logo abaixo do label)
         hint_y = row_y + int(item_height * 0.35)
-        self.music_hint_rect = pygame.Rect(
-            left_x,
-            hint_y,
-            hint_width,
-            int(item_height * 0.2)
-        )
+        self.music_hint_rect = pygame.Rect(left_x, hint_y, hint_width, int(item_height * 0.2))
 
-        # Slider (abaixo da hint, com espaço)
         slider_y = hint_y + int(item_height * 0.25)
         if not self.music_slider:
-            self.music_slider = Slider(
-                left_x / vw,
-                slider_y / vh,
-                slider_width / vw,
-                self.music_volume
-            )
+            self.music_slider = Slider(left_x / vw, slider_y / vh, slider_width / vw, self.music_volume)
             self.music_slider.is_music = True
         else:
             self.music_slider.relative_x = left_x / vw
@@ -313,37 +280,21 @@ class SettingsScene(BaseScene):
             self.music_slider.relative_width = slider_width / vw
         self.music_slider.update_rect(vx, vy, vw, vh)
 
-        # === LINHA 2: SOUND FX ===
-        row_y = start_y + int(item_height * 1.2)  # Espaçamento maior entre itens
+        row_y = start_y + int(item_height * 1.2)
 
-        # Label
         self.sfx_label_rect = pygame.Rect(left_x, row_y, label_width, int(item_height * 0.3))
-
-        # Checkbox
         self.sfx_checkbox_rect = pygame.Rect(
             left_x + label_width + 10,
             row_y + (int(item_height * 0.3) - checkbox_size) // 2,
             checkbox_size, checkbox_size
         )
 
-        # Hint
         hint_y = row_y + int(item_height * 0.35)
-        self.sfx_hint_rect = pygame.Rect(
-            left_x,
-            hint_y,
-            hint_width,
-            int(item_height * 0.2)
-        )
+        self.sfx_hint_rect = pygame.Rect(left_x, hint_y, hint_width, int(item_height * 0.2))
 
-        # Slider
         slider_y = hint_y + int(item_height * 0.25)
         if not self.sfx_slider:
-            self.sfx_slider = Slider(
-                left_x / vw,
-                slider_y / vh,
-                slider_width / vw,
-                self.sfx_volume
-            )
+            self.sfx_slider = Slider(left_x / vw, slider_y / vh, slider_width / vw, self.sfx_volume)
             self.sfx_slider.is_music = False
         else:
             self.sfx_slider.relative_x = left_x / vw
@@ -351,51 +302,30 @@ class SettingsScene(BaseScene):
             self.sfx_slider.relative_width = slider_width / vw
         self.sfx_slider.update_rect(vx, vy, vw, vh)
 
-        # === COLUNA DIREITA: FULLSCREEN ===
         row_y = start_y
 
-        # Label
         self.fullscreen_label_rect = pygame.Rect(right_x, row_y, int(label_width * 1.2), int(item_height * 0.3))
-
-        # Checkbox
         self.fullscreen_checkbox_rect = pygame.Rect(
             right_x + int(label_width * 1.2) + 10,
             row_y + (int(item_height * 0.3) - checkbox_size) // 2,
             checkbox_size, checkbox_size
         )
 
-        # Hint
         hint_y = row_y + int(item_height * 0.35)
-        self.fullscreen_hint_rect = pygame.Rect(
-            right_x,
-            hint_y,
-            hint_width,
-            int(item_height * 0.2)
-        )
+        self.fullscreen_hint_rect = pygame.Rect(right_x, hint_y, hint_width, int(item_height * 0.2))
 
-        # === LINHA 2 DIREITA: VSYNC ===
         row_y = start_y + int(item_height * 1.2)
 
-        # Label
         self.vsync_label_rect = pygame.Rect(right_x, row_y, label_width, int(item_height * 0.3))
-
-        # Checkbox
         self.vsync_checkbox_rect = pygame.Rect(
             right_x + label_width + 10,
             row_y + (int(item_height * 0.3) - checkbox_size) // 2,
             checkbox_size, checkbox_size
         )
 
-        # Hint
         hint_y = row_y + int(item_height * 0.35)
-        self.vsync_hint_rect = pygame.Rect(
-            right_x,
-            hint_y,
-            hint_width,
-            int(item_height * 0.2)
-        )
+        self.vsync_hint_rect = pygame.Rect(right_x, hint_y, hint_width, int(item_height * 0.2))
 
-        # Botões
         button_width = int(vw * 0.1)
         button_height = int(vh * 0.055)
         button_spacing = int(vw * 0.02)
@@ -403,8 +333,7 @@ class SettingsScene(BaseScene):
         buttons_y = panel_y + panel_height - button_height - int(vh * 0.02)
         buttons_x = vx + (vw - total_width) // 2
         self.apply_button = pygame.Rect(buttons_x, buttons_y, button_width, button_height)
-        self.reset_button = pygame.Rect(buttons_x + button_width + button_spacing, buttons_y, button_width,
-                                        button_height)
+        self.reset_button = pygame.Rect(buttons_x + button_width + button_spacing, buttons_y, button_width, button_height)
 
     def handle_event(self, event):
         if event.type == pygame.VIDEORESIZE:
@@ -422,13 +351,10 @@ class SettingsScene(BaseScene):
             self.hover_back = self.back_button.collidepoint(event.pos) if self.back_button else False
             self.hover_apply = self.apply_button.collidepoint(event.pos) if self.apply_button else False
             self.hover_reset = self.reset_button.collidepoint(event.pos) if self.reset_button else False
-            self.hover_music_check = self.music_checkbox_rect.collidepoint(
-                event.pos) if self.music_checkbox_rect else False
+            self.hover_music_check = self.music_checkbox_rect.collidepoint(event.pos) if self.music_checkbox_rect else False
             self.hover_sfx_check = self.sfx_checkbox_rect.collidepoint(event.pos) if self.sfx_checkbox_rect else False
-            self.hover_fullscreen_check = self.fullscreen_checkbox_rect.collidepoint(
-                event.pos) if self.fullscreen_checkbox_rect else False
-            self.hover_vsync_check = self.vsync_checkbox_rect.collidepoint(
-                event.pos) if self.vsync_checkbox_rect else False
+            self.hover_fullscreen_check = self.fullscreen_checkbox_rect.collidepoint(event.pos) if self.fullscreen_checkbox_rect else False
+            self.hover_vsync_check = self.vsync_checkbox_rect.collidepoint(event.pos) if self.vsync_checkbox_rect else False
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.back_button and self.back_button.collidepoint(event.pos):
@@ -548,6 +474,15 @@ class SettingsScene(BaseScene):
                 sound_manager.stop_music()
 
         self.preview_music_timer = 0
+
+        if self._on_back_callback is not None:
+            print("[SETTINGS] Voltando via callback")
+            callback = self._on_back_callback
+            self._on_back_callback = None
+            callback()
+            return  # <--- ESSA LINHA É CRUCIAL!
+
+        print("[SETTINGS] Voltando para o menu")
         self.game.current_scene = self.game.menu_scene
 
     def update(self, dt):
@@ -565,13 +500,11 @@ class SettingsScene(BaseScene):
     def render(self, screen):
         self._draw_gradient_background(screen)
 
-        # Atualiza viewport
         vx = self.screen_manager.viewport_x
         vy = self.screen_manager.viewport_y
         vw = self.screen_manager.viewport_width
         vh = self.screen_manager.viewport_height
 
-        # Recria os rects baseados no tamanho atual da viewport
         panel_width = int(vw * 0.75)
         panel_height = int(vh * 0.7)
         panel_x = vx + (vw - panel_width) // 2
@@ -579,7 +512,6 @@ class SettingsScene(BaseScene):
 
         self._update_rects(vx, vy, vw, vh, panel_y, panel_height)
 
-        # Título
         title = self.title_font.render("CONFIGURATIONS", True, (255, 255, 255))
         title_shadow = self.title_font.render("CONFIGURATIONS", True, (30, 30, 45))
         title_x = vx + (vw - title.get_width()) // 2
@@ -587,7 +519,6 @@ class SettingsScene(BaseScene):
         screen.blit(title_shadow, (title_x + 2, title_y + 2))
         screen.blit(title, (title_x, title_y))
 
-        # Barra decorativa
         bar_width = int(vw * 0.12)
         bar_x = vx + (vw - bar_width) // 2
         bar_y = title_y + title.get_height() + 6
@@ -598,7 +529,6 @@ class SettingsScene(BaseScene):
             self._render_back_button(screen)
             return
 
-        # Painel principal
         panel_scale = min(1.0, self.panel_animation_progress)
         if panel_scale < 1.0:
             scaled_rect = self.panel_rect.inflate(
@@ -610,17 +540,14 @@ class SettingsScene(BaseScene):
         else:
             render_rect = self.panel_rect
 
-        # Fundo do painel
         panel_surface = pygame.Surface((render_rect.width, render_rect.height), pygame.SRCALPHA)
         for i in range(render_rect.height):
             alpha = int(200 - (i / render_rect.height) * 40)
             pygame.draw.line(panel_surface, (20, 20, 35, alpha), (0, i), (render_rect.width, i))
 
-        # Borda
         pygame.draw.rect(panel_surface, (100, 85, 55), panel_surface.get_rect(), 3, border_radius=8)
         pygame.draw.rect(panel_surface, (160, 140, 100), panel_surface.get_rect().inflate(-2, -2), 1, border_radius=6)
 
-        # Cantos decorativos
         corner_size = 20
         corner_color = (180, 160, 100)
         w, h = render_rect.width, render_rect.height
@@ -633,44 +560,33 @@ class SettingsScene(BaseScene):
         pygame.draw.line(panel_surface, corner_color, (w - 6, h - 6), (w - corner_size, h - 6), 2)
         pygame.draw.line(panel_surface, corner_color, (w - 6, h - 6), (w - 6, h - corner_size), 2)
 
-        # Linha divisória vertical entre as colunas
         mid_x = render_rect.width // 2
         pygame.draw.line(panel_surface, (100, 85, 55, 100), (mid_x, 30), (mid_x, h - 30), 1)
 
         screen.blit(panel_surface, render_rect)
 
-        # ===== RENDERIZAÇÃO NA ORDEM CORRETA =====
-        # 1. Categorias
         self._render_categories(screen)
-
-        # 2. Labels (textos)
         self._render_audio_labels(screen)
         self._render_video_labels(screen)
 
-        # 3. Sliders
         if self.music_slider:
             self.music_slider.render(screen, self.value_font)
         if self.sfx_slider:
             self.sfx_slider.render(screen, self.value_font)
 
-        # 4. Checkboxes
         self._render_checkbox(screen, self.music_checkbox_rect, self.music_enabled, self.hover_music_check)
         self._render_checkbox(screen, self.sfx_checkbox_rect, self.sfx_enabled, self.hover_sfx_check)
-        self._render_checkbox(screen, self.fullscreen_checkbox_rect, self.fullscreen_enabled,
-                              self.hover_fullscreen_check)
+        self._render_checkbox(screen, self.fullscreen_checkbox_rect, self.fullscreen_enabled, self.hover_fullscreen_check)
         self._render_checkbox(screen, self.vsync_checkbox_rect, self.vsync_enabled, self.hover_vsync_check)
 
-        # 5. Hints
         self._render_audio_hints(screen)
         self._render_video_hints(screen)
 
-        # 6. Botões
         self._render_back_button(screen)
         self._render_button(screen, self.apply_button, "APLICAR", self.hover_apply)
         self._render_button(screen, self.reset_button, "PADRAO", self.hover_reset)
 
     def _render_categories(self, screen):
-        """Renderiza os cabeçalhos das categorias"""
         if self.audio_category_rect:
             audio_text = self.category_font.render("AUDIO", True, (180, 160, 100))
             screen.blit(audio_text, (self.audio_category_rect.x, self.audio_category_rect.y))

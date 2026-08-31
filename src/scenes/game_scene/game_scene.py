@@ -146,6 +146,25 @@ class GameScene(BaseScene):
         # Inicia o jogo
         self._start_game()
 
+    def toggle_pause(self):
+        """Alterna pausa do jogo usando o novo overlay"""
+        if self.paused:
+            # Se já está pausado, despausa
+            self.paused = False
+            self.game_paused = False
+            if hasattr(self, 'wave_manager'):
+                self.wave_manager.paused = False
+            self.overlay_manager.hide()  # Fecha o overlay
+            print("Jogo continuando")
+        else:
+            # Pausa o jogo
+            self.paused = True
+            self.game_paused = True
+            if hasattr(self, 'wave_manager'):
+                self.wave_manager.paused = True
+            self.overlay_manager.show(OverlayType.PAUSE)  # Mostra o overlay de pausa
+            print("Jogo pausado")
+
     def _start_test_weather(self):
         """
         Inicia um clima de teste automaticamente ao carregar a fase.
@@ -960,7 +979,7 @@ class GameScene(BaseScene):
 
     def handle_event(self, event):
         """Processa eventos do jogo"""
-        # Cache de referências (já existente no seu código)
+        # Cache de referências
         overlay_active = self.overlay_manager.is_active
         drag_manager = self.item_drag_manager
         bag_renderer = self.item_bag_renderer
@@ -983,6 +1002,15 @@ class GameScene(BaseScene):
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.handle_event(event)
             return None
+
+        # ===== OVERLAY DE PAUSA =====
+        # O overlay de pausa é tratado antes dos outros overlays
+        # para garantir que ele capture eventos mesmo com outros overlays ativos
+        if self.overlay_manager.is_active and self.overlay_manager.current_type == OverlayType.PAUSE:
+            if self.overlay_manager.handle_event(event):
+                return None
+            # Não retorna None aqui para permitir que outros eventos sejam processados
+            # Mas o overlay de pausa já trata ESC e P internamente
 
         if overlay_active:
             if self.overlay_manager.handle_event(event):
@@ -1019,11 +1047,11 @@ class GameScene(BaseScene):
                     player.bag.cycle_category()
                 return None
             elif event.key == pygame.K_p:
-                self.toggle_pause()
+                self.toggle_pause()  # Agora usa o novo sistema de pausa
                 return None
             elif event.key == pygame.K_ESCAPE:
-                self.cleanup()
-                self.game.current_scene = self.game.menu_scene
+                # ESC agora abre o overlay de pausa em vez de sair
+                self.toggle_pause()
                 return None
             elif event.key == pygame.K_F1:
                 self.show_debug = not self.show_debug
@@ -1531,12 +1559,6 @@ class GameScene(BaseScene):
                           screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
         perf_monitor.end_section()
 
-        # Pause overlay
-        if self.paused and not self.game_paused:
-            perf_monitor.start_section("RENDER_PAUSE_OVERLAY")
-            self._render_pause_overlay(screen)
-            perf_monitor.end_section()
-
         # Overlay Manager
         viewport_rect = pygame.Rect(
             self.screen_manager.viewport_x,
@@ -1691,28 +1713,6 @@ class GameScene(BaseScene):
         elif self.game_state == "completed":
             complete_text = font.render("FASE COMPLETA!", True, (255, 215, 0))
             screen.blit(complete_text, (viewport_x + 15, y_offset))
-
-    def _render_pause_overlay(self, screen):
-        """Overlay de pausa do jogo"""
-        screen_mgr = self.screen_manager
-
-        overlay = pygame.Surface((screen_mgr.viewport_width, screen_mgr.viewport_height))
-        overlay.set_alpha(128)
-        overlay.fill((0, 0, 0))
-        screen.blit(overlay, (screen_mgr.viewport_x, screen_mgr.viewport_y))
-
-        font_large = pygame.font.Font(None, 48)
-        pause_text = font_large.render("PAUSADO", True, (255, 255, 255))
-        text_x = screen_mgr.viewport_x + (screen_mgr.viewport_width - pause_text.get_width()) // 2
-        text_y = screen_mgr.viewport_y + (screen_mgr.viewport_height - pause_text.get_height()) // 2
-        screen.blit(pause_text, (text_x, text_y))
-
-        font_small = pygame.font.Font(None, 24)
-        phase_display = self.phase_info.get("name", f"Fase {self.phase_number}")
-        phase_text = font_small.render(phase_display, True, (200, 200, 200))
-        phase_x = screen_mgr.viewport_x + (screen_mgr.viewport_width - phase_text.get_width()) // 2
-        phase_y = text_y + pause_text.get_height() + 10
-        screen.blit(phase_text, (phase_x, phase_y))
 
     def _render_debug_info(self, screen):
         """Informações de debug"""
