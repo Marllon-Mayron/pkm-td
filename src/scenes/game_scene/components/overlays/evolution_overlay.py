@@ -156,7 +156,30 @@ class EvolutionOverlay(BaseOverlay):
     def cancel_evolution(self):
         """Cancela a evolução"""
         self.active = False
+
+        # ===== CONQUISTAS: Bloqueio de Evolução =====
+        game_scene = self.game_scene
+        if game_scene and hasattr(game_scene, 'player'):
+            player = game_scene.player
+            phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+            if hasattr(player, 'achievement_manager'):
+                ach_mgr = player.achievement_manager
+                ach_mgr.increment_counter("evolution_blocked_count")
+                ach_mgr.check_and_unlock("first_evolution_blocked", phase_id)
+                ach_mgr.check_and_unlock("evolution_blocked_10", phase_id)
+                print(
+                    f"[ACHIEVEMENT] Bloqueio de evolução contado! Total: {ach_mgr.get_counter('evolution_blocked_count')}")
+
         self.game_scene.close_evolution_overlay(cancel=True)
+
+        # Mensagem visual para o jogador
+        try:
+            from src.ui.toast_renderer import toast_info
+            toast_info(f"{self.pokemon.get_display_name()} não evoluiu!", duration=2.0)
+        except:
+            pass
+
+        print(f"[EVOLUTION] {self.pokemon.name} evolução cancelada pelo jogador!")
 
     def close(self):
         """Fecha o overlay"""

@@ -91,7 +91,7 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
     ),
     "capture_50": Achievement(
         id="capture_50",
-        title="Colecionador intermediário",
+        title="Colecionador Intermediario",
         description="Capture 50 Pokemon diferentes",
         rarity=AchievementRarity.RARE,
         rewards={"gold": 1000, "xp": 500}
@@ -139,6 +139,126 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         description="Tenha seu primeiro ataque fortalecido pelo clima",
         rarity=AchievementRarity.COMMON,
         rewards={"gold": 50, "xp": 20}
+    ),
+
+    # ===== NOVAS CONQUISTAS DE EVOLUÇÃO =====
+    "first_evolution": Achievement(
+        id="first_evolution",
+        title="A Nova Forma!",
+        description="Evolua um Pokemon pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 100, "xp": 50}
+    ),
+    "evolution_10": Achievement(
+        id="evolution_10",
+        title="Mestre das Transformações",
+        description="Evolua Pokemon 10 vezes",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 400, "xp": 200}
+    ),
+    "evolution_50": Achievement(
+        id="evolution_50",
+        title="Arquiteto da Evolução",
+        description="Evolua Pokemon 50 vezes",
+        rarity=AchievementRarity.EPIC,
+        rewards={"gold": 1200, "xp": 600}
+    ),
+
+    # ===== CONQUISTAS DE BLOQUEIO DE EVOLUÇÃO =====
+    "first_evolution_blocked": Achievement(
+        id="first_evolution_blocked",
+        title="Pare! Não Agora!",
+        description="Interrompa a evolução de um Pokemon pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 30, "xp": 15}
+    ),
+    "evolution_blocked_10": Achievement(
+        id="evolution_blocked_10",
+        title="O Dominador",
+        description="Interrompa a evolução de Pokemon 10 vezes",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 200, "xp": 100}
+    ),
+
+    # ===== CONQUISTAS DE CURA DE STATUS =====
+    # Poison
+    "first_antidote": Achievement(
+        id="first_antidote",
+        title="Antídoto Eficaz",
+        description="Cure veneno com Antídoto pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 30, "xp": 15}
+    ),
+    "antidote_100": Achievement(
+        id="antidote_100",
+        title="Mestre Antiveneno",
+        description="Cure veneno com Antídoto 100 vezes",
+        rarity=AchievementRarity.EPIC,
+        rewards={"gold": 800, "xp": 400}
+    ),
+
+    # Sleep
+    "first_awake": Achievement(
+        id="first_awake",
+        title="Despertador",
+        description="Acorde um Pokemon com Awake pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 30, "xp": 15}
+    ),
+    "awake_100": Achievement(
+        id="awake_100",
+        title="Mestre dos Sonhos",
+        description="Acorde Pokemon com Awake 100 vezes",
+        rarity=AchievementRarity.EPIC,
+        rewards={"gold": 800, "xp": 400}
+    ),
+
+    # Paralysis
+    "first_paralyze_heal": Achievement(
+        id="first_paralyze_heal",
+        title="Paralisia Curada!",
+        description="Cure paralisia pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 30, "xp": 15}
+    ),
+    "paralyze_heal_100": Achievement(
+        id="paralyze_heal_100",
+        title="Mestre da Mobilidade",
+        description="Cure paralisia 100 vezes",
+        rarity=AchievementRarity.EPIC,
+        rewards={"gold": 800, "xp": 400}
+    ),
+
+    # Revive
+    "first_revive": Achievement(
+        id="first_revive",
+        title="Renascer",
+        description="Reviva um Pokemon pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 50, "xp": 25}
+    ),
+    "revive_25": Achievement(
+        id="revive_25",
+        title="Mestre da Ressurreição",
+        description="Reviva Pokemon 25 vezes",
+        rarity=AchievementRarity.RARE,
+        rewards={"gold": 600, "xp": 300}
+    ),
+
+    # ===== CONQUISTAS DE ENSINO DE MOVES =====
+    "first_move_taught": Achievement(
+        id="first_move_taught",
+        title="Primeira Lição",
+        description="Ensine um movimento a um Pokemon pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 50, "xp": 25}
+    ),
+    "move_taught_10": Achievement(
+        id="move_taught_10",
+        title="Mestre Professor",
+        description="Ensine 10 movimentos a Pokemon",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 300, "xp": 150}
     ),
 }
 

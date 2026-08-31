@@ -504,8 +504,8 @@ class EnemySpawner:
                 toast_battle(f"Novo Pokémon avistado: {pokemon_name}!", duration=3.0)
 
                 if pokemon.is_shiny:
-                    print(f"[Spawner] ✨ Shiny {pokemon_name} visto pela primeira vez!")
-                    toast_battle(f"✨ Shiny {pokemon_name} avistado!", duration=4.0)
+                    print(f"[Spawner] Shiny {pokemon_name} visto pela primeira vez!")
+                    toast_battle(f" Shiny {pokemon_name} avistado!", duration=4.0)
 
         except Exception as e:
             print(f"[Spawner] Erro ao registrar Pokémon visto: {e}")

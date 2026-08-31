@@ -227,14 +227,69 @@ class Pokedex:
     # ===== MÉTODOS PARA INMAP =====
 
     def get_inmap_animation(self, pokemon_id: int, shiny: bool = False) -> Dict:
+        """
+        Retorna animações COMPLETAS com 8 direções.
+        Usa os dados já carregados pelo SpriteLoader.
+        """
         cache_key = f"{pokemon_id}_{shiny}"
         if cache_key in self.inmap_animations_cache:
             return self.inmap_animations_cache[cache_key]
 
-        animation = self.sprite_manager.get_inmap_animation(pokemon_id, shiny)
-        self.inmap_animations_cache[cache_key] = animation
-        return animation
+        # Carrega os dados completos do SpriteLoader (já tem 8 direções)
+        sprites_data = self.sprite_manager.loader.load_pokemon_sprites(pokemon_id, shiny)
 
+        # Pega a animação Walk (ou a primeira disponível)
+        animations = sprites_data.get("animations", {})
+        walk_frames = animations.get("walk", {})
+
+        # Se não tem Walk, tenta a primeira animação disponível
+        if not walk_frames and animations:
+            walk_frames = next(iter(animations.values()))
+
+        # Remove o metadado se existir
+        if '_metadata' in walk_frames:
+            del walk_frames['_metadata']
+
+        # AGORA RETORNA AS 8 DIREÇÕES DIRETAMENTE
+        # Garante que todas as 8 direções estão presentes (mesmo que vazias)
+        all_directions = [
+            "down", "down-right", "right", "up-right",
+            "up", "up-left", "left", "down-left"
+        ]
+
+        result = {}
+        for direction in all_directions:
+            result[direction] = walk_frames.get(direction, [])
+
+        # SE SÓ TEM UMA DIREÇÃO, REPLICA PARA TODAS
+        # Isso acontece quando o spritesheet tem apenas 1 linha (direção única)
+        non_empty = [d for d, frames in result.items() if frames]
+
+        if len(non_empty) == 1:
+            # Só tem uma direção com frames - replica para todas
+            source_frames = result[non_empty[0]]
+            for direction in all_directions:
+                if direction != non_empty[0]:
+                    result[direction] = source_frames.copy()
+            print(f"[POKEDEX] {pokemon_id}: animação de direção única replicada para 8 direções")
+        elif len(non_empty) == 4 and set(non_empty) == {"down", "right", "up", "left"}:
+            # Tem 4 direções principais - replica para diagonais
+            diagonal_map = {
+                "down-right": "right",
+                "up-right": "right",
+                "up-left": "left",
+                "down-left": "left"
+            }
+            for diag, src in diagonal_map.items():
+                if src in result and result[src]:
+                    result[diag] = result[src].copy()
+            print(f"[POKEDEX] {pokemon_id}: 4 direções replicadas para diagonais")
+
+        self.inmap_animations_cache[cache_key] = result
+
+        print(f"[POKEDEX] get_inmap_animation: {pokemon_id} - "
+              f"direções com frames: {[d for d in all_directions if result[d]]}")
+        return result
     def get_pokemon_animations_info(self, pokemon_id: int, shiny: bool = False) -> Dict:
         cache_key = f"{pokemon_id}_{shiny}_info"
         if cache_key in self.pokemon_animations_info:

@@ -53,6 +53,18 @@ class PokemonEvolution:
         print(f"[EVOLUÇÃO] ✓ {old_name} (Lv.{old_level}) evoluiu para {self.pokemon.name}!")
         print(f"[EVOLUÇÃO] Moves atuais: {[m.name for m in self.pokemon.moves]}")
 
+        # ===== CONQUISTAS: Evolução =====
+        if hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
+            game_scene = self.pokemon.game_scene
+            phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+            if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+                ach_mgr = game_scene.player.achievement_manager
+                ach_mgr.increment_counter("evolution_count")
+                ach_mgr.check_and_unlock("first_evolution", phase_id)
+                ach_mgr.check_and_unlock("evolution_10", phase_id)
+                ach_mgr.check_and_unlock("evolution_50", phase_id)
+                print(f"[ACHIEVEMENT] Evolução contada! Total: {ach_mgr.get_counter('evolution_count')}")
+
     def check_combination_evolution(self, nearby_pokemon):
         """
         Verifica se há evolução por combinação com outro Pokémon próximo.
@@ -74,7 +86,7 @@ class PokemonEvolution:
                 "partner": nearby_pokemon,
                 "partner_new_id": other_new_id,
                 "message": message,
-                "remove_partner": remove_partner  # NOVO: flag para remover o parceiro
+                "remove_partner": remove_partner
             }
 
         return None
@@ -172,7 +184,6 @@ class PokemonEvolution:
             if hasattr(game_scene.game, 'current_scene'):
                 from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
                 if isinstance(game_scene.game.current_scene, TeamSelectScene):
-                    # Marca para recriar o layout na tela de seleção de time
                     game_scene.game.current_scene.layout_initialized = False
                     print(f"[COMBINATION] TeamSelectScene marcado para recriar layout!")
 

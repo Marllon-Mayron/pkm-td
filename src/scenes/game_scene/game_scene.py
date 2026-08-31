@@ -323,8 +323,16 @@ class GameScene(BaseScene):
         # Se NÃO foi cancelado e temos dados pendentes de TM, aplica o aprendizado
         if not cancel and hasattr(self, 'pending_tm_data') and self.pending_tm_data:
             # O Pokémon já aprendeu o move via replace_move no overlay
-            # Só precisamos limpar os dados pendentes
             print(f"[TM] {self.pending_tm_data['move_name']} aprendido com sucesso!")
+
+            # ===== CONQUISTAS: Ensino de Moves =====
+            phase_id = f"{self.chapter_id}-{self.phase_number}"
+            if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+                ach_mgr = self.player.achievement_manager
+                ach_mgr.increment_counter("move_taught_count")
+                ach_mgr.check_and_unlock("first_move_taught", phase_id)
+                ach_mgr.check_and_unlock("move_taught_10", phase_id)
+
             self.pending_tm_data = None
 
         self.game_paused = False
@@ -400,6 +408,30 @@ class GameScene(BaseScene):
                         self.battle_system.effect_manager.remove_status(target)
                         toast_battle(f"{target.name} curou {status_to_cure}!", duration=4.0, pokemon=target,
                                      portrait="happy")
+
+                        # ===== CONQUISTAS: CURA DE STATUS =====
+                        phase_id = f"{self.chapter_id}-{self.phase_number}"
+                        if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+                            ach_mgr = self.player.achievement_manager
+
+                            # Cura de Veneno com Antídoto
+                            if status_to_cure == "poison" and item_data.get("id") == "antidote":
+                                ach_mgr.increment_counter("antidote_count")
+                                ach_mgr.check_and_unlock("first_antidote", phase_id)
+                                ach_mgr.check_and_unlock("antidote_100", phase_id)
+
+                            # Cura de Sono com Awake
+                            elif status_to_cure == "sleep" and item_data.get("id") == "awake":
+                                ach_mgr.increment_counter("awake_count")
+                                ach_mgr.check_and_unlock("first_awake", phase_id)
+                                ach_mgr.check_and_unlock("awake_100", phase_id)
+
+                            # Cura de Paralisia
+                            elif status_to_cure == "paralysis":
+                                ach_mgr.increment_counter("paralyze_heal_count")
+                                ach_mgr.check_and_unlock("first_paralyze_heal", phase_id)
+                                ach_mgr.check_and_unlock("paralyze_heal_100", phase_id)
+
                         return True
                 return False
 
@@ -500,17 +532,24 @@ class GameScene(BaseScene):
             new_move = Move(move_name, move_info)
             pokemon.moves.append(new_move)
             print(f"[TM] {pokemon.name} aprendeu {move_name} via TM!")
+
+            # ===== CONQUISTAS: Ensino de Moves =====
+            phase_id = f"{self.chapter_id}-{self.phase_number}"
+            if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+                ach_mgr = self.player.achievement_manager
+                ach_mgr.increment_counter("move_taught_count")
+                ach_mgr.check_and_unlock("first_move_taught", phase_id)
+                ach_mgr.check_and_unlock("move_taught_10", phase_id)
+
             return True
 
         # ===== Se tem 4 moves, usa o MoveLearnOverlay existente =====
-        # Salva o item_data para usar depois se o usuário confirmar
         self.pending_tm_data = {
             "item_id": item_data["id"],
             "move_name": move_name,
             "move_info": move_info
         }
 
-        # Abre o overlay de aprendizado (já existente!)
         self.open_move_learn_overlay(pokemon, move_name)
         return True
 
@@ -616,15 +655,23 @@ class GameScene(BaseScene):
             toast_battle(f"{pokemon.name} foi revivido!", duration=4.0, pokemon=pokemon, portrait="happy")
             pokemon.revive(heal_percentage=revive_percentage)
 
-            # ===== CONQUISTAS: Cura (Revive também conta) =====
+            # ===== CONQUISTAS: Revive =====
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
                 player = game_scene.player
                 phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
                 if hasattr(player, 'achievement_manager'):
-                    # Incrementa contador de curas
+                    ach_mgr = player.achievement_manager
+                    ach_mgr.increment_counter("revive_count")
+                    ach_mgr.check_and_unlock("first_revive", phase_id)
+                    ach_mgr.check_and_unlock("revive_25", phase_id)
+
+            # ===== CONQUISTAS: Cura (Revive também conta) =====
+            if game_scene and hasattr(game_scene, 'player'):
+                player = game_scene.player
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                if hasattr(player, 'achievement_manager'):
                     player.achievement_manager.increment_counter("heal_count")
-                    # Verifica conquistas de cura (passando a fase atual)
                     player.achievement_manager.check_and_unlock("heal_5", phase_id)
                     player.achievement_manager.check_and_unlock("heal_100", phase_id)
 

@@ -184,7 +184,7 @@ class AchievementManager:
             if self.get_counter("boss_defeated_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
 
-        # ===== NOVAS CONQUISTAS DE CLIMA =====
+        # ===== CONQUISTAS DE CLIMA =====
         elif achievement_id == "first_weather_change":
             if self.get_counter("weather_change_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
@@ -201,6 +201,74 @@ class AchievementManager:
             if self.get_counter("weather_boosted_attack_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
 
+        # ===== NOVAS CONQUISTAS DE EVOLUÇÃO =====
+        elif achievement_id == "first_evolution":
+            if self.get_counter("evolution_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "evolution_10":
+            if self.get_counter("evolution_count") >= 10:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "evolution_50":
+            if self.get_counter("evolution_count") >= 50:
+                return self.unlock(achievement_id, phase_id)
+
+        # ===== CONQUISTAS DE BLOQUEIO DE EVOLUÇÃO =====
+        elif achievement_id == "first_evolution_blocked":
+            if self.get_counter("evolution_blocked_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "evolution_blocked_10":
+            if self.get_counter("evolution_blocked_count") >= 10:
+                return self.unlock(achievement_id, phase_id)
+
+        # ===== CONQUISTAS DE CURA DE STATUS =====
+        # Poison
+        elif achievement_id == "first_antidote":
+            if self.get_counter("antidote_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "antidote_100":
+            if self.get_counter("antidote_count") >= 100:
+                return self.unlock(achievement_id, phase_id)
+
+        # Sleep
+        elif achievement_id == "first_awake":
+            if self.get_counter("awake_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "awake_100":
+            if self.get_counter("awake_count") >= 100:
+                return self.unlock(achievement_id, phase_id)
+
+        # Paralysis
+        elif achievement_id == "first_paralyze_heal":
+            if self.get_counter("paralyze_heal_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "paralyze_heal_100":
+            if self.get_counter("paralyze_heal_count") >= 100:
+                return self.unlock(achievement_id, phase_id)
+
+        # Revive
+        elif achievement_id == "first_revive":
+            if self.get_counter("revive_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "revive_25":
+            if self.get_counter("revive_count") >= 25:
+                return self.unlock(achievement_id, phase_id)
+
+        # ===== CONQUISTAS DE ENSINO DE MOVES =====
+        elif achievement_id == "first_move_taught":
+            if self.get_counter("move_taught_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "move_taught_10":
+            if self.get_counter("move_taught_count") >= 10:
+                return self.unlock(achievement_id, phase_id)
+
         return False
 
     def check_all_counters(self, phase_id: Optional[str] = None):
@@ -214,6 +282,7 @@ class AchievementManager:
         Retorna (0, 1) para conquistas sem contador
         """
         progress_map = {
+            # Existentes
             "first_capture": ("capture_count", 1),
             "heal_5": ("heal_count", 5),
             "first_badge": ("badge_count", 1),
@@ -222,11 +291,27 @@ class AchievementManager:
             "capture_50": ("capture_count", 50),
             "perfect_phase": ("perfect_phase_count", 1),
             "boss_defeated": ("boss_defeated_count", 1),
-            # NOVOS
+            # Clima
             "first_weather_change": ("weather_change_count", 1),
             "weather_change_50": ("weather_change_count", 50),
             "weather_change_100": ("weather_change_count", 100),
             "first_weather_boosted_attack": ("weather_boosted_attack_count", 1),
+            # NOVAS
+            "first_evolution": ("evolution_count", 1),
+            "evolution_10": ("evolution_count", 10),
+            "evolution_50": ("evolution_count", 50),
+            "first_evolution_blocked": ("evolution_blocked_count", 1),
+            "evolution_blocked_10": ("evolution_blocked_count", 10),
+            "first_antidote": ("antidote_count", 1),
+            "antidote_100": ("antidote_count", 100),
+            "first_awake": ("awake_count", 1),
+            "awake_100": ("awake_count", 100),
+            "first_paralyze_heal": ("paralyze_heal_count", 1),
+            "paralyze_heal_100": ("paralyze_heal_count", 100),
+            "first_revive": ("revive_count", 1),
+            "revive_25": ("revive_count", 25),
+            "first_move_taught": ("move_taught_count", 1),
+            "move_taught_10": ("move_taught_count", 10),
         }
 
         if achievement_id in progress_map:
