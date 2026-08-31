@@ -1,7 +1,7 @@
 # src/data/achievement_data.py
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 from enum import Enum
 from datetime import datetime
 
@@ -38,12 +38,11 @@ class AchievementRarity(Enum):
 
 @dataclass
 class Achievement:
-    """Estrutura de uma conquista"""
     id: str
     title: str
     description: str
     rarity: AchievementRarity
-    rewards: Dict[str, int]  # {"gold": 100, "xp": 50}
+    rewards: Dict[str, Any]
 
     # Estado (não salvo, vem do jogador)
     unlocked: bool = False
@@ -66,7 +65,7 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         title="Curandeiro Iniciante",
         description="Cure seus Pokemon 5 vezes",
         rarity=AchievementRarity.COMMON,
-        rewards={"gold": 30, "xp": 15}
+        rewards={"gold": 30, "xp": 15, "pokemon": 113}
     ),
     "first_badge": Achievement(
         id="first_badge",
@@ -80,7 +79,7 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         title="Colecionador Iniciante",
         description="Capture 10 Pokemon diferentes",
         rarity=AchievementRarity.COMMON,
-        rewards={"gold": 150, "xp": 75}
+        rewards={"gold": 150, "xp": 75, "items": {"ultraball": 3}}
     ),
     "heal_100": Achievement(
         id="heal_100",
