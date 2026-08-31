@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Dict
 
 SAVE_FORMAT_VERSION = "0.1.4"  # Versão do FORMATO do save (ATUALIZADA)
-GAME_VERSION_COMPATIBLE = "0.1.11"  # Versão do jogo que usa este formato
+GAME_VERSION_COMPATIBLE = "0.1.10"  # Versão do jogo que usa este formato
 
 
 class SaveManager:
