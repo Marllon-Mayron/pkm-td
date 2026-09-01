@@ -71,19 +71,22 @@ class WaveVariant:
         self.enemies = enemies or []
         self.min_level = 1
         self.max_level = 5
+        self.template_id = None  # NOVO: pode usar um template
 
     def to_dict(self):
         return {
             "condition": self.condition,
             "enemies": [e.to_dict() for e in self.enemies],
             "min_level": self.min_level,
-            "max_level": self.max_level
+            "max_level": self.max_level,
+            "template_id": self.template_id  # NOVO
         }
 
     def from_dict(self, data):
         self.condition = data.get("condition", "any")
         self.min_level = data.get("min_level", 1)
         self.max_level = data.get("max_level", 5)
+        self.template_id = data.get("template_id")  # NOVO
 
         self.enemies = []
         for e_data in data.get("enemies", []):
@@ -92,10 +95,6 @@ class WaveVariant:
             self.enemies.append(enemy)
 
         return self
-
-    def get_total_percentage(self) -> float:
-        """Retorna a soma total das porcentagens"""
-        return sum(e.percentage for e in self.enemies)
 
 
 class Wave:

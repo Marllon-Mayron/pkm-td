@@ -65,7 +65,7 @@ class EnemySpawner:
         self._load_waves()
 
     def _load_waves(self):
-        """Carrega configurações das wavess"""
+        """Carrega configurações das waves"""
         self.waves.clear()
 
         for idx, wave_dict in enumerate(self.raw_waves_data):
@@ -73,10 +73,12 @@ class EnemySpawner:
             min_level = wave_dict.get("min_level", 1)
             max_level = wave_dict.get("max_level", 5)
 
-            # ===== LÊ OS DADOS DE TEMPLATE E VARIANTS =====
             template_id = wave_dict.get("template_id")
             use_variants = wave_dict.get("use_variants", False)
+
+            # ===== CARREGA VARIANTS COMO DICT =====
             variants = wave_dict.get("variants", [])
+            variants = [v for v in variants if isinstance(v, dict)]
 
             # Converte inimigos (legado)
             enemies = []
@@ -113,10 +115,19 @@ class EnemySpawner:
                 self.waves[path_idx] = []
             self.waves[path_idx].append(wave)
 
-            print(
-                f"[Spawner] Carregada wave {idx} para path {path_idx}: {wave.wave_size} inimigos, boss={wave.has_boss}")
+            print(f"[Spawner] Carregada wave {idx} para path {path_idx}:")
+            print(f"  - wave_size: {wave.wave_size}")
+            print(f"  - template_id: {template_id}")
+            print(f"  - use_variants: {use_variants}")
             if use_variants and variants:
-                print(f"[Spawner]   - {len(variants)} variants configurados")
+                print(f"  - {len(variants)} variants:")
+                for v in variants:
+                    cond = v.get("condition", "any")
+                    tid = v.get("template_id")
+                    enemies_count = len(v.get("enemies", []))
+                    print(f"      {cond}: {enemies_count} inimigos" + (f" (template: {tid})" if tid else ""))
+            else:
+                print(f"  - {len(enemies)} inimigos diretos")
 
     def start_all_waves(self) -> bool:
         """Inicia todas as waves de todos os paths"""
@@ -208,12 +219,80 @@ class EnemySpawner:
         """
         Retorna a lista de inimigos para a wave baseado na condição atual.
         Suporta templates e variants.
+        PRIORIDADE: Variants (se condição corresponder) > Template > Enemies direto
         """
-        # ===== PRIORIDADE 1: Template =====
+        from src.editor.wave_config import WaveTemplateManager
+
+        # ===== PRIORIDADE 1: Variants (se ativado) =====
+        if wave.use_variants and wave.variants:
+            # Procura pela condição atual
+            for variant_data in wave.variants:
+                condition = variant_data.get("condition", "any")
+
+                if condition == self.current_condition:
+                    print(f"[Spawner] Usando VARIANT para condição: {self.current_condition}")
+
+                    # Verifica se a variant tem template_id
+                    variant_template_id = variant_data.get("template_id")
+                    if variant_template_id:
+                        template = WaveTemplateManager.get_template(variant_template_id)
+                        if template:
+                            print(f"[Spawner]   - Usando template da variant: {template.name}")
+                            return [{
+                                "pokemon_id": e.pokemon_id,
+                                "percentage": float(e.percentage),
+                                "level_min": variant_data.get("min_level", wave.min_level),
+                                "level_max": variant_data.get("max_level", wave.max_level)
+                            } for e in template.enemies]
+
+                    # Se não tem template, usa os enemies direto da variant
+                    enemies = variant_data.get("enemies", [])
+                    if enemies:
+                        print(f"[Spawner]   - Usando enemies direto da variant ({len(enemies)} inimigos)")
+                        return [{
+                            "pokemon_id": e.get("pokemon_id", 1),
+                            "percentage": float(e.get("percentage", 100.0)),
+                            "level_min": variant_data.get("min_level", wave.min_level),
+                            "level_max": variant_data.get("max_level", wave.max_level)
+                        } for e in enemies]
+
+            # ===== SÓ USA FALLBACK "any" SE TIVER UMA VARIANT COM CONDITION "any" =====
+            for variant_data in wave.variants:
+                if variant_data.get("condition", "any") == "any":
+                    print(f"[Spawner] Usando VARIANT fallback 'any'")
+
+                    variant_template_id = variant_data.get("template_id")
+                    if variant_template_id:
+                        template = WaveTemplateManager.get_template(variant_template_id)
+                        if template:
+                            print(f"[Spawner]   - Usando template da variant: {template.name}")
+                            return [{
+                                "pokemon_id": e.pokemon_id,
+                                "percentage": float(e.percentage),
+                                "level_min": variant_data.get("min_level", wave.min_level),
+                                "level_max": variant_data.get("max_level", wave.max_level)
+                            } for e in template.enemies]
+
+                    enemies = variant_data.get("enemies", [])
+                    if enemies:
+                        print(f"[Spawner]   - Usando enemies direto da variant ({len(enemies)} inimigos)")
+                        return [{
+                            "pokemon_id": e.get("pokemon_id", 1),
+                            "percentage": float(e.get("percentage", 100.0)),
+                            "level_min": variant_data.get("min_level", wave.min_level),
+                            "level_max": variant_data.get("max_level", wave.max_level)
+                        } for e in enemies]
+
+            # ===== SE NENHUMA VARIANT CORRESPONDE, USA O TEMPLATE PRINCIPAL =====
+            # (NÃO USA A PRIMEIRA VARIANT COMO FALLBACK!)
+            print(
+                f"[Spawner] Nenhuma variant corresponde à condição '{self.current_condition}'. Usando template/enemies principal.")
+
+        # ===== PRIORIDADE 2: Template (usado quando NENHUMA variant corresponde) =====
         if wave.template_id:
-            from src.editor.wave_config import WaveTemplateManager
             template = WaveTemplateManager.get_template(wave.template_id)
             if template:
+                print(f"[Spawner] Usando TEMPLATE principal: {template.name}")
                 return [{
                     "pokemon_id": e.pokemon_id,
                     "percentage": float(e.percentage),
@@ -221,43 +300,8 @@ class EnemySpawner:
                     "level_max": template.max_level
                 } for e in template.enemies]
 
-        # ===== PRIORIDADE 2: Variants =====
-        if wave.use_variants and wave.variants:
-            # Procura pela condição atual
-            for variant in wave.variants:
-                if variant.get("condition", "any") == self.current_condition:
-                    print(f"[Spawner] Usando variant para condição: {self.current_condition}")
-                    return [{
-                        "pokemon_id": e.get("pokemon_id", 1),
-                        "percentage": float(e.get("percentage", 100.0)),
-                        "level_min": variant.get("min_level", wave.min_level),
-                        "level_max": variant.get("max_level", wave.max_level)
-                    } for e in variant.get("enemies", [])]
-
-            # Fallback: "any"
-            for variant in wave.variants:
-                if variant.get("condition", "any") == "any":
-                    print(f"[Spawner] Usando variant fallback 'any'")
-                    return [{
-                        "pokemon_id": e.get("pokemon_id", 1),
-                        "percentage": float(e.get("percentage", 100.0)),
-                        "level_min": variant.get("min_level", wave.min_level),
-                        "level_max": variant.get("max_level", wave.max_level)
-                    } for e in variant.get("enemies", [])]
-
-            # Fallback: primeira variant
-            if wave.variants:
-                variant = wave.variants[0]
-                print(f"[Spawner] Usando primeira variant como fallback")
-                return [{
-                    "pokemon_id": e.get("pokemon_id", 1),
-                    "percentage": float(e.get("percentage", 100.0)),
-                    "level_min": variant.get("min_level", wave.min_level),
-                    "level_max": variant.get("max_level", wave.max_level)
-                } for e in variant.get("enemies", [])]
-
         # ===== PRIORIDADE 3: enemies direto (legado) =====
-        print(f"[Spawner] Usando lista de enemies padrão")
+        print(f"[Spawner] Usando ENEMIES direto (legado)")
         return wave.enemies
 
     def update(self, dt: float) -> List['Pokemon']:

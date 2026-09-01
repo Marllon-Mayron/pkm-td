@@ -83,6 +83,15 @@ class WaveConfigDialog:
         self.template_combo_hovered_index = -1
         self.template_combo_selected_index = 0
 
+        # ===== SELETOR DE TEMPLATE NA VARIANT =====
+        self.variant_template_combo_open = False
+        self.variant_template_hovered_index = -1
+        self.variant_template_rect = None
+        self.variant_clear_template_rect = None
+        self.variant_add_rect = None
+        self.variant_equalize_rect = None
+        self.variant_clear_enemies_rect = None
+
         # Scroll
         self.waves_scroll = 0
         self.enemies_scroll = 0
@@ -281,6 +290,11 @@ class WaveConfigDialog:
         self.new_template_button = pygame.Rect(x + m, btn_y, 130, 26)
         self.delete_template_button = pygame.Rect(x + m + 140, btn_y, 95, 26)
         self.edit_template_button = pygame.Rect(x + m + 245, btn_y, 110, 26)
+
+        # Botões do editor de templates (quando aberto)
+        self.template_editor_equalize_rect = pygame.Rect(x + m + 365, btn_y, 110, 26)
+        self.template_editor_clear_rect = pygame.Rect(x + m + 485, btn_y, 95, 26)
+
         list_y = btn_y + 34
         self.templates_list_area = pygame.Rect(
             x + m,
@@ -288,6 +302,12 @@ class WaveConfigDialog:
             w - m * 2,
             self.templates_per_page * self.template_item_height + 4
         )
+
+        # ===== VARIANT EDITOR (posições internas) =====
+        # Estas posições serão usadas dentro do editor de variant
+        self.variant_editor_template_label = None
+        self.variant_editor_template_selector = None
+        self.variant_editor_clear_template = None
 
     def _update_button_positions(self):
         self._calculate_positions()
@@ -462,6 +482,31 @@ class WaveConfigDialog:
             (self.edit_template_button, "edit_template"),
             (self.clear_template_rect, "clear_template"),
         ]
+
+        # Botões do editor de templates (se estiver aberto)
+        if self.template_editor_open:
+            editor_rect = pygame.Rect(
+                self.rect.x + 50,
+                self.rect.y + 100,
+                self.rect.width - 100,
+                self.rect.height - 160
+            )
+            # Botão Adicionar
+            add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 88, 120, 26)
+            if add_rect.collidepoint(mouse_x, mouse_y):
+                self.hovered_button = "template_add_enemy"
+                return
+            # Botão Distribuir
+            equalize_rect = pygame.Rect(editor_rect.x + 150, editor_rect.y + 88, 110, 26)
+            if equalize_rect.collidepoint(mouse_x, mouse_y):
+                self.hovered_button = "template_equalize"
+                return
+            # Botão Limpar
+            clear_rect = pygame.Rect(editor_rect.x + 270, editor_rect.y + 88, 95, 26)
+            if clear_rect.collidepoint(mouse_x, mouse_y):
+                self.hovered_button = "template_clear"
+                return
+
         for button, name in buttons:
             if button.collidepoint(mouse_x, mouse_y):
                 self.hovered_button = name
@@ -810,6 +855,7 @@ class WaveConfigDialog:
             if not editor_rect.collidepoint(mouse_x, mouse_y):
                 self.variant_editor_open = False
                 self.condition_dropdown_open = False
+                self.variant_template_combo_open = False
                 return True
 
             # Fechar
@@ -817,6 +863,7 @@ class WaveConfigDialog:
             if close_rect.collidepoint(mouse_x, mouse_y):
                 self.variant_editor_open = False
                 self.condition_dropdown_open = False
+                self.variant_template_combo_open = False
                 return True
 
             # Dropdown de condição
@@ -841,28 +888,111 @@ class WaveConfigDialog:
                 self.condition_dropdown_open = not self.condition_dropdown_open
                 return True
 
+            # ===== SELETOR DE TEMPLATE NA VARIANT =====
+            template_rect = pygame.Rect(editor_rect.x + 100, editor_rect.y + 86, 150, 26)
+
+            # Clique no seletor de template
+            if template_rect.collidepoint(mouse_x, mouse_y):
+                self.variant_template_combo_open = not self.variant_template_combo_open
+                return True
+
+            # Clique no botão "Limpar" do template
+            clear_template_rect = pygame.Rect(template_rect.right + 10, template_rect.y, 70, 26)
+            if clear_template_rect.collidepoint(mouse_x, mouse_y):
+                if hasattr(variant, 'template_id'):
+                    variant.template_id = None
+                variant.enemies = []
+                self.variant_template_combo_open = False
+                return True
+
+            # Clique no dropdown de templates
+            if self.variant_template_combo_open:
+                templates = WaveTemplateManager.get_all_templates()
+                item_height = 28
+                list_height = min(len(templates) * item_height + 4, 160)
+                list_rect = pygame.Rect(
+                    template_rect.x,
+                    template_rect.bottom + 2,
+                    template_rect.width,
+                    list_height
+                )
+                # Ajusta para não sobrepor
+                if list_rect.bottom > editor_rect.bottom - 10:
+                    list_rect.y = template_rect.top - list_height - 2
+                    if list_rect.top < editor_rect.top + 40:
+                        list_rect.y = template_rect.bottom + 2
+
+                if list_rect.collidepoint(mouse_x, mouse_y):
+                    relative_y = mouse_y - list_rect.y - 2
+                    index = int(relative_y // item_height)
+                    if 0 <= index < len(templates):
+                        template = templates[index]
+                        variant.template_id = template.template_id
+                        # Copia os inimigos do template
+                        variant.enemies = [WaveEnemy(e.pokemon_id, e.percentage) for e in template.enemies]
+                        variant.min_level = template.min_level
+                        variant.max_level = template.max_level
+                        self.variant_template_combo_open = False
+                        return True
+
+                # Clicou fora do dropdown
+                if not template_rect.collidepoint(mouse_x, mouse_y):
+                    self.variant_template_combo_open = False
+                    return True
+
+            # ===== BOTÕES DA VARIANT =====
             # Adicionar inimigo
-            add_enemy_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 88, 120, 26)
-            if add_enemy_rect.collidepoint(mouse_x, mouse_y):
-                if len(variant.enemies) < 8:
+            add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, 120, 26)
+            if add_rect.collidepoint(mouse_x, mouse_y):
+                if len(variant.enemies) < 8 and not (hasattr(variant, 'template_id') and variant.template_id):
                     first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
                     variant.enemies.append(WaveEnemy(first_id, 0.0))
                 return True
 
+            # Distribuir
+            equalize_rect = pygame.Rect(editor_rect.x + 150, editor_rect.y + 122, 110, 26)
+            if equalize_rect.collidepoint(mouse_x, mouse_y):
+                enemies = variant.enemies
+                if not (hasattr(variant, 'template_id') and variant.template_id) and enemies:
+                    equal_percent = 100.0 / len(enemies)
+                    for enemy in enemies:
+                        enemy.percentage = equal_percent
+                    total = sum(e.percentage for e in enemies)
+                    if abs(total - 100.0) > 0.01:
+                        enemies[-1].percentage += (100.0 - total)
+                return True
+
+            # Limpar inimigos
+            clear_enemies_rect = pygame.Rect(editor_rect.x + 270, editor_rect.y + 122, 95, 26)
+            if clear_enemies_rect.collidepoint(mouse_x, mouse_y):
+                if not (hasattr(variant, 'template_id') and variant.template_id):
+                    variant.enemies.clear()
+                return True
+
             # Lista de inimigos
-            list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
+            list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 156, editor_rect.width - 40, 160)
             if list_rect.collidepoint(mouse_x, mouse_y):
+                # Pega os inimigos (do template ou da variant)
+                if hasattr(variant, 'template_id') and variant.template_id:
+                    template = WaveTemplateManager.get_template(variant.template_id)
+                    enemies = template.enemies if template else []
+                else:
+                    enemies = variant.enemies
+
                 relative_y = mouse_y - list_rect.y
                 item_index = int(relative_y // 32)
-                if 0 <= item_index < len(variant.enemies):
-                    enemy = variant.enemies[item_index]
+                if 0 <= item_index < len(enemies):
+                    enemy = enemies[item_index]
                     item_y = list_rect.y + item_index * 32
 
-                    remove_rect = pygame.Rect(list_rect.right - 28, item_y + 4, 18, 18)
-                    if remove_rect.collidepoint(mouse_x, mouse_y):
-                        del variant.enemies[item_index]
-                        return True
+                    # Botão remover (só se não tiver template)
+                    if not (hasattr(variant, 'template_id') and variant.template_id):
+                        remove_rect = pygame.Rect(list_rect.right - 28, item_y + 4, 18, 18)
+                        if remove_rect.collidepoint(mouse_x, mouse_y):
+                            del variant.enemies[item_index]
+                            return True
 
+                    # Selecionar Pokémon
                     pokemon_rect = pygame.Rect(list_rect.x + 38, item_y + 4, 120, 22)
                     if pokemon_rect.collidepoint(mouse_x, mouse_y):
                         self.showing_pokemon_selector = True
@@ -872,11 +1002,13 @@ class WaveConfigDialog:
                         self.pokemon_search = ""
                         return True
 
-                    percent_rect = pygame.Rect(list_rect.right - 85, item_y + 4, 50, 20)
-                    if percent_rect.collidepoint(mouse_x, mouse_y):
-                        self.active_input = f"variant_percent_{item_index}"
-                        self.input_texts[self.active_input] = f"{enemy.percentage:.1f}"
-                        return True
+                    # Editar percentual (só se não tiver template)
+                    if not (hasattr(variant, 'template_id') and variant.template_id):
+                        percent_rect = pygame.Rect(list_rect.right - 85, item_y + 4, 50, 20)
+                        if percent_rect.collidepoint(mouse_x, mouse_y):
+                            self.active_input = f"variant_percent_{item_index}"
+                            self.input_texts[self.active_input] = f"{enemy.percentage:.1f}"
+                            return True
 
         if event.type == pygame.MOUSEMOTION and self.condition_dropdown_open:
             cond_rect = pygame.Rect(editor_rect.x + 140, editor_rect.y + 50, 180, 26)
@@ -891,9 +1023,37 @@ class WaveConfigDialog:
             else:
                 self.condition_hovered_index = -1
 
+        # Hover do dropdown de templates na variant
+        if event.type == pygame.MOUSEMOTION and self.variant_template_combo_open:
+            templates = WaveTemplateManager.get_all_templates()
+            template_rect = pygame.Rect(editor_rect.x + 100, editor_rect.y + 86, 150, 26)
+            item_height = 28
+            list_height = min(len(templates) * item_height + 4, 160)
+            list_rect = pygame.Rect(
+                template_rect.x,
+                template_rect.bottom + 2,
+                template_rect.width,
+                list_height
+            )
+            if list_rect.bottom > editor_rect.bottom - 10:
+                list_rect.y = template_rect.top - list_height - 2
+                if list_rect.top < editor_rect.top + 40:
+                    list_rect.y = template_rect.bottom + 2
+
+            if list_rect.collidepoint(mouse_x, mouse_y):
+                relative_y = mouse_y - list_rect.y - 2
+                index = int(relative_y // item_height)
+                if 0 <= index < len(templates):
+                    self.variant_template_hovered_index = index
+                else:
+                    self.variant_template_hovered_index = -1
+            else:
+                self.variant_template_hovered_index = -1
+
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.variant_editor_open = False
             self.condition_dropdown_open = False
+            self.variant_template_combo_open = False
             return True
 
         return None
@@ -942,17 +1102,112 @@ class WaveConfigDialog:
         cond_labels = {c["id"]: c["label"] for c in self.condition_options}
         cond_text = self._get_font(14).render(cond_labels.get(variant.condition, "Qualquer"), True, self.colors['text'])
         screen.blit(cond_text, (cond_rect.x + 8, cond_rect.y + 3))
-        arrow = self._get_font(14).render("▼" if not self.condition_dropdown_open else "▲", True, self.colors['text_muted'])
+        arrow = self._get_font(14).render("▼" if not self.condition_dropdown_open else "▲", True,
+                                          self.colors['text_muted'])
         screen.blit(arrow, (cond_rect.right - 20, cond_rect.y + 3))
 
+        # ===== SELETOR DE TEMPLATE (NOVO) =====
+        templates = WaveTemplateManager.get_all_templates()
+
+        template_label = self._get_font(13).render("Template:", True, self.colors['text_dim'])
+        template_label_pos = (editor_rect.x + 20, editor_rect.y + 88)
+        screen.blit(template_label, template_label_pos)
+
+        # Posiciona o seletor ao lado do label
+        template_rect = pygame.Rect(editor_rect.x + 100, editor_rect.y + 86, 150, 26)
+        border = self.colors['border_active'] if self.variant_template_combo_open else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], template_rect, border_radius=5)
+        pygame.draw.rect(screen, border, template_rect, 1, border_radius=5)
+
+        # Texto do template selecionado (se houver)
+        template_name = "Nenhum"
+        if hasattr(variant, 'template_id') and variant.template_id:
+            template = WaveTemplateManager.get_template(variant.template_id)
+            if template:
+                template_name = template.name
+
+        text = self._get_font(13).render(template_name, True, self.colors['text'])
+        screen.blit(text, (template_rect.x + 8, template_rect.y + 4))
+
+        arrow = self._get_font(13).render("▼" if not self.variant_template_combo_open else "▲", True,
+                                          self.colors['text_muted'])
+        screen.blit(arrow, (template_rect.right - 18, template_rect.y + 4))
+
+        # Botão "Limpar template" na variant
+        clear_template_rect = pygame.Rect(template_rect.right + 10, template_rect.y, 70, 26)
+        self._render_button(screen, clear_template_rect, "variant_clear_template", "Limpar")
+
+        # Guarda as referências para usar no clique
+        self.variant_template_rect = template_rect
+        self.variant_clear_template_rect = clear_template_rect
+
+        # Dropdown de templates (se aberto)
+        if self.variant_template_combo_open:
+            item_height = 28
+            list_height = min(len(templates) * item_height + 4, 160)
+            list_rect = pygame.Rect(
+                template_rect.x,
+                template_rect.bottom + 2,
+                template_rect.width,
+                list_height
+            )
+            # Ajusta para não sobrepor
+            if list_rect.bottom > editor_rect.bottom - 10:
+                list_rect.y = template_rect.top - list_height - 2
+                if list_rect.top < editor_rect.top + 40:
+                    list_rect.y = template_rect.bottom + 2
+
+            pygame.draw.rect(screen, self.colors['bg_dropdown'], list_rect, border_radius=5)
+            pygame.draw.rect(screen, self.colors['border_dropdown'], list_rect, 1, border_radius=5)
+
+            for i, template in enumerate(templates):
+                item_rect = pygame.Rect(list_rect.x + 4, list_rect.y + 2 + i * item_height, list_rect.width - 8, 22)
+                is_hover = (i == self.variant_template_hovered_index)
+                is_sel = (hasattr(variant, 'template_id') and template.template_id == variant.template_id)
+
+                bg = self.colors['dropdown_item_hover'] if is_hover else self.colors['bg_dropdown']
+                if is_sel:
+                    bg = self.colors['accent']
+                pygame.draw.rect(screen, bg, item_rect, border_radius=4)
+
+                text = self._get_font(13).render(template.name, True, self.colors['text'])
+                screen.blit(text, (item_rect.x + 8, item_rect.y + 3))
+                if is_sel:
+                    check = self._get_font(13).render("✓", True, self.colors['radio_selected'])
+                    screen.blit(check, (item_rect.right - 20, item_rect.y + 3))
+
+        # Botão Adicionar (abaixo do seletor de template)
+        add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, 120, 26)
+        self._render_button(screen, add_rect, "variant_add_enemy", "+ Adicionar")
+
+        # Botão Distribuir
+        equalize_rect = pygame.Rect(editor_rect.x + 150, editor_rect.y + 122, 110, 26)
+        self._render_button(screen, equalize_rect, "variant_equalize", "Distribuir")
+
+        # Botão Limpar
+        clear_enemies_rect = pygame.Rect(editor_rect.x + 270, editor_rect.y + 122, 95, 26)
+        self._render_button(screen, clear_enemies_rect, "variant_clear_enemies", "Limpar")
+
+        # Guarda referências
+        self.variant_add_rect = add_rect
+        self.variant_equalize_rect = equalize_rect
+        self.variant_clear_enemies_rect = clear_enemies_rect
+
         # Lista de inimigos
-        list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
+        list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 156, editor_rect.width - 40, 160)
         pygame.draw.rect(screen, self.colors['bg_dark'], list_rect, border_radius=6)
 
         old_clip = screen.get_clip()
         screen.set_clip(list_rect)
 
-        for i, enemy in enumerate(variant.enemies):
+        # Pega os inimigos (do template ou da variant)
+        if hasattr(variant, 'template_id') and variant.template_id:
+            template = WaveTemplateManager.get_template(variant.template_id)
+            enemies = template.enemies if template else []
+        else:
+            enemies = variant.enemies
+
+        for i, enemy in enumerate(enemies):
             item_y = list_rect.y + i * 32
             if item_y + 32 < list_rect.y or item_y > list_rect.y + list_rect.height:
                 continue
@@ -975,28 +1230,35 @@ class WaveConfigDialog:
             pygame.draw.rect(screen, self.colors['bg_input'], percent_rect, border_radius=3)
             pygame.draw.rect(screen, border, percent_rect, 1, border_radius=3)
 
-            display = self.input_texts.get(f"variant_percent_{i}", f"{enemy.percentage:.1f}") if is_active else f"{enemy.percentage:.1f}"
+            display = self.input_texts.get(f"variant_percent_{i}",
+                                           f"{enemy.percentage:.1f}") if is_active else f"{enemy.percentage:.1f}"
             pct_text = self._get_font(12).render(display, True, self.colors['text'])
             screen.blit(pct_text, (percent_rect.x + 3, percent_rect.y + 3))
             pct_symbol = self._get_font(10).render("%", True, self.colors['text_muted'])
             screen.blit(pct_symbol, (percent_rect.right + 2, percent_rect.y + 3))
 
-            # Botão remover
-            remove_rect = pygame.Rect(list_rect.right - 22, item_y + 7, 14, 14)
-            pygame.draw.rect(screen, self.colors['danger'], remove_rect, border_radius=3)
-            pygame.draw.line(screen, self.colors['text'],
-                             (remove_rect.x + 3, remove_rect.y + 3),
-                             (remove_rect.right - 3, remove_rect.bottom - 3), 2)
-            pygame.draw.line(screen, self.colors['text'],
-                             (remove_rect.right - 3, remove_rect.y + 3),
-                             (remove_rect.x + 3, remove_rect.bottom - 3), 2)
+            # Botão remover (só se não tiver template)
+            if not (hasattr(variant, 'template_id') and variant.template_id):
+                remove_rect = pygame.Rect(list_rect.right - 22, item_y + 7, 14, 14)
+                pygame.draw.rect(screen, self.colors['danger'], remove_rect, border_radius=3)
+                pygame.draw.line(screen, self.colors['text'],
+                                 (remove_rect.x + 3, remove_rect.y + 3),
+                                 (remove_rect.right - 3, remove_rect.bottom - 3), 2)
+                pygame.draw.line(screen, self.colors['text'],
+                                 (remove_rect.right - 3, remove_rect.y + 3),
+                                 (remove_rect.x + 3, remove_rect.bottom - 3), 2)
 
         screen.set_clip(old_clip)
+
+        # Total
+        total = sum(e.percentage for e in enemies)
+        color = (100, 255, 100) if abs(total - 100.0) < 0.01 else (255, 100, 100)
+        total_text = self._get_font(13).render(f"Total: {total:.1f}%", True, color)
+        screen.blit(total_text, (list_rect.x, list_rect.bottom + 6))
 
         # Dropdown de condição (sobreposto)
         if self.condition_dropdown_open:
             list_rect_drop = self._get_dropdown_list_rect(cond_rect, self.condition_options)
-            # Reposiciona se invadir a lista
             if list_rect_drop.bottom > list_rect.y and list_rect_drop.y < list_rect.bottom:
                 list_rect_drop.y = cond_rect.top - list_rect_drop.height - 2
                 if list_rect_drop.top < editor_rect.top:
@@ -1006,7 +1268,8 @@ class WaveConfigDialog:
             pygame.draw.rect(screen, self.colors['border_dropdown'], list_rect_drop, 1, border_radius=5)
 
             for i, opt in enumerate(self.condition_options):
-                item_rect = pygame.Rect(list_rect_drop.x + 4, list_rect_drop.y + 2 + i * 26, list_rect_drop.width - 8, 22)
+                item_rect = pygame.Rect(list_rect_drop.x + 4, list_rect_drop.y + 2 + i * 26, list_rect_drop.width - 8,
+                                        22)
                 is_hover = (i == self.condition_hovered_index)
                 is_sel = opt["id"] == variant.condition
 
@@ -1020,16 +1283,6 @@ class WaveConfigDialog:
                 if is_sel:
                     check = self._get_font(13).render("✓", True, self.colors['radio_selected'])
                     screen.blit(check, (item_rect.right - 20, item_rect.y + 3))
-
-        # Botão adicionar
-        add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 88, 120, 26)
-        self._render_button(screen, add_rect, "variant_add_enemy", "+ Adicionar")
-
-        # Total
-        total = sum(e.percentage for e in variant.enemies)
-        color = (100, 255, 100) if abs(total - 100.0) < 0.01 else (255, 100, 100)
-        total_text = self._get_font(13).render(f"Total: {total:.1f}%", True, color)
-        screen.blit(total_text, (list_rect.x, list_rect.bottom + 6))
 
     # --- Editor de Template ---
     def _handle_template_editor_event(self, event, mouse_x, mouse_y):
@@ -1064,16 +1317,34 @@ class WaveConfigDialog:
                 self.input_texts["template_name"] = template.name
                 return True
 
-            # Adicionar inimigo
-            add_enemy_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 52, 120, 26)
-            if add_enemy_rect.collidepoint(mouse_x, mouse_y):
+            # ===== BOTÃO ADICIONAR =====
+            add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 88, 120, 26)
+            if add_rect.collidepoint(mouse_x, mouse_y):
                 if len(template.enemies) < 8:
                     first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
                     template.enemies.append(WaveEnemy(first_id, 0.0))
                 return True
 
+            # ===== BOTÃO DISTRIBUIR =====
+            equalize_rect = pygame.Rect(editor_rect.x + 150, editor_rect.y + 88, 110, 26)
+            if equalize_rect.collidepoint(mouse_x, mouse_y):
+                if template.enemies:
+                    equal_percent = 100.0 / len(template.enemies)
+                    for enemy in template.enemies:
+                        enemy.percentage = equal_percent
+                    total = sum(e.percentage for e in template.enemies)
+                    if abs(total - 100.0) > 0.01:
+                        template.enemies[-1].percentage += (100.0 - total)
+                return True
+
+            # ===== BOTÃO LIMPAR =====
+            clear_rect = pygame.Rect(editor_rect.x + 270, editor_rect.y + 88, 95, 26)
+            if clear_rect.collidepoint(mouse_x, mouse_y):
+                template.enemies.clear()
+                return True
+
             # Lista de inimigos
-            list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 86, editor_rect.width - 40, 200)
+            list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
             if list_rect.collidepoint(mouse_x, mouse_y):
                 relative_y = mouse_y - list_rect.y
                 item_index = int(relative_y // 32)
@@ -1081,11 +1352,13 @@ class WaveConfigDialog:
                     enemy = template.enemies[item_index]
                     item_y = list_rect.y + item_index * 32
 
+                    # Botão remover
                     remove_rect = pygame.Rect(list_rect.right - 28, item_y + 4, 18, 18)
                     if remove_rect.collidepoint(mouse_x, mouse_y):
                         del template.enemies[item_index]
                         return True
 
+                    # Selecionar Pokémon
                     pokemon_rect = pygame.Rect(list_rect.x + 38, item_y + 4, 120, 22)
                     if pokemon_rect.collidepoint(mouse_x, mouse_y):
                         self.showing_pokemon_selector = True
@@ -1095,6 +1368,7 @@ class WaveConfigDialog:
                         self.pokemon_search = ""
                         return True
 
+                    # Editar percentual
                     percent_rect = pygame.Rect(list_rect.right - 85, item_y + 4, 50, 20)
                     if percent_rect.collidepoint(mouse_x, mouse_y):
                         self.active_input = f"template_percent_{item_index}"
@@ -1121,16 +1395,20 @@ class WaveConfigDialog:
             self.rect.height - 160
         )
 
+        # Sombra
         shadow = pygame.Surface((editor_rect.width + 10, editor_rect.height + 10), pygame.SRCALPHA)
         shadow.fill((0, 0, 0, 120))
         screen.blit(shadow, (editor_rect.x - 5, editor_rect.y - 5))
 
+        # Fundo
         pygame.draw.rect(screen, self.colors['bg_light'], editor_rect, border_radius=10)
         pygame.draw.rect(screen, self.colors['border_active'], editor_rect, 2, border_radius=10)
 
+        # Título
         title = self._get_font(18, True).render("Editor de Template", True, self.colors['title'])
         screen.blit(title, (editor_rect.x + 20, editor_rect.y + 10))
 
+        # Fechar
         close_rect = pygame.Rect(editor_rect.right - 35, editor_rect.y + 8, 28, 28)
         pygame.draw.rect(screen, self.colors['danger'], close_rect, border_radius=6)
         close_text = self._get_font(18).render("X", True, self.colors['text'])
@@ -1150,11 +1428,20 @@ class WaveConfigDialog:
         name_text = self._get_font(14).render(display, True, self.colors['text'])
         screen.blit(name_text, (name_rect.x + 8, name_rect.y + 3))
 
-        # Botão adicionar
+        # ===== BOTÕES DO EDITOR =====
+        # Botão Adicionar
         add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 88, 120, 26)
         self._render_button(screen, add_rect, "template_add_enemy", "+ Adicionar")
 
-        # Lista
+        # Botão Distribuir
+        equalize_rect = pygame.Rect(editor_rect.x + 150, editor_rect.y + 88, 110, 26)
+        self._render_button(screen, equalize_rect, "template_equalize", "Distribuir")
+
+        # Botão Limpar
+        clear_rect = pygame.Rect(editor_rect.x + 270, editor_rect.y + 88, 95, 26)
+        self._render_button(screen, clear_rect, "template_clear", "Limpar")
+
+        # Lista de inimigos
         list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
         pygame.draw.rect(screen, self.colors['bg_dark'], list_rect, border_radius=6)
 
@@ -1177,18 +1464,21 @@ class WaveConfigDialog:
             name_text = self._get_font(13).render(name, True, self.colors['text'])
             screen.blit(name_text, (item_rect.x + 28, item_rect.y + 8))
 
+            # Campo de percentual
             percent_rect = pygame.Rect(list_rect.right - 78, item_y + 6, 45, 20)
             is_active = self.active_input == f"template_percent_{i}"
             border = self.colors['border_active'] if is_active else self.colors['border']
             pygame.draw.rect(screen, self.colors['bg_input'], percent_rect, border_radius=3)
             pygame.draw.rect(screen, border, percent_rect, 1, border_radius=3)
 
-            display = self.input_texts.get(f"template_percent_{i}", f"{enemy.percentage:.1f}") if is_active else f"{enemy.percentage:.1f}"
+            display = self.input_texts.get(f"template_percent_{i}",
+                                           f"{enemy.percentage:.1f}") if is_active else f"{enemy.percentage:.1f}"
             pct_text = self._get_font(12).render(display, True, self.colors['text'])
             screen.blit(pct_text, (percent_rect.x + 3, percent_rect.y + 3))
             pct_symbol = self._get_font(10).render("%", True, self.colors['text_muted'])
             screen.blit(pct_symbol, (percent_rect.right + 2, percent_rect.y + 3))
 
+            # Botão remover
             remove_rect = pygame.Rect(list_rect.right - 22, item_y + 7, 14, 14)
             pygame.draw.rect(screen, self.colors['danger'], remove_rect, border_radius=3)
             pygame.draw.line(screen, self.colors['text'],
@@ -1200,6 +1490,7 @@ class WaveConfigDialog:
 
         screen.set_clip(old_clip)
 
+        # Total
         total = sum(e.percentage for e in template.enemies)
         color = (100, 255, 100) if abs(total - 100.0) < 0.01 else (255, 100, 100)
         total_text = self._get_font(13).render(f"Total: {total:.1f}%", True, color)

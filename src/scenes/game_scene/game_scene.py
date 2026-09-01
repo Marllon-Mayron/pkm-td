@@ -1518,7 +1518,6 @@ class GameScene(BaseScene):
         if hasattr(self, 'battle_system') and self.battle_system:
             weather = self.battle_system.weather_manager.current_weather
             if weather and weather.active:
-                print(f"[GAME_SCENE] Renderizando clima: {weather.type.value}")
                 self.weather_filter.render(screen, weather, viewport_rect)
 
         # ===== 2. FILTRO DE DIA/NOITE (POR CIMA DO CLIMA) =====

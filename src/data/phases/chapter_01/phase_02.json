@@ -1520,19 +1520,19 @@
                 "enemies": [
                     {
                         "pokemon_id": 10,
-                        "percentage": 30
+                        "percentage": 30.0
                     },
                     {
                         "pokemon_id": 13,
-                        "percentage": 30
+                        "percentage": 30.0
                     },
                     {
                         "pokemon_id": 19,
-                        "percentage": 25
+                        "percentage": 25.0
                     },
                     {
                         "pokemon_id": 16,
-                        "percentage": 15
+                        "percentage": 15.0
                     }
                 ],
                 "min_level": 4,
@@ -1541,10 +1541,74 @@
                 "spawn_interval": 3.0,
                 "initial_delay": 2.0,
                 "repeat_wave": true,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": "template_5599",
+                "use_variants": true,
+                "variants": [
+                    {
+                        "condition": "night",
+                        "enemies": [
+                            {
+                                "pokemon_id": 163,
+                                "percentage": 100.0
+                            }
+                        ],
+                        "min_level": 4,
+                        "max_level": 7,
+                        "template_id": "template_5599"
+                    }
+                ]
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 0,
+        "templates": {
+            "templates": [
+                {
+                    "template_id": "template_5084",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 10,
+                            "percentage": 30.0
+                        },
+                        {
+                            "pokemon_id": 13,
+                            "percentage": 30.0
+                        },
+                        {
+                            "pokemon_id": 19,
+                            "percentage": 25.0
+                        },
+                        {
+                            "pokemon_id": 16,
+                            "percentage": 15.0
+                        }
+                    ],
+                    "min_level": 4,
+                    "max_level": 7
+                },
+                {
+                    "template_id": "template_5599",
+                    "name": "Noite",
+                    "enemies": [
+                        {
+                            "pokemon_id": 163,
+                            "percentage": 33.333333333333336
+                        },
+                        {
+                            "pokemon_id": 10,
+                            "percentage": 33.333333333333336
+                        },
+                        {
+                            "pokemon_id": 13,
+                            "percentage": 33.333333333333336
+                        }
+                    ],
+                    "min_level": 4,
+                    "max_level": 7
+                }
+            ]
+        }
     },
     "tower_spots": {
         "spot_size": 24,
@@ -1638,8 +1702,16 @@
             }
         ]
     },
+    "events": {
+        "triggers": [],
+        "selected_trigger": 0
+    },
     "rewards": {
         "money": 200,
         "experience": 10
-    }
+    },
+    "localization_type": "default",
+    "custom_folder": "",
+    "day_night_mode": "random",
+    "base_weather": "random"
 }
