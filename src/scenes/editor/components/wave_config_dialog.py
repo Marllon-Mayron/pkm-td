@@ -92,6 +92,13 @@ class WaveConfigDialog:
         self.variant_equalize_rect = None
         self.variant_clear_enemies_rect = None
 
+        # ===== SCROLL DO EDITOR DE TEMPLATE =====
+        self.template_editor_scroll = 0
+        self.template_editor_max_scroll = 0
+        self.template_editor_dragging_scroll = False
+        self.template_editor_drag_start_y = 0
+        self.template_editor_drag_start_scroll = 0
+
         # Scroll
         self.waves_scroll = 0
         self.enemies_scroll = 0
@@ -821,6 +828,7 @@ class WaveConfigDialog:
         if self.edit_template_button.collidepoint(mouse_x, mouse_y):
             if self.template_selected_index > 0:
                 self.template_editor_open = True
+                self.template_editor_scroll = 0  # RESETA O SCROLL AO ABRIR O EDITOR
             return True
 
         if self.templates_list_area.collidepoint(mouse_x, mouse_y):
@@ -1299,6 +1307,17 @@ class WaveConfigDialog:
             self.rect.height - 160
         )
 
+        # Retângulo da lista para cálculos de scroll
+        list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
+        ITEM_HEIGHT = 32
+        total_items = len(template.enemies)
+        visible_items = list_rect.height // ITEM_HEIGHT
+        max_scroll = max(0, total_items - visible_items)
+
+        # Atualiza o scroll máximo
+        self.template_editor_max_scroll = max_scroll
+        self.template_editor_scroll = max(0, min(max_scroll, self.template_editor_scroll))
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if not editor_rect.collidepoint(mouse_x, mouse_y):
                 self.template_editor_open = False
@@ -1323,6 +1342,8 @@ class WaveConfigDialog:
                 if len(template.enemies) < 8:
                     first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
                     template.enemies.append(WaveEnemy(first_id, 0.0))
+                    # Ajusta scroll para mostrar o novo item
+                    self.template_editor_scroll = max(0, len(template.enemies) - visible_items)
                 return True
 
             # ===== BOTÃO DISTRIBUIR =====
@@ -1341,21 +1362,39 @@ class WaveConfigDialog:
             clear_rect = pygame.Rect(editor_rect.x + 270, editor_rect.y + 88, 95, 26)
             if clear_rect.collidepoint(mouse_x, mouse_y):
                 template.enemies.clear()
+                self.template_editor_scroll = 0
                 return True
 
-            # Lista de inimigos
-            list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
+            # ===== CLIQUE NA BARRA DE ROLAGEM =====
+            if total_items > visible_items:
+                scrollbar_rect = pygame.Rect(
+                    list_rect.right + 4,
+                    list_rect.y,
+                    10,
+                    list_rect.height
+                )
+                if scrollbar_rect.collidepoint(mouse_x, mouse_y):
+                    self.template_editor_dragging_scroll = True
+                    self.template_editor_drag_start_y = mouse_y
+                    self.template_editor_drag_start_scroll = self.template_editor_scroll
+                    return True
+
+            # ===== CLIQUE NA LISTA =====
             if list_rect.collidepoint(mouse_x, mouse_y):
-                relative_y = mouse_y - list_rect.y
-                item_index = int(relative_y // 32)
+                # Ajusta o mouse_y para considerar o scroll
+                relative_y = mouse_y - list_rect.y - 2 + self.template_editor_scroll * ITEM_HEIGHT
+                item_index = int(relative_y // ITEM_HEIGHT)
                 if 0 <= item_index < len(template.enemies):
                     enemy = template.enemies[item_index]
-                    item_y = list_rect.y + item_index * 32
+                    item_y = list_rect.y + 2 + (item_index - self.template_editor_scroll) * ITEM_HEIGHT
 
                     # Botão remover
                     remove_rect = pygame.Rect(list_rect.right - 28, item_y + 4, 18, 18)
                     if remove_rect.collidepoint(mouse_x, mouse_y):
                         del template.enemies[item_index]
+                        # Ajusta scroll se necessário
+                        self.template_editor_scroll = min(self.template_editor_scroll,
+                                                          max(0, len(template.enemies) - visible_items))
                         return True
 
                     # Selecionar Pokémon
@@ -1374,6 +1413,37 @@ class WaveConfigDialog:
                         self.active_input = f"template_percent_{item_index}"
                         self.input_texts[self.active_input] = f"{enemy.percentage:.1f}"
                         return True
+
+        # ===== DRAG DA BARRA DE ROLAGEM =====
+        if event.type == pygame.MOUSEMOTION:
+            if self.template_editor_dragging_scroll and total_items > visible_items:
+                scrollbar_rect = pygame.Rect(
+                    list_rect.right + 4,
+                    list_rect.y,
+                    10,
+                    list_rect.height
+                )
+                delta_y = mouse_y - self.template_editor_drag_start_y
+                thumb_ratio = visible_items / total_items
+                thumb_height = max(20, int(scrollbar_rect.height * thumb_ratio))
+                max_thumb_y = scrollbar_rect.height - thumb_height
+                if max_thumb_y > 0:
+                    scroll_delta = (delta_y / max_thumb_y) * max_scroll
+                    new_scroll = self.template_editor_drag_start_scroll + int(scroll_delta)
+                    self.template_editor_scroll = max(0, min(max_scroll, new_scroll))
+                return True
+
+        # ===== SOLTA O DRAG =====
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self.template_editor_dragging_scroll:
+                self.template_editor_dragging_scroll = False
+                return True
+
+        # ===== RODA DO MOUSE =====
+        if event.type == pygame.MOUSEWHEEL:
+            if editor_rect.collidepoint(mouse_x, mouse_y) and list_rect.collidepoint(mouse_x, mouse_y):
+                self.template_editor_scroll = max(0, min(max_scroll, self.template_editor_scroll - event.y))
+                return True
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.template_editor_open = False
@@ -1441,19 +1511,33 @@ class WaveConfigDialog:
         clear_rect = pygame.Rect(editor_rect.x + 270, editor_rect.y + 88, 95, 26)
         self._render_button(screen, clear_rect, "template_clear", "Limpar")
 
-        # Lista de inimigos
+        # ===== LISTA DE INIMIGOS COM SCROLL =====
         list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
         pygame.draw.rect(screen, self.colors['bg_dark'], list_rect, border_radius=6)
 
+        ITEM_HEIGHT = 32
+        total_items = len(template.enemies)
+        visible_items = list_rect.height // ITEM_HEIGHT
+        max_scroll = max(0, total_items - visible_items)
+
+        # Atualiza o scroll máximo
+        self.template_editor_max_scroll = max_scroll
+        self.template_editor_scroll = max(0, min(max_scroll, self.template_editor_scroll))
+
+        # Área de clipping para a lista
         old_clip = screen.get_clip()
         screen.set_clip(list_rect)
 
+        # Calcula o offset de scroll
+        scroll_offset = self.template_editor_scroll * ITEM_HEIGHT
+        list_start_y = list_rect.y + 2 - scroll_offset
+
         for i, enemy in enumerate(template.enemies):
-            item_y = list_rect.y + i * 32
-            if item_y + 32 < list_rect.y or item_y > list_rect.y + list_rect.height:
+            item_y = list_start_y + i * ITEM_HEIGHT
+            if item_y + ITEM_HEIGHT < list_rect.y or item_y > list_rect.y + list_rect.height:
                 continue
 
-            item_rect = pygame.Rect(list_rect.x + 4, item_y, list_rect.width - 8, 32)
+            item_rect = pygame.Rect(list_rect.x + 4, item_y, list_rect.width - 8, ITEM_HEIGHT - 2)
             bg_color = self.colors['bg_light'] if i % 2 == 0 else self.colors['bg_dark']
             pygame.draw.rect(screen, bg_color, item_rect)
 
@@ -1489,6 +1573,27 @@ class WaveConfigDialog:
                              (remove_rect.x + 3, remove_rect.bottom - 3), 2)
 
         screen.set_clip(old_clip)
+
+        # ===== BARRA DE ROLAGEM =====
+        if total_items > visible_items:
+            scrollbar_rect = pygame.Rect(
+                list_rect.right + 4,
+                list_rect.y,
+                10,
+                list_rect.height
+            )
+
+            # Fundo da barra
+            pygame.draw.rect(screen, self.colors['scrollbar_bg'], scrollbar_rect, border_radius=4)
+
+            # Thumb (alça da barra)
+            thumb_ratio = visible_items / total_items
+            thumb_height = max(20, int(scrollbar_rect.height * thumb_ratio))
+            max_scroll_val = max(1, total_items - visible_items)
+            scroll_ratio = self.template_editor_scroll / max_scroll_val if max_scroll_val > 0 else 0
+            thumb_y = scrollbar_rect.y + int(scroll_ratio * (scrollbar_rect.height - thumb_height))
+            thumb_rect = pygame.Rect(scrollbar_rect.x, thumb_y, scrollbar_rect.width, thumb_height)
+            pygame.draw.rect(screen, self.colors['scrollbar_thumb'], thumb_rect, border_radius=4)
 
         # Total
         total = sum(e.percentage for e in template.enemies)
