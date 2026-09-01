@@ -24,6 +24,8 @@ class WaveConfigDialog:
         self.drag_offset_y = 0
         self.hovered_button = None
 
+        self.num_max_wave = 12
+
         self.active_input = None
         self.input_texts = {}
         self.input_errors = {}
@@ -952,7 +954,7 @@ class WaveConfigDialog:
             # Adicionar inimigo
             add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, 120, 26)
             if add_rect.collidepoint(mouse_x, mouse_y):
-                if len(variant.enemies) < 8 and not (hasattr(variant, 'template_id') and variant.template_id):
+                if len(variant.enemies) < self.num_max_wave and not (hasattr(variant, 'template_id') and variant.template_id):
                     first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
                     variant.enemies.append(WaveEnemy(first_id, 0.0))
                 return True
@@ -1339,7 +1341,7 @@ class WaveConfigDialog:
             # ===== BOTÃO ADICIONAR =====
             add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 88, 120, 26)
             if add_rect.collidepoint(mouse_x, mouse_y):
-                if len(template.enemies) < 8:
+                if len(template.enemies) < self.num_max_wave:
                     first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
                     template.enemies.append(WaveEnemy(first_id, 0.0))
                     # Ajusta scroll para mostrar o novo item

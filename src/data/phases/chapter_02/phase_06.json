@@ -1615,15 +1615,19 @@
                     },
                     {
                         "pokemon_id": 35,
-                        "percentage": 20.0
+                        "percentage": 0.1
                     },
                     {
                         "pokemon_id": 50,
-                        "percentage": 15.0
+                        "percentage": 24.9
                     },
                     {
                         "pokemon_id": 27,
                         "percentage": 20.0
+                    },
+                    {
+                        "pokemon_id": 173,
+                        "percentage": 10.0
                     }
                 ],
                 "min_level": 14,
@@ -1653,7 +1657,7 @@
                     },
                     {
                         "pokemon_id": 35,
-                        "percentage": 20.0
+                        "percentage": 0.1
                     },
                     {
                         "pokemon_id": 27,
@@ -1661,7 +1665,11 @@
                     },
                     {
                         "pokemon_id": 50,
-                        "percentage": 15.0
+                        "percentage": 24.9
+                    },
+                    {
+                        "pokemon_id": 173,
+                        "percentage": 10.0
                     }
                 ],
                 "min_level": 14,
@@ -1698,7 +1706,7 @@
                 "variants": []
             }
         ],
-        "selected_wave": 2,
+        "selected_wave": 1,
         "templates": {
             "templates": []
         }

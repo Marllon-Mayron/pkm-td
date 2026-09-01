@@ -59,7 +59,7 @@ class DayNightWeatherSystem:
         else:  # "random"
             period_type = random.choices(
                 [DayNightType.DAY, DayNightType.NIGHT, DayNightType.DUSK, DayNightType.DAWN],
-                weights=[0.25, 0.65, 0.050, 0.050]  # 60% dia, 25% noite, 5% cada transição
+                weights=[0.65, 0.25, 0.050, 0.050]  # 60% dia, 25% noite, 5% cada transição
             )[0]
             print(f"[DAY/NIGHT] Período aleatório: {period_type.value}")
 
