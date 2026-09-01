@@ -203,9 +203,17 @@ class PokemonEvolution:
             self.pokemon.attack_damage = self.pokemon._calculate_attack_damage()
             self.pokemon.defense_value = self.pokemon._calculate_defense()
 
+            # Verifica evolução por nível primeiro
             evolution = evolution_manager.check_evolution(self.pokemon.id, current_level=self.pokemon.level)
             if evolution and self.pokemon.game_scene:
                 self.pokemon.game_scene.open_evolution_overlay(self.pokemon, evolution)
+                return True
+
+            # Se não evoluiu por nível, verifica evolução por felicidade
+            # (caso a felicidade tenha mudado indiretamente)
+            happiness_evo = evolution_manager.check_happiness_evolution(self.pokemon)
+            if happiness_evo and self.pokemon.game_scene:
+                self.pokemon.game_scene.open_evolution_overlay(self.pokemon, happiness_evo)
                 return True
 
         return leveled_up

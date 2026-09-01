@@ -57,7 +57,7 @@ class Pokemon(Entity):
 
         # Felicidade: 0-100
         self.happiness = 0
-        self._max_happiness = 100
+        self._max_happiness = 255
         self._min_happiness = 0
 
         # Peso (kg) - com variação individual de ±10%
@@ -778,6 +778,9 @@ class Pokemon(Entity):
                     self.effect_manager.add_status_text(self, f"Felicidade {gained}!", duration=1.5,
                                                         color=(100, 100, 255))
 
+            # ===== VERIFICA EVOLUÇÃO POR FELICIDADE =====
+            self._check_happiness_evolution()
+
             # Conquista: Felicidade Máxima
             if self.happiness >= 100 and old_happiness < 100:
                 if hasattr(self, 'game_scene') and self.game_scene:
@@ -787,6 +790,30 @@ class Pokemon(Entity):
                         game_scene.player.achievement_manager.check_and_unlock("max_happiness", phase_id)
 
         return self.happiness
+
+    def _check_happiness_evolution(self):
+        """
+        Verifica se o Pokémon pode evoluir por felicidade.
+        Se puder, mostra o overlay de evolução.
+        """
+        from src.managers.evolution_manager import evolution_manager
+
+        # Só verifica se tiver game_scene e não for selvagem
+        if not hasattr(self, 'game_scene') or not self.game_scene:
+            return
+
+        if self.is_wild:
+            return
+
+        # Verifica evolução por felicidade
+        evolution = evolution_manager.check_happiness_evolution(self)
+
+        if evolution:
+            print(f"[HAPPINESS_EVOLUTION] {self.name} pode evoluir por felicidade! "
+                  f"Felicidade: {self.happiness}, Requerido: {evolution['requirement']}")
+
+            # Abre o overlay de evolução
+            self.game_scene.open_evolution_overlay(self, evolution)
 
     def set_happiness(self, value: int) -> int:
         """Define felicidade diretamente (0-100). Retorna o novo valor."""

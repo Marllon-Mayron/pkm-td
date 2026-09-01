@@ -279,6 +279,43 @@ class EvolutionManager:
                     }
         return None
 
+    def check_happiness_evolution(self, pokemon):
+        """
+        Verifica se um Pokémon específico pode evoluir por felicidade.
+        Retorna os dados da evolução ou None.
+        """
+        # Só verifica se o Pokémon tem game_scene
+        if not hasattr(pokemon, 'game_scene') or not pokemon.game_scene:
+            return None
+
+        # Só verifica se não for selvagem
+        if pokemon.is_wild:
+            return None
+
+        # Pega o período atual (dia/noite)
+        time_of_day = None
+        if hasattr(pokemon.game_scene, 'day_night_weather'):
+            from src.battle.effects.specific.day_night.day_night_state import DayNightType
+            day_night = pokemon.game_scene.day_night_weather.day_night_state
+            if day_night:
+                if day_night.type in [DayNightType.DAY, DayNightType.DAY_CAVE]:
+                    time_of_day = "day"
+                elif day_night.type in [DayNightType.NIGHT, DayNightType.NIGHT_CAVE]:
+                    time_of_day = "night"
+
+        # Verifica evolução por felicidade usando o método existente
+        evolution = self.can_evolve_by_happiness(
+            pokemon.id,
+            pokemon.happiness,
+            time_of_day
+        )
+
+        # Se encontrou evolução, retorna com dados adicionais
+        if evolution:
+            evolution['pokemon'] = pokemon
+
+        return evolution
+
     def check_evolution(self, pokemon_id, current_level=None, stone_name=None,
                         is_trade=False, current_happiness=None, time_of_day=None,
                         location_name=None):
@@ -286,23 +323,23 @@ class EvolutionManager:
         Verifica todas as possibilidades de evolução
         Retorna a PRIMEIRA evolução encontrada (para compatibilidade)
         """
-        # 1. Evolução por nível
+        # 1. Evolução por nível (prioridade máxima)
         if current_level is not None:
             level_evo = self.can_evolve_by_level(pokemon_id, current_level)
             if level_evo:
                 return level_evo
 
-        # 2. Evolução por pedra
-        if stone_name is not None:
-            stone_evo = self.can_evolve_by_stone(pokemon_id, stone_name)
-            if stone_evo:
-                return stone_evo
-
-        # 3. Evolução por felicidade
+        # 2. Evolução por felicidade (antes de pedras, para Eevee)
         if current_happiness is not None:
             happiness_evo = self.can_evolve_by_happiness(pokemon_id, current_happiness, time_of_day)
             if happiness_evo:
                 return happiness_evo
+
+        # 3. Evolução por pedra
+        if stone_name is not None:
+            stone_evo = self.can_evolve_by_stone(pokemon_id, stone_name)
+            if stone_evo:
+                return stone_evo
 
         # 4. Evolução por local
         if location_name is not None:
