@@ -229,7 +229,7 @@ class Wave:
 
     def from_dict(self, data):
         self.wave_index = data.get("wave_index", 0)
-        self.path_index = data.get("path_index", 0)
+        self.path_index = data.get("path_index", 0)  # JÁ ESTÁ CORRETO
         self.name = data.get("name", f"Wave {self.wave_index + 1}")
         self.enabled = data.get("enabled", True)
 

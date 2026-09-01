@@ -56,10 +56,10 @@ class WaveConfigDialog:
         self.variant_editor_open = False
         self.editing_variant_index = -1
 
-        # ===== NOVO SELETOR DE POKÉMON =====
+        # ===== SELETOR DE POKÉMON =====
         self.showing_pokemon_selector = False
-        self.pokemon_selector_target = None      # "enemy", "variant", "template"
-        self.pokemon_selector_index = 0          # índice do inimigo na lista
+        self.pokemon_selector_target = None  # "enemy", "variant", "template"
+        self.pokemon_selector_index = 0  # índice do inimigo na lista
         self.pokemon_selector_scroll = 0
         self.pokemon_search = ""
 
@@ -72,6 +72,16 @@ class WaveConfigDialog:
         self.pokemon_dragging_thumb = False
         self.pokemon_thumb_start_y = 0
         self.pokemon_thumb_start_scroll = 0
+
+        # ===== SELETOR DE PATH =====
+        self.path_dropdown_open = False
+        self.path_hovered_index = -1
+        self.path_selected_index = 0
+
+        # ===== SELETOR DE TEMPLATE (na aba composição) =====
+        self.template_combo_open = False
+        self.template_combo_hovered_index = -1
+        self.template_combo_selected_index = 0
 
         # Scroll
         self.waves_scroll = 0
@@ -126,6 +136,7 @@ class WaveConfigDialog:
         }
 
         self._sync_template_dropdown()
+        self._sync_path_dropdown()
         self._calculate_positions()
         self._update_template_options()
 
@@ -149,6 +160,25 @@ class WaveConfigDialog:
                     self.template_selected_index = i + 1
                     return
         self.template_selected_index = 0
+
+        # Sincroniza o path também
+        self._sync_path_dropdown()
+
+    def _sync_path_dropdown(self):
+        """Sincroniza o dropdown de path com a wave atual"""
+        wave = self.wave_manager.get_current_wave()
+        if not wave:
+            self.path_selected_index = 0
+            return
+
+        path_count = len(self.path_manager.paths)
+        if path_count == 0:
+            self.path_selected_index = 0
+            return
+
+        # Encontra o índice do path atual
+        current_path_idx = wave.path_index if hasattr(wave, 'path_index') else 0
+        self.path_selected_index = max(0, min(current_path_idx, path_count - 1))
 
     def _update_template_options(self):
         self.template_options = [{"id": None, "label": "Nenhum"}]
@@ -185,13 +215,19 @@ class WaveConfigDialog:
         self.save_button = pygame.Rect(button_x, button_y, button_width, button_height)
         self.cancel_button = pygame.Rect(button_x + button_width + 15, button_y, button_width, button_height)
 
-        # Waves
+        # ===== WAVES TAB =====
         waves_y = content_top + 10
-        self.waves_label = pygame.Rect(x + m, waves_y, 200, 22)
+        self.waves_label = pygame.Rect(x + m, waves_y, 120, 22)
+
         btn_y = waves_y + 28
         self.add_wave_button = pygame.Rect(x + m, btn_y, 85, 26)
         self.remove_wave_button = pygame.Rect(x + m + 95, btn_y, 85, 26)
         self.duplicate_wave_button = pygame.Rect(x + m + 190, btn_y, 95, 26)
+
+        # Seletor de Path (ao lado do botão Duplicar)
+        self.path_label = pygame.Rect(x + m + 295, btn_y + 2, 35, 22)
+        self.path_selector_rect = pygame.Rect(x + m + 330, btn_y, 140, 26)
+
         list_y = btn_y + 34
         self.waves_list_area = pygame.Rect(
             x + m,
@@ -200,13 +236,20 @@ class WaveConfigDialog:
             self.waves_per_page * self.wave_item_height + 4
         )
 
-        # Composição
+        # ===== COMPOSITION TAB =====
         comp_y = content_top + 10
         self.comp_info_rect = pygame.Rect(x + m, comp_y, w - m * 2, 22)
+
         btn_y = comp_y + 28
         self.add_enemy_button = pygame.Rect(x + m, btn_y, 130, 26)
         self.equalize_button = pygame.Rect(x + m + 140, btn_y, 110, 26)
         self.clear_enemies_button = pygame.Rect(x + m + 260, btn_y, 95, 26)
+
+        # Seletor de Template (ao lado do botão Limpar)
+        self.template_label = pygame.Rect(x + m + 365, btn_y + 2, 60, 22)
+        self.template_selector_rect = pygame.Rect(x + m + 425, btn_y, 150, 26)
+        self.clear_template_rect = pygame.Rect(x + m + 585, btn_y, 70, 26)
+
         list_y = btn_y + 34
         self.enemies_list_area = pygame.Rect(
             x + m,
@@ -216,7 +259,7 @@ class WaveConfigDialog:
         )
         self.total_rect = pygame.Rect(x + m, self.enemies_list_area.bottom + 6, 200, 22)
 
-        # Variants
+        # ===== VARIANTS TAB =====
         var_y = content_top + 10
         self.variant_info_rect = pygame.Rect(x + m, var_y, w - m * 2, 28)
         btn_y = var_y + 34
@@ -231,7 +274,7 @@ class WaveConfigDialog:
             self.variants_per_page * self.variant_item_height + 4
         )
 
-        # Templates
+        # ===== TEMPLATES TAB =====
         temp_y = content_top + 10
         self.template_info_rect = pygame.Rect(x + m, temp_y, w - m * 2, 28)
         btn_y = temp_y + 34
@@ -248,6 +291,7 @@ class WaveConfigDialog:
 
     def _update_button_positions(self):
         self._calculate_positions()
+        self._sync_path_dropdown()
 
     # --- Sprites de Pokémon ---
     def _get_pokemon_sprite(self, pokemon_id, size=32):
@@ -416,12 +460,44 @@ class WaveConfigDialog:
             (self.new_template_button, "new_template"),
             (self.delete_template_button, "delete_template"),
             (self.edit_template_button, "edit_template"),
+            (self.clear_template_rect, "clear_template"),
         ]
         for button, name in buttons:
             if button.collidepoint(mouse_x, mouse_y):
                 self.hovered_button = name
+                self._update_dropdown_hovers(mouse_x, mouse_y)
                 return
         self.hovered_button = None
+        self._update_dropdown_hovers(mouse_x, mouse_y)
+
+    def _update_dropdown_hovers(self, mouse_x, mouse_y):
+        """Atualiza hovers dos dropdowns separadamente"""
+        # Atualiza hover do dropdown de paths
+        if self.path_dropdown_open:
+            list_rect = self._get_path_dropdown_rect()
+            if list_rect.collidepoint(mouse_x, mouse_y):
+                relative_y = mouse_y - list_rect.y - 2
+                index = int(relative_y // 26)
+                if 0 <= index < len(self.path_manager.paths):
+                    self.path_hovered_index = index
+                else:
+                    self.path_hovered_index = -1
+            else:
+                self.path_hovered_index = -1
+
+        # Atualiza hover do dropdown de templates
+        if self.template_combo_open:
+            list_rect = self._get_template_dropdown_rect()
+            templates = WaveTemplateManager.get_all_templates()
+            if list_rect.collidepoint(mouse_x, mouse_y):
+                relative_y = mouse_y - list_rect.y - 2
+                index = int(relative_y // 28)
+                if 0 <= index < len(templates):
+                    self.template_combo_hovered_index = index
+                else:
+                    self.template_combo_hovered_index = -1
+            else:
+                self.template_combo_hovered_index = -1
 
     # --- Manipuladores de abas ---
     def _handle_waves_tab_click(self, mouse_x, mouse_y):
@@ -429,13 +505,17 @@ class WaveConfigDialog:
             self.wave_manager.add_wave()
             self.selected_wave_index = self.wave_manager.selected_wave
             self._sync_template_dropdown()
+            self._sync_path_dropdown()
             return True
+
         if self.remove_wave_button.collidepoint(mouse_x, mouse_y):
             if self.wave_manager.waves:
                 self.wave_manager.remove_wave(self.selected_wave_index)
                 self.selected_wave_index = self.wave_manager.selected_wave
                 self._sync_template_dropdown()
+                self._sync_path_dropdown()
             return True
+
         if self.duplicate_wave_button.collidepoint(mouse_x, mouse_y):
             wave = self.wave_manager.get_current_wave()
             if wave:
@@ -463,7 +543,32 @@ class WaveConfigDialog:
                     self.selected_wave_index = len(self.wave_manager.waves) - 1
                     self.wave_manager.selected_wave = self.selected_wave_index
                     self._sync_template_dropdown()
+                    self._sync_path_dropdown()
             return True
+
+        # Clique no seletor de path
+        if self.path_selector_rect.collidepoint(mouse_x, mouse_y):
+            self.path_dropdown_open = not self.path_dropdown_open
+            return True
+
+        # Clique na lista de paths (dropdown aberto)
+        if self.path_dropdown_open:
+            list_rect = self._get_path_dropdown_rect()
+            if list_rect.collidepoint(mouse_x, mouse_y):
+                relative_y = mouse_y - list_rect.y - 2
+                index = int(relative_y // 26)
+                if 0 <= index < len(self.path_manager.paths):
+                    self.path_selected_index = index
+                    wave = self.wave_manager.get_current_wave()
+                    if wave:
+                        wave.path_index = index
+                    self.path_dropdown_open = False
+                    return True
+            # Clicou fora do dropdown
+            if not self.path_selector_rect.collidepoint(mouse_x, mouse_y):
+                self.path_dropdown_open = False
+                return True
+
         if self.waves_list_area.collidepoint(mouse_x, mouse_y):
             relative_y = mouse_y - self.waves_list_area.y
             item_index = (relative_y // self.wave_item_height) + self.waves_scroll
@@ -471,6 +576,7 @@ class WaveConfigDialog:
                 self.selected_wave_index = item_index
                 self.wave_manager.selected_wave = item_index
                 self._sync_template_dropdown()
+                self._sync_path_dropdown()
                 self.enemies_scroll = 0
                 return True
         return True
@@ -479,6 +585,61 @@ class WaveConfigDialog:
         wave = self.wave_manager.get_current_wave()
         if not wave:
             return True
+
+        # ===== SELETOR DE TEMPLATE =====
+        # Clique no seletor de template
+        if self.template_selector_rect.collidepoint(mouse_x, mouse_y):
+            self.template_combo_open = not self.template_combo_open
+            return True
+
+        # Clique no botão "Limpar"
+        if self.clear_template_rect.collidepoint(mouse_x, mouse_y):
+            wave.template_id = None
+            wave.enemies = []
+            wave.use_variants = False
+            wave.variants = []
+            self.template_combo_open = False
+            self._check_total_percentage(wave)
+            return True
+
+        # Clique no dropdown de templates
+        if self.template_combo_open:
+            list_rect = self._get_template_dropdown_rect()
+            templates = WaveTemplateManager.get_all_templates()
+
+            if list_rect.collidepoint(mouse_x, mouse_y):
+                relative_y = mouse_y - list_rect.y - 2
+                index = int(relative_y // 28)
+                if 0 <= index < len(templates):
+                    template = templates[index]
+
+                    # ===== APLICA O TEMPLATE NA WAVE =====
+                    wave.template_id = template.template_id
+
+                    # Limpa enemies e variants antigos
+                    wave.enemies = []
+                    wave.use_variants = False
+                    wave.variants = []
+
+                    # Copia os inimigos do template
+                    for enemy in template.enemies:
+                        wave.enemies.append(WaveEnemy(enemy.pokemon_id, enemy.percentage))
+
+                    # Copia os níveis
+                    wave.min_level = template.min_level
+                    wave.max_level = template.max_level
+
+                    # Fecha o dropdown
+                    self.template_combo_open = False
+                    self._check_total_percentage(wave)
+                    return True
+
+            # Clicou fora do dropdown
+            if not self.template_selector_rect.collidepoint(mouse_x, mouse_y):
+                self.template_combo_open = False
+                return True
+
+        # Se tem template, não permite edição manual
         if wave.template_id:
             return True
 
@@ -487,6 +648,7 @@ class WaveConfigDialog:
                 first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
                 wave.enemies.append(WaveEnemy(first_id, 0.0))
             return True
+
         if self.equalize_button.collidepoint(mouse_x, mouse_y) and wave.enemies:
             equal_percent = 100.0 / len(wave.enemies)
             for enemy in wave.enemies:
@@ -496,8 +658,10 @@ class WaveConfigDialog:
                 wave.enemies[-1].percentage += (100.0 - total)
             self._check_total_percentage(wave)
             return True
+
         if self.clear_enemies_button.collidepoint(mouse_x, mouse_y):
             wave.enemies.clear()
+            wave.template_id = None  # Também limpa o template
             self.input_errors.pop("total", None)
             return True
 
@@ -511,6 +675,9 @@ class WaveConfigDialog:
                 remove_rect = pygame.Rect(self.enemies_list_area.right - 28, item_y + 4, 18, 18)
                 if remove_rect.collidepoint(mouse_x, mouse_y):
                     del wave.enemies[item_index]
+                    # Se não tiver mais inimigos, limpa o template
+                    if not wave.enemies:
+                        wave.template_id = None
                     self._check_total_percentage(wave)
                     return True
 
@@ -1049,6 +1216,50 @@ class WaveConfigDialog:
             list_height
         )
 
+    def _get_path_dropdown_rect(self):
+        """Retorna o retângulo do dropdown de paths"""
+        item_height = 28
+        path_count = len(self.path_manager.paths)
+        list_height = min(path_count * item_height + 4, 160)
+
+        # Posiciona abaixo do seletor, mas se não couber, vai para cima
+        rect = pygame.Rect(
+            self.path_selector_rect.x,
+            self.path_selector_rect.bottom + 2,
+            self.path_selector_rect.width,
+            list_height
+        )
+
+        # Verifica se vai sobrepor a lista de waves
+        if rect.bottom > self.waves_list_area.y:
+            rect.y = self.path_selector_rect.top - rect.height - 2
+            if rect.top < self.rect.y + 80:
+                rect.y = self.path_selector_rect.bottom + 2
+
+        return rect
+
+    def _get_template_dropdown_rect(self):
+        """Retorna o retângulo do dropdown de templates"""
+        templates = WaveTemplateManager.get_all_templates()
+        item_height = 28
+        list_height = min(len(templates) * item_height + 4, 160)
+
+        # Posiciona abaixo do seletor, mas se não couber, vai para cima
+        rect = pygame.Rect(
+            self.template_selector_rect.x,
+            self.template_selector_rect.bottom + 2,
+            self.template_selector_rect.width,
+            list_height
+        )
+
+        # Verifica se vai sobrepor a lista de inimigos
+        if rect.bottom > self.enemies_list_area.y:
+            rect.y = self.template_selector_rect.top - rect.height - 2
+            if rect.top < self.rect.y + 80:
+                rect.y = self.template_selector_rect.bottom + 2
+
+        return rect
+
     def _check_total_percentage(self, wave):
         total = sum(e.percentage for e in wave.enemies)
         if abs(total - 100.0) > 0.01:
@@ -1408,16 +1619,18 @@ class WaveConfigDialog:
         if not self.visible:
             return
 
-        # Overlay escuro fora do diálogo (já feito no seletor, mas mantido para consistência)
+        # Overlay escuro fora do diálogo
         if not self.showing_pokemon_selector:
             overlay = pygame.Surface((screen.get_width(), screen.get_height()))
             overlay.set_alpha(180)
             overlay.fill((0, 0, 0))
             screen.blit(overlay, (0, 0))
 
+        # Fundo do diálogo
         pygame.draw.rect(screen, self.colors['bg'], self.rect, border_radius=12)
         pygame.draw.rect(screen, self.colors['border'], self.rect, 2, border_radius=12)
 
+        # Barra de título
         title_bar = pygame.Rect(self.rect.x, self.rect.y, self.rect.width, 38)
         pygame.draw.rect(screen, self.colors['bg_light'], title_bar, border_top_left_radius=12,
                          border_top_right_radius=12)
@@ -1446,7 +1659,7 @@ class WaveConfigDialog:
             text_y = tab_button.y + (tab_button.height - text.get_height()) // 2
             screen.blit(text, (text_x, text_y))
 
-        # Conteúdo da aba
+        # ===== CONTEÚDO DA ABA (primeiro) =====
         if self.selected_tab == "waves":
             self._render_waves_tab(screen)
         elif self.selected_tab == "composition":
@@ -1456,13 +1669,22 @@ class WaveConfigDialog:
         elif self.selected_tab == "templates":
             self._render_templates_tab(screen)
 
-        # Editores (por cima)
+        # ===== DROPDOWNS (por cima do conteúdo) =====
+        # Dropdown de Paths
+        if self.path_dropdown_open and self.selected_tab == "waves":
+            self._render_path_dropdown(screen)
+
+        # Dropdown de Templates
+        if self.template_combo_open and self.selected_tab == "composition":
+            self._render_template_dropdown(screen)
+
+        # ===== EDITORES (por cima) =====
         if self.variant_editor_open:
             self._render_variant_editor(screen)
         if self.template_editor_open:
             self._render_template_editor(screen)
 
-        # Seletor de Pokémon (por cima de TUDO)
+        # ===== SELETOR DE POKÉMON (por cima de TUDO) =====
         if self.showing_pokemon_selector:
             self._render_pokemon_selector(screen)
 
@@ -1473,7 +1695,73 @@ class WaveConfigDialog:
             error_text = self._get_font(14).render(self.input_errors["total"], True, (255, 100, 100))
             screen.blit(error_text, (self.rect.x + 20, self.rect.bottom - 60))
 
-    # --- Render de abas (já existentes, mantidas) ---
+    def _render_path_dropdown(self, screen):
+        """Renderiza o dropdown de paths (separado para ficar por cima)"""
+        path_count = len(self.path_manager.paths)
+        if path_count == 0:
+            return
+
+        list_rect = self._get_path_dropdown_rect()
+
+        # Sombra do dropdown
+        shadow = pygame.Surface((list_rect.width + 4, list_rect.height + 4), pygame.SRCALPHA)
+        shadow.fill((0, 0, 0, 160))
+        screen.blit(shadow, (list_rect.x - 2, list_rect.y - 2))
+
+        pygame.draw.rect(screen, self.colors['bg_dropdown'], list_rect, border_radius=5)
+        pygame.draw.rect(screen, self.colors['border_dropdown'], list_rect, 2, border_radius=5)
+
+        for i in range(path_count):
+            item_rect = pygame.Rect(list_rect.x + 4, list_rect.y + 2 + i * 26, list_rect.width - 8, 22)
+            is_hover = (i == self.path_hovered_index)
+            is_sel = (i == self.path_selected_index)
+
+            bg = self.colors['dropdown_item_hover'] if is_hover else self.colors['bg_dropdown']
+            if is_sel:
+                bg = self.colors['accent']
+            pygame.draw.rect(screen, bg, item_rect, border_radius=4)
+
+            text = self._get_font(13).render(f"Path {i + 1}", True, self.colors['text'])
+            screen.blit(text, (item_rect.x + 8, item_rect.y + 3))
+            if is_sel:
+                check = self._get_font(13).render("✓", True, self.colors['radio_selected'])
+                screen.blit(check, (item_rect.right - 20, item_rect.y + 3))
+
+    def _render_template_dropdown(self, screen):
+        """Renderiza o dropdown de templates (separado para ficar por cima)"""
+        templates = WaveTemplateManager.get_all_templates()
+        if not templates:
+            return
+
+        list_rect = self._get_template_dropdown_rect()
+
+        # Sombra do dropdown
+        shadow = pygame.Surface((list_rect.width + 4, list_rect.height + 4), pygame.SRCALPHA)
+        shadow.fill((0, 0, 0, 160))
+        screen.blit(shadow, (list_rect.x - 2, list_rect.y - 2))
+
+        pygame.draw.rect(screen, self.colors['bg_dropdown'], list_rect, border_radius=5)
+        pygame.draw.rect(screen, self.colors['border_dropdown'], list_rect, 2, border_radius=5)
+
+        wave = self.wave_manager.get_current_wave()
+
+        for i, template in enumerate(templates):
+            item_rect = pygame.Rect(list_rect.x + 4, list_rect.y + 2 + i * 28, list_rect.width - 8, 22)
+            is_hover = (i == self.template_combo_hovered_index)
+            is_sel = (wave and template.template_id == wave.template_id)
+
+            bg = self.colors['dropdown_item_hover'] if is_hover else self.colors['bg_dropdown']
+            if is_sel:
+                bg = self.colors['accent']
+            pygame.draw.rect(screen, bg, item_rect, border_radius=4)
+
+            text = self._get_font(13).render(template.name, True, self.colors['text'])
+            screen.blit(text, (item_rect.x + 8, item_rect.y + 3))
+            if is_sel:
+                check = self._get_font(13).render("✓", True, self.colors['radio_selected'])
+                screen.blit(check, (item_rect.right - 20, item_rect.y + 3))
+
+    # --- Render de abas ---
     def _render_buttons(self, screen):
         color = self.colors['success'] if self.hovered_button == "save" else (50, 150, 50)
         pygame.draw.rect(screen, color, self.save_button, border_radius=8)
@@ -1516,6 +1804,24 @@ class WaveConfigDialog:
         self._render_button(screen, self.remove_wave_button, "remove_wave", "- Remover")
         self._render_button(screen, self.duplicate_wave_button, "duplicate_wave", "Duplicar")
 
+        # Seletor de Path (apenas o botão, sem o dropdown)
+        path_label = self._get_font(13).render("Path:", True, self.colors['text_dim'])
+        screen.blit(path_label, (self.path_label.x, self.path_label.y))
+
+        path_count = len(self.path_manager.paths)
+        path_text = f"P{self.path_selected_index + 1}" if path_count > 0 else "Nenhum"
+
+        border = self.colors['border_active'] if self.path_dropdown_open else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], self.path_selector_rect, border_radius=5)
+        pygame.draw.rect(screen, border, self.path_selector_rect, 1, border_radius=5)
+
+        text = self._get_font(13).render(path_text, True, self.colors['text'])
+        screen.blit(text, (self.path_selector_rect.x + 8, self.path_selector_rect.y + 4))
+
+        arrow = self._get_font(13).render("▼" if not self.path_dropdown_open else "▲", True, self.colors['text_muted'])
+        screen.blit(arrow, (self.path_selector_rect.right - 18, self.path_selector_rect.y + 4))
+
+        # Lista de waves
         pygame.draw.rect(screen, self.colors['bg_dark'], self.waves_list_area, border_radius=6)
 
         old_clip = screen.get_clip()
@@ -1548,10 +1854,14 @@ class WaveConfigDialog:
             if indicators:
                 wave_name += " " + " ".join(indicators)
 
+            # Mostra o path da wave
+            path_idx = wave.path_index if hasattr(wave, 'path_index') else 0
+            wave_name += f" (P{path_idx + 1})"
+
             name_text = self._get_font(14).render(wave_name, True, self.colors['text'])
             screen.blit(name_text, (item_rect.x + 5, item_rect.y + 2))
 
-            info = f"Path {wave.path_index + 1} | {wave.wave_size} inim | Lv.{wave.min_level}-{wave.max_level}"
+            info = f"{wave.wave_size} inim | Lv.{wave.min_level}-{wave.max_level}"
             info_text = self._get_font(12).render(info, True, self.colors['text_dim'])
             screen.blit(info_text, (item_rect.x + 5, item_rect.y + 17))
 
@@ -1593,6 +1903,33 @@ class WaveConfigDialog:
         self._render_button(screen, self.equalize_button, "equalize", "Distribuir", not can_edit)
         self._render_button(screen, self.clear_enemies_button, "clear_enemies", "Limpar", not can_edit)
 
+        # ===== SELETOR DE TEMPLATE =====
+        templates = WaveTemplateManager.get_all_templates()
+
+        template_label = self._get_font(13).render("Template:", True, self.colors['text_dim'])
+        screen.blit(template_label, (self.template_label.x, self.template_label.y))
+
+        border = self.colors['border_active'] if self.template_combo_open else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], self.template_selector_rect, border_radius=5)
+        pygame.draw.rect(screen, border, self.template_selector_rect, 1, border_radius=5)
+
+        # Texto do template selecionado
+        if wave.template_id:
+            template = WaveTemplateManager.get_template(wave.template_id)
+            template_name = template.name if template else "Template removido"
+        else:
+            template_name = "Nenhum"
+
+        text = self._get_font(13).render(template_name, True, self.colors['text'])
+        screen.blit(text, (self.template_selector_rect.x + 8, self.template_selector_rect.y + 4))
+
+        arrow = self._get_font(13).render("▼" if not self.template_combo_open else "▲", True, self.colors['text_muted'])
+        screen.blit(arrow, (self.template_selector_rect.right - 18, self.template_selector_rect.y + 4))
+
+        # Botão "Limpar"
+        self._render_button(screen, self.clear_template_rect, "clear_template", "Limpar")
+
+        # Lista de inimigos
         pygame.draw.rect(screen, self.colors['bg_dark'], self.enemies_list_area, border_radius=6)
 
         old_clip = screen.get_clip()
@@ -1601,7 +1938,14 @@ class WaveConfigDialog:
         list_x = self.enemies_list_area.x + 4
         list_start_y = self.enemies_list_area.y + 2 - self.enemies_scroll * self.enemy_item_height
 
-        enemies = wave.enemies if not wave.template_id else []
+        # ===== PEGA OS INIMIGOS CORRETAMENTE =====
+        # Se tem template, usa os inimigos do template
+        # Senão, usa os inimigos da wave
+        if wave.template_id:
+            template = WaveTemplateManager.get_template(wave.template_id)
+            enemies = template.enemies if template else []
+        else:
+            enemies = wave.enemies
 
         for i, enemy in enumerate(enemies):
             item_y = list_start_y + i * self.enemy_item_height
@@ -1630,13 +1974,15 @@ class WaveConfigDialog:
             pygame.draw.rect(screen, self.colors['bg_input'], percent_rect, border_radius=4)
             pygame.draw.rect(screen, border, percent_rect, 1, border_radius=4)
 
-            display = self.input_texts.get(f"percent_{i}", f"{enemy.percentage:.1f}") if is_active else f"{enemy.percentage:.1f}"
+            display = self.input_texts.get(f"percent_{i}",
+                                           f"{enemy.percentage:.1f}") if is_active else f"{enemy.percentage:.1f}"
             pct_text = self._get_font(13).render(display, True, self.colors['text'])
             screen.blit(pct_text, (percent_rect.x + 4, percent_rect.y + 2))
 
             pct_symbol = self._get_font(11).render("%", True, self.colors['text_muted'])
             screen.blit(pct_symbol, (percent_rect.right + 2, percent_rect.y + 3))
 
+            # Só mostra o botão remover se não tiver template
             if can_edit:
                 remove_rect = pygame.Rect(self.enemies_list_area.right - 28, item_y + 4, 18, 18)
                 pygame.draw.rect(screen, self.colors['danger'], remove_rect, border_radius=4)
@@ -1649,7 +1995,16 @@ class WaveConfigDialog:
 
         screen.set_clip(old_clip)
 
-        if not wave.template_id:
+        # ===== CALCULA TOTAL CORRETAMENTE =====
+        if wave.template_id:
+            template = WaveTemplateManager.get_template(wave.template_id)
+            enemies = template.enemies if template else []
+            total = sum(e.percentage for e in enemies)
+            is_valid = abs(total - 100.0) < 0.01
+            color = (100, 255, 100) if is_valid else (255, 100, 100)
+            total_text = self._get_font(14).render(f"Total: {total:.1f}%", True, color)
+            screen.blit(total_text, (self.total_rect.x, self.total_rect.y))
+        else:
             total = sum(e.percentage for e in wave.enemies)
             is_valid = abs(total - 100.0) < 0.01
             color = (100, 255, 100) if is_valid else (255, 100, 100)
