@@ -207,6 +207,8 @@ class GameScene(BaseScene):
         # ===== RESTAURA COMPLETAMENTE TODOS OS POKÉMON =====
         self.cleanup()
 
+        self.update_box_happiness()
+
         self._start_battle_music()
 
         self.wave_manager.initialize_condition()
@@ -274,6 +276,21 @@ class GameScene(BaseScene):
         if self.show_debug:
             # Reseta as métricas quando ativa
             perf_monitor.reset()
+
+    def update_box_happiness(self):
+        """Atualiza felicidade dos Pokémon na Box (-1 por fase)."""
+        if not hasattr(self.player, 'pc_box'):
+            return
+
+        box_pokemon = self.player.pc_box
+        if not box_pokemon:
+            return
+
+        team_ids = set(id(p) for p in self.player.team)
+
+        for pokemon in box_pokemon:
+            if id(pokemon) not in team_ids:
+                pokemon.add_happiness(-1, "Na Box")
 
     def is_team_defeated(self) -> bool:
         """
@@ -672,6 +689,9 @@ class GameScene(BaseScene):
 
             revive_percentage = item_data.get("effect_value", 0.5)
             toast_battle(f"{pokemon.name} foi revivido!", duration=4.0, pokemon=pokemon, portrait="happy")
+
+            pokemon.add_happiness(2, f"Usou {item_data.get('name', 'Revive')}")
+
             pokemon.revive(heal_percentage=revive_percentage)
 
             # ===== CONQUISTAS: Revive =====
@@ -708,7 +728,7 @@ class GameScene(BaseScene):
         if heal_amount == -1:
             pokemon.heal()
             toast_battle(f"{pokemon.name} foi completamente curado!", duration=4.0, pokemon=pokemon, portrait="happy")
-
+            pokemon.add_happiness(2, f"Usou {item_data.get('name', 'medicina')}")
             # ===== CONQUISTAS: Cura =====
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
@@ -728,7 +748,7 @@ class GameScene(BaseScene):
             healed = pokemon.current_hp - old_hp
             toast_battle(f"{pokemon.name} recuperou {healed} HP! ({pokemon.current_hp}/{pokemon.max_hp})",
                          duration=4.0, pokemon=pokemon, portrait="happy")
-
+            pokemon.add_happiness(2, f"Usou {item_data.get('name', 'medicina')}")
             # ===== CONQUISTAS: Cura =====
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
@@ -1315,6 +1335,8 @@ class GameScene(BaseScene):
             print(f"[GAME_OVER] Time derrotado! Fim de jogo.")
             self._stop_battle_music(fade_ms=1000)
             self.game_state = "game_over"
+            for pokemon in self.player.team:
+                pokemon.add_happiness(-5, "Fase perdida")
             self.overlay_manager.show(OverlayType.GAME_OVER)
 
             for pokemon in self.player.team:
@@ -1326,6 +1348,8 @@ class GameScene(BaseScene):
         if items_lost:
             print(f"[GAME_OVER] Todos os itens foram roubados!")
             self.game_state = "game_over"
+            for pokemon in self.player.team:
+                pokemon.add_happiness(-5, "Fase perdida")
             self.overlay_manager.show(OverlayType.GAME_OVER)
 
             for pokemon in self.player.team:
@@ -1365,6 +1389,9 @@ class GameScene(BaseScene):
 
         # ===== RESETA TODOS OS DITTOS TRANSFORMADOS =====
         self.reset_all_transformed_dittos()
+
+        for pokemon in self.player.team:
+            pokemon.add_happiness(5, "Fase completada")
 
         base_reward = self.phase_rewards['money']
         gold_from_defeats = self.wave_manager.get_total_gold_earned()

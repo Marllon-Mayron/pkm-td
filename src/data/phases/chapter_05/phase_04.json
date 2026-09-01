@@ -1514,7 +1514,15 @@
                 "enemies": [
                     {
                         "pokemon_id": 92,
-                        "percentage": 100.0
+                        "percentage": 50.0
+                    },
+                    {
+                        "pokemon_id": 200,
+                        "percentage": 40.0
+                    },
+                    {
+                        "pokemon_id": 198,
+                        "percentage": 10.0
                     }
                 ],
                 "min_level": 21,
@@ -1551,7 +1559,7 @@
                 "variants": []
             }
         ],
-        "selected_wave": 1,
+        "selected_wave": 0,
         "templates": {
             "templates": []
         }

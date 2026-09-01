@@ -1721,15 +1721,15 @@
                 "enemies": [
                     {
                         "pokemon_id": 90,
-                        "percentage": 20
+                        "percentage": 20.0
                     },
                     {
                         "pokemon_id": 98,
-                        "percentage": 60
+                        "percentage": 60.0
                     },
                     {
                         "pokemon_id": 102,
-                        "percentage": 20
+                        "percentage": 20.0
                     }
                 ],
                 "min_level": 21,
@@ -1738,7 +1738,10 @@
                 "spawn_interval": 2.0,
                 "initial_delay": 10.0,
                 "repeat_wave": true,
-                "repeat_count": 2
+                "repeat_count": 2,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             },
             {
                 "wave_index": 1,
@@ -1748,15 +1751,19 @@
                 "enemies": [
                     {
                         "pokemon_id": 72,
-                        "percentage": 60
+                        "percentage": 50.0
                     },
                     {
                         "pokemon_id": 90,
-                        "percentage": 30
+                        "percentage": 30.0
                     },
                     {
                         "pokemon_id": 54,
-                        "percentage": 10
+                        "percentage": 10.0
+                    },
+                    {
+                        "pokemon_id": 223,
+                        "percentage": 10.0
                     }
                 ],
                 "min_level": 21,
@@ -1765,10 +1772,65 @@
                 "spawn_interval": 2.0,
                 "initial_delay": 10.0,
                 "repeat_wave": true,
-                "repeat_count": 2
+                "repeat_count": 2,
+                "template_id": "template_4229",
+                "use_variants": false,
+                "variants": []
             }
         ],
-        "selected_wave": 1
+        "selected_wave": 0,
+        "templates": {
+            "templates": [
+                {
+                    "template_id": "template_3166",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 72,
+                            "percentage": 50.0
+                        },
+                        {
+                            "pokemon_id": 90,
+                            "percentage": 30.0
+                        },
+                        {
+                            "pokemon_id": 54,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 223,
+                            "percentage": 10.0
+                        }
+                    ],
+                    "min_level": 21,
+                    "max_level": 22
+                },
+                {
+                    "template_id": "template_4229",
+                    "name": "Noite",
+                    "enemies": [
+                        {
+                            "pokemon_id": 72,
+                            "percentage": 50.0
+                        },
+                        {
+                            "pokemon_id": 90,
+                            "percentage": 30.0
+                        },
+                        {
+                            "pokemon_id": 54,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 226,
+                            "percentage": 10.0
+                        }
+                    ],
+                    "min_level": 21,
+                    "max_level": 22
+                }
+            ]
+        }
     },
     "tower_spots": {
         "spot_size": 24,
@@ -1893,5 +1955,7 @@
         "experience": 300
     },
     "localization_type": "default",
-    "custom_folder": ""
+    "custom_folder": "",
+    "day_night_mode": "random",
+    "base_weather": "random"
 }

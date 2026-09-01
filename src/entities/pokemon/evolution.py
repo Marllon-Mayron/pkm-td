@@ -218,7 +218,7 @@ class PokemonEvolution:
         self.pokemon._calculate_stats()
         self.pokemon.current_hp = self.pokemon.max_hp
         self.pokemon.xp_to_next = self.pokemon._calculate_xp_needed()
-
+        self.pokemon.add_happiness(3, "Subiu de nivel")
         toast_battle(f"{self.pokemon.name} subiu de nivel!!!", duration=4.0, pokemon=self.pokemon, portrait="joyous")
         new_moves, pending_moves = self.pokemon.check_new_moves_on_level_up(old_level)
         if new_moves:

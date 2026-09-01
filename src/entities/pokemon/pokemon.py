@@ -56,7 +56,7 @@ class Pokemon(Entity):
         self.base_stats = self.pokemon_data["base_stats"]
 
         # Felicidade: 0-100
-        self.happiness = 50
+        self.happiness = 0
         self._max_happiness = 100
         self._min_happiness = 0
 
@@ -763,23 +763,28 @@ class Pokemon(Entity):
     def get_happiness_percentage(self) -> float:
         return self.happiness / self._max_happiness
 
-    def add_happiness(self, amount: int) -> int:
-        """Adiciona felicidade (pode ser negativo). Retorna o novo valor."""
+    def add_happiness(self, amount: int, source: str = "") -> int:
+        """Adiciona ou remove felicidade do Pokémon."""
         old_happiness = self.happiness
         self.happiness = max(self._min_happiness, min(self._max_happiness, self.happiness + amount))
         gained = self.happiness - old_happiness
 
         if gained != 0:
-            print(f"[HAPPINESS] {self.get_display_name()}: felicidade {gained:+d} → {self.happiness}/100")
-
-            # Mostra mensagem visual se tiver effect_manager
             if hasattr(self, 'effect_manager') and self.effect_manager:
                 if gained > 0:
                     self.effect_manager.add_status_text(self, f"Felicidade +{gained}!", duration=1.5,
-                                                        color=(100, 255, 100))
+                                                        color=(255, 100, 100))
                 else:
                     self.effect_manager.add_status_text(self, f"Felicidade {gained}!", duration=1.5,
-                                                        color=(255, 100, 100))
+                                                        color=(100, 100, 255))
+
+            # Conquista: Felicidade Máxima
+            if self.happiness >= 100 and old_happiness < 100:
+                if hasattr(self, 'game_scene') and self.game_scene:
+                    game_scene = self.game_scene
+                    phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                    if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+                        game_scene.player.achievement_manager.check_and_unlock("max_happiness", phase_id)
 
         return self.happiness
 
@@ -1409,6 +1414,8 @@ class Pokemon(Entity):
 
             # ===== LIMPA TODOS OS STATUS EFFECTS =====
             self.clear_all_status()
+
+            self.add_happiness(-30, "Derrotado")
 
             # ===== CANCELA QUALQUER CARGA DE GOLPE =====
             if hasattr(self, 'battle_system') and self.battle_system:
