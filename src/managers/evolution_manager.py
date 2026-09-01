@@ -231,7 +231,10 @@ class EvolutionManager:
         return False
 
     def can_evolve_by_happiness(self, pokemon_id, current_happiness, time_of_day=None):
-        """Verifica se o Pokémon pode evoluir por felicidade (Eevee -> Espeon/Umbreon)"""
+        """
+        Verifica se o Pokémon pode evoluir por felicidade.
+        Suporta evoluções que dependem do período do dia (Espeon/Umbreon).
+        """
         variants = self.get_evolution_variants(pokemon_id)
 
         for variant in variants:
@@ -241,22 +244,51 @@ class EvolutionManager:
                 if current_happiness >= min_happiness:
                     # Verifica horário se necessário
                     req_time = variant.get("time_of_day")
-                    if req_time and time_of_day:
-                        if req_time.lower() == time_of_day.lower():
-                            return {
-                                "evolve_to": variant.get("evolves_to_id"),
-                                "method": "happiness",
-                                "requirement": min_happiness,
-                                "variant_name": variant.get("evolves_to_name"),
-                                "time_of_day": req_time
-                            }
-                    elif not req_time:
+
+                    # Se não tem requisito de horário, pode evoluir
+                    if not req_time:
                         return {
                             "evolve_to": variant.get("evolves_to_id"),
                             "method": "happiness",
                             "requirement": min_happiness,
                             "variant_name": variant.get("evolves_to_name")
                         }
+
+                    # Se tem requisito de horário, verifica
+                    if req_time and time_of_day:
+                        req_time_lower = req_time.lower()
+                        time_of_day_lower = time_of_day.lower()
+
+                        # Dusk e Dawn são considerados "day" para evoluções
+                        if req_time_lower == "day":
+                            if time_of_day_lower in ["day", "dusk", "dawn"]:
+                                return {
+                                    "evolve_to": variant.get("evolves_to_id"),
+                                    "method": "happiness",
+                                    "requirement": min_happiness,
+                                    "variant_name": variant.get("evolves_to_name"),
+                                    "time_of_day": req_time
+                                }
+                        # Night só é night e cave/deep
+                        elif req_time_lower == "night":
+                            if time_of_day_lower in ["night", "cave", "deep"]:
+                                return {
+                                    "evolve_to": variant.get("evolves_to_id"),
+                                    "method": "happiness",
+                                    "requirement": min_happiness,
+                                    "variant_name": variant.get("evolves_to_name"),
+                                    "time_of_day": req_time
+                                }
+                        else:
+                            # Match exato para outros períodos
+                            if req_time_lower == time_of_day_lower:
+                                return {
+                                    "evolve_to": variant.get("evolves_to_id"),
+                                    "method": "happiness",
+                                    "requirement": min_happiness,
+                                    "variant_name": variant.get("evolves_to_name"),
+                                    "time_of_day": req_time
+                                }
         return None
 
     def can_evolve_by_location(self, pokemon_id, location_name):
@@ -293,15 +325,7 @@ class EvolutionManager:
             return None
 
         # Pega o período atual (dia/noite)
-        time_of_day = None
-        if hasattr(pokemon.game_scene, 'day_night_weather'):
-            from src.battle.effects.specific.day_night.day_night_state import DayNightType
-            day_night = pokemon.game_scene.day_night_weather.day_night_state
-            if day_night:
-                if day_night.type in [DayNightType.DAY, DayNightType.DAY_CAVE]:
-                    time_of_day = "day"
-                elif day_night.type in [DayNightType.NIGHT, DayNightType.NIGHT_CAVE]:
-                    time_of_day = "night"
+        time_of_day = self._get_time_of_day(pokemon.game_scene)
 
         # Verifica evolução por felicidade usando o método existente
         evolution = self.can_evolve_by_happiness(
@@ -315,6 +339,35 @@ class EvolutionManager:
             evolution['pokemon'] = pokemon
 
         return evolution
+
+    def _get_time_of_day(self, game_scene) -> str:
+        """
+        Retorna o período atual do dia como string.
+        Usa o DayNightWeatherSystem do game_scene.
+        """
+        if not hasattr(game_scene, 'day_night_weather'):
+            return None
+
+        day_night = game_scene.day_night_weather.day_night_state
+        if not day_night:
+            return None
+
+        from src.battle.effects.specific.day_night.day_night_state import DayNightType
+
+        if day_night.type in [DayNightType.DAY]:
+            return "day"
+        elif day_night.type in [DayNightType.NIGHT]:
+            return "night"
+        elif day_night.type == DayNightType.DUSK:
+            return "dusk"
+        elif day_night.type == DayNightType.DAWN:
+            return "dawn"
+        elif day_night.type == DayNightType.CAVE:
+            return "cave"
+        elif day_night.type == DayNightType.DEEP:
+            return "deep"
+
+        return None
 
     def check_evolution(self, pokemon_id, current_level=None, stone_name=None,
                         is_trade=False, current_happiness=None, time_of_day=None,

@@ -805,7 +805,7 @@ class Pokemon(Entity):
         if self.is_wild:
             return
 
-        # Verifica evolução por felicidade
+        # Verifica evolução por felicidade (já inclui verificação de período)
         evolution = evolution_manager.check_happiness_evolution(self)
 
         if evolution:
