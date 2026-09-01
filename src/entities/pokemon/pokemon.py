@@ -809,6 +809,15 @@ class Pokemon(Entity):
         evolution = evolution_manager.check_happiness_evolution(self)
 
         if evolution:
+            # Guarda o método e horário para a conquista
+            if hasattr(self, 'evolution'):
+                self.evolution._pending_evolution_method = "happiness"
+                if "time_of_day" in evolution:
+                    self._last_evolution_time_of_day = evolution.get("time_of_day")
+
+            # Guarda os dados da evolução
+            self._last_evolution_data = evolution
+
             print(f"[HAPPINESS_EVOLUTION] {self.name} pode evoluir por felicidade! "
                   f"Felicidade: {self.happiness}, Requerido: {evolution['requirement']}")
 

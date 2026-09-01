@@ -53,17 +53,58 @@ class PokemonEvolution:
         print(f"[EVOLUÇÃO] ✓ {old_name} (Lv.{old_level}) evoluiu para {self.pokemon.name}!")
         print(f"[EVOLUÇÃO] Moves atuais: {[m.name for m in self.pokemon.moves]}")
 
-        # ===== CONQUISTAS: Evolução =====
+        # ===== REGISTRA CONTADORES DE EVOLUÇÃO =====
         if hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
             game_scene = self.pokemon.game_scene
             phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+
             if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
                 ach_mgr = game_scene.player.achievement_manager
+
+                # Contador geral de evoluções
                 ach_mgr.increment_counter("evolution_count")
                 ach_mgr.check_and_unlock("first_evolution", phase_id)
                 ach_mgr.check_and_unlock("evolution_10", phase_id)
                 ach_mgr.check_and_unlock("evolution_50", phase_id)
-                print(f"[ACHIEVEMENT] Evolução contada! Total: {ach_mgr.get_counter('evolution_count')}")
+
+                # ===== IDENTIFICA O TIPO DE EVOLUÇÃO =====
+                method = getattr(self, '_pending_evolution_method', None)
+                if method:
+                    delattr(self, '_pending_evolution_method')
+
+                # Se não tem método definido, tenta inferir
+                if not method:
+                    # Verifica se veio do evolution_data
+                    if hasattr(self.pokemon, '_last_evolution_data'):
+                        evo_data = self.pokemon._last_evolution_data
+                        method = evo_data.get("method", "level")
+
+                # Contadores por tipo de evolução
+                if method == "happiness":
+                    ach_mgr.increment_counter("happiness_evolution_count")
+                    ach_mgr.check_and_unlock("first_happiness_evolution", phase_id)
+                    ach_mgr.check_and_unlock("happiness_evolution_3", phase_id)
+                    ach_mgr.check_and_unlock("happiness_evolution_10", phase_id)
+
+                    # Verifica se foi por clima (dia/noite) - Espeon/Umbreon
+                    if hasattr(self.pokemon, '_last_evolution_time_of_day'):
+                        ach_mgr.increment_counter("weather_evolution_count")
+                        ach_mgr.check_and_unlock("first_weather_evolution", phase_id)
+                        ach_mgr.check_and_unlock("weather_evolution_5", phase_id)
+
+                elif method == "stone":
+                    ach_mgr.increment_counter("stone_evolution_count")
+                    ach_mgr.check_and_unlock("first_stone_evolution", phase_id)
+                    ach_mgr.check_and_unlock("stone_evolution_5", phase_id)
+                    ach_mgr.check_and_unlock("stone_evolution_20", phase_id)
+
+                elif method == "level":
+                    ach_mgr.increment_counter("level_evolution_count")
+                    ach_mgr.check_and_unlock("first_level_evolution", phase_id)
+                    ach_mgr.check_and_unlock("level_evolution_50", phase_id)
+
+                print(
+                    f"[ACHIEVEMENT] Evolucao contada! Metodo: {method}, Total: {ach_mgr.get_counter('evolution_count')}")
 
     def check_combination_evolution(self, nearby_pokemon):
         """

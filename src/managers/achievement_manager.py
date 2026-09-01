@@ -254,7 +254,7 @@ class AchievementManager:
             if self.get_counter("weather_boosted_attack_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
 
-        # ===== EVOLUÇÃO =====
+        # ===== EVOLUÇÃO GERAL =====
         elif achievement_id == "first_evolution":
             if self.get_counter("evolution_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
@@ -265,6 +265,66 @@ class AchievementManager:
 
         elif achievement_id == "evolution_50":
             if self.get_counter("evolution_count") >= 50:
+                return self.unlock(achievement_id, phase_id)
+
+        # ===== EVOLUÇÃO POR NÍVEL =====
+        elif achievement_id == "first_level_evolution":
+            if self.get_counter("level_evolution_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "level_evolution_50":
+            if self.get_counter("level_evolution_count") >= 50:
+                return self.unlock(achievement_id, phase_id)
+
+        # ===== EVOLUÇÃO POR PEDRA =====
+        elif achievement_id == "first_stone_evolution":
+            if self.get_counter("stone_evolution_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "stone_evolution_5":
+            if self.get_counter("stone_evolution_count") >= 5:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "stone_evolution_20":
+            if self.get_counter("stone_evolution_count") >= 20:
+                return self.unlock(achievement_id, phase_id)
+
+        # ===== EVOLUÇÃO POR FELICIDADE =====
+        elif achievement_id == "max_happiness":
+            # Verifica se algum Pokémon do time tem felicidade >= 100
+            for pokemon in self.player.team:
+                if pokemon.get_happiness() >= 100:
+                    return self.unlock(achievement_id, phase_id)
+            return False
+
+        elif achievement_id == "full_team_max_happiness":
+            # Verifica se TODOS os Pokémon do time têm felicidade máxima (255)
+            if not self.player.team:
+                return False
+            all_max = all(pokemon.get_happiness() >= 255 for pokemon in self.player.team)
+            if all_max:
+                return self.unlock(achievement_id, phase_id)
+            return False
+
+        elif achievement_id == "first_happiness_evolution":
+            if self.get_counter("happiness_evolution_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "happiness_evolution_3":
+            if self.get_counter("happiness_evolution_count") >= 3:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "happiness_evolution_10":
+            if self.get_counter("happiness_evolution_count") >= 10:
+                return self.unlock(achievement_id, phase_id)
+
+        # ===== EVOLUÇÃO POR CLIMA =====
+        elif achievement_id == "first_weather_evolution":
+            if self.get_counter("weather_evolution_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "weather_evolution_5":
+            if self.get_counter("weather_evolution_count") >= 5:
                 return self.unlock(achievement_id, phase_id)
 
         # ===== BLOQUEIO DE EVOLUÇÃO =====
@@ -325,7 +385,9 @@ class AchievementManager:
             self.check_and_unlock(ach_id, phase_id)
 
     def get_progress(self, achievement_id: str) -> tuple:
+        """Retorna o progresso de uma conquista (atual, necessário)"""
         progress_map = {
+            # ===== EXISTENTES =====
             "first_capture": ("capture_count", 1),
             "heal_5": ("heal_count", 5),
             "first_badge": ("badge_count", 1),
@@ -334,15 +396,43 @@ class AchievementManager:
             "capture_50": ("capture_count", 50),
             "perfect_phase": ("perfect_phase_count", 1),
             "boss_defeated": ("boss_defeated_count", 1),
+
+            # ===== CLIMA =====
             "first_weather_change": ("weather_change_count", 1),
             "weather_change_50": ("weather_change_count", 50),
             "weather_change_100": ("weather_change_count", 100),
             "first_weather_boosted_attack": ("weather_boosted_attack_count", 1),
+
+            # ===== EVOLUÇÃO GERAL =====
             "first_evolution": ("evolution_count", 1),
             "evolution_10": ("evolution_count", 10),
             "evolution_50": ("evolution_count", 50),
+
+            # ===== EVOLUÇÃO POR NÍVEL =====
+            "first_level_evolution": ("level_evolution_count", 1),
+            "level_evolution_50": ("level_evolution_count", 50),
+
+            # ===== EVOLUÇÃO POR PEDRA =====
+            "first_stone_evolution": ("stone_evolution_count", 1),
+            "stone_evolution_5": ("stone_evolution_count", 5),
+            "stone_evolution_20": ("stone_evolution_count", 20),
+
+            # ===== EVOLUÇÃO POR FELICIDADE =====
+            "max_happiness": ("max_happiness_check", 1),  # Especial
+            "full_team_max_happiness": ("full_team_max_happiness_check", 1),  # Especial
+            "first_happiness_evolution": ("happiness_evolution_count", 1),
+            "happiness_evolution_3": ("happiness_evolution_count", 3),
+            "happiness_evolution_10": ("happiness_evolution_count", 10),
+
+            # ===== EVOLUÇÃO POR CLIMA =====
+            "first_weather_evolution": ("weather_evolution_count", 1),
+            "weather_evolution_5": ("weather_evolution_count", 5),
+
+            # ===== BLOQUEIO DE EVOLUÇÃO =====
             "first_evolution_blocked": ("evolution_blocked_count", 1),
             "evolution_blocked_10": ("evolution_blocked_count", 10),
+
+            # ===== CURA DE STATUS =====
             "first_antidote": ("antidote_count", 1),
             "antidote_100": ("antidote_count", 100),
             "first_awake": ("awake_count", 1),
@@ -351,6 +441,8 @@ class AchievementManager:
             "paralyze_heal_100": ("paralyze_heal_count", 100),
             "first_revive": ("revive_count", 1),
             "revive_25": ("revive_count", 25),
+
+            # ===== ENSINO DE MOVES =====
             "first_move_taught": ("move_taught_count", 1),
             "move_taught_10": ("move_taught_count", 10),
         }

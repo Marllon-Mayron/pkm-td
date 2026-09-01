@@ -337,6 +337,9 @@ class EvolutionManager:
         # Se encontrou evolução, retorna com dados adicionais
         if evolution:
             evolution['pokemon'] = pokemon
+            # Garante que o método está presente
+            if 'method' not in evolution:
+                evolution['method'] = 'happiness'
 
         return evolution
 

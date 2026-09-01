@@ -396,6 +396,17 @@ class GameScene(BaseScene):
 
     def open_evolution_overlay(self, pokemon, evolution_data):
         """Abre o overlay de evolução para um Pokémon"""
+        # Guarda o método de evolução para contagem depois
+        if hasattr(pokemon, 'evolution'):
+            method = evolution_data.get("method", "unknown")
+            pokemon.evolution._pending_evolution_method = method
+
+            # Se for evolução por felicidade com horário (Espeon/Umbreon)
+            if method == "happiness" and "time_of_day" in evolution_data:
+                pokemon._last_evolution_time_of_day = evolution_data.get("time_of_day")
+
+            # Guarda os dados para referência
+            pokemon._last_evolution_data = evolution_data
 
         sound_manager.play_effect(SoundEffect.EVOLUTION)
         self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data)
@@ -1316,11 +1327,25 @@ class GameScene(BaseScene):
         target_mgr.update(dt)
         perf_monitor.end_section()
 
+        # ===== VERIFICA CONQUISTAS DE FELICIDADE =====
+        if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+            ach_mgr = self.player.achievement_manager
+            phase_id = f"{self.chapter_id}-{self.phase_number}"
+
+            # Verifica conquista de felicidade máxima do time
+            if not ach_mgr.is_unlocked("full_team_max_happiness"):
+                ach_mgr.check_and_unlock("full_team_max_happiness", phase_id)
+
+            # Verifica se algum Pokémon alcançou 100 de felicidade
+            if not ach_mgr.is_unlocked("max_happiness"):
+                ach_mgr.check_and_unlock("max_happiness", phase_id)
+
         # Effect Manager
         if hasattr(self, 'battle_system') and self.battle_system:
             perf_monitor.start_section("EFFECT_MANAGER")
             self.battle_system.effect_manager.update(dt)
             perf_monitor.end_section()
+
 
         self.notification_manager.update(dt)
         # ===== GAME OVER CHECK - MODIFICADO =====
