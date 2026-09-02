@@ -1310,19 +1310,19 @@
                 "enemies": [
                     {
                         "pokemon_id": 109,
-                        "percentage": 33
+                        "percentage": 33.0
                     },
                     {
                         "pokemon_id": 88,
-                        "percentage": 33
+                        "percentage": 33.0
                     },
                     {
                         "pokemon_id": 24,
-                        "percentage": 33
+                        "percentage": 33.0
                     },
                     {
-                        "pokemon_id": 132,
-                        "percentage": 1
+                        "pokemon_id": 211,
+                        "percentage": 1.0
                     }
                 ],
                 "min_level": 21,
@@ -1331,7 +1331,10 @@
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
                 "repeat_wave": true,
-                "repeat_count": 3
+                "repeat_count": 3,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             },
             {
                 "wave_index": 1,
@@ -1341,19 +1344,19 @@
                 "enemies": [
                     {
                         "pokemon_id": 24,
-                        "percentage": 33
+                        "percentage": 33.0
                     },
                     {
                         "pokemon_id": 109,
-                        "percentage": 33
+                        "percentage": 33.0
                     },
                     {
                         "pokemon_id": 88,
-                        "percentage": 33
+                        "percentage": 33.0
                     },
                     {
-                        "pokemon_id": 132,
-                        "percentage": 1
+                        "pokemon_id": 211,
+                        "percentage": 1.0
                     }
                 ],
                 "min_level": 21,
@@ -1362,10 +1365,16 @@
                 "spawn_interval": 1.5,
                 "initial_delay": 10.0,
                 "repeat_wave": true,
-                "repeat_count": 3
+                "repeat_count": 3,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 1,
+        "templates": {
+            "templates": []
+        }
     },
     "tower_spots": {
         "spot_size": 24,
@@ -1477,5 +1486,7 @@
         "experience": 50
     },
     "localization_type": "default",
-    "custom_folder": ""
+    "custom_folder": "",
+    "day_night_mode": "random",
+    "base_weather": "random"
 }

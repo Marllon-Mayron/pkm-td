@@ -174,9 +174,9 @@
                         15,
                         104,
                         248,
-                        7,
-                        8,
-                        9,
+                        13,
+                        14,
+                        15,
                         248,
                         13,
                         15,
@@ -254,13 +254,13 @@
                         248
                     ],
                     [
-                        8,
-                        9,
+                        2,
+                        3,
                         104,
                         248,
                         104,
-                        7,
-                        9,
+                        1,
+                        3,
                         248,
                         104,
                         1,
@@ -1393,11 +1393,15 @@
                 "enemies": [
                     {
                         "pokemon_id": 129,
-                        "percentage": 99
+                        "percentage": 99.0
                     },
                     {
                         "pokemon_id": 147,
-                        "percentage": 1
+                        "percentage": 0.5
+                    },
+                    {
+                        "pokemon_id": 246,
+                        "percentage": 0.5
                     }
                 ],
                 "min_level": 20,
@@ -1406,10 +1410,37 @@
                 "spawn_interval": 1.0,
                 "initial_delay": 10.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": "template_7996",
+                "use_variants": false,
+                "variants": []
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 0,
+        "templates": {
+            "templates": [
+                {
+                    "template_id": "template_7996",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 129,
+                            "percentage": 99.0
+                        },
+                        {
+                            "pokemon_id": 147,
+                            "percentage": 0.5
+                        },
+                        {
+                            "pokemon_id": 246,
+                            "percentage": 0.5
+                        }
+                    ],
+                    "min_level": 20,
+                    "max_level": 30
+                }
+            ]
+        }
     },
     "tower_spots": {
         "spot_size": 24,
@@ -1506,5 +1537,7 @@
         "experience": 50
     },
     "localization_type": "default",
-    "custom_folder": ""
+    "custom_folder": "",
+    "day_night_mode": "random",
+    "base_weather": "random"
 }

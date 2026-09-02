@@ -1396,39 +1396,43 @@
                 "enemies": [
                     {
                         "pokemon_id": 12,
-                        "percentage": 11
+                        "percentage": 10.0
                     },
                     {
                         "pokemon_id": 15,
-                        "percentage": 11
+                        "percentage": 10.0
                     },
                     {
                         "pokemon_id": 127,
-                        "percentage": 10
+                        "percentage": 10.0
                     },
                     {
                         "pokemon_id": 123,
-                        "percentage": 10
+                        "percentage": 10.0
                     },
                     {
                         "pokemon_id": 103,
-                        "percentage": 11
+                        "percentage": 10.0
                     },
                     {
                         "pokemon_id": 70,
-                        "percentage": 11
+                        "percentage": 10.0
                     },
                     {
                         "pokemon_id": 44,
-                        "percentage": 12
+                        "percentage": 10.0
                     },
                     {
                         "pokemon_id": 47,
-                        "percentage": 12
+                        "percentage": 10.0
                     },
                     {
                         "pokemon_id": 49,
-                        "percentage": 12
+                        "percentage": 10.0
+                    },
+                    {
+                        "pokemon_id": 214,
+                        "percentage": 10.0
                     }
                 ],
                 "min_level": 25,
@@ -1437,10 +1441,65 @@
                 "spawn_interval": 2.0,
                 "initial_delay": 10.0,
                 "repeat_wave": true,
-                "repeat_count": 3
+                "repeat_count": 3,
+                "template_id": "template_5877",
+                "use_variants": false,
+                "variants": []
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 0,
+        "templates": {
+            "templates": [
+                {
+                    "template_id": "template_5877",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 12,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 15,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 127,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 123,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 103,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 70,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 44,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 47,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 49,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 214,
+                            "percentage": 10.0
+                        }
+                    ],
+                    "min_level": 25,
+                    "max_level": 30
+                }
+            ]
+        }
     },
     "tower_spots": {
         "spot_size": 24,
@@ -1562,5 +1621,7 @@
         "experience": 50
     },
     "localization_type": "default",
-    "custom_folder": ""
+    "custom_folder": "",
+    "day_night_mode": "random",
+    "base_weather": "random"
 }

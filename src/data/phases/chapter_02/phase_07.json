@@ -1468,11 +1468,11 @@
                     },
                     {
                         "pokemon_id": 48,
-                        "percentage": 19.0
+                        "percentage": 14.0
                     },
                     {
                         "pokemon_id": 56,
-                        "percentage": 20.0
+                        "percentage": 15.0
                     },
                     {
                         "pokemon_id": 23,
@@ -1481,6 +1481,10 @@
                     {
                         "pokemon_id": 179,
                         "percentage": 9.0
+                    },
+                    {
+                        "pokemon_id": 204,
+                        "percentage": 10.0
                     }
                 ],
                 "min_level": 15,

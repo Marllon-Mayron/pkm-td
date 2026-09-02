@@ -1581,7 +1581,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 79,
-                        "percentage": 70.0
+                        "percentage": 40.0
                     },
                     {
                         "pokemon_id": 90,
@@ -1594,6 +1594,10 @@
                     {
                         "pokemon_id": 102,
                         "percentage": 10.0
+                    },
+                    {
+                        "pokemon_id": 213,
+                        "percentage": 30.0
                     }
                 ],
                 "min_level": 21,
@@ -1603,7 +1607,7 @@
                 "initial_delay": 10.0,
                 "repeat_wave": true,
                 "repeat_count": 3,
-                "template_id": null,
+                "template_id": "template_1958",
                 "use_variants": false,
                 "variants": []
             },
@@ -1615,7 +1619,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 79,
-                        "percentage": 70.0
+                        "percentage": 40.0
                     },
                     {
                         "pokemon_id": 90,
@@ -1628,6 +1632,10 @@
                     {
                         "pokemon_id": 102,
                         "percentage": 10.0
+                    },
+                    {
+                        "pokemon_id": 213,
+                        "percentage": 30.0
                     }
                 ],
                 "min_level": 21,
@@ -1637,7 +1645,7 @@
                 "initial_delay": 10.0,
                 "repeat_wave": true,
                 "repeat_count": 2,
-                "template_id": null,
+                "template_id": "template_1958",
                 "use_variants": false,
                 "variants": []
             },
@@ -1736,7 +1744,7 @@
                 ]
             }
         ],
-        "selected_wave": 2,
+        "selected_wave": 0,
         "templates": {
             "templates": [
                 {
@@ -1774,6 +1782,34 @@
                     ],
                     "min_level": 20,
                     "max_level": 20
+                },
+                {
+                    "template_id": "template_1958",
+                    "name": "Areia",
+                    "enemies": [
+                        {
+                            "pokemon_id": 79,
+                            "percentage": 40.0
+                        },
+                        {
+                            "pokemon_id": 90,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 98,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 102,
+                            "percentage": 10.0
+                        },
+                        {
+                            "pokemon_id": 213,
+                            "percentage": 30.0
+                        }
+                    ],
+                    "min_level": 21,
+                    "max_level": 25
                 }
             ]
         }

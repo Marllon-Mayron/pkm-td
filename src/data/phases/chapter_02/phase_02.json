@@ -2038,7 +2038,7 @@
                     },
                     {
                         "pokemon_id": 46,
-                        "percentage": 15.0
+                        "percentage": 14.9
                     },
                     {
                         "pokemon_id": 56,
@@ -2047,6 +2047,10 @@
                     {
                         "pokemon_id": 187,
                         "percentage": 3.0
+                    },
+                    {
+                        "pokemon_id": 185,
+                        "percentage": 0.1
                     }
                 ],
                 "min_level": 11,
@@ -2056,7 +2060,7 @@
                 "initial_delay": 6.0,
                 "repeat_wave": true,
                 "repeat_count": 2,
-                "template_id": "template_4264",
+                "template_id": "template_6633",
                 "use_variants": true,
                 "variants": [
                     {
@@ -2137,7 +2141,7 @@
                     },
                     {
                         "pokemon_id": 46,
-                        "percentage": 15.0
+                        "percentage": 14.9
                     },
                     {
                         "pokemon_id": 56,
@@ -2146,6 +2150,10 @@
                     {
                         "pokemon_id": 187,
                         "percentage": 3.0
+                    },
+                    {
+                        "pokemon_id": 185,
+                        "percentage": 0.1
                     }
                 ],
                 "min_level": 11,
@@ -2238,7 +2246,7 @@
                         },
                         {
                             "pokemon_id": 46,
-                            "percentage": 15.0
+                            "percentage": 14.9
                         },
                         {
                             "pokemon_id": 56,
@@ -2247,6 +2255,10 @@
                         {
                             "pokemon_id": 187,
                             "percentage": 3.0
+                        },
+                        {
+                            "pokemon_id": 185,
+                            "percentage": 0.1
                         }
                     ],
                     "min_level": 11,

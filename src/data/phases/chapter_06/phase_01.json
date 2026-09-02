@@ -1406,27 +1406,27 @@
                 "enemies": [
                     {
                         "pokemon_id": 72,
-                        "percentage": 15
+                        "percentage": 15.0
                     },
                     {
                         "pokemon_id": 130,
-                        "percentage": 15
+                        "percentage": 15.0
                     },
                     {
                         "pokemon_id": 116,
-                        "percentage": 15
+                        "percentage": 15.0
                     },
                     {
                         "pokemon_id": 121,
-                        "percentage": 15
+                        "percentage": 15.0
                     },
                     {
                         "pokemon_id": 118,
-                        "percentage": 20
+                        "percentage": 20.0
                     },
                     {
                         "pokemon_id": 119,
-                        "percentage": 20
+                        "percentage": 20.0
                     }
                 ],
                 "min_level": 21,
@@ -1435,10 +1435,53 @@
                 "spawn_interval": 2.0,
                 "initial_delay": 10.0,
                 "repeat_wave": true,
-                "repeat_count": 3
+                "repeat_count": 3,
+                "template_id": "template_5405",
+                "use_variants": false,
+                "variants": []
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 0,
+        "templates": {
+            "templates": [
+                {
+                    "template_id": "template_5405",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 72,
+                            "percentage": 15.0
+                        },
+                        {
+                            "pokemon_id": 130,
+                            "percentage": 15.0
+                        },
+                        {
+                            "pokemon_id": 116,
+                            "percentage": 7.5
+                        },
+                        {
+                            "pokemon_id": 121,
+                            "percentage": 15.0
+                        },
+                        {
+                            "pokemon_id": 118,
+                            "percentage": 20.0
+                        },
+                        {
+                            "pokemon_id": 119,
+                            "percentage": 20.0
+                        },
+                        {
+                            "pokemon_id": 222,
+                            "percentage": 7.5
+                        }
+                    ],
+                    "min_level": 21,
+                    "max_level": 25
+                }
+            ]
+        }
     },
     "tower_spots": {
         "spot_size": 24,
@@ -1572,5 +1615,7 @@
         "experience": 50
     },
     "localization_type": "default",
-    "custom_folder": ""
+    "custom_folder": "",
+    "day_night_mode": "random",
+    "base_weather": "random"
 }
