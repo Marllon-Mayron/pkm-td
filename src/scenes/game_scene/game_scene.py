@@ -505,6 +505,10 @@ class GameScene(BaseScene):
                     return True
                 return False
 
+        elif effect == "battle_stat_boost":
+            if target_type == "ally":
+                return self._apply_battle_item(target, item_data)
+
         # ===== PEDRA DE EVOLUÇÃO =====
         elif effect == "evolution":
             if target_type == "ally":
@@ -564,6 +568,87 @@ class GameScene(BaseScene):
 
 
         return False
+
+    def _apply_battle_item(self, pokemon, item_data):
+        """Aplica um item de batalha (X-Item) ao Pokémon alvo."""
+        from src.battle.effects.stat_modifier import StatType
+
+        effect_value = item_data.get("effect_value", {})
+        stat_key = effect_value.get("stat")
+        stages = effect_value.get("stages", 1)
+        duration = effect_value.get("duration", 15.0)
+
+        # Mapeia string para StatType
+        stat_map = {
+            "attack": StatType.ATTACK,
+            "defense": StatType.DEFENSE,
+            "sp_attack": StatType.SP_ATTACK,
+            "sp_defense": StatType.SP_DEFENSE,
+            "speed": StatType.SPEED,
+            "accuracy": StatType.ACCURACY,
+            "evasion": StatType.EVASION
+        }
+        stat_type = stat_map.get(stat_key)
+        if not stat_type:
+            print(f"[BATTLE_ITEM] Stat inválido: {stat_key}")
+            return False
+
+        # Verifica se já existe um buff de batalha ativo (qualquer stat)
+        battle_buff = self.battle_system.effect_manager.get_battle_item_buff(pokemon)
+        if battle_buff:
+            # Substitui: remove o antigo
+            old_stat = battle_buff["stat"]
+            # O modificador antigo será removido automaticamente quando expirar, mas vamos forçar remoção agora
+            self.battle_system.effect_manager.remove_battle_item_buff(pokemon)
+            # Conquista de substituição
+            if hasattr(self.player, 'achievement_manager'):
+                self.player.achievement_manager.increment_counter("battle_item_replace_count")
+                phase_id = f"{self.chapter_id}-{self.phase_number}"
+                self.player.achievement_manager.check_and_unlock("battle_item_replace", phase_id)
+            # Mensagem de substituição
+            self.battle_system.effect_manager.add_status_text(
+                pokemon,
+                f"Buff de batalha substituído!",
+                duration=1.5
+            )
+
+        # Aplica o novo buff via EffectManager, marcando como item de batalha
+        self.battle_system.effect_manager.add_stat_modifier(
+            pokemon,
+            stat_type,
+            stages,
+            duration,
+            is_battle_item=True
+        )
+
+        # Armazena o buff ativo no EffectManager
+        self.battle_system.effect_manager.set_battle_item_buff(pokemon, stat_type, duration)
+
+        # Feedback visual
+        stat_name_pt = {
+            StatType.ATTACK: "Ataque",
+            StatType.DEFENSE: "Defesa",
+            StatType.SP_ATTACK: "Ataque Especial",
+            StatType.SP_DEFENSE: "Defesa Especial",
+            StatType.SPEED: "Velocidade",
+            StatType.ACCURACY: "Precisão",
+            StatType.EVASION: "Evasão"
+        }.get(stat_type, stat_key)
+
+        self.battle_system.effect_manager.add_status_text(
+            pokemon,
+            f"{item_data['name']} usado! {stat_name_pt} +{stages} por {duration:.0f}s!",
+            duration=2.0
+        )
+
+        # Conquista de uso de item de batalha
+        if hasattr(self.player, 'achievement_manager'):
+            self.player.achievement_manager.increment_counter("battle_item_use_count")
+            phase_id = f"{self.chapter_id}-{self.phase_number}"
+            self.player.achievement_manager.check_and_unlock("battle_item_use_10", phase_id)
+
+        # Consome o item (retorna True)
+        return True
 
     def _use_evolution_stone(self, pokemon, item_data):
         """Usa pedra de evolução em um Pokémon"""

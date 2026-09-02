@@ -357,6 +357,28 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rarity=AchievementRarity.UNCOMMON,
         rewards={"gold": 600, "xp": 350}
     ),
+    # ===== CONQUISTAS DE ITENS DE BATALHA =====
+    "battle_item_use_10": Achievement(
+        id="battle_item_use_10",
+        title="Mestre dos Itens de Batalha",
+        description="Use 10 itens de batalha (X-Items) em seus Pokémon.",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 500, "xp": 250}
+    ),
+    "battle_item_replace": Achievement(
+        id="battle_item_replace",
+        title="Substituição Estratégica",
+        description="Use um item de batalha por cima de outro (substitua um buff ativo).",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 100, "xp": 50}
+    ),
+    "accuracy_buff_miss": Achievement(
+        id="accuracy_buff_miss",
+        title="Vai precisar aumentar a dose...",
+        description="Tenha X Accuracy ativa e erre um golpe.",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 300, "xp": 300, "items": {"x_accuracy": 3}}
+    ),
 }
 
 

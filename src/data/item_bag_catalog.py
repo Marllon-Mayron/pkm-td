@@ -103,6 +103,7 @@ class ItemBagCatalog:
         medicine_path = self.base_path / "medicine"
         evo_stones_path = self.base_path / "evo-stones"
         tm_hm_path = self.base_path / "tm-hm"
+        battle_items_path = self.base_path / "battle-item"
 
         # ===== POKÉBOLAS =====
         items["pokeball"] = {
@@ -386,7 +387,6 @@ class ItemBagCatalog:
             ("shinystone", "SHINYSTONE", "4-5"),
             ("dawnstone", "DAWNSTONE", "4-5")
         ]
-
         for stone_id, stone_name, unlock_phase in stones:
             items[stone_id] = {
                 "id": stone_id,
@@ -400,6 +400,34 @@ class ItemBagCatalog:
                 "effect_value": 0,
                 "price": 1200,
                 "unlock_phase": unlock_phase,
+                "unlock_chapter": None
+            }
+        # ===== ITENS DE BATALHA (X-ITEMS) =====
+        battle_items = [
+            ("x_accuracy", "X ACCURACY", "XACCURACY.png", "Precisão", "accuracy"),
+            ("x_attack", "X ATTACK", "XATTACK.png", "Ataque", "attack"),
+            ("x_defense", "X DEFENSE", "XDEFENSE.png", "Defesa", "defense"),
+            ("x_spatk", "X SPATK", "XSPATK.png", "Ataque Especial", "sp_attack"),
+            ("x_spdef", "X SPDEF", "XSPDEF.png", "Defesa Especial", "sp_defense"),
+            ("x_speed", "X SPEED", "XSPEED.png", "Velocidade", "speed"),
+        ]
+        for item_id, name, filename, stat_display, stat_key in battle_items:
+            items[item_id] = {
+                "id": item_id,
+                "name": name,
+                "sprite_path": battle_items_path / filename,
+                "description": f"Aumenta {stat_display} do Pokémon por 20 segundos.",
+                "category": "battle_item",
+                "usable_in_battle": True,
+                "usable_on_map": False,
+                "effect": "battle_stat_boost",
+                "effect_value": {
+                    "stat": stat_key,
+                    "stages": 1,
+                    "duration": 20.0,
+                },
+                "price": 500,
+                "unlock_phase": None,
                 "unlock_chapter": None
             }
 

@@ -380,6 +380,18 @@ class AchievementManager:
             if self.get_counter("move_taught_count") >= 10:
                 return self.unlock(achievement_id, phase_id)
 
+        # ===== ITENS DE BATALHA =====
+        elif achievement_id == "battle_item_use_10":
+            if self.get_counter("battle_item_use_count") >= 10:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "battle_item_replace":
+            if self.get_counter("battle_item_replace_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "accuracy_buff_miss":
+            if self.get_counter("accuracy_buff_miss_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
         return False
 
     def check_all_counters(self, phase_id: Optional[str] = None):
@@ -449,6 +461,11 @@ class AchievementManager:
             # ===== ENSINO DE MOVES =====
             "first_move_taught": ("move_taught_count", 1),
             "move_taught_10": ("move_taught_count", 10),
+
+            # ===== ITENS DE BATALHA =====
+            "battle_item_use_10": ("battle_item_use_count", 10),
+            "battle_item_replace": ("battle_item_replace_count", 1),
+            "accuracy_buff_miss": ("accuracy_buff_miss_count", 1),
         }
 
         if achievement_id in progress_map:

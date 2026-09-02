@@ -125,6 +125,7 @@ class TripleKickState:
                     f"O {hit_ordinal} chute errou!",
                     duration=1.0
                 )
+                self.battle_system.miss_hit_general(self.attacker)
 
                 # Toca som de erro
                 move_sound_manager.play_attack_sound("miss")

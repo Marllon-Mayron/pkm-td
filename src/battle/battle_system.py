@@ -634,6 +634,9 @@ class BattleSystem:
             print(f"[BATTLE] {move.name} errou!")
             self._show_miss_on_attacker(attacker)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+            self.miss_hit_general(attacker)
+
             return True
 
         # Toca som
@@ -657,6 +660,19 @@ class BattleSystem:
         attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
         return True
+
+    def miss_hit_general (self, attacker):
+        if hasattr(self, 'effect_manager') and self.effect_manager:
+            buff = self.effect_manager.get_battle_item_buff(attacker)
+            if buff and buff["stat"] == StatType.ACCURACY:
+                # Conquista: acertar um miss com X Accuracy ativo
+                if hasattr(self, 'game_scene') and self.game_scene:
+                    player = self.game_scene.player
+                    if hasattr(player, 'achievement_manager'):
+                        phase_id = f"{self.game_scene.chapter_id}-{self.game_scene.phase_number}"
+                        player.achievement_manager.increment_counter("accuracy_buff_miss_count")
+                        player.achievement_manager.check_and_unlock("accuracy_buff_miss", phase_id)
+                        print("[ACHIEVEMENT] Miss com X Accuracy ativo!")
 
     def _attempt_struggle(self, attacker: 'Pokemon', target: 'Pokemon', move) -> bool:
         """
@@ -1077,7 +1093,8 @@ class BattleSystem:
         """Limpa todos os efeitos (usado quando batalha termina)"""
         self.residual_effects.clear_all()
         self.effect_manager.clear_all()
-        self.battle_participants.clear()  # Limpa participantes também
+        self.effect_manager.clear_battle_item_buffs()
+        self.battle_participants.clear()
 
         # ===== LIMPA SCREENS =====
         if hasattr(self, 'active_screens'):

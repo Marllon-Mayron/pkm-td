@@ -30,6 +30,8 @@ class EffectManager:
         # Feedback visual (APENAS para efeitos temporários como "MISS", "Drenou", etc)
         self.status_texts: List[Tuple[int, str, float]] = []
 
+        self.battle_item_buffs: Dict[int, dict] = {}
+
         # Tempo para ticks de status (a cada 2 segundos)
         self.status_timer: float = 0.0
         self.STATUS_TICK_INTERVAL = 2.0
@@ -197,7 +199,8 @@ class EffectManager:
             del self._pokemon_refs[pokemon_id]
             print(f"[EFFECT] Pokémon {pokemon.name} removido do registro")
 
-    def add_stat_modifier(self, pokemon, stat_type: StatType, stages: int, duration: float = None):
+    def add_stat_modifier(self, pokemon, stat_type: StatType, stages: int, duration: float = None,
+                          is_battle_item: bool = False):
         """Adiciona um modificador de stat a um Pokémon"""
         pokemon_id = id(pokemon)
 
@@ -214,8 +217,7 @@ class EffectManager:
                 return False
 
         print(
-            f"[EFFECT] Aplicando modificador em {pokemon.name}: {stat_type} {stages:+d} (duração: {duration if duration else 'permanente'})")
-
+            f"[EFFECT] Aplicando modificador em {pokemon.name}: {stat_type} {stages:+d} (duração: {duration if duration else 'permanente'}, battle_item: {is_battle_item})")
 
         # Inicializa stage se necessário
         if pokemon_id not in self.stat_stages:
@@ -231,13 +233,15 @@ class EffectManager:
         if pokemon_id not in self.stat_modifiers:
             self.stat_modifiers[pokemon_id] = []
 
-        modifier = StatModifier(stat_type, stages, duration)
+        modifier = StatModifier(stat_type, stages, duration, is_battle_item=is_battle_item)
         self.stat_modifiers[pokemon_id].append(modifier)
 
         # ===== FORÇA ATUALIZAÇÃO DA VELOCIDADE IMEDIATAMENTE =====
         if stat_type == StatType.SPEED and hasattr(pokemon, 'update_move_speed_from_effects'):
             pokemon.update_move_speed_from_effects()
             print(f"[SPEED] Velocidade de {pokemon.name} atualizada imediatamente após aplicar modificador")
+
+        return True
 
     def _get_stat_name(self, stat_type: StatType) -> str:
         """Retorna o nome do stat em português (para uso interno)"""
@@ -281,6 +285,30 @@ class EffectManager:
 
         return {}
 
+    def set_battle_item_buff(self, pokemon, stat_type: StatType, duration: float):
+        """Registra um buff de batalha ativo para o Pokémon."""
+        import time
+        pokemon_id = id(pokemon)
+        self.battle_item_buffs[pokemon_id] = {
+            "stat": stat_type,
+            "expires": time.time() + duration
+        }
+
+    def get_battle_item_buff(self, pokemon) -> Optional[dict]:
+        """Retorna o buff de batalha ativo, se houver."""
+        pokemon_id = id(pokemon)
+        return self.battle_item_buffs.get(pokemon_id)
+
+    def remove_battle_item_buff(self, pokemon):
+        """Remove o buff de batalha ativo manualmente."""
+        pokemon_id = id(pokemon)
+        if pokemon_id in self.battle_item_buffs:
+            del self.battle_item_buffs[pokemon_id]
+
+    def clear_battle_item_buffs(self):
+        """Limpa todos os buffs de batalha (usado ao terminar batalha)."""
+        self.battle_item_buffs.clear()
+
     def update(self, dt: float):
         """Atualiza todos os efeitos - dt em segundos"""
 
@@ -306,6 +334,18 @@ class EffectManager:
                 # Se o estágio voltou a 0, remove o StatStage se não tiver outros modificadores
                 if new_stage == 0 and not any(s != 0 for s in self.stat_stages[pokemon_id].stages.values()):
                     del self.stat_stages[pokemon_id]
+
+            # ===== REMOVE DO DICIONÁRIO DE BUFFS DE BATALHA SE FOR UM =====
+            if modifier.is_battle_item and pokemon_id in self.battle_item_buffs:
+                # Verifica se o buff ainda é o mesmo stat (pode ter sido substituído manualmente)
+                buff = self.battle_item_buffs[pokemon_id]
+                if buff["stat"] == modifier.stat_type:
+                    del self.battle_item_buffs[pokemon_id]
+                    # Mensagem visual de expiração
+                    if pokemon_id in self._pokemon_refs:
+                        pokemon = self._pokemon_refs[pokemon_id]
+                        self.add_status_text(pokemon, f"O buff de batalha de {pokemon.name} acabou!", duration=1.5)
+                    print(f"[BATTLE_ITEM] Buff de {modifier.stat_type.value} expirou para Pokémon {pokemon_id}")
 
         # Atualiza velocidade
         self._update_speed_for_pokemon_ids(pokemon_to_update)

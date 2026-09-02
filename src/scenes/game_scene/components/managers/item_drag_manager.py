@@ -155,6 +155,9 @@ class ItemDragManager:
         elif self.drag_item_data["category"] == "tm":
             self._check_tm_target(allied_pokemon, screen_pos, camera)
 
+        elif self.drag_item_data["category"] == "battle_item":
+            self._check_battle_item_target(allied_pokemon, screen_pos, camera)
+
         # ===== LIMPA MENSAGEM DE ERRO SE O ALVO MUDOU =====
         # Se não tem alvo hovered OU o alvo mudou, limpa a mensagem de erro
         if self.hovered_target is None:
@@ -258,6 +261,19 @@ class ItemDragManager:
                     self.error_message_target = None
                 break
 
+    def _check_battle_item_target(self, allies, screen_pos, camera):
+        """Verifica alvo para itens de batalha (aliados)"""
+        for ally in allies:
+            if self._is_target_valid(ally, screen_pos, camera):
+                self.hovered_target = ally
+                self.target_type = "ally"
+                self.valid_target = True
+                if self.error_message_target == ally:
+                    self.error_message = None
+                    self.error_message_timer = 0
+                    self.error_message_target = None
+                break
+
     def _is_target_valid(self, target, screen_pos, camera, tolerance=50):
         """Verifica se um alvo é válido baseado na posição do mouse"""
         target_x, target_y = self.game.screen_manager.world_to_screen(
@@ -298,6 +314,9 @@ class ItemDragManager:
 
             # TMs em aliados (já validado no update)
             elif self.drag_item_data["category"] == "tm" and self.target_type == "ally":
+                valid_use = True
+
+            elif self.drag_item_data["category"] == "battle_item" and self.target_type == "ally":
                 valid_use = True
 
             if valid_use:
@@ -612,6 +631,14 @@ class ItemDragManager:
                     "ESC para cancelar"
                 ]
                 color = (255, 255, 255)
+
+        elif self.drag_item_data["category"] == "battle_item":
+            instructions = [
+                f"{self.drag_item_data['name']} - Arraste até um Pokémon aliado",
+                "Clique DIREITO para soltar",
+                "ESC para cancelar"
+            ]
+            color = (255, 200, 100)
         else:
             instructions = ["Arraste o item", "Clique DIREITO para soltar", "ESC para cancelar"]
             color = (255, 255, 255)
