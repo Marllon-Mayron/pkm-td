@@ -165,9 +165,8 @@ class SaveManager:
                 "is_placed": getattr(pokemon, 'is_placed', False),
                 "spot_id": getattr(pokemon, 'spot_id', None),
                 "moves": moves_data,
-                # NOVOS CAMPOS para Ditto transformado (preservar nome/felicidade do Ditto original)
                 "custom_name": getattr(pokemon, 'custom_name', None),
-                "happiness": getattr(pokemon, 'happiness', 50),
+                "happiness": getattr(pokemon, 'happiness', 0),
             }
 
             return pokemon_dict
@@ -206,7 +205,6 @@ class SaveManager:
             "weight_kg": pokemon.weight_kg,
             "height_m": pokemon.height_m,
             "gender": pokemon.gender,
-            # NOVOS CAMPOS
             "custom_name": pokemon.custom_name,
             "happiness": pokemon.happiness,
         }
@@ -241,11 +239,9 @@ class SaveManager:
         pokemon.weight_kg = data.get("weight_kg", 10.0)
         pokemon.height_m = data.get("height_m", 1.0)
         pokemon.gender = data.get("gender")
-
-        # ===== NOVOS CAMPOS COM FALLBACK PARA SAVES ANTIGOS =====
-        pokemon.custom_name = data.get("custom_name")  # None se não existir
-        pokemon.happiness = data.get("happiness", 50)  # 50 se não existir
-        pokemon.happiness = max(0, min(100, pokemon.happiness))  # Garante limites
+        pokemon.custom_name = data.get("custom_name")
+        pokemon.happiness = data.get("happiness", 0)
+        pokemon.happiness = max(0, min(255, pokemon.happiness))
 
         # Restaura os moves
         moves_data = data.get("moves", [])
@@ -625,14 +621,14 @@ class SaveManager:
                 if "custom_name" not in pokemon_data:
                     pokemon_data["custom_name"] = None
                 if "happiness" not in pokemon_data:
-                    pokemon_data["happiness"] = 50
+                    pokemon_data["happiness"] = 0
 
             team = migrated.get("player", {}).get("team", [])
             for idx, pokemon_data in enumerate(team):
                 if "custom_name" not in pokemon_data:
                     pokemon_data["custom_name"] = None
                 if "happiness" not in pokemon_data:
-                    pokemon_data["happiness"] = 50
+                    pokemon_data["happiness"] = 0
 
             migrated["meta"]["version"] = "0.1.3"
             version = "0.1.3"

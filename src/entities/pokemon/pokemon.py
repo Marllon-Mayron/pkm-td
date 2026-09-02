@@ -770,13 +770,6 @@ class Pokemon(Entity):
         gained = self.happiness - old_happiness
 
         if gained != 0:
-            if hasattr(self, 'effect_manager') and self.effect_manager:
-                if gained > 0:
-                    self.effect_manager.add_status_text(self, f"Felicidade +{gained}!", duration=1.5,
-                                                        color=(255, 100, 100))
-                else:
-                    self.effect_manager.add_status_text(self, f"Felicidade {gained}!", duration=1.5,
-                                                        color=(100, 100, 255))
 
             # ===== VERIFICA EVOLUÇÃO POR FELICIDADE =====
             self._check_happiness_evolution()
@@ -1451,7 +1444,7 @@ class Pokemon(Entity):
             # ===== LIMPA TODOS OS STATUS EFFECTS =====
             self.clear_all_status()
 
-            self.add_happiness(-20, "Derrotado")
+            self.add_happiness(-15, "Derrotado")
 
             # ===== CANCELA QUALQUER CARGA DE GOLPE =====
             if hasattr(self, 'battle_system') and self.battle_system:

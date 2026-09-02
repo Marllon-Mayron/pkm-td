@@ -579,7 +579,7 @@ class GameScene(BaseScene):
             new_move = Move(move_name, move_info)
             pokemon.moves.append(new_move)
             print(f"[TM] {pokemon.name} aprendeu {move_name} via TM!")
-
+            pokemon.add_happiness(5, f"Usou {item_data.get('name', 'Aprendeu um move')}")
             # ===== CONQUISTAS: Ensino de Moves =====
             phase_id = f"{self.chapter_id}-{self.phase_number}"
             if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
@@ -596,7 +596,7 @@ class GameScene(BaseScene):
             "move_name": move_name,
             "move_info": move_info
         }
-
+        pokemon.add_happiness(5, f"Usou {item_data.get('name', 'Aprendeu um move')}")
         self.open_move_learn_overlay(pokemon, move_name)
         return True
 
@@ -701,7 +701,7 @@ class GameScene(BaseScene):
             revive_percentage = item_data.get("effect_value", 0.5)
             toast_battle(f"{pokemon.name} foi revivido!", duration=4.0, pokemon=pokemon, portrait="happy")
 
-            pokemon.add_happiness(2, f"Usou {item_data.get('name', 'Revive')}")
+            pokemon.add_happiness(5, f"Usou {item_data.get('name', 'Revive')}")
 
             pokemon.revive(heal_percentage=revive_percentage)
 
@@ -739,7 +739,7 @@ class GameScene(BaseScene):
         if heal_amount == -1:
             pokemon.heal()
             toast_battle(f"{pokemon.name} foi completamente curado!", duration=4.0, pokemon=pokemon, portrait="happy")
-            pokemon.add_happiness(2, f"Usou {item_data.get('name', 'medicina')}")
+            pokemon.add_happiness(3, f"Usou {item_data.get('name', 'medicina')}")
             # ===== CONQUISTAS: Cura =====
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
@@ -759,7 +759,7 @@ class GameScene(BaseScene):
             healed = pokemon.current_hp - old_hp
             toast_battle(f"{pokemon.name} recuperou {healed} HP! ({pokemon.current_hp}/{pokemon.max_hp})",
                          duration=4.0, pokemon=pokemon, portrait="happy")
-            pokemon.add_happiness(2, f"Usou {item_data.get('name', 'medicina')}")
+            pokemon.add_happiness(3, f"Usou {item_data.get('name', 'medicina')}")
             # ===== CONQUISTAS: Cura =====
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
