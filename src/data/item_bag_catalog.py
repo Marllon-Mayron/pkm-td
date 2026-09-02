@@ -315,7 +315,7 @@ class ItemBagCatalog:
             "effect": "level_up",
             "effect_value": 1,
             "price": 4800,
-            "unlock_phase": None,
+            "unlock_phase": "999-999",
             "unlock_chapter": None
         }
         # ===== REVIVES =====
@@ -427,7 +427,7 @@ class ItemBagCatalog:
                     "duration": 20.0,
                 },
                 "price": 500,
-                "unlock_phase": None,
+                "unlock_phase": 1-5,
                 "unlock_chapter": None
             }
 

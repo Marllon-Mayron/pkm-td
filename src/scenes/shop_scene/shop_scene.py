@@ -320,30 +320,68 @@ class InventoryItemCard:
 
 
 class CategorySelector:
-    """Seletor de categorias clean"""
+    """Seletor de categorias com paginação (setas < >)"""
 
     def __init__(self, x, y, width):
         self.rect = pygame.Rect(x, y, width, 35)
         self.categories = [
             ("all", "Todos"),
-            ("pokeball", "Pokeballs"),
+            ("pokeball", "Pokébolas"),
             ("medicine", "Medicina"),
+            ("battle_item", "Batalha"),
             ("tm", "TMs/HMs"),
             ("items", "Itens"),
         ]
+        self.categories_per_page = 3
+        self.current_page = 0
+        self.total_pages = (len(self.categories) + self.categories_per_page - 1) // self.categories_per_page
+
         self.selected = "all"
-        self.buttons = []
         self.hovered_button = None
 
-        # Calcula largura dos botões
-        btn_width = (width - 20) // len(self.categories)
-        for i, (cat_id, cat_name) in enumerate(self.categories):
-            btn_x = x + 10 + i * btn_width
+        # Atributo para compatibilidade com o código existente
+        self.buttons = []  # será preenchido em _update_buttons
+
+        # Botões de navegação
+        self.left_arrow_rect = None
+        self.right_arrow_rect = None
+        self.page_label_rect = None
+
+        self._update_buttons()
+
+    def _update_buttons(self):
+        """Atualiza a lista de botões com base na página atual"""
+        self.buttons = []  # limpa
+
+        start_idx = self.current_page * self.categories_per_page
+        end_idx = min(start_idx + self.categories_per_page, len(self.categories))
+        page_categories = self.categories[start_idx:end_idx]
+
+        # Largura disponível para as categorias (descontando margens e espaço para setas)
+        margin = 10
+        arrows_space = 60
+        available_width = self.rect.width - margin * 2 - arrows_space
+        btn_width = (available_width - (len(page_categories) - 1) * 5) // len(page_categories) if page_categories else 0
+        btn_width = max(60, btn_width)
+
+        x = self.rect.x + margin
+        y = self.rect.y + 5
+        height = self.rect.height - 10
+
+        for cat_id, cat_name in page_categories:
+            btn_rect = pygame.Rect(x, y, btn_width, height)
             self.buttons.append({
                 "id": cat_id,
                 "name": cat_name,
-                "rect": pygame.Rect(btn_x, y + 5, btn_width - 5, 25)
+                "rect": btn_rect
             })
+            x += btn_width + 5
+
+        # Setas e indicador de página
+        arrows_x = self.rect.x + self.rect.width - arrows_space - 5
+        self.left_arrow_rect = pygame.Rect(arrows_x, y, 20, height)
+        self.page_label_rect = pygame.Rect(arrows_x + 22, y, 20, height)
+        self.right_arrow_rect = pygame.Rect(arrows_x + 44, y, 20, height)
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
@@ -355,19 +393,34 @@ class CategorySelector:
             return None
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Clique em categorias
             for btn in self.buttons:
                 if btn["rect"].collidepoint(event.pos):
                     if self.selected != btn["id"]:
                         self.selected = btn["id"]
                         return self.selected
+
+            # Clique nas setas
+            if self.left_arrow_rect and self.left_arrow_rect.collidepoint(event.pos):
+                if self.current_page > 0:
+                    self.current_page -= 1
+                    self._update_buttons()
+                    return "page_changed"
+
+            if self.right_arrow_rect and self.right_arrow_rect.collidepoint(event.pos):
+                if self.current_page < self.total_pages - 1:
+                    self.current_page += 1
+                    self._update_buttons()
+                    return "page_changed"
+
         return None
 
     def render(self, screen, fonts):
+        # Desenha os botões de categoria
         for btn in self.buttons:
             selected = (btn["id"] == self.selected)
             hovered = (btn["id"] == self.hovered_button)
 
-            # Determina cores - clean
             if selected:
                 bg_color = (60, 100, 140, 200)
                 text_color = (255, 255, 255)
@@ -378,17 +431,38 @@ class CategorySelector:
                 bg_color = (30, 35, 45, 150)
                 text_color = (180, 190, 210)
 
-            # Fundo
             pygame.draw.rect(screen, bg_color, btn["rect"], border_radius=4)
-
-            # Borda sutil
             pygame.draw.rect(screen, (80, 90, 110), btn["rect"], 1, border_radius=4)
 
-            # Texto
             text = fonts['small'].render(btn["name"], True, text_color)
             text_x = btn["rect"].x + (btn["rect"].width - text.get_width()) // 2
             text_y = btn["rect"].y + (btn["rect"].height - text.get_height()) // 2
             screen.blit(text, (text_x, text_y))
+
+        # Desenha setas e página (se houver mais de uma página)
+        if self.total_pages > 1:
+            # Seta esquerda
+            left_color = (150, 150, 150) if self.current_page > 0 else (80, 80, 80)
+            left_points = [
+                (self.left_arrow_rect.x + 5, self.left_arrow_rect.centery),
+                (self.left_arrow_rect.x + 12, self.left_arrow_rect.y + 5),
+                (self.left_arrow_rect.x + 12, self.left_arrow_rect.y + self.left_arrow_rect.height - 5)
+            ]
+            pygame.draw.polygon(screen, left_color, left_points)
+
+            # Seta direita
+            right_color = (150, 150, 150) if self.current_page < self.total_pages - 1 else (80, 80, 80)
+            right_points = [
+                (self.right_arrow_rect.x + self.right_arrow_rect.width - 5, self.right_arrow_rect.centery),
+                (self.right_arrow_rect.x + self.right_arrow_rect.width - 12, self.right_arrow_rect.y + 5),
+                (self.right_arrow_rect.x + self.right_arrow_rect.width - 12, self.right_arrow_rect.y + self.right_arrow_rect.height - 5)
+            ]
+            pygame.draw.polygon(screen, right_color, right_points)
+
+            # Número da página
+            page_text = fonts['small'].render(f"{self.current_page + 1}/{self.total_pages}", True, (180, 180, 200))
+            page_rect = page_text.get_rect(center=self.page_label_rect.center)
+            screen.blit(page_text, page_rect)
 
 
 class QuantitySelector:

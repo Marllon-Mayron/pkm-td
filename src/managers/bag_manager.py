@@ -21,8 +21,8 @@ class BagManager:
         # Lista de itens para navegação
         self.filtered_items = []
 
-        # Ordem das categorias (mantém consistência)
-        self.categories_order = ["all", "pokeball", "medicine", "items"]
+        # Ordem das categorias
+        self.categories_order = ["all", "pokeball", "medicine", "battle_item", "tm", "items"]
 
         # Garante que o pygame está inicializado
         self._ensure_pygame()
