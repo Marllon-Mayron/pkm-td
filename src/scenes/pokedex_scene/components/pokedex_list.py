@@ -185,6 +185,9 @@ class PokedexList:
         elif filter_type == "seen":
             filtered = [item for item in filtered if item.is_seen]
             print(f"[POKEDEX_LIST] Filtro VISTOS: {len(filtered)} itens")
+        elif filter_type == "not_caught":
+            filtered = [item for item in filtered if item.is_seen and not item.is_caught]
+            print(f"[POKEDEX_LIST] Filtro VISTOS NÃO CAPTURADOS: {len(filtered)} itens")
         elif filter_type == "unseen":
             filtered = [item for item in filtered if not item.is_seen and not item.is_caught]
             print(f"[POKEDEX_LIST] Filtro NÃO VISTOS: {len(filtered)} itens")

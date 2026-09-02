@@ -61,6 +61,7 @@ FILTERS = {
     'CAUGHT': 'caught',
     'SEEN': 'seen',
     'UNSEEN': 'unseen',
+    'NOT_CAUGHT': 'not_caught',
 }
 
 # Tamanhos

@@ -89,8 +89,8 @@ class PokedexScene(BaseScene):
 
         # ===== FILTERS =====
         filter_y = search_y + search_height + gap
-        filter_spacing = 8
-        filter_width = 115
+        filter_spacing = 12
+        filter_width = 150
         filter_height = 30
         filter_start_x = vx + padding
 
@@ -99,6 +99,7 @@ class PokedexScene(BaseScene):
             (FILTERS['ALL'], "TODOS"),
             (FILTERS['CAUGHT'], "CAPTURADOS"),
             (FILTERS['SEEN'], "VISTOS"),
+            (FILTERS['NOT_CAUGHT'], "NÃO CAPTURADOS"),
             (FILTERS['UNSEEN'], "NÃO VISTOS")
         ]
 
