@@ -662,7 +662,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 120,
-                        "percentage": 100
+                        "percentage": 100.0
                     }
                 ],
                 "min_level": 18,
@@ -671,7 +671,10 @@
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             },
             {
                 "wave_index": 1,
@@ -681,19 +684,25 @@
                 "enemies": [
                     {
                         "pokemon_id": 121,
-                        "percentage": 100
+                        "percentage": 100.0
                     }
                 ],
                 "min_level": 22,
-                "max_level": 19,
+                "max_level": 25,
                 "wave_size": 1,
                 "spawn_interval": 3.0,
                 "initial_delay": 15.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             }
         ],
-        "selected_wave": 1
+        "selected_wave": 1,
+        "templates": {
+            "templates": []
+        }
     },
     "tower_spots": {
         "spot_size": 24,
@@ -746,5 +755,7 @@
         "experience": 0
     },
     "localization_type": "default",
-    "custom_folder": ""
+    "custom_folder": "",
+    "day_night_mode": "random",
+    "base_weather": "random"
 }

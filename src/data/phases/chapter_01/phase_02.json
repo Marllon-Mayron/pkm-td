@@ -1550,7 +1550,19 @@
                         "enemies": [
                             {
                                 "pokemon_id": 163,
-                                "percentage": 100.0
+                                "percentage": 40.0
+                            },
+                            {
+                                "pokemon_id": 10,
+                                "percentage": 20.0
+                            },
+                            {
+                                "pokemon_id": 13,
+                                "percentage": 20.0
+                            },
+                            {
+                                "pokemon_id": 206,
+                                "percentage": 20.0
                             }
                         ],
                         "min_level": 4,

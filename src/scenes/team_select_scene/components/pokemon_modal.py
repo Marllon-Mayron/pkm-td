@@ -1161,21 +1161,22 @@ class PokemonModal:
         screen.blit(category_text, (right_card.x + 80, right_y + 26))
         right_y += right_line_spacing
 
-        # ===== FELICIDADE =====
+        # ===== FELICIDADE (ALTERADO PARA 255) =====
         label_text = label_font.render("FELICIDADE", True, self.colors['text_secondary'])
         screen.blit(label_text, (right_card.x + 20, right_y))
 
         happiness = self.pokemon.get_happiness()
-        happiness_text = f"{happiness} / 100"
+        MAX_HAPPINESS = 255  # Valor máximo original dos jogos
+        happiness_text = f"{happiness} / {MAX_HAPPINESS}"
 
-        # Determina a cor baseada na felicidade
-        if happiness >= 80:
+        # Determina a cor baseada na felicidade (escala de 0-255)
+        if happiness >= 200:
             happiness_color = (255, 215, 0)  # Dourado
-        elif happiness >= 60:
+        elif happiness >= 150:
             happiness_color = (100, 220, 100)  # Verde
-        elif happiness >= 40:
+        elif happiness >= 100:
             happiness_color = (255, 220, 100)  # Amarelo
-        elif happiness >= 20:
+        elif happiness >= 50:
             happiness_color = (255, 150, 100)  # Laranja
         else:
             happiness_color = (255, 100, 100)  # Vermelho
@@ -1184,7 +1185,7 @@ class PokemonModal:
         value_text = value_font.render(happiness_text, True, happiness_color)
         screen.blit(value_text, (right_card.x + 20 + 110, right_y + 2))
 
-        # Barra de felicidade
+        # Barra de felicidade (escala de 0-255)
         bar_width = right_card.width - 40
         bar_height = 12
         bar_x = right_card.x + 20
@@ -1193,17 +1194,18 @@ class PokemonModal:
         # Fundo da barra
         pygame.draw.rect(screen, (45, 48, 55), (bar_x, bar_y, bar_width, bar_height), border_radius=6)
 
-        # Calcula largura da barra de felicidade
-        happiness_width = int(bar_width * (happiness / 100))
+        # Calcula largura da barra de felicidade (baseado em 255)
+        happiness_width = int(bar_width * (happiness / MAX_HAPPINESS))
 
-        # Gradiente da barra (vermelho -> amarelo -> verde)
+        # Gradiente da barra (vermelho -> amarelo -> verde) baseado em 255
         if happiness_width > 0:
-            if happiness <= 50:
+            percent = happiness / MAX_HAPPINESS  # 0.0 a 1.0
+            if percent <= 0.5:
                 r = 255
-                g = int(255 * (happiness / 50))
+                g = int(255 * (percent / 0.5))
                 b = 0
             else:
-                r = int(255 * (1 - ((happiness - 50) / 50)))
+                r = int(255 * (1 - ((percent - 0.5) / 0.5)))
                 g = 255
                 b = 0
 
@@ -1213,14 +1215,14 @@ class PokemonModal:
         # Borda da barra
         pygame.draw.rect(screen, self.colors['border_light'], (bar_x, bar_y, bar_width, bar_height), 2, border_radius=6)
 
-        # Nível de felicidade em texto (SEM EMOJIS)
-        if happiness >= 80:
+        # Nível de felicidade em texto (baseado em 255)
+        if happiness >= 200:
             level_text = "Muito feliz!"
-        elif happiness >= 60:
+        elif happiness >= 150:
             level_text = "Feliz"
-        elif happiness >= 40:
+        elif happiness >= 100:
             level_text = "Normal"
-        elif happiness >= 20:
+        elif happiness >= 50:
             level_text = "Triste"
         else:
             level_text = "Muito triste!"

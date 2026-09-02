@@ -747,23 +747,51 @@
                 "enemies": [
                     {
                         "pokemon_id": 10,
-                        "percentage": 50
+                        "percentage": 50.0
                     },
                     {
                         "pokemon_id": 13,
-                        "percentage": 50
+                        "percentage": 50.0
                     }
                 ],
                 "min_level": 2,
                 "max_level": 5,
                 "wave_size": 6,
                 "spawn_interval": 3.0,
-                "initial_delay": 2.0,
+                "initial_delay": 3.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": "template_2365",
+                "use_variants": false,
+                "variants": []
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 0,
+        "templates": {
+            "templates": [
+                {
+                    "template_id": "template_2365",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 10,
+                            "percentage": 50.0
+                        },
+                        {
+                            "pokemon_id": 13,
+                            "percentage": 50.0
+                        }
+                    ],
+                    "min_level": 2,
+                    "max_level": 5,
+                    "wave_size": 6,
+                    "spawn_interval": 3.0,
+                    "initial_delay": 3.0,
+                    "repeat_wave": false,
+                    "repeat_count": 1
+                }
+            ]
+        }
     },
     "tower_spots": {
         "spot_size": 24,
@@ -839,8 +867,16 @@
             }
         ]
     },
+    "events": {
+        "triggers": [],
+        "selected_trigger": 0
+    },
     "rewards": {
         "money": 200,
         "experience": 10
-    }
+    },
+    "localization_type": "default",
+    "custom_folder": "",
+    "day_night_mode": "random",
+    "base_weather": "random"
 }

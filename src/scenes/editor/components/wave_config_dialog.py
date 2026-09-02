@@ -641,22 +641,27 @@ class WaveConfigDialog:
             return True
 
         # ===== SELETOR DE TEMPLATE =====
-        # Clique no seletor de template
         if self.template_selector_rect.collidepoint(mouse_x, mouse_y):
             self.template_combo_open = not self.template_combo_open
             return True
 
-        # Clique no botão "Limpar"
         if self.clear_template_rect.collidepoint(mouse_x, mouse_y):
             wave.template_id = None
             wave.enemies = []
             wave.use_variants = False
             wave.variants = []
+            # Reset configurações da wave para padrão
+            wave.min_level = 1
+            wave.max_level = 5
+            wave.wave_size = 6
+            wave.spawn_interval = 3.0
+            wave.initial_delay = 2.0
+            wave.repeat_wave = False
+            wave.repeat_count = 1
             self.template_combo_open = False
             self._check_total_percentage(wave)
             return True
 
-        # Clique no dropdown de templates
         if self.template_combo_open:
             list_rect = self._get_template_dropdown_rect()
             templates = WaveTemplateManager.get_all_templates()
@@ -666,29 +671,12 @@ class WaveConfigDialog:
                 index = int(relative_y // 28)
                 if 0 <= index < len(templates):
                     template = templates[index]
-
-                    # ===== APLICA O TEMPLATE NA WAVE =====
-                    wave.template_id = template.template_id
-
-                    # Limpa enemies e variants antigos
-                    wave.enemies = []
-                    wave.use_variants = False
-                    wave.variants = []
-
-                    # Copia os inimigos do template
-                    for enemy in template.enemies:
-                        wave.enemies.append(WaveEnemy(enemy.pokemon_id, enemy.percentage))
-
-                    # Copia os níveis
-                    wave.min_level = template.min_level
-                    wave.max_level = template.max_level
-
-                    # Fecha o dropdown
+                    # Aplica TODAS as configurações do template
+                    template.apply_to_wave(wave)
                     self.template_combo_open = False
                     self._check_total_percentage(wave)
                     return True
 
-            # Clicou fora do dropdown
             if not self.template_selector_rect.collidepoint(mouse_x, mouse_y):
                 self.template_combo_open = False
                 return True
@@ -697,6 +685,7 @@ class WaveConfigDialog:
         if wave.template_id:
             return True
 
+        # ===== BOTÕES DE EDIÇÃO =====
         if self.add_enemy_button.collidepoint(mouse_x, mouse_y):
             if len(wave.enemies) < 12:
                 first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
@@ -715,10 +704,19 @@ class WaveConfigDialog:
 
         if self.clear_enemies_button.collidepoint(mouse_x, mouse_y):
             wave.enemies.clear()
-            wave.template_id = None  # Também limpa o template
+            wave.template_id = None
+            # Reset configurações da wave para padrão
+            wave.min_level = 1
+            wave.max_level = 5
+            wave.wave_size = 6
+            wave.spawn_interval = 3.0
+            wave.initial_delay = 2.0
+            wave.repeat_wave = False
+            wave.repeat_count = 1
             self.input_errors.pop("total", None)
             return True
 
+        # ===== CLIQUE NA LISTA DE INIMIGOS =====
         if self.enemies_list_area.collidepoint(mouse_x, mouse_y):
             relative_y = mouse_y - self.enemies_list_area.y
             item_index = (relative_y // self.enemy_item_height) + self.enemies_scroll
@@ -729,7 +727,6 @@ class WaveConfigDialog:
                 remove_rect = pygame.Rect(self.enemies_list_area.right - 28, item_y + 4, 18, 18)
                 if remove_rect.collidepoint(mouse_x, mouse_y):
                     del wave.enemies[item_index]
-                    # Se não tiver mais inimigos, limpa o template
                     if not wave.enemies:
                         wave.template_id = None
                     self._check_total_percentage(wave)
@@ -749,6 +746,42 @@ class WaveConfigDialog:
                     self.active_input = f"percent_{item_index}"
                     self.input_texts[self.active_input] = f"{enemy.percentage:.1f}"
                     return True
+
+        # ===== CLIQUE NOS CAMPOS DE CONFIGURAÇÃO DA WAVE =====
+        if hasattr(self, 'wave_size_rect') and self.wave_size_rect.collidepoint(mouse_x, mouse_y):
+            self.active_input = "wave_size"
+            self.input_texts["wave_size"] = str(wave.wave_size)
+            return True
+
+        if hasattr(self, 'wave_min_level_rect') and self.wave_min_level_rect.collidepoint(mouse_x, mouse_y):
+            self.active_input = "wave_min_level"
+            self.input_texts["wave_min_level"] = str(wave.min_level)
+            return True
+
+        if hasattr(self, 'wave_max_level_rect') and self.wave_max_level_rect.collidepoint(mouse_x, mouse_y):
+            self.active_input = "wave_max_level"
+            self.input_texts["wave_max_level"] = str(wave.max_level)
+            return True
+
+        if hasattr(self, 'wave_interval_rect') and self.wave_interval_rect.collidepoint(mouse_x, mouse_y):
+            self.active_input = "wave_interval"
+            self.input_texts["wave_interval"] = f"{wave.spawn_interval:.1f}"
+            return True
+
+        if hasattr(self, 'wave_delay_rect') and self.wave_delay_rect.collidepoint(mouse_x, mouse_y):
+            self.active_input = "wave_delay"
+            self.input_texts["wave_delay"] = f"{wave.initial_delay:.1f}"
+            return True
+
+        if hasattr(self, 'wave_repeat_rect') and self.wave_repeat_rect.collidepoint(mouse_x, mouse_y):
+            wave.repeat_wave = not wave.repeat_wave
+            return True
+
+        if hasattr(self, 'wave_repeat_count_rect') and self.wave_repeat_count_rect.collidepoint(mouse_x, mouse_y):
+            self.active_input = "wave_repeat_count"
+            self.input_texts["wave_repeat_count"] = str(wave.repeat_count)
+            return True
+
         return True
 
     def _handle_variants_tab_click(self, mouse_x, mouse_y):
@@ -802,20 +835,43 @@ class WaveConfigDialog:
         return True
 
     def _handle_templates_tab_click(self, mouse_x, mouse_y):
+        # ===== BOTÃO NOVO TEMPLATE =====
         if self.new_template_button.collidepoint(mouse_x, mouse_y):
             wave = self.wave_manager.get_current_wave()
             if wave and wave.enemies:
                 template_id = f"template_{random.randint(1000, 9999)}"
                 template = WaveTemplate(template_id, f"Template {len(WaveTemplateManager.get_all_templates()) + 1}")
+                # Copia TODAS as configurações da wave atual
                 template.enemies = [WaveEnemy(e.pokemon_id, e.percentage) for e in wave.enemies]
                 template.min_level = wave.min_level
                 template.max_level = wave.max_level
+                template.wave_size = wave.wave_size
+                template.spawn_interval = wave.spawn_interval
+                template.initial_delay = wave.initial_delay
+                template.repeat_wave = wave.repeat_wave
+                template.repeat_count = wave.repeat_count
+                WaveTemplateManager.add_template(template)
+                self._update_template_options()
+                self._sync_template_dropdown()
+                self.template_selected_index = len(WaveTemplateManager.get_all_templates())
+            elif wave and not wave.enemies:
+                # Cria template vazio com configurações padrão
+                template_id = f"template_{random.randint(1000, 9999)}"
+                template = WaveTemplate(template_id, f"Template {len(WaveTemplateManager.get_all_templates()) + 1}")
+                template.min_level = wave.min_level if wave else 1
+                template.max_level = wave.max_level if wave else 5
+                template.wave_size = wave.wave_size if wave else 6
+                template.spawn_interval = wave.spawn_interval if wave else 3.0
+                template.initial_delay = wave.initial_delay if wave else 2.0
+                template.repeat_wave = wave.repeat_wave if wave else False
+                template.repeat_count = wave.repeat_count if wave else 1
                 WaveTemplateManager.add_template(template)
                 self._update_template_options()
                 self._sync_template_dropdown()
                 self.template_selected_index = len(WaveTemplateManager.get_all_templates())
             return True
 
+        # ===== BOTÃO REMOVER TEMPLATE =====
         if self.delete_template_button.collidepoint(mouse_x, mouse_y):
             if self.template_selected_index > 0:
                 templates = WaveTemplateManager.get_all_templates()
@@ -827,12 +883,14 @@ class WaveConfigDialog:
                     self._sync_template_dropdown()
             return True
 
+        # ===== BOTÃO EDITAR TEMPLATE =====
         if self.edit_template_button.collidepoint(mouse_x, mouse_y):
             if self.template_selected_index > 0:
                 self.template_editor_open = True
-                self.template_editor_scroll = 0  # RESETA O SCROLL AO ABRIR O EDITOR
+                self.template_editor_scroll = 0
             return True
 
+        # ===== CLIQUE NA LISTA DE TEMPLATES =====
         if self.templates_list_area.collidepoint(mouse_x, mouse_y):
             relative_y = mouse_y - self.templates_list_area.y
             item_index = (relative_y // self.template_item_height) + self.templates_scroll
@@ -841,9 +899,13 @@ class WaveConfigDialog:
                 self.template_selected_index = item_index + 1
                 wave = self.wave_manager.get_current_wave()
                 if wave:
-                    wave.template_id = templates[item_index].template_id
+                    # Aplica TODAS as configurações do template à wave atual
+                    template = templates[item_index]
+                    template.apply_to_wave(wave)
+                    self._check_total_percentage(wave)
                 self._sync_template_dropdown()
                 return True
+
         return True
 
     # --- Editor de Variant ---
@@ -1310,7 +1372,7 @@ class WaveConfigDialog:
         )
 
         # Retângulo da lista para cálculos de scroll
-        list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
+        list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 120)
         ITEM_HEIGHT = 32
         total_items = len(template.enemies)
         visible_items = list_rect.height // ITEM_HEIGHT
@@ -1332,7 +1394,7 @@ class WaveConfigDialog:
                 return True
 
             # Nome
-            name_rect = pygame.Rect(editor_rect.x + 140, editor_rect.y + 15, 200, 26)
+            name_rect = pygame.Rect(editor_rect.x + 140, editor_rect.y + 50, 200, 26)
             if name_rect.collidepoint(mouse_x, mouse_y):
                 self.active_input = "template_name"
                 self.input_texts["template_name"] = template.name
@@ -1344,7 +1406,6 @@ class WaveConfigDialog:
                 if len(template.enemies) < self.num_max_wave:
                     first_id = self.available_pokemon_ids[0] if self.available_pokemon_ids else 1
                     template.enemies.append(WaveEnemy(first_id, 0.0))
-                    # Ajusta scroll para mostrar o novo item
                     self.template_editor_scroll = max(0, len(template.enemies) - visible_items)
                 return True
 
@@ -1363,8 +1424,18 @@ class WaveConfigDialog:
             # ===== BOTÃO LIMPAR =====
             clear_rect = pygame.Rect(editor_rect.x + 270, editor_rect.y + 88, 95, 26)
             if clear_rect.collidepoint(mouse_x, mouse_y):
+                # LIMPA TUDO - inimigos E configurações
                 template.enemies.clear()
+                template.min_level = 1
+                template.max_level = 5
+                template.wave_size = 6
+                template.spawn_interval = 3.0
+                template.initial_delay = 2.0
+                template.repeat_wave = False
+                template.repeat_count = 1
                 self.template_editor_scroll = 0
+                # Fecha o editor após limpar
+                self.template_editor_open = False
                 return True
 
             # ===== CLIQUE NA BARRA DE ROLAGEM =====
@@ -1383,23 +1454,19 @@ class WaveConfigDialog:
 
             # ===== CLIQUE NA LISTA =====
             if list_rect.collidepoint(mouse_x, mouse_y):
-                # Ajusta o mouse_y para considerar o scroll
                 relative_y = mouse_y - list_rect.y - 2 + self.template_editor_scroll * ITEM_HEIGHT
                 item_index = int(relative_y // ITEM_HEIGHT)
                 if 0 <= item_index < len(template.enemies):
                     enemy = template.enemies[item_index]
                     item_y = list_rect.y + 2 + (item_index - self.template_editor_scroll) * ITEM_HEIGHT
 
-                    # Botão remover
                     remove_rect = pygame.Rect(list_rect.right - 28, item_y + 4, 18, 18)
                     if remove_rect.collidepoint(mouse_x, mouse_y):
                         del template.enemies[item_index]
-                        # Ajusta scroll se necessário
                         self.template_editor_scroll = min(self.template_editor_scroll,
                                                           max(0, len(template.enemies) - visible_items))
                         return True
 
-                    # Selecionar Pokémon
                     pokemon_rect = pygame.Rect(list_rect.x + 38, item_y + 4, 120, 22)
                     if pokemon_rect.collidepoint(mouse_x, mouse_y):
                         self.showing_pokemon_selector = True
@@ -1409,12 +1476,47 @@ class WaveConfigDialog:
                         self.pokemon_search = ""
                         return True
 
-                    # Editar percentual
                     percent_rect = pygame.Rect(list_rect.right - 85, item_y + 4, 50, 20)
                     if percent_rect.collidepoint(mouse_x, mouse_y):
                         self.active_input = f"template_percent_{item_index}"
                         self.input_texts[self.active_input] = f"{enemy.percentage:.1f}"
                         return True
+
+            # ===== CLIQUE NOS CAMPOS DE CONFIGURAÇÃO DO TEMPLATE =====
+            if hasattr(self, 'template_size_rect') and self.template_size_rect.collidepoint(mouse_x, mouse_y):
+                self.active_input = "template_size"
+                self.input_texts["template_size"] = str(template.wave_size)
+                return True
+
+            if hasattr(self, 'template_min_level_rect') and self.template_min_level_rect.collidepoint(mouse_x, mouse_y):
+                self.active_input = "template_min_level"
+                self.input_texts["template_min_level"] = str(template.min_level)
+                return True
+
+            if hasattr(self, 'template_max_level_rect') and self.template_max_level_rect.collidepoint(mouse_x, mouse_y):
+                self.active_input = "template_max_level"
+                self.input_texts["template_max_level"] = str(template.max_level)
+                return True
+
+            if hasattr(self, 'template_interval_rect') and self.template_interval_rect.collidepoint(mouse_x, mouse_y):
+                self.active_input = "template_interval"
+                self.input_texts["template_interval"] = f"{template.spawn_interval:.1f}"
+                return True
+
+            if hasattr(self, 'template_delay_rect') and self.template_delay_rect.collidepoint(mouse_x, mouse_y):
+                self.active_input = "template_delay"
+                self.input_texts["template_delay"] = f"{template.initial_delay:.1f}"
+                return True
+
+            if hasattr(self, 'template_repeat_rect') and self.template_repeat_rect.collidepoint(mouse_x, mouse_y):
+                template.repeat_wave = not template.repeat_wave
+                return True
+
+            if hasattr(self, 'template_repeat_count_rect') and self.template_repeat_count_rect.collidepoint(mouse_x,
+                                                                                                            mouse_y):
+                self.active_input = "template_repeat_count"
+                self.input_texts["template_repeat_count"] = str(template.repeat_count)
+                return True
 
         # ===== DRAG DA BARRA DE ROLAGEM =====
         if event.type == pygame.MOUSEMOTION:
@@ -1501,20 +1603,17 @@ class WaveConfigDialog:
         screen.blit(name_text, (name_rect.x + 8, name_rect.y + 3))
 
         # ===== BOTÕES DO EDITOR =====
-        # Botão Adicionar
         add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 88, 120, 26)
         self._render_button(screen, add_rect, "template_add_enemy", "+ Adicionar")
 
-        # Botão Distribuir
         equalize_rect = pygame.Rect(editor_rect.x + 150, editor_rect.y + 88, 110, 26)
         self._render_button(screen, equalize_rect, "template_equalize", "Distribuir")
 
-        # Botão Limpar
         clear_rect = pygame.Rect(editor_rect.x + 270, editor_rect.y + 88, 95, 26)
         self._render_button(screen, clear_rect, "template_clear", "Limpar")
 
-        # ===== LISTA DE INIMIGOS COM SCROLL =====
-        list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 195)
+        # ===== LISTA DE INIMIGOS =====
+        list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, editor_rect.width - 40, 120)
         pygame.draw.rect(screen, self.colors['bg_dark'], list_rect, border_radius=6)
 
         ITEM_HEIGHT = 32
@@ -1522,15 +1621,12 @@ class WaveConfigDialog:
         visible_items = list_rect.height // ITEM_HEIGHT
         max_scroll = max(0, total_items - visible_items)
 
-        # Atualiza o scroll máximo
         self.template_editor_max_scroll = max_scroll
         self.template_editor_scroll = max(0, min(max_scroll, self.template_editor_scroll))
 
-        # Área de clipping para a lista
         old_clip = screen.get_clip()
         screen.set_clip(list_rect)
 
-        # Calcula o offset de scroll
         scroll_offset = self.template_editor_scroll * ITEM_HEIGHT
         list_start_y = list_rect.y + 2 - scroll_offset
 
@@ -1550,7 +1646,6 @@ class WaveConfigDialog:
             name_text = self._get_font(13).render(name, True, self.colors['text'])
             screen.blit(name_text, (item_rect.x + 28, item_rect.y + 8))
 
-            # Campo de percentual
             percent_rect = pygame.Rect(list_rect.right - 78, item_y + 6, 45, 20)
             is_active = self.active_input == f"template_percent_{i}"
             border = self.colors['border_active'] if is_active else self.colors['border']
@@ -1564,7 +1659,6 @@ class WaveConfigDialog:
             pct_symbol = self._get_font(10).render("%", True, self.colors['text_muted'])
             screen.blit(pct_symbol, (percent_rect.right + 2, percent_rect.y + 3))
 
-            # Botão remover
             remove_rect = pygame.Rect(list_rect.right - 22, item_y + 7, 14, 14)
             pygame.draw.rect(screen, self.colors['danger'], remove_rect, border_radius=3)
             pygame.draw.line(screen, self.colors['text'],
@@ -1584,11 +1678,8 @@ class WaveConfigDialog:
                 10,
                 list_rect.height
             )
-
-            # Fundo da barra
             pygame.draw.rect(screen, self.colors['scrollbar_bg'], scrollbar_rect, border_radius=4)
 
-            # Thumb (alça da barra)
             thumb_ratio = visible_items / total_items
             thumb_height = max(20, int(scrollbar_rect.height * thumb_ratio))
             max_scroll_val = max(1, total_items - visible_items)
@@ -1602,6 +1693,137 @@ class WaveConfigDialog:
         color = (100, 255, 100) if abs(total - 100.0) < 0.01 else (255, 100, 100)
         total_text = self._get_font(13).render(f"Total: {total:.1f}%", True, color)
         screen.blit(total_text, (list_rect.x, list_rect.bottom + 6))
+
+        # ===== PAINEL DE CONFIGURAÇÃO COMPLETO DO TEMPLATE =====
+        config_y = list_rect.bottom + 20
+        config_rect = pygame.Rect(editor_rect.x + 20, config_y, editor_rect.width - 40, 130)
+        pygame.draw.rect(screen, self.colors['bg_dark'], config_rect, border_radius=6)
+        pygame.draw.rect(screen, self.colors['border'], config_rect, 1, border_radius=6)
+
+        # Título
+        config_title = self._get_font(12, True).render("CONFIGURAÇÕES DO TEMPLATE", True, self.colors['title'])
+        screen.blit(config_title, (config_rect.x + 10, config_rect.y + 4))
+
+        # ===== LINHA 1: Tamanho e Níveis =====
+        field_y = config_rect.y + 28
+        field_height = 22
+
+        # Tamanho da wave
+        label1 = self._get_font(11).render("Tamanho:", True, self.colors['text_dim'])
+        screen.blit(label1, (config_rect.x + 10, field_y))
+
+        size_rect = pygame.Rect(config_rect.x + 70, field_y, 50, field_height)
+        is_active = self.active_input == "template_size"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], size_rect, border_radius=4)
+        pygame.draw.rect(screen, border, size_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("template_size", str(template.wave_size)) if is_active else str(
+            template.wave_size)
+        size_text = self._get_font(13).render(display, True, self.colors['text'])
+        screen.blit(size_text, (size_rect.x + 4, size_rect.y + 2))
+
+        # Níveis
+        label2 = self._get_font(11).render("Níveis:", True, self.colors['text_dim'])
+        screen.blit(label2, (config_rect.x + 140, field_y))
+
+        min_rect = pygame.Rect(config_rect.x + 190, field_y, 45, field_height)
+        is_active = self.active_input == "template_min_level"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], min_rect, border_radius=4)
+        pygame.draw.rect(screen, border, min_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("template_min_level", str(template.min_level)) if is_active else str(
+            template.min_level)
+        min_text = self._get_font(13).render(display, True, self.colors['text'])
+        screen.blit(min_text, (min_rect.x + 4, min_rect.y + 2))
+
+        sep_text = self._get_font(13).render("a", True, self.colors['text_dim'])
+        screen.blit(sep_text, (min_rect.right + 4, field_y + 2))
+
+        max_rect = pygame.Rect(min_rect.right + 18, field_y, 45, field_height)
+        is_active = self.active_input == "template_max_level"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], max_rect, border_radius=4)
+        pygame.draw.rect(screen, border, max_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("template_max_level", str(template.max_level)) if is_active else str(
+            template.max_level)
+        max_text = self._get_font(13).render(display, True, self.colors['text'])
+        screen.blit(max_text, (max_rect.x + 4, max_rect.y + 2))
+
+        # ===== LINHA 2: Timings =====
+        field_y2 = config_rect.y + 56
+
+        # Intervalo
+        label3 = self._get_font(11).render("Intervalo:", True, self.colors['text_dim'])
+        screen.blit(label3, (config_rect.x + 10, field_y2))
+
+        interval_rect = pygame.Rect(config_rect.x + 70, field_y2, 50, field_height)
+        is_active = self.active_input == "template_interval"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], interval_rect, border_radius=4)
+        pygame.draw.rect(screen, border, interval_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("template_interval",
+                                       f"{template.spawn_interval:.1f}") if is_active else f"{template.spawn_interval:.1f}"
+        interval_text = self._get_font(13).render(display, True, self.colors['text'])
+        screen.blit(interval_text, (interval_rect.x + 4, interval_rect.y + 2))
+
+        # Delay inicial
+        label4 = self._get_font(11).render("Delay inicial:", True, self.colors['text_dim'])
+        screen.blit(label4, (config_rect.x + 140, field_y2))
+
+        delay_rect = pygame.Rect(config_rect.x + 215, field_y2, 50, field_height)
+        is_active = self.active_input == "template_delay"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], delay_rect, border_radius=4)
+        pygame.draw.rect(screen, border, delay_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("template_delay",
+                                       f"{template.initial_delay:.1f}") if is_active else f"{template.initial_delay:.1f}"
+        delay_text = self._get_font(13).render(display, True, self.colors['text'])
+        screen.blit(delay_text, (delay_rect.x + 4, delay_rect.y + 2))
+
+        # ===== LINHA 3: Repetição =====
+        field_y3 = config_rect.y + 84
+
+        # Repetir (checkbox)
+        label5 = self._get_font(11).render("Repetir:", True, self.colors['text_dim'])
+        screen.blit(label5, (config_rect.x + 10, field_y3))
+
+        repeat_rect = pygame.Rect(config_rect.x + 60, field_y3, 18, 18)
+        if template.repeat_wave:
+            pygame.draw.rect(screen, self.colors['accent'], repeat_rect, border_radius=4)
+            check = self._get_font(14).render("✓", True, self.colors['text'])
+            screen.blit(check, (repeat_rect.x + 2, repeat_rect.y - 1))
+        else:
+            pygame.draw.rect(screen, self.colors['bg_input'], repeat_rect, border_radius=4)
+        pygame.draw.rect(screen, self.colors['border'], repeat_rect, 1, border_radius=4)
+
+        # Vezes
+        label6 = self._get_font(11).render("Vezes:", True, self.colors['text_dim'])
+        screen.blit(label6, (config_rect.x + 90, field_y3))
+
+        repeat_count_rect = pygame.Rect(config_rect.x + 130, field_y3, 45, field_height)
+        is_active = self.active_input == "template_repeat_count"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], repeat_count_rect, border_radius=4)
+        pygame.draw.rect(screen, border, repeat_count_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("template_repeat_count", str(template.repeat_count)) if is_active else str(
+            template.repeat_count)
+        repeat_count_text = self._get_font(13).render(display, True, self.colors['text'])
+        screen.blit(repeat_count_text, (repeat_count_rect.x + 4, repeat_count_rect.y + 2))
+
+        # Guarda referências para cliques
+        self.template_size_rect = size_rect
+        self.template_min_level_rect = min_rect
+        self.template_max_level_rect = max_rect
+        self.template_interval_rect = interval_rect
+        self.template_delay_rect = delay_rect
+        self.template_repeat_rect = repeat_rect
+        self.template_repeat_count_rect = repeat_count_rect
 
     # --- Utilitários ---
     def _get_dropdown_list_rect(self, dropdown_rect, options):
@@ -1690,6 +1912,7 @@ class WaveConfigDialog:
         try:
             value = self.input_texts.get(self.active_input, "")
 
+            # ===== PERCENTUAIS DA WAVE =====
             if self.active_input.startswith("percent_"):
                 index = int(self.active_input.split("_")[1])
                 if 0 <= index < len(wave.enemies):
@@ -1698,12 +1921,32 @@ class WaveConfigDialog:
                     wave.enemies[index].percentage = new_percent
                     self._check_total_percentage(wave)
 
+            # ===== NOME DA WAVE =====
             elif self.active_input == "wave_name":
                 wave.name = value
 
+            # ===== CONFIGURAÇÕES DA WAVE =====
             elif self.active_input == "wave_size":
                 wave.wave_size = max(1, int(float(value)) if value else 1)
 
+            elif self.active_input == "wave_min_level":
+                wave.min_level = max(1, int(float(value)) if value else 1)
+                if wave.min_level > wave.max_level:
+                    wave.max_level = wave.min_level
+
+            elif self.active_input == "wave_max_level":
+                wave.max_level = max(wave.min_level, int(float(value)) if value else 1)
+
+            elif self.active_input == "wave_interval":
+                wave.spawn_interval = max(0.5, float(value) if value else 3.0)
+
+            elif self.active_input == "wave_delay":
+                wave.initial_delay = max(0.0, float(value) if value else 2.0)
+
+            elif self.active_input == "wave_repeat_count":
+                wave.repeat_count = max(1, int(float(value)) if value else 1)
+
+            # ===== PERCENTUAIS DA VARIANT =====
             elif self.active_input.startswith("variant_percent_"):
                 index = int(self.active_input.split("_")[2])
                 if self.editing_variant_index >= 0:
@@ -1713,6 +1956,7 @@ class WaveConfigDialog:
                         new_percent = max(0.0, min(100.0, new_percent))
                         variant.enemies[index].percentage = new_percent
 
+            # ===== PERCENTUAIS DO TEMPLATE =====
             elif self.active_input.startswith("template_percent_"):
                 index = int(self.active_input.split("_")[2])
                 templates = WaveTemplateManager.get_all_templates()
@@ -1723,11 +1967,51 @@ class WaveConfigDialog:
                         new_percent = max(0.0, min(100.0, new_percent))
                         template.enemies[index].percentage = new_percent
 
+            # ===== NOME DO TEMPLATE =====
             elif self.active_input == "template_name":
                 templates = WaveTemplateManager.get_all_templates()
                 if self.template_selected_index > 0 and self.template_selected_index - 1 < len(templates):
                     templates[self.template_selected_index - 1].name = value
                     self._update_template_options()
+
+            # ===== CONFIGURAÇÕES DO TEMPLATE =====
+            elif self.active_input == "template_size":
+                templates = WaveTemplateManager.get_all_templates()
+                if self.template_selected_index > 0 and self.template_selected_index - 1 < len(templates):
+                    template = templates[self.template_selected_index - 1]
+                    template.wave_size = max(1, int(float(value)) if value else 1)
+
+            elif self.active_input == "template_min_level":
+                templates = WaveTemplateManager.get_all_templates()
+                if self.template_selected_index > 0 and self.template_selected_index - 1 < len(templates):
+                    template = templates[self.template_selected_index - 1]
+                    template.min_level = max(1, int(float(value)) if value else 1)
+                    if template.min_level > template.max_level:
+                        template.max_level = template.min_level
+
+            elif self.active_input == "template_max_level":
+                templates = WaveTemplateManager.get_all_templates()
+                if self.template_selected_index > 0 and self.template_selected_index - 1 < len(templates):
+                    template = templates[self.template_selected_index - 1]
+                    template.max_level = max(template.min_level, int(float(value)) if value else 1)
+
+            elif self.active_input == "template_interval":
+                templates = WaveTemplateManager.get_all_templates()
+                if self.template_selected_index > 0 and self.template_selected_index - 1 < len(templates):
+                    template = templates[self.template_selected_index - 1]
+                    template.spawn_interval = max(0.5, float(value) if value else 3.0)
+
+            elif self.active_input == "template_delay":
+                templates = WaveTemplateManager.get_all_templates()
+                if self.template_selected_index > 0 and self.template_selected_index - 1 < len(templates):
+                    template = templates[self.template_selected_index - 1]
+                    template.initial_delay = max(0.0, float(value) if value else 2.0)
+
+            elif self.active_input == "template_repeat_count":
+                templates = WaveTemplateManager.get_all_templates()
+                if self.template_selected_index > 0 and self.template_selected_index - 1 < len(templates):
+                    template = templates[self.template_selected_index - 1]
+                    template.repeat_count = max(1, int(float(value)) if value else 1)
 
             self.active_input = None
             return True
@@ -2280,6 +2564,7 @@ class WaveConfigDialog:
             screen.blit(no_text, (text_x, text_y))
             return
 
+        # ===== INFORMAÇÃO DO TEMPLATE =====
         info_text = ""
         if wave.template_id:
             template = WaveTemplateManager.get_template(wave.template_id)
@@ -2297,6 +2582,8 @@ class WaveConfigDialog:
         screen.blit(info, (self.comp_info_rect.x, self.comp_info_rect.y + 2))
 
         can_edit = not wave.template_id
+
+        # ===== LINHA 1: BOTÕES DE EDIÇÃO =====
         self._render_button(screen, self.add_enemy_button, "add_enemy", "+ Adicionar", not can_edit)
         self._render_button(screen, self.equalize_button, "equalize", "Distribuir", not can_edit)
         self._render_button(screen, self.clear_enemies_button, "clear_enemies", "Limpar", not can_edit)
@@ -2311,7 +2598,6 @@ class WaveConfigDialog:
         pygame.draw.rect(screen, self.colors['bg_input'], self.template_selector_rect, border_radius=5)
         pygame.draw.rect(screen, border, self.template_selector_rect, 1, border_radius=5)
 
-        # Texto do template selecionado
         if wave.template_id:
             template = WaveTemplateManager.get_template(wave.template_id)
             template_name = template.name if template else "Template removido"
@@ -2324,10 +2610,9 @@ class WaveConfigDialog:
         arrow = self._get_font(13).render("▼" if not self.template_combo_open else "▲", True, self.colors['text_muted'])
         screen.blit(arrow, (self.template_selector_rect.right - 18, self.template_selector_rect.y + 4))
 
-        # Botão "Limpar"
         self._render_button(screen, self.clear_template_rect, "clear_template", "Limpar")
 
-        # Lista de inimigos
+        # ===== LISTA DE INIMIGOS =====
         pygame.draw.rect(screen, self.colors['bg_dark'], self.enemies_list_area, border_radius=6)
 
         old_clip = screen.get_clip()
@@ -2336,9 +2621,6 @@ class WaveConfigDialog:
         list_x = self.enemies_list_area.x + 4
         list_start_y = self.enemies_list_area.y + 2 - self.enemies_scroll * self.enemy_item_height
 
-        # ===== PEGA OS INIMIGOS CORRETAMENTE =====
-        # Se tem template, usa os inimigos do template
-        # Senão, usa os inimigos da wave
         if wave.template_id:
             template = WaveTemplateManager.get_template(wave.template_id)
             enemies = template.enemies if template else []
@@ -2380,7 +2662,6 @@ class WaveConfigDialog:
             pct_symbol = self._get_font(11).render("%", True, self.colors['text_muted'])
             screen.blit(pct_symbol, (percent_rect.right + 2, percent_rect.y + 3))
 
-            # Só mostra o botão remover se não tiver template
             if can_edit:
                 remove_rect = pygame.Rect(self.enemies_list_area.right - 28, item_y + 4, 18, 18)
                 pygame.draw.rect(screen, self.colors['danger'], remove_rect, border_radius=4)
@@ -2393,7 +2674,7 @@ class WaveConfigDialog:
 
         screen.set_clip(old_clip)
 
-        # ===== CALCULA TOTAL CORRETAMENTE =====
+        # Total
         if wave.template_id:
             template = WaveTemplateManager.get_template(wave.template_id)
             enemies = template.enemies if template else []
@@ -2412,6 +2693,137 @@ class WaveConfigDialog:
             if not is_valid:
                 warn = self._get_font(12).render("(Deve ser 100%)", True, (255, 100, 100))
                 screen.blit(warn, (self.total_rect.x + 120, self.total_rect.y))
+
+        # ===== PAINEL DE CONFIGURAÇÃO DA WAVE =====
+        config_y = self.enemies_list_area.bottom + 30
+        config_x = self.rect.x + self.margin
+
+        # Fundo do painel de configuração
+        config_rect = pygame.Rect(config_x, config_y, self.rect.width - self.margin * 2, 85)
+        pygame.draw.rect(screen, self.colors['bg_light'], config_rect, border_radius=8)
+        pygame.draw.rect(screen, self.colors['border'], config_rect, 1, border_radius=8)
+
+        # Título do painel
+        config_title = self._get_font(14, True).render("CONFIGURAÇÃO DA WAVE", True, self.colors['title'])
+        screen.blit(config_title, (config_rect.x + 12, config_rect.y + 6))
+
+        # ===== CAMPOS EM 3 COLUNAS =====
+        field_y = config_rect.y + 32
+        field_height = 22
+
+        # Coluna 1: Quantidade de inimigos
+        label1 = self._get_font(12).render("Tamanho da wave:", True, self.colors['text_dim'])
+        screen.blit(label1, (config_rect.x + 12, field_y))
+
+        size_rect = pygame.Rect(config_rect.x + 130, field_y, 60, field_height)
+        is_active = self.active_input == "wave_size"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], size_rect, border_radius=4)
+        pygame.draw.rect(screen, border, size_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("wave_size", str(wave.wave_size)) if is_active else str(wave.wave_size)
+        size_text = self._get_font(14).render(display, True, self.colors['text'])
+        screen.blit(size_text, (size_rect.x + 4, size_rect.y + 2))
+
+        # Coluna 2: Níveis (min - max)
+        label2 = self._get_font(12).render("Níveis:", True, self.colors['text_dim'])
+        screen.blit(label2, (config_rect.x + 220, field_y))
+
+        # Min level
+        min_rect = pygame.Rect(config_rect.x + 270, field_y, 50, field_height)
+        is_active = self.active_input == "wave_min_level"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], min_rect, border_radius=4)
+        pygame.draw.rect(screen, border, min_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("wave_min_level", str(wave.min_level)) if is_active else str(wave.min_level)
+        min_text = self._get_font(14).render(display, True, self.colors['text'])
+        screen.blit(min_text, (min_rect.x + 4, min_rect.y + 2))
+
+        # Separador
+        sep_text = self._get_font(14).render("a", True, self.colors['text_dim'])
+        screen.blit(sep_text, (min_rect.right + 4, field_y + 2))
+
+        # Max level
+        max_rect = pygame.Rect(min_rect.right + 20, field_y, 50, field_height)
+        is_active = self.active_input == "wave_max_level"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], max_rect, border_radius=4)
+        pygame.draw.rect(screen, border, max_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("wave_max_level", str(wave.max_level)) if is_active else str(wave.max_level)
+        max_text = self._get_font(14).render(display, True, self.colors['text'])
+        screen.blit(max_text, (max_rect.x + 4, max_rect.y + 2))
+
+        # Coluna 3: Timings
+        label3 = self._get_font(12).render("Intervalo (s):", True, self.colors['text_dim'])
+        screen.blit(label3, (config_rect.x + 430, field_y))
+
+        interval_rect = pygame.Rect(config_rect.x + 530, field_y, 60, field_height)
+        is_active = self.active_input == "wave_interval"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], interval_rect, border_radius=4)
+        pygame.draw.rect(screen, border, interval_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("wave_interval",
+                                       f"{wave.spawn_interval:.1f}") if is_active else f"{wave.spawn_interval:.1f}"
+        interval_text = self._get_font(14).render(display, True, self.colors['text'])
+        screen.blit(interval_text, (interval_rect.x + 4, interval_rect.y + 2))
+
+        # ===== SEGUNDA LINHA DO PAINEL =====
+        field_y2 = config_rect.y + 58
+
+        # Delay inicial
+        label4 = self._get_font(12).render("Delay inicial:", True, self.colors['text_dim'])
+        screen.blit(label4, (config_rect.x + 12, field_y2))
+
+        delay_rect = pygame.Rect(config_rect.x + 100, field_y2, 60, field_height)
+        is_active = self.active_input == "wave_delay"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], delay_rect, border_radius=4)
+        pygame.draw.rect(screen, border, delay_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("wave_delay",
+                                       f"{wave.initial_delay:.1f}") if is_active else f"{wave.initial_delay:.1f}"
+        delay_text = self._get_font(14).render(display, True, self.colors['text'])
+        screen.blit(delay_text, (delay_rect.x + 4, delay_rect.y + 2))
+
+        # Repetição (checkbox)
+        label5 = self._get_font(12).render("Repetir:", True, self.colors['text_dim'])
+        screen.blit(label5, (config_rect.x + 200, field_y2))
+
+        repeat_rect = pygame.Rect(config_rect.x + 260, field_y2, 20, 20)
+        if wave.repeat_wave:
+            pygame.draw.rect(screen, self.colors['accent'], repeat_rect, border_radius=4)
+            check = self._get_font(16).render("✓", True, self.colors['text'])
+            screen.blit(check, (repeat_rect.x + 2, repeat_rect.y - 1))
+        else:
+            pygame.draw.rect(screen, self.colors['bg_input'], repeat_rect, border_radius=4)
+        pygame.draw.rect(screen, self.colors['border'], repeat_rect, 1, border_radius=4)
+
+        # Contagem de repetições
+        label6 = self._get_font(12).render("Vezes:", True, self.colors['text_dim'])
+        screen.blit(label6, (config_rect.x + 300, field_y2))
+
+        repeat_count_rect = pygame.Rect(config_rect.x + 350, field_y2, 50, field_height)
+        is_active = self.active_input == "wave_repeat_count"
+        border = self.colors['border_active'] if is_active else self.colors['border']
+        pygame.draw.rect(screen, self.colors['bg_input'], repeat_count_rect, border_radius=4)
+        pygame.draw.rect(screen, border, repeat_count_rect, 1, border_radius=4)
+
+        display = self.input_texts.get("wave_repeat_count", str(wave.repeat_count)) if is_active else str(
+            wave.repeat_count)
+        repeat_count_text = self._get_font(14).render(display, True, self.colors['text'])
+        screen.blit(repeat_count_text, (repeat_count_rect.x + 4, repeat_count_rect.y + 2))
+
+        # Guarda as referências dos campos para clique
+        self.wave_size_rect = size_rect
+        self.wave_min_level_rect = min_rect
+        self.wave_max_level_rect = max_rect
+        self.wave_interval_rect = interval_rect
+        self.wave_delay_rect = delay_rect
+        self.wave_repeat_rect = repeat_rect
+        self.wave_repeat_count_rect = repeat_count_rect
 
     def _render_variants_tab(self, screen):
         wave = self.wave_manager.get_current_wave()

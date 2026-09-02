@@ -27,15 +27,22 @@ class WaveEnemy:
 class WaveTemplate:
     """
     Template de composição de Pokémon reutilizável entre waves.
-    Pode ser usado em diferentes paths e waves.
+    Agora inclui TODAS as configurações da wave.
     """
 
     def __init__(self, template_id: str = None, name: str = "Template"):
         self.template_id = template_id or f"template_{random.randint(1000, 9999)}"
         self.name = name
         self.enemies: List[WaveEnemy] = []
+
+        # ===== TODAS AS CONFIGURAÇÕES DA WAVE =====
         self.min_level = 1
         self.max_level = 5
+        self.wave_size = 6
+        self.spawn_interval = 3.0
+        self.initial_delay = 2.0
+        self.repeat_wave = False
+        self.repeat_count = 1
 
     def to_dict(self):
         return {
@@ -43,7 +50,12 @@ class WaveTemplate:
             "name": self.name,
             "enemies": [e.to_dict() for e in self.enemies],
             "min_level": self.min_level,
-            "max_level": self.max_level
+            "max_level": self.max_level,
+            "wave_size": self.wave_size,
+            "spawn_interval": self.spawn_interval,
+            "initial_delay": self.initial_delay,
+            "repeat_wave": self.repeat_wave,
+            "repeat_count": self.repeat_count
         }
 
     def from_dict(self, data):
@@ -51,6 +63,11 @@ class WaveTemplate:
         self.name = data.get("name", "Template")
         self.min_level = data.get("min_level", 1)
         self.max_level = data.get("max_level", 5)
+        self.wave_size = data.get("wave_size", 6)
+        self.spawn_interval = data.get("spawn_interval", 3.0)
+        self.initial_delay = data.get("initial_delay", 2.0)
+        self.repeat_wave = data.get("repeat_wave", False)
+        self.repeat_count = data.get("repeat_count", 1)
 
         self.enemies = []
         for e_data in data.get("enemies", []):
@@ -59,6 +76,20 @@ class WaveTemplate:
             self.enemies.append(enemy)
 
         return self
+
+    def apply_to_wave(self, wave):
+        """Aplica TODAS as configurações do template a uma wave"""
+        wave.template_id = self.template_id
+        wave.enemies = [WaveEnemy(e.pokemon_id, e.percentage) for e in self.enemies]
+        wave.min_level = self.min_level
+        wave.max_level = self.max_level
+        wave.wave_size = self.wave_size
+        wave.spawn_interval = self.spawn_interval
+        wave.initial_delay = self.initial_delay
+        wave.repeat_wave = self.repeat_wave
+        wave.repeat_count = self.repeat_count
+        wave.use_variants = False
+        wave.variants = []
 
 
 class WaveVariant:
