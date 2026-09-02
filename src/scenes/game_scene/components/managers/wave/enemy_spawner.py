@@ -23,6 +23,9 @@ class WaveConfig:
     repeat_wave: bool = False
     repeat_count: int = 1
     current_repeat: int = 0
+    template_id: Optional[str] = None
+    use_variants: bool = False
+    variants: List[dict] = None
 
 
 class EnemySpawner:
@@ -39,6 +42,8 @@ class EnemySpawner:
         # ===== ESTADO DE PAUSA =====
         self.paused = False
 
+        self.current_condition = "any"
+
         # Estado por path
         self.current_wave_idx: Dict[int, int] = {}
         self.wave_active: Dict[int, bool] = {}
@@ -49,6 +54,10 @@ class EnemySpawner:
     def set_paused(self, paused: bool):
         """Define o estado de pausa do spawner"""
         self.paused = paused
+
+    def set_condition(self, condition: str):
+        """Define a condição atual (day, night, etc) para usar os variants"""
+        self.current_condition = condition
 
     def initialize_waves(self, raw_data):
         """Inicializa as waves a partir dos dados brutos"""
@@ -64,18 +73,25 @@ class EnemySpawner:
             min_level = wave_dict.get("min_level", 1)
             max_level = wave_dict.get("max_level", 5)
 
-            # Converte inimigos
+            template_id = wave_dict.get("template_id")
+            use_variants = wave_dict.get("use_variants", False)
+
+            # ===== CARREGA VARIANTS COMO DICT =====
+            variants = wave_dict.get("variants", [])
+            variants = [v for v in variants if isinstance(v, dict)]
+
+            # Converte inimigos (legado)
             enemies = []
             for enemy_dict in wave_dict.get("enemies", []):
                 enemies.append({
                     "pokemon_id": enemy_dict.get("pokemon_id", 1),
-                    "percentage": enemy_dict.get("percentage", 100),
+                    "percentage": float(enemy_dict.get("percentage", 100.0)),
                     "level_min": enemy_dict.get("level_min", min_level),
                     "level_max": enemy_dict.get("level_max", max_level)
                 })
 
-            if not enemies:
-                enemies = [{"pokemon_id": 1, "percentage": 100, "level_min": min_level, "level_max": max_level}]
+            if not enemies and not template_id and not use_variants:
+                enemies = [{"pokemon_id": 1, "percentage": 100.0, "level_min": min_level, "level_max": max_level}]
 
             wave = WaveConfig(
                 path_index=path_idx,
@@ -89,15 +105,29 @@ class EnemySpawner:
                 min_level=min_level,
                 max_level=max_level,
                 repeat_wave=wave_dict.get("repeat_wave", False),
-                repeat_count=wave_dict.get("repeat_count", 1)
+                repeat_count=wave_dict.get("repeat_count", 1),
+                template_id=template_id,
+                use_variants=use_variants,
+                variants=variants
             )
 
             if path_idx not in self.waves:
                 self.waves[path_idx] = []
             self.waves[path_idx].append(wave)
 
-            print(
-                f"[Spawner] Carregada wave {idx} para path {path_idx}: {wave.wave_size} inimigos, boss={wave.has_boss}")
+            print(f"[Spawner] Carregada wave {idx} para path {path_idx}:")
+            print(f"  - wave_size: {wave.wave_size}")
+            print(f"  - template_id: {template_id}")
+            print(f"  - use_variants: {use_variants}")
+            if use_variants and variants:
+                print(f"  - {len(variants)} variants:")
+                for v in variants:
+                    cond = v.get("condition", "any")
+                    tid = v.get("template_id")
+                    enemies_count = len(v.get("enemies", []))
+                    print(f"      {cond}: {enemies_count} inimigos" + (f" (template: {tid})" if tid else ""))
+            else:
+                print(f"  - {len(enemies)} inimigos diretos")
 
     def start_all_waves(self) -> bool:
         """Inicia todas as waves de todos os paths"""
@@ -184,6 +214,95 @@ class EnemySpawner:
             "progress": total_spawned / total_enemies if total_enemies > 0 else 0,
             "active_paths": active_paths
         }
+
+    def _get_enemies_for_wave(self, wave: WaveConfig) -> List[dict]:
+        """
+        Retorna a lista de inimigos para a wave baseado na condição atual.
+        Suporta templates e variants.
+        PRIORIDADE: Variants (se condição corresponder) > Template > Enemies direto
+        """
+        from src.editor.wave_config import WaveTemplateManager
+
+        # ===== PRIORIDADE 1: Variants (se ativado) =====
+        if wave.use_variants and wave.variants:
+            # Procura pela condição atual
+            for variant_data in wave.variants:
+                condition = variant_data.get("condition", "any")
+
+                if condition == self.current_condition:
+                    print(f"[Spawner] Usando VARIANT para condição: {self.current_condition}")
+
+                    # Verifica se a variant tem template_id
+                    variant_template_id = variant_data.get("template_id")
+                    if variant_template_id:
+                        template = WaveTemplateManager.get_template(variant_template_id)
+                        if template:
+                            print(f"[Spawner]   - Usando template da variant: {template.name}")
+                            return [{
+                                "pokemon_id": e.pokemon_id,
+                                "percentage": float(e.percentage),
+                                "level_min": variant_data.get("min_level", wave.min_level),
+                                "level_max": variant_data.get("max_level", wave.max_level)
+                            } for e in template.enemies]
+
+                    # Se não tem template, usa os enemies direto da variant
+                    enemies = variant_data.get("enemies", [])
+                    if enemies:
+                        print(f"[Spawner]   - Usando enemies direto da variant ({len(enemies)} inimigos)")
+                        return [{
+                            "pokemon_id": e.get("pokemon_id", 1),
+                            "percentage": float(e.get("percentage", 100.0)),
+                            "level_min": variant_data.get("min_level", wave.min_level),
+                            "level_max": variant_data.get("max_level", wave.max_level)
+                        } for e in enemies]
+
+            # ===== SÓ USA FALLBACK "any" SE TIVER UMA VARIANT COM CONDITION "any" =====
+            for variant_data in wave.variants:
+                if variant_data.get("condition", "any") == "any":
+                    print(f"[Spawner] Usando VARIANT fallback 'any'")
+
+                    variant_template_id = variant_data.get("template_id")
+                    if variant_template_id:
+                        template = WaveTemplateManager.get_template(variant_template_id)
+                        if template:
+                            print(f"[Spawner]   - Usando template da variant: {template.name}")
+                            return [{
+                                "pokemon_id": e.pokemon_id,
+                                "percentage": float(e.percentage),
+                                "level_min": variant_data.get("min_level", wave.min_level),
+                                "level_max": variant_data.get("max_level", wave.max_level)
+                            } for e in template.enemies]
+
+                    enemies = variant_data.get("enemies", [])
+                    if enemies:
+                        print(f"[Spawner]   - Usando enemies direto da variant ({len(enemies)} inimigos)")
+                        return [{
+                            "pokemon_id": e.get("pokemon_id", 1),
+                            "percentage": float(e.get("percentage", 100.0)),
+                            "level_min": variant_data.get("min_level", wave.min_level),
+                            "level_max": variant_data.get("max_level", wave.max_level)
+                        } for e in enemies]
+
+            # ===== SE NENHUMA VARIANT CORRESPONDE, USA O TEMPLATE PRINCIPAL =====
+            # (NÃO USA A PRIMEIRA VARIANT COMO FALLBACK!)
+            print(
+                f"[Spawner] Nenhuma variant corresponde à condição '{self.current_condition}'. Usando template/enemies principal.")
+
+        # ===== PRIORIDADE 2: Template (usado quando NENHUMA variant corresponde) =====
+        if wave.template_id:
+            template = WaveTemplateManager.get_template(wave.template_id)
+            if template:
+                print(f"[Spawner] Usando TEMPLATE principal: {template.name}")
+                return [{
+                    "pokemon_id": e.pokemon_id,
+                    "percentage": float(e.percentage),
+                    "level_min": template.min_level,
+                    "level_max": template.max_level
+                } for e in template.enemies]
+
+        # ===== PRIORIDADE 3: enemies direto (legado) =====
+        print(f"[Spawner] Usando ENEMIES direto (legado)")
+        return wave.enemies
 
     def update(self, dt: float) -> List['Pokemon']:
         """
@@ -277,21 +396,29 @@ class EnemySpawner:
             print(f"[WaveSpawner] Path {path_idx}: todas as waves concluídas")
 
     def _create_enemy(self, wave: WaveConfig, path, path_idx: int, is_boss: bool) -> Optional['Pokemon']:
-        """Cria um novo inimigo"""
+        """Cria um novo inimigo com suporte a porcentagens decimais, templates e variants"""
         from src.entities.pokemon import Pokemon
 
-        # Escolhe inimigo baseado em porcentagem
-        enemy_config = self._choose_enemy(wave.enemies)
-        if not enemy_config:
-            print(f"[Spawner] ERRO: Nenhum inimigo configurado!")
+        # ===== OBTÉM A LISTA DE INIMIGOS (COM VARIANTS SE HOUVER) =====
+        enemies_list = self._get_enemies_for_wave(wave)
+
+        if not enemies_list:
+            print(f"[Spawner] ERRO: Nenhum inimigo configurado para wave {wave.wave_index}!")
             return None
 
+        # ===== ESCOLHE INIMIGO BASEADO EM PORCENTAGEM (SUPORTA FLOAT) =====
+        enemy_config = self._choose_enemy(enemies_list)
+        if not enemy_config:
+            print(f"[Spawner] ERRO: Falha ao escolher inimigo!")
+            return None
+
+        # ===== CALCULA NÍVEL =====
         level = random.randint(
             enemy_config.get("level_min", wave.min_level),
             enemy_config.get("level_max", wave.max_level)
         )
 
-        # Garante que o ponto de início existe
+        # ===== VERIFICA PONTO DE INÍCIO =====
         if not path.start_point:
             print(f"[Spawner] ERRO: Path {path_idx} não tem start_point!")
             return None
@@ -299,6 +426,7 @@ class EnemySpawner:
         start_x, start_y = path.start_point
         print(f"[Spawner] Criando inimigo em ({start_x}, {start_y})")
 
+        # ===== CRIA O POKÉMON =====
         pokemon = Pokemon(
             start_x, start_y,
             enemy_config.get("pokemon_id", 1),
@@ -308,12 +436,12 @@ class EnemySpawner:
             is_boss=is_boss
         )
 
-        # Configura screen_manager e camera
+        # ===== CONFIGURA SCREEN_MANAGER E CAMERA =====
         if self.wave_manager.game_scene and hasattr(self.wave_manager.game_scene, 'screen_manager'):
             pokemon.screen_manager = self.wave_manager.game_scene.screen_manager
             pokemon.camera = self.wave_manager.game_scene.camera
 
-        # Configura path
+        # ===== CONFIGURA PATH =====
         success = self.wave_manager.path_tracker.assign_path(pokemon, path_idx, start_at_begin=True)
         if not success:
             print(f"[Spawner] ERRO: Falha ao atribuir path para {pokemon.name}")
@@ -321,40 +449,71 @@ class EnemySpawner:
 
         pokemon.move_speed = pokemon.base_move_speed * wave.speed_multiplier
 
-        # Marca que acabou de nascer (evita detecção de chegada imediata)
+        # ===== MARCA QUE ACABOU DE NASCER (EVITA DETECÇÃO DE CHEGADA IMEDIATA) =====
         pokemon._just_spawned = True
         pokemon._spawn_timer = 0.5
 
-        # Inicializa controle de distância percorrida
+        # ===== INICIALIZA CONTROLE DE DISTÂNCIA PERCORRIDA =====
         pokemon._distance_traveled = 0.0
         pokemon._last_pos = (pokemon.x, pokemon.y)
 
-        # Garante que o inimigo está vivo
+        # ===== GARANTE QUE O INIMIGO ESTÁ VIVO =====
         pokemon.current_hp = pokemon.max_hp
+
+        # ===== DEFINE PADRÃO DE ATAQUE =====
+        from src.battle.attack_pattern import AttackPatternManager
+        attack_pattern = AttackPatternManager.get_pattern_for_enemy(
+            is_boss=is_boss,
+            is_shiny=pokemon.is_shiny
+        )
+        pokemon.attack_pattern = attack_pattern
 
         # ===== REGISTRA O POKÉMON COMO VISTO =====
         self._register_enemy_as_seen(pokemon)
 
+        # ===== EFEITO SHINY =====
         if pokemon.is_shiny:
             sound_manager.play_effect(SoundEffect.SHINY)
             toast_battle(f"{pokemon.name} shiny apareceu!", duration=4.0, pokemon=pokemon, portrait="angry")
 
+        # ===== LOG DE SPAWN =====
+        print(f"[Spawner] Spawnado {pokemon.name} Lv.{pokemon.level} (BOSS={is_boss}) no path {path_idx}")
+        print(f"[Spawner]   - Pattern: {attack_pattern.value}")
+        print(f"[Spawner]   - HP: {pokemon.current_hp}/{pokemon.max_hp}")
+        print(f"[Spawner]   - Moves: {[m.name for m in pokemon.moves]}")
+
         return pokemon
 
     def _choose_enemy(self, enemies: List[dict]) -> Optional[dict]:
-        """Escolhe um inimigo baseado nas porcentagens"""
+        """
+        Escolhe um inimigo baseado nas porcentagens.
+        SUPORTA PORCENTAGENS DECIMAIS (ex: 0.2, 1.5, 100.0)
+        """
         if not enemies:
             return None
 
-        total = sum(e.get("percentage", 100) for e in enemies)
+        # ===== CONVERTE PARA FLOAT E SOMA =====
+        total = 0.0
+        for e in enemies:
+            percentage = e.get("percentage", 100.0)
+            try:
+                total += float(percentage)
+            except (ValueError, TypeError):
+                total += 100.0
+
         if total <= 0:
             return random.choice(enemies)
 
+        # ===== SORTEIA USANDO FLOAT =====
         roll = random.uniform(0, total)
-        cumulative = 0
+        cumulative = 0.0
 
         for enemy in enemies:
-            cumulative += enemy.get("percentage", 100)
+            try:
+                cumulative += float(enemy.get("percentage", 100.0))
+            except (ValueError, TypeError):
+                cumulative += 100.0
+
             if roll <= cumulative:
                 return enemy
 
@@ -389,8 +548,8 @@ class EnemySpawner:
                 toast_battle(f"Novo Pokémon avistado: {pokemon_name}!", duration=3.0)
 
                 if pokemon.is_shiny:
-                    print(f"[Spawner] ✨ Shiny {pokemon_name} visto pela primeira vez!")
-                    toast_battle(f"✨ Shiny {pokemon_name} avistado!", duration=4.0)
+                    print(f"[Spawner] Shiny {pokemon_name} visto pela primeira vez!")
+                    toast_battle(f" Shiny {pokemon_name} avistado!", duration=4.0)
 
         except Exception as e:
             print(f"[Spawner] Erro ao registrar Pokémon visto: {e}")

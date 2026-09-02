@@ -56,8 +56,8 @@ class Pokemon(Entity):
         self.base_stats = self.pokemon_data["base_stats"]
 
         # Felicidade: 0-100
-        self.happiness = 50
-        self._max_happiness = 100
+        self.happiness = 0
+        self._max_happiness = 255
         self._min_happiness = 0
 
         # Peso (kg) - com variação individual de ±10%
@@ -763,25 +763,66 @@ class Pokemon(Entity):
     def get_happiness_percentage(self) -> float:
         return self.happiness / self._max_happiness
 
-    def add_happiness(self, amount: int) -> int:
-        """Adiciona felicidade (pode ser negativo). Retorna o novo valor."""
+    def add_happiness(self, amount: int, source: str = "") -> int:
+        """Adiciona ou remove felicidade do Pokémon."""
         old_happiness = self.happiness
         self.happiness = max(self._min_happiness, min(self._max_happiness, self.happiness + amount))
         gained = self.happiness - old_happiness
 
         if gained != 0:
-            print(f"[HAPPINESS] {self.get_display_name()}: felicidade {gained:+d} → {self.happiness}/100")
-
-            # Mostra mensagem visual se tiver effect_manager
             if hasattr(self, 'effect_manager') and self.effect_manager:
                 if gained > 0:
                     self.effect_manager.add_status_text(self, f"Felicidade +{gained}!", duration=1.5,
-                                                        color=(100, 255, 100))
+                                                        color=(255, 100, 100))
                 else:
                     self.effect_manager.add_status_text(self, f"Felicidade {gained}!", duration=1.5,
-                                                        color=(255, 100, 100))
+                                                        color=(100, 100, 255))
+
+            # ===== VERIFICA EVOLUÇÃO POR FELICIDADE =====
+            self._check_happiness_evolution()
+
+            # Conquista: Felicidade Máxima
+            if self.happiness >= 100 and old_happiness < 100:
+                if hasattr(self, 'game_scene') and self.game_scene:
+                    game_scene = self.game_scene
+                    phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                    if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+                        game_scene.player.achievement_manager.check_and_unlock("max_happiness", phase_id)
 
         return self.happiness
+
+    def _check_happiness_evolution(self):
+        """
+        Verifica se o Pokémon pode evoluir por felicidade.
+        Se puder, mostra o overlay de evolução.
+        """
+        from src.managers.evolution_manager import evolution_manager
+
+        # Só verifica se tiver game_scene e não for selvagem
+        if not hasattr(self, 'game_scene') or not self.game_scene:
+            return
+
+        if self.is_wild:
+            return
+
+        # Verifica evolução por felicidade (já inclui verificação de período)
+        evolution = evolution_manager.check_happiness_evolution(self)
+
+        if evolution:
+            # Guarda o método e horário para a conquista
+            if hasattr(self, 'evolution'):
+                self.evolution._pending_evolution_method = "happiness"
+                if "time_of_day" in evolution:
+                    self._last_evolution_time_of_day = evolution.get("time_of_day")
+
+            # Guarda os dados da evolução
+            self._last_evolution_data = evolution
+
+            print(f"[HAPPINESS_EVOLUTION] {self.name} pode evoluir por felicidade! "
+                  f"Felicidade: {self.happiness}, Requerido: {evolution['requirement']}")
+
+            # Abre o overlay de evolução
+            self.game_scene.open_evolution_overlay(self, evolution)
 
     def set_happiness(self, value: int) -> int:
         """Define felicidade diretamente (0-100). Retorna o novo valor."""
@@ -1409,6 +1450,8 @@ class Pokemon(Entity):
 
             # ===== LIMPA TODOS OS STATUS EFFECTS =====
             self.clear_all_status()
+
+            self.add_happiness(-30, "Derrotado")
 
             # ===== CANCELA QUALQUER CARGA DE GOLPE =====
             if hasattr(self, 'battle_system') and self.battle_system:

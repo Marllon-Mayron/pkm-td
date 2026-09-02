@@ -28,6 +28,9 @@ from src.scenes.game_scene.components.renderer.pokemon_spot_renderer import Poke
 from src.scenes.game_scene.components.renderer.target_item_renderer import TargetItemRenderer
 from src.managers.notification_manager import notification_manager
 from src.ui.toast_renderer import toast_info, toast_warning, toast_battle
+from src.battle.effects.specific.day_night.day_night_filter import DayNightFilter
+from src.battle.effects.specific.day_night.day_night_state import DayNightType
+from src.scenes.game_scene.components.day_night_weather_system import DayNightWeatherSystem
 
 class GameScene(BaseScene):
     def __init__(self, game, chapter_id=1, phase_number=1):
@@ -62,14 +65,23 @@ class GameScene(BaseScene):
         # Weather filter
         self.weather_filter = WeatherFilter()
 
-        # CARREGA OS DADOS DA FASE
-        self._load_phase_data()
+        # CARREGA OS DADOS DA FASE (inclui _phase_data)
+        self._load_phase_data()  # <--- PRIMEIRO CARREGA OS DADOS
+
+        # ===== AGORA CARREGA AS CONFIGURAÇÕES =====
+        self.day_night_mode = "random"
+        self.base_weather = "random"
+
+        if hasattr(self, '_phase_data') and self._phase_data:
+            self.day_night_mode = self._phase_data.get("day_night_mode", "random")
+            self.base_weather = self._phase_data.get("base_weather", "random")
+            print(f"[GAME_SCENE] Configurações da fase: Dia/Noite={self.day_night_mode}, Clima={self.base_weather}")
 
         # Cria o overlay_manager
         self.overlay_manager = OverlayManager(self)
 
         self.wave_manager = WaveManager(phase_loader, self)
-        self.wave_manager.set_paths(self.path_renderer.paths)  # Define os paths
+        self.wave_manager.set_paths(self.path_renderer.paths)
 
         # Vincula os itens alvo
         self.wave_manager.set_target_items(self.target_item_manager.items)
@@ -104,6 +116,16 @@ class GameScene(BaseScene):
         self.between_waves_timer = 3.0
         self.show_debug = False
 
+        # Weather filter
+        self.weather_filter = WeatherFilter()
+
+        # Day/Night filter
+        self.day_night_filter = DayNightFilter()
+
+        # ===== SISTEMA DIA/NOITE E CLIMA =====
+        self.day_night_weather = DayNightWeatherSystem(self)
+        self.day_night_weather.initialize()  # Inicializa com valores aleatórios
+
         # Fontes cacheadas
         self._debug_font = pygame.font.Font(None, 18)
         self._debug_font_bold = pygame.font.Font(None, 20)
@@ -123,7 +145,25 @@ class GameScene(BaseScene):
 
         # Inicia o jogo
         self._start_game()
-        #self._start_test_weather()
+
+    def toggle_pause(self):
+        """Alterna pausa do jogo usando o novo overlay"""
+        if self.paused:
+            # Se já está pausado, despausa
+            self.paused = False
+            self.game_paused = False
+            if hasattr(self, 'wave_manager'):
+                self.wave_manager.paused = False
+            self.overlay_manager.hide()  # Fecha o overlay
+            print("Jogo continuando")
+        else:
+            # Pausa o jogo
+            self.paused = True
+            self.game_paused = True
+            if hasattr(self, 'wave_manager'):
+                self.wave_manager.paused = True
+            self.overlay_manager.show(OverlayType.PAUSE)  # Mostra o overlay de pausa
+            print("Jogo pausado")
 
     def _start_test_weather(self):
         """
@@ -167,7 +207,11 @@ class GameScene(BaseScene):
         # ===== RESTAURA COMPLETAMENTE TODOS OS POKÉMON =====
         self.cleanup()
 
+        self.update_box_happiness()
+
         self._start_battle_music()
+
+        self.wave_manager.initialize_condition()
 
         for pokemon in self.player.team:
             pokemon.reset(self)
@@ -193,6 +237,9 @@ class GameScene(BaseScene):
     def _load_phase_data(self):
         """Carrega os dados da fase do disco"""
         data = phase_loader.load_phase(self.chapter_id, self.phase_number)
+
+        # ===== ARMAZENA OS DADOS DA FASE =====
+        self._phase_data = data  # <--- ADICIONE ESTA LINHA
 
         if not data:
             self.phase_rewards = {"money": 0, "experience": 0}
@@ -229,6 +276,21 @@ class GameScene(BaseScene):
         if self.show_debug:
             # Reseta as métricas quando ativa
             perf_monitor.reset()
+
+    def update_box_happiness(self):
+        """Atualiza felicidade dos Pokémon na Box (-1 por fase)."""
+        if not hasattr(self.player, 'pc_box'):
+            return
+
+        box_pokemon = self.player.pc_box
+        if not box_pokemon:
+            return
+
+        team_ids = set(id(p) for p in self.player.team)
+
+        for pokemon in box_pokemon:
+            if id(pokemon) not in team_ids:
+                pokemon.add_happiness(-1, "Na Box")
 
     def is_team_defeated(self) -> bool:
         """
@@ -297,8 +359,16 @@ class GameScene(BaseScene):
         # Se NÃO foi cancelado e temos dados pendentes de TM, aplica o aprendizado
         if not cancel and hasattr(self, 'pending_tm_data') and self.pending_tm_data:
             # O Pokémon já aprendeu o move via replace_move no overlay
-            # Só precisamos limpar os dados pendentes
             print(f"[TM] {self.pending_tm_data['move_name']} aprendido com sucesso!")
+
+            # ===== CONQUISTAS: Ensino de Moves =====
+            phase_id = f"{self.chapter_id}-{self.phase_number}"
+            if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+                ach_mgr = self.player.achievement_manager
+                ach_mgr.increment_counter("move_taught_count")
+                ach_mgr.check_and_unlock("first_move_taught", phase_id)
+                ach_mgr.check_and_unlock("move_taught_10", phase_id)
+
             self.pending_tm_data = None
 
         self.game_paused = False
@@ -326,6 +396,17 @@ class GameScene(BaseScene):
 
     def open_evolution_overlay(self, pokemon, evolution_data):
         """Abre o overlay de evolução para um Pokémon"""
+        # Guarda o método de evolução para contagem depois
+        if hasattr(pokemon, 'evolution'):
+            method = evolution_data.get("method", "unknown")
+            pokemon.evolution._pending_evolution_method = method
+
+            # Se for evolução por felicidade com horário (Espeon/Umbreon)
+            if method == "happiness" and "time_of_day" in evolution_data:
+                pokemon._last_evolution_time_of_day = evolution_data.get("time_of_day")
+
+            # Guarda os dados para referência
+            pokemon._last_evolution_data = evolution_data
 
         sound_manager.play_effect(SoundEffect.EVOLUTION)
         self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data)
@@ -374,6 +455,30 @@ class GameScene(BaseScene):
                         self.battle_system.effect_manager.remove_status(target)
                         toast_battle(f"{target.name} curou {status_to_cure}!", duration=4.0, pokemon=target,
                                      portrait="happy")
+
+                        # ===== CONQUISTAS: CURA DE STATUS =====
+                        phase_id = f"{self.chapter_id}-{self.phase_number}"
+                        if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+                            ach_mgr = self.player.achievement_manager
+
+                            # Cura de Veneno com Antídoto
+                            if status_to_cure == "poison" and item_data.get("id") == "antidote":
+                                ach_mgr.increment_counter("antidote_count")
+                                ach_mgr.check_and_unlock("first_antidote", phase_id)
+                                ach_mgr.check_and_unlock("antidote_100", phase_id)
+
+                            # Cura de Sono com Awake
+                            elif status_to_cure == "sleep" and item_data.get("id") == "awake":
+                                ach_mgr.increment_counter("awake_count")
+                                ach_mgr.check_and_unlock("first_awake", phase_id)
+                                ach_mgr.check_and_unlock("awake_100", phase_id)
+
+                            # Cura de Paralisia
+                            elif status_to_cure == "paralysis":
+                                ach_mgr.increment_counter("paralyze_heal_count")
+                                ach_mgr.check_and_unlock("first_paralyze_heal", phase_id)
+                                ach_mgr.check_and_unlock("paralyze_heal_100", phase_id)
+
                         return True
                 return False
 
@@ -474,17 +579,24 @@ class GameScene(BaseScene):
             new_move = Move(move_name, move_info)
             pokemon.moves.append(new_move)
             print(f"[TM] {pokemon.name} aprendeu {move_name} via TM!")
+
+            # ===== CONQUISTAS: Ensino de Moves =====
+            phase_id = f"{self.chapter_id}-{self.phase_number}"
+            if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+                ach_mgr = self.player.achievement_manager
+                ach_mgr.increment_counter("move_taught_count")
+                ach_mgr.check_and_unlock("first_move_taught", phase_id)
+                ach_mgr.check_and_unlock("move_taught_10", phase_id)
+
             return True
 
         # ===== Se tem 4 moves, usa o MoveLearnOverlay existente =====
-        # Salva o item_data para usar depois se o usuário confirmar
         self.pending_tm_data = {
             "item_id": item_data["id"],
             "move_name": move_name,
             "move_info": move_info
         }
 
-        # Abre o overlay de aprendizado (já existente!)
         self.open_move_learn_overlay(pokemon, move_name)
         return True
 
@@ -588,17 +700,28 @@ class GameScene(BaseScene):
 
             revive_percentage = item_data.get("effect_value", 0.5)
             toast_battle(f"{pokemon.name} foi revivido!", duration=4.0, pokemon=pokemon, portrait="happy")
+
+            pokemon.add_happiness(2, f"Usou {item_data.get('name', 'Revive')}")
+
             pokemon.revive(heal_percentage=revive_percentage)
 
-            # ===== CONQUISTAS: Cura (Revive também conta) =====
+            # ===== CONQUISTAS: Revive =====
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
                 player = game_scene.player
                 phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
                 if hasattr(player, 'achievement_manager'):
-                    # Incrementa contador de curas
+                    ach_mgr = player.achievement_manager
+                    ach_mgr.increment_counter("revive_count")
+                    ach_mgr.check_and_unlock("first_revive", phase_id)
+                    ach_mgr.check_and_unlock("revive_25", phase_id)
+
+            # ===== CONQUISTAS: Cura (Revive também conta) =====
+            if game_scene and hasattr(game_scene, 'player'):
+                player = game_scene.player
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                if hasattr(player, 'achievement_manager'):
                     player.achievement_manager.increment_counter("heal_count")
-                    # Verifica conquistas de cura (passando a fase atual)
                     player.achievement_manager.check_and_unlock("heal_5", phase_id)
                     player.achievement_manager.check_and_unlock("heal_100", phase_id)
 
@@ -616,7 +739,7 @@ class GameScene(BaseScene):
         if heal_amount == -1:
             pokemon.heal()
             toast_battle(f"{pokemon.name} foi completamente curado!", duration=4.0, pokemon=pokemon, portrait="happy")
-
+            pokemon.add_happiness(2, f"Usou {item_data.get('name', 'medicina')}")
             # ===== CONQUISTAS: Cura =====
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
@@ -636,7 +759,7 @@ class GameScene(BaseScene):
             healed = pokemon.current_hp - old_hp
             toast_battle(f"{pokemon.name} recuperou {healed} HP! ({pokemon.current_hp}/{pokemon.max_hp})",
                          duration=4.0, pokemon=pokemon, portrait="happy")
-
+            pokemon.add_happiness(2, f"Usou {item_data.get('name', 'medicina')}")
             # ===== CONQUISTAS: Cura =====
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
@@ -821,6 +944,12 @@ class GameScene(BaseScene):
         """Limpa o estado da fase antes de sair - INCLUI RESET DOS DITTOS"""
         self._stop_battle_music(fade_ms=500)
 
+        # ===== LIMPA DIA/NOITE E CLIMA =====
+        self.day_night_filter.clear()
+        self.weather_filter.clear()
+        if hasattr(self, 'day_night_weather'):
+            self.day_night_weather._initialized = False
+
         # ===== RESETA TODOS OS DITTOS TRANSFORMADOS =====
         self.reset_all_transformed_dittos()
 
@@ -881,7 +1010,7 @@ class GameScene(BaseScene):
 
     def handle_event(self, event):
         """Processa eventos do jogo"""
-        # Cache de referências (já existente no seu código)
+        # Cache de referências
         overlay_active = self.overlay_manager.is_active
         drag_manager = self.item_drag_manager
         bag_renderer = self.item_bag_renderer
@@ -904,6 +1033,15 @@ class GameScene(BaseScene):
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.handle_event(event)
             return None
+
+        # ===== OVERLAY DE PAUSA =====
+        # O overlay de pausa é tratado antes dos outros overlays
+        # para garantir que ele capture eventos mesmo com outros overlays ativos
+        if self.overlay_manager.is_active and self.overlay_manager.current_type == OverlayType.PAUSE:
+            if self.overlay_manager.handle_event(event):
+                return None
+            # Não retorna None aqui para permitir que outros eventos sejam processados
+            # Mas o overlay de pausa já trata ESC e P internamente
 
         if overlay_active:
             if self.overlay_manager.handle_event(event):
@@ -940,11 +1078,11 @@ class GameScene(BaseScene):
                     player.bag.cycle_category()
                 return None
             elif event.key == pygame.K_p:
-                self.toggle_pause()
+                self.toggle_pause()  # Agora usa o novo sistema de pausa
                 return None
             elif event.key == pygame.K_ESCAPE:
-                self.cleanup()
-                self.game.current_scene = self.game.menu_scene
+                # ESC agora abre o overlay de pausa em vez de sair
+                self.toggle_pause()
                 return None
             elif event.key == pygame.K_F1:
                 self.show_debug = not self.show_debug
@@ -1147,6 +1285,11 @@ class GameScene(BaseScene):
         perf_monitor.start_section("BATTLE_SYSTEM")
         if hasattr(self, 'battle_system'):
             self.battle_system.update(dt)
+
+        # ===== DIA/NOITE E CLIMA =====
+        if hasattr(self, 'day_night_weather'):
+            self.day_night_weather.update(dt)
+
         perf_monitor.end_section()
 
         # Bag Renderer
@@ -1184,11 +1327,25 @@ class GameScene(BaseScene):
         target_mgr.update(dt)
         perf_monitor.end_section()
 
+        # ===== VERIFICA CONQUISTAS DE FELICIDADE =====
+        if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+            ach_mgr = self.player.achievement_manager
+            phase_id = f"{self.chapter_id}-{self.phase_number}"
+
+            # Verifica conquista de felicidade máxima do time
+            if not ach_mgr.is_unlocked("full_team_max_happiness"):
+                ach_mgr.check_and_unlock("full_team_max_happiness", phase_id)
+
+            # Verifica se algum Pokémon alcançou 100 de felicidade
+            if not ach_mgr.is_unlocked("max_happiness"):
+                ach_mgr.check_and_unlock("max_happiness", phase_id)
+
         # Effect Manager
         if hasattr(self, 'battle_system') and self.battle_system:
             perf_monitor.start_section("EFFECT_MANAGER")
             self.battle_system.effect_manager.update(dt)
             perf_monitor.end_section()
+
 
         self.notification_manager.update(dt)
         # ===== GAME OVER CHECK - MODIFICADO =====
@@ -1203,6 +1360,8 @@ class GameScene(BaseScene):
             print(f"[GAME_OVER] Time derrotado! Fim de jogo.")
             self._stop_battle_music(fade_ms=1000)
             self.game_state = "game_over"
+            for pokemon in self.player.team:
+                pokemon.add_happiness(-5, "Fase perdida")
             self.overlay_manager.show(OverlayType.GAME_OVER)
 
             for pokemon in self.player.team:
@@ -1214,6 +1373,8 @@ class GameScene(BaseScene):
         if items_lost:
             print(f"[GAME_OVER] Todos os itens foram roubados!")
             self.game_state = "game_over"
+            for pokemon in self.player.team:
+                pokemon.add_happiness(-5, "Fase perdida")
             self.overlay_manager.show(OverlayType.GAME_OVER)
 
             for pokemon in self.player.team:
@@ -1253,6 +1414,9 @@ class GameScene(BaseScene):
 
         # ===== RESETA TODOS OS DITTOS TRANSFORMADOS =====
         self.reset_all_transformed_dittos()
+
+        for pokemon in self.player.team:
+            pokemon.add_happiness(5, "Fase completada")
 
         base_reward = self.phase_rewards['money']
         gold_from_defeats = self.wave_manager.get_total_gold_earned()
@@ -1391,6 +1555,31 @@ class GameScene(BaseScene):
             placement_mgr.render_hp(screen, camera)
         perf_monitor.end_section()
 
+        # ===== RENDERIZAÇÃO DOS FILTROS DE CLIMA E DIA/NOITE =====
+        # IMPORTANTE: A ORDEM É: 1. CLIMA, 2. DIA/NOITE
+        perf_monitor.start_section("RENDER_WEATHER_AND_DAYNIGHT")
+
+        viewport_rect = pygame.Rect(
+            self.screen_manager.viewport_x,
+            self.screen_manager.viewport_y,
+            self.screen_manager.viewport_width,
+            self.screen_manager.viewport_height
+        )
+
+        # ===== 1. FILTRO DE CLIMA (CHUVA, AREIA, SOL) =====
+        if hasattr(self, 'battle_system') and self.battle_system:
+            weather = self.battle_system.weather_manager.current_weather
+            if weather and weather.active:
+                self.weather_filter.render(screen, weather, viewport_rect)
+
+        # ===== 2. FILTRO DE DIA/NOITE (POR CIMA DO CLIMA) =====
+        if hasattr(self, 'day_night_weather'):
+            day_night = self.day_night_weather.day_night_state
+            if day_night and day_night.active:
+                self.day_night_filter.render(screen, day_night, viewport_rect)
+
+        perf_monitor.end_section()
+
         # UI do jogo
         perf_monitor.start_section("RENDER_GAME_UI")
         self._render_game_ui(screen)
@@ -1420,24 +1609,6 @@ class GameScene(BaseScene):
                          (screen_mgr.viewport_x, screen_mgr.viewport_y,
                           screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
         perf_monitor.end_section()
-
-        # ===== WEATHER FILTER =====
-        if hasattr(self, 'battle_system') and self.battle_system:
-            weather = self.battle_system.weather_manager.current_weather
-            if weather and weather.active:
-                viewport_rect = pygame.Rect(
-                    self.screen_manager.viewport_x,
-                    self.screen_manager.viewport_y,
-                    self.screen_manager.viewport_width,
-                    self.screen_manager.viewport_height
-                )
-                self.weather_filter.render(screen, weather, viewport_rect)
-
-        # Pause overlay
-        if self.paused and not self.game_paused:
-            perf_monitor.start_section("RENDER_PAUSE_OVERLAY")
-            self._render_pause_overlay(screen)
-            perf_monitor.end_section()
 
         # Overlay Manager
         viewport_rect = pygame.Rect(
@@ -1492,7 +1663,7 @@ class GameScene(BaseScene):
         viewport_x = screen_mgr.viewport_x
         viewport_y = screen_mgr.viewport_y
 
-        ui_bg = pygame.Surface((400, 150))
+        ui_bg = pygame.Surface((400, 180))  # Aumentado para acomodar clima
         ui_bg.set_alpha(180)
         ui_bg.fill((20, 20, 30))
         screen.blit(ui_bg, (viewport_x + 10, viewport_y + 10))
@@ -1503,6 +1674,41 @@ class GameScene(BaseScene):
         screen.blit(phase_text, (viewport_x + 15, y_offset))
         y_offset += 25
 
+        # ===== PERIODO (DIA/NOITE) =====
+        if hasattr(self, 'day_night_weather'):
+            day_night = self.day_night_weather.day_night_state
+            if day_night:
+                period_text = day_night.get_display_name()
+                # Cores específicas para cada tipo
+                period_colors = {
+                    "Dia": (255, 200, 100),
+                    "Noite": (100, 150, 255),
+                    "Entardecer": (255, 180, 80),
+                    "Amanhecer": (255, 200, 200),
+                    "Caverna": (150, 150, 150),
+                    "Fundo do Mar": (80, 180, 255),
+                }
+                period_color = period_colors.get(period_text, (255, 200, 100))
+                period_display = font_small.render(f"Periodo: {period_text}", True, period_color)
+                screen.blit(period_display, (viewport_x + 15, y_offset))
+                y_offset += 20
+
+        # ===== CLIMA =====
+        if hasattr(self, 'battle_system') and self.battle_system:
+            weather = self.battle_system.weather_manager.current_weather
+            if weather and weather.active:
+                weather_name = weather.get_display_name()
+                weather_color = {
+                    "sandstorm": (194, 178, 128),
+                    "rain": (100, 150, 255),
+                    "sunny": (255, 215, 0)
+                }.get(weather.type.value, (200, 200, 200))
+
+                weather_display = font_small.render(f"Clima: {weather_name}", True, weather_color)
+                screen.blit(weather_display, (viewport_x + 15, y_offset))
+                y_offset += 20
+
+        # ===== ITENS =====
         items_color = (100, 255, 100) if target_mgr.items_protected > 0 else (255, 100, 100)
         items_text = font_small.render(
             f"Itens: {target_mgr.items_protected} protegidos | {target_mgr.items_stolen} levados",
@@ -1511,8 +1717,9 @@ class GameScene(BaseScene):
         screen.blit(items_text, (viewport_x + 15, y_offset))
         y_offset += 20
 
+        # ===== ESTADO DO JOGO =====
         if self.game_state == "waiting":
-            state_text = font_small.render("Aguardando início...", True, (200, 200, 200))
+            state_text = font_small.render("Aguardando inicio...", True, (200, 200, 200))
             screen.blit(state_text, (viewport_x + 15, y_offset))
 
         elif self.game_state == "in_wave":
@@ -1528,6 +1735,7 @@ class GameScene(BaseScene):
             screen.blit(wave_text, (viewport_x + 15, y_offset))
             y_offset += 20
 
+            # ===== BARRA DE PROGRESSO =====
             bar_x = viewport_x + 15
             bar_y = y_offset
             bar_width = 370
@@ -1546,6 +1754,7 @@ class GameScene(BaseScene):
 
             y_offset += 25
 
+            # ===== INIMIGOS VIVOS =====
             enemies_color = (255, 100, 100) if wave_mgr.active_enemies else (100, 255, 100)
             enemies_text = font_small.render(
                 f"Inimigos vivos: {len(wave_mgr.active_enemies)}",
@@ -1555,28 +1764,6 @@ class GameScene(BaseScene):
         elif self.game_state == "completed":
             complete_text = font.render("FASE COMPLETA!", True, (255, 215, 0))
             screen.blit(complete_text, (viewport_x + 15, y_offset))
-
-    def _render_pause_overlay(self, screen):
-        """Overlay de pausa do jogo"""
-        screen_mgr = self.screen_manager
-
-        overlay = pygame.Surface((screen_mgr.viewport_width, screen_mgr.viewport_height))
-        overlay.set_alpha(128)
-        overlay.fill((0, 0, 0))
-        screen.blit(overlay, (screen_mgr.viewport_x, screen_mgr.viewport_y))
-
-        font_large = pygame.font.Font(None, 48)
-        pause_text = font_large.render("PAUSADO", True, (255, 255, 255))
-        text_x = screen_mgr.viewport_x + (screen_mgr.viewport_width - pause_text.get_width()) // 2
-        text_y = screen_mgr.viewport_y + (screen_mgr.viewport_height - pause_text.get_height()) // 2
-        screen.blit(pause_text, (text_x, text_y))
-
-        font_small = pygame.font.Font(None, 24)
-        phase_display = self.phase_info.get("name", f"Fase {self.phase_number}")
-        phase_text = font_small.render(phase_display, True, (200, 200, 200))
-        phase_x = screen_mgr.viewport_x + (screen_mgr.viewport_width - phase_text.get_width()) // 2
-        phase_y = text_y + pause_text.get_height() + 10
-        screen.blit(phase_text, (phase_x, phase_y))
 
     def _render_debug_info(self, screen):
         """Informações de debug"""

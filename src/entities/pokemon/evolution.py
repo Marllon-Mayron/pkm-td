@@ -53,6 +53,59 @@ class PokemonEvolution:
         print(f"[EVOLUÇÃO] ✓ {old_name} (Lv.{old_level}) evoluiu para {self.pokemon.name}!")
         print(f"[EVOLUÇÃO] Moves atuais: {[m.name for m in self.pokemon.moves]}")
 
+        # ===== REGISTRA CONTADORES DE EVOLUÇÃO =====
+        if hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
+            game_scene = self.pokemon.game_scene
+            phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+
+            if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+                ach_mgr = game_scene.player.achievement_manager
+
+                # Contador geral de evoluções
+                ach_mgr.increment_counter("evolution_count")
+                ach_mgr.check_and_unlock("first_evolution", phase_id)
+                ach_mgr.check_and_unlock("evolution_10", phase_id)
+                ach_mgr.check_and_unlock("evolution_50", phase_id)
+
+                # ===== IDENTIFICA O TIPO DE EVOLUÇÃO =====
+                method = getattr(self, '_pending_evolution_method', None)
+                if method:
+                    delattr(self, '_pending_evolution_method')
+
+                # Se não tem método definido, tenta inferir
+                if not method:
+                    # Verifica se veio do evolution_data
+                    if hasattr(self.pokemon, '_last_evolution_data'):
+                        evo_data = self.pokemon._last_evolution_data
+                        method = evo_data.get("method", "level")
+
+                # Contadores por tipo de evolução
+                if method == "happiness":
+                    ach_mgr.increment_counter("happiness_evolution_count")
+                    ach_mgr.check_and_unlock("first_happiness_evolution", phase_id)
+                    ach_mgr.check_and_unlock("happiness_evolution_3", phase_id)
+                    ach_mgr.check_and_unlock("happiness_evolution_10", phase_id)
+
+                    # Verifica se foi por clima (dia/noite) - Espeon/Umbreon
+                    if hasattr(self.pokemon, '_last_evolution_time_of_day'):
+                        ach_mgr.increment_counter("weather_evolution_count")
+                        ach_mgr.check_and_unlock("first_weather_evolution", phase_id)
+                        ach_mgr.check_and_unlock("weather_evolution_5", phase_id)
+
+                elif method == "stone":
+                    ach_mgr.increment_counter("stone_evolution_count")
+                    ach_mgr.check_and_unlock("first_stone_evolution", phase_id)
+                    ach_mgr.check_and_unlock("stone_evolution_5", phase_id)
+                    ach_mgr.check_and_unlock("stone_evolution_20", phase_id)
+
+                elif method == "level":
+                    ach_mgr.increment_counter("level_evolution_count")
+                    ach_mgr.check_and_unlock("first_level_evolution", phase_id)
+                    ach_mgr.check_and_unlock("level_evolution_50", phase_id)
+
+                print(
+                    f"[ACHIEVEMENT] Evolucao contada! Metodo: {method}, Total: {ach_mgr.get_counter('evolution_count')}")
+
     def check_combination_evolution(self, nearby_pokemon):
         """
         Verifica se há evolução por combinação com outro Pokémon próximo.
@@ -74,7 +127,7 @@ class PokemonEvolution:
                 "partner": nearby_pokemon,
                 "partner_new_id": other_new_id,
                 "message": message,
-                "remove_partner": remove_partner  # NOVO: flag para remover o parceiro
+                "remove_partner": remove_partner
             }
 
         return None
@@ -172,7 +225,6 @@ class PokemonEvolution:
             if hasattr(game_scene.game, 'current_scene'):
                 from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
                 if isinstance(game_scene.game.current_scene, TeamSelectScene):
-                    # Marca para recriar o layout na tela de seleção de time
                     game_scene.game.current_scene.layout_initialized = False
                     print(f"[COMBINATION] TeamSelectScene marcado para recriar layout!")
 
@@ -192,9 +244,17 @@ class PokemonEvolution:
             self.pokemon.attack_damage = self.pokemon._calculate_attack_damage()
             self.pokemon.defense_value = self.pokemon._calculate_defense()
 
+            # Verifica evolução por nível primeiro
             evolution = evolution_manager.check_evolution(self.pokemon.id, current_level=self.pokemon.level)
             if evolution and self.pokemon.game_scene:
                 self.pokemon.game_scene.open_evolution_overlay(self.pokemon, evolution)
+                return True
+
+            # Se não evoluiu por nível, verifica evolução por felicidade
+            # (caso a felicidade tenha mudado indiretamente)
+            happiness_evo = evolution_manager.check_happiness_evolution(self.pokemon)
+            if happiness_evo and self.pokemon.game_scene:
+                self.pokemon.game_scene.open_evolution_overlay(self.pokemon, happiness_evo)
                 return True
 
         return leveled_up
@@ -207,7 +267,7 @@ class PokemonEvolution:
         self.pokemon._calculate_stats()
         self.pokemon.current_hp = self.pokemon.max_hp
         self.pokemon.xp_to_next = self.pokemon._calculate_xp_needed()
-
+        self.pokemon.add_happiness(3, "Subiu de nivel")
         toast_battle(f"{self.pokemon.name} subiu de nivel!!!", duration=4.0, pokemon=self.pokemon, portrait="joyous")
         new_moves, pending_moves = self.pokemon.check_new_moves_on_level_up(old_level)
         if new_moves:

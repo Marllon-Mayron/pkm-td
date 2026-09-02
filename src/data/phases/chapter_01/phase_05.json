@@ -642,8 +642,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 9,
-                "max_level": 9,
+                "min_level": 11,
+                "max_level": 11,
                 "wave_size": 1,
                 "spawn_interval": 3.0,
                 "initial_delay": 5.0,
@@ -661,8 +661,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 11,
-                "max_level": 11,
+                "min_level": 13,
+                "max_level": 13,
                 "wave_size": 1,
                 "spawn_interval": 10.0,
                 "initial_delay": 10.0,
@@ -670,7 +670,7 @@
                 "repeat_count": 1
             }
         ],
-        "selected_wave": 0
+        "selected_wave": 1
     },
     "tower_spots": {
         "spot_size": 24,

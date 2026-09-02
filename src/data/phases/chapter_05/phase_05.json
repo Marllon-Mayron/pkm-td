@@ -793,8 +793,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 34,
-                "max_level": 34,
+                "min_level": 40,
+                "max_level": 40,
                 "wave_size": 1,
                 "spawn_interval": 1.0,
                 "initial_delay": 10.0,
@@ -812,8 +812,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 34,
-                "max_level": 34,
+                "min_level": 40,
+                "max_level": 40,
                 "wave_size": 1,
                 "spawn_interval": 1.0,
                 "initial_delay": 10.0,
@@ -831,8 +831,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 36,
-                "max_level": 36,
+                "min_level": 42,
+                "max_level": 42,
                 "wave_size": 1,
                 "spawn_interval": 1.0,
                 "initial_delay": 20.0,
@@ -903,8 +903,14 @@
             }
         ]
     },
+    "events": {
+        "triggers": [],
+        "selected_trigger": 0
+    },
     "rewards": {
         "money": 100,
         "experience": 50
-    }
+    },
+    "localization_type": "default",
+    "custom_folder": ""
 }

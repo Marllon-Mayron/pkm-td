@@ -85,11 +85,11 @@ class BattleSystem:
 
         # ===== CALCULA XP BASE (exponencial pelo nível do inimigo) =====
         level = defeated_enemy.level
-        base_xp = 20 + int((level ** 1.5) * 2)
+        base_xp = 5 + int((level ** 1.5) * 2)
 
-        # Bônus para boss (3x)
+        # Bônus para boss (2x)
         if defeated_enemy.is_boss:
-            base_xp = int(base_xp * 3)
+            base_xp = int(base_xp * 1.5)
             print(f"[XP] BOSS derrotado! XP base: {base_xp}")
 
         # Bônus para shiny (1.5x)
@@ -958,14 +958,27 @@ class BattleSystem:
         if move.category == "physical":
             atk_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.ATTACK)
             def_mult = self.effect_manager.get_stat_multiplier(target, StatType.DEFENSE)
-            print(f"[DAMAGE] {attacker.name} atk_mult={atk_mult:.2f}, {target.name} def_mult={def_mult:.2f}")
             damage_result["damage"] = int(damage_result["damage"] * atk_mult / def_mult)
         else:
             sp_atk_mult = self.effect_manager.get_stat_multiplier(attacker, StatType.SP_ATTACK)
             sp_def_mult = self.effect_manager.get_stat_multiplier(target, StatType.SP_DEFENSE)
-            print(
-                f"[DAMAGE] {attacker.name} sp_atk_mult={sp_atk_mult:.2f}, {target.name} sp_def_mult={sp_def_mult:.2f}")
             damage_result["damage"] = int(damage_result["damage"] * sp_atk_mult / sp_def_mult)
+
+        # ===== APLICA EFEITOS DO CLIMA =====
+        move_info = {
+            'type': move.type,
+            'category': move.category,
+            'power': move.power
+        }
+        weather_effects = self.apply_weather_effects(attacker, target, move_info)
+
+        if weather_effects['damage_multiplier'] != 1.0:
+            old_damage = damage_result["damage"]
+            damage_result["damage"] = int(damage_result["damage"] * weather_effects['damage_multiplier'])
+            if weather_effects['message']:
+                self.effect_manager.add_status_text(attacker, weather_effects['message'], duration=1.0)
+            print(
+                f"[WEATHER] Dano ajustado: {old_damage} -> {damage_result['damage']} (x{weather_effects['damage_multiplier']})")
 
         # ===== APLICA REDUÇÃO DE SCREENS =====
         screen_reduction = self.get_screen_damage_reduction(target, move.category)
@@ -1147,6 +1160,81 @@ class BattleSystem:
         if not self.weather_manager:
             return False
         return self.weather_manager.is_weather_active(weather_type)
+
+    def apply_weather_effects(self, attacker, defender, move_info) -> dict:
+        """
+        Aplica os efeitos do clima no movimento.
+        Retorna um dicionário com modificadores.
+        """
+        effects = {
+            'damage_multiplier': 1.0,
+            'accuracy_modifier': 1.0,
+            'heal_modifier': 1.0,
+            'is_immune': False,
+            'message': None
+        }
+
+        if not self.weather_manager:
+            return effects
+
+        weather = self.weather_manager.current_weather
+        if not weather or not weather.active:
+            return effects
+
+        move_type = move_info.get('type', '').lower()
+        weather_boosted = False
+
+        # ===== RAIN =====
+        if weather.type.value == "rain":
+            if move_type == 'water':
+                effects['damage_multiplier'] = 1.5
+                effects['message'] = "A chuva fortaleceu o ataque!"
+                weather_boosted = True
+            elif move_type == 'fire':
+                effects['damage_multiplier'] = 0.5
+                effects['message'] = "A chuva enfraqueceu o ataque!"
+            elif move_type in ['solar_beam', 'solar_blade']:
+                effects['damage_multiplier'] = 0.5
+                effects['message'] = "A chuva enfraqueceu o ataque!"
+
+        # ===== SUNNY =====
+        elif weather.type.value == "sunny":
+            if move_type == 'fire':
+                effects['damage_multiplier'] = 1.5
+                effects['message'] = "O sol forte fortaleceu o ataque!"
+                weather_boosted = True
+            elif move_type == 'water':
+                effects['damage_multiplier'] = 0.5
+                effects['message'] = "O sol forte enfraqueceu o ataque!"
+            elif move_type in ['solar_beam', 'solar_blade']:
+                effects['damage_multiplier'] = 1.5
+                effects['message'] = "O sol forte carregou o ataque!"
+                weather_boosted = True
+
+        # ===== SANDSTORM =====
+        elif weather.type.value == "sandstorm":
+            if move_type in ['rock', 'ground', 'steel']:
+                effects['damage_multiplier'] = 1.3
+                effects['message'] = "A tempestade de areia fortaleceu o ataque!"
+                weather_boosted = True
+
+        # ===== CONQUISTAS: Ataque buffado pelo clima =====
+        if weather_boosted and hasattr(self, 'game_scene') and self.game_scene:
+            game_scene = self.game_scene
+            if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+                player = game_scene.player
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+
+                # Incrementa contador de ataques buffados pelo clima
+                player.achievement_manager.increment_counter("weather_boosted_attack_count")
+
+                # Verifica conquista
+                player.achievement_manager.check_and_unlock("first_weather_boosted_attack", phase_id)
+
+                print(
+                    f"[ACHIEVEMENT] Ataque buffado pelo clima #{player.achievement_manager.get_counter('weather_boosted_attack_count')}")
+
+        return effects
 
     def register_attacker_for_enemy(self, attacker: 'Pokemon', enemy: 'Pokemon'):
         """Registra que um atacante atingiu um inimigo específico"""

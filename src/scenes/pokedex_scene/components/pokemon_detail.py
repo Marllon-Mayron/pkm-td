@@ -1,4 +1,4 @@
-# src/scenes/pokedex_scene/components/pokemon_detail.py
+# src/scenes/pokedex_scene/components/pokemon_detail.py - CORREÇÃO PARA USAR WALK ANIMATION
 
 import pygame
 from src.scenes.pokedex_scene.utils.constants import COLORS, TYPE_COLORS, SIZES
@@ -18,9 +18,19 @@ class PokemonDetail:
         self.inmap_timer = 0
         self.animation_speed = 0.15
 
-        # ===== ROTACAO AUTOMATICA EM SENTIDO HORARIO =====
+        # ===== ROTACAO AUTOMATICA COM 8 DIRECOES =====
         self.direction_index = 0
-        self.directions = ["down", "right", "up", "left"]
+        # 8 DIREÇÕES COMPLETAS (ordem horária)
+        self.directions = [
+            "down",  # 0
+            "down-right",  # 1
+            "right",  # 2
+            "up-right",  # 3
+            "up",  # 4
+            "up-left",  # 5
+            "left",  # 6
+            "down-left"  # 7
+        ]
         self.direction_change_timer = 0
         self.direction_change_interval = 1.5
 
@@ -39,7 +49,10 @@ class PokemonDetail:
         self._sprite_size_cache = {}
 
         # ===== MULTIPLICADOR PARA O TAMANHO DO SPRITE INMAP =====
-        self.inmap_scale_multiplier = 4.0  # Multiplica o tamanho original por 4
+        self.inmap_scale_multiplier = 4.0
+
+        # ===== ANIMAÇÃO A SER USADA =====
+        self._animation_name = "walk"  # Usa walk que tem 8 direções
 
     def set_pokemon(self, pokemon_id, pokemon_data, is_caught, is_seen):
         self.pokemon_id = pokemon_id
@@ -55,18 +68,43 @@ class PokemonDetail:
         self._sprite_size_cache = {}
 
     def _get_animation_frames(self, pokedex, direction):
-        """Obtem os frames da animacao para uma direcao especifica com cache"""
+        """
+        Obtem os frames da animacao para uma direcao especifica.
+        Agora funciona com 8 direções diretamente.
+        """
         cache_key = f"{self.pokemon_id}_{direction}"
 
         if cache_key in self._cached_frames:
             return self._cached_frames[cache_key]
 
+        # ===== OBTÉM A ANIMAÇÃO COMPLETA COM 8 DIREÇÕES =====
         anim = pokedex.get_inmap_animation(self.pokemon_id, shiny=False)
         frames = anim.get(direction, [])
 
+        # Fallback: se não encontrou, tenta direções próximas
         if not frames:
-            for fallback_dir in ["down", "right", "left", "up"]:
-                frames = anim.get(fallback_dir, [])
+            # Mapeamento de fallback para diagonais
+            fallback_map = {
+                "down-right": ["down", "right"],
+                "up-right": ["up", "right"],
+                "up-left": ["up", "left"],
+                "down-left": ["down", "left"]
+            }
+
+            if direction in fallback_map:
+                for fallback_dir in fallback_map[direction]:
+                    frames = anim.get(fallback_dir, [])
+                    if frames:
+                        break
+
+        # Último fallback: tenta qualquer direção que tenha frames
+        if not frames:
+            all_directions = [
+                "down", "down-right", "right", "up-right",
+                "up", "up-left", "left", "down-left"
+            ]
+            for d in all_directions:
+                frames = anim.get(d, [])
                 if frames:
                     break
 
@@ -74,22 +112,15 @@ class PokemonDetail:
         return frames
 
     def _get_sprite_size(self, pokedex) -> int:
-        """
-        Obtem o tamanho real do sprite InMap do Pokemon.
-        USA O MESMO METODO QUE O JOGO USA NO MAPA, MAS MULTIPLICA POR 4.
-
-        No jogo: self.map_sprite_size = self.pokedex.get_map_sprite_size(pokemon_id, shiny)
-        """
+        """Obtem o tamanho real do sprite InMap do Pokemon."""
         cache_key = f"{self.pokemon_id}_size"
 
         if cache_key in self._sprite_size_cache:
             return self._sprite_size_cache[cache_key]
 
-        # ===== USA O MESMO METODO DO JOGO =====
         try:
             size = pokedex.get_map_sprite_size(self.pokemon_id, shiny=False)
             if size > 0:
-                # ===== MULTIPLICA POR 4 PARA FICAR MAIOR NA POKEDEX =====
                 scaled_size = int(size * self.inmap_scale_multiplier)
                 self._sprite_size_cache[cache_key] = scaled_size
                 return scaled_size
@@ -97,14 +128,13 @@ class PokemonDetail:
             pass
 
         # Fallback: tenta obter de um frame real
-        for d in ["down", "right", "left", "up"]:
+        for d in self.directions:
             frames = self._get_animation_frames(pokedex, d)
             if frames and len(frames) > 0:
                 frame = frames[0]
                 if frame:
                     width, height = frame.get_width(), frame.get_height()
                     size = max(width, height)
-                    # ===== MULTIPLICA POR 4 =====
                     scaled_size = int(size * self.inmap_scale_multiplier)
                     self._sprite_size_cache[cache_key] = scaled_size
                     return scaled_size
@@ -115,7 +145,7 @@ class PokemonDetail:
         return default_size
 
     def update(self, dt):
-        """Atualiza a animacao com loop continuo e rotacao automatica"""
+        """Atualiza a animacao com loop continuo e rotacao automatica (8 direções)"""
         if not self.pokemon_id or not self.show_inmap:
             return
 
@@ -188,6 +218,8 @@ class PokemonDetail:
     def _get_sprite(self, pokedex):
         if self.show_inmap:
             direction = self._get_direction()
+
+            # ===== OBTÉM O SPRITE DA ANIMAÇÃO WALK =====
             sprite = pokedex.get_sprite(
                 self.pokemon_id,
                 "inmap",
@@ -195,6 +227,8 @@ class PokemonDetail:
                 direction=direction,
                 frame=self.inmap_frame
             )
+
+            # Fallback: tenta frame 0 da mesma direção
             if not sprite:
                 sprite = pokedex.get_sprite(
                     self.pokemon_id,
@@ -203,8 +237,10 @@ class PokemonDetail:
                     direction=direction,
                     frame=0
                 )
+
+            # Fallback: tenta todas as direções
             if not sprite:
-                for fallback_dir in ["down", "right", "left", "up"]:
+                for fallback_dir in self.directions:
                     sprite = pokedex.get_sprite(
                         self.pokemon_id,
                         "inmap",
@@ -215,7 +251,6 @@ class PokemonDetail:
                     if sprite:
                         break
 
-            # ===== OBTEM O TAMANHO REAL DO SPRITE (MULTIPLICADO POR 4) =====
             sprite_size = self._get_sprite_size(pokedex)
             return sprite, sprite_size
         else:
@@ -250,20 +285,16 @@ class PokemonDetail:
         sprite, sprite_size = self._get_sprite(pokedex)
 
         if sprite:
-            # ===== USA O TAMANHO MULTIPLICADO POR 4 =====
             max_display_size = min(sprite_area.width - 20, sprite_area.height - 20)
 
-            # Se o sprite for maior que a area, escala proporcionalmente
             if sprite_size > max_display_size:
                 scale_factor = max_display_size / sprite_size
                 display_size = int(sprite_size * scale_factor)
             else:
                 display_size = sprite_size
 
-            # Escala o sprite mantendo proporcao
             scaled_sprite = pygame.transform.scale(sprite, (display_size, display_size))
 
-            # Centraliza na area
             sprite_x = sprite_area.centerx - display_size // 2
             sprite_y = sprite_area.centery - display_size // 2
             screen.blit(scaled_sprite, (sprite_x, sprite_y))
@@ -273,7 +304,6 @@ class PokemonDetail:
                 glow.fill((255, 215, 0, 40))
                 screen.blit(glow, (sprite_x, sprite_y))
 
-            # ===== MOSTRA INFO DO TAMANHO (DEBUG) =====
             if self.show_inmap:
                 info_font = pygame.font.Font(None, 12)
                 original_size = int(sprite_size / self.inmap_scale_multiplier)
@@ -285,7 +315,7 @@ class PokemonDetail:
             placeholder = placeholder_font.render("?", True, COLORS['text_secondary'])
             screen.blit(placeholder, placeholder.get_rect(center=sprite_area.center))
 
-        # ===== INFORMACOES DA ANIMACAO (MODO AUTOMATICO) =====
+        # ===== INFORMACOES DA ANIMACAO (MODO AUTOMATICO COM 8 DIRECOES) =====
         if self.show_inmap:
             info_font = pygame.font.Font(None, 16)
 
@@ -304,11 +334,22 @@ class PokemonDetail:
                 frame_surf = info_font.render(frame_text, True, COLORS['text_secondary'])
                 screen.blit(frame_surf, (sprite_area.right - frame_surf.get_width() - 8, sprite_area.bottom - 18))
 
-            # ===== INDICADOR VISUAL DE ROTACAO AUTOMATICA =====
-            dir_font = pygame.font.Font(None, 14)
-            direction_names = ["DOWN", "RIGHT", "UP", "LEFT"]
+            # ===== INDICADOR VISUAL DE ROTACAO COM 8 DIRECOES =====
+            dir_font = pygame.font.Font(None, 12)
 
-            current_x = sprite_area.centerx - 60
+            direction_names = [
+                "DOWN",  # 0
+                "D-R",  # 1
+                "RIGHT",  # 2
+                "U-R",  # 3
+                "UP",  # 4
+                "U-L",  # 5
+                "LEFT",  # 6
+                "D-L"  # 7
+            ]
+
+            total_width = 0
+            text_surfaces = []
 
             for i, d in enumerate(direction_names):
                 if i == self.direction_index:
@@ -317,13 +358,20 @@ class PokemonDetail:
                 else:
                     color = COLORS['text_secondary']
                     text = d
+                surf = dir_font.render(text, True, color)
+                text_surfaces.append((surf, i == self.direction_index))
+                total_width += surf.get_width() + 4
 
-                text_surf = dir_font.render(text, True, color)
-                screen.blit(text_surf, (current_x, sprite_area.bottom + 4))
-                current_x += text_surf.get_width() + 8
+            start_x = sprite_area.centerx - total_width // 2
+            current_x = start_x
+            y_pos = sprite_area.bottom + 4
+
+            for surf, is_active in text_surfaces:
+                screen.blit(surf, (current_x, y_pos))
+                current_x += surf.get_width() + 4
 
             auto_font = pygame.font.Font(None, 12)
-            auto_text = auto_font.render("AUTO ROTATE", True, COLORS['text_secondary'])
+            auto_text = auto_font.render("AUTO ROTATE (8 DIR)", True, COLORS['text_secondary'])
             screen.blit(auto_text, (sprite_area.centerx - auto_text.get_width() // 2, sprite_area.bottom + 22))
 
         # Botao toggle view

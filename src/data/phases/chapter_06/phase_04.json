@@ -1563,8 +1563,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 35,
-                "max_level": 35,
+                "min_level": 45,
+                "max_level": 45,
                 "wave_size": 1,
                 "spawn_interval": 1.0,
                 "initial_delay": 10.0,
@@ -1582,8 +1582,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 35,
-                "max_level": 35,
+                "min_level": 45,
+                "max_level": 45,
                 "wave_size": 1,
                 "spawn_interval": 1.0,
                 "initial_delay": 10.0,
@@ -1601,8 +1601,8 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 34,
-                "max_level": 34,
+                "min_level": 47,
+                "max_level": 47,
                 "wave_size": 1,
                 "spawn_interval": 1.0,
                 "initial_delay": 10.0,
@@ -1620,12 +1620,12 @@
                         "percentage": 100
                     }
                 ],
-                "min_level": 40,
-                "max_level": 40,
+                "min_level": 47,
+                "max_level": 47,
                 "wave_size": 1,
                 "spawn_interval": 1.0,
                 "initial_delay": 15.0,
-                "repeat_wave": true,
+                "repeat_wave": false,
                 "repeat_count": 1
             }
         ],

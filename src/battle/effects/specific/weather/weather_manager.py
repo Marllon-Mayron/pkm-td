@@ -9,32 +9,74 @@ class WeatherManager:
     def __init__(self, battle_system):
         self.battle_system = battle_system
         self.current_weather: Optional[WeatherState] = None
+        self.base_weather: Optional[WeatherState] = None  # Clima permanente da fase
         self._weather_damage_timer = 0.0
 
+    def set_base_weather(self, weather_type: WeatherType, duration: float = None):
+        """
+        Define o clima BASE da fase (permanente).
+        """
+        if self.base_weather:
+            self.base_weather.active = False
+            self.base_weather = None
+
+        self.base_weather = WeatherState(weather_type, duration or 999999.0, source=None, is_base_weather=True)
+        self.base_weather.active = True
+
+        if self.current_weather is None or not self.current_weather.active:
+            self.current_weather = self.base_weather
+
+        print(f"[WEATHER_MANAGER] Clima BASE definido: {weather_type.value} (permanente)")
+
     def set_weather(self, weather_type: WeatherType, duration: float = 10.0, source=None):
-        if self.current_weather:
+        """
+        Define um clima TEMPORÁRIO (de move).
+        Quando expirar, restaura o clima base.
+        """
+        # Se já tem clima temporário, remove
+        if self.current_weather and not self.current_weather.is_base_weather:
             self._on_weather_end(self.current_weather)
 
-        self.current_weather = WeatherState(weather_type, duration, source)
+        # Cria o clima temporário
+        self.current_weather = WeatherState(weather_type, duration, source, is_base_weather=False)
         self._weather_damage_timer = 0.0
         self._on_weather_start(self.current_weather)
 
+        print(f"[WEATHER_MANAGER] Clima TEMPORÁRIO: {weather_type.value} por {duration:.1f}s (fonte: {source.name if source else '?'})")
+
     def clear_weather(self):
-        if self.current_weather:
+        """Remove o clima temporário e restaura o base"""
+        if self.current_weather and not self.current_weather.is_base_weather:
             self._on_weather_end(self.current_weather)
             self.current_weather = None
             self._weather_damage_timer = 0.0
 
+            # ===== RESTAURA O CLIMA BASE =====
+            if self.base_weather and self.base_weather.active:
+                self.current_weather = self.base_weather
+                print(f"[WEATHER_MANAGER] Clima BASE restaurado: {self.base_weather.type.value}")
+                self._on_weather_start(self.current_weather)
+
     def update(self, dt: float):
         """Atualiza o clima atual"""
-        if self.current_weather:
-            self._apply_weather_damage(dt)
+        if not self.current_weather:
+            return
 
-            still_active = self.current_weather.update(dt)
+        # ===== ATUALIZA O CLIMA ATUAL =====
+        self._apply_weather_damage(dt)
 
-            if not still_active:
-                self._on_weather_end(self.current_weather)
-                self.current_weather = None
+        still_active = self.current_weather.update(dt)
+
+        if not still_active:
+            # Se o clima expirou, limpa e restaura o base
+            self._on_weather_end(self.current_weather)
+            self.current_weather = None
+
+            # ===== RESTAURA O CLIMA BASE =====
+            if self.base_weather and self.base_weather.active:
+                self.current_weather = self.base_weather
+                print(f"[WEATHER_MANAGER] Clima BASE restaurado: {self.base_weather.type.value}")
+                self._on_weather_start(self.current_weather)
 
     def get_current_weather(self) -> Optional[WeatherState]:
         return self.current_weather
@@ -46,21 +88,40 @@ class WeatherManager:
             return True
         return self.current_weather.type == weather_type
 
+    def is_base_weather_active(self) -> bool:
+        """Verifica se o clima ativo é o base (não temporário)"""
+        return self.current_weather and self.current_weather.is_base_weather
+
+    def is_weather_from_move(self) -> bool:
+        """Verifica se o clima atual foi causado por um move"""
+        return self.current_weather and not self.current_weather.is_base_weather and self.current_weather.source is not None
+
     def _on_weather_start(self, weather: WeatherState):
         if self.battle_system and self.battle_system.effect_manager:
-            self.battle_system.effect_manager.add_status_text(
-                None,
-                weather.get_display_name(),
-                duration=2.0
-            )
+            if weather.is_base_weather:
+                # Clima base: mensagem mais sutil
+                self.battle_system.effect_manager.add_status_text(
+                    None,
+                    f"{weather.get_display_name()} (clima da fase)",
+                    duration=2.0
+                )
+            else:
+                # Clima temporário: mensagem normal
+                self.battle_system.effect_manager.add_status_text(
+                    None,
+                    weather.get_display_name(),
+                    duration=2.0
+                )
 
     def _on_weather_end(self, weather: WeatherState):
         if self.battle_system and self.battle_system.effect_manager:
-            self.battle_system.effect_manager.add_status_text(
-                None,
-                f"{weather.get_display_name()} acabou!",
-                duration=2.0
-            )
+            # Só mostra mensagem se não for clima base (que nunca acaba)
+            if not weather.is_base_weather:
+                self.battle_system.effect_manager.add_status_text(
+                    None,
+                    f"{weather.get_display_name()} acabou!",
+                    duration=2.0
+                )
 
     def _apply_weather_damage(self, dt: float):
         """Aplica dano de clima a cada tick (a cada ~2 segundos)"""

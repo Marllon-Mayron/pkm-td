@@ -1939,7 +1939,7 @@ class EffectFactory:
                 "weather_type": "sunny",
                 "duration": 10.0
             },
-            "description": "Cria sol forte por 5 turnos"
+            "description": "Cria sol forte por 5 turnos. (NÃO FUNCIONA À NOITE!)"
         },
 
         "vital-throw": {

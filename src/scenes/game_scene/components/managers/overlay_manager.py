@@ -1,10 +1,11 @@
-# src/scenes/game_scene/components/overlay_manager.py
+# src/scenes/game_scene/components/managers/overlay_manager.py
 
 from enum import Enum
 
 from src.scenes.game_scene.components.overlays.game_over_overlay import GameOverOverlay
 from src.scenes.game_scene.components.overlays.phase_complete_overlay import PhaseCompleteOverlay
 from src.scenes.game_scene.components.overlays.capture_overlay import CaptureOverlay
+from src.scenes.game_scene.components.overlays.pause_overlay import PauseOverlay  # NOVO
 
 
 class OverlayType(Enum):
@@ -12,6 +13,7 @@ class OverlayType(Enum):
     GAME_OVER = "game_over"
     PHASE_COMPLETE = "phase_complete"
     CAPTURE = "capture"
+    PAUSE = "pause"
 
 
 class OverlayManager:
@@ -28,7 +30,7 @@ class OverlayManager:
 
         # Cria o overlay apenas quando for mostrar
         if overlay_type == OverlayType.GAME_OVER:
-            reason = kwargs.get('reason', 'items_stolen')  # Pega o motivo ou usa default
+            reason = kwargs.get('reason', 'items_stolen')
             self.current_overlay = GameOverOverlay(self.game_scene, reason=reason)
             print(f"[OVERLAY] GameOverOverlay criado com motivo: {reason}")
 
@@ -44,6 +46,9 @@ class OverlayManager:
             else:
                 self.current_overlay = None
                 return
+        elif overlay_type == OverlayType.PAUSE:  # NOVO
+            self.current_overlay = PauseOverlay(self.game_scene)
+            print(f"[OVERLAY] PauseOverlay criado")
         else:
             self.current_overlay = None
             return

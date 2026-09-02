@@ -16,7 +16,7 @@ class WeatherState:
     Estado do clima na batalha.
     """
 
-    def __init__(self, weather_type: WeatherType, duration: float = 10.0, source=None):
+    def __init__(self, weather_type: WeatherType, duration: float = 10.0, source=None, is_base_weather: bool = False):
         print(f"[WeatherState] __init__: weather_type={weather_type}, type(weather_type)={type(weather_type)}")
 
         # Garantir que é um WeatherType
@@ -38,8 +38,10 @@ class WeatherState:
         self.max_duration = duration
         self.source = source
         self.active = True
+        self.is_base_weather = is_base_weather  # True = clima permanente da fase
 
-        print(f"[WeatherState] Finalizado: type={self.type}, value={self.type.value}, active={self.active}")
+        print(f"[WeatherState] Finalizado: type={self.type}, value={self.type.value}, "
+              f"active={self.active}, is_base_weather={self.is_base_weather}")
 
     def is_immune_to_damage(self, pokemon) -> bool:
         """Verifica se um Pokémon é imune ao dano deste clima"""
@@ -50,8 +52,19 @@ class WeatherState:
         return True  # Outros climas não causam dano
 
     def update(self, dt: float) -> bool:
+        """
+        Atualiza o clima.
+
+        Retorna False se o clima expirou.
+        Clima base (is_base_weather=True) NUNCA expira.
+        """
         if not self.active:
             return False
+
+        # ===== CLIMA BASE NUNCA EXPIRE =====
+        if self.is_base_weather:
+            return True
+
         self.duration -= dt
         if self.duration <= 0:
             self.active = False
@@ -74,7 +87,6 @@ class WeatherState:
 
     def get_filter_color(self) -> tuple:
         """Retorna a cor do filtro com opacidade"""
-        # Use .value para comparar a string, não o objeto enum
         if self.type.value == "sandstorm":
             return (194, 178, 128, 110)
         elif self.type.value == "rain":
