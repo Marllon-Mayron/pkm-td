@@ -303,6 +303,20 @@ class ItemBagCatalog:
             "unlock_phase": "1-5",
             "unlock_chapter": None
         }
+        items["rare_candy"] = {
+            "id": "rare_candy",
+            "name": "RARE CANDY",
+            "sprite_path": medicine_path / "rare-candy.png",
+            "description": "Doce raro que aumenta o nível em 1.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "level_up",
+            "effect_value": 1,
+            "price": 4800,
+            "unlock_phase": None,
+            "unlock_chapter": None
+        }
         # ===== REVIVES =====
         items["revive"] = {
             "id": "revive",

@@ -528,10 +528,40 @@ class GameScene(BaseScene):
             self._attempt_capture(target, item_data)
             return True
 
+        elif effect == "level_up":
+            if target_type == "ally":
+                pokemon = target
+                if pokemon.is_defeated:
+                    toast_warning(f"{pokemon.name} está derrotado! Não pode usar Rare Candy.", duration=2.0)
+                    return False
+
+                old_level = pokemon.level
+                xp_needed = pokemon.xp_to_next
+                pokemon.gain_xp(xp_needed)  # ganha XP exato para subir 1 nível
+                new_level = pokemon.level
+
+                if new_level > old_level:
+                    toast_battle(
+                        f"{pokemon.name} subiu para o nível {new_level}!",
+                        duration=4.0,
+                        pokemon=pokemon,
+                        portrait="joyous"
+                    )
+                    # ===== CONQUISTA: RARE CANDY =====
+                    phase_id = f"{self.chapter_id}-{self.phase_number}"
+                    if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+                        ach_mgr = self.player.achievement_manager
+                        ach_mgr.increment_counter("rare_candy_count")
+                        ach_mgr.check_and_unlock("rare_candy_3", phase_id)
+                    return True
+                else:
+                    # Caso raro: não subiu (ex: nível máximo?) – não consome o item
+                    return False
         # ===== MEDICAMENTOS =====
         elif target_type == "ally" and category == "medicine":
             medicine_success = self.use_medicine(target, item_data)
             return medicine_success
+
 
         return False
 

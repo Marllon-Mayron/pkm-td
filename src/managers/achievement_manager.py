@@ -252,7 +252,10 @@ class AchievementManager:
         elif achievement_id == "first_weather_boosted_attack":
             if self.get_counter("weather_boosted_attack_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
-
+        # ===== RARE CANDY =====
+        elif achievement_id == "rare_candy_3":
+            if self.get_counter("rare_candy_count") >= 3:
+                return self.unlock(achievement_id, phase_id)
         # ===== EVOLUÇÃO GERAL =====
         elif achievement_id == "first_evolution":
             if self.get_counter("evolution_count") >= 1:
@@ -402,6 +405,8 @@ class AchievementManager:
             "weather_change_100": ("weather_change_count", 100),
             "first_weather_boosted_attack": ("weather_boosted_attack_count", 1),
 
+            # ===== RARE CANDY =====
+            "rare_candy_3": ("rare_candy_count", 3),
             # ===== EVOLUÇÃO GERAL =====
             "first_evolution": ("evolution_count", 1),
             "evolution_10": ("evolution_count", 10),

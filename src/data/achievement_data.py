@@ -52,7 +52,6 @@ class Achievement:
 
 # ===== CATALOGO DE CONQUISTAS =====
 ACHIEVEMENTS: Dict[str, Achievement] = {
-    # ===== CONQUISTAS EXISTENTES (VALORES AJUSTADOS) =====
     "first_capture": Achievement(
         id="first_capture",
         title="Primeiro Passo",
@@ -114,32 +113,39 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
     "first_weather_change": Achievement(
         id="first_weather_change",
         title="Mestre do Clima Iniciante",
-        description="Mude o clima pela primeira vez usando um movimento",
+        description="É possivel mudar o clima das fases! Então mude o clima pela primeira vez usando um movimento",
         rarity=AchievementRarity.COMMON,
         rewards={"gold": 100, "xp": 50}
     ),
     "weather_change_50": Achievement(
         id="weather_change_50",
         title="Mestre do Clima Intermediario",
-        description="Mude o clima 50 vezes usando movimentos",
+        description="Que tal mudar todo o cenário a seu favor? Mude o clima 50 vezes usando movimentos",
         rarity=AchievementRarity.UNCOMMON,
         rewards={"gold": 600, "xp": 300}
     ),
     "weather_change_100": Achievement(
         id="weather_change_100",
         title="Mestre do Clima Absoluto",
-        description="Mude o clima 100 vezes usando movimentos",
+        description="Que tal mudar todo o cenário a seu favor? Mude o clima 100 vezes usando movimentos!",
         rarity=AchievementRarity.EPIC,
         rewards={"gold": 1500, "xp": 750}
     ),
     "first_weather_boosted_attack": Achievement(
         id="first_weather_boosted_attack",
         title="Poder do Clima",
-        description="Tenha seu primeiro ataque fortalecido pelo clima",
+        description="O clima pode aumentar o poder dos ataques, tenha seu primeiro ataque fortalecido pelo clima",
         rarity=AchievementRarity.COMMON,
         rewards={"gold": 100, "xp": 50}
     ),
-
+    # ===== CONQUISTAS DE RARE CANDY =====
+    "rare_candy_3": Achievement(
+        id="rare_candy_3",
+        title="Distribuidor de Docinhos",
+        description="Seus pokemons adorariam receber alguns doces, que tal conseguir alguns e dar 3 doces para seus pokemons?",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 500, "xp": 300}
+    ),
     # ===== CONQUISTAS DE EVOLUÇÃO (GERAL) =====
     "first_evolution": Achievement(
         id="first_evolution",
@@ -207,15 +213,15 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         id="max_happiness",
         title="Amor Incondicional",
         description="Alcance a felicidade máxima com um Pokemon (255)",
-        rarity=AchievementRarity.UNCOMMON,
-        rewards={"gold": 500, "xp": 500}
+        rarity=AchievementRarity.RARE,
+        rewards={"gold": 500, "xp": 500, "items": {"rare_candy": 1}}
     ),
     "full_team_max_happiness": Achievement(
         id="full_team_max_happiness",
         title="Familia Feliz",
         description="Tenha toda sua equipe com felicidade máxima (255)",
-        rarity=AchievementRarity.EPIC,
-        rewards={"gold": 5000, "xp": 7500}
+        rarity=AchievementRarity.LEGENDARY,
+        rewards={"gold": 5000, "xp": 7500, "items": {"rare_candy": 6}}
     ),
     "first_happiness_evolution": Achievement(
         id="first_happiness_evolution",
@@ -284,7 +290,7 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         id="antidote_100",
         title="Mestre Antiveneno",
         description="Cure veneno com Antidoto 100 vezes",
-        rarity=AchievementRarity.EPIC,
+        rarity=AchievementRarity.RARE,
         rewards={"gold": 1500, "xp": 750}
     ),
 
@@ -300,7 +306,7 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         id="awake_100",
         title="Mestre dos Sonhos",
         description="Acorde Pokemon com Awake 100 vezes",
-        rarity=AchievementRarity.EPIC,
+        rarity=AchievementRarity.RARE,
         rewards={"gold": 1500, "xp": 750}
     ),
 
@@ -316,7 +322,7 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         id="paralyze_heal_100",
         title="Mestre da Mobilidade",
         description="Cure paralisia 100 vezes",
-        rarity=AchievementRarity.EPIC,
+        rarity=AchievementRarity.RARE,
         rewards={"gold": 5000, "xp": 7500}
     ),
 
