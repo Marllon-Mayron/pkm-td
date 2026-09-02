@@ -206,14 +206,14 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
     "max_happiness": Achievement(
         id="max_happiness",
         title="Amor Incondicional",
-        description="Alcance 100 de felicidade com um Pokemon",
-        rarity=AchievementRarity.COMMON,
-        rewards={"gold": 100, "xp": 50}
+        description="Alcance a felicidade máxima com um Pokemon (255)",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 500, "xp": 500}
     ),
     "full_team_max_happiness": Achievement(
         id="full_team_max_happiness",
         title="Familia Feliz",
-        description="Tenha toda sua equipe com felicidade maxima (255)",
+        description="Tenha toda sua equipe com felicidade máxima (255)",
         rarity=AchievementRarity.EPIC,
         rewards={"gold": 5000, "xp": 7500}
     ),

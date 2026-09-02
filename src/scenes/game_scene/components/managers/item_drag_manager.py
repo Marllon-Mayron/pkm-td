@@ -454,14 +454,14 @@ class ItemDragManager:
         elif self.valid_target:
             if self.target_type == "enemy":
                 color = (100, 255, 100)
-                text = "✓ SOLTAR PARA CAPTURAR"
+                text = "SOLTAR PARA CAPTURAR"
             else:
                 color = (100, 255, 100)
-                text = "✓ SOLTAR PARA APLICAR"
+                text = "SOLTAR PARA APLICAR"
             valid = True
         else:
             color = (255, 100, 100)
-            text = "✗ ALVO INVÁLIDO"
+            text = "ALVO INVÁLIDO"
             valid = False
 
         alpha = int(150 + 105 * pulse)

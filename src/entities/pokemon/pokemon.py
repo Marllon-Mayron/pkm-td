@@ -782,7 +782,7 @@ class Pokemon(Entity):
             self._check_happiness_evolution()
 
             # Conquista: Felicidade Máxima
-            if self.happiness >= 100 and old_happiness < 100:
+            if self.happiness >= 255 and old_happiness < 255:
                 if hasattr(self, 'game_scene') and self.game_scene:
                     game_scene = self.game_scene
                     phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
@@ -827,7 +827,7 @@ class Pokemon(Entity):
     def set_happiness(self, value: int) -> int:
         """Define felicidade diretamente (0-100). Retorna o novo valor."""
         self.happiness = max(self._min_happiness, min(self._max_happiness, value))
-        print(f"[HAPPINESS] {self.get_display_name()}: felicidade definida para {self.happiness}/100")
+        print(f"[HAPPINESS] {self.get_display_name()}: felicidade definida para {self.happiness}/255")
         return self.happiness
 
     def set_custom_name(self, new_name: str) -> bool:
@@ -1451,7 +1451,7 @@ class Pokemon(Entity):
             # ===== LIMPA TODOS OS STATUS EFFECTS =====
             self.clear_all_status()
 
-            self.add_happiness(-30, "Derrotado")
+            self.add_happiness(-20, "Derrotado")
 
             # ===== CANCELA QUALQUER CARGA DE GOLPE =====
             if hasattr(self, 'battle_system') and self.battle_system:

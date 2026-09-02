@@ -424,12 +424,6 @@ class DragDropManager:
 
         screen.blit(indicator, (spot_x - radius, spot_y - radius))
 
-        font = pygame.font.Font(None, 24)
-        swap_text = font.render("⇄", True, (255, 215, 0))
-        text_x = spot_x - swap_text.get_width() // 2
-        text_y = spot_y - radius - 15
-        screen.blit(swap_text, (text_x, text_y))
-
         font_small = pygame.font.Font(None, 20)
         text = font_small.render("TROCAR", True, (255, 215, 0))
         text_bg = pygame.Surface((text.get_width() + 10, text.get_height() + 4), pygame.SRCALPHA)

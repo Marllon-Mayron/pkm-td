@@ -128,9 +128,8 @@ class AchievementManager:
         # ===== XP =====
         if "xp" in rewards:
             amount = rewards["xp"]
-            for pokemon in self.player.team:
-                pokemon.gain_xp(amount)
-            print(f"[ACHIEVEMENT] +{amount} XP para o time")
+            self.player.score += amount
+            print(f"[ACHIEVEMENT] +{amount} XP para o jogador")
 
         # ===== ITENS =====
         if "items" in rewards:
@@ -291,9 +290,9 @@ class AchievementManager:
 
         # ===== EVOLUÇÃO POR FELICIDADE =====
         elif achievement_id == "max_happiness":
-            # Verifica se algum Pokémon do time tem felicidade >= 100
+            # Verifica se algum Pokémon do time tem felicidade >= 255
             for pokemon in self.player.team:
-                if pokemon.get_happiness() >= 100:
+                if pokemon.get_happiness() >= 255:
                     return self.unlock(achievement_id, phase_id)
             return False
 

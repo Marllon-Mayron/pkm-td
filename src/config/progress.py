@@ -161,12 +161,12 @@ class ProgressManager:
         if next_phase_id and next_phase_id not in self.progress["unlocked_phases"]:
             self.progress["unlocked_phases"].append(next_phase_id)
             self.progress["unlocked_phases"].sort()
-            print(f"🎉 Nova fase desbloqueada: {next_phase_id}!")
+            print(f"Nova fase desbloqueada: {next_phase_id}!")
             return True
         elif next_phase_id:
             print(f"Fase {next_phase_id} já estava desbloqueada")
         else:
-            print("🏆 Parabéns! Você completou todas as fases disponíveis!")
+            print(" Parabéns! Você completou todas as fases disponíveis!")
         return False
 
     def complete_phase(self, phase_id: str, stars: int = 0):
@@ -182,7 +182,7 @@ class ProgressManager:
         if phase_id in self.progress["completed_phases"]:
             if stars > self.progress["stars"].get(phase_id, 0):
                 self.progress["stars"][phase_id] = stars
-                print(f"⭐ Nova pontuação na fase {phase_id}: {stars} estrelas!")
+                print(f"Nova pontuação na fase {phase_id}: {stars} estrelas!")
             else:
                 print(f"[PROGRESS] Fase {phase_id} já estava completada")
         else:
@@ -190,7 +190,7 @@ class ProgressManager:
             self.progress["completed_phases"].append(phase_id)
             self.progress["completed_phases"].sort()
             self.progress["stars"][phase_id] = stars
-            print(f"✅ Fase {phase_id} completada com {stars} estrelas!")
+            print(f"Fase {phase_id} completada com {stars} estrelas!")
 
             # Desbloqueia a próxima fase
             next_phase = self.get_next_phase(phase_id)

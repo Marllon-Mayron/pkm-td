@@ -512,8 +512,8 @@ class SettingsScene(BaseScene):
 
         self._update_rects(vx, vy, vw, vh, panel_y, panel_height)
 
-        title = self.title_font.render("CONFIGURATIONS", True, (255, 255, 255))
-        title_shadow = self.title_font.render("CONFIGURATIONS", True, (30, 30, 45))
+        title = self.title_font.render("CONFIGURAÇÕES", True, (255, 255, 255))
+        title_shadow = self.title_font.render("CONFIGURAÇÕES", True, (30, 30, 45))
         title_x = vx + (vw - title.get_width()) // 2
         title_y = vy + int(vh * 0.03)
         screen.blit(title_shadow, (title_x + 2, title_y + 2))
