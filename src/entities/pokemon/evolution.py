@@ -11,7 +11,6 @@ class PokemonEvolution:
         self.pokemon = pokemon
 
     def check_and_evolve(self):
-
         evolution = evolution_manager.check_evolution(self.pokemon.id, current_level=self.pokemon.level)
 
         if evolution:
@@ -30,6 +29,18 @@ class PokemonEvolution:
         new_pokemon_data = self.pokemon.pokedex.get_pokemon(new_id)
         if not new_pokemon_data:
             return
+
+        # ===== REGISTRA NA POKEDEX ANTES DE ALTERAR O ID =====
+        # Isso garante que o novo Pokémon seja registrado como visto/capturado
+        if hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
+            game_scene = self.pokemon.game_scene
+            if hasattr(game_scene, 'player'):
+                player = game_scene.player
+                # Registra como visto
+                player.register_seen(new_id)
+                # Registra como capturado (já que o Pokémon agora faz parte do time/box do jogador)
+                player.caught_pokemon.add(new_id)
+                print(f"[POKEDEX] {new_pokemon_data['name']} (ID: {new_id}) registrado como visto e capturado!")
 
         self.pokemon.id = new_id
         self.pokemon.name = new_pokemon_data["name"].capitalize()
