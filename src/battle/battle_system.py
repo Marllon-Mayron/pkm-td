@@ -619,6 +619,12 @@ class BattleSystem:
         """
         import random
 
+        # ===== CONSUME PP =====
+        if move.current_pp <= 0:
+            print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
+            return False
+        move.current_pp -= 1
+
         print(f"[BATTLE] {attacker.name} usou {move.name}!")
 
         # Verifica acerto
@@ -634,9 +640,7 @@ class BattleSystem:
             print(f"[BATTLE] {move.name} errou!")
             self._show_miss_on_attacker(attacker)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
-
             self.miss_hit_general(attacker)
-
             return True
 
         # Toca som

@@ -618,10 +618,9 @@ class EffectFactory:
         },
         # ===== ATAQUES EM ÁREA =====
         "earthquake": {
-            "effect_type": "",  # Pode ser qualquer tipo, o importante é is_area=True
+            "effect_type": "",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
-            "is_area": True,  # Flag de área
             "params": {
                 "area": True,
                 "hit_all_in_range": True,
@@ -1995,7 +1994,6 @@ class EffectFactory:
             "effect_type": "magnitude",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
-            "is_area": True,
             "params": {
                 "area": True,
                 "hit_all_in_range": True,
