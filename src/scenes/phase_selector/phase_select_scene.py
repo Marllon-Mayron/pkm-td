@@ -1,14 +1,14 @@
 # src/scenes/phase_select_scene.py
 
 """
-Tela de seleção de fases - Versão dinâmica com scroll
-Adaptada para usar IDs compostos (formato "capítulo-fase")
+Tela de seleção de fases adaptada para usar IDs compostos (formato "capítulo-fase")
 """
 import pygame
 import math
 from src.scenes.base_scene import BaseScene
 from src.config.progress import progress_manager
 from src.config.phase_catalog import phase_catalog
+from src.scenes.incubator_scene.incubator_scene import IncubatorScene
 from src.scenes.shop_scene.shop_scene import ShopScene
 from src.scenes.pokedex_scene import PokedexScene
 from src.scenes.achievement_scene.achievement_scene import AchievementScene
@@ -25,6 +25,8 @@ class PhaseCard:
         self.completed = completed
         self.rect = pygame.Rect(0, 0, 0, 0)
         self.is_hovered = False
+        self.incubator_button = None
+        self.incubator_button_hovered = False
 
         # Cores baseadas no status
         if not unlocked:
@@ -209,7 +211,9 @@ class PhaseSelectScene(BaseScene):
         self.shop_button = None
         self.minigame_button = None
         self.pokedex_button = None
-        self.achievement_button = None  # NOVO - Botão de Conquistas
+        self.achievement_button = None
+        self.incubator_button = None
+
 
         self.scroll_y = 0
         self.scroll_target = 0
@@ -231,7 +235,8 @@ class PhaseSelectScene(BaseScene):
         self.shop_button_hovered = False
         self.minigame_button_hovered = False
         self.pokedex_button_hovered = False
-        self.achievement_button_hovered = False  # NOVO
+        self.achievement_button_hovered = False
+        self.incubator_button_hovered = False
 
         self.refresh_data()
         self.dev_mode = True
@@ -275,7 +280,7 @@ class PhaseSelectScene(BaseScene):
         button_width = 130
         button_height = 50
         button_spacing = 10
-        total_width = button_width * 4 + button_spacing * 3
+        total_width = button_width * 5 + button_spacing * 4
         start_x = viewport_x + (viewport_width - total_width) // 2
         bottom_y = viewport_y + viewport_height - 90
 
@@ -298,9 +303,16 @@ class PhaseSelectScene(BaseScene):
             button_height
         )
 
-        # Botão CONQUISTAS (NOVO)
+        # Botão CONQUISTAS
         self.achievement_button = pygame.Rect(
             start_x + (button_width + button_spacing) * 3,
+            bottom_y,
+            button_width,
+            button_height
+        )
+
+        self.incubator_button = pygame.Rect(
+            start_x + (button_width + button_spacing) * 4,
             bottom_y,
             button_width,
             button_height
@@ -383,6 +395,10 @@ class PhaseSelectScene(BaseScene):
             card.update_position(card_x, card_y, card_width, card_height)
             self.phase_cards.append(card)
 
+    def _is_incubator_unlocked(self) -> bool:
+        """Verifica se a incubadora está desbloqueada (fase 1-5 completada)"""
+        return self.progress.is_phase_completed("1-5")
+
     def refresh_data(self):
         self.progress.reload_progress()
         self.catalog.refresh()
@@ -442,8 +458,10 @@ class PhaseSelectScene(BaseScene):
                 self._open_minigames()
             elif event.key == pygame.K_x:
                 self._open_pokedex()
-            elif event.key == pygame.K_c:  # NOVO - Tecla para abrir Conquistas
+            elif event.key == pygame.K_c:
                 self._open_achievements()
+            elif event.key == pygame.K_i:
+                self._open_incubator()
 
         elif event.type == pygame.VIDEORESIZE:
             self.layout_initialized = False
@@ -465,8 +483,10 @@ class PhaseSelectScene(BaseScene):
                 self.minigame_button_hovered = self.minigame_button.collidepoint(event.pos)
             if self.pokedex_button:
                 self.pokedex_button_hovered = self.pokedex_button.collidepoint(event.pos)
-            if self.achievement_button:  # NOVO
+            if self.achievement_button:
                 self.achievement_button_hovered = self.achievement_button.collidepoint(event.pos)
+            if self.incubator_button:
+                self.incubator_button_hovered = self.incubator_button.collidepoint(event.pos)
 
             if self.dragging_scroll:
                 dy = event.pos[1] - self.last_mouse_y
@@ -493,8 +513,15 @@ class PhaseSelectScene(BaseScene):
                     self._open_pokedex()
                     return
 
-                if self.achievement_button and self.achievement_button.collidepoint(event.pos):  # NOVO
+                if self.achievement_button and self.achievement_button.collidepoint(event.pos):
                     self._open_achievements()
+                    return
+
+                if self.incubator_button and self.incubator_button.collidepoint(event.pos):
+                    if self._is_incubator_unlocked():
+                        self._open_incubator()
+                    else:
+                        print("Incubadora desbloqueada após completar a fase 1-5!")
                     return
 
                 for tab in self.chapter_tabs:
@@ -548,6 +575,11 @@ class PhaseSelectScene(BaseScene):
         """Abre a tela de conquistas"""
         self.game.achievement_scene = AchievementScene(self.game)
         self.game.current_scene = self.game.achievement_scene
+
+    def _open_incubator(self):  # NOVO
+        """Abre a tela da incubadora"""
+        self.game.incubator_scene = IncubatorScene(self.game)
+        self.game.current_scene = self.game.incubator_scene
 
     def _on_shop_closed(self):
         self.layout_initialized = False
@@ -701,7 +733,7 @@ class PhaseSelectScene(BaseScene):
             text_rect = pokedex_text.get_rect(center=self.pokedex_button.center)
             screen.blit(pokedex_text, text_rect)
 
-        # Botao Conquistas (NOVO)
+        # Botao Conquistas
         if self.achievement_button:
             if self.achievement_button_hovered:
                 bg_color = (100, 80, 60)
@@ -724,6 +756,45 @@ class PhaseSelectScene(BaseScene):
             text_rect = achievement_text.get_rect(center=self.achievement_button.center)
             screen.blit(achievement_text, text_rect)
 
+        # Botao Incubadora
+        if self.incubator_button:
+            is_unlocked = self._is_incubator_unlocked()
+
+            if not is_unlocked:
+                # Botão bloqueado (escurecido)
+                bg_color = (35, 35, 40)
+                border_color = (60, 60, 65)
+                text_color = (80, 80, 85)
+                shadow_color = (10, 10, 10)
+            elif self.incubator_button_hovered:
+                bg_color = (60, 100, 80)
+                border_color = (100, 220, 150)
+                text_color = (255, 255, 255)
+                shadow_color = (15, 15, 15)
+            else:
+                bg_color = (40, 70, 55)
+                border_color = (80, 180, 120)
+                text_color = (220, 240, 230)
+                shadow_color = (15, 15, 15)
+
+            shadow_rect = self.incubator_button.copy()
+            shadow_rect.x += 4
+            shadow_rect.y += 4
+            pygame.draw.rect(screen, shadow_color, shadow_rect, border_radius=10)
+            pygame.draw.rect(screen, bg_color, self.incubator_button, border_radius=10)
+            pygame.draw.rect(screen, border_color, self.incubator_button, 3, border_radius=10)
+
+            incubator_text = self.button_font.render("INCUBADORA", True, text_color)
+            text_rect = incubator_text.get_rect(center=self.incubator_button.center)
+            screen.blit(incubator_text, text_rect)
+
+            # Se bloqueado, mostra cadeado
+            if not is_unlocked:
+                # Texto de requisito
+                req_font = pygame.font.Font(None, 16)
+                req_text = req_font.render("Complete 1 Cap", True, (80, 80, 80))
+                req_rect = req_text.get_rect(center=(self.incubator_button.centerx, self.incubator_button.bottom + 12))
+                screen.blit(req_text, req_rect)
         # Abas
         for tab in self.chapter_tabs:
             tab.render(screen, self.tab_font)
@@ -769,7 +840,7 @@ class PhaseSelectScene(BaseScene):
 
         # Instrucoes
         font_small = pygame.font.Font(None, 18)
-        inst_text = "< >  NAVEGAR  |  CLIQUE NA FASE  |  S  LOJA  |  M  MINIGAMES  |  X  POKÉDEX  |  C  CONQUISTAS  |  ESC  VOLTAR"
+        inst_text = "< >  NAVEGAR  |  CLIQUE NA FASE  |  S  LOJA  |  M  MINIGAMES  |  X  POKÉDEX  |  C  CONQUISTAS  |  I  INCUBADORA  |  ESC  VOLTAR"
         if self.dev_mode:
             inst_text += "  |  [U] proxima fase  |  [A] todas"
         inst = font_small.render(inst_text, True, (120, 120, 130))

@@ -331,6 +331,7 @@ class CategorySelector:
             ("battle_item", "Batalha"),
             ("tm", "TMs/HMs"),
             ("items", "Itens"),
+            ("fossil", "Fósseis"),
         ]
         self.categories_per_page = 3
         self.current_page = 0

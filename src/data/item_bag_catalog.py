@@ -157,9 +157,9 @@ class ItemBagCatalog:
             "usable_in_battle": True,
             "usable_on_map": True,
             "effect": "capture",
-            "effect_value": 2,
-            "price": 10000,
-            "unlock_phase": "4-5",
+            "effect_value": 3,
+            "price": 20000,
+            "unlock_phase": "999-999",
             "unlock_chapter": None
         }
         items["safariball"] = {
@@ -427,10 +427,31 @@ class ItemBagCatalog:
                     "duration": 20.0,
                 },
                 "price": 500,
-                "unlock_phase": 1-5,
+                "unlock_phase": "1-5",
                 "unlock_chapter": None
             }
 
+        fossils = [
+            ("helix_fossil", "HELIX FOSSIL", "HELIXFOSSIL.png", "Omanyte/Omastar"),
+            ("dome_fossil", "DOME FOSSIL", "DOMEFOSSIL.png", "Kabuto/Kabutops"),
+            ("old_amber", "OLD AMBER", "OLDAMBER.png", "Aerodactyl")
+        ]
+
+        for fossil_id, fossil_name, filename, pokemon_name in fossils:
+            items[fossil_id] = {
+                "id": fossil_id,
+                "name": fossil_name,
+                "sprite_path": self.base_path / "Fosseis" / filename,
+                "description": f"Fóssil antigo que pode ser revivido em {pokemon_name}.",
+                "category": "fossil",
+                "usable_in_battle": False,
+                "usable_on_map": True,
+                "effect": "revive_fossil",
+                "effect_value": pokemon_name,
+                "price": 10000,
+                "unlock_phase": "999-999",
+                "unlock_chapter": None
+            }
         # ===== TMs/HMs =====
         # Lista de TMs: (id, nome, sprite_file, move_name, unlock_phase, price)
         tms = [

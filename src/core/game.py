@@ -104,6 +104,10 @@ class Game:
 
     def fixed_update(self, dt):
         """Update fixo para lógica do jogo"""
+        # Acumular tempo de jogo
+        if hasattr(self.player, 'total_playtime'):
+            self.player.total_playtime += dt
+
         if self.current_scene and not self.current_scene.paused:
             self.current_scene.fixed_update(dt)
 

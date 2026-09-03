@@ -7,7 +7,7 @@ import pickle
 from datetime import datetime
 from typing import Dict
 
-SAVE_FORMAT_VERSION = "0.1.4"  # Versão do FORMATO do save (ATUALIZADA)
+SAVE_FORMAT_VERSION = "0.1.5"  # Versão do FORMATO do save (ATUALIZADA)
 GAME_VERSION_COMPATIBLE = "0.1.12"  # Versão do jogo que usa este formato
 
 
@@ -291,6 +291,8 @@ class SaveManager:
         existing_data["player"]["bag"] = dict(player.bag.items)
         existing_data["player"]["seen_pokemon"] = list(player.seen_pokemon)
         existing_data["player"]["caught_pokemon"] = list(player.caught_pokemon)
+        existing_data["player"]["desfossilizadores"] = player.desfossilizadores
+        existing_data["player"]["total_playtime"] = player.total_playtime
 
         # ===== PRESERVA MYSTERY GIFT =====
         existing_data["player"]["mystery_gift"] = {
@@ -473,6 +475,58 @@ class SaveManager:
             player.seen_pokemon = set(player_data.get("seen_pokemon", []))
             player.caught_pokemon = set(player_data.get("caught_pokemon", []))
 
+            # ===== CARREGA DESFOSSILIZADORES =====
+            player.desfossilizadores = player_data.get("desfossilizadores", [])
+
+            # Se não tiver desfossilizadores, cria um inicial
+            if not player.desfossilizadores:
+                if hasattr(player, '_add_initial_desfossilizador'):
+                    player._add_initial_desfossilizador()
+                else:
+                    # Fallback: cria desfossilizador manualmente
+                    player.desfossilizadores = [{
+                        "id": 1,
+                        "level": 1,
+                        "status": "empty",
+                        "fossil_id": None,
+                        "pokemon_id": None,
+                        "start_time": None,
+                        "duration_minutes": 60,
+                        "time_elapsed": 0.0
+                    }]
+
+            # Garante que cada desfossilizador tenha os campos necessários
+            durations = {1: 60, 2: 2700, 3: 1200}  # 1 minuto para testes
+            for desfossilizador in player.desfossilizadores:
+                if "time_elapsed" not in desfossilizador:
+                    desfossilizador["time_elapsed"] = 0.0
+                if "start_time" not in desfossilizador:
+                    desfossilizador["start_time"] = None
+                level = desfossilizador.get("level", 1)
+                if "duration_minutes" not in desfossilizador or desfossilizador["duration_minutes"] == 0:
+                    desfossilizador["duration_minutes"] = durations.get(level, 60)
+                if "status" not in desfossilizador:
+                    desfossilizador["status"] = "empty"
+                if "fossil_id" not in desfossilizador:
+                    desfossilizador["fossil_id"] = None
+                if "pokemon_id" not in desfossilizador:
+                    desfossilizador["pokemon_id"] = None
+
+                # ===== Verifica se já passou do tempo =====
+                if desfossilizador["status"] == "processing":
+                    # Se o tempo já passou, marca como pronto
+                    if desfossilizador["time_elapsed"] >= desfossilizador["duration_minutes"]:
+                        desfossilizador["status"] = "ready"
+                        desfossilizador["start_time"] = None
+                        desfossilizador["time_elapsed"] = desfossilizador["duration_minutes"]
+                        print(f"[DESFOSSILIZADOR] {desfossilizador['id']} já estava pronto ao carregar!")
+                    else:
+                        print(
+                            f"[DESFOSSILIZADOR] {desfossilizador['id']} processando: {desfossilizador['time_elapsed']:.0f}s / {desfossilizador['duration_minutes']:.0f}s")
+
+            # Carrega tempo de jogo
+            player.total_playtime = player_data.get("total_playtime", 0.0)
+
             # Carrega Mystery Gift
             mg_data = player_data.get("mystery_gift", {})
             player.redeemed_codes = mg_data.get("redeemed_codes", {})
@@ -504,26 +558,26 @@ class SaveManager:
                 else:
                     sound_manager.set_sfx_volume(0)
 
-                # ===== CARREGA ACHIEVEMENTS =====
-                achievements_data = player_data.get("achievements", {})
+            # ===== CARREGA ACHIEVEMENTS =====
+            achievements_data = player_data.get("achievements", {})
 
-                # Garante que a estrutura existe no player
-                if not hasattr(player, 'achievements'):
-                    player.achievements = {
-                        "unlocked": [],
-                        "counters": {},
-                        "unlocked_data": {}
-                    }
+            # Garante que a estrutura existe no player
+            if not hasattr(player, 'achievements'):
+                player.achievements = {
+                    "unlocked": [],
+                    "counters": {},
+                    "unlocked_data": {}
+                }
 
-                # Carrega os dados
-                player.achievements["unlocked"] = list(achievements_data.get("unlocked", []))
-                player.achievements["counters"] = dict(achievements_data.get("counters", {}))
-                player.achievements["unlocked_data"] = dict(achievements_data.get("unlocked_data", {}))
+            # Carrega os dados
+            player.achievements["unlocked"] = list(achievements_data.get("unlocked", []))
+            player.achievements["counters"] = dict(achievements_data.get("counters", {}))
+            player.achievements["unlocked_data"] = dict(achievements_data.get("unlocked_data", {}))
 
-                # ===== RECARREGA O ACHIEVEMENT_MANAGER =====
-                if hasattr(player, 'achievement_manager'):
-                    player.achievement_manager.load_from_player()
-                    print(f"[SAVE] Achievements carregados: {len(player.achievements['unlocked'])} desbloqueadas")
+            # ===== RECARREGA O ACHIEVEMENT_MANAGER =====
+            if hasattr(player, 'achievement_manager'):
+                player.achievement_manager.load_from_player()
+                print(f"[SAVE] Achievements carregados: {len(player.achievements['unlocked'])} desbloqueadas")
 
             print(f"[SAVE] Jogo carregado de {filepath}")
             return True
@@ -641,7 +695,7 @@ class SaveManager:
                 migrated["player"]["achievements"] = {
                     "unlocked": [],
                     "counters": {},
-                    "unlocked_data": {}  # NOVO: dados de data/hora e fase
+                    "unlocked_data": {}
                 }
                 print("[MIGRATE] Estrutura de conquistas adicionada")
             else:
@@ -654,8 +708,56 @@ class SaveManager:
             migrated["meta"]["version"] = current_version
             print("[MIGRATE] Migracao para 0.1.4 concluida: conquistas adicionadas")
 
+        # ===== NOVA MIGRAÇÃO: 0.1.4 para 0.1.5 (INCUBADORA) =====
+        if version == "0.1.4":
+            # Adiciona incubadora inicial se não existir
+            if "incubators" not in migrated.get("player", {}):
+                migrated["player"]["incubators"] = []
+                print("[MIGRATE] Campo incubators criado")
+
+            # Se não tiver incubadoras, adiciona uma inicial
+            if not migrated["player"]["incubators"]:
+                incubator = {
+                    "id": 1,
+                    "level": 1,
+                    "status": "empty",
+                    "fossil_id": None,
+                    "pokemon_id": None,
+                    "start_time": None,
+                    "duration_minutes": 60,  # 1 minuto para testes
+                    "time_elapsed": 0.0
+                }
+                migrated["player"]["incubators"].append(incubator)
+                print("[MIGRATE] Incubadora inicial adicionada ao save!")
+
+            # Garante que cada incubadora existente tem os campos corretos
+            for incubator in migrated["player"]["incubators"]:
+                if "time_elapsed" not in incubator:
+                    incubator["time_elapsed"] = 0.0
+                if "start_time" not in incubator:
+                    incubator["start_time"] = None
+                if "duration_minutes" not in incubator or incubator["duration_minutes"] == 0:
+                    durations = {1: 60, 2: 2700, 3: 1200}
+                    level = incubator.get("level", 1)
+                    incubator["duration_minutes"] = durations.get(level, 60)
+                if "status" not in incubator:
+                    incubator["status"] = "empty"
+                if "fossil_id" not in incubator:
+                    incubator["fossil_id"] = None
+                if "pokemon_id" not in incubator:
+                    incubator["pokemon_id"] = None
+
+            # Adiciona total_playtime se não existir
+            if "total_playtime" not in migrated.get("player", {}):
+                migrated["player"]["total_playtime"] = 0.0
+                print("[MIGRATE] Campo total_playtime adicionado")
+
+            # Atualiza versão
+            migrated["meta"]["version"] = current_version
+            print("[MIGRATE] Migracao concluida: incubadora e tempo de jogo adicionados")
+
         # ===== FUTURAS MIGRAÇÕES =====
-        # if version == "0.1.4" and current_version == "0.1.5":
+        # if version == "0.1.4" and current_version == "0.1.6":
         #     pass
 
         # ===== VALIDAÇÃO PÓS-MIGRAÇÃO =====
@@ -670,6 +772,25 @@ class SaveManager:
 
         if "caught_pokemon" not in migrated["player"]:
             migrated["player"]["caught_pokemon"] = []
+
+        # GARANTE QUE INCUBADORA EXISTE MESMO EM SAVES ANTIGOS
+        if "incubators" not in migrated["player"]:
+            migrated["player"]["incubators"] = []
+            incubator = {
+                "id": 1,
+                "level": 1,
+                "status": "empty",
+                "fossil_id": None,
+                "pokemon_id": None,
+                "start_time": None,
+                "duration_minutes": 60,
+                "time_elapsed": 0.0
+            }
+            migrated["player"]["incubators"].append(incubator)
+            print("[MIGRATE] Incubadora inicial adicionada (fallback)")
+
+        if "total_playtime" not in migrated["player"]:
+            migrated["player"]["total_playtime"] = 0.0
 
         print(f"[MIGRATE] Migracao concluida! Versao final: {migrated['meta']['version']}")
         return migrated

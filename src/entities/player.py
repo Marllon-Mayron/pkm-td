@@ -59,9 +59,12 @@ class Player(Entity):
         # Histórico completo de gifts resgatados
         self.mystery_gift_history = []
 
+        self.desfossilizadores = [] = []
+        self._add_initial_desfossilizador()
+        self.total_playtime = 0.0  # segundos totais de jogo
+        self._playtime_accumulator = 0.0  # para acumular dt
+
         self.save_manager = SaveManager()
-
-
 
     def add_to_team(self, pokemon, slot=None):
         """Adiciona Pokémon ao time"""
@@ -113,6 +116,15 @@ class Player(Entity):
         if 0 <= index < len(self.team):
             return self.team[index]
         return None
+
+    def _get_duration_for_level(self, level):
+        """Retorna a duração em segundos para cada nível"""
+        durations = {
+            1: 6000,  # 1 hora
+            2: 2700,  # 45 minutos
+            3: 1200  # 20 minutos
+        }
+        return durations.get(level, 60)
 
     def has_team_space(self):
         return len(self.team) < 6
@@ -186,7 +198,95 @@ class Player(Entity):
         from src.managers.save_manager import save_manager
         return save_manager.load_game(self, slot)
 
-    # Adicione este método para salvar automaticamente em momentos chave
+    # metodo para salvar automaticamente em momentos chave
     def auto_save(self):
         """Salvamento automático após ações importantes"""
         self.save_game()
+
+    def _add_initial_desfossilizador(self):
+        """Adiciona o desfossilizador inicial do jogador"""
+        desfossilizador = {
+            "id": 1,
+            "level": 1,
+            "status": "empty",  # "empty", "processing", "ready"
+            "fossil_id": None,
+            "pokemon_id": None,
+            "start_time": None,
+            "duration_minutes": self._get_duration_for_level(1),
+            "time_elapsed": 0.0
+        }
+        self.desfossilizadores.append(desfossilizador)
+
+    def add_desfossilizador(self, level=1):
+        """Adiciona um novo desfossilizador vazio."""
+        desfossilizador_id = len(self.desfossilizadores) + 1
+        desfossilizador = {
+            "id": desfossilizador_id,
+            "level": level,
+            "status": "empty",
+            "fossil_id": None,
+            "pokemon_id": None,
+            "start_time": None,
+            "duration_minutes": self._get_duration_for_level(level),
+            "time_elapsed": 0.0
+        }
+        self.desfossilizadores.append(desfossilizador)
+        return desfossilizador
+
+    def start_desfossilizacao(self, desfossilizador_index, fossil_id, pokemon_id):
+        """Inicia a desfossilização de um fóssil no desfossilizador."""
+        desfossilizador = self.desfossilizadores[desfossilizador_index]
+        if desfossilizador["status"] != "empty":
+            return False
+        desfossilizador["status"] = "processing"
+        desfossilizador["fossil_id"] = fossil_id
+        desfossilizador["pokemon_id"] = pokemon_id
+        desfossilizador["start_time"] = None
+        desfossilizador["time_elapsed"] = 0.0
+        return True
+
+    def update_desfossilizadores(self, dt):
+        """Atualiza o progresso dos desfossilizadores."""
+        for desfossilizador in self.desfossilizadores:
+            if desfossilizador["status"] == "processing":
+                desfossilizador["time_elapsed"] += dt
+                if desfossilizador["time_elapsed"] >= desfossilizador["duration_minutes"]:
+                    desfossilizador["status"] = "ready"
+                    desfossilizador["start_time"] = None
+                    desfossilizador["time_elapsed"] = desfossilizador["duration_minutes"]
+
+    def collect_pokemon_from_desfossilizador(self, desfossilizador_index):
+        """Coleta o Pokémon do desfossilizador pronto."""
+        desfossilizador = self.desfossilizadores[desfossilizador_index]
+        if desfossilizador["status"] != "ready":
+            return None
+        pokemon_id = desfossilizador["pokemon_id"]
+        from src.entities.pokemon import Pokemon
+        pokemon = Pokemon(0, 0, pokemon_id, level=5, is_wild=False)
+
+        if len(self.team) < 6:
+            self.team.append(pokemon)
+            pokemon.is_in_team = True
+        else:
+            self.pc_box.append(pokemon)
+
+        desfossilizador["status"] = "empty"
+        desfossilizador["fossil_id"] = None
+        desfossilizador["pokemon_id"] = None
+        desfossilizador["start_time"] = None
+        desfossilizador["time_elapsed"] = 0.0
+        return pokemon
+
+    def upgrade_desfossilizador(self, desfossilizador_index):
+        """Upgrade do desfossilizador para o próximo nível."""
+        desfossilizador = self.desfossilizadores[desfossilizador_index]
+        if desfossilizador["level"] >= 3:
+            return False
+        new_level = desfossilizador["level"] + 1
+        cost = 30000 if desfossilizador["level"] == 1 else 50000
+        if self.money < cost:
+            return False
+        self.money -= cost
+        desfossilizador["level"] = new_level
+        desfossilizador["duration_minutes"] = self._get_duration_for_level(new_level)
+        return True
