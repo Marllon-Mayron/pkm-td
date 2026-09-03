@@ -1,0 +1,60 @@
+{
+  "templates": {
+    "Basico": {
+      "items": [
+        {
+          "item_id": "potion",
+          "weight": 60
+        },
+        {
+          "item_id": "pokeball",
+          "weight": 40
+        }
+      ]
+    },
+    "Avancado": {
+      "items": [
+        {
+          "item_id": "superpotion",
+          "weight": 40
+        },
+        {
+          "item_id": "greatball",
+          "weight": 30
+        },
+        {
+          "item_id": "rare_candy",
+          "weight": 10
+        }
+      ]
+    },
+    "Fosseis": {
+      "items": [
+        {
+          "item_id": "helix_fossil",
+          "weight": 33
+        },
+        {
+          "item_id": "dome_fossil",
+          "weight": 33
+        },
+        {
+          "item_id": "old_amber",
+          "weight": 34
+        }
+      ]
+    },
+    "Teste": {
+      "items": [
+        {
+          "item_id": "antidote",
+          "weight": 100
+        },
+        {
+          "item_id": "awakening",
+          "weight": 100
+        }
+      ]
+    }
+  }
+}

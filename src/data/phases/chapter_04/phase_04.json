@@ -1504,7 +1504,12 @@
                         }
                     ],
                     "min_level": 20,
-                    "max_level": 24
+                    "max_level": 24,
+                    "wave_size": 6,
+                    "spawn_interval": 3.0,
+                    "initial_delay": 2.0,
+                    "repeat_wave": false,
+                    "repeat_count": 1
                 }
             ]
         }
@@ -1638,7 +1643,16 @@
     },
     "rewards": {
         "money": 500,
-        "experience": 100
+        "experience": 100,
+        "item_rewards": [
+            {
+                "item_id": "thunderstone",
+                "weight": 100
+            }
+        ],
+        "drop_chance": 0.01,
+        "max_items": 1,
+        "template_name": null
     },
     "localization_type": "default",
     "custom_folder": "",

@@ -34,7 +34,7 @@ class WaveManager:
         # Configurações
         self.gold_per_defeat = 10
         self.total_gold_earned = 0
-
+        self.total_enemies_defeated = 0
         # Carrega dados das waves
         self._load_wave_data(phase_loader)
 
@@ -392,6 +392,9 @@ class WaveManager:
 
         # ===== VERIFICA MULTIPLICADOR DE PAY DAY PARA GOLD =====
         gold_reward = self.gold_per_defeat
+        # Incrementa o contador de inimigos derrotados
+        self.total_enemies_defeated += 1
+        print(f"[DEBUG] total_enemies_defeated agora = {self.total_enemies_defeated}")
         pay_day_gold_mult = 1.0
 
         if hasattr(enemy, '_pay_day_hit') and enemy._pay_day_hit:

@@ -1827,7 +1827,12 @@
                         }
                     ],
                     "min_level": 10,
-                    "max_level": 12
+                    "max_level": 12,
+                    "wave_size": 6,
+                    "spawn_interval": 3.0,
+                    "initial_delay": 2.0,
+                    "repeat_wave": false,
+                    "repeat_count": 1
                 }
             ]
         }
@@ -1937,7 +1942,16 @@
     },
     "rewards": {
         "money": 300,
-        "experience": 30
+        "experience": 30,
+        "item_rewards": [
+            {
+                "item_id": "leafstone",
+                "weight": 100
+            }
+        ],
+        "drop_chance": 0.01,
+        "max_items": 1,
+        "template_name": null
     },
     "localization_type": "default",
     "custom_folder": "",

@@ -239,10 +239,17 @@ class GameScene(BaseScene):
         data = phase_loader.load_phase(self.chapter_id, self.phase_number)
 
         # ===== ARMAZENA OS DADOS DA FASE =====
-        self._phase_data = data  # <--- ADICIONE ESTA LINHA
+        self._phase_data = data
 
         if not data:
-            self.phase_rewards = {"money": 0, "experience": 0}
+            self.phase_rewards = {
+                "money": 0,
+                "experience": 0,
+                "item_rewards": [],
+                "drop_chance": 0.0,
+                "max_items": 3,
+                "template_name": None
+            }
             return
 
         base_path = PROJECT_ROOT
@@ -253,12 +260,17 @@ class GameScene(BaseScene):
         self.spot_renderer.load_from_data(phase_loader.get_tower_spots_data())
         self.target_item_manager.load_from_data(data.get("target_items", {}))
 
-        # Carrega recompensas
+        # ===== CARREGA AS RECOMPENSAS (COM TODOS OS CAMPOS) =====
         rewards = data.get("rewards", {})
         self.phase_rewards = {
             "money": rewards.get("money", 0),
-            "experience": rewards.get("experience", 0)
+            "experience": rewards.get("experience", 0),
+            "item_rewards": rewards.get("item_rewards", []),
+            "drop_chance": rewards.get("drop_chance", 0.0),
+            "max_items": rewards.get("max_items", 3),
+            "template_name": rewards.get("template_name", None)
         }
+        print(f"[GAME_SCENE] Recompensas carregadas: {self.phase_rewards}")
 
     def _setup_world_dimensions(self):
         """Configura dimensões do mundo baseado no mapa"""
@@ -1551,47 +1563,71 @@ class GameScene(BaseScene):
         perf_monitor.end_frame()
 
     def _complete_phase(self):
-        """Marca a fase como completada e dá as recompensas"""
         from src.config.progress import progress_manager
+        import random
 
         self._stop_battle_music(fade_ms=1000)
 
-        # ===== RESETA TODOS OS DITTOS TRANSFORMADOS =====
+        # Reset Dittos (já existente)
         self.reset_all_transformed_dittos()
 
         for pokemon in self.player.team:
             pokemon.add_happiness(5, "Fase completada")
 
-        base_reward = self.phase_rewards['money']
+        # ===== RECOMPENSAS BASE =====
+        base_reward = self.phase_rewards.get('money', 100)
         gold_from_defeats = self.wave_manager.get_total_gold_earned()
-
         total_items = len(self.target_item_manager.items)
         stolen_items = self.target_item_manager.items_stolen
 
         bonus_amount = 0
         perfect_run = False
-
         if stolen_items == 0 and total_items > 0:
             bonus_amount = int(gold_from_defeats * 0.3)
             perfect_run = True
-
-            # ===== CONQUISTAS: Fase Perfeita =====
-            if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
-                phase_id = f"{self.chapter_id}-{self.phase_number}"
-                self.player.achievement_manager.increment_counter("perfect_phase_count")
-                self.player.achievement_manager.check_and_unlock("perfect_phase", phase_id)
-                print(f"[ACHIEVEMENT] Fase perfeita! Verificando conquistas...")
+            # conquista...
 
         gold_total = base_reward + gold_from_defeats + bonus_amount
-
         self.player.money += gold_total
-        print(f"[REWARD] Ouro adicionado: {gold_total}")
 
-        for pokemon in self.player.team:
-            pokemon.reset(self)
+        # ===== RECOMPENSAS DE ITENS =====
+        item_rewards_config = self.phase_rewards.get('item_rewards', [])
+        drop_chance = self.phase_rewards.get('drop_chance', 0.0)
+        max_items = self.phase_rewards.get('max_items', 3)
+        earned_items = []  # lista de (item_id, quantidade)
 
-        self.player.score += self.phase_rewards['experience']
+        if item_rewards_config and drop_chance > 0 and max_items > 0:
+            total_kills = self.wave_manager.total_enemies_defeated
+            print(f"[DEBUG] total_kills em _complete_phase = {total_kills}")
+            # Prepara lista de itens com pesos
+            items_pool = []
+            weights = []
+            for entry in item_rewards_config:
+                items_pool.append(entry['item_id'])
+                weights.append(entry.get('weight', 100))
 
+            drops = 0
+            for _ in range(total_kills):
+                if drops >= max_items:
+                    break
+                if random.random() < drop_chance:
+                    # Sorteia um item da lista
+                    chosen = random.choices(items_pool, weights=weights, k=1)[0]
+                    earned_items.append(chosen)
+                    drops += 1
+
+            # Adiciona os itens ao inventário
+            for item_id in earned_items:
+                self.player.bag.add_item(item_id, 1)
+                print(f"[REWARD] Item ganho: {item_id}")
+
+
+        # XP
+        self.player.score += self.phase_rewards.get('experience', 50)
+
+        print(f"[DEBUG] phase_rewards = {self.phase_rewards}")
+
+        # Estrelas
         if total_items > 0:
             protected_items = self.target_item_manager.items_protected
             stars = int((protected_items / total_items) * 3)
@@ -1604,9 +1640,10 @@ class GameScene(BaseScene):
             "gold_from_defeats": gold_from_defeats,
             "bonus_amount": bonus_amount,
             "gold_total": gold_total,
-            "total_xp": self.phase_rewards['experience'],
+            "total_xp": self.phase_rewards.get('experience', 50),
             "perfect_run": perfect_run,
-            "stars": stars
+            "stars": stars,
+            "earned_items": earned_items  # NOVO
         }
 
         progress_manager.complete_phase(self.phase_id, stars=stars)

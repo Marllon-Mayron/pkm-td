@@ -873,7 +873,16 @@
     },
     "rewards": {
         "money": 200,
-        "experience": 10
+        "experience": 10,
+        "item_rewards": [
+            {
+                "item_id": "antidote",
+                "weight": 100
+            }
+        ],
+        "drop_chance": 0.01,
+        "max_items": 3,
+        "template_name": null
     },
     "localization_type": "default",
     "custom_folder": "",

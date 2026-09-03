@@ -81,7 +81,11 @@ class EditorScene(BaseScene):
         # Recompensas da fase (NOVO)
         self.phase_rewards = {
             "money": 100,
-            "experience": 50
+            "experience": 50,
+            "item_rewards": [],
+            "drop_chance": 0.0,  # 0 a 1
+            "max_items": 3,
+            "template_name": None
         }
 
         # UI Panels
@@ -199,14 +203,18 @@ class EditorScene(BaseScene):
             self._open_rewards_config_dialog()
 
     def _open_rewards_config_dialog(self):
-        """Abre o diálogo de configuração de recompensas (gold e XP)"""
-        dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 400) // 2
-        dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 300) // 2
+        """Abre o diálogo de configuração de recompensas (com itens)."""
+        dialog_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - 500) // 2
+        dialog_y = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - 500) // 2
 
         self.rewards_config_dialog = RewardsConfigDialog(
-            dialog_x, dialog_y, 400, 300,
-            self.phase_rewards.get("money", 100),
-            self.phase_rewards.get("experience", 50)
+            dialog_x, dialog_y, 500, 480,
+            current_money=self.phase_rewards.get("money", 100),
+            current_xp=self.phase_rewards.get("experience", 50),
+            item_rewards=self.phase_rewards.get("item_rewards", []),
+            drop_chance=self.phase_rewards.get("drop_chance", 0.0),
+            max_items=self.phase_rewards.get("max_items", 3),
+            template_name=self.phase_rewards.get("template_name")
         )
 
     def _import_tileset(self):
@@ -510,10 +518,14 @@ class EditorScene(BaseScene):
         # Diálogo de recompensas (NOVO)
         if self.rewards_config_dialog and self.rewards_config_dialog.visible:
             result = self.rewards_config_dialog.handle_event(event)
-            if result is not None:
+            if result is not None and isinstance(result, dict):
                 # Atualiza as recompensas
                 self.phase_rewards.update(result)
-                print(f"Recompensas atualizadas: Gold={self.phase_rewards['money']}, XP={self.phase_rewards['experience']}")
+                print(
+                    f"Recompensas atualizadas: Gold={self.phase_rewards['money']}, XP={self.phase_rewards['experience']}, "
+                    f"Itens={len(self.phase_rewards.get('item_rewards', []))}, "
+                    f"Chance={self.phase_rewards.get('drop_chance', 0.0) * 100:.0f}%, "
+                    f"Max={self.phase_rewards.get('max_items', 3)}")
                 self.rewards_config_dialog = None
             elif not self.rewards_config_dialog.visible:
                 self.rewards_config_dialog = None

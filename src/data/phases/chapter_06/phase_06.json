@@ -2198,7 +2198,24 @@
     },
     "rewards": {
         "money": 100,
-        "experience": 50
+        "experience": 50,
+        "item_rewards": [
+            {
+                "item_id": "dome_fossil",
+                "weight": 40
+            },
+            {
+                "item_id": "helix_fossil",
+                "weight": 30
+            },
+            {
+                "item_id": "old_amber",
+                "weight": 30
+            }
+        ],
+        "drop_chance": 0.03,
+        "max_items": 3,
+        "template_name": null
     },
     "localization_type": "default",
     "custom_folder": "",
