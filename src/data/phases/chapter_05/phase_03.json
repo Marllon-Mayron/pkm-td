@@ -1326,7 +1326,7 @@
                     }
                 ],
                 "min_level": 21,
-                "max_level": 5,
+                "max_level": 25,
                 "wave_size": 6,
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
@@ -1371,7 +1371,7 @@
                 "variants": []
             }
         ],
-        "selected_wave": 1,
+        "selected_wave": 0,
         "templates": {
             "templates": []
         }
