@@ -73,6 +73,13 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rarity=AchievementRarity.COMMON,
         rewards={"gold": 200, "xp": 100}
     ),
+    "all_badges": Achievement(
+        id="all_badges",
+        title="Mestre de Ginásio",
+        description="Obtenha todas as 8 insígnias de ginásio!",
+        rarity=AchievementRarity.LEGENDARY,
+        rewards={"gold": 5000, "xp": 3000, "items": {"masterball": 1}}
+    ),
     "capture_10": Achievement(
         id="capture_10",
         title="Colecionador Iniciante",

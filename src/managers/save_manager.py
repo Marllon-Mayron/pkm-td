@@ -774,8 +774,8 @@ class SaveManager:
             migrated["player"]["caught_pokemon"] = []
 
         # GARANTE QUE INCUBADORA EXISTE MESMO EM SAVES ANTIGOS
-        if "incubators" not in migrated["player"]:
-            migrated["player"]["incubators"] = []
+        if "desfossilizadores" not in migrated["player"]:
+            migrated["player"]["desfossilizadores"] = []
             incubator = {
                 "id": 1,
                 "level": 1,
@@ -783,11 +783,11 @@ class SaveManager:
                 "fossil_id": None,
                 "pokemon_id": None,
                 "start_time": None,
-                "duration_minutes": 60,
+                "duration_minutes": 3600,
                 "time_elapsed": 0.0
             }
-            migrated["player"]["incubators"].append(incubator)
-            print("[MIGRATE] Incubadora inicial adicionada (fallback)")
+            migrated["player"]["desfossilizadores"].append(incubator)
+            print("[MIGRATE] desfossilizador inicial adicionada (fallback)")
 
         if "total_playtime" not in migrated["player"]:
             migrated["player"]["total_playtime"] = 0.0

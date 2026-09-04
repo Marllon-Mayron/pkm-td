@@ -108,6 +108,10 @@ class Game:
         if hasattr(self.player, 'total_playtime'):
             self.player.total_playtime += dt
 
+        # Atualiza desfossilizadores (incubadora) em segundo plano
+        if hasattr(self.player, 'update_desfossilizadores'):
+            self.player.update_desfossilizadores(dt)
+
         if self.current_scene and not self.current_scene.paused:
             self.current_scene.fixed_update(dt)
 

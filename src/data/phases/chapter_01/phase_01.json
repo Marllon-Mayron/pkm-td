@@ -888,7 +888,7 @@
                 "weight": 30
             }
         ],
-        "drop_chance": 1.0,
+        "drop_chance": 0.02,
         "max_items": 3,
         "template_name": null
     },

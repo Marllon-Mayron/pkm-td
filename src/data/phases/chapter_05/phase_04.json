@@ -1500,9 +1500,42 @@
                     ]
                 ],
                 "closed": false
+            },
+            {
+                "nodes": [
+                    [
+                        108,
+                        444
+                    ],
+                    [
+                        108,
+                        204
+                    ],
+                    [
+                        276,
+                        204
+                    ],
+                    [
+                        276,
+                        108
+                    ],
+                    [
+                        372,
+                        108
+                    ],
+                    [
+                        372,
+                        348
+                    ],
+                    [
+                        540,
+                        348
+                    ]
+                ],
+                "closed": false
             }
         ],
-        "current_path_index": 0
+        "current_path_index": 1
     },
     "waves": {
         "waves": [
@@ -1538,7 +1571,7 @@
             },
             {
                 "wave_index": 1,
-                "path_index": 0,
+                "path_index": 1,
                 "name": "Wave 2",
                 "enabled": true,
                 "enemies": [
@@ -1559,7 +1592,7 @@
                 "variants": []
             }
         ],
-        "selected_wave": 0,
+        "selected_wave": 1,
         "templates": {
             "templates": []
         }

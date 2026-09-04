@@ -32,6 +32,17 @@ from src.battle.effects.specific.day_night.day_night_filter import DayNightFilte
 from src.battle.effects.specific.day_night.day_night_state import DayNightType
 from src.scenes.game_scene.components.day_night_weather_system import DayNightWeatherSystem
 
+GYM_PHASES = {
+    (1, 5): 1,   # 1º Ginásio
+    (2, 8): 2,   # 2º Ginásio
+    (3, 4): 3,   # 3º Ginásio
+    (4, 5): 4,   # 4º Ginásio
+    (5, 5): 5,   # 5º Ginásio
+    (6, 5): 6,   # 6º Ginásio
+    (6, 10): 7,  # 7º Ginásio
+    (7, 4): 8,   # 8º Ginásio
+}
+
 class GameScene(BaseScene):
     def __init__(self, game, chapter_id=1, phase_number=1):
         super().__init__(game)
@@ -181,9 +192,9 @@ class GameScene(BaseScene):
 
         # Mensagem no console
         weather_names = {
-            WeatherType.SANDSTORM: "🌪️ TEMPESTADE DE AREIA (TESTE)",
-            WeatherType.RAIN: "🌧️ CHUVA (TESTE)",
-            WeatherType.SUNNY: "☀️ SOL FORTE (TESTE)"
+            WeatherType.SANDSTORM: "TEMPESTADE DE AREIA",
+            WeatherType.RAIN: "CHUVA (TESTE)",
+            WeatherType.SUNNY: "SOL FORTE (TESTE)"
         }
         print(f"\n{'=' * 50}")
         print(f"[WEATHER TEST] {weather_names.get(test_weather, 'CLIMA')} iniciado!")
@@ -1574,6 +1585,17 @@ class GameScene(BaseScene):
         for pokemon in self.player.team:
             pokemon.add_happiness(5, "Fase completada")
 
+        # ===== VERIFICA SE É GINÁSIO =====
+        if (self.chapter_id, self.phase_number) in GYM_PHASES:
+            gym_number = GYM_PHASES[(self.chapter_id, self.phase_number)]
+            print(f"[GYM] Ginásio {gym_number} completado!")
+            # Incrementa contador de insígnias
+            self.player.achievement_manager.increment_counter("badge_count")
+            # Verifica conquista de primeira insígnia
+            self.player.achievement_manager.check_and_unlock("first_badge", self.phase_id)
+            # Verifica conquista de todas as insígnias
+            self.player.achievement_manager.check_and_unlock("all_badges", self.phase_id)
+
         # ===== RECOMPENSAS BASE =====
         base_reward = self.phase_rewards.get('money', 100)
         gold_from_defeats = self.wave_manager.get_total_gold_earned()
@@ -1585,7 +1607,14 @@ class GameScene(BaseScene):
         if stolen_items == 0 and total_items > 0:
             bonus_amount = int(gold_from_defeats * 0.3)
             perfect_run = True
-            # conquista...
+            # ===== CONQUISTAS: Fase Perfeita =====
+            if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+                phase_id = f"{self.chapter_id}-{self.phase_number}"
+                self.player.achievement_manager.increment_counter("perfect_phase_count")
+                self.player.achievement_manager.check_and_unlock("perfect_phase", phase_id)
+                print(f"[ACHIEVEMENT] Fase perfeita! Verificando conquistas...")
+
+        # ===== CONQUISTAS: Ginasios =====
 
         gold_total = base_reward + gold_from_defeats + bonus_amount
         self.player.money += gold_total

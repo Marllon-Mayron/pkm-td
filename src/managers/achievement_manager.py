@@ -216,6 +216,10 @@ class AchievementManager:
             if self.get_counter("badge_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
 
+        elif achievement_id == "all_badges":
+            if self.get_counter("badge_count") >= 8:
+                return self.unlock(achievement_id, phase_id)
+
         elif achievement_id == "capture_10":
             if self.get_counter("capture_count") >= 10:
                 return self.unlock(achievement_id, phase_id)
@@ -405,6 +409,7 @@ class AchievementManager:
             "first_capture": ("capture_count", 1),
             "heal_5": ("heal_count", 5),
             "first_badge": ("badge_count", 1),
+            "all_badges": ("badge_count", 8),
             "capture_10": ("capture_count", 10),
             "heal_100": ("heal_count", 100),
             "capture_50": ("capture_count", 50),

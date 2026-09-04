@@ -120,11 +120,11 @@ class Player(Entity):
     def _get_duration_for_level(self, level):
         """Retorna a duração em segundos para cada nível"""
         durations = {
-            1: 6000,  # 1 hora
+            1: 3600,  # 1 hora
             2: 2700,  # 45 minutos
             3: 1200  # 20 minutos
         }
-        return durations.get(level, 60)
+        return durations.get(level, 3600)
 
     def has_team_space(self):
         return len(self.team) < 6
