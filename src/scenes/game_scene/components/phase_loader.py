@@ -7,6 +7,7 @@ import pygame
 from pathlib import Path
 from src.config.phase_catalog import phase_catalog
 from src.config.paths import PROJECT_ROOT  # Importe o caminho absoluto
+from src.editor.wave_config import WaveTemplateManager
 
 
 class PhaseLoader:
@@ -63,6 +64,49 @@ class PhaseLoader:
             import traceback
             traceback.print_exc()
             return None
+
+    def get_all_pokemon_ids_from_phase(self) -> list[int]:
+        """
+        Retorna uma lista com todos os pokemon_id únicos que podem aparecer
+        em qualquer wave, template ou variant da fase atual.
+        """
+        ids = set()
+        waves = self.get_waves_data()
+        if not waves:
+            return []
+
+        for wave in waves:
+            # 1. Inimigos diretos da wave
+            for enemy in wave.get("enemies", []):
+                pid = enemy.get("pokemon_id")
+                if pid:
+                    ids.add(pid)
+
+            # 2. Template principal da wave
+            template_id = wave.get("template_id")
+            if template_id:
+                template = WaveTemplateManager.get_template(template_id)
+                if template:
+                    for e in template.enemies:
+                        ids.add(e.pokemon_id)
+
+            # 3. Variants (se ativados)
+            if wave.get("use_variants", False):
+                for variant in wave.get("variants", []):
+                    # 3a. Template do variant
+                    var_template_id = variant.get("template_id")
+                    if var_template_id:
+                        var_template = WaveTemplateManager.get_template(var_template_id)
+                        if var_template:
+                            for e in var_template.enemies:
+                                ids.add(e.pokemon_id)
+                    # 3b. Inimigos diretos do variant
+                    for enemy in variant.get("enemies", []):
+                        pid = enemy.get("pokemon_id")
+                        if pid:
+                            ids.add(pid)
+
+        return list(ids)
 
     def get_base_path(self) -> str:
         """Retorna o caminho base do projeto (onde está a pasta res)"""

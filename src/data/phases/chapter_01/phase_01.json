@@ -877,10 +877,18 @@
         "item_rewards": [
             {
                 "item_id": "antidote",
-                "weight": 100
+                "weight": 60
+            },
+            {
+                "item_id": "pokeball",
+                "weight": 30
+            },
+            {
+                "item_id": "potion",
+                "weight": 30
             }
         ],
-        "drop_chance": 0.01,
+        "drop_chance": 1.0,
         "max_items": 3,
         "template_name": null
     },

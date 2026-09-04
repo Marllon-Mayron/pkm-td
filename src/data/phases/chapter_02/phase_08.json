@@ -756,6 +756,6 @@
     },
     "localization_type": "default",
     "custom_folder": "",
-    "day_night_mode": "random",
-    "base_weather": "random"
+    "day_night_mode": "day",
+    "base_weather": "rain"
 }

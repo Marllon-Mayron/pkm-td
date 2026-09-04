@@ -1549,22 +1549,18 @@
                         "percentage": 60.0
                     },
                     {
-                        "pokemon_id": 238,
-                        "percentage": 3.0
-                    },
-                    {
-                        "pokemon_id": 220,
-                        "percentage": 17.0
+                        "pokemon_id": 170,
+                        "percentage": 20.0
                     }
                 ],
                 "min_level": 21,
                 "max_level": 25,
-                "wave_size": 15,
-                "spawn_interval": 1.0,
-                "initial_delay": 2.0,
-                "repeat_wave": true,
+                "wave_size": 30,
+                "spawn_interval": 1.5,
+                "initial_delay": 5.0,
+                "repeat_wave": false,
                 "repeat_count": 2,
-                "template_id": "template_9461",
+                "template_id": "template_5920",
                 "use_variants": true,
                 "variants": [
                     {
@@ -1583,12 +1579,8 @@
                                 "percentage": 60.0
                             },
                             {
-                                "pokemon_id": 225,
-                                "percentage": 17.0
-                            },
-                            {
-                                "pokemon_id": 215,
-                                "percentage": 3.0
+                                "pokemon_id": 170,
+                                "percentage": 20.0
                             }
                         ],
                         "min_level": 21,
@@ -1618,16 +1610,17 @@
                             "percentage": 60.0
                         },
                         {
-                            "pokemon_id": 238,
-                            "percentage": 3.0
-                        },
-                        {
-                            "pokemon_id": 220,
-                            "percentage": 17.0
+                            "pokemon_id": 226,
+                            "percentage": 20.0
                         }
                     ],
                     "min_level": 21,
-                    "max_level": 25
+                    "max_level": 25,
+                    "wave_size": 30,
+                    "spawn_interval": 1.5,
+                    "initial_delay": 5.0,
+                    "repeat_wave": false,
+                    "repeat_count": 2
                 },
                 {
                     "template_id": "template_5920",
@@ -1646,16 +1639,17 @@
                             "percentage": 60.0
                         },
                         {
-                            "pokemon_id": 225,
-                            "percentage": 17.0
-                        },
-                        {
-                            "pokemon_id": 215,
-                            "percentage": 3.0
+                            "pokemon_id": 170,
+                            "percentage": 20.0
                         }
                     ],
                     "min_level": 21,
-                    "max_level": 25
+                    "max_level": 25,
+                    "wave_size": 30,
+                    "spawn_interval": 1.5,
+                    "initial_delay": 5.0,
+                    "repeat_wave": false,
+                    "repeat_count": 2
                 }
             ]
         }

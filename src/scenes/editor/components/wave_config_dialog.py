@@ -1213,41 +1213,6 @@ class WaveConfigDialog:
         self.variant_template_rect = template_rect
         self.variant_clear_template_rect = clear_template_rect
 
-        # Dropdown de templates (se aberto)
-        if self.variant_template_combo_open:
-            item_height = 28
-            list_height = min(len(templates) * item_height + 4, 160)
-            list_rect = pygame.Rect(
-                template_rect.x,
-                template_rect.bottom + 2,
-                template_rect.width,
-                list_height
-            )
-            # Ajusta para não sobrepor
-            if list_rect.bottom > editor_rect.bottom - 10:
-                list_rect.y = template_rect.top - list_height - 2
-                if list_rect.top < editor_rect.top + 40:
-                    list_rect.y = template_rect.bottom + 2
-
-            pygame.draw.rect(screen, self.colors['bg_dropdown'], list_rect, border_radius=5)
-            pygame.draw.rect(screen, self.colors['border_dropdown'], list_rect, 1, border_radius=5)
-
-            for i, template in enumerate(templates):
-                item_rect = pygame.Rect(list_rect.x + 4, list_rect.y + 2 + i * item_height, list_rect.width - 8, 22)
-                is_hover = (i == self.variant_template_hovered_index)
-                is_sel = (hasattr(variant, 'template_id') and template.template_id == variant.template_id)
-
-                bg = self.colors['dropdown_item_hover'] if is_hover else self.colors['bg_dropdown']
-                if is_sel:
-                    bg = self.colors['accent']
-                pygame.draw.rect(screen, bg, item_rect, border_radius=4)
-
-                text = self._get_font(13).render(template.name, True, self.colors['text'])
-                screen.blit(text, (item_rect.x + 8, item_rect.y + 3))
-                if is_sel:
-                    check = self._get_font(13).render("✓", True, self.colors['radio_selected'])
-                    screen.blit(check, (item_rect.right - 20, item_rect.y + 3))
-
         # Botão Adicionar (abaixo do seletor de template)
         add_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 122, 120, 26)
         self._render_button(screen, add_rect, "variant_add_enemy", "+ Adicionar")
@@ -1265,7 +1230,7 @@ class WaveConfigDialog:
         self.variant_equalize_rect = equalize_rect
         self.variant_clear_enemies_rect = clear_enemies_rect
 
-        # Lista de inimigos
+        # ===== LISTA DE INIMIGOS =====
         list_rect = pygame.Rect(editor_rect.x + 20, editor_rect.y + 156, editor_rect.width - 40, 160)
         pygame.draw.rect(screen, self.colors['bg_dark'], list_rect, border_radius=6)
 
@@ -1327,6 +1292,42 @@ class WaveConfigDialog:
         color = (100, 255, 100) if abs(total - 100.0) < 0.01 else (255, 100, 100)
         total_text = self._get_font(13).render(f"Total: {total:.1f}%", True, color)
         screen.blit(total_text, (list_rect.x, list_rect.bottom + 6))
+
+        # ===== DROPDOWN DE TEMPLATES (REPOSICIONADO AQUI, APÓS A LISTA) =====
+        if self.variant_template_combo_open:
+            item_height = 28
+            list_height = min(len(templates) * item_height + 4, 160)
+            list_rect_drop = pygame.Rect(
+                template_rect.x,
+                template_rect.bottom + 2,
+                template_rect.width,
+                list_height
+            )
+            # Ajusta para não sobrepor
+            if list_rect_drop.bottom > editor_rect.bottom - 10:
+                list_rect_drop.y = template_rect.top - list_height - 2
+                if list_rect_drop.top < editor_rect.top + 40:
+                    list_rect_drop.y = template_rect.bottom + 2
+
+            pygame.draw.rect(screen, self.colors['bg_dropdown'], list_rect_drop, border_radius=5)
+            pygame.draw.rect(screen, self.colors['border_dropdown'], list_rect_drop, 1, border_radius=5)
+
+            for i, template in enumerate(templates):
+                item_rect = pygame.Rect(list_rect_drop.x + 4, list_rect_drop.y + 2 + i * item_height,
+                                        list_rect_drop.width - 8, 22)
+                is_hover = (i == self.variant_template_hovered_index)
+                is_sel = (hasattr(variant, 'template_id') and template.template_id == variant.template_id)
+
+                bg = self.colors['dropdown_item_hover'] if is_hover else self.colors['bg_dropdown']
+                if is_sel:
+                    bg = self.colors['accent']
+                pygame.draw.rect(screen, bg, item_rect, border_radius=4)
+
+                text = self._get_font(13).render(template.name, True, self.colors['text'])
+                screen.blit(text, (item_rect.x + 8, item_rect.y + 3))
+                if is_sel:
+                    check = self._get_font(13).render("✓", True, self.colors['radio_selected'])
+                    screen.blit(check, (item_rect.right - 20, item_rect.y + 3))
 
         # Dropdown de condição (sobreposto)
         if self.condition_dropdown_open:
