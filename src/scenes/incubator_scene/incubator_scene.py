@@ -545,38 +545,25 @@ class IncubatorScene(BaseScene):
             self.feedback_timer = 2.0
 
     def _upgrade_desfossilizador(self, index):
-        """Faz upgrade do desfossilizador"""
+        """Faz upgrade do desfossilizador delegando ao jogador."""
         if index >= len(self.player.desfossilizadores):
             return
 
         desfossilizador = self.player.desfossilizadores[index]
         if desfossilizador["level"] >= 3:
-            self.feedback_message = "Nivel maximo atingido!"
+            self.feedback_message = "Nível máximo atingido!"
             self.feedback_timer = 2.0
             return
 
-        new_level = desfossilizador["level"] + 1
-        cost = 30000 if desfossilizador["level"] == 1 else 50000
-
-        if self.player.money < cost:
-            self.feedback_message = f"Voce precisa de ${cost} para o upgrade!"
+        # Tenta realizar o upgrade através do jogador (ele aplica custo e conquista)
+        if self.player.upgrade_desfossilizador(index):
+            novo_nivel = desfossilizador["level"]
+            self.feedback_message = f"Desfossilizador #{desfossilizador['id']} agora está no nível {novo_nivel}!"
             self.feedback_timer = 2.0
-            return
-
-        # Faz o upgrade
-        self.player.money -= cost
-        desfossilizador["level"] = new_level
-        desfossilizador["duration_minutes"] = self.player._get_duration_for_level(new_level)
-
-        self.feedback_message = f"Desfossilizador #{desfossilizador['id']} agora esta no nivel {new_level}!"
-        self.feedback_timer = 2.0
-        self.game.player.auto_save()
-
-        # ===== CONQUISTAS: upgrade =====
-        phase_id = "incubator"
-        if hasattr(self.player, 'achievement_manager'):
-            self.player.achievement_manager.increment_counter("upgrade_desfossilizador_count")
-            self.player.achievement_manager.check_and_unlock("upgrade_desfossilizador", phase_id)
+            self.game.player.auto_save()
+        else:
+            self.feedback_message = "Falha no upgrade. Verifique se você tem dinheiro suficiente."
+            self.feedback_timer = 2.0
 
     def fixed_update(self, dt):
         if not self.layout_initialized:
