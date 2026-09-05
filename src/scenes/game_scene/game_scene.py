@@ -674,38 +674,39 @@ class GameScene(BaseScene):
         return True
 
     def _use_evolution_stone(self, pokemon, item_data):
-        """Usa pedra de evolução em um Pokémon """
+        """Usa pedra de evolução em um Pokémon"""
         from src.managers.evolution_manager import evolution_manager
 
         stone_name = item_data["id"]
         evolution = evolution_manager.check_evolution(pokemon.id, stone_name=stone_name)
 
         if not evolution:
-            # Se não pode evoluir, devolve o item
-            self.player.bag.add_item(item_data["id"], 1)
-            return {"consume_item": False, "success": False,
-                    "message": f"{pokemon.name} não pode evoluir com {item_data['name']}!"}
+            return {
+                "consume_item": False,
+                "success": False,
+                "message": f"{pokemon.name} não pode evoluir com {item_data['name']}!"
+            }
 
         evolve_to_id = evolution["evolve_to"]
 
-        # ===== DEFINE O MÉTODO DE EVOLUÇÃO ANTES DE EXECUTAR =====
+        # Define o método de evolução antes de executar
         if hasattr(pokemon, 'evolution'):
             pokemon.evolution._pending_evolution_method = "stone"
 
         # Guarda os dados da evolução para referência
         pokemon._last_evolution_data = evolution
 
-        # ===== EXECUTA A EVOLUÇÃO (INSTANTÂNEA) =====
+        # Executa a evolução (instantânea)
         pokemon._perform_evolution(evolve_to_id)
 
-        # ===== REGISTRA NA POKEDEX =====
+        # Registra na Pokédex
         self.player.caught_pokemon.add(evolve_to_id)
         self.player.register_seen(evolve_to_id)
 
-        # ===== SALVA =====
+        # Salva
         self.player.auto_save()
 
-        # ===== TOAST DE CONFIRMAÇÃO =====
+        # Toast de confirmação
         toast_battle(
             f"{pokemon.name} evoluiu para {pokemon.get_display_name()}!",
             duration=3.0,
@@ -713,7 +714,7 @@ class GameScene(BaseScene):
             portrait="joyous"
         )
 
-        # ===== TOCA SOM DE EVOLUÇÃO =====
+        # Toca som de evolução
         sound_manager.play_effect(SoundEffect.EVOLUTION)
 
         print(f"[STONE_EVOLUTION] {pokemon.name} evoluiu com {item_data['name']}!")

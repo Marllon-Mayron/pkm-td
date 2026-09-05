@@ -2482,7 +2482,7 @@
                         },
                         {
                             "pokemon_id": 46,
-                            "percentage": 13.9
+                            "percentage": 13.7
                         },
                         {
                             "pokemon_id": 48,
@@ -2506,7 +2506,7 @@
                         },
                         {
                             "pokemon_id": 185,
-                            "percentage": 0.1
+                            "percentage": 0.3
                         }
                     ],
                     "min_level": 12,
@@ -2665,6 +2665,10 @@
         "item_rewards": [
             {
                 "item_id": "leafstone",
+                "weight": 70
+            },
+            {
+                "item_id": "antidote",
                 "weight": 100
             }
         ],

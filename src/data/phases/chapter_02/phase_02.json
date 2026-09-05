@@ -2026,19 +2026,15 @@
                     },
                     {
                         "pokemon_id": 29,
-                        "percentage": 15.0
+                        "percentage": 4.0
                     },
                     {
                         "pokemon_id": 32,
-                        "percentage": 2.0
+                        "percentage": 1.0
                     },
                     {
                         "pokemon_id": 43,
                         "percentage": 20.0
-                    },
-                    {
-                        "pokemon_id": 46,
-                        "percentage": 14.9
                     },
                     {
                         "pokemon_id": 56,
@@ -2049,69 +2045,28 @@
                         "percentage": 3.0
                     },
                     {
-                        "pokemon_id": 185,
-                        "percentage": 0.1
+                        "pokemon_id": 167,
+                        "percentage": 15.0
+                    },
+                    {
+                        "pokemon_id": 161,
+                        "percentage": 6.0
+                    },
+                    {
+                        "pokemon_id": 163,
+                        "percentage": 6.0
                     }
                 ],
                 "min_level": 11,
                 "max_level": 12,
-                "wave_size": 12,
-                "spawn_interval": 2.0,
-                "initial_delay": 6.0,
-                "repeat_wave": true,
-                "repeat_count": 2,
-                "template_id": "template_6633",
-                "use_variants": true,
-                "variants": [
-                    {
-                        "condition": "night",
-                        "enemies": [
-                            {
-                                "pokemon_id": 12,
-                                "percentage": 21.0
-                            },
-                            {
-                                "pokemon_id": 15,
-                                "percentage": 21.0
-                            },
-                            {
-                                "pokemon_id": 29,
-                                "percentage": 4.0
-                            },
-                            {
-                                "pokemon_id": 32,
-                                "percentage": 1.0
-                            },
-                            {
-                                "pokemon_id": 43,
-                                "percentage": 20.0
-                            },
-                            {
-                                "pokemon_id": 56,
-                                "percentage": 3.0
-                            },
-                            {
-                                "pokemon_id": 187,
-                                "percentage": 3.0
-                            },
-                            {
-                                "pokemon_id": 167,
-                                "percentage": 15.0
-                            },
-                            {
-                                "pokemon_id": 161,
-                                "percentage": 6.0
-                            },
-                            {
-                                "pokemon_id": 163,
-                                "percentage": 6.0
-                            }
-                        ],
-                        "min_level": 11,
-                        "max_level": 12,
-                        "template_id": "template_4264"
-                    }
-                ]
+                "wave_size": 6,
+                "spawn_interval": 3.0,
+                "initial_delay": 2.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": "template_4264",
+                "use_variants": false,
+                "variants": []
             },
             {
                 "wave_index": 1,
@@ -2217,7 +2172,7 @@
                 ]
             }
         ],
-        "selected_wave": 1,
+        "selected_wave": 0,
         "templates": {
             "templates": [
                 {
@@ -2246,7 +2201,7 @@
                         },
                         {
                             "pokemon_id": 46,
-                            "percentage": 14.9
+                            "percentage": 14.7
                         },
                         {
                             "pokemon_id": 56,
@@ -2258,7 +2213,7 @@
                         },
                         {
                             "pokemon_id": 185,
-                            "percentage": 0.1
+                            "percentage": 0.3
                         }
                     ],
                     "min_level": 11,
@@ -2437,8 +2392,12 @@
         "experience": 30,
         "item_rewards": [
             {
+                "item_id": "antidote",
+                "weight": 30
+            },
+            {
                 "item_id": "leafstone",
-                "weight": 100
+                "weight": 70
             }
         ],
         "drop_chance": 0.01,

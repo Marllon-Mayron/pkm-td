@@ -1778,7 +1778,7 @@
                 "variants": []
             }
         ],
-        "selected_wave": 1,
+        "selected_wave": 0,
         "templates": {
             "templates": [
                 {
@@ -1787,7 +1787,7 @@
                     "enemies": [
                         {
                             "pokemon_id": 11,
-                            "percentage": 9.9
+                            "percentage": 9.7
                         },
                         {
                             "pokemon_id": 14,
@@ -1823,7 +1823,7 @@
                         },
                         {
                             "pokemon_id": 185,
-                            "percentage": 0.1
+                            "percentage": 0.3
                         }
                     ],
                     "min_level": 10,
@@ -1946,6 +1946,10 @@
         "item_rewards": [
             {
                 "item_id": "leafstone",
+                "weight": 70
+            },
+            {
+                "item_id": "antidote",
                 "weight": 100
             }
         ],
