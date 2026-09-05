@@ -1547,11 +1547,9 @@ class MoveEffect:
                         hit_count += 1
 
                 elif self.effect_type == "stat_mod":
-                    # Para golpes como Sand Attack em área
                     success = self._apply_stat_mod(attacker, target_entity, effect_manager)
                     if success:
                         hit_count += 1
-                        print(f"[AREA_EFFECT] stat_mod aplicado com sucesso em {target_entity.name}")
 
                 elif self.effect_type == "drain":
                     success = self._apply_drain(attacker, target_entity, damage, effect_manager)
@@ -1595,10 +1593,19 @@ class MoveEffect:
                         elif 0 < damage_result["effectiveness"] < 1.0:
                             effect_manager.add_status_text(target_entity, "Não é muito efetivo...", duration=0.8)
 
-                        # ===== CORREÇÃO CRÍTICA: NÃO CHAMA _apply_move_effect PARA ATAQUES EM ÁREA =====
-                        # Isso evita recursão e duplicação de PP
-                        # battle_system._apply_move_effect(attacker, target_entity, current_move, damage_result["damage"])
+                        # ===== APLICA FLINCH  =====
+                        flinch_chance = self.params.get("flinch_chance", 0)
+                        if flinch_chance > 0 and random.random() < flinch_chance:
+                            # Reseta o cooldown do alvo para fazê-lo perder o turno
+                            target_entity.attack_cooldown = max(0.5, 1.0 - (target_entity.speed_stat / 500))
+                            effect_manager.add_status_text(
+                                target_entity,
+                                f"{target_entity.name} hesitou!",
+                                duration=1.0
+                            )
+                            print(f"[FLINCH] {target_entity.name} foi afetado por flinch em área!")
 
+                        # Toca som de impacto
                         move_sound_manager.play_hit_sound(current_move.sound_name)
 
                         hit_count += 1
@@ -3803,10 +3810,6 @@ class MoveEffect:
                 )
                 print(f"[SUNNY_DAY] {attacker.name} tentou usar Sunny Day, mas é NOITE! Bloqueado.")
 
-                current_move = attacker.get_current_move()
-                if current_move:
-                    current_move.current_pp -= 1
-
                 attacker.attack_cooldown = attacker.attack_cooldown_max
                 return False
 
@@ -3840,11 +3843,6 @@ class MoveEffect:
 
         if weather_type in messages:
             effect_manager.add_status_text(attacker, messages[weather_type], duration=2.0)
-
-        # Gasta PP
-        current_move = attacker.get_current_move()
-        if current_move:
-            current_move.current_pp -= 1
 
         # Cooldown do atacante
         attacker.attack_cooldown = attacker.attack_cooldown_max

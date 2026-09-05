@@ -568,7 +568,7 @@ class EffectFactory:
                 "tick_interval": 2.0,
                 "drain_percentage": 0.125
             },
-            "description": "Planta uma semente que drena HP do oponente a cada turno"
+            "description": "Planta uma semente que drena HP do oponente a cada turno (2s)"
         },
         # ===== CONFUSÕES (CONFUSION) =====
         "confuse-ray": {
@@ -825,9 +825,10 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "is_area": True,
             "params": {
-                "chance": 0.3
+                "use_normal_damage": True,
+                "flinch_chance": 0.3
             },
-            "description": "Pode fazer o oponente hesitar"
+            "description": "Causa dano em área e pode fazer o oponente hesitar"
         },
         "hyper-fang": {
             "effect_type": "flinch",
@@ -1576,13 +1577,13 @@ class EffectFactory:
             "timing": EffectTiming.AFTER_DAMAGE,
             "params": {
                 "residual_type": "whirlpool",
-                "duration_min": 2,  # 2-5 turnos
+                "duration_min": 2,
                 "duration_max": 5,
                 "tick_interval": 2.0,
                 "damage_percentage": 1 / 16,
                 "trapping": True,
             },
-            "description": "Prende o alvo por 2-5 turnos, causando dano de 1/16 do HP máximo por turno."
+            "description": "Prende o alvo por 4-10 segundos, causando dano de 1/16 do HP máximo por turno."
         },
         # ===== VENENO (POISON) =====
         "sludge-bomb": {
@@ -1918,7 +1919,7 @@ class EffectFactory:
                 "weather_type": "sandstorm",
                 "duration": 10.0
             },
-            "description": "Causa tempestade de areia por 5 turnos"
+            "description": "Causa tempestade de areia por 10 segundos "
         },
         "rain-dance": {
             "effect_type": "weather",
@@ -1928,7 +1929,7 @@ class EffectFactory:
                 "weather_type": "rain",
                 "duration": 10.0
             },
-            "description": "Faz chover por 5 turnos"
+            "description": "Faz chover por 10 segundos "
         },
         "sunny-day": {
             "effect_type": "weather",
@@ -1938,7 +1939,7 @@ class EffectFactory:
                 "weather_type": "sunny",
                 "duration": 10.0
             },
-            "description": "Cria sol forte por 5 turnos. (NÃO FUNCIONA À NOITE!)"
+            "description": "Cria sol forte por 10 segundos . (NÃO FUNCIONA À NOITE!)"
         },
 
         "vital-throw": {
@@ -2132,18 +2133,18 @@ class EffectFactory:
             "description": "Garante que o próximo ataque do usuário acertará o alvo."
         },
         "rollout": {
-    "effect_type": "rollout",
-    "target": EffectTarget.TARGET,
-    "timing": EffectTiming.ON_HIT,
-    "params": {
-        "base_power": 30,
-        "power_multiplier": 2,  # Dobra a cada acerto consecutivo
-        "max_multiplier": 16,   # Máximo 16x (poder 480)
-        "defense_curl_boost": 2,  # Defense Curl dobra poder base
-        "reset_on_miss": True,    # Reseta se errar
-    },
-    "description": "Poder dobra a cada acerto consecutivo. Máximo 480. Defense Curl dobra o poder base."
-},
+            "effect_type": "rollout",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "base_power": 30,
+                "power_multiplier": 2,  # Dobra a cada acerto consecutivo
+                "max_multiplier": 16,   # Máximo 16x (poder 480)
+                "defense_curl_boost": 2,  # Defense Curl dobra poder base
+                "reset_on_miss": True,    # Reseta se errar
+            },
+            "description": "Poder dobra a cada acerto consecutivo. Máximo 480. Defense Curl dobra o poder base."
+        },
         "foresight": {
             "effect_type": "foresight",
             "target": EffectTarget.TARGET,
@@ -2190,9 +2191,9 @@ class EffectFactory:
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "params": {
-                "duration_attacks": 3,  # 3 turnos (ataques) preso
+                "duration_attacks": 3,
             },
-            "description": "Prende o alvo na posição atual por 3 turnos. Não pode se mover ou atacar."
+            "description": "Prende o alvo na posição atual por 6 segundos. Não pode se mover ou atacar."
         },
         # ===== DANO NO ATACANTE =====
         "outrage": {
