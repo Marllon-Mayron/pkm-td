@@ -345,12 +345,15 @@ class AchievementScene(BaseScene):
         screen.blit(stat_surf, (stat_x, 30))
 
         self._render_back_button(screen)
-        self._render_filters(screen)
 
+        # ===== ALTERAÇÃO: PRIMEIRO RENDERIZA A LISTA, DEPOIS OS FILTROS =====
         if self.achievements:
             self._render_achievement_list(screen)
         else:
             self._render_empty_message(screen)
+
+        # Agora os filtros (dropdown e busca) são desenhados por cima da lista
+        self._render_filters(screen)
 
     def _render_back_button(self, screen):
         self.back_button_rect = pygame.Rect(20, 20, 120, 44)

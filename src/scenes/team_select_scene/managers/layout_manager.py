@@ -120,22 +120,28 @@ class LayoutManager:
             self.team_slots.append(slot)
 
     def _create_buttons(self, screen_width, screen_height):
-        margin = LAYOUT['MARGIN']
+        margin = LAYOUT['MARGIN'] + 20
         button_width = LAYOUT['BUTTON']['WIDTH']
         button_height = LAYOUT['BUTTON']['HEIGHT']
         button_y = screen_height - 60
 
+        # Botão VOLTAR
         self.back_button = pygame.Rect(margin, button_y, button_width, button_height)
+
+        # Botão INICIAR
         self.start_button = pygame.Rect(screen_width - button_width - margin,
                                         button_y, button_width, button_height)
 
         page_button_width = LAYOUT['BUTTON']['PAGE_WIDTH']
+        page_gap = 60
+        center_x = screen_width // 2
+
         self.prev_page_button = pygame.Rect(
-            screen_width // 2 - page_button_width - 10,
+            center_x - page_button_width - page_gap,
             button_y, page_button_width, button_height
         )
         self.next_page_button = pygame.Rect(
-            screen_width // 2 + 10,
+            center_x + page_gap,
             button_y, page_button_width, button_height
         )
 
