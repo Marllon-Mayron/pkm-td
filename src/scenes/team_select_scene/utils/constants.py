@@ -1,3 +1,4 @@
+# src/scenes/team_select_scene/utils/constants.py
 # Constantes de cores
 COLORS = {
     'BACKGROUND': {
@@ -45,6 +46,13 @@ COLORS = {
         'SORT_DEFAULT': (45, 48, 55),
         'SORT_ACTIVE': (70, 120, 70),
         'SORT_BORDER': (80, 85, 95),
+        'DROPDOWN_BG': (30, 33, 40),
+        'DROPDOWN_HOVER': (50, 55, 65),
+        'DROPDOWN_BORDER': (70, 75, 85),
+        'DROPDOWN_OPTION_BG': (35, 38, 45),
+        'DROPDOWN_OPTION_HOVER': (55, 60, 72),
+        'DROPDOWN_OPTION_SELECTED': (65, 110, 65),
+        'DROPDOWN_SHADOW': (15, 17, 22),
     },
     'TEXT': {
         'WHITE': (255, 255, 255),
@@ -54,7 +62,8 @@ COLORS = {
         'GREEN': (150, 255, 150),
         'HP_GREEN': (0, 200, 0),
         'HP_YELLOW': (255, 255, 0),
-        'HP_RED': (255, 0, 0)
+        'HP_RED': (255, 0, 0),
+        'SHINY_GOLD': (255, 215, 0),
     },
     'MODAL': {
         'BACKGROUND': (30, 30, 40),
@@ -89,6 +98,14 @@ LAYOUT = {
         'WIDTH': 100,
         'HEIGHT': 40,
         'PAGE_WIDTH': 80
+    },
+    'FILTERS': {
+        'HEIGHT': 56,
+        'PADDING': 12,
+        'SEARCH_WIDTH': 240,
+        'DROPDOWN_WIDTH': 150,
+        'SPACING': 10,
+        'MAX_WIDTH': 780,
     }
 }
 
@@ -100,5 +117,7 @@ FONT_SIZES = {
     'PAGE': 24,
     'MODAL_TITLE': 28,
     'MODAL_TEXT': 22,
-    'SMALL': 18
+    'SMALL': 18,
+    'FILTER_LABEL': 14,
+    'FILTER_VALUE': 16,
 }

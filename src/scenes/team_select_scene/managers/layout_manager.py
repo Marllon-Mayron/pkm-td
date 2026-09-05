@@ -23,7 +23,6 @@ class LayoutManager:
         self.rows_per_page = 3
 
     def create_layout(self, team, page_pokemon, page=0, current_sort="capture", current_search=""):
-        """create_layout agora recebe apenas os pokémons da página atual"""
         screen_width = self.game.screen_manager.window_width
         screen_height = self.game.screen_manager.window_height
 
@@ -46,7 +45,6 @@ class LayoutManager:
         }
 
     def _create_filters(self, screen_width, screen_height, current_sort, current_search):
-        """Cria a área de filtros abaixo do grid label"""
         margin = LAYOUT['MARGIN']
         top_margin = LAYOUT['TOP_MARGIN']
         slot_height = LAYOUT['SLOT']['HEIGHT']
@@ -54,21 +52,23 @@ class LayoutManager:
         grid_label_y = top_margin + slot_height + 20
         filters_y = grid_label_y + 35
 
-        filter_width = screen_width - 2 * margin
+        # Largura máxima da área de filtros, centralizada
+        max_width = LAYOUT['FILTERS']['MAX_WIDTH']
+        filter_width = min(max_width, screen_width - 2 * margin)
+        filter_x = (screen_width - filter_width) // 2
 
-        # Cria novos filtros
-        self.filters = PokemonFilters(margin, filters_y, filter_width)
+        self.filters = PokemonFilters(filter_x, filters_y, filter_width)
         self.filters.update_sort_state(current_sort)
         self.filters.update_search_state(current_search)
+        self.filters.update_filter_state("all")
 
     def _create_grid(self, screen_width, screen_height, page_pokemon, page):
-        """Cria grid APENAS com os pokémons da página atual"""
         margin = LAYOUT['MARGIN']
         top_margin = LAYOUT['TOP_MARGIN']
         slot_height = LAYOUT['SLOT']['HEIGHT']
+        filters_height = LAYOUT['FILTERS']['HEIGHT'] + 20  # espaço extra
 
         grid_label_y = top_margin + slot_height + 20
-        filters_height = 100
         grid_y = grid_label_y + 35 + filters_height + 10
 
         grid_height = screen_height - grid_y - 100

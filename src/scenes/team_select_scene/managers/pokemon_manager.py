@@ -4,17 +4,26 @@ class PokemonManager:
     def __init__(self, player):
         self.player = player
         self.current_sort = "capture"  # capture, name_asc, name_desc, id_asc, id_desc
+        self.current_filter = "all"    # all, shiny, normal
         self.current_search = ""
 
     def _apply_filters_and_sort(self, pokemon_list):
-        """Aplica busca e ordenação à lista de Pokémon"""
-        # Aplica busca por nome
+        """Aplica busca, filtro e ordenação à lista de Pokémon"""
         filtered_list = pokemon_list
+
+        # Aplica filtro de shiny
+        if self.current_filter == "shiny":
+            filtered_list = [p for p in filtered_list if p.is_shiny]
+        elif self.current_filter == "normal":
+            filtered_list = [p for p in filtered_list if not p.is_shiny]
+
+        # Aplica busca por nome OU apelido (custom_name)
         if self.current_search:
             search_lower = self.current_search.lower()
             filtered_list = [
                 p for p in filtered_list
-                if search_lower in p.name.lower()
+                if search_lower in p.name.lower() or
+                   (p.custom_name and search_lower in p.custom_name.lower())
             ]
 
         # Aplica ordenação
@@ -31,7 +40,6 @@ class PokemonManager:
         return filtered_list
 
     def get_available_pokemon(self, page=0, items_per_page=30):
-        """Retorna os pokémons da página atual com filtros aplicados"""
         all_pokemon = list(self.player.pc_box)
         filtered_list = self._apply_filters_and_sort(all_pokemon)
 
@@ -41,34 +49,29 @@ class PokemonManager:
         return filtered_list[start_idx:end_idx]
 
     def get_page_count(self, items_per_page):
-        """Retorna o número total de páginas baseado na lista filtrada"""
         all_pokemon = list(self.player.pc_box)
         filtered_list = self._apply_filters_and_sort(all_pokemon)
         return max(1, (len(filtered_list) + items_per_page - 1) // items_per_page)
 
     def get_total_filtered_count(self):
-        """Retorna o total de Pokémon após filtros"""
         all_pokemon = list(self.player.pc_box)
         filtered_list = self._apply_filters_and_sort(all_pokemon)
         return len(filtered_list)
 
     def set_sort(self, sort_type):
-        """Define o tipo de ordenação"""
-        print(f"PokemonManager.set_sort: {sort_type}")  # Debug
         self.current_sort = sort_type
 
+    def set_filter(self, filter_type):
+        self.current_filter = filter_type
+
     def set_search(self, search_text):
-        """Define o texto de busca"""
-        print(f"PokemonManager.set_search: '{search_text}'")  # Debug
         self.current_search = search_text
 
     def update_team_status(self):
-        """Atualiza o status 'in_team' para todos os pokémons da box"""
         for pokemon in self.player.pc_box:
             pokemon.is_in_team = any(p is pokemon for p in self.player.team)
 
     def add_to_team(self, pokemon):
-        """Adiciona um pokémon ao time"""
         if len(self.player.team) < 6:
             if pokemon in self.player.pc_box:
                 success, _ = self.player.add_to_team(pokemon)
@@ -80,7 +83,6 @@ class PokemonManager:
         return False
 
     def remove_from_team(self, pokemon):
-        """Remove um pokémon do time"""
         for i, p in enumerate(self.player.team):
             if p is pokemon:
                 removed = self.player.remove_from_team(i)
@@ -94,23 +96,15 @@ class PokemonManager:
         return False
 
     def release_pokemon(self, pokemon):
-        """Liberta um Pokémon (remove da box e do time se estiver nele)"""
-        # Remove do time se estiver lá
         if pokemon.is_in_team:
             for i, p in enumerate(self.player.team):
                 if p is pokemon:
                     self.player.remove_from_team(i)
                     break
 
-        # Remove da PC Box
         if pokemon in self.player.pc_box:
             self.player.pc_box.remove(pokemon)
 
-        # Atualiza status
         pokemon.is_in_team = False
-
-        # Salva
         self.player.auto_save()
-
-        print(f"[RELEASE] {pokemon.name} foi libertado!")
         return True

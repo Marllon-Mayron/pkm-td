@@ -2249,10 +2249,6 @@
                             "percentage": 20.0
                         },
                         {
-                            "pokemon_id": 56,
-                            "percentage": 3.0
-                        },
-                        {
                             "pokemon_id": 187,
                             "percentage": 3.0
                         },
@@ -2267,6 +2263,10 @@
                         {
                             "pokemon_id": 163,
                             "percentage": 6.0
+                        },
+                        {
+                            "pokemon_id": 114,
+                            "percentage": 3.0
                         }
                     ],
                     "min_level": 11,

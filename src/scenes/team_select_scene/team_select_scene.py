@@ -9,7 +9,7 @@ from src.scenes.team_select_scene.components.navigation_buttons import Navigatio
 from src.scenes.team_select_scene.managers.layout_manager import LayoutManager
 from src.scenes.team_select_scene.managers.pokemon_manager import PokemonManager
 from src.scenes.team_select_scene.handlers.event_handler import EventHandler
-from src.scenes.team_select_scene.utils.constants import FONT_SIZES
+from src.scenes.team_select_scene.utils.constants import FONT_SIZES, LAYOUT
 from src.data.pokedex import Pokedex
 
 
@@ -36,7 +36,7 @@ class TeamSelectScene(BaseScene):
         self.total_pages = 1
         self.layout_initialized = False
 
-        # Controle de resize (NOVO)
+        # Controle de resize
         self.last_window_size = (self.game.screen_manager.window_width, self.game.screen_manager.window_height)
 
         # Fonts
@@ -46,7 +46,6 @@ class TeamSelectScene(BaseScene):
         self.page_font = pygame.font.Font(None, FONT_SIZES['PAGE'])
 
     def _check_resize(self):
-        """Verifica se a tela foi redimensionada e reinicializa o layout se necessário"""
         current_size = (self.game.screen_manager.window_width, self.game.screen_manager.window_height)
         if current_size != self.last_window_size:
             self.last_window_size = current_size
@@ -55,8 +54,6 @@ class TeamSelectScene(BaseScene):
         return False
 
     def _initialize_layout(self):
-        """Inicializa o layout da cena"""
-        # PEGA OS POKÉMONS DA PÁGINA ATUAL COM FILTROS APLICADOS
         available_pokemon = self.pokemon_manager.get_available_pokemon(
             self.current_page,
             self.layout_manager.items_per_page
@@ -88,47 +85,45 @@ class TeamSelectScene(BaseScene):
         self.layout_initialized = True
 
     def _refresh_grid(self):
-        """Atualiza apenas o grid sem recriar todo o layout"""
         if not self.layout_initialized:
             return
 
-        # Pega os pokémons atualizados com os filtros
         available_pokemon = self.pokemon_manager.get_available_pokemon(
             self.current_page,
             self.layout_manager.items_per_page
         )
 
-        # Recria apenas os grid items
         screen_width = self.game.screen_manager.window_width
         screen_height = self.game.screen_manager.window_height
 
-        margin = 30
-        top_margin = 80
-        slot_height = 110
+        margin = LAYOUT['MARGIN']
+        top_margin = LAYOUT['TOP_MARGIN']
+        slot_height = LAYOUT['SLOT']['HEIGHT']
 
         grid_label_y = top_margin + slot_height + 20
-        filters_height = 100
+        filters_height = LAYOUT['FILTERS']['HEIGHT'] + 20
         grid_y = grid_label_y + 35 + filters_height + 10
 
-        card_height = 90
-        card_spacing = 10
+        card_height = LAYOUT['GRID']['CARD_HEIGHT']
+        card_spacing = LAYOUT['GRID']['SPACING']
 
-        card_width = min(140,
-                         (screen_width - 2 * margin - (6 - 1) * card_spacing) // 6)
+        card_width = min(LAYOUT['GRID']['CARD_WIDTH'],
+                         (screen_width - 2 * margin - (LAYOUT['GRID']['COLS'] - 1) * card_spacing)
+                         // LAYOUT['GRID']['COLS'])
 
-        grid_width = (6 * card_width + (6 - 1) * card_spacing)
+        grid_width = (LAYOUT['GRID']['COLS'] * card_width +
+                      (LAYOUT['GRID']['COLS'] - 1) * card_spacing)
         grid_start_x = (screen_width - grid_width) // 2
 
-        # Recria os grid items
+        from src.scenes.team_select_scene.components.pokemon_grid_item import PokemonGridItem
         self.layout_manager.grid_items = []
         for i, pokemon in enumerate(available_pokemon):
-            row = i // 6
-            col = i % 6
+            row = i // LAYOUT['GRID']['COLS']
+            col = i % LAYOUT['GRID']['COLS']
 
             card_x = grid_start_x + col * (card_width + card_spacing)
             card_y = grid_y + row * (card_height + card_spacing)
 
-            from src.scenes.team_select_scene.components.pokemon_grid_item import PokemonGridItem
             item = PokemonGridItem(pokemon, card_x, card_y, card_width, card_height)
             self.layout_manager.grid_items.append(item)
 
@@ -136,25 +131,18 @@ class TeamSelectScene(BaseScene):
         self.total_pages = self.pokemon_manager.get_page_count(self.layout_manager.items_per_page)
 
     def _refresh_all_pokemon_status(self):
-        """Força atualização do status is_in_team para todos os Pokémon"""
-        # Atualiza status dos Pokémon no time
         for pokemon in self.game.player.team:
             pokemon.is_in_team = True
-
-        # Atualiza status dos Pokémon na Box
         for pokemon in self.game.player.pc_box:
             pokemon.is_in_team = pokemon in self.game.player.team
 
     def handle_event(self, event):
-        # Verifica se houve resize (NOVO)
         self._check_resize()
 
-        # Processa evento de redimensionamento explicitamente (NOVO)
         if event.type == pygame.VIDEORESIZE:
             self.layout_initialized = False
             return
 
-        # Verifica se precisa recriar layout
         if not self.layout_initialized:
             self._initialize_layout()
 
@@ -180,7 +168,6 @@ class TeamSelectScene(BaseScene):
         else:
             self.pokemon_manager.add_to_team(modal.pokemon)
 
-        # Atualiza slots
         for i, slot in enumerate(self.team_slots):
             if i < len(self.game.player.team):
                 slot.set_pokemon(self.game.player.team[i])
@@ -188,8 +175,6 @@ class TeamSelectScene(BaseScene):
                 slot.set_pokemon(None)
 
         self._refresh_all_pokemon_status()
-
-        # Recria layout
         self.layout_initialized = False
 
     def _handle_action(self, action):
@@ -201,7 +186,15 @@ class TeamSelectScene(BaseScene):
             if self.filters:
                 self.filters.update_sort_state(sort_type)
             self.current_page = 0
-            self.layout_initialized = False
+            self._refresh_grid()
+
+        elif action_type == 'FILTER_CHANGED':
+            filter_type = action['filter']
+            self.pokemon_manager.set_filter(filter_type)
+            if self.filters:
+                self.filters.update_filter_state(filter_type)
+            self.current_page = 0
+            self._refresh_grid()
 
         elif action_type == 'SEARCH_CHANGED':
             search_text = action['search']
@@ -209,7 +202,6 @@ class TeamSelectScene(BaseScene):
             if self.filters:
                 self.filters.update_search_state(search_text)
             self.current_page = 0
-            # Não recria o layout, apenas atualiza o grid
             self._refresh_grid()
 
         elif action_type == 'GO_BACK':
@@ -218,8 +210,6 @@ class TeamSelectScene(BaseScene):
             self.game.current_scene = self.game.phase_select_scene
 
         elif action_type == 'START_GAME':
-            print("Iniciando batalha com time:",
-                  [p.name for p in self.game.player.team])
             self.game.game_scene = GameScene(self.game, self.chapter, self.phase)
             self.game.current_scene = self.game.game_scene
 
@@ -253,34 +243,20 @@ class TeamSelectScene(BaseScene):
         elif action_type == 'RELEASE_POKEMON':
             modal = self.event_handler.modal
             if modal and modal.pokemon:
-                pokemon_to_release = modal.pokemon
-
-                # Liberta o Pokémon
-                self.pokemon_manager.release_pokemon(pokemon_to_release)
-
-                # Fecha o modal
+                self.pokemon_manager.release_pokemon(modal.pokemon)
                 self.event_handler.set_modal(None)
-
-                # Recria o layout (atualiza grid e slots)
                 self.layout_initialized = False
-
-                print(f"Pokémon {pokemon_to_release.name} libertado com sucesso!")
 
         elif action_type == 'RESIZE':
             self.layout_initialized = False
 
     def fixed_update(self, dt):
-        # Verifica se houve resize (NOVO)
         self._check_resize()
-
         if not self.layout_initialized:
             self._initialize_layout()
 
     def render(self, screen):
-        # Verifica se houve resize antes de renderizar (NOVO)
         self._check_resize()
-
-        # Fundo
         self.background.render(screen)
 
         if not self.layout_initialized:
@@ -300,18 +276,22 @@ class TeamSelectScene(BaseScene):
             slot.render(screen, self.slot_font, self.pokedex)
 
         # Label do grid
-        grid_label = self.slot_font.render("POKÉMONS DISPONÍVEIS", True, (180, 180, 190))
+        grid_label = self.slot_font.render("POKEMONS DISPONIVEIS", True, (180, 180, 190))
         label_x = (self.game.screen_manager.window_width - grid_label.get_width()) // 2
         label_y = self.team_slots[0].rect.bottom + 20
         screen.blit(grid_label, (label_x, label_y))
 
-        # Renderiza filtros
+        # Renderiza filtros (sem opções)
         if self.filters:
             self.filters.render(screen, self.slot_font)
 
         # Grid items
         for item in self.grid_items:
             item.render(screen, self.grid_font, self.pokedex)
+
+        # Renderiza opções dos dropdowns por cima do grid
+        if self.filters:
+            self.filters.render_dropdowns(screen, self.slot_font)
 
         # Informação de página
         if self.total_pages > 1:
@@ -333,32 +313,30 @@ class TeamSelectScene(BaseScene):
                 self.current_page, self.total_pages
             )
 
-        # Mostra contagem de resultados dos filtros
-        if self.filters and (self.pokemon_manager.current_search or self.pokemon_manager.current_sort != "capture"):
+        # Contagem de resultados
+        if self.filters:
             total_filtered = self.pokemon_manager.get_total_filtered_count()
             total_pc = len(self.game.player.pc_box)
+            filter_active = (self.pokemon_manager.current_search or
+                             self.pokemon_manager.current_filter != "all" or
+                             self.pokemon_manager.current_sort != "capture")
 
-            if total_filtered > 0:
-                filter_info = f"Mostrando {total_filtered} de {total_pc} Pokémon"
-            else:
-                filter_info = "Nenhum Pokémon encontrado"
+            if filter_active:
+                if total_filtered > 0:
+                    filter_info = f"Mostrando {total_filtered} de {total_pc} Pokemon"
+                else:
+                    filter_info = "Nenhum Pokemon encontrado"
+                info_font = pygame.font.Font(None, 14)
+                info_text = info_font.render(filter_info, True, (150, 150, 160))
+                info_y = self.filters.rect.bottom + 8
+                screen.blit(info_text, (30, info_y))
 
-            info_font = pygame.font.Font(None, 14)
-            info_text = info_font.render(filter_info, True, (150, 150, 160))
-
-            if self.filters:
-                info_y = self.filters.rect.bottom + 5
-            else:
-                info_y = label_y + 35
-
-            screen.blit(info_text, (20, info_y))
-
-            if total_filtered == 0:
-                empty_font = pygame.font.Font(None, 24)
-                empty_text = empty_font.render("Nenhum Pokémon encontrado com esses filtros", True, (150, 150, 160))
-                empty_x = (self.game.screen_manager.window_width - empty_text.get_width()) // 2
-                empty_y = label_y + 100
-                screen.blit(empty_text, (empty_x, empty_y))
+                if total_filtered == 0:
+                    empty_font = pygame.font.Font(None, 24)
+                    empty_text = empty_font.render("Nenhum Pokemon encontrado com esses filtros", True, (150, 150, 160))
+                    empty_x = (self.game.screen_manager.window_width - empty_text.get_width()) // 2
+                    empty_y = self.filters.rect.bottom + 50
+                    screen.blit(empty_text, (empty_x, empty_y))
 
         # Status do time
         team_status = f"Time: {len(self.game.player.team)}/6"
@@ -369,4 +347,3 @@ class TeamSelectScene(BaseScene):
         # Modal
         if self.event_handler.modal and self.event_handler.modal.visible:
             self.event_handler.modal.render(screen)
-
