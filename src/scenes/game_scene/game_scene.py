@@ -842,14 +842,20 @@ class GameScene(BaseScene):
         # ===== CONQUISTAS: Captura =====
         if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
             phase_id = f"{self.chapter_id}-{self.phase_number}"
+            ach_mgr = self.player.achievement_manager
 
             # Incrementa contador de capturas
-            self.player.achievement_manager.increment_counter("capture_count")
+            ach_mgr.increment_counter("capture_count")
 
             # Verifica conquistas de captura (passando a fase atual)
-            self.player.achievement_manager.check_and_unlock("first_capture", phase_id)
-            self.player.achievement_manager.check_and_unlock("capture_10", phase_id)
-            self.player.achievement_manager.check_and_unlock("capture_50", phase_id)
+            ach_mgr.check_and_unlock("first_capture", phase_id)
+            ach_mgr.check_and_unlock("capture_10", phase_id)
+            ach_mgr.check_and_unlock("capture_50", phase_id)
+
+            # ===== CONQUISTA: SHINY =====
+            if enemy.is_shiny:
+                ach_mgr.increment_counter("shiny_capture_count")
+                ach_mgr.check_and_unlock("first_shiny_capture", phase_id)
 
         self.show_capture_overlay(caught, is_to_team)
 

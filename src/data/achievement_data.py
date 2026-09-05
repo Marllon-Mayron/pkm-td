@@ -46,12 +46,18 @@ class Achievement:
 
     # Estado (não salvo, vem do jogador)
     unlocked: bool = False
-    unlocked_at: Optional[str] = None  # Data/hora da conquista
-    unlocked_phase: Optional[str] = None  # Fase onde foi obtida (ex: "1-3")
+    unlocked_at: Optional[str] = None
+    unlocked_phase: Optional[str] = None
 
 
-# ===== CATALOGO DE CONQUISTAS =====
+# ============================================================
+# ===================== CATÁLOGO DE CONQUISTAS =====================
+# ============================================================
+
 ACHIEVEMENTS: Dict[str, Achievement] = {
+    # ============================================================
+    # 1. CONQUISTAS GERAIS
+    # ============================================================
     "first_capture": Achievement(
         id="first_capture",
         title="Primeiro Passo",
@@ -59,12 +65,19 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rarity=AchievementRarity.COMMON,
         rewards={"gold": 100, "xp": 50}
     ),
-    "heal_5": Achievement(
-        id="heal_5",
-        title="Curandeiro Iniciante",
-        description="Cure seus Pokemon 5 vezes",
+    "capture_10": Achievement(
+        id="capture_10",
+        title="Colecionador Iniciante",
+        description="Capture 10 Pokemon diferentes",
         rarity=AchievementRarity.COMMON,
-        rewards={"gold": 200, "xp": 50}
+        rewards={"gold": 300, "xp": 150, "items": {"ultraball": 3}}
+    ),
+    "capture_50": Achievement(
+        id="capture_50",
+        title="Colecionador Intermediario",
+        description="Capture 50 Pokemon diferentes",
+        rarity=AchievementRarity.RARE,
+        rewards={"gold": 2000, "xp": 1000}
     ),
     "first_badge": Achievement(
         id="first_badge",
@@ -79,27 +92,6 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         description="Obtenha todas as 8 insígnias de ginásio!",
         rarity=AchievementRarity.LEGENDARY,
         rewards={"gold": 5000, "xp": 3000, "items": {"masterball": 1}}
-    ),
-    "capture_10": Achievement(
-        id="capture_10",
-        title="Colecionador Iniciante",
-        description="Capture 10 Pokemon diferentes",
-        rarity=AchievementRarity.COMMON,
-        rewards={"gold": 300, "xp": 150, "items": {"ultraball": 3}}
-    ),
-    "heal_100": Achievement(
-        id="heal_100",
-        title="Mestre Curandeiro",
-        description="Cure seus Pokemon 100 vezes",
-        rarity=AchievementRarity.UNCOMMON,
-        rewards={"gold": 1000, "xp": 500, "pokemon": 113}
-    ),
-    "capture_50": Achievement(
-        id="capture_50",
-        title="Colecionador Intermediario",
-        description="Capture 50 Pokemon diferentes",
-        rarity=AchievementRarity.RARE,
-        rewards={"gold": 2000, "xp": 1000}
     ),
     "perfect_phase": Achievement(
         id="perfect_phase",
@@ -116,7 +108,83 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rewards={"gold": 600, "xp": 300}
     ),
 
-    # ===== CONQUISTAS DE CLIMA =====
+    # ============================================================
+    # 2. CURA E MEDICAMENTOS
+    # ============================================================
+    "heal_5": Achievement(
+        id="heal_5",
+        title="Curandeiro Iniciante",
+        description="Cure seus Pokemon 5 vezes",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 200, "xp": 50}
+    ),
+    "heal_100": Achievement(
+        id="heal_100",
+        title="Mestre Curandeiro",
+        description="Cure seus Pokemon 100 vezes",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 1000, "xp": 500, "pokemon": 113}  # Chansey
+    ),
+    "first_antidote": Achievement(
+        id="first_antidote",
+        title="Antidoto Eficaz",
+        description="Cure veneno com Antidoto pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 100, "xp": 50}
+    ),
+    "antidote_100": Achievement(
+        id="antidote_100",
+        title="Mestre Antiveneno",
+        description="Cure veneno com Antidoto 100 vezes",
+        rarity=AchievementRarity.RARE,
+        rewards={"gold": 1500, "xp": 750}
+    ),
+    "first_awake": Achievement(
+        id="first_awake",
+        title="Despertador",
+        description="Acorde um Pokemon com Awake pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 100, "xp": 50}
+    ),
+    "awake_100": Achievement(
+        id="awake_100",
+        title="Mestre dos Sonhos",
+        description="Acorde Pokemon com Awake 100 vezes",
+        rarity=AchievementRarity.RARE,
+        rewards={"gold": 1500, "xp": 750}
+    ),
+    "first_paralyze_heal": Achievement(
+        id="first_paralyze_heal",
+        title="Paralisia Curada!",
+        description="Cure paralisia pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 100, "xp": 50}
+    ),
+    "paralyze_heal_100": Achievement(
+        id="paralyze_heal_100",
+        title="Mestre da Mobilidade",
+        description="Cure paralisia 100 vezes",
+        rarity=AchievementRarity.RARE,
+        rewards={"gold": 5000, "xp": 7500}
+    ),
+    "first_revive": Achievement(
+        id="first_revive",
+        title="Renascer",
+        description="Reviva um Pokemon pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 200, "xp": 200}
+    ),
+    "revive_25": Achievement(
+        id="revive_25",
+        title="Mestre da Ressurreicao",
+        description="Reviva Pokemon 25 vezes",
+        rarity=AchievementRarity.RARE,
+        rewards={"gold": 2000, "xp": 1000}
+    ),
+
+    # ============================================================
+    # 3. CLIMA
+    # ============================================================
     "first_weather_change": Achievement(
         id="first_weather_change",
         title="Mestre do Clima Iniciante",
@@ -145,7 +213,10 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rarity=AchievementRarity.COMMON,
         rewards={"gold": 100, "xp": 50}
     ),
-    # ===== CONQUISTAS DE RARE CANDY =====
+
+    # ============================================================
+    # 4. RARE CANDY
+    # ============================================================
     "rare_candy_3": Achievement(
         id="rare_candy_3",
         title="Distribuidor de Docinhos",
@@ -153,7 +224,10 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rarity=AchievementRarity.UNCOMMON,
         rewards={"gold": 500, "xp": 300}
     ),
-    # ===== CONQUISTAS DE EVOLUÇÃO (GERAL) =====
+
+    # ============================================================
+    # 5. EVOLUÇÃO GERAL
+    # ============================================================
     "first_evolution": Achievement(
         id="first_evolution",
         title="A Nova Forma!",
@@ -176,7 +250,9 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rewards={"gold": 2000, "xp": 1000}
     ),
 
-    # ===== CONQUISTAS DE EVOLUÇÃO POR NÍVEL =====
+    # ============================================================
+    # 6. EVOLUÇÃO POR NÍVEL
+    # ============================================================
     "first_level_evolution": Achievement(
         id="first_level_evolution",
         title="Nova Etapa",
@@ -192,7 +268,9 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rewards={"gold": 3000, "xp": 1500}
     ),
 
-    # ===== CONQUISTAS DE EVOLUÇÃO POR PEDRA =====
+    # ============================================================
+    # 7. EVOLUÇÃO POR PEDRA
+    # ============================================================
     "first_stone_evolution": Achievement(
         id="first_stone_evolution",
         title="Pedra Fundamental",
@@ -215,7 +293,9 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rewards={"gold": 2000, "xp": 1000}
     ),
 
-    # ===== CONQUISTAS DE EVOLUÇÃO POR FELICIDADE =====
+    # ============================================================
+    # 8. EVOLUÇÃO POR FELICIDADE
+    # ============================================================
     "max_happiness": Achievement(
         id="max_happiness",
         title="Amor Incondicional",
@@ -252,7 +332,9 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rewards={"gold": 3000, "xp": 1500}
     ),
 
-    # ===== CONQUISTAS DE EVOLUÇÃO POR CLIMA =====
+    # ============================================================
+    # 9. EVOLUÇÃO POR CLIMA (DIA/NOITE)
+    # ============================================================
     "first_weather_evolution": Achievement(
         id="first_weather_evolution",
         title="Clima Favoravel",
@@ -268,7 +350,9 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rewards={"gold": 1000, "xp": 500}
     ),
 
-    # ===== CONQUISTAS DE BLOQUEIO DE EVOLUÇÃO =====
+    # ============================================================
+    # 10. BLOQUEIO DE EVOLUÇÃO
+    # ============================================================
     "first_evolution_blocked": Achievement(
         id="first_evolution_blocked",
         title="Pare! Nao Agora!",
@@ -284,72 +368,9 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rewards={"gold": 1200, "xp": 600}
     ),
 
-    # ===== CONQUISTAS DE CURA DE STATUS =====
-    # Poison
-    "first_antidote": Achievement(
-        id="first_antidote",
-        title="Antidoto Eficaz",
-        description="Cure veneno com Antidoto pela primeira vez",
-        rarity=AchievementRarity.COMMON,
-        rewards={"gold": 100, "xp": 50}
-    ),
-    "antidote_100": Achievement(
-        id="antidote_100",
-        title="Mestre Antiveneno",
-        description="Cure veneno com Antidoto 100 vezes",
-        rarity=AchievementRarity.RARE,
-        rewards={"gold": 1500, "xp": 750}
-    ),
-
-    # Sleep
-    "first_awake": Achievement(
-        id="first_awake",
-        title="Despertador",
-        description="Acorde um Pokemon com Awake pela primeira vez",
-        rarity=AchievementRarity.COMMON,
-        rewards={"gold": 100, "xp": 50}
-    ),
-    "awake_100": Achievement(
-        id="awake_100",
-        title="Mestre dos Sonhos",
-        description="Acorde Pokemon com Awake 100 vezes",
-        rarity=AchievementRarity.RARE,
-        rewards={"gold": 1500, "xp": 750}
-    ),
-
-    # Paralysis
-    "first_paralyze_heal": Achievement(
-        id="first_paralyze_heal",
-        title="Paralisia Curada!",
-        description="Cure paralisia pela primeira vez",
-        rarity=AchievementRarity.COMMON,
-        rewards={"gold": 100, "xp": 50}
-    ),
-    "paralyze_heal_100": Achievement(
-        id="paralyze_heal_100",
-        title="Mestre da Mobilidade",
-        description="Cure paralisia 100 vezes",
-        rarity=AchievementRarity.RARE,
-        rewards={"gold": 5000, "xp": 7500}
-    ),
-
-    # Revive
-    "first_revive": Achievement(
-        id="first_revive",
-        title="Renascer",
-        description="Reviva um Pokemon pela primeira vez",
-        rarity=AchievementRarity.COMMON,
-        rewards={"gold": 200, "xp": 200}
-    ),
-    "revive_25": Achievement(
-        id="revive_25",
-        title="Mestre da Ressurreicao",
-        description="Reviva Pokemon 25 vezes",
-        rarity=AchievementRarity.RARE,
-        rewards={"gold": 2000, "xp": 1000}
-    ),
-
-    # ===== CONQUISTAS DE ENSINO DE MOVES =====
+    # ============================================================
+    # 11. ENSINO DE MOVES (TMs)
+    # ============================================================
     "first_move_taught": Achievement(
         id="first_move_taught",
         title="Primeira Licao",
@@ -364,7 +385,10 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rarity=AchievementRarity.UNCOMMON,
         rewards={"gold": 600, "xp": 350}
     ),
-    # ===== CONQUISTAS DE ITENS DE BATALHA =====
+
+    # ============================================================
+    # 12. ITENS DE BATALHA (X-ITEMS)
+    # ============================================================
     "battle_item_use_10": Achievement(
         id="battle_item_use_10",
         title="Mestre dos Itens de Batalha",
@@ -386,8 +410,36 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rarity=AchievementRarity.UNCOMMON,
         rewards={"gold": 300, "xp": 300, "items": {"x_accuracy": 3}}
     ),
+
+    # ============================================================
+    # 13. INCUBADORA (DESFOSSILIZADOR) - NOVAS
+    # ============================================================
+    "first_incubator_revive": Achievement(
+        id="first_incubator_revive",
+        title="Ressurreição Fóssil",
+        description="Reviva seu primeiro Pokémon fóssil usando o Desfossilizador",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 200, "xp": 100}
+    ),
+    "buy_second_incubator": Achievement(
+        id="buy_second_incubator",
+        title="Expansão de Laboratório",
+        description="Compre um segundo Desfossilizador",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 500, "xp": 200}
+    ),
+    "first_incubator_upgrade": Achievement(
+        id="first_incubator_upgrade",
+        title="Tecnologia Avançada",
+        description="Faça o primeiro upgrade no seu Desfossilizador para o nível 2",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 500, "xp": 200}
+    ),
 }
 
+# ============================================================
+# ===================== FUNÇÕES AUXILIARES =====================
+# ============================================================
 
 def get_achievement(achievement_id: str) -> Optional[Achievement]:
     """Retorna uma conquista pelo ID"""

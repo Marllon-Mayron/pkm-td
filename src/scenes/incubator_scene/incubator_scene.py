@@ -409,6 +409,12 @@ class IncubatorScene(BaseScene):
         self.feedback_timer = 2.0
         self.game.player.auto_save()
 
+        # ===== CONQUISTA: comprar desfossilizador (segundo ou mais) =====
+        phase_id = "incubator"
+        if hasattr(self.player, 'achievement_manager'):
+            self.player.achievement_manager.increment_counter("desfossilizador_count")
+            self.player.achievement_manager.check_and_unlock("buy_desfossilizador", phase_id)
+
     def _go_back(self):
         from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
         self.game.current_scene = PhaseSelectScene(self.game)
@@ -526,6 +532,13 @@ class IncubatorScene(BaseScene):
             self.feedback_message = f"{pokemon.name} foi revivido!"
             self.feedback_timer = 2.0
             self.game.player.auto_save()
+
+            # ===== CONQUISTA: primeira desfossilização =====
+            phase_id = "incubator"  # ou use a fase atual se disponível
+            if hasattr(self.player, 'achievement_manager'):
+                self.player.achievement_manager.increment_counter("desfossilizacao_count")
+                self.player.achievement_manager.check_and_unlock("first_desfossilizacao", phase_id)
+
             self._open_reveal_overlay(pokemon)
         else:
             self.feedback_message = "Erro ao coletar Pokemon!"
@@ -558,6 +571,12 @@ class IncubatorScene(BaseScene):
         self.feedback_message = f"Desfossilizador #{desfossilizador['id']} agora esta no nivel {new_level}!"
         self.feedback_timer = 2.0
         self.game.player.auto_save()
+
+        # ===== CONQUISTA: upgrade =====
+        phase_id = "incubator"
+        if hasattr(self.player, 'achievement_manager'):
+            self.player.achievement_manager.increment_counter("upgrade_desfossilizador_count")
+            self.player.achievement_manager.check_and_unlock("upgrade_desfossilizador", phase_id)
 
     def fixed_update(self, dt):
         if not self.layout_initialized:

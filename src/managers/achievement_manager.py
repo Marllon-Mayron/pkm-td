@@ -224,6 +224,11 @@ class AchievementManager:
             if self.get_counter("capture_count") >= 10:
                 return self.unlock(achievement_id, phase_id)
 
+        elif achievement_id == "first_shiny_capture":
+            # Verifica se capturou pelo menos 1 shiny (o contador é incrementado)
+            if self.get_counter("shiny_capture_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
         elif achievement_id == "heal_100":
             if self.get_counter("heal_count") >= 100:
                 return self.unlock(achievement_id, phase_id)
@@ -411,6 +416,7 @@ class AchievementManager:
             "first_badge": ("badge_count", 1),
             "all_badges": ("badge_count", 8),
             "capture_10": ("capture_count", 10),
+            "first_shiny_capture": ("shiny_capture_count", 1),
             "heal_100": ("heal_count", 100),
             "capture_50": ("capture_count", 50),
             "perfect_phase": ("perfect_phase_count", 1),

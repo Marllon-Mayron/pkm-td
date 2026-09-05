@@ -1621,7 +1621,16 @@
     },
     "rewards": {
         "money": 100,
-        "experience": 50
+        "experience": 50,
+        "item_rewards": [
+            {
+                "item_id": "waterstone",
+                "weight": 100
+            }
+        ],
+        "drop_chance": 0.01,
+        "max_items": 1,
+        "template_name": null
     },
     "localization_type": "default",
     "custom_folder": "",
