@@ -231,6 +231,12 @@ class Player(Entity):
             "time_elapsed": 0.0
         }
         self.desfossilizadores.append(desfossilizador)
+
+        # ===== CONQUISTA: COMPRAR DESFOSSILIZADOR =====
+
+        self.achievement_manager.increment_counter("second_incubator_bought")
+        self.achievement_manager.check_and_unlock("buy_second_incubator")
+
         return desfossilizador
 
     def start_desfossilizacao(self, desfossilizador_index, fossil_id, pokemon_id):
@@ -270,6 +276,14 @@ class Player(Entity):
         else:
             self.pc_box.append(pokemon)
 
+        # ===== REGISTRA NA POKÉDEX =====
+        self.caught_pokemon.add(pokemon_id)
+        self.register_seen(pokemon_id)
+
+        # ===== CONQUISTA: FÓSSIL =====
+        self.achievement_manager.increment_counter("incubator_revive_count")
+        self.achievement_manager.check_and_unlock("first_incubator_revive")
+
         desfossilizador["status"] = "empty"
         desfossilizador["fossil_id"] = None
         desfossilizador["pokemon_id"] = None
@@ -289,4 +303,8 @@ class Player(Entity):
         self.money -= cost
         desfossilizador["level"] = new_level
         desfossilizador["duration_minutes"] = self._get_duration_for_level(new_level)
+
+        # ===== CONQUISTA: UPGRADE DESFOSSILIZADOR =====
+        self.achievement_manager.increment_counter("incubator_upgrade_count")
+        self.achievement_manager.check_and_unlock("first_incubator_upgrade")
         return True

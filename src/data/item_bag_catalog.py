@@ -398,7 +398,7 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "evolution",
                 "effect_value": 0,
-                "price": 3000,
+                "price": 5000,
                 "unlock_phase": unlock_phase,
                 "unlock_chapter": None
             }

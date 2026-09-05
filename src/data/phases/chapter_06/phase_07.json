@@ -1989,11 +1989,11 @@
                 "enemies": [
                     {
                         "pokemon_id": 42,
-                        "percentage": 27.0
+                        "percentage": 25.0
                     },
                     {
                         "pokemon_id": 41,
-                        "percentage": 35.0
+                        "percentage": 30.0
                     },
                     {
                         "pokemon_id": 51,
@@ -2006,6 +2006,10 @@
                     {
                         "pokemon_id": 203,
                         "percentage": 15.0
+                    },
+                    {
+                        "pokemon_id": 227,
+                        "percentage": 7.0
                     }
                 ],
                 "min_level": 25,
@@ -2029,11 +2033,11 @@
                     "enemies": [
                         {
                             "pokemon_id": 42,
-                            "percentage": 27.0
+                            "percentage": 25.0
                         },
                         {
                             "pokemon_id": 41,
-                            "percentage": 35.0
+                            "percentage": 30.0
                         },
                         {
                             "pokemon_id": 51,
@@ -2046,6 +2050,10 @@
                         {
                             "pokemon_id": 203,
                             "percentage": 15.0
+                        },
+                        {
+                            "pokemon_id": 227,
+                            "percentage": 7.0
                         }
                     ],
                     "min_level": 25,

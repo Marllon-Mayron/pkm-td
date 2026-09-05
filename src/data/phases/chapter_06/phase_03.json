@@ -2166,30 +2166,30 @@
                 "enabled": true,
                 "enemies": [
                     {
-                        "pokemon_id": 86,
+                        "pokemon_id": 220,
+                        "percentage": 20.0
+                    },
+                    {
+                        "pokemon_id": 234,
+                        "percentage": 42.0
+                    },
+                    {
+                        "pokemon_id": 225,
                         "percentage": 35.0
                     },
                     {
-                        "pokemon_id": 131,
+                        "pokemon_id": 238,
                         "percentage": 3.0
-                    },
-                    {
-                        "pokemon_id": 91,
-                        "percentage": 45.0
-                    },
-                    {
-                        "pokemon_id": 226,
-                        "percentage": 17.0
                     }
                 ],
                 "min_level": 22,
                 "max_level": 26,
-                "wave_size": 25,
+                "wave_size": 21,
                 "spawn_interval": 1.5,
                 "initial_delay": 5.0,
                 "repeat_wave": true,
                 "repeat_count": 3,
-                "template_id": "template_9461",
+                "template_id": "template_9281",
                 "use_variants": true,
                 "variants": [
                     {

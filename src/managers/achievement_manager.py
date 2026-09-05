@@ -401,6 +401,20 @@ class AchievementManager:
         elif achievement_id == "accuracy_buff_miss":
             if self.get_counter("accuracy_buff_miss_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
+
+        # ===== FÓSSEIS / INCUBADORA =====
+        elif achievement_id == "first_incubator_revive":
+            if self.get_counter("incubator_revive_count") >= 1:
+                 return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "buy_second_incubator":
+            if self.get_counter("second_incubator_bought") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "first_incubator_upgrade":
+            if self.get_counter("incubator_upgrade_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
         return False
 
     def check_all_counters(self, phase_id: Optional[str] = None):
@@ -477,6 +491,11 @@ class AchievementManager:
             "battle_item_use_10": ("battle_item_use_count", 10),
             "battle_item_replace": ("battle_item_replace_count", 1),
             "accuracy_buff_miss": ("accuracy_buff_miss_count", 1),
+
+            # ===== FÓSSEIS / INCUBADORA =====
+            "first_incubator_revive": ("incubator_revive_count", 1),
+            "buy_second_incubator": ("second_incubator_bought", 1),
+            "first_incubator_upgrade": ("incubator_upgrade_count", 1),
         }
 
         if achievement_id in progress_map:
