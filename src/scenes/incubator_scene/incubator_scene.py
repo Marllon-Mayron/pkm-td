@@ -409,7 +409,7 @@ class IncubatorScene(BaseScene):
         self.feedback_timer = 2.0
         self.game.player.auto_save()
 
-        # ===== CONQUISTA: comprar desfossilizador (segundo ou mais) =====
+        # ===== CONQUISTAS: comprar desfossilizador (segundo ou mais) =====
         phase_id = "incubator"
         if hasattr(self.player, 'achievement_manager'):
             self.player.achievement_manager.increment_counter("desfossilizador_count")
@@ -533,7 +533,7 @@ class IncubatorScene(BaseScene):
             self.feedback_timer = 2.0
             self.game.player.auto_save()
 
-            # ===== CONQUISTA: primeira desfossilização =====
+            # ===== CONQUISTAS: primeira desfossilização =====
             phase_id = "incubator"  # ou use a fase atual se disponível
             if hasattr(self.player, 'achievement_manager'):
                 self.player.achievement_manager.increment_counter("desfossilizacao_count")
@@ -572,7 +572,7 @@ class IncubatorScene(BaseScene):
         self.feedback_timer = 2.0
         self.game.player.auto_save()
 
-        # ===== CONQUISTA: upgrade =====
+        # ===== CONQUISTAS: upgrade =====
         phase_id = "incubator"
         if hasattr(self.player, 'achievement_manager'):
             self.player.achievement_manager.increment_counter("upgrade_desfossilizador_count")

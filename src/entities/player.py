@@ -232,7 +232,7 @@ class Player(Entity):
         }
         self.desfossilizadores.append(desfossilizador)
 
-        # ===== CONQUISTA: COMPRAR DESFOSSILIZADOR =====
+        # ===== CONQUISTAS: COMPRAR DESFOSSILIZADOR =====
 
         self.achievement_manager.increment_counter("second_incubator_bought")
         self.achievement_manager.check_and_unlock("buy_second_incubator")
@@ -280,7 +280,7 @@ class Player(Entity):
         self.caught_pokemon.add(pokemon_id)
         self.register_seen(pokemon_id)
 
-        # ===== CONQUISTA: FÓSSIL =====
+        # ===== CONQUISTAS: FÓSSIL =====
         self.achievement_manager.increment_counter("incubator_revive_count")
         self.achievement_manager.check_and_unlock("first_incubator_revive")
 
@@ -304,7 +304,7 @@ class Player(Entity):
         desfossilizador["level"] = new_level
         desfossilizador["duration_minutes"] = self._get_duration_for_level(new_level)
 
-        # ===== CONQUISTA: UPGRADE DESFOSSILIZADOR =====
+        # ===== CONQUISTAS: UPGRADE DESFOSSILIZADOR =====
         self.achievement_manager.increment_counter("incubator_upgrade_count")
         self.achievement_manager.check_and_unlock("first_incubator_upgrade")
         return True

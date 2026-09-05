@@ -669,7 +669,7 @@ class BattleSystem:
         if hasattr(self, 'effect_manager') and self.effect_manager:
             buff = self.effect_manager.get_battle_item_buff(attacker)
             if buff and buff["stat"] == StatType.ACCURACY:
-                # Conquista: acertar um miss com X Accuracy ativo
+                # ConquistaS: acertar um miss com X Accuracy ativo
                 if hasattr(self, 'game_scene') and self.game_scene:
                     player = self.game_scene.player
                     if hasattr(player, 'achievement_manager'):

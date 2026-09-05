@@ -1673,7 +1673,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 11,
-                        "percentage": 10.0
+                        "percentage": 9.7
                     },
                     {
                         "pokemon_id": 14,
@@ -1706,15 +1706,19 @@
                     {
                         "pokemon_id": 161,
                         "percentage": 5.0
+                    },
+                    {
+                        "pokemon_id": 185,
+                        "percentage": 0.3
                     }
                 ],
                 "min_level": 10,
                 "max_level": 12,
-                "wave_size": 10,
-                "spawn_interval": 2.0,
-                "initial_delay": 10.0,
-                "repeat_wave": true,
-                "repeat_count": 2,
+                "wave_size": 6,
+                "spawn_interval": 3.0,
+                "initial_delay": 2.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
                 "template_id": "template_6519",
                 "use_variants": false,
                 "variants": []

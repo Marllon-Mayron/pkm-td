@@ -774,7 +774,7 @@ class Pokemon(Entity):
             # ===== VERIFICA EVOLUÇÃO POR FELICIDADE =====
             self._check_happiness_evolution()
 
-            # Conquista: Felicidade Máxima
+            # Conquistas: Felicidade Máxima
             if self.happiness >= 255 and old_happiness < 255:
                 if hasattr(self, 'game_scene') and self.game_scene:
                     game_scene = self.game_scene

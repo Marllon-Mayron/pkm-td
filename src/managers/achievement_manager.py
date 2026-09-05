@@ -232,6 +232,22 @@ class AchievementManager:
         elif achievement_id == "heal_100":
             if self.get_counter("heal_count") >= 100:
                 return self.unlock(achievement_id, phase_id)
+        elif achievement_id == "first_burn_heal":
+            if self.get_counter("burn_heal_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "burn_heal_10":
+            if self.get_counter("burn_heal_count") >= 10:
+                return self.unlock(achievement_id, phase_id)
+
+            # ===== CURA DE CONGELAMENTO =====
+        elif achievement_id == "first_freeze_heal":
+            if self.get_counter("freeze_heal_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "freeze_heal_10":
+            if self.get_counter("freeze_heal_count") >= 10:
+                return self.unlock(achievement_id, phase_id)
 
         elif achievement_id == "capture_50":
             if self.get_counter("capture_count") >= 50:
@@ -286,7 +302,15 @@ class AchievementManager:
         elif achievement_id == "level_evolution_50":
             if self.get_counter("level_evolution_count") >= 50:
                 return self.unlock(achievement_id, phase_id)
-
+        elif achievement_id == "max_level_reached":
+            # Verifica se algum Pokémon do time ou box tem level >= 100
+            for pokemon in self.player.team:
+                if pokemon.level >= 100:
+                    return self.unlock(achievement_id, phase_id)
+            for pokemon in self.player.pc_box:
+                if pokemon.level >= 100:
+                    return self.unlock(achievement_id, phase_id)
+            return False
         # ===== EVOLUÇÃO POR PEDRA =====
         elif achievement_id == "first_stone_evolution":
             if self.get_counter("stone_evolution_count") >= 1:
@@ -432,6 +456,10 @@ class AchievementManager:
             "capture_10": ("capture_count", 10),
             "first_shiny_capture": ("shiny_capture_count", 1),
             "heal_100": ("heal_count", 100),
+            "first_burn_heal": ("burn_heal_count", 1),
+            "burn_heal_10": ("burn_heal_count", 10),
+            "first_freeze_heal": ("freeze_heal_count", 1),
+            "freeze_heal_10": ("freeze_heal_count", 10),
             "capture_50": ("capture_count", 50),
             "perfect_phase": ("perfect_phase_count", 1),
             "boss_defeated": ("boss_defeated_count", 1),
@@ -452,7 +480,7 @@ class AchievementManager:
             # ===== EVOLUÇÃO POR NÍVEL =====
             "first_level_evolution": ("level_evolution_count", 1),
             "level_evolution_50": ("level_evolution_count", 50),
-
+            "max_level_reached": ("max_level_check", 1),
             # ===== EVOLUÇÃO POR PEDRA =====
             "first_stone_evolution": ("stone_evolution_count", 1),
             "stone_evolution_5": ("stone_evolution_count", 5),

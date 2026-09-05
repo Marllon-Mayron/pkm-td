@@ -251,6 +251,13 @@ class PokemonEvolution:
             self.level_up()
             leveled_up = True
 
+        if self.pokemon.level >= 100:
+            if hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
+                game_scene = self.pokemon.game_scene
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+                    game_scene.player.achievement_manager.check_and_unlock("max_level_reached", phase_id)
+
         if leveled_up:
             self.pokemon.attack_damage = self.pokemon._calculate_attack_damage()
             self.pokemon.defense_value = self.pokemon._calculate_defense()

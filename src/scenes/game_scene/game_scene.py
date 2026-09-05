@@ -451,7 +451,7 @@ class GameScene(BaseScene):
     # ===== MÉTODOS DE ITEM E CAPTURA =====
 
     def _on_item_use(self, target, item_data, target_type):
-        """Callback quando um item é usado em um alvo. """
+        """Callback quando um item é usado em um alvo."""
         effect = item_data.get("effect", "")
         category = item_data.get("category", "")
 
@@ -490,8 +490,8 @@ class GameScene(BaseScene):
                                 ach_mgr.check_and_unlock("first_antidote", phase_id)
                                 ach_mgr.check_and_unlock("antidote_100", phase_id)
 
-                            # Cura de Sono com Awake
-                            elif status_to_cure == "sleep" and item_data.get("id") == "awake":
+                            # Cura de Sono com Awakening
+                            elif status_to_cure == "sleep" and item_data.get("id") == "awakening":
                                 ach_mgr.increment_counter("awake_count")
                                 ach_mgr.check_and_unlock("first_awake", phase_id)
                                 ach_mgr.check_and_unlock("awake_100", phase_id)
@@ -502,10 +502,22 @@ class GameScene(BaseScene):
                                 ach_mgr.check_and_unlock("first_paralyze_heal", phase_id)
                                 ach_mgr.check_and_unlock("paralyze_heal_100", phase_id)
 
+                            # Cura de Queimadura =====
+                            elif status_to_cure == "burn" and item_data.get("id") == "burn_heal":
+                                ach_mgr.increment_counter("burn_heal_count")
+                                ach_mgr.check_and_unlock("first_burn_heal", phase_id)
+                                ach_mgr.check_and_unlock("burn_heal_10", phase_id)
+
+                            # Cura de Congelamento =====
+                            elif status_to_cure == "freeze" and item_data.get("id") == "ice_heal":
+                                ach_mgr.increment_counter("freeze_heal_count")
+                                ach_mgr.check_and_unlock("first_freeze_heal", phase_id)
+                                ach_mgr.check_and_unlock("freeze_heal_10", phase_id)
+
                         return True
                 return False
 
-        # ===== CURA TODOS STATUS =====
+        # ===== CURA TODOS STATUS (full_heal) =====
         elif effect == "cure_all_status":
             if target_type == "ally":
                 current_status = self.battle_system.effect_manager.get_status(target)
@@ -547,7 +559,6 @@ class GameScene(BaseScene):
 
         # ===== POKÉBOLA =====
         elif target_type == "enemy" and category == "pokeball":
-            # Verifica se é BOSS primeiro
             if hasattr(target, 'is_boss') and target.is_boss:
                 toast_battle(f"Não é possível capturar {target.name}!", duration=2.0, pokemon=target, portrait="angry")
                 return False  # BOSS: NÃO consome a pokébola
@@ -564,7 +575,7 @@ class GameScene(BaseScene):
 
                 old_level = pokemon.level
                 xp_needed = pokemon.xp_to_next
-                pokemon.gain_xp(xp_needed)  # ganha XP exato para subir 1 nível
+                pokemon.gain_xp(xp_needed)
                 new_level = pokemon.level
 
                 if new_level > old_level:
@@ -574,7 +585,7 @@ class GameScene(BaseScene):
                         pokemon=pokemon,
                         portrait="joyous"
                     )
-                    # ===== CONQUISTA: RARE CANDY =====
+                    # ===== CONQUISTAS: RARE CANDY =====
                     phase_id = f"{self.chapter_id}-{self.phase_number}"
                     if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
                         ach_mgr = self.player.achievement_manager
@@ -582,13 +593,12 @@ class GameScene(BaseScene):
                         ach_mgr.check_and_unlock("rare_candy_3", phase_id)
                     return True
                 else:
-                    # Caso raro: não subiu (ex: nível máximo?) – não consome o item
                     return False
-        # ===== MEDICAMENTOS =====
+
+        # ===== MEDICAMENTOS (poções e revives) =====
         elif target_type == "ally" and category == "medicine":
             medicine_success = self.use_medicine(target, item_data)
             return medicine_success
-
 
         return False
 
@@ -853,7 +863,7 @@ class GameScene(BaseScene):
             ach_mgr.check_and_unlock("capture_10", phase_id)
             ach_mgr.check_and_unlock("capture_50", phase_id)
 
-            # ===== CONQUISTA: SHINY =====
+            # ===== CONQUISTAS: SHINY =====
             if enemy.is_shiny:
                 ach_mgr.increment_counter("shiny_capture_count")
                 ach_mgr.check_and_unlock("first_shiny_capture", phase_id)

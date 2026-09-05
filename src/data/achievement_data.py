@@ -167,6 +167,34 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rarity=AchievementRarity.RARE,
         rewards={"gold": 5000, "xp": 7500}
     ),
+    "first_burn_heal": Achievement(
+        id="first_burn_heal",
+        title="Primeira Cura de Queimadura",
+        description="Cure uma queimadura pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 100, "xp": 50}
+    ),
+    "burn_heal_10": Achievement(
+        id="burn_heal_10",
+        title="Mestre Anti-Queimadura",
+        description="Cure queimaduras 10 vezes",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 500, "xp": 250}
+    ),
+    "first_freeze_heal": Achievement(
+        id="first_freeze_heal",
+        title="Primeiro Descongelamento",
+        description="Cure um congelamento pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 100, "xp": 50}
+    ),
+    "freeze_heal_10": Achievement(
+        id="freeze_heal_10",
+        title="Mestre do Descongelamento",
+        description="Cure congelamentos 10 vezes",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 500, "xp": 250}
+    ),
     "first_revive": Achievement(
         id="first_revive",
         title="Renascer",
@@ -266,6 +294,13 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         description="Evolua 50 Pokemon por nivel",
         rarity=AchievementRarity.LEGENDARY,
         rewards={"gold": 3000, "xp": 1500}
+    ),
+    "max_level_reached": Achievement(
+            id="max_level_reached",
+            title="Mestre Pokémon",
+            description="Alcance o nível 100 com um Pokémon",
+            rarity=AchievementRarity.LEGENDARY,
+            rewards={"gold": 10000, "xp": 5000, "items": {"masterball": 1}}
     ),
 
     # ============================================================
