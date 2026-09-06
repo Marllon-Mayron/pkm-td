@@ -580,7 +580,7 @@
                 "events": [
                     {
                         "event_type": "message",
-                        "delay": 0.0,
+                        "delay": 1.0,
                         "pause_game": true,
                         "message_text": "Perfeito! Você também consegue arrastar o pokemon de um circulo para outro. Em cima do seu pokémon, você consegue ver a vida dele, ele parece estar um pouco machucado... que tal dar uma potion para ele? É só arrastar da sua bolsa e coloca-la em cima do seu pokemon.",
                         "speaker_name": "Professor Carvalho",
@@ -599,7 +599,7 @@
                 "events": [
                     {
                         "event_type": "message",
-                        "delay": 0.0,
+                        "delay": 1.0,
                         "pause_game": true,
                         "message_text": "Muito melhor! Que tal dar uma olhadinha nos ataques disponiveis pro seu pokemon? É só clicar na imagem do seu pokemon no time, mas não esqueça que o painel só abre se seu pokemon estiver posicionado no mapa!",
                         "speaker_name": "Professor Carvalho",
@@ -618,7 +618,7 @@
                 "events": [
                     {
                         "event_type": "message",
-                        "delay": 0.0,
+                        "delay": 0,
                         "pause_game": true,
                         "message_text": "É um bom começo... sempre que possivel verifique os PPs e Prioridade de ataque do seu pokemon para fortalecer suas estratégias. Vamos começar a batalha, feche a tela e se prepare!",
                         "speaker_name": "Professor Venossauro",
@@ -648,7 +648,7 @@
                 ]
             }
         ],
-        "selected_trigger": 4
+        "selected_trigger": 3
     },
     "rewards": {
         "money": 100,

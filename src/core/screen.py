@@ -1,8 +1,12 @@
+# src/core/screen.py
+
 """
 Gerenciador de tela - Renderização em resolução nativa sem stretching
 """
 import pygame
+import os
 from src.config.settings import settings
+
 
 class ScreenManager:
     def __init__(self):
@@ -29,22 +33,95 @@ class ScreenManager:
         self.initialize_screen()
 
     def initialize_screen(self):
-        """Inicializa a tela com as configurações atuais"""
-        flags = pygame.RESIZABLE
-        if self.settings.fullscreen:
-            flags |= pygame.FULLSCREEN
+        """
+        Inicializa a tela com as configurações atuais.
+        Usa janela maximizada para manter barra de tarefas visível.
+        """
+        print(f"[SCREEN] Inicializando tela - fullscreen={self.settings.fullscreen}")
 
+        if self.settings.fullscreen:
+            # ===== ABORDAGEM: Janela maximizada =====
+            # Obtém a resolução do desktop
+            info = pygame.display.Info()
+            screen_width = info.current_w
+            screen_height = info.current_h
+
+            # Garante que a resolução é válida
+            if screen_width <= 0 or screen_height <= 0:
+                screen_width = 1920
+                screen_height = 1080
+                print(f"[SCREEN] Resolução inválida, usando fallback: {screen_width}x{screen_height}")
+
+            # Define o tamanho da janela para a resolução da tela
+            self.window_width = screen_width
+            self.window_height = screen_height
+
+            # Define a posição no canto superior esquerdo
+            os.environ['SDL_VIDEO_WINDOW_POS'] = '0,0'
+
+            # Usa janela redimensionável (permite maximizar)
+            flags = pygame.RESIZABLE
+
+            print(f"[SCREEN] Modo maximizado: {self.window_width}x{self.window_height}")
+            print(f"[SCREEN] Posição: canto superior esquerdo (0,0)")
+
+        else:
+            # Modo janela normal
+            self.window_width = self.settings.screen_width
+            self.window_height = self.settings.screen_height
+            flags = pygame.RESIZABLE
+            print(f"[SCREEN] Modo janela: {self.window_width}x{self.window_height}")
+
+            # Reseta a posição
+            if 'SDL_VIDEO_WINDOW_POS' in os.environ:
+                del os.environ['SDL_VIDEO_WINDOW_POS']
+
+        # Garante que a resolução é válida
+        if self.window_width <= 0:
+            self.window_width = 1280
+        if self.window_height <= 0:
+            self.window_height = 720
+
+        # Cria a janela
         self.screen = pygame.display.set_mode(
             (self.window_width, self.window_height),
             flags,
             vsync=self.settings.vsync
         )
 
+        # ===== SE ESTIVER EM MODO FULLSCREEN, MAXIMIZA A JANELA =====
+        if self.settings.fullscreen:
+            try:
+                # Tenta maximizar a janela via SDL
+                pygame.display._set_window_style(True)  # True = maximizado
+            except:
+                # Fallback: tenta via Windows API
+                try:
+                    import ctypes
+                    # Obtém o handle da janela
+                    hwnd = pygame.display.get_wm_info()['window']
+                    # Maximiza a janela
+                    ctypes.windll.user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE = 3
+                except:
+                    # Fallback: apenas cria a janela no tamanho da tela
+                    print("[SCREEN] Não foi possível maximizar a janela automaticamente")
+
         self._calculate_viewport()
         pygame.display.set_caption("Pokemon Tower Defense")
+        print(f"[SCREEN] Viewport: {self.viewport_width}x{self.viewport_height} - Escala: {self.render_scale:.3f}")
 
     def _calculate_viewport(self):
         """Calcula o viewport para manter a proporção sem stretching"""
+        # ===== PROTEÇÃO CONTRA DIVISÃO POR ZERO =====
+        if self.window_height <= 0:
+            self.window_height = 720
+        if self.window_width <= 0:
+            self.window_width = 1280
+        if self.render_height <= 0:
+            self.render_height = 720
+        if self.render_width <= 0:
+            self.render_width = 1280
+
         window_ratio = self.window_width / self.window_height
         render_ratio = self.render_width / self.render_height
 
@@ -62,6 +139,14 @@ class ScreenManager:
         # Centraliza o viewport
         self.viewport_x = (self.window_width - self.viewport_width) // 2
         self.viewport_y = (self.window_height - self.viewport_height) // 2
+
+        # ===== GARANTE QUE OS VALORES SÃO POSITIVOS =====
+        if self.viewport_width <= 0:
+            self.viewport_width = 1
+        if self.viewport_height <= 0:
+            self.viewport_height = 1
+        if self.render_scale <= 0:
+            self.render_scale = 1.0
 
     def world_to_screen(self, world_x, world_y, camera=None):
         """Delega para o render_context"""
@@ -86,7 +171,6 @@ class ScreenManager:
         final_y = screen_y * self.render_scale + self.viewport_y
 
         return (final_x, final_y), scale
-
 
     def get_render_position(self, world_x, world_y, camera=None):
         """
@@ -155,20 +239,45 @@ class ScreenManager:
         """Lida com redimensionamento da janela"""
         self.window_width = new_width
         self.window_height = new_height
+
+        # Garante que a resolução é válida
+        if self.window_width <= 0:
+            self.window_width = 1280
+        if self.window_height <= 0:
+            self.window_height = 720
+
         self.screen = pygame.display.set_mode(
-            (new_width, new_height),
+            (self.window_width, self.window_height),
             pygame.RESIZABLE,
             vsync=self.settings.vsync
         )
         self._calculate_viewport()
 
         # Propaga resize para a cena atual (se existir)
-        from src.core.game import Game
-        if hasattr(self, '_game') and self._game and self._game.current_scene:
-            if hasattr(self._game.current_scene, 'on_resize'):
-                self._game.current_scene.on_resize()
+        if hasattr(self, 'game') and self.game and self.game.current_scene:
+            if hasattr(self.game.current_scene, 'on_resize'):
+                self.game.current_scene.on_resize()
 
     def toggle_fullscreen(self):
-        """Alterna entre tela cheia e janela"""
-        self.settings.fullscreen = not self.settings.fullscreen
+        """
+        Aplica o estado atual de fullscreen (não alterna!)
+        Usa o valor já definido em self.settings.fullscreen
+        """
+        print(f"[SCREEN] Aplicando fullscreen = {self.settings.fullscreen}")
+
+        # ===== CRUCIAL: Fecha a tela atual antes de criar uma nova =====
+        try:
+            # Força a liberação da tela atual
+            if self.screen:
+                del self.screen
+                self.screen = None
+        except:
+            pass
+
+        # Recria a tela com as novas configurações
         self.initialize_screen()
+
+        # Notifica a cena atual sobre o redimensionamento
+        if hasattr(self, 'game') and self.game and self.game.current_scene:
+            if hasattr(self.game.current_scene, 'on_resize'):
+                self.game.current_scene.on_resize()

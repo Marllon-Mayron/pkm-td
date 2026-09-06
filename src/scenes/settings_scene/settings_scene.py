@@ -179,42 +179,38 @@ class SettingsScene(BaseScene):
         return False
 
     def _load_settings_from_save(self):
+        from src.config.settings import settings as global_settings
         from src.managers.save_manager import save_manager
 
+        # Tenta carregar do save_manager primeiro
         if save_manager.save_data and save_manager.save_data.get("settings"):
             settings_data = save_manager.save_data.get("settings", {})
+            self.music_volume = settings_data.get("music_volume", 0.5)
+            self.sfx_volume = settings_data.get("sfx_volume", 0.7)
+            self.music_enabled = settings_data.get("music_enabled", True)
+            self.sfx_enabled = settings_data.get("sfx_enabled", True)
+            self.fullscreen_enabled = settings_data.get("fullscreen", False)
+            self.vsync_enabled = settings_data.get("vsync", True)
         else:
-            saves_dir = "saves"
-            import json
-            settings_data = {}
-            for i in range(1, 4):
-                save_file = os.path.join(saves_dir, f"save_{i}.json")
-                if os.path.exists(save_file):
-                    try:
-                        with open(save_file, 'r', encoding='utf-8') as f:
-                            data = json.load(f)
-                            if data.get("settings"):
-                                settings_data = data.get("settings", {})
-                                save_manager.save_data = data
-                                save_manager.current_save_file = i
-                                break
-                    except:
-                        pass
+            # Fallback: usa o objeto global
+            self.music_volume = global_settings.music_volume
+            self.sfx_volume = global_settings.sfx_volume
+            self.music_enabled = global_settings.music_enabled
+            self.sfx_enabled = global_settings.sfx_enabled
+            self.fullscreen_enabled = global_settings.fullscreen
+            self.vsync_enabled = global_settings.vsync
 
-        self.music_volume = settings_data.get("music_volume", 0.5)
-        self.sfx_volume = settings_data.get("sfx_volume", 0.7)
-        self.music_enabled = settings_data.get("music_enabled", True)
-        self.sfx_enabled = settings_data.get("sfx_enabled", True)
-        self.fullscreen_enabled = settings_data.get("fullscreen", False)
-        self.vsync_enabled = settings_data.get("vsync", True)
+        print(f"[SETTINGS] Carregado - fullscreen={self.fullscreen_enabled}, vsync={self.vsync_enabled}")
 
     def _load_default_settings(self):
-        self.music_volume = 0.5
-        self.sfx_volume = 0.7
-        self.music_enabled = True
-        self.sfx_enabled = True
-        self.fullscreen_enabled = False
-        self.vsync_enabled = True
+        from src.config.settings import settings as global_settings
+        # Usa os valores padrão definidos no próprio settings
+        self.music_volume = global_settings.music_volume
+        self.sfx_volume = global_settings.sfx_volume
+        self.music_enabled = global_settings.music_enabled
+        self.sfx_enabled = global_settings.sfx_enabled
+        self.fullscreen_enabled = global_settings.fullscreen
+        self.vsync_enabled = global_settings.vsync
 
     def _get_font_size(self, base_size):
         return max(int(base_size * self.screen_manager.viewport_height / 720), 12)
@@ -417,32 +413,54 @@ class SettingsScene(BaseScene):
             sound_manager.set_sfx_volume(0)
 
     def _apply_settings(self):
-        from src.config.settings import settings
+        from src.config.settings import settings as global_settings
         from src.managers.save_manager import save_manager
 
-        if not save_manager.current_save_file:
-            print("[SETTINGS] Não é possível salvar - nenhum save carregado!")
-            sound_manager.play_effect(SoundEffect.CLICK)
-            return
+        # Salva o estado ANTES de qualquer mudança
+        old_fullscreen = global_settings.fullscreen
+        old_vsync = global_settings.vsync
 
-        settings.music_volume = self.music_volume
-        settings.sfx_volume = self.sfx_volume
-        settings.music_enabled = self.music_enabled
-        settings.sfx_enabled = self.sfx_enabled
-        settings.fullscreen = self.fullscreen_enabled
-        settings.vsync = self.vsync_enabled
+        # ATUALIZA o objeto global de configurações
+        global_settings.music_volume = self.music_volume
+        global_settings.sfx_volume = self.sfx_volume
+        global_settings.music_enabled = self.music_enabled
+        global_settings.sfx_enabled = self.sfx_enabled
+        global_settings.fullscreen = self.fullscreen_enabled
+        global_settings.vsync = self.vsync_enabled
 
+        # Sincroniza áudio
         sound_manager.sync_all_managers()
 
-        if save_manager.save_data:
-            old_fullscreen = save_manager.save_data["settings"].get("fullscreen", False)
-            if self.fullscreen_enabled != old_fullscreen:
-                self.screen_manager.toggle_fullscreen()
+        # ===== APLICA AS MUDANÇAS DE TELA =====
+        if global_settings.fullscreen != old_fullscreen:
+            print(f"[SETTINGS] Alterando fullscreen: {old_fullscreen} -> {global_settings.fullscreen}")
+            # O toggle NÃO alterna mais, apenas aplica o valor atual
+            self.screen_manager.toggle_fullscreen()
 
-        save_manager.save_settings(settings)
-        sound_manager.play_effect(SoundEffect.CLICK)
+        # Se o vsync mudou, recria a tela
+        if global_settings.vsync != old_vsync:
+            print(f"[SETTINGS] Alterando vsync: {old_vsync} -> {global_settings.vsync}")
+            self.screen_manager.initialize_screen()
+
+        # ===== SALVA AS CONFIGURAÇÕES =====
+        if save_manager.current_save_file:
+            success = save_manager.save_settings(global_settings)
+            if success:
+                print("[SETTINGS] Configurações salvas com sucesso!")
+                sound_manager.play_effect(SoundEffect.CLICK)
+            else:
+                print("[SETTINGS] Erro ao salvar configurações!")
+        else:
+            print("[SETTINGS] Não foi possível salvar - nenhum save carregado!")
+            # Tenta salvar mesmo assim
+            try:
+                save_manager.save_settings(global_settings)
+            except:
+                pass
 
     def _reset_to_default(self):
+        from src.config.settings import settings as global_settings
+
         self.music_volume = 0.5
         self.sfx_volume = 0.7
         self.music_enabled = True
@@ -462,27 +480,18 @@ class SettingsScene(BaseScene):
     def _go_back(self):
         from src.managers.save_manager import save_manager
 
+        # Para a música de preview
         sound_manager.stop_music()
-
-        if save_manager.current_save_file and save_manager.save_data:
-            settings_data = save_manager.save_data.get("settings", {})
-            music_vol = settings_data.get("music_volume", 0.5)
-            music_en = settings_data.get("music_enabled", True)
-            if music_en and music_vol > 0:
-                pygame.time.wait(100)
-                sound_manager.set_music_volume(music_vol)
-                sound_manager.stop_music()
-
         self.preview_music_timer = 0
 
+        # Se houver um callback, usa ele
         if self._on_back_callback is not None:
-            print("[SETTINGS] Voltando via callback")
             callback = self._on_back_callback
             self._on_back_callback = None
             callback()
-            return  # <--- ESSA LINHA É CRUCIAL!
+            return
 
-        print("[SETTINGS] Voltando para o menu")
+        # Senão, volta para o menu
         self.game.current_scene = self.game.menu_scene
 
     def update(self, dt):

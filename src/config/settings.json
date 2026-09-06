@@ -1,0 +1,13 @@
+{
+  "screen_width": 1280,
+  "screen_height": 720,
+  "fullscreen": false,
+  "vsync": true,
+  "target_fps": 60,
+  "game_tick_rate": 60,
+  "max_fps": 60,
+  "sfx_volume": 0.265625,
+  "music_volume": 0.0546875,
+  "music_enabled": true,
+  "sfx_enabled": true
+}
