@@ -218,23 +218,22 @@ class GameScene(BaseScene):
 
     def _start_game(self):
         """Inicia o jogo"""
-        # ===== RESTAURA COMPLETAMENTE TODOS OS POKÉMON =====
         self.cleanup()
-
         self.update_box_happiness()
-
         self._start_battle_music()
-
         self.wave_manager.initialize_condition()
 
         for pokemon in self.player.team:
             pokemon.reset(self)
 
-        # Reseta ouro acumulado
         self.wave_manager.reset_gold()
 
-        # Inicia as waves
-        if self.wave_manager.has_more_waves():
+        # ===== NÃO INICIA AS WAVES AUTOMATICAMENTE =====
+        # Deixa o EventProcessor controlar o início
+        self.game_state = "waiting"
+        # A primeira wave será iniciada pelo evento START_PHASE ou manualmente
+        # Se não houver eventos, inicia normalmente
+        if not self.event_manager.triggers:
             self.game_state = "in_wave"
             self.wave_manager.start_all_waves()
 
@@ -348,7 +347,12 @@ class GameScene(BaseScene):
             return
 
         if hasattr(self, 'event_processor'):
-            self.event_processor.custom_flags["abriu_move_select"] = True
+            expected = self.event_processor.get_next_custom_flag()
+            if expected == "abriu_move_select":
+                self.event_processor.custom_flags["abriu_move_select"] = True
+            else:
+                toast_warning("Clique na imagem de um pokemon posicionado para abrir o menu de combate!", duration=5.0)
+                return
 
         self.move_select_overlay = MoveSelectOverlay(self, pokemon)
         self.move_select_overlay.active = True
@@ -604,7 +608,13 @@ class GameScene(BaseScene):
         # ===== MEDICAMENTOS (poções e revives) =====
         elif target_type == "ally" and category == "medicine":
             if hasattr(self, 'event_processor'):
-                self.event_processor.custom_flags["curou_pokemon"] = True
+                expected = self.event_processor.get_next_custom_flag()
+                if expected == "curou_pokemon":
+                    self.event_processor.custom_flags["curou_pokemon"] = True
+                else:
+                    toast_warning("Arraste uma potion e coloque em cima do seu pokemon!", duration=5.0)
+                    return False
+
             medicine_success = self.use_medicine(target, item_data)
             return medicine_success
 
@@ -1056,8 +1066,15 @@ class GameScene(BaseScene):
         """Callback quando um Pokémon é colocado no mapa OU movido"""
         action = placement_data.get('action', 'place')
 
-        if hasattr(self, 'event_processor'):
-            self.event_processor.custom_flags["colocou_pokemon"] = True
+        if action == 'place' and hasattr(self, 'event_processor'):
+            expected = self.event_processor.get_next_custom_flag()
+            if expected == "colocou_pokemon":
+                self.event_processor.custom_flags["colocou_pokemon"] = True
+            else:
+                # Opcional: mostrar toast avisando que essa ação não é a esperada
+                from src.ui.toast_renderer import toast_warning
+                toast_warning("Arraste seu pokemon, e posicione-o no lugar!", duration=5.0)
+                return
 
         if action == 'swap':
             self._on_pokemon_swap(placement_data)
@@ -1475,6 +1492,7 @@ class GameScene(BaseScene):
             return
 
         # ===== ATUALIZAÇÃO NORMAL =====
+        self.event_processor.update(dt)
         wave_mgr = self.wave_manager
         target_mgr = self.target_item_manager
         placement_mgr = self.placement_manager
@@ -1484,7 +1502,7 @@ class GameScene(BaseScene):
         placed_pokemon = self.placed_pokemon
         screen_mgr = self.screen_manager
         path_renderer = self.path_renderer
-        self.event_processor.update(dt)
+
 
         # Battle System
         perf_monitor.start_section("BATTLE_SYSTEM")
@@ -1594,32 +1612,57 @@ class GameScene(BaseScene):
         perf_monitor.end_section()
 
         # ===== TRANSIÇÕES DE ESTADO =====
-        perf_monitor.start_section("STATE_TRANSITIONS")
         if self.game_state == "in_wave":
             # Verifica se a wave está completamente finalizada
-            # (sem inimigos vivos E sem waves pendentes)
             if wave_mgr.is_wave_completely_finished():
-                if target_mgr.items_protected > 0:
-                    print(f"[GAME] Fase COMPLETA! Todos os inimigos foram derrotados!")
-                    self.game_state = "completed"
-                    self._complete_phase()
+                # Verifica se ainda há gatilhos AFTER_BOSS_DEFEAT não processados
+                has_after_boss_pending = False
+                for trigger in self.event_manager.triggers:
+                    if trigger.trigger_type == "after_boss_defeat":
+                        idx = self.event_manager.triggers.index(trigger)
+                        if not self.event_processor.triggered[idx]:
+                            has_after_boss_pending = True
+                            break
+
+                # Verifica se há eventos pendentes aguardando execução
+                has_pending_events = bool(self.event_processor.pending_events)
+
+                if has_after_boss_pending or has_pending_events:
+                    # Ainda há eventos a serem processados – aguarda
+                    if has_after_boss_pending:
+                        print("[GAME] Aguardando gatilho AFTER_BOSS_DEFEAT antes de completar fase")
+                    if has_pending_events:
+                        print(f"[GAME] Aguardando {len(self.event_processor.pending_events)} evento(s) pendente(s)")
                 else:
-                    print(f"[GAME] GAME OVER! Todos os itens foram roubados!")
-                    self.game_state = "game_over"
-                    self.overlay_manager.show(OverlayType.GAME_OVER)
+                    # Tudo pronto – completa a fase
+                    if target_mgr.items_protected > 0:
+                        print("[GAME] Fase COMPLETA! Todos os inimigos foram derrotados e eventos processados!")
+                        self.game_state = "completed"
+                        self._complete_phase()
+                    else:
+                        print("[GAME] GAME OVER! Todos os itens foram roubados!")
+                        self.game_state = "game_over"
+                        self.overlay_manager.show(OverlayType.GAME_OVER)
+
         perf_monitor.end_section()
 
         perf_monitor.end_frame()
 
     def _complete_phase(self):
+        """
+        Completa a fase com sucesso.
+        Calcula recompensas, estrelas, e mostra overlay de conclusão.
+        """
         from src.config.progress import progress_manager
         import random
 
+        # Para a música de batalha
         self._stop_battle_music(fade_ms=1000)
 
-        # Reset Dittos (já existente)
+        # Reset Dittos transformados
         self.reset_all_transformed_dittos()
 
+        # Adiciona felicidade aos Pokémon do time
         for pokemon in self.player.team:
             pokemon.add_happiness(5, "Fase completada")
 
@@ -1640,6 +1683,7 @@ class GameScene(BaseScene):
         total_items = len(self.target_item_manager.items)
         stolen_items = self.target_item_manager.items_stolen
 
+        # ===== BÔNUS POR FASE PERFEITA =====
         bonus_amount = 0
         perfect_run = False
         if stolen_items == 0 and total_items > 0:
@@ -1652,8 +1696,7 @@ class GameScene(BaseScene):
                 self.player.achievement_manager.check_and_unlock("perfect_phase", phase_id)
                 print(f"[ACHIEVEMENT] Fase perfeita! Verificando conquistas...")
 
-        # ===== CONQUISTAS: Ginasios =====
-
+        # ===== GOLD TOTAL =====
         gold_total = base_reward + gold_from_defeats + bonus_amount
         self.player.money += gold_total
 
@@ -1661,11 +1704,12 @@ class GameScene(BaseScene):
         item_rewards_config = self.phase_rewards.get('item_rewards', [])
         drop_chance = self.phase_rewards.get('drop_chance', 0.0)
         max_items = self.phase_rewards.get('max_items', 3)
-        earned_items = []  # lista de (item_id, quantidade)
+        earned_items = []  # lista de item_ids ganhos
 
         if item_rewards_config and drop_chance > 0 and max_items > 0:
             total_kills = self.wave_manager.total_enemies_defeated
             print(f"[DEBUG] total_kills em _complete_phase = {total_kills}")
+
             # Prepara lista de itens com pesos
             items_pool = []
             weights = []
@@ -1688,13 +1732,12 @@ class GameScene(BaseScene):
                 self.player.bag.add_item(item_id, 1)
                 print(f"[REWARD] Item ganho: {item_id}")
 
-
-        # XP
+        # ===== XP =====
         self.player.score += self.phase_rewards.get('experience', 50)
 
         print(f"[DEBUG] phase_rewards = {self.phase_rewards}")
 
-        # Estrelas
+        # ===== ESTRELAS =====
         if total_items > 0:
             protected_items = self.target_item_manager.items_protected
             stars = int((protected_items / total_items) * 3)
@@ -1702,6 +1745,7 @@ class GameScene(BaseScene):
         else:
             stars = 3
 
+        # ===== DADOS PARA O OVERLAY =====
         self.phase_complete_data = {
             "base_reward": base_reward,
             "gold_from_defeats": gold_from_defeats,
@@ -1710,11 +1754,14 @@ class GameScene(BaseScene):
             "total_xp": self.phase_rewards.get('experience', 50),
             "perfect_run": perfect_run,
             "stars": stars,
-            "earned_items": earned_items  # NOVO
+            "earned_items": earned_items
         }
 
+        # ===== SALVA PROGRESSO =====
         progress_manager.complete_phase(self.phase_id, stars=stars)
         self.player.auto_save()
+
+        # ===== MOSTRA OVERLAY DE FASE COMPLETA =====
         self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
 
     # ===== MÉTODOS DE RENDER =====

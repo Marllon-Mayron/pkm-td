@@ -558,7 +558,8 @@
                 "events": [
                     {
                         "event_type": "message",
-                        "delay": 1.0,
+                        "delay": 0.0,
+                        "pause_game": true,
                         "message_text": "Bem vindo, vamos colocar seu pokemon no lugar!",
                         "speaker_name": "Professor Bulbasauro",
                         "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/front/3.png",
@@ -572,11 +573,12 @@
                 "time_value": 0.0,
                 "wave_index": 0,
                 "wave_state": "wave_start",
-                "custom_condition": "colocar_pokemon",
+                "custom_condition": "colocou_pokemon",
                 "events": [
                     {
                         "event_type": "message",
                         "delay": 0.0,
+                        "pause_game": true,
                         "message_text": "Parece que seu pokemon está machucado, tente dar uma potion para ele! ",
                         "speaker_name": "Professor Venossauro",
                         "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/front/3.png",
@@ -595,9 +597,10 @@
                     {
                         "event_type": "message",
                         "delay": 0.0,
+                        "pause_game": true,
                         "message_text": "Muito melhor! que tal dar uma olhadinha nos ataques do seu pokemon? clique na imagem dele para olharr",
                         "speaker_name": "Professor Venossauro",
-                        "speaker_sprite_path": "",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/front/3.png",
                         "action_label": "Vou olhar",
                         "action_trigger": ""
                     }
@@ -613,6 +616,7 @@
                     {
                         "event_type": "message",
                         "delay": 0.0,
+                        "pause_game": true,
                         "message_text": "É um bom começo... vamos começar a batalha, feche a tela e se prepare.",
                         "speaker_name": "Professor Venossauro",
                         "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/front/3.png",
@@ -631,6 +635,7 @@
                     {
                         "event_type": "message",
                         "delay": 0.0,
+                        "pause_game": false,
                         "message_text": "Parabens, voce já está pronto para seguir jornada sozinho!",
                         "speaker_name": "Professor Venossauro",
                         "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/front/3.png",

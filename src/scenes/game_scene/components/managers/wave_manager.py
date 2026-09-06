@@ -130,6 +130,10 @@ class WaveManager:
             all_pokemon = self.game_scene.placement_manager.placed_pokemon
             enemy.combat.update_combat(dt, all_pokemon)
 
+    def is_boss_defeated(self) -> bool:
+        """Retorna se o boss já foi derrotado."""
+        return self._boss_defeated
+
     def update(self, dt: float) -> List['Pokemon']:
         """
         Atualiza o sistema de waves
@@ -137,6 +141,11 @@ class WaveManager:
         """
         if self.paused:
             return []
+
+        # ===== SÓ PROCESSA SE O JOGO ESTIVER EM "in_wave" =====
+        if self.game_scene.game_state != "in_wave":
+            return []
+
 
         if self.game_scene and hasattr(self.game_scene, 'day_night_weather'):
             day_night = self.game_scene.day_night_weather.day_night_state
@@ -388,7 +397,10 @@ class WaveManager:
             self._remove_enemy(enemy)
 
     def _handle_enemy_death(self, enemy: 'Pokemon'):
-        """Processa morte de um inimigo (inclui boss!) """
+        """
+        Processa morte de um inimigo (inclui boss!)
+        Distribui XP, gold e verifica conquistas.
+        """
         print(f"[WaveManager] {enemy.name} (BOSS={enemy.is_boss}) MORREU em batalha!")
 
         # ===== VERIFICA MULTIPLICADOR DE PAY DAY PARA GOLD =====
@@ -421,9 +433,12 @@ class WaveManager:
                 print(f"[ERROR] Falha ao processar item de {enemy.name}: {e}")
                 enemy.is_carrying = None
 
-        # ===== CONQUISTAS: Boss Derrotado (SOMENTE AQUI, QUANDO MORRE) =====
+        # ===== BOSS DERROTADO: SETA A FLAG E VERIFICA CONQUISTAS =====
         if enemy.is_boss:
             self._boss_defeated = True
+            print(f"[WaveManager] BOSS derrotado! Flag _boss_defeated = True")
+
+            # ===== CONQUISTAS: Boss Derrotado =====
             if self.game_scene and hasattr(self.game_scene, 'player'):
                 player = self.game_scene.player
                 if hasattr(player, 'achievement_manager'):
@@ -432,7 +447,10 @@ class WaveManager:
                     player.achievement_manager.check_and_unlock("boss_defeated", phase_id)
                     print(f"[ACHIEVEMENT] Boss {enemy.name} derrotado! Verificando conquistas...")
 
+        # Remove o inimigo da lista ativa
         self._remove_enemy(enemy)
+
+        # Auto-save após morte de inimigo
         self.game_scene.player.auto_save()
 
     def _steal_item(self, enemy: 'Pokemon'):

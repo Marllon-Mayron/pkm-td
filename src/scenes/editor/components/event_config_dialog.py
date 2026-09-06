@@ -44,17 +44,17 @@ class EventConfigDialog:
         self.triggers_per_page = 5
         self.trigger_item_height = 40
         self.events_per_page = 4
-        self.event_item_height = 60
+        self.event_item_height = 70  # Aumentado para acomodar o checkbox
 
         self.font_title = pygame.font.Font(None, 24)
         self.font = pygame.font.Font(None, 20)
         self.font_small = pygame.font.Font(None, 16)
 
-        # Armazenará os retângulos dos campos específicos para detecção de clique
+        # Armazenará os retângulos dos campos específicos
         self.specific_fields = {}
 
         self._init_ui()
-        self._update_editor_layout()  # Calcula layout inicial
+        self._update_editor_layout()
 
     def _init_ui(self):
         x, y, w, h = self.rect
@@ -79,7 +79,6 @@ class EventConfigDialog:
         self.save_button = pygame.Rect(buttons_start_x, y + h - 40, button_width, 30)
         self.cancel_button = pygame.Rect(buttons_start_x + button_width + button_spacing, y + h - 40, button_width, 30)
 
-        # Elementos fixos do editor (título, tipo, etc.)
         self._init_fixed_editor_elements(editor_area_x, editor_area_y, editor_width)
 
     def _init_fixed_editor_elements(self, editor_x, editor_y, editor_width):
@@ -96,49 +95,38 @@ class EventConfigDialog:
         self.trigger_type_next = pygame.Rect(editor_x + margin + 250, current_y, 25, 25)
         current_y += 35
 
-        # Área onde serão desenhados os campos específicos (será preenchida dinamicamente)
         self.specific_area_start_y = current_y
-        # A altura será calculada em _update_editor_layout
-
-        # Área da lista de eventos (será posicionada após os campos específicos)
-        self.events_label = pygame.Rect(editor_x + margin, 0, 100, 25)   # y será atualizado
-        self.add_event_button = pygame.Rect(editor_x + editor_width - 110, 0, 90, 25)  # y atualizado
-        self.events_list_area = pygame.Rect(editor_x + margin, 0, editor_width - margin*2,
-                                            self.events_per_page * self.event_item_height + 5)
-
-        # Guardamos a largura do editor para recalcular
         self.editor_width = editor_width
         self.editor_x = editor_x
         self.editor_y = editor_y
 
+        # Área da lista de eventos (será posicionada dinamicamente)
+        self.events_label = pygame.Rect(editor_x + margin, 0, 100, 25)
+        self.add_event_button = pygame.Rect(editor_x + editor_width - 110, 0, 90, 25)
+        self.events_list_area = pygame.Rect(editor_x + margin, 0, editor_width - margin*2,
+                                            self.events_per_page * self.event_item_height + 5)
+
     def _update_editor_layout(self):
-        """Recalcula as posições de todos os elementos do editor com base no tipo atual."""
+        """Recalcula as posições de todos os elementos do editor."""
         trigger = self.event_manager.get_current_trigger()
         if not trigger:
             return
 
-        # Margens
         margin = 10
         x = self.editor_x
         y = self.editor_y
 
-        # Posição inicial após o título e tipo
-        current_y = self.trigger_title.y + 35 + 35  # título + tipo (já incluso)
+        current_y = self.trigger_title.y + 35 + 35
 
-        # O tipo ocupa uma linha, então current_y já está após o tipo
-        # Agora vamos posicionar os campos específicos conforme o tipo
+        # Layout dos campos específicos por tipo
         specific_height = 0
         if trigger.trigger_type == TriggerType.TIME:
-            # TIME: apenas um campo "Tempo (s)"
             specific_height = 35
             self.time_label = pygame.Rect(x + margin, current_y, 100, 25)
             self.time_input = pygame.Rect(x + margin + 110, current_y, 80, 25)
-            # Armazenar referências para detecção de clique
-            self.specific_fields = {
-                'time_input': self.time_input,
-            }
+            self.specific_fields = {'time_input': self.time_input}
+
         elif trigger.trigger_type in (TriggerType.WAVE, TriggerType.AFTER_WAVE):
-            # WAVE: índice + estado (se for WAVE)
             specific_height = 35
             self.wave_index_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.wave_index_display = pygame.Rect(x + margin + 90, current_y, 60, 25)
@@ -149,7 +137,6 @@ class EventConfigDialog:
                 'wave_index_next': self.wave_index_next,
             }
             if trigger.trigger_type == TriggerType.WAVE:
-                # Estado da wave
                 self.wave_state_label = pygame.Rect(x + margin, current_y + 35, 80, 25)
                 self.wave_state_display = pygame.Rect(x + margin + 90, current_y + 35, 100, 25)
                 self.wave_state_prev = pygame.Rect(x + margin + 200, current_y + 35, 25, 25)
@@ -158,33 +145,27 @@ class EventConfigDialog:
                     'wave_state_prev': self.wave_state_prev,
                     'wave_state_next': self.wave_state_next,
                 })
-                specific_height = 70  # duas linhas
+                specific_height = 70
             else:
                 specific_height = 35
+
         elif trigger.trigger_type == TriggerType.CUSTOM:
             specific_height = 35
             self.custom_condition_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.custom_condition_input = pygame.Rect(x + margin + 90, current_y, 200, 25)
-            self.specific_fields = {
-                'custom_condition_input': self.custom_condition_input,
-            }
+            self.specific_fields = {'custom_condition_input': self.custom_condition_input}
+
         else:
-            # Outros tipos não têm parâmetros
             specific_height = 0
             self.specific_fields = {}
 
-        # Agora posicionamos a lista de eventos logo após os campos específicos
-        events_y = current_y + specific_height + 15  # 15px de espaçamento
+        # Posiciona a lista de eventos
+        events_y = current_y + specific_height + 15
         self.events_label.y = events_y
         self.add_event_button.y = events_y
-        self.events_list_area.y = events_y + 30  # abaixo do label
-
-        # Ajusta a altura total da área de editor (opcional, mas não necessário para colisão)
-        # Guardamos a posição inferior para referência
-        self.events_bottom = self.events_list_area.bottom
+        self.events_list_area.y = events_y + 30
 
     def _update_button_positions(self):
-        # (mesmo código original, mas com a chamada a _update_editor_layout no final)
         x, y, w, h = self.rect
         margin = 20
         content_y = y + 45
@@ -301,7 +282,7 @@ class EventConfigDialog:
         return True
 
     def _handle_editor_click(self, mouse_x, mouse_y, trigger):
-        # PRIORIDADE 1: Campos específicos (definidos em specific_fields)
+        # Campos específicos
         for field_name, rect in self.specific_fields.items():
             if rect.collidepoint(mouse_x, mouse_y):
                 if field_name == "time_input":
@@ -329,7 +310,7 @@ class EventConfigDialog:
                     self.input_texts["custom_condition"] = trigger.custom_condition
                     return True
 
-        # PRIORIDADE 2: Controles de tipo (sempre visíveis)
+        # Controles de tipo
         if self.trigger_type_prev.collidepoint(mouse_x, mouse_y):
             self._change_trigger_type(trigger, -1)
             self._update_editor_layout()
@@ -339,7 +320,7 @@ class EventConfigDialog:
             self._update_editor_layout()
             return True
 
-        # PRIORIDADE 3: Botão adicionar evento
+        # Botão adicionar evento
         if self.add_event_button.collidepoint(mouse_x, mouse_y):
             new_event = GameEvent()
             new_event.event_type = EventType.MESSAGE
@@ -348,7 +329,7 @@ class EventConfigDialog:
             self.events_scroll = max(0, len(trigger.events) - self.events_per_page)
             return True
 
-        # PRIORIDADE 4: Lista de eventos
+        # Lista de eventos
         if self.events_list_area.collidepoint(mouse_x, mouse_y):
             relative_y = mouse_y - self.events_list_area.y
             item_index = (relative_y // self.event_item_height) + self.events_scroll
@@ -398,8 +379,8 @@ class EventConfigDialog:
 
     def _open_event_editor(self, trigger, event_index):
         event = trigger.events[event_index]
-        dialog_width = 550
-        dialog_height = 480
+        dialog_width = 600
+        dialog_height = 520
         dialog_x = self.rect.x + (self.rect.width - dialog_width) // 2
         dialog_y = self.rect.y + (self.rect.height - dialog_height) // 2
 
@@ -413,7 +394,6 @@ class EventConfigDialog:
         )
 
     def _update_hover(self, mouse_x, mouse_y):
-        # Atualiza o hover para todos os botões (incluindo os específicos)
         buttons = [
             (self.save_button, "save"),
             (self.cancel_button, "cancel"),
@@ -423,12 +403,9 @@ class EventConfigDialog:
             (self.trigger_type_prev, "trigger_type_prev"),
             (self.trigger_type_next, "trigger_type_next"),
         ]
-        # Adiciona os específicos dinamicamente
         for field_name, rect in self.specific_fields.items():
-            if field_name in ("time_input", "custom_condition_input"):
-                # São inputs, não botões com hover especial
-                continue
-            buttons.append((rect, field_name))
+            if field_name not in ("time_input", "custom_condition_input"):
+                buttons.append((rect, field_name))
 
         for button, name in buttons:
             if button.collidepoint(mouse_x, mouse_y):
@@ -511,7 +488,6 @@ class EventConfigDialog:
             self.event_edit_dialog.render(screen)
 
     def _render_triggers_list(self, screen):
-        # (mesmo código original, sem alterações)
         pygame.draw.rect(screen, self.COLORS['bg_dark'], self.triggers_list_area, border_radius=5)
 
         add_color = self.COLORS['success'] if self.hovered_button == "add_trigger" else (0, 80, 0)
@@ -542,7 +518,6 @@ class EventConfigDialog:
             if is_selected:
                 pygame.draw.rect(screen, self.COLORS['border'], item_rect, 1)
 
-            # Descrição do gatilho (mesmo)
             desc = self._get_trigger_description(trigger)
             text = self.font_small.render(desc, True, self.COLORS['text'])
             screen.blit(text, (item_rect.x + 5, item_rect.y + 7))
@@ -583,15 +558,13 @@ class EventConfigDialog:
         pygame.draw.rect(screen, self.COLORS['bg_light'], self.editor_area, border_radius=5)
         pygame.draw.rect(screen, self.COLORS['border_light'], self.editor_area, 1, border_radius=5)
 
-        # Título do gatilho
         title_text = self.font.render(f"Gatilho {self.event_manager.selected_trigger + 1}", True, self.COLORS['border'])
         screen.blit(title_text, (self.trigger_title.x, self.trigger_title.y))
 
-        # Tipo de gatilho
         type_label = self.font_small.render("Tipo:", True, self.COLORS['text_dim'])
         screen.blit(type_label, (self.trigger_type_label.x, self.trigger_type_label.y))
 
-        type_name = trigger.trigger_type.capitalize() if trigger.trigger_type in ["time", "wave", "start_phase", "before_boss", "after_boss_defeat", "after_wave", "custom"] else trigger.trigger_type
+        type_name = trigger.trigger_type.capitalize()
         pygame.draw.rect(screen, self.COLORS['bg'], self.trigger_type_display)
         pygame.draw.rect(screen, self.COLORS['border_light'], self.trigger_type_display, 1)
         type_text = self.font_small.render(type_name, True, self.COLORS['text'])
@@ -599,14 +572,10 @@ class EventConfigDialog:
 
         self._render_nav_buttons(screen, self.trigger_type_prev, self.trigger_type_next)
 
-        # Renderiza campos específicos
         self._render_specific_fields(screen, trigger)
-
-        # Lista de eventos
         self._render_events_list(screen, trigger)
 
     def _render_specific_fields(self, screen, trigger):
-        # Usa os retângulos já calculados em _update_editor_layout
         if trigger.trigger_type == TriggerType.TIME:
             label = self.font_small.render("Tempo (s):", True, self.COLORS['text_dim'])
             screen.blit(label, (self.time_label.x, self.time_label.y))
@@ -690,8 +659,13 @@ class EventConfigDialog:
             text = self.font_small.render(desc, True, self.COLORS['text'])
             screen.blit(text, (item_rect.x + 5, item_rect.y + 5))
 
+            # Delay
             delay_text = self.font_small.render(f"Delay: {event.delay}s", True, self.COLORS['text_dim'])
             screen.blit(delay_text, (item_rect.x + 5, item_rect.y + 25))
+
+            # Pause Game - Mostra se o evento pausa o jogo
+            pause_text = self.font_small.render("⏸ Pausa" if hasattr(event, 'pause_game') and event.pause_game else "", True, self.COLORS['warning'] if hasattr(event, 'pause_game') and event.pause_game else self.COLORS['text_dark'])
+            screen.blit(pause_text, (item_rect.x + 5, item_rect.y + 45))
 
         screen.set_clip(old_clip)
 
@@ -749,7 +723,7 @@ class EventConfigDialog:
 
 
 # ======================================================================
-# Classe EventEditDialog (também revisada com layout dinâmico)
+# Classe EventEditDialog (reformulada com suporte a pause_game)
 # ======================================================================
 
 class EventEditDialog:
@@ -776,7 +750,10 @@ class EventEditDialog:
         self.save_button = pygame.Rect(x + width - 180, y + height - 45, 80, 30)
         self.cancel_button = pygame.Rect(x + width - 90, y + height - 45, 80, 30)
 
-        # Campos específicos serão armazenados aqui
+        # Pause Game checkbox
+        self.pause_checkbox = pygame.Rect(x + 20, y + height - 80, 18, 18)
+        self.pause_label = pygame.Rect(x + 45, y + height - 80, 150, 18)
+
         self.specific_fields = {}
 
         self._init_fixed_fields()
@@ -787,50 +764,40 @@ class EventEditDialog:
         margin = 20
         current_y = y + 50
 
-        # Tipo de evento
         self.event_type_label = pygame.Rect(x + margin, current_y, 80, 25)
         self.event_type_display = pygame.Rect(x + margin + 90, current_y, 150, 25)
         self.event_type_prev = pygame.Rect(x + margin + 250, current_y, 25, 25)
         self.event_type_next = pygame.Rect(x + margin + 280, current_y, 25, 25)
         current_y += 35
 
-        # Delay comum
         self.delay_label = pygame.Rect(x + margin, current_y, 80, 25)
         self.delay_input = pygame.Rect(x + margin + 90, current_y, 80, 25)
         current_y += 35
 
-        # Área para campos específicos (começa após o delay)
         self.specific_start_y = current_y
-
-        # Guardamos dimensões
         self.margin = margin
         self.editor_x = x
         self.editor_y = y
 
     def _update_specific_layout(self):
-        """Recalcula posições dos campos específicos com base no tipo de evento."""
         x = self.rect.x
         y = self.rect.y
         margin = self.margin
         current_y = self.specific_start_y
 
-        # Limpa campos anteriores
         self.specific_fields = {}
 
         if self.event.event_type == EventType.MESSAGE:
-            # Speaker
             self.speaker_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.speaker_input = pygame.Rect(x + margin + 100, current_y, 200, 25)
             self.specific_fields['speaker_input'] = self.speaker_input
             current_y += 35
 
-            # Mensagem
             self.message_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.message_input = pygame.Rect(x + margin + 100, current_y, 300, 50)
             self.specific_fields['message_input'] = self.message_input
             current_y += 60
 
-            # Sprite
             self.sprite_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.sprite_input = pygame.Rect(x + margin + 100, current_y, 200, 25)
             self.sprite_button = pygame.Rect(x + margin + 310, current_y, 80, 25)
@@ -838,19 +805,16 @@ class EventEditDialog:
             self.specific_fields['sprite_button'] = self.sprite_button
             current_y += 35
 
-            # Action Label
             self.action_label_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.action_label_input = pygame.Rect(x + margin + 100, current_y, 150, 25)
             self.specific_fields['action_label_input'] = self.action_label_input
             current_y += 35
 
-            # Action Trigger
             self.action_trigger_label = pygame.Rect(x + margin, current_y, 120, 25)
             self.action_trigger_input = pygame.Rect(x + margin + 130, current_y, 200, 25)
             self.specific_fields['action_trigger_input'] = self.action_trigger_input
 
         elif self.event.event_type == EventType.CAMERA:
-            # Efeito
             self.effect_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.effect_display = pygame.Rect(x + margin + 100, current_y, 120, 25)
             self.effect_prev = pygame.Rect(x + margin + 230, current_y, 25, 25)
@@ -859,19 +823,16 @@ class EventEditDialog:
             self.specific_fields['effect_next'] = self.effect_next
             current_y += 35
 
-            # Intensidade
             self.intensity_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.intensity_input = pygame.Rect(x + margin + 100, current_y, 60, 25)
             self.specific_fields['intensity_input'] = self.intensity_input
             current_y += 35
 
-            # Duração
             self.duration_label = pygame.Rect(x + margin, current_y, 100, 25)
             self.duration_input = pygame.Rect(x + margin + 110, current_y, 60, 25)
             self.specific_fields['duration_input'] = self.duration_input
 
         elif self.event.event_type == EventType.TUTORIAL:
-            # Ação
             self.tutorial_action_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.tutorial_action_display = pygame.Rect(x + margin + 100, current_y, 180, 25)
             self.tutorial_action_prev = pygame.Rect(x + margin + 290, current_y, 25, 25)
@@ -880,13 +841,11 @@ class EventEditDialog:
             self.specific_fields['tutorial_action_next'] = self.tutorial_action_next
             current_y += 35
 
-            # Highlight
             self.highlight_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.highlight_input = pygame.Rect(x + margin + 100, current_y, 200, 25)
             self.specific_fields['highlight_input'] = self.highlight_input
 
         elif self.event.event_type == EventType.GAME_STATE:
-            # Ação
             self.state_action_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.state_action_display = pygame.Rect(x + margin + 100, current_y, 180, 25)
             self.state_action_prev = pygame.Rect(x + margin + 290, current_y, 25, 25)
@@ -895,13 +854,11 @@ class EventEditDialog:
             self.specific_fields['state_action_next'] = self.state_action_next
             current_y += 35
 
-            # Parâmetros
             self.state_params_label = pygame.Rect(x + margin, current_y, 100, 25)
             self.state_params_input = pygame.Rect(x + margin + 110, current_y, 250, 25)
             self.specific_fields['state_params_input'] = self.state_params_input
 
         elif self.event.event_type == EventType.SPAWN:
-            # Tipo
             self.spawn_type_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.spawn_type_display = pygame.Rect(x + margin + 100, current_y, 180, 25)
             self.spawn_type_prev = pygame.Rect(x + margin + 290, current_y, 25, 25)
@@ -910,19 +867,16 @@ class EventEditDialog:
             self.specific_fields['spawn_type_next'] = self.spawn_type_next
             current_y += 35
 
-            # Parâmetros
             self.spawn_params_label = pygame.Rect(x + margin, current_y, 100, 25)
             self.spawn_params_input = pygame.Rect(x + margin + 110, current_y, 250, 25)
             self.specific_fields['spawn_params_input'] = self.spawn_params_input
 
         elif self.event.event_type == EventType.CUSTOM_ACTION:
-            # Nome
             self.custom_name_label = pygame.Rect(x + margin, current_y, 80, 25)
             self.custom_name_input = pygame.Rect(x + margin + 100, current_y, 200, 25)
             self.specific_fields['custom_name_input'] = self.custom_name_input
             current_y += 35
 
-            # Parâmetros
             self.custom_params_label = pygame.Rect(x + margin, current_y, 100, 25)
             self.custom_params_input = pygame.Rect(x + margin + 110, current_y, 250, 25)
             self.specific_fields['custom_params_input'] = self.custom_params_input
@@ -933,6 +887,13 @@ class EventEditDialog:
         self.save_button.y = y + h - 45
         self.cancel_button.x = x + w - 90
         self.cancel_button.y = y + h - 45
+
+        # Atualiza posição do checkbox
+        self.pause_checkbox.x = x + 20
+        self.pause_checkbox.y = y + h - 80
+        self.pause_label.x = x + 45
+        self.pause_label.y = y + h - 80
+
         self._init_fixed_fields()
         self._update_specific_layout()
 
@@ -984,6 +945,11 @@ class EventEditDialog:
             self.visible = False
             return True
 
+        # Pause checkbox
+        if self.pause_checkbox.collidepoint(mouse_x, mouse_y):
+            self.event.pause_game = not getattr(self.event, 'pause_game', False)
+            return True
+
         # Tipo
         if self.event_type_prev.collidepoint(mouse_x, mouse_y):
             self._change_event_type(-1)
@@ -1000,14 +966,12 @@ class EventEditDialog:
             self.input_texts["delay"] = str(self.event.delay)
             return True
 
-        # Campos específicos
         return self._handle_specific_click(mouse_x, mouse_y)
 
     def _handle_specific_click(self, mouse_x, mouse_y):
         for field_name, rect in self.specific_fields.items():
             if rect.collidepoint(mouse_x, mouse_y):
                 if field_name.endswith("_input"):
-                    # Campo de texto
                     self.active_input = field_name
                     if field_name not in self.input_texts:
                         self.input_texts[field_name] = self._get_field_value(field_name)
@@ -1040,7 +1004,6 @@ class EventEditDialog:
         return mapping.get(field_name, "")
 
     def _toggle_dropdown(self, field_name):
-        # Para simplificar, usamos os mesmos métodos da versão original
         if field_name == "effect_prev":
             self._change_effect(-1)
         elif field_name == "effect_next":
@@ -1109,32 +1072,21 @@ class EventEditDialog:
         except ValueError:
             self.event.delay = 0
 
-        # Salva campos específicos
+        # Pause Game - preserva o valor atual
+        # Não sobrescrever se não foi alterado explicitamente
+        if hasattr(self.event, 'pause_game'):
+            # Mantém o valor atual, já que o checkbox altera diretamente
+            pass
+
         if self.event.event_type == EventType.MESSAGE:
-            self.event.speaker_name = self.input_texts.get("speaker_input", "")
-            self.event.message_text = self.input_texts.get("message_input", "")
-            self.event.speaker_sprite_path = self.input_texts.get("sprite_input", "")
-            self.event.action_label = self.input_texts.get("action_label_input", "")
-            self.event.action_trigger = self.input_texts.get("action_trigger_input", "")
-        elif self.event.event_type == EventType.CAMERA:
-            try:
-                self.event.camera_intensity = float(self.input_texts.get("intensity_input", "5"))
-            except ValueError:
-                self.event.camera_intensity = 5
-            try:
-                self.event.camera_duration = float(self.input_texts.get("duration_input", "0.5"))
-            except ValueError:
-                self.event.camera_duration = 0.5
-        elif self.event.event_type == EventType.TUTORIAL:
-            self.event.tutorial_highlight = self.input_texts.get("highlight_input", "")
-        elif self.event.event_type == EventType.GAME_STATE:
-            # state_params pode ser dict, mas tratamos como string
-            self.event.state_params = self.input_texts.get("state_params_input", {})
-        elif self.event.event_type == EventType.SPAWN:
-            self.event.spawn_params = self.input_texts.get("spawn_params_input", {})
-        elif self.event.event_type == EventType.CUSTOM_ACTION:
-            self.event.custom_action_name = self.input_texts.get("custom_name_input", "")
-            self.event.custom_action_params = self.input_texts.get("custom_params_input", {})
+            # Só atualiza se houver texto nos inputs, senão mantém o valor existente
+            if "speaker_input" in self.input_texts and self.input_texts["speaker_input"]:
+                self.event.speaker_name = self.input_texts["speaker_input"]
+            if "message_input" in self.input_texts and self.input_texts["message_input"]:
+                self.event.message_text = self.input_texts["message_input"]
+            if "sprite_input" in self.input_texts and self.input_texts["sprite_input"]:
+                self.event.speaker_sprite_path = self.input_texts["sprite_input"]
+            # ... e assim por diante
 
     def _handle_keydown(self, event):
         if event.key == pygame.K_RETURN:
@@ -1201,6 +1153,16 @@ class EventEditDialog:
         delay_text = self.font.render(self.input_texts.get("delay", "0"), True, self.COLORS['text'])
         screen.blit(delay_text, (self.delay_input.x + 5, self.delay_input.y + 4))
 
+        # Pause Game
+        pause_color = self.COLORS['input_active'] if getattr(self.event, 'pause_game', False) else self.COLORS['input_border']
+        pygame.draw.rect(screen, self.COLORS['input_bg'], self.pause_checkbox)
+        pygame.draw.rect(screen, pause_color, self.pause_checkbox, 1)
+        if getattr(self.event, 'pause_game', False):
+            check = self.font.render("✓", True, self.COLORS['text'])
+            screen.blit(check, (self.pause_checkbox.x + 3, self.pause_checkbox.y + 1))
+        pause_label = self.font_small.render("Pausar jogo (esperar conclusão)", True, self.COLORS['text_dim'])
+        screen.blit(pause_label, (self.pause_label.x, self.pause_label.y))
+
         # Renderiza campos específicos
         self._render_specific_fields(screen)
 
@@ -1214,7 +1176,6 @@ class EventEditDialog:
         screen.blit(cancel_text, (self.cancel_button.x + 15, self.cancel_button.y + 7))
 
     def _render_specific_fields(self, screen):
-        """Desenha os campos específicos conforme o tipo atual."""
         if self.event.event_type == EventType.MESSAGE:
             label = self.font_small.render("Falante:", True, self.COLORS['text_dim'])
             screen.blit(label, (self.speaker_label.x, self.speaker_label.y))

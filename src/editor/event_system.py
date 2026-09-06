@@ -69,6 +69,7 @@ class GameEvent:
 
         # Dados comuns a todos os tipos
         self.delay = 0.0  # Segundos de delay antes de executar o evento
+        self.pause_game = False  # Se True, pausa a wave até o evento ser concluído
 
         # ----- Dados específicos para MENSAGEM -----
         self.message_text = ""
@@ -103,6 +104,7 @@ class GameEvent:
         data = {
             "event_type": self.event_type,
             "delay": self.delay,
+            "pause_game": self.pause_game,
         }
 
         if self.event_type == EventType.MESSAGE:
@@ -146,6 +148,7 @@ class GameEvent:
         """Carrega os dados do evento a partir de um dicionário."""
         self.event_type = data.get("event_type", EventType.MESSAGE)
         self.delay = data.get("delay", 0.0)
+        self.pause_game = data.get("pause_game", False)
 
         if self.event_type == EventType.MESSAGE:
             self.message_text = data.get("message_text", "")
@@ -211,7 +214,7 @@ class EventTrigger:
 
     def to_dict(self):
         """Converte o gatilho para um dicionário (para salvar no JSON)."""
-        data = {
+        return {
             "trigger_type": self.trigger_type,
             "time_value": self.time_value,
             "wave_index": self.wave_index,
@@ -219,7 +222,6 @@ class EventTrigger:
             "custom_condition": self.custom_condition,
             "events": [e.to_dict() for e in self.events],
         }
-        return data
 
     def from_dict(self, data):
         """Carrega os dados do gatilho a partir de um dicionário."""
