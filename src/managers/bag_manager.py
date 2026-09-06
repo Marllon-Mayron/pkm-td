@@ -135,6 +135,11 @@ class BagManager:
         self.selected_category = category
         self._update_filtered_items()
         self.selected_item_index = 0
+
+        # ===== SALVA NO PLAYER =====
+        if hasattr(self, 'player') and self.player:
+            self.player.update_bag_ui_config(category=category)
+
         print(f"[BAG] Categoria alterada para: {category}")
 
     def cycle_category(self):

@@ -1,8 +1,10 @@
 # src/entities/player.py
 import pygame
+
 from src.entities.base import Entity
 from src.data.pokedex import Pokedex
 from src.managers.bag_manager import BagManager
+from src.managers.ui_config_manager import ui_config_manager
 from src.managers.save_manager import SaveManager
 from src.managers.achievement_manager import AchievementManager
 
@@ -18,6 +20,10 @@ class Player(Entity):
         self.pokedex = Pokedex()
 
         self.bag = BagManager(self)
+
+        self.bag_ui_config = ui_config_manager.get_bag_config()
+        self._bag_ui_loaded = False
+        print(f"[PLAYER] Configuração carregada: {self.bag_ui_config}")
 
         self.chapter_page_num = 1
 
@@ -59,12 +65,56 @@ class Player(Entity):
         # Histórico completo de gifts resgatados
         self.mystery_gift_history = []
 
-        self.desfossilizadores = [] = []
+        self.desfossilizadores = []
         self._add_initial_desfossilizador()
         self.total_playtime = 0.0  # segundos totais de jogo
         self._playtime_accumulator = 0.0  # para acumular dt
 
         self.save_manager = SaveManager()
+
+    def update_bag_ui_config(self, **kwargs):
+        """Atualiza a configuração da UI da bolsa e salva no arquivo"""
+        self.bag_ui_config.update(kwargs)
+        ui_config_manager.update_bag_config(**kwargs)
+
+    def apply_bag_ui_config(self, bag_renderer):
+        """
+        Aplica a configuração salva da UI da bolsa ao renderizador.
+        """
+        config = self.bag_ui_config
+
+        # Aplica posição
+        if config.get("x") is not None and config.get("y") is not None:
+            screen_width = pygame.display.get_surface().get_width() if pygame.display.get_init() else 1280
+            screen_height = pygame.display.get_surface().get_height() if pygame.display.get_init() else 720
+            x = max(5, min(config["x"], screen_width - bag_renderer.width - 5))
+            y = max(5, min(config["y"], screen_height - bag_renderer.height - 5))
+            bag_renderer.x = x
+            bag_renderer.y = y
+
+        # Aplica tamanho
+        if config.get("width"):
+            bag_renderer.width = max(bag_renderer.min_width, config["width"])
+        if config.get("height"):
+            if config.get("minimized", False):
+                bag_renderer.height = bag_renderer.minimized_height
+            else:
+                bag_renderer.height = max(bag_renderer.min_height, config["height"])
+
+        # Aplica minimização
+        bag_renderer.minimized = config.get("minimized", False)
+        if bag_renderer.minimized:
+            bag_renderer.height = bag_renderer.minimized_height
+
+        # Aplica categoria
+        category = config.get("category", "all")
+        if hasattr(bag_renderer, 'bag') and bag_renderer.bag:
+            if category in bag_renderer.bag.categories_order:
+                bag_renderer.bag.set_category(category)
+                if hasattr(bag_renderer, '_sync_page_with_category'):
+                    bag_renderer._sync_page_with_category()
+
+        print(f"[PLAYER] Configuração da UI da bolsa aplicada: {config}")
 
     def add_to_team(self, pokemon, slot=None):
         """Adiciona Pokémon ao time"""

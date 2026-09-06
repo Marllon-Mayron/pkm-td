@@ -112,6 +112,9 @@ class GameScene(BaseScene):
         self.item_bag_renderer = ItemBagRenderer(game, self.player.bag)
         self.item_drag_manager = ItemDragManager(game, self.player.bag)
 
+        # Salvar configurações da bolsa
+        self.player.apply_bag_ui_config(self.item_bag_renderer)
+
         # Controle de música
         self.music_playing = False
         self.current_music = None

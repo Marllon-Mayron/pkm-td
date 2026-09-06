@@ -1,4 +1,4 @@
-# src/scenes/game_scene/components/ui/item_bag_renderer.py
+# src/scenes/game_scene/components/item_bag_renderer.py
 
 import pygame
 import math
@@ -136,6 +136,21 @@ class ItemBagRenderer:
         else:
             self.hovered_index = -1
 
+    def _save_config_to_player(self):
+        """Salva a configuração atual da UI no Player"""
+        if hasattr(self, 'game') and hasattr(self.game, 'player') and self.game.player:
+            print(
+                f"[BAG_RENDERER] Salvando: x={self.x}, y={self.y}, min={self.minimized}, cat={self.bag.selected_category}")
+            self.game.player.update_bag_ui_config(
+                x=self.x,
+                y=self.y,
+                width=self.width,
+                height=self.full_height if not self.minimized else self.minimized_height,
+                minimized=self.minimized,
+                category=self.bag.selected_category
+            )
+        else:
+            print(f"[BAG_RENDERER] ERRO: game ou player não disponível")
     # ---------- EVENTOS ----------
     def handle_event(self, event):
         """Processa eventos da UI (sem lógica de arraste de item)"""
@@ -199,6 +214,7 @@ class ItemBagRenderer:
                 self.y = event.pos[1] + self.drag_offset_y
                 self._clamp_position()
                 self._cached_background = None
+                self._save_config_to_player()  # Salva enquanto arrasta
                 return True
 
             if self.resizing:
@@ -220,6 +236,7 @@ class ItemBagRenderer:
                         self.height = self.min_height
 
                 self._cached_background = None
+                self._save_config_to_player()  # Salva enquanto redimensiona
                 return True
 
             self.update_hover(event.pos)
@@ -229,10 +246,12 @@ class ItemBagRenderer:
                 if self.dragging:
                     self.dragging = False
                     pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+                    self._save_config_to_player()  # Salva ao soltar
                     return True
                 if self.resizing:
                     self.resizing = False
                     pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+                    self._save_config_to_player()  # Salva ao soltar
                     return True
 
         # Roda do mouse: SCROLL vertical (apenas se não minimizado)
@@ -272,6 +291,9 @@ class ItemBagRenderer:
             self.height = max(self.min_height, self.full_height)
         self._cached_background = None
         self._clamp_position()
+
+        # ===== SALVA NO PLAYER =====
+        self._save_config_to_player()
 
     def _is_mouse_in_minimize_button(self, mouse_x, mouse_y):
         btn_x = self.x + self.width - 30
