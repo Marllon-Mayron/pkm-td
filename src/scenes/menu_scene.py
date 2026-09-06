@@ -9,6 +9,7 @@ import random
 from src.scenes.base_scene import BaseScene
 from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 from src.scenes.settings_scene.settings_scene import SettingsScene
+from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 
 
 class Button:
@@ -32,6 +33,9 @@ class Button:
         self.text_surface = None
         self.text_rect = None
 
+        # Controle de hover para som
+        self._was_hovered = False
+
     def update_absolute_position(self, viewport_width, viewport_height, viewport_x, viewport_y):
         """Atualiza posição absoluta baseada no tamanho do viewport"""
         # Calcula posição absoluta dentro do viewport
@@ -51,9 +55,16 @@ class Button:
     def handle_event(self, event):
         """Processa eventos sem precisar de viewport_offset"""
         if event.type == pygame.MOUSEMOTION:
+            was_hovered = self.is_hovered
             self.is_hovered = self.rect.collidepoint(event.pos)
+
+            # Toca som de hover quando o mouse entra no botão
+            if self.is_hovered and not was_hovered:
+                sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered:
+                sound_manager.play_effect(SoundEffect.CLICK)
                 self.callback()
 
     def render(self, screen):
@@ -81,21 +92,42 @@ class MenuScene(BaseScene):
         # Botões - "Iniciar Jogo" agora verifica save
         self.buttons = [
             Button(0.3, 0.5, 0.4, 0.08, "Iniciar Jogo",
-                  (100, 100, 0), (150, 150, 0), self.start_game, None),
+                   (100, 100, 0), (150, 150, 0), self.start_game, None),
             Button(0.3, 0.6, 0.4, 0.08, "Configurações",
-                  (100, 100, 0), (150, 150, 0), self.open_settings, None),
+                   (100, 100, 0), (150, 150, 0), self.open_settings, None),
             Button(0.3, 0.4, 0.4, 0.08, "Editor de Fases",
                    (100, 100, 0), (150, 150, 0), self.open_editor, None),
             Button(0.015, 0.86, 0.15, 0.06, "Mystery Gift",
                    (100, 50, 100), (150, 80, 150), self.open_mystery_gift, None),
             Button(0.3, 0.7, 0.4, 0.08, "Sair",
-                  (100, 0, 0), (150, 0, 0), self.quit_game, None)
+                   (100, 0, 0), (150, 0, 0), self.quit_game, None)
 
         ]
 
         # Partículas
         self.particles = []
         self.create_particles()
+
+        # Controle de música
+        self._music_started = False
+
+        # INICIA A MÚSICA DO MENU IMEDIATAMENTE
+        self._start_menu_music()
+
+    def _start_menu_music(self):
+        """Inicia a música do menu"""
+        if not self._music_started:
+            success = sound_manager.play_menu_music("Title_Theme", loop=True)
+            if success:
+                self._music_started = True
+                print("[MENU] Música do menu iniciada: Title_Theme")
+            else:
+                # Tenta tocar a música padrão se Title_Theme não existir
+                print("[MENU] Tentando tocar música alternativa...")
+                success = sound_manager.play_menu_music("Come_Along", loop=True)
+                if success:
+                    self._music_started = True
+                    print("[MENU] Música do menu iniciada: Come_Along (fallback)")
 
     def create_logo(self):
         """Cria um logo simples"""
@@ -125,8 +157,8 @@ class MenuScene(BaseScene):
                     random.uniform(-20, 20)
                 ),
                 'color': (random.randint(100, 255),
-                         random.randint(100, 255),
-                         random.randint(100, 255)),
+                          random.randint(100, 255),
+                          random.randint(100, 255)),
                 'size': random.randint(2, 5)
             })
 
@@ -186,7 +218,8 @@ class MenuScene(BaseScene):
 
         # Versão
         font_small = pygame.font.Font(None, 20)
-        version_text = font_small.render("v"+self.game.current_version+" - Em desenvolvimento", True, (150, 150, 150))
+        version_text = font_small.render("v" + self.game.current_version + " - Em desenvolvimento", True,
+                                         (150, 150, 150))
         version_x = self.screen_manager.viewport_x + 10
         version_y = self.screen_manager.viewport_y + self.screen_manager.viewport_height - 25
         screen.blit(version_text, (version_x, version_y))
@@ -204,7 +237,7 @@ class MenuScene(BaseScene):
     def _render_pause_overlay(self, screen):
         """Overlay de pausa"""
         overlay = pygame.Surface((self.screen_manager.window_width,
-                                 self.screen_manager.window_height))
+                                  self.screen_manager.window_height))
         overlay.set_alpha(128)
         overlay.fill((0, 0, 0))
         screen.blit(overlay, (0, 0))
@@ -217,6 +250,8 @@ class MenuScene(BaseScene):
 
     def start_game(self):
         """Inicia o jogo - verifica se tem save ou precisa escolher inicial"""
+        # Para a música do menu antes de trocar de tela
+        sound_manager.stop_music(fade_ms=300)
 
         # Verifica se existe um save
         save_loaded = self.game.player.load_game(1)
@@ -243,6 +278,8 @@ class MenuScene(BaseScene):
     def open_settings(self):
         """Abre configurações"""
         print("Abrindo configurações...")
+        # Para a música do menu com fade
+        sound_manager.stop_music(fade_ms=300)
         self.game.current_scene = SettingsScene(self.game)
 
     def open_editor(self):
@@ -260,4 +297,16 @@ class MenuScene(BaseScene):
     def quit_game(self):
         """Sai do jogo"""
         print("Saindo do jogo...")
+        sound_manager.stop_music(fade_ms=300)
         self.game.running = False
+
+    def on_enter(self):
+        """Chamado quando a cena é ativada - inicia a música do menu se não estiver tocando"""
+        # Verifica se a música já está tocando
+        if not self._music_started or not pygame.mixer.music.get_busy():
+            self._start_menu_music()
+
+    def on_exit(self):
+        """Chamado quando a cena é desativada - para a música"""
+        sound_manager.stop_music(fade_ms=300)
+        self._music_started = False

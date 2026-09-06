@@ -207,6 +207,67 @@ class SoundManager(BaseSoundManager):
         self.play_music(selected_music.stem, loop=True)
         return True
 
+    def play_menu_music(self, music_id: str = "Title_Theme", loop: bool = True):
+        """
+        Toca música do menu principal.
+
+        Args:
+            music_id: Nome do arquivo sem extensão (padrão: "Title_Theme")
+            loop: Se deve tocar em loop (padrão: True)
+        """
+        if not self._music_enabled or self._music_volume == 0:
+            print(f"[MUSIC] Música do menu desabilitada")
+            return False
+
+        # Verifica se a música já está tocando
+        if self.music_playing == music_id and pygame.mixer.music.get_busy():
+            return True
+
+        music_file = None
+        possible_paths = [
+            self.sounds_path / "music" / f"{music_id}.mp3",
+            self.sounds_path / "music" / f"{music_id}.ogg",
+            self.sounds_path / "music" / f"{music_id}.wav",
+        ]
+
+        for path in possible_paths:
+            if path.exists():
+                music_file = str(path)
+                break
+
+        if not music_file:
+            print(f"[MUSIC] Música do menu não encontrada: {music_id}")
+            print(f"[MUSIC] Procurado em: {self.sounds_path / 'music'}")
+            return False
+
+        try:
+            # Para música atual com fade
+            if pygame.mixer.music.get_busy():
+                pygame.mixer.music.fadeout(500)
+                pygame.time.wait(100)
+
+            pygame.mixer.music.load(music_file)
+            pygame.mixer.music.set_volume(self._music_volume)
+
+            if loop:
+                pygame.mixer.music.play(-1, fade_ms=500)
+            else:
+                pygame.mixer.music.play(fade_ms=500)
+
+            self.music_playing = music_id
+            print(f"[MUSIC] Música do menu iniciada: {music_id}")
+            return True
+
+        except Exception as e:
+            print(f"[MUSIC] Erro ao tocar música do menu: {e}")
+            return False
+
+    def play_team_select_music(self, loop: bool = True):
+        """
+        Toca a música da tela de seleção de time (Come_Along)
+        """
+        return self.play_menu_music("Come_Along", loop)
+
     def play_music(self, music_id: str, fade_ms: int = 1000, loop: bool = True):
         """Toca música de fundo"""
         print(f"[MUSIC] play_music chamado: music_id='{music_id}'")

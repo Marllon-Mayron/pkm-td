@@ -12,6 +12,7 @@ from src.scenes.incubator_scene.incubator_scene import IncubatorScene
 from src.scenes.shop_scene.shop_scene import ShopScene
 from src.scenes.pokedex_scene import PokedexScene
 from src.scenes.achievement_scene.achievement_scene import AchievementScene
+from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 
 
 class PhaseCard:
@@ -25,6 +26,7 @@ class PhaseCard:
         self.completed = completed
         self.rect = pygame.Rect(0, 0, 0, 0)
         self.is_hovered = False
+        self._was_hovered = False
         self.incubator_button = None
         self.incubator_button_hovered = False
 
@@ -52,9 +54,13 @@ class PhaseCard:
         if event.type == pygame.MOUSEMOTION:
             was_hovered = self.is_hovered
             self.is_hovered = self.rect.collidepoint(event.pos)
+            # Toca som de hover quando o mouse entra no card (apenas se desbloqueado)
+            if self.is_hovered and not was_hovered and self.unlocked:
+                sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
             return was_hovered != self.is_hovered
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered and self.unlocked:
+                sound_manager.play_effect(SoundEffect.CLICK)
                 return self.phase_number
         return None
 
@@ -149,6 +155,7 @@ class ChapterTab:
         self.progress = progress
         self.rect = pygame.Rect(0, 0, 0, 0)
         self.is_hovered = False
+        self._was_hovered = False
         self.active = False
 
     def update_position(self, x, y, width, height):
@@ -156,9 +163,13 @@ class ChapterTab:
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
+            was_hovered = self.is_hovered
             self.is_hovered = self.rect.collidepoint(event.pos)
+            if self.is_hovered and not was_hovered:
+                sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered:
+                sound_manager.play_effect(SoundEffect.CLICK)
                 return self.chapter_id
         return None
 
@@ -214,7 +225,6 @@ class PhaseSelectScene(BaseScene):
         self.achievement_button = None
         self.incubator_button = None
 
-
         self.scroll_y = 0
         self.scroll_target = 0
         self.max_scroll = 0
@@ -233,13 +243,41 @@ class PhaseSelectScene(BaseScene):
 
         self.hover_changed = False
         self.shop_button_hovered = False
+        self._shop_was_hovered = False
         self.minigame_button_hovered = False
+        self._minigame_was_hovered = False
         self.pokedex_button_hovered = False
+        self._pokedex_was_hovered = False
         self.achievement_button_hovered = False
+        self._achievement_was_hovered = False
         self.incubator_button_hovered = False
+        self._incubator_was_hovered = False
+        self.back_button_hovered = False
+        self._back_was_hovered = False
 
         self.refresh_data()
         self.dev_mode = True
+
+        # Controle de música
+        self._music_started = False
+
+        # INICIA A MÚSICA DA SELEÇÃO DE FASES IMEDIATAMENTE
+        self._start_phase_select_music()
+
+    def _start_phase_select_music(self):
+        """Inicia a música da tela de seleção de fases"""
+        if not self._music_started:
+            # Tenta Come_Along primeiro (música mais animada)
+            success = sound_manager.play_team_select_music(loop=True)
+            if success:
+                self._music_started = True
+                print("[PHASE_SELECT] Música iniciada: Come_Along")
+            else:
+                # Tenta Title_Theme como fallback
+                success = sound_manager.play_menu_music("Title_Theme", loop=True)
+                if success:
+                    self._music_started = True
+                    print("[PHASE_SELECT] Música iniciada: Title_Theme (fallback)")
 
     def _get_first_available_chapter(self):
         if not self.available_chapters:
@@ -417,10 +455,62 @@ class PhaseSelectScene(BaseScene):
         print("Dados da PhaseSelectScene recarregados!")
 
     def handle_event(self, event):
+        # Verifica hover para todos os botões
+        if event.type == pygame.MOUSEMOTION:
+            # Back button
+            if self.back_button:
+                was_hovered = self.back_button_hovered
+                self.back_button_hovered = self.back_button.collidepoint(event.pos)
+                if self.back_button_hovered and not was_hovered:
+                    sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
+            # Shop button
+            if self.shop_button:
+                was_hovered = self._shop_was_hovered
+                self.shop_button_hovered = self.shop_button.collidepoint(event.pos)
+                self._shop_was_hovered = self.shop_button_hovered
+                if self.shop_button_hovered and not was_hovered:
+                    sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
+            # Minigame button
+            if self.minigame_button:
+                was_hovered = self._minigame_was_hovered
+                self.minigame_button_hovered = self.minigame_button.collidepoint(event.pos)
+                self._minigame_was_hovered = self.minigame_button_hovered
+                if self.minigame_button_hovered and not was_hovered:
+                    sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
+            # Pokedex button
+            if self.pokedex_button:
+                was_hovered = self._pokedex_was_hovered
+                self.pokedex_button_hovered = self.pokedex_button.collidepoint(event.pos)
+                self._pokedex_was_hovered = self.pokedex_button_hovered
+                if self.pokedex_button_hovered and not was_hovered:
+                    sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
+            # Achievement button
+            if self.achievement_button:
+                was_hovered = self._achievement_was_hovered
+                self.achievement_button_hovered = self.achievement_button.collidepoint(event.pos)
+                self._achievement_was_hovered = self.achievement_button_hovered
+                if self.achievement_button_hovered and not was_hovered:
+                    sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
+            # Incubator button
+            if self.incubator_button:
+                was_hovered = self._incubator_was_hovered
+                self.incubator_button_hovered = self.incubator_button.collidepoint(event.pos)
+                self._incubator_was_hovered = self.incubator_button_hovered
+                if self.incubator_button_hovered and not was_hovered:
+                    sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_p:
                 self.toggle_pause()
             elif event.key == pygame.K_ESCAPE:
+                sound_manager.play_effect(SoundEffect.CLICK)
+                # Para a música com fade ao voltar ao menu
+                sound_manager.stop_music(fade_ms=300)
                 self.game.current_scene = self.game.menu_scene
             elif event.key == pygame.K_LEFT:
                 if self.available_chapters:
@@ -477,17 +567,6 @@ class PhaseSelectScene(BaseScene):
             for tab in self.chapter_tabs:
                 tab.handle_event(event)
 
-            if self.shop_button:
-                self.shop_button_hovered = self.shop_button.collidepoint(event.pos)
-            if self.minigame_button:
-                self.minigame_button_hovered = self.minigame_button.collidepoint(event.pos)
-            if self.pokedex_button:
-                self.pokedex_button_hovered = self.pokedex_button.collidepoint(event.pos)
-            if self.achievement_button:
-                self.achievement_button_hovered = self.achievement_button.collidepoint(event.pos)
-            if self.incubator_button:
-                self.incubator_button_hovered = self.incubator_button.collidepoint(event.pos)
-
             if self.dragging_scroll:
                 dy = event.pos[1] - self.last_mouse_y
                 scroll_speed = self.max_scroll / self._get_scroll_bar_area()[1]
@@ -498,6 +577,8 @@ class PhaseSelectScene(BaseScene):
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 if self.back_button and self.back_button.collidepoint(event.pos):
+                    sound_manager.play_effect(SoundEffect.CLICK)
+                    sound_manager.stop_music(fade_ms=300)
                     self.game.current_scene = self.game.menu_scene
                     return
 
@@ -522,6 +603,7 @@ class PhaseSelectScene(BaseScene):
                         self._open_incubator()
                     else:
                         print("Incubadora desbloqueada após completar a fase 1-5!")
+                        sound_manager.play_effect(SoundEffect.CLICK, volume=0.5)
                     return
 
                 for tab in self.chapter_tabs:
@@ -545,6 +627,7 @@ class PhaseSelectScene(BaseScene):
                 for card in self.phase_cards:
                     result = card.handle_event(event)
                     if result:
+                        sound_manager.play_effect(SoundEffect.CLICK)
                         self.start_phase(result)
                         return
 
@@ -557,27 +640,32 @@ class PhaseSelectScene(BaseScene):
                 self.dragging_scroll = False
 
     def _open_shop(self):
+        sound_manager.play_effect(SoundEffect.CLICK)
         self.game.shop_scene = ShopScene(self.game)
         self.game.shop_scene.on_close_callback = self._on_shop_closed
         self.game.current_scene = self.game.shop_scene
 
     def _open_minigames(self):
         """Abre a tela de minigames"""
+        sound_manager.play_effect(SoundEffect.CLICK)
         from src.scenes.minigame_select_scene.minigame_select_scene import MinigameSelectScene
         self.game.current_scene = MinigameSelectScene(self.game)
 
     def _open_pokedex(self):
         """Abre a Pokédex"""
+        sound_manager.play_effect(SoundEffect.CLICK)
         self.game.pokedex_scene = PokedexScene(self.game)
         self.game.current_scene = self.game.pokedex_scene
 
-    def _open_achievements(self):  # NOVO
+    def _open_achievements(self):
         """Abre a tela de conquistas"""
+        sound_manager.play_effect(SoundEffect.CLICK)
         self.game.achievement_scene = AchievementScene(self.game)
         self.game.current_scene = self.game.achievement_scene
 
-    def _open_incubator(self):  # NOVO
+    def _open_incubator(self):
         """Abre a tela da incubadora"""
+        sound_manager.play_effect(SoundEffect.CLICK)
         self.game.incubator_scene = IncubatorScene(self.game)
         self.game.current_scene = self.game.incubator_scene
 
@@ -661,8 +749,15 @@ class PhaseSelectScene(BaseScene):
 
         # Botao voltar
         if self.back_button:
-            pygame.draw.rect(screen, (50, 50, 55), self.back_button, border_radius=8)
-            pygame.draw.rect(screen, (90, 90, 100), self.back_button, 2, border_radius=8)
+            if self.back_button_hovered:
+                bg_color = (70, 70, 80)
+                border_color = (160, 160, 180)
+            else:
+                bg_color = (50, 50, 55)
+                border_color = (90, 90, 100)
+
+            pygame.draw.rect(screen, bg_color, self.back_button, border_radius=8)
+            pygame.draw.rect(screen, border_color, self.back_button, 2, border_radius=8)
             font = pygame.font.Font(None, 40)
             text = font.render("<", True, (200, 200, 210))
             text_rect = text.get_rect(center=self.back_button.center)
@@ -751,7 +846,6 @@ class PhaseSelectScene(BaseScene):
             pygame.draw.rect(screen, bg_color, self.achievement_button, border_radius=10)
             pygame.draw.rect(screen, border_color, self.achievement_button, 3, border_radius=10)
 
-            # Ícone de troféu + texto
             achievement_text = self.button_font.render("CONQUISTAS", True, text_color)
             text_rect = achievement_text.get_rect(center=self.achievement_button.center)
             screen.blit(achievement_text, text_rect)
@@ -761,7 +855,6 @@ class PhaseSelectScene(BaseScene):
             is_unlocked = self._is_incubator_unlocked()
 
             if not is_unlocked:
-                # Botão bloqueado (escurecido)
                 bg_color = (35, 35, 40)
                 border_color = (60, 60, 65)
                 text_color = (80, 80, 85)
@@ -788,13 +881,12 @@ class PhaseSelectScene(BaseScene):
             text_rect = incubator_text.get_rect(center=self.incubator_button.center)
             screen.blit(incubator_text, text_rect)
 
-            # Se bloqueado, mostra cadeado
             if not is_unlocked:
-                # Texto de requisito
                 req_font = pygame.font.Font(None, 16)
-                req_text = req_font.render("Complete 1 Cap", True, (80, 80, 80))
+                req_text = req_font.render("Complete 1-5", True, (80, 80, 80))
                 req_rect = req_text.get_rect(center=(self.incubator_button.centerx, self.incubator_button.bottom + 12))
                 screen.blit(req_text, req_rect)
+
         # Abas
         for tab in self.chapter_tabs:
             tab.render(screen, self.tab_font)
@@ -916,6 +1008,10 @@ class PhaseSelectScene(BaseScene):
         screen.blit(pause_text, (text_x, text_y))
 
     def start_phase(self, phase_number):
+        sound_manager.play_effect(SoundEffect.CLICK)
+        # Para a música com fade ao ir para seleção de time
+        sound_manager.stop_music(fade_ms=300)
+
         phase_id = f"{self.current_chapter_id}-{phase_number}"
         phase_info = self.catalog.get_phase_info(self.current_chapter_id, phase_number)
 
@@ -925,3 +1021,13 @@ class PhaseSelectScene(BaseScene):
         from src.scenes.team_select_scene import TeamSelectScene
         self.game.team_select_scene = TeamSelectScene(self.game, self.current_chapter_id, phase_number)
         self.game.current_scene = self.game.team_select_scene
+
+    def on_enter(self):
+        """Chamado quando a cena é ativada - inicia a música se não estiver tocando"""
+        if not self._music_started or not pygame.mixer.music.get_busy():
+            self._start_phase_select_music()
+
+    def on_exit(self):
+        """Chamado quando a cena é desativada - para a música"""
+        sound_manager.stop_music(fade_ms=300)
+        self._music_started = False

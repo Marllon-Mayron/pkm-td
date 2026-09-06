@@ -11,6 +11,7 @@ from src.scenes.team_select_scene.managers.pokemon_manager import PokemonManager
 from src.scenes.team_select_scene.handlers.event_handler import EventHandler
 from src.scenes.team_select_scene.utils.constants import FONT_SIZES, LAYOUT
 from src.data.pokedex import Pokedex
+from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 
 
 class TeamSelectScene(BaseScene):
@@ -44,6 +45,27 @@ class TeamSelectScene(BaseScene):
         self.slot_font = pygame.font.Font(None, FONT_SIZES['SLOT'])
         self.grid_font = pygame.font.Font(None, FONT_SIZES['GRID'])
         self.page_font = pygame.font.Font(None, FONT_SIZES['PAGE'])
+
+        # Controle de música
+        self._music_started = False
+
+        # INICIA A MÚSICA DO TEAM SELECT IMEDIATAMENTE
+        self._start_team_select_music()
+
+    def _start_team_select_music(self):
+        """Inicia a música da tela de seleção de time"""
+        if not self._music_started:
+            success = sound_manager.play_team_select_music(loop=True)
+            if success:
+                self._music_started = True
+                print("[TEAM_SELECT] Música iniciada: Come_Along")
+            else:
+                # Tenta Title_Theme como fallback
+                print("[TEAM_SELECT] Tentando música alternativa...")
+                success = sound_manager.play_menu_music("Title_Theme", loop=True)
+                if success:
+                    self._music_started = True
+                    print("[TEAM_SELECT] Música iniciada: Title_Theme (fallback)")
 
     def _check_resize(self):
         current_size = (self.game.screen_manager.window_width, self.game.screen_manager.window_height)
@@ -205,11 +227,19 @@ class TeamSelectScene(BaseScene):
             self._refresh_grid()
 
         elif action_type == 'GO_BACK':
+            # Toca som de clique
+            sound_manager.play_effect(SoundEffect.CLICK)
+            # Para a música do team select com fade
+            sound_manager.stop_music(fade_ms=300)
             from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
             self.game.phase_select_scene = PhaseSelectScene(self.game)
             self.game.current_scene = self.game.phase_select_scene
 
         elif action_type == 'START_GAME':
+            # Toca som de clique
+            sound_manager.play_effect(SoundEffect.CLICK)
+            # Para a música do team select com fade
+            sound_manager.stop_music(fade_ms=300)
             self.game.game_scene = GameScene(self.game, self.chapter, self.phase)
             self.game.current_scene = self.game.game_scene
 
@@ -347,3 +377,13 @@ class TeamSelectScene(BaseScene):
         # Modal
         if self.event_handler.modal and self.event_handler.modal.visible:
             self.event_handler.modal.render(screen)
+
+    def on_enter(self):
+        """Chamado quando a cena é ativada - inicia a música do team select se não estiver tocando"""
+        if not self._music_started or not pygame.mixer.music.get_busy():
+            self._start_team_select_music()
+
+    def on_exit(self):
+        """Chamado quando a cena é desativada - para a música"""
+        sound_manager.stop_music(fade_ms=300)
+        self._music_started = False
