@@ -208,6 +208,18 @@ class PhaseLoader:
             }
         return {"paths": []}
 
+    def get_event_manager(self):
+        """
+        Retorna um EventManager a partir dos dados da fase atual.
+        Se não houver dados de eventos, retorna um EventManager vazio.
+        """
+        from src.editor.event_system import EventManager
+        if not self.current_phase_data:
+            return EventManager()
+        events_data = self.current_phase_data.get("events", {})
+        event_manager = EventManager()
+        event_manager.from_dict(events_data)
+        return event_manager
 
 # Instância global
 phase_loader = PhaseLoader()

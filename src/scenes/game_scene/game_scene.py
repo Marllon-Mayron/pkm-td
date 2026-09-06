@@ -4,6 +4,7 @@ Cena principal do jogo - COM NOVA ARQUITETURA DE WAVES
 """
 import pygame
 
+from scenes.game_scene.components.managers.event_processor import EventProcessor
 from src.battle.effects.specific.weather.weather_state import WeatherType
 from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
@@ -72,13 +73,15 @@ class GameScene(BaseScene):
         self.notification_manager = notification_manager
         self.target_item_manager = TargetItemManager(game)
         self.target_item_renderer = TargetItemRenderer()
+        # carrega o event_manager dos dados da fase
 
         # Weather filter
         self.weather_filter = WeatherFilter()
 
         # CARREGA OS DADOS DA FASE (inclui _phase_data)
         self._load_phase_data()  # <--- PRIMEIRO CARREGA OS DADOS
-
+        self.event_manager = phase_loader.get_event_manager()
+        self.event_processor = EventProcessor(self)
         # ===== AGORA CARREGA AS CONFIGURAÇÕES =====
         self.day_night_mode = "random"
         self.base_weather = "random"
@@ -344,6 +347,9 @@ class GameScene(BaseScene):
         if not pokemon or not pokemon.moves:
             return
 
+        if hasattr(self, 'event_processor'):
+            self.event_processor.custom_flags["abriu_move_select"] = True
+
         self.move_select_overlay = MoveSelectOverlay(self, pokemon)
         self.move_select_overlay.active = True
         self.game_paused = True
@@ -597,6 +603,8 @@ class GameScene(BaseScene):
 
         # ===== MEDICAMENTOS (poções e revives) =====
         elif target_type == "ally" and category == "medicine":
+            if hasattr(self, 'event_processor'):
+                self.event_processor.custom_flags["curou_pokemon"] = True
             medicine_success = self.use_medicine(target, item_data)
             return medicine_success
 
@@ -1048,6 +1056,9 @@ class GameScene(BaseScene):
         """Callback quando um Pokémon é colocado no mapa OU movido"""
         action = placement_data.get('action', 'place')
 
+        if hasattr(self, 'event_processor'):
+            self.event_processor.custom_flags["colocou_pokemon"] = True
+
         if action == 'swap':
             self._on_pokemon_swap(placement_data)
         elif action == 'move':
@@ -1216,6 +1227,15 @@ class GameScene(BaseScene):
 
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.handle_event(event)
+            return None
+
+        if hasattr(self, 'event_processor') and self.event_processor.current_dialog:
+            if self.event_processor.current_dialog.handle_event(event):
+                return None
+            # Se o diálogo foi fechado, o event_processor já o removeu
+            if not self.event_processor.current_dialog.active:
+                self.event_processor.current_dialog = None
+            # Consome o evento (não passa para outros handlers)
             return None
 
         # ===== OVERLAY DE PAUSA =====
@@ -1464,6 +1484,7 @@ class GameScene(BaseScene):
         placed_pokemon = self.placed_pokemon
         screen_mgr = self.screen_manager
         path_renderer = self.path_renderer
+        self.event_processor.update(dt)
 
         # Battle System
         perf_monitor.start_section("BATTLE_SYSTEM")
@@ -1849,6 +1870,9 @@ class GameScene(BaseScene):
         perf_monitor.start_section("RENDER_OVERLAY_MANAGER")
         if overlay_mgr:
             overlay_mgr.render(screen)
+
+        if hasattr(self, 'event_processor') and self.event_processor.current_dialog:
+            self.event_processor.current_dialog.render(screen)
         perf_monitor.end_section()
 
         # Move Learn Overlay

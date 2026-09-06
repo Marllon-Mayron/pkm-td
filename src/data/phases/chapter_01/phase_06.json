@@ -1,0 +1,657 @@
+{
+    "chapter": 1,
+    "phase": 6,
+    "name": "Tutorial",
+    "map": {
+        "width": 11,
+        "height": 11,
+        "tile_size": 24,
+        "layers": [
+            {
+                "name": "Chão",
+                "type": "ground",
+                "tiles": [
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ]
+                ],
+                "width": 11,
+                "height": 11,
+                "tile_size": 24
+            },
+            {
+                "name": "Decoração",
+                "type": "decoration",
+                "tiles": [
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ]
+                ],
+                "width": 11,
+                "height": 11,
+                "tile_size": 24
+            },
+            {
+                "name": "Teto",
+                "type": "ceiling",
+                "tiles": [
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ]
+                ],
+                "width": 11,
+                "height": 11,
+                "tile_size": 24
+            }
+        ]
+    },
+    "paths": {
+        "paths": [
+            {
+                "nodes": [
+                    [
+                        132,
+                        12
+                    ],
+                    [
+                        132,
+                        252
+                    ],
+                    [
+                        132,
+                        12
+                    ]
+                ],
+                "closed": false
+            }
+        ],
+        "current_path_index": 0
+    },
+    "waves": {
+        "waves": [
+            {
+                "wave_index": 0,
+                "path_index": 0,
+                "name": "Wave 1",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 19,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 1,
+                "max_level": 1,
+                "wave_size": 1,
+                "spawn_interval": 3.0,
+                "initial_delay": 3.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
+            }
+        ],
+        "selected_wave": 0,
+        "templates": {
+            "templates": []
+        }
+    },
+    "tower_spots": {
+        "spot_size": 24,
+        "grid_size": 24,
+        "snap_to_grid": true,
+        "spots": [
+            {
+                "x": 72,
+                "y": 120,
+                "size": 24,
+                "allowed_types": []
+            },
+            {
+                "x": 168,
+                "y": 120,
+                "size": 24,
+                "allowed_types": []
+            }
+        ]
+    },
+    "target_items": {
+        "grid_size": 16,
+        "snap_to_grid": true,
+        "items": [
+            {
+                "x": 120,
+                "y": 240,
+                "item_id": 1
+            }
+        ]
+    },
+    "events": {
+        "triggers": [
+            {
+                "trigger_type": "start_phase",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 1.0,
+                        "message_text": "Bem vindo, vamos colocar seu pokemon no lugar!",
+                        "speaker_name": "Professor Bulbasauro",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/front/3.png",
+                        "action_label": "Entendi",
+                        "action_trigger": ""
+                    }
+                ]
+            },
+            {
+                "trigger_type": "custom",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "colocar_pokemon",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 0.0,
+                        "message_text": "Parece que seu pokemon está machucado, tente dar uma potion para ele! ",
+                        "speaker_name": "Professor Venossauro",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/front/3.png",
+                        "action_label": "Certo!",
+                        "action_trigger": ""
+                    }
+                ]
+            },
+            {
+                "trigger_type": "custom",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "curou_pokemon",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 0.0,
+                        "message_text": "Muito melhor! que tal dar uma olhadinha nos ataques do seu pokemon? clique na imagem dele para olharr",
+                        "speaker_name": "Professor Venossauro",
+                        "speaker_sprite_path": "",
+                        "action_label": "Vou olhar",
+                        "action_trigger": ""
+                    }
+                ]
+            },
+            {
+                "trigger_type": "custom",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "abriu_move_select",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 0.0,
+                        "message_text": "É um bom começo... vamos começar a batalha, feche a tela e se prepare.",
+                        "speaker_name": "Professor Venossauro",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/front/3.png",
+                        "action_label": "Vamos lá! ",
+                        "action_trigger": ""
+                    }
+                ]
+            },
+            {
+                "trigger_type": "after_boss_defeat",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 0.0,
+                        "message_text": "Parabens, voce já está pronto para seguir jornada sozinho!",
+                        "speaker_name": "Professor Venossauro",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/front/3.png",
+                        "action_label": "Obrigado! ",
+                        "action_trigger": ""
+                    }
+                ]
+            }
+        ],
+        "selected_trigger": 4
+    },
+    "rewards": {
+        "money": 100,
+        "experience": 50,
+        "item_rewards": [],
+        "drop_chance": 0.0,
+        "max_items": 3,
+        "template_name": null
+    },
+    "localization_type": "default",
+    "custom_folder": "",
+    "day_night_mode": "day",
+    "base_weather": "none"
+}

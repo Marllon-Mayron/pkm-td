@@ -30,6 +30,7 @@ class WaveManager:
         self.active_enemies: List['Pokemon'] = []
         self.paused = False
         self.target_items = []
+        self._boss_defeated = False
 
         # Configurações
         self.gold_per_defeat = 10
@@ -422,6 +423,7 @@ class WaveManager:
 
         # ===== CONQUISTAS: Boss Derrotado (SOMENTE AQUI, QUANDO MORRE) =====
         if enemy.is_boss:
+            self._boss_defeated = True
             if self.game_scene and hasattr(self.game_scene, 'player'):
                 player = self.game_scene.player
                 if hasattr(player, 'achievement_manager'):
@@ -520,3 +522,22 @@ class WaveManager:
     def remove_enemy(self, enemy: 'Pokemon'):
         """Remove um inimigo (para captura)"""
         self._remove_enemy(enemy)
+
+    def is_next_wave_boss(self) -> bool:
+        """Verifica se a próxima wave (de qualquer path ativo) contém um boss"""
+        for path_idx, active in self.spawner.wave_active.items():
+            if active:
+                waves = self.spawner.waves.get(path_idx, [])
+                wave_idx = self.spawner.current_wave_idx.get(path_idx, 0)
+                if wave_idx < len(waves):
+                    wave = waves[wave_idx]
+                    return wave.has_boss
+        return False
+
+    def is_boss_defeated(self) -> bool:
+        """Retorna se o boss já foi derrotado"""
+        return self._boss_defeated
+
+    def is_wave_completed(self, wave_index: int) -> bool:
+        """Verifica se uma wave específica já foi completamente spawnada e todos os inimigos mortos"""
+        return wave_index in self.spawner.waves_ended

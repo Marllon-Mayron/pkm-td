@@ -50,6 +50,7 @@ class EnemySpawner:
         self.wave_timer: Dict[int, float] = {}
         self.spawn_timer: Dict[int, float] = {}
         self.spawned_count: Dict[int, int] = {}
+        self.waves_ended = []
 
     def set_paused(self, paused: bool):
         """Define o estado de pausa do spawner"""
@@ -374,12 +375,16 @@ class EnemySpawner:
 
         wave_data = waves[current_idx]
 
+        # ===== MARCA A WAVE ATUAL COMO TERMINADA =====
+        if current_idx not in self.waves_ended:
+            self.waves_ended.append(current_idx)
+            print(f"[Spawner] Wave {current_idx} marcada como terminada")
+
         # Verifica se deve repetir
         if wave_data.repeat_wave:
             wave_data.current_repeat += 1
 
             if wave_data.repeat_count == 0 or wave_data.current_repeat < wave_data.repeat_count:
-                # Reinicia a wave atual
                 print(
                     f"[WaveSpawner] Path {path_idx}: repetindo wave {current_idx + 1} (repetição {wave_data.current_repeat})")
                 self._start_wave_for_path(path_idx)
