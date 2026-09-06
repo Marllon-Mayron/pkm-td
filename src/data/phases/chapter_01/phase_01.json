@@ -1,7 +1,7 @@
 {
     "chapter": 1,
     "phase": 1,
-    "name": "Fase 1-1",
+    "name": "Tutorial",
     "map": {
         "width": 11,
         "height": 11,
@@ -12,152 +12,155 @@
                 "type": "ground",
                 "tiles": [
                     [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        8,
+                        8,
+                        8,
+                        9,
+                        104,
+                        104,
+                        105,
+                        7,
+                        8,
+                        8,
+                        8
                     ],
                     [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        14,
+                        14,
+                        14,
+                        15,
+                        103,
+                        104,
+                        100,
+                        13,
+                        14,
+                        14,
+                        14
                     ],
                     [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        50,
+                        50,
+                        50,
+                        51,
+                        103,
+                        104,
+                        105,
+                        49,
+                        50,
+                        50,
+                        50
                     ],
                     [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        56,
+                        56,
+                        56,
+                        57,
+                        104,
+                        104,
+                        105,
+                        55,
+                        56,
+                        56,
+                        56
                     ],
                     [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        56,
+                        56,
+                        79,
+                        63,
+                        103,
+                        104,
+                        105,
+                        61,
+                        80,
+                        56,
+                        56
                     ],
                     [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        56,
+                        56,
+                        57,
+                        104,
+                        103,
+                        104,
+                        105,
+                        104,
+                        55,
+                        56,
+                        56
                     ],
                     [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        56,
+                        56,
+                        85,
+                        51,
+                        104,
+                        104,
+                        105,
+                        49,
+                        86,
+                        56,
+                        56
                     ],
                     [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        56,
+                        56,
+                        56,
+                        57,
+                        103,
+                        104,
+                        105,
+                        55,
+                        56,
+                        56,
+                        56
                     ],
                     [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        56,
+                        56,
+                        56,
+                        57,
+                        103,
+                        104,
+                        105,
+                        55,
+                        56,
+                        56,
+                        56
                     ],
                     [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        56,
+                        56,
+                        56,
+                        57,
+                        104,
+                        104,
+                        105,
+                        55,
+                        56,
+                        56,
+                        56
                     ],
                     [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        56,
+                        56,
+                        56,
+                        85,
+                        50,
+                        50,
+                        50,
+                        86,
+                        56,
+                        56,
+                        56
                     ]
                 ],
                 "width": 11,
                 "height": 11,
-                "tile_size": 24
+                "tile_size": 24,
+                "tileset_paths": [
+                    "res/AllTiles/TileDtef/TestDungeon/tileset_0.png"
+                ]
             },
             {
                 "name": "Decoração",
@@ -468,14 +471,50 @@
     "paths": {
         "paths": [
             {
-                "nodes": [],
+                "nodes": [
+                    [
+                        132,
+                        12
+                    ],
+                    [
+                        132,
+                        228
+                    ],
+                    [
+                        132,
+                        12
+                    ]
+                ],
                 "closed": false
             }
         ],
         "current_path_index": 0
     },
     "waves": {
-        "waves": [],
+        "waves": [
+            {
+                "wave_index": 0,
+                "path_index": 0,
+                "name": "Wave 1",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 19,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 1,
+                "max_level": 1,
+                "wave_size": 1,
+                "spawn_interval": 3.0,
+                "initial_delay": 3.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
+            }
+        ],
         "selected_wave": 0,
         "templates": {
             "templates": []
@@ -485,16 +524,131 @@
         "spot_size": 24,
         "grid_size": 24,
         "snap_to_grid": true,
-        "spots": []
+        "spots": [
+            {
+                "x": 72,
+                "y": 120,
+                "size": 24,
+                "allowed_types": []
+            },
+            {
+                "x": 168,
+                "y": 120,
+                "size": 24,
+                "allowed_types": []
+            }
+        ]
     },
     "target_items": {
         "grid_size": 16,
         "snap_to_grid": true,
-        "items": []
+        "items": [
+            {
+                "x": 120,
+                "y": 216,
+                "item_id": 1
+            }
+        ]
     },
     "events": {
-        "triggers": [],
-        "selected_trigger": 0
+        "triggers": [
+            {
+                "trigger_type": "start_phase",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 0.0,
+                        "pause_game": true,
+                        "message_text": "Seja bem-vindo! Esse é o pokemon tower defese! Já vi que escolheu seu primeiro pokemon, vamos coloca-lo no mapa! Arraste a imagem do seu pokemon que está no seu time, e coloque no circulo no mapa.",
+                        "speaker_name": "Professor Carvalho",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/introOak.png",
+                        "action_label": "Entendi",
+                        "action_trigger": ""
+                    }
+                ]
+            },
+            {
+                "trigger_type": "custom",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "colocou_pokemon",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 0.0,
+                        "pause_game": true,
+                        "message_text": "Perfeito! Você também consegue arrastar o pokemon de um circulo para outro. Em cima do seu pokémon, você consegue ver a vida dele, ele parece estar um pouco machucado... que tal dar uma potion para ele? É só arrastar da sua bolsa e coloca-la em cima do seu pokemon.",
+                        "speaker_name": "Professor Carvalho",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/introOak.png",
+                        "action_label": "Entendi!",
+                        "action_trigger": ""
+                    }
+                ]
+            },
+            {
+                "trigger_type": "custom",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "curou_pokemon",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 0.0,
+                        "pause_game": true,
+                        "message_text": "Muito melhor! Que tal dar uma olhadinha nos ataques disponiveis pro seu pokemon? É só clicar na imagem do seu pokemon no time, mas não esqueça que o painel só abre se seu pokemon estiver posicionado no mapa!",
+                        "speaker_name": "Professor Carvalho",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/introOak.png",
+                        "action_label": "Vou olhar",
+                        "action_trigger": ""
+                    }
+                ]
+            },
+            {
+                "trigger_type": "custom",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "abriu_move_select",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 0.0,
+                        "pause_game": true,
+                        "message_text": "É um bom começo... sempre que possivel verifique os PPs e Prioridade de ataque do seu pokemon para fortalecer suas estratégias. Vamos começar a batalha, feche a tela e se prepare!",
+                        "speaker_name": "Professor Venossauro",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/introOak.png",
+                        "action_label": "Vamos lá! ",
+                        "action_trigger": ""
+                    }
+                ]
+            },
+            {
+                "trigger_type": "after_boss_defeat",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 0.0,
+                        "pause_game": false,
+                        "message_text": "Parabens, voce já está pronto para seguir jornada sozinho!",
+                        "speaker_name": "Professor Venossauro",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/introOak.png",
+                        "action_label": "Obrigado! ",
+                        "action_trigger": ""
+                    }
+                ]
+            }
+        ],
+        "selected_trigger": 4
     },
     "rewards": {
         "money": 100,

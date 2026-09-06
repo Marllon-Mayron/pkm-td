@@ -218,24 +218,88 @@ class GameScene(BaseScene):
 
     def _start_game(self):
         """Inicia o jogo"""
-        self.cleanup()
+        # ===== TUTORIAL: FASE 1:1 =====
+        is_tutorial = (self.chapter_id == 1 and self.phase_number == 1)
+
+        # Só chama cleanup se NÃO for tutorial (evita reset duplo)
+        if not is_tutorial:
+            self.cleanup()
+        else:
+            # Para o tutorial, faz uma limpeza leve sem resetar os Pokémon
+            self._stop_battle_music(fade_ms=500)
+            self.day_night_filter.clear()
+            self.weather_filter.clear()
+            if hasattr(self, 'day_night_weather'):
+                self.day_night_weather._initialized = False
+
+            # Limpa apenas os spots, sem resetar os Pokémon
+            for spot in self.spot_renderer.get_spots():
+                spot.occupied = False
+
+            # Limpa a lista de Pokémon colocados
+            self.placed_pokemon.clear()
+            self.placement_manager.placed_pokemon.clear()
+
+            # NÃO RESETA OS POKÉMON AQUI
+
         self.update_box_happiness()
         self._start_battle_music()
         self.wave_manager.initialize_condition()
 
+        # Reseta os Pokémon (cura)
         for pokemon in self.player.team:
             pokemon.reset(self)
 
-        self.wave_manager.reset_gold()
+        # Se for tutorial, REDUZ o HP DEPOIS do reset
+        if is_tutorial:
+            self._apply_tutorial_setup()
 
-        # ===== NÃO INICIA AS WAVES AUTOMATICAMENTE =====
-        # Deixa o EventProcessor controlar o início
+        self.wave_manager.reset_gold()
         self.game_state = "waiting"
-        # A primeira wave será iniciada pelo evento START_PHASE ou manualmente
-        # Se não houver eventos, inicia normalmente
+
         if not self.event_manager.triggers:
             self.game_state = "in_wave"
             self.wave_manager.start_all_waves()
+
+    def _apply_tutorial_setup(self):
+        """
+        Aplica configuração especial para o tutorial (fase 1:1):
+        - Reduz HP de todos os Pokémon do time pela metade (DEPOIS do reset)
+        - Garante que o jogador tenha pelo menos 1 poção
+        """
+        print("[TUTORIAL] Aplicando setup da fase 1:1...")
+
+        # ===== 1. REDUZ HP PELA METADE =====
+        for pokemon in self.player.team:
+            # Guarda o HP original antes de reduzir
+            original_max_hp = pokemon.max_hp
+            original_current_hp = pokemon.current_hp
+
+            pokemon.current_hp = max(1, original_current_hp // 2)
+
+            # Se o Pokémon ficou com 0 HP, garante que tenha pelo menos 1
+            if pokemon.current_hp < 1:
+                pokemon.current_hp = 1
+
+            print(f"[TUTORIAL] {pokemon.name}: HP {original_max_hp} -> {pokemon.max_hp} | Atual: {pokemon.current_hp}")
+
+        # ===== 2. GARANTE POÇÃO =====
+        has_potion = self.player.bag.get_quantity("potion") > 0
+
+        if not has_potion:
+            self.player.bag.add_item("potion", 1)
+            print("[TUTORIAL] 1 Poção adicionada ao jogador (não tinha nenhuma)")
+        else:
+            print(f"[TUTORIAL] Jogador já tem {self.player.bag.get_quantity('potion')} poção(ões)")
+
+        # ===== 3. LIMPA FLAGS DO EVENT PROCESSOR PARA O TUTORIAL =====
+        if hasattr(self, 'event_processor'):
+            self.event_processor.custom_flags.clear()
+            print("[TUTORIAL] Flags do event_processor resetadas")
+
+        # ===== 4. FORÇA O ESTADO DO JOGO PARA "WAITING" =====
+        self.game_state = "waiting"
+        print("[TUTORIAL] Estado do jogo definido como 'waiting' para o tutorial iniciar corretamente")
 
     def _load_phase_info(self):
         """Carrega informações da fase do catálogo"""
@@ -351,7 +415,8 @@ class GameScene(BaseScene):
             if expected == "abriu_move_select":
                 self.event_processor.custom_flags["abriu_move_select"] = True
             else:
-                toast_warning("Clique na imagem de um pokemon posicionado para abrir o menu de combate!", duration=5.0)
+
+                toast_warning("Complete a etapa anterior primeiro!", duration=5.0)
                 return
 
         self.move_select_overlay = MoveSelectOverlay(self, pokemon)
@@ -612,7 +677,7 @@ class GameScene(BaseScene):
                 if expected == "curou_pokemon":
                     self.event_processor.custom_flags["curou_pokemon"] = True
                 else:
-                    toast_warning("Arraste uma potion e coloque em cima do seu pokemon!", duration=5.0)
+                    toast_warning("Complete a etapa anterior primeiro!", duration=5.0)
                     return False
 
             medicine_success = self.use_medicine(target, item_data)
@@ -1073,7 +1138,7 @@ class GameScene(BaseScene):
             else:
                 # Opcional: mostrar toast avisando que essa ação não é a esperada
                 from src.ui.toast_renderer import toast_warning
-                toast_warning("Arraste seu pokemon, e posicione-o no lugar!", duration=5.0)
+                toast_warning("Complete a etapa anterior primeiro!", duration=5.0)
                 return
 
         if action == 'swap':
