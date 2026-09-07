@@ -324,7 +324,7 @@ class AchievementManager:
             if self.get_counter("stone_evolution_count") >= 20:
                 return self.unlock(achievement_id, phase_id)
 
-        # ===== EVOLUÇÃO POR FELICIDADE =====
+        # ===== SISTEMA DE FELICIDADE =====
         elif achievement_id == "max_happiness":
             # Verifica se algum Pokémon do time tem felicidade >= 255
             for pokemon in self.player.team:
@@ -353,6 +353,9 @@ class AchievementManager:
             if self.get_counter("happiness_evolution_count") >= 10:
                 return self.unlock(achievement_id, phase_id)
 
+        elif achievement_id == "friendball_capture_5":
+            if self.get_counter("friendball_capture_count") >= 5:
+                return self.unlock(achievement_id, phase_id)
         # ===== EVOLUÇÃO POR CLIMA =====
         elif achievement_id == "first_weather_evolution":
             if self.get_counter("weather_evolution_count") >= 1:
@@ -426,6 +429,14 @@ class AchievementManager:
             if self.get_counter("accuracy_buff_miss_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
 
+        elif achievement_id == "first_escaperope_use":
+            if self.get_counter("escaperope_use_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
+
+        elif achievement_id == "escaperope_last_stand":
+            if self.get_counter("escaperope_last_stand_count") >= 10:
+                return self.unlock(achievement_id, phase_id)
+
         # ===== FÓSSEIS / INCUBADORA =====
         elif achievement_id == "first_incubator_revive":
             if self.get_counter("incubator_revive_count") >= 1:
@@ -486,12 +497,13 @@ class AchievementManager:
             "stone_evolution_5": ("stone_evolution_count", 5),
             "stone_evolution_20": ("stone_evolution_count", 20),
 
-            # ===== EVOLUÇÃO POR FELICIDADE =====
-            "max_happiness": ("max_happiness_check", 1),  # Especial
-            "full_team_max_happiness": ("full_team_max_happiness_check", 1),  # Especial
+            # ===== SISTEMA DE FELICIDADE =====
+            "max_happiness": ("max_happiness_check", 1),
+            "full_team_max_happiness": ("full_team_max_happiness_check", 1),
             "first_happiness_evolution": ("happiness_evolution_count", 1),
             "happiness_evolution_3": ("happiness_evolution_count", 3),
             "happiness_evolution_10": ("happiness_evolution_count", 10),
+            "friendball_capture_5": ("friendball_capture_count", 5),
 
             # ===== EVOLUÇÃO POR CLIMA =====
             "first_weather_evolution": ("weather_evolution_count", 1),
@@ -519,6 +531,8 @@ class AchievementManager:
             "battle_item_use_10": ("battle_item_use_count", 10),
             "battle_item_replace": ("battle_item_replace_count", 1),
             "accuracy_buff_miss": ("accuracy_buff_miss_count", 1),
+            "first_escaperope_use": ("escaperope_use_count", 1),
+            "escaperope_last_stand": ("escaperope_last_stand_count", 10),
 
             # ===== FÓSSEIS / INCUBADORA =====
             "first_incubator_revive": ("incubator_revive_count", 1),

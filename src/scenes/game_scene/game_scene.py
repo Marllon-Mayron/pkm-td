@@ -924,7 +924,7 @@ class GameScene(BaseScene):
             self._last_capture_item = None
 
     def _perform_capture(self, enemy):
-        """Executa a captura de um Pokémon - COM SISTEMA DE CONQUISTAS"""
+        """Executa a captura de um Pokémon"""
         carried_item = enemy.is_carrying
         if carried_item:
             enemy.drop_item()
@@ -959,6 +959,14 @@ class GameScene(BaseScene):
                 pokemon=caught,
                 portrait="happy"
             )
+
+            # ===== INCREMENTA CONTADOR DA FRIEND BALL =====
+            if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+                phase_id = f"{self.chapter_id}-{self.phase_number}"
+                ach_mgr = self.player.achievement_manager
+                ach_mgr.increment_counter("friendball_capture_count")
+                ach_mgr.check_and_unlock("friendball_capture_5", phase_id)
+
             # Limpa a flag
             self._last_capture_item = None
 
@@ -1093,6 +1101,31 @@ class GameScene(BaseScene):
 
         print(f"[ESCAPEROPE] Jogador fugiu da fase {self.phase_id}!")
 
+        # ===== CONQUISTAS: "Saindo no ultimo momento" =====
+        # Verifica se é uma "última chance": apenas 1 Pokémon vivo com menos da metade da vida
+        alive_pokemon = [p for p in self.player.team if p.is_alive()]
+        is_last_stand = False
+
+        if len(alive_pokemon) == 1:
+            pokemon = alive_pokemon[0]
+            hp_percentage = pokemon.current_hp / pokemon.max_hp
+            if hp_percentage < 0.5:  # Menos da metade da vida
+                is_last_stand = True
+
+        # ===== INCREMENTA CONTADORES DO ESCAPEROPE =====
+        if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+            phase_id = f"{self.chapter_id}-{self.phase_number}"
+            ach_mgr = self.player.achievement_manager
+
+            # Primeiro uso
+            ach_mgr.increment_counter("escaperope_use_count")
+            ach_mgr.check_and_unlock("first_escaperope_use", phase_id)
+
+            # Última chance (se for o caso)
+            if is_last_stand:
+                ach_mgr.increment_counter("escaperope_last_stand_count")
+                ach_mgr.check_and_unlock("escaperope_last_stand", phase_id)
+
         # Para a música
         sound_manager.stop_music(fade_ms=500)
 
@@ -1127,8 +1160,6 @@ class GameScene(BaseScene):
 
         # Mensagem de confirmação
         toast_info("Você fugiu da fase sem penalidades!", duration=3.0)
-
-        print(f"[ESCAPEROPE] Fuga concluída com sucesso, voltando para seleção de time!")
 
     # ===== MÉTODOS DE POSICIONAMENTO =====
 

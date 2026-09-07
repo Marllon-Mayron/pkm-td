@@ -329,7 +329,7 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
     ),
 
     # ============================================================
-    # 8. EVOLUÇÃO POR FELICIDADE
+    # 8. SISTEMA DE FELICIDADE
     # ============================================================
     "max_happiness": Achievement(
         id="max_happiness",
@@ -365,6 +365,13 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         description="Evolua 10 Pokemon por felicidade",
         rarity=AchievementRarity.EPIC,
         rewards={"gold": 3000, "xp": 1500}
+    ),
+    "friendball_capture_5": Achievement(
+        id="friendball_capture_5",
+        title="Amigo Amigo",
+        description="Capture 5 Pokémon usando a Friend Ball",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 500, "xp": 250, "items": {"friendball": 5}}
     ),
 
     # ============================================================
@@ -444,6 +451,21 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         description="Tenha X Accuracy ativa e erre um golpe.",
         rarity=AchievementRarity.UNCOMMON,
         rewards={"gold": 300, "xp": 300, "items": {"x_accuracy": 3}}
+    ),
+    "first_escaperope_use": Achievement(
+        id="first_escaperope_use",
+        title="Retirada Estratégica",
+        description="Use o ESCAPEROPE pela primeira vez para fugir de uma fase",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 100, "xp": 50}
+    ),
+
+    "escaperope_last_stand": Achievement(
+        id="escaperope_last_stand",
+        title="Saindo no ultimo momento",
+        description="Use ESCAPEROPE 10 vezes quando só restar um Pokémon no time e ele estiver com menos da metade da vida",
+        rarity=AchievementRarity.EPIC,
+        rewards={"gold": 2000, "xp": 1000, "items": {"escaperope": 3}}
     ),
 
     # ============================================================
