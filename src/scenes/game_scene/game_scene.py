@@ -287,11 +287,11 @@ class GameScene(BaseScene):
             print(f"[TUTORIAL] {pokemon.name}: HP {original_max_hp} -> {pokemon.max_hp} | Atual: {pokemon.current_hp}")
 
         # ===== 2. GARANTE POÇÃO =====
-        has_potion = self.player.bag.get_quantity("potion") > 0
+        has_potion = self.player.bag.get_quantity("potion") > 1
 
         if not has_potion:
-            self.player.bag.add_item("potion", 1)
-            print("[TUTORIAL] 1 Poção adicionada ao jogador (não tinha nenhuma)")
+            self.player.bag.add_item("potion", 2)
+            print("[TUTORIAL] 1 Poção adicionada ao jogador (precisa de 2)")
         else:
             print(f"[TUTORIAL] Jogador já tem {self.player.bag.get_quantity('potion')} poção(ões)")
 

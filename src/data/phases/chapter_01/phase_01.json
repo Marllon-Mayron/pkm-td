@@ -499,7 +499,7 @@
                 "enabled": true,
                 "enemies": [
                     {
-                        "pokemon_id": 19,
+                        "pokemon_id": 10,
                         "percentage": 100.0
                     }
                 ],
