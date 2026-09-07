@@ -415,10 +415,11 @@ class GameScene(BaseScene):
 
         if hasattr(self, 'event_processor'):
             expected = self.event_processor.get_next_custom_flag()
-            if expected == "abriu_move_select":
+            if expected is None:
+                pass
+            elif expected == "abriu_move_select":
                 self.event_processor.custom_flags["abriu_move_select"] = True
             else:
-
                 toast_warning("Complete a etapa anterior primeiro!", duration=5.0)
                 return
 
@@ -677,7 +678,10 @@ class GameScene(BaseScene):
         elif target_type == "ally" and category == "medicine":
             if hasattr(self, 'event_processor'):
                 expected = self.event_processor.get_next_custom_flag()
-                if expected == "curou_pokemon":
+                if expected is None:
+                    # Nenhum trigger CUSTOM pendente, segue a ação
+                    pass
+                elif expected == "curou_pokemon":
                     self.event_processor.custom_flags["curou_pokemon"] = True
                 else:
                     toast_warning("Complete a etapa anterior primeiro!", duration=5.0)
@@ -1136,11 +1140,11 @@ class GameScene(BaseScene):
 
         if action == 'place' and hasattr(self, 'event_processor'):
             expected = self.event_processor.get_next_custom_flag()
-            if expected == "colocou_pokemon":
+            if expected is None:
+                pass
+            elif expected == "colocou_pokemon":
                 self.event_processor.custom_flags["colocou_pokemon"] = True
             else:
-                # Opcional: mostrar toast avisando que essa ação não é a esperada
-                from src.ui.toast_renderer import toast_warning
                 toast_warning("Complete a etapa anterior primeiro!", duration=5.0)
                 return
 
