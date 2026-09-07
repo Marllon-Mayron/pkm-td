@@ -27,6 +27,8 @@ class Player(Entity):
 
         self.chapter_page_num = 1
 
+        self.has_chosen_starter = False
+
         # Recursos
         self.money = 100
         self.score = 0
@@ -225,6 +227,9 @@ class Player(Entity):
         self.team.append(starter)
         self.caught_pokemon.add(starter_id)
         self.register_seen(starter_id)
+
+        # NOVO: Marca que o jogador escolheu o inicial
+        self.has_chosen_starter = True
 
         print(f"[PLAYER] Pokémon inicial adicionado: {starter.name} (ID: {starter_id})")
         return starter

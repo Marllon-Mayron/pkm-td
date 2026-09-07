@@ -7,7 +7,7 @@ import pickle
 from datetime import datetime
 from typing import Dict
 
-SAVE_FORMAT_VERSION = "0.1.5"  # Versão do FORMATO do save (ATUALIZADA)
+SAVE_FORMAT_VERSION = "0.1.6"  # Versão do FORMATO do save (ATUALIZADA)
 GAME_VERSION_COMPATIBLE = "0.1.14"  # Versão do jogo que usa este formato
 
 
@@ -44,7 +44,7 @@ class SaveManager:
             print(f"[SAVE] Pasta criada: {self.save_dir}")
 
     def _get_default_save_data(self) -> Dict:
-        """Retorna a estrutura padrão de save (versão 0.1.4)"""
+        """Retorna a estrutura padrão de save (versão 0.1.6)"""
         return {
             "meta": {
                 "version": SAVE_FORMAT_VERSION,
@@ -68,8 +68,11 @@ class SaveManager:
                 "achievements": {
                     "unlocked": [],
                     "counters": {},
-                    "unlocked_data": {}  # NOVO: {"ach_id": {"unlocked_at": "...", "unlocked_phase": "1-3"}}
-                }
+                    "unlocked_data": {}
+                },
+                "desfossilizadores": [],
+                "total_playtime": 0,
+                "has_chosen_starter": False  # NOVO
             },
             "game_state": {
                 "current_chapter": 1,
@@ -293,6 +296,7 @@ class SaveManager:
         existing_data["player"]["caught_pokemon"] = list(player.caught_pokemon)
         existing_data["player"]["desfossilizadores"] = player.desfossilizadores
         existing_data["player"]["total_playtime"] = player.total_playtime
+        existing_data["player"]["has_chosen_starter"] = getattr(player, 'has_chosen_starter', False)
 
         # ===== PRESERVA MYSTERY GIFT =====
         existing_data["player"]["mystery_gift"] = {
@@ -443,6 +447,7 @@ class SaveManager:
             player.score = player_data["score"]
             player.x = player_data["position"]["x"]
             player.y = player_data["position"]["y"]
+            player.has_chosen_starter = player_data.get("has_chosen_starter", False)
 
             # Carrega a bag
             player.bag.items = player_data.get("bag", {})
@@ -617,7 +622,7 @@ class SaveManager:
 
     def migrate_save_data(self, save_data: Dict, version: str) -> Dict:
         """
-        Migra dados de save de versões antigas para o formato atual (0.1.4)
+        Migra dados de save de versões antigas para o formato atual (0.1.6)
         """
         import copy
         migrated = copy.deepcopy(save_data)
@@ -705,47 +710,48 @@ class SaveManager:
                     print("[MIGRATE] Campo unlocked_data adicionado as conquistas")
 
             # Atualiza versão
-            migrated["meta"]["version"] = current_version
+            migrated["meta"]["version"] = "0.1.4"
+            version = "0.1.4"
             print("[MIGRATE] Migracao para 0.1.4 concluida: conquistas adicionadas")
 
-        # ===== NOVA MIGRAÇÃO: 0.1.4 para 0.1.5 (INCUBADORA) =====
+        # ===== MIGRAÇÃO DE 0.1.4 para 0.1.5 (INCUBADORA/DESFOSSILIZADOR) =====
         if version == "0.1.4":
-            # Adiciona incubadora inicial se não existir
-            if "incubators" not in migrated.get("player", {}):
-                migrated["player"]["incubators"] = []
-                print("[MIGRATE] Campo incubators criado")
+            # Adiciona desfossilizadores se não existir
+            if "desfossilizadores" not in migrated.get("player", {}):
+                migrated["player"]["desfossilizadores"] = []
+                print("[MIGRATE] Campo desfossilizadores criado")
 
-            # Se não tiver incubadoras, adiciona uma inicial
-            if not migrated["player"]["incubators"]:
-                incubator = {
+            # Se não tiver desfossilizadores, adiciona um inicial
+            if not migrated["player"]["desfossilizadores"]:
+                desfossilizador = {
                     "id": 1,
                     "level": 1,
                     "status": "empty",
                     "fossil_id": None,
                     "pokemon_id": None,
                     "start_time": None,
-                    "duration_minutes": 60,  # 1 minuto para testes
+                    "duration_minutes": 3600,  # 1 hora para jogadores existentes
                     "time_elapsed": 0.0
                 }
-                migrated["player"]["incubators"].append(incubator)
-                print("[MIGRATE] Incubadora inicial adicionada ao save!")
+                migrated["player"]["desfossilizadores"].append(desfossilizador)
+                print("[MIGRATE] Desfossilizador inicial adicionado ao save!")
 
-            # Garante que cada incubadora existente tem os campos corretos
-            for incubator in migrated["player"]["incubators"]:
-                if "time_elapsed" not in incubator:
-                    incubator["time_elapsed"] = 0.0
-                if "start_time" not in incubator:
-                    incubator["start_time"] = None
-                if "duration_minutes" not in incubator or incubator["duration_minutes"] == 0:
-                    durations = {1: 60, 2: 2700, 3: 1200}
-                    level = incubator.get("level", 1)
-                    incubator["duration_minutes"] = durations.get(level, 60)
-                if "status" not in incubator:
-                    incubator["status"] = "empty"
-                if "fossil_id" not in incubator:
-                    incubator["fossil_id"] = None
-                if "pokemon_id" not in incubator:
-                    incubator["pokemon_id"] = None
+            # Garante que cada desfossilizador existente tem os campos corretos
+            durations = {1: 3600, 2: 2700, 3: 1200}
+            for desfossilizador in migrated["player"]["desfossilizadores"]:
+                if "time_elapsed" not in desfossilizador:
+                    desfossilizador["time_elapsed"] = 0.0
+                if "start_time" not in desfossilizador:
+                    desfossilizador["start_time"] = None
+                if "duration_minutes" not in desfossilizador or desfossilizador["duration_minutes"] == 0:
+                    level = desfossilizador.get("level", 1)
+                    desfossilizador["duration_minutes"] = durations.get(level, 3600)
+                if "status" not in desfossilizador:
+                    desfossilizador["status"] = "empty"
+                if "fossil_id" not in desfossilizador:
+                    desfossilizador["fossil_id"] = None
+                if "pokemon_id" not in desfossilizador:
+                    desfossilizador["pokemon_id"] = None
 
             # Adiciona total_playtime se não existir
             if "total_playtime" not in migrated.get("player", {}):
@@ -753,11 +759,36 @@ class SaveManager:
                 print("[MIGRATE] Campo total_playtime adicionado")
 
             # Atualiza versão
+            migrated["meta"]["version"] = "0.1.5"
+            version = "0.1.5"
+            print("[MIGRATE] Migracao para 0.1.5 concluida: desfossilizadores e tempo de jogo")
+
+        # ===== NOVA MIGRAÇÃO: 0.1.5 para 0.1.6 (HAS_CHOSEN_STARTER) =====
+        if version == "0.1.5":
+            # Adiciona has_chosen_starter se não existir
+            if "has_chosen_starter" not in migrated.get("player", {}):
+                # ===== VERIFICA SE O JOGADOR TEM POKÉMON NO TIME OU NA BOX =====
+                has_team = len(migrated.get("player", {}).get("team", [])) > 0
+                has_box = len(migrated.get("player", {}).get("pc_box", [])) > 0
+
+                # Se tem Pokémon no time ou na box, assume que já escolheu o inicial
+                if has_team or has_box:
+                    migrated["player"]["has_chosen_starter"] = True
+                    print(
+                        f"[MIGRATE] has_chosen_starter definido como True (time: {len(migrated['player']['team'])}, box: {len(migrated['player']['pc_box'])})")
+                else:
+                    migrated["player"]["has_chosen_starter"] = False
+                    print("[MIGRATE] has_chosen_starter definido como False (sem Pokémon)")
+            else:
+                # Se já existe, mantém o valor
+                print(f"[MIGRATE] has_chosen_starter já existia: {migrated['player']['has_chosen_starter']}")
+
+            # Atualiza versão
             migrated["meta"]["version"] = current_version
-            print("[MIGRATE] Migracao concluida: incubadora e tempo de jogo adicionados")
+            print("[MIGRATE] Migracao para 0.1.6 concluida: has_chosen_starter adicionado")
 
         # ===== FUTURAS MIGRAÇÕES =====
-        # if version == "0.1.4" and current_version == "0.1.6":
+        # if version == "0.1.6" and current_version == "0.1.7":
         #     pass
 
         # ===== VALIDAÇÃO PÓS-MIGRAÇÃO =====
@@ -773,10 +804,9 @@ class SaveManager:
         if "caught_pokemon" not in migrated["player"]:
             migrated["player"]["caught_pokemon"] = []
 
-        # GARANTE QUE INCUBADORA EXISTE MESMO EM SAVES ANTIGOS
         if "desfossilizadores" not in migrated["player"]:
             migrated["player"]["desfossilizadores"] = []
-            incubator = {
+            desfossilizador = {
                 "id": 1,
                 "level": 1,
                 "status": "empty",
@@ -786,11 +816,18 @@ class SaveManager:
                 "duration_minutes": 3600,
                 "time_elapsed": 0.0
             }
-            migrated["player"]["desfossilizadores"].append(incubator)
-            print("[MIGRATE] desfossilizador inicial adicionada (fallback)")
+            migrated["player"]["desfossilizadores"].append(desfossilizador)
+            print("[MIGRATE] desfossilizador inicial adicionado (fallback)")
 
         if "total_playtime" not in migrated["player"]:
             migrated["player"]["total_playtime"] = 0.0
+
+        # Garante que has_chosen_starter existe (fallback)
+        if "has_chosen_starter" not in migrated["player"]:
+            has_team = len(migrated["player"].get("team", [])) > 0
+            has_box = len(migrated["player"].get("pc_box", [])) > 0
+            migrated["player"]["has_chosen_starter"] = has_team or has_box
+            print(f"[MIGRATE] has_chosen_starter definido como {migrated['player']['has_chosen_starter']} (fallback)")
 
         print(f"[MIGRATE] Migracao concluida! Versao final: {migrated['meta']['version']}")
         return migrated

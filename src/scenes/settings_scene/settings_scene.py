@@ -181,26 +181,32 @@ class SettingsScene(BaseScene):
     def _check_any_save_exists(self):
         """Verifica se existe algum save disponível"""
         from src.managers.save_manager import save_manager
+        import os
+        import json
 
+        # Primeiro verifica se o save_manager já tem um save carregado
         if save_manager.current_save_file is not None and save_manager.save_data is not None:
             return True
 
+        # Verifica se existe arquivo de save
         saves_dir = "saves"
         if os.path.exists(saves_dir):
             for i in range(1, 4):
                 save_file = os.path.join(saves_dir, f"save_{i}.json")
                 if os.path.exists(save_file):
                     try:
-                        import json
                         with open(save_file, 'r', encoding='utf-8') as f:
                             data = json.load(f)
-                            if data.get("settings"):
+                            # Se tem dados, considera que existe save
+                            if data.get("player"):
+                                # Carrega o save no save_manager
                                 save_manager.save_data = data
                                 save_manager.current_save_file = i
                                 return True
                     except Exception:
                         pass
 
+        # Fallback: verifica se o jogador tem Pokémon (pode ter sido criado em memória)
         if len(self.game.player.team) > 0 or len(self.game.player.pc_box) > 0:
             return True
 

@@ -8,6 +8,7 @@ Permite ao jogador resgatar códigos para ganhar Pokémon especiais
 import pygame
 import string
 import time
+import os
 
 from src.scenes.base_scene import BaseScene
 
@@ -43,35 +44,36 @@ class MysteryGiftScene(BaseScene):
         self._last_error_click = 0
 
         # ===== VERIFICA SE HÁ SAVE CARREGADO =====
+        # Agora sempre deve ter save porque o Game inicializa automaticamente
         self.has_save = self._check_save_loaded()
 
         if not self.has_save:
             self.state = "blocked"
             print("[MYSTERY_GIFT] Acesso bloqueado: nenhum save carregado!")
+        else:
+            # Garante que o save está carregado
+            self.game.player.load_game(1)
+            print("[MYSTERY_GIFT] Save carregado com sucesso!")
 
         # Inicializa UI
         self._init_ui()
 
     def _check_save_loaded(self):
         """Verifica se o jogador tem um save carregado"""
-        # Verifica se existe pelo menos um Pokémon no time ou na box
-        has_pokemon = len(self.game.player.team) > 0 or len(self.game.player.pc_box) > 0
-
         # Verifica se existe um arquivo de save
-        import os
         save_file = os.path.join("saves", "save_1.json")
         has_save_file = os.path.exists(save_file)
 
         # Verifica se o save_manager tem um save carregado
-        has_save_manager = self.game.player.save_manager.current_save_file is not None
+        from src.managers.save_manager import save_manager
+        has_save_manager = save_manager.current_save_file is not None
 
         print(f"[MYSTERY_GIFT] Verificação de save:")
-        print(f"  - Pokémon no time/box: {has_pokemon}")
         print(f"  - Arquivo de save existe: {has_save_file}")
         print(f"  - SaveManager tem save: {has_save_manager}")
 
-        # Retorna True se tiver Pokémon OU se tiver arquivo de save
-        return has_pokemon or (has_save_file and has_save_manager)
+        # Retorna True se tiver arquivo de save
+        return has_save_file and has_save_manager
 
     def _init_ui(self):
         """Inicializa elementos de UI"""
@@ -341,7 +343,7 @@ class MysteryGiftScene(BaseScene):
             self.success_message = message
             self.redeemed_pokemon = pokemon
 
-            # bsca informações do evento do código resgatado
+            # Busca informações do evento do código resgatado
             from src.data.mystery_gift_data import get_code_info
             from src.managers.mystery_gift_manager import MysteryGiftManager
 
@@ -560,16 +562,15 @@ class MysteryGiftScene(BaseScene):
         screen.blit(success_text, (text_x, text_y))
 
         # Exibe o nome do evento (fonte maior)
-        event_name_font = self._get_font(20, bold=True)  # Aumentado de 18 para 20
+        event_name_font = self._get_font(20, bold=True)
         event_name_text = event_name_font.render(f"Evento: {self.redeemed_event_name}", True, (255, 200, 100))
         event_name_x = container_x + (container_width - event_name_text.get_width()) // 2
         event_name_y = text_y + 45
         screen.blit(event_name_text, (event_name_x, event_name_y))
 
         # Exibe a descrição do evento (fonte maior)
-        desc_font = self._get_font(16)  # Aumentado de 14 para 16
-        # Quebra a descrição em múltiplas linhas se for muito longa
-        max_chars_per_line = 38  # Ajustado para fonte maior
+        desc_font = self._get_font(16)
+        max_chars_per_line = 38
         desc_lines = []
         current_line = ""
 
@@ -586,12 +587,12 @@ class MysteryGiftScene(BaseScene):
         if current_line:
             desc_lines.append(current_line)
 
-        line_y = event_name_y + 35  # Aumentado espaçamento
+        line_y = event_name_y + 35
         for line in desc_lines:
             desc_text = desc_font.render(line, True, (200, 220, 200))
             desc_x = container_x + (container_width - desc_text.get_width()) // 2
             screen.blit(desc_text, (desc_x, line_y))
-            line_y += 26  # Aumentado espaçamento entre linhas
+            line_y += 26
 
         # Linha separadora
         pygame.draw.line(screen, (255, 215, 0),
@@ -611,7 +612,6 @@ class MysteryGiftScene(BaseScene):
             )
 
             if sprite:
-
                 sprite_width = int(sprite.get_width() * 1.4)
                 sprite_height = int(sprite.get_height() * 1.4)
                 scaled_sprite = pygame.transform.scale(sprite, (sprite_width, sprite_height))

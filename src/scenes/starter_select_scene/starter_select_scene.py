@@ -252,7 +252,7 @@ class StarterSelectScene(BaseScene):
                 self.nickname_input = self.nickname_input[:-1]
             else:
                 char = event.unicode
-                if char in string.ascii_letters + string.digits + " _-" and len(self.nickname_input) < 12:
+                if char in string.ascii_letters + string.digits + " _-" and len(self.nickname_input) < 20:
                     self.nickname_input += char
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -281,6 +281,8 @@ class StarterSelectScene(BaseScene):
             pokemon.nickname = nickname
             pokemon.name = nickname
         if pokemon:
+            # ===== MARCA QUE ESCOLHEU O INICIAL =====
+            self.game.player.has_chosen_starter = True
             self.game.player.save_game(1)
             from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
             self.game.current_scene = PhaseSelectScene(self.game)
@@ -633,7 +635,7 @@ class StarterSelectScene(BaseScene):
             pygame.draw.line(screen, (255, 215, 0), (cursor_x, cursor_y), (cursor_x, cursor_y + cursor_h), 2)
 
         limit_font = self._get_font(int(self.nickname_input_rect.height * 0.25))
-        limit = limit_font.render(f"{len(self.nickname_input)}/12", True, (100, 100, 120))
+        limit = limit_font.render(f"{len(self.nickname_input)}/20", True, (100, 100, 120))
         lx = self.nickname_input_rect.right - limit.get_width() - 10
         ly = self.nickname_input_rect.bottom - limit.get_height() - 5
         screen.blit(limit, (lx, ly))

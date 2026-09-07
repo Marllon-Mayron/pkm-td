@@ -89,9 +89,18 @@ class MenuScene(BaseScene):
         self.logo = None
         self.create_logo()
 
-        # Botões - "Iniciar Jogo" agora verifica save
+        # ===== VERIFICA SE JÁ ESCOLHEU O INICIAL =====
+        has_starter = getattr(self.game.player, 'has_chosen_starter', False)
+
+        # Define o texto do botão baseado no status
+        if has_starter:
+            start_text = "Continuar Jogo"
+        else:
+            start_text = "Iniciar Jogo"
+
+        # Botões
         self.buttons = [
-            Button(0.3, 0.5, 0.4, 0.08, "Iniciar Jogo",
+            Button(0.3, 0.5, 0.4, 0.08, start_text,
                    (100, 100, 0), (150, 150, 0), self.start_game, None),
             Button(0.3, 0.6, 0.4, 0.08, "Configurações",
                    (100, 100, 0), (150, 150, 0), self.open_settings, None),
@@ -101,7 +110,6 @@ class MenuScene(BaseScene):
                    (100, 50, 100), (150, 80, 150), self.open_mystery_gift, None),
             Button(0.3, 0.7, 0.4, 0.08, "Sair",
                    (100, 0, 0), (150, 0, 0), self.quit_game, None)
-
         ]
 
         # Partículas
@@ -249,22 +257,16 @@ class MenuScene(BaseScene):
         screen.blit(pause_text, (text_x, text_y))
 
     def start_game(self):
-        """Inicia o jogo - verifica se tem save ou precisa escolher inicial"""
+        """Inicia o jogo - verifica se já escolheu o inicial ou precisa escolher"""
         # Para a música do menu antes de trocar de tela
         sound_manager.stop_music(fade_ms=300)
 
-        # Verifica se existe um save
-        save_loaded = self.game.player.load_game(1)
+        # ===== VERIFICA SE O JOGADOR JÁ ESCOLHEU O INICIAL =====
+        has_chosen_starter = getattr(self.game.player, 'has_chosen_starter', False)
 
-        if not save_loaded:
-            # Sem save: mostra tela de seleção de inicial
-            from src.scenes.starter_select_scene.starter_select_scene import StarterSelectScene
-
-            self.game.starter_select_scene = StarterSelectScene(self.game)
-            self.game.current_scene = self.game.starter_select_scene
-        else:
-            # Com save: vai direto para seleção de fases
-            print("[MENU] Save encontrado - indo para seleção de fases")
+        if has_chosen_starter:
+            # Já escolheu o inicial - vai direto para seleção de fases
+            print("[MENU] Jogador já escolheu o inicial - indo para seleção de fases")
             print(f"  - Time: {len(self.game.player.team)} Pokémon")
             print(f"  - Último capítulo acessado: {self.game.player.chapter_page_num}")
 
@@ -272,8 +274,14 @@ class MenuScene(BaseScene):
             from src.config.progress import progress_manager
             progress_manager._load_settings_from_save()
 
-            # A PhaseSelectScene agora vai ler o chapter_page_num automaticamente
             self.game.current_scene = PhaseSelectScene(self.game)
+        else:
+            # Não escolheu o inicial - mostra tela de seleção
+            from src.scenes.starter_select_scene.starter_select_scene import StarterSelectScene
+
+            print("[MENU] Jogador ainda não escolheu o inicial - abrindo seleção")
+            self.game.starter_select_scene = StarterSelectScene(self.game)
+            self.game.current_scene = self.game.starter_select_scene
 
     def open_settings(self):
         """Abre configurações"""

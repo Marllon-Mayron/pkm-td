@@ -4,6 +4,7 @@
 Classe principal do jogo
 """
 import pygame
+import os
 
 from src.config.settings import settings
 from src.core.screen import ScreenManager
@@ -19,8 +20,11 @@ class Game:
         self.running = True
         self.current_version = ""
 
-        # Cria o jogador primeiro
+        # Cria o jogador
         self.player = Player(100, 100)
+
+        # ===== NOVO: CARREGA OU CRIA SAVE AUTOMATICAMENTE =====
+        self._initialize_save()
 
         # Câmera
         self.camera = None
@@ -46,6 +50,72 @@ class Game:
 
         print(f"Jogo inicializado - FPS alvo: {settings.target_fps}")
         print(f"Tick rate do jogo: {settings.game_tick_rate} updates/segundo")
+
+    def _initialize_save(self):
+        """
+        Inicializa o save automaticamente.
+        - Se existir save, carrega
+        - Se não existir, cria um save inicial vazio
+        """
+        from src.managers.save_manager import save_manager
+        from src.config.progress import progress_manager
+
+        # Verifica se existe save_1.json
+        save_file = os.path.join("saves", "save_1.json")
+        save_exists = os.path.exists(save_file)
+
+        if save_exists:
+            print("[GAME] Save existente encontrado - carregando...")
+            success = self.player.load_game(1)
+            if success:
+                print("[GAME] Save carregado com sucesso!")
+                # Carrega as configurações do save
+                progress_manager._load_settings_from_save()
+                return
+            else:
+                print("[GAME] Erro ao carregar save - criando novo...")
+        else:
+            print("[GAME] Nenhum save encontrado - criando novo...")
+
+        # Cria um save inicial vazio
+        self._create_initial_save()
+
+    def _create_initial_save(self):
+        """
+        Cria um save inicial vazio.
+        Isso permite que o jogador acesse configurações, mystery gift, etc.
+        """
+        from src.managers.save_manager import save_manager
+        from src.config.progress import progress_manager
+
+        print("[GAME] Criando save inicial vazio...")
+
+        # Garante que o jogador tem um desfossilizador
+        if not hasattr(self.player, 'desfossilizadores') or not self.player.desfossilizadores:
+            if hasattr(self.player, '_add_initial_desfossilizador'):
+                self.player._add_initial_desfossilizador()
+
+        # ===== GARANTE QUE HAS_CHOSEN_STARTER É FALSE =====
+        self.player.has_chosen_starter = False
+
+        # Salva o jogo com estado inicial
+        game_state = {
+            "current_chapter": 1,
+            "current_phase": 1,
+            "unlocked_chapters": [1],
+            "unlocked_phases": ["1-1"],
+            "completed_phases": [],
+            "stars": {}
+        }
+
+        success = save_manager.save_game(self.player, game_state, save_name="Save 1", slot=1)
+
+        if success:
+            print("[GAME] Save inicial criado com sucesso!")
+            # Carrega as configurações do save
+            progress_manager._load_settings_from_save()
+        else:
+            print("[GAME] ERRO: Não foi possível criar o save inicial!")
 
     def initialize_camera(self, world_width, world_height):
         """Inicializa a câmera com o tamanho do mundo"""
@@ -82,13 +152,10 @@ class Game:
             if event.type == pygame.QUIT:
                 self.running = False
 
-
             elif event.type == pygame.VIDEORESIZE:
-
                 self.screen_manager.handle_resize(event.w, event.h)
 
                 # Propaga para a cena atual
-
                 if self.current_scene and hasattr(self.current_scene, 'on_resize'):
                     self.current_scene.on_resize()
 
