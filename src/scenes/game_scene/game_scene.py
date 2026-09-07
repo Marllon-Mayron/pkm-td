@@ -887,6 +887,9 @@ class GameScene(BaseScene):
             toast_battle(f"Não é possível capturar {enemy.name}!", duration=2.0, pokemon=enemy, portrait="angry")
             return  # Sai sem fazer nada, mas a pokébola já foi consumida
 
+        # ===== ARMAZENA QUAL ITEM ESTÁ SENDO USADO PARA A CAPTURA =====
+        self._last_capture_item = item_data.get("id")
+
         hp_ratio = enemy.current_hp / enemy.max_hp
         base_chance = (1 - hp_ratio * 0.5)
 
@@ -894,7 +897,8 @@ class GameScene(BaseScene):
             "pokeball": 1.0,
             "greatball": 1.5,
             "ultraball": 2.0,
-            "masterball": 100.0
+            "masterball": 100.0,
+            "friendball": 1.0,  # Mesma taxa que pokeball
         }
         multiplier = multipliers.get(item_data["id"], 1.0)
         chance = min(1.0, base_chance * multiplier)
@@ -916,6 +920,8 @@ class GameScene(BaseScene):
             # Captura falhou
             toast_battle(f"{enemy.name} escapou...", duration=2.0, pokemon=enemy, portrait="angry")
             print(f"[CAPTURE] {enemy.name} escapou! Pokébola foi consumida.")
+            # Limpa a flag se falhou
+            self._last_capture_item = None
 
     def _perform_capture(self, enemy):
         """Executa a captura de um Pokémon - COM SISTEMA DE CONQUISTAS"""
@@ -939,6 +945,22 @@ class GameScene(BaseScene):
         caught.evs = enemy.evs.copy()
         caught.xp = enemy.xp
         caught.nature = enemy.nature
+
+        # ===== FRIEND BALL: APLICA BÔNUS DE FELICIDADE =====
+        # Verifica se foi capturado com Friend Ball
+        if hasattr(self, '_last_capture_item') and self._last_capture_item == "friendball":
+            happiness_bonus = 60
+            caught.set_happiness(happiness_bonus)
+            print(f"[FRIEND_BALL] {caught.name} capturado com {happiness_bonus} de felicidade!")
+            # Mostra toast especial
+            toast_battle(
+                f"{caught.name} veio com {happiness_bonus} de felicidade!️",
+                duration=4.0,
+                pokemon=caught,
+                portrait="happy"
+            )
+            # Limpa a flag
+            self._last_capture_item = None
 
         is_to_team = self.player.has_team_space()
         if is_to_team:

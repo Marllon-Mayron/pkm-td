@@ -43,7 +43,6 @@ class DayNightWeatherSystem:
         print(f"[DAY/NIGHT] Configuração do editor: Dia/Noite={day_night_mode}, Clima={base_weather}")
 
         # ===== DIA/NOITE =====
-        # Mapeia os modos para os tipos DayNightType
         mode_map = {
             "day": DayNightType.DAY,
             "night": DayNightType.NIGHT,
@@ -56,10 +55,24 @@ class DayNightWeatherSystem:
         if day_night_mode in mode_map:
             period_type = mode_map[day_night_mode]
             print(f"[DAY/NIGHT] Forçando {period_type.value.upper()} (configuração do editor)")
+
+            # ===== PERÍODOS ESPECIAIS (CAVE, DEEP) NUNCA TRANSICIONAM =====
+            if period_type in [DayNightType.CAVE, DayNightType.DEEP]:
+                print(f"[DAY/NIGHT] Ambiente fixo: {period_type.value.upper()} - NÃO haverá ciclo dia/noite")
+                # Duração infinita
+                duration = 999999.0
+                self.day_night_state = DayNightState(period_type, duration)
+                self._initialized = True
+
+                # ===== CLIMA BASE DA FASE =====
+                weather_type = self._get_weather_from_config(base_weather)
+                if weather_type:
+                    self._apply_base_weather(weather_type)
+                return
         else:  # "random"
             period_type = random.choices(
                 [DayNightType.DAY, DayNightType.NIGHT, DayNightType.DUSK, DayNightType.DAWN],
-                weights=[0.65, 0.25, 0.050, 0.050]  # 60% dia, 25% noite, 5% cada transição
+                weights=[0.65, 0.25, 0.050, 0.050]
             )[0]
             print(f"[DAY/NIGHT] Período aleatório: {period_type.value}")
 
@@ -68,21 +81,23 @@ class DayNightWeatherSystem:
 
         # ===== CLIMA BASE DA FASE =====
         weather_type = self._get_weather_from_config(base_weather)
-
         if weather_type:
-            weather_names = {
-                WeatherType.SUNNY: "Sol Forte",
-                WeatherType.RAIN: "Chuva",
-            }
-            print(
-                f"[WEATHER_BASE] Clima BASE da fase: {weather_names.get(weather_type, weather_type.value)} (PERMANENTE)")
-
-            if hasattr(self.game_scene, 'battle_system'):
-                self.game_scene.battle_system.weather_manager.set_base_weather(weather_type)
+            self._apply_base_weather(weather_type)
         else:
             print(f"[WEATHER_BASE] Clima BASE da fase: Normal (PERMANENTE)")
 
         self._initialized = True
+
+    def _apply_base_weather(self, weather_type):
+        """Aplica o clima base da fase"""
+        weather_names = {
+            WeatherType.SUNNY: "Sol Forte",
+            WeatherType.RAIN: "Chuva",
+        }
+        print(f"[WEATHER_BASE] Clima BASE da fase: {weather_names.get(weather_type, weather_type.value)} (PERMANENTE)")
+
+        if hasattr(self.game_scene, 'battle_system'):
+            self.game_scene.battle_system.weather_manager.set_base_weather(weather_type)
 
     def _get_weather_from_config(self, base_weather):
         """Retorna o WeatherType baseado na configuração do editor."""
@@ -106,33 +121,6 @@ class DayNightWeatherSystem:
 
             return None
 
-    def _get_weather_from_config(self, base_weather):
-        """
-        Retorna o WeatherType baseado na configuração do editor.
-        """
-        if base_weather == "sunny":
-            # Verifica se é noite (Sunny Day não funciona à noite)
-            if self.day_night_state and self.day_night_state.is_night():
-                print(f"[WEATHER_BASE] Sunny Day bloqueado (é noite) - usando Normal")
-                return None
-            return WeatherType.SUNNY
-        elif base_weather == "rain":
-            return WeatherType.RAIN
-        elif base_weather == "none":
-            return None
-        else:  # "random"
-            # Escolhe aleatoriamente, mas respeitando a regra de Sunny Day à noite
-            is_night = self.day_night_state and self.day_night_state.is_night()
-
-            # Tenta até 10 vezes
-            for _ in range(10):
-                weather_type = random.choice(self.MAP_WEATHER_TYPES)
-                if weather_type == WeatherType.SUNNY and is_night:
-                    continue
-                return weather_type
-
-            return None
-
     def update(self, dt: float):
         """Atualiza o sistema de dia/noite"""
         if not self._initialized:
@@ -140,9 +128,14 @@ class DayNightWeatherSystem:
             return
 
         if self.day_night_state:
-            self.day_night_state.update(dt)
-            if not self.day_night_state.active:
-                self._change_period()
+            # Verifica se é um período TRANSICIONAL antes de atualizar
+            if self.day_night_state.is_transitional():
+                self.day_night_state.update(dt)
+                if not self.day_night_state.active:
+                    self._change_period()
+            else:
+                # CAVE ou DEEP: não atualiza (permanece fixo)
+                pass
 
     def _change_period(self):
         """Alterna entre dia e noite (respeitando a configuração do editor)"""
@@ -151,6 +144,14 @@ class DayNightWeatherSystem:
 
         # Verifica se a fase é fixa (day ou night)
         day_night_mode = getattr(self.game_scene, 'day_night_mode', 'random')
+
+        # ===== SE FOR CAVE OU DEEP, NUNCA MUDA =====
+        if day_night_mode in ["cave", "deep"]:
+            print(f"[DAY/NIGHT] Ambiente fixo ({day_night_mode}) - NÃO muda")
+            # Mantém o estado atual com duração infinita
+            self.day_night_state.active = True
+            self.day_night_state.duration = 999999.0
+            return
 
         if day_night_mode == "day":
             period_type = DayNightType.DAY
@@ -188,7 +189,7 @@ class DayNightWeatherSystem:
                     weather_mgr.battle_system.effect_manager.add_status_text(
                         None,
                         "O sol se pôs! O clima voltou ao normal.",
-                        duration=2.0
+                        duration=3.0
                     )
 
     def get_day_night_type(self) -> DayNightType:

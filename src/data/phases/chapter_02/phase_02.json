@@ -2055,10 +2055,10 @@
                 ],
                 "min_level": 11,
                 "max_level": 12,
-                "wave_size": 6,
+                "wave_size": 12,
                 "spawn_interval": 3.0,
-                "initial_delay": 2.0,
-                "repeat_wave": false,
+                "initial_delay": 3.0,
+                "repeat_wave": true,
                 "repeat_count": 1,
                 "template_id": "template_6633",
                 "use_variants": true,
@@ -2158,10 +2158,10 @@
                 ],
                 "min_level": 11,
                 "max_level": 12,
-                "wave_size": 6,
+                "wave_size": 12,
                 "spawn_interval": 3.0,
-                "initial_delay": 2.0,
-                "repeat_wave": false,
+                "initial_delay": 3.0,
+                "repeat_wave": true,
                 "repeat_count": 1,
                 "template_id": "template_6633",
                 "use_variants": true,
@@ -2263,10 +2263,10 @@
                     ],
                     "min_level": 11,
                     "max_level": 12,
-                    "wave_size": 6,
+                    "wave_size": 12,
                     "spawn_interval": 3.0,
-                    "initial_delay": 2.0,
-                    "repeat_wave": false,
+                    "initial_delay": 3.0,
+                    "repeat_wave": true,
                     "repeat_count": 1
                 },
                 {
@@ -2316,11 +2316,11 @@
                     ],
                     "min_level": 11,
                     "max_level": 12,
-                    "wave_size": 6,
+                    "wave_size": 12,
                     "spawn_interval": 3.0,
-                    "initial_delay": 2.0,
-                    "repeat_wave": false,
-                    "repeat_count": 1
+                    "initial_delay": 3.0,
+                    "repeat_wave": true,
+                    "repeat_count": 2
                 }
             ]
         }

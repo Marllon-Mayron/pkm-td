@@ -131,7 +131,7 @@ class ItemBagCatalog:
             "effect": "capture",
             "effect_value": 1.5,
             "price": 600,
-            "unlock_phase": "1-5",
+            "unlock_phase": "1-6",
             "unlock_chapter": None
         }
         items["ultraball"] = {
@@ -176,6 +176,21 @@ class ItemBagCatalog:
             "unlock_phase": "999-999",
             "unlock_chapter": None
         }
+        items["friendball"] = {
+            "id": "friendball",
+            "name": "FRIENDBALL",
+            "sprite_path": pokeballs_path / "FRIENDBALL.png",
+            "description": "Pokémon capturado com esta bola começa com 60 de felicidade!",
+            "category": "pokeball",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "capture",
+            "effect_value": 1.0,
+            "happiness_bonus": 60,
+            "price": 400,
+            "unlock_phase": "1-6",
+            "unlock_chapter": None
+        }
         # ===== POÇÕES =====
         items["potion"] = {
             "id": "potion",
@@ -202,7 +217,7 @@ class ItemBagCatalog:
             "effect": "heal",
             "effect_value": 50,
             "price": 450,
-            "unlock_phase": "1-5",
+            "unlock_phase": "1-6",
             "unlock_chapter": None
         }
         items["hyperpotion"] = {
@@ -245,7 +260,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "paralysis",
             "price": 200,
-            "unlock_phase": "1-5",
+            "unlock_phase": "1-6",
             "unlock_chapter": None
         }
         items["awakening"] = {
@@ -259,7 +274,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "sleep",
             "price": 250,
-            "unlock_phase": "1-5",
+            "unlock_phase": "1-6",
             "unlock_chapter": None
         }
         items["burn_heal"] = {
@@ -301,7 +316,7 @@ class ItemBagCatalog:
             "effect": "cure_all_status",
             "effect_value": None,
             "price": 600,
-            "unlock_phase": "1-5",
+            "unlock_phase": "1-6",
             "unlock_chapter": None
         }
         items["rare_candy"] = {
@@ -330,7 +345,7 @@ class ItemBagCatalog:
             "effect": "revive",
             "effect_value": 0.5,  # 50% do HP máximo
             "price": 1000,
-            "unlock_phase": "1-5",
+            "unlock_phase": "1-6",
             "unlock_chapter": None
         }
         items["max_revive"] = {
@@ -359,7 +374,7 @@ class ItemBagCatalog:
             "effect": "pp_restore",
             "effect_value": 0.2,
             "price": 100,
-            "unlock_phase": "1-3",
+            "unlock_phase": "1-4",
             "unlock_chapter": None
         }
         items["pp_max"] = {
@@ -427,7 +442,7 @@ class ItemBagCatalog:
                     "duration": 20.0,
                 },
                 "price": 500,
-                "unlock_phase": "1-5",
+                "unlock_phase": "1-6",
                 "unlock_chapter": None
             }
 
@@ -470,7 +485,7 @@ class ItemBagCatalog:
         # ===== TMs/HMs =====
         # Lista de TMs: (id, nome, sprite_file, move_name, unlock_phase, price)
         tms = [
-            ("tm_bide", "TM01 - Bide", "machine_NORMAL.png", "bide", "1-5", 2000),
+            ("tm_bide", "TM01 - Bide", "machine_NORMAL.png", "bide", "1-6", 2000),
             ("tm_thunder_wave", "TM45 - Thunder Wave", "machine_ELECTRIC.png", "thunder-wave", "2-2", 1500),
             ("tm_whirlwind", "TM04 - Whirlwind", "machine_NORMAL.png", "whirlwind", "2-3", 2500),
             ("tm_water_gun", "TM12 - Water Gun", "machine_WATER.png", "water-gun", "2-4", 2000),

@@ -8,10 +8,10 @@ class DayNightType(Enum):
     """Tipos de período do dia/ambiente"""
     DAY = "day"
     NIGHT = "night"
-    DUSK = "dusk"      # Entardecer
-    DAWN = "dawn"      # Amanhecer
-    CAVE = "cave"      # Caverna (escuro)
-    DEEP = "deep"      # Fundo do mar (azul profundo)
+    DUSK = "dusk"  # Entardecer
+    DAWN = "dawn"  # Amanhecer
+    CAVE = "cave"  # Caverna (escuro) - NÃO TRANSICIONA
+    DEEP = "deep"  # Fundo do mar (azul profundo) - NÃO TRANSICIONA
 
 
 class DayNightState:
@@ -35,6 +35,12 @@ class DayNightState:
         """Atualiza o estado do período"""
         if not self.active:
             return False
+
+        # ===== CAVE E DEEP NUNCA TRANSICIONAM =====
+        if self.type in [DayNightType.CAVE, DayNightType.DEEP]:
+            # Sempre ativos, nunca expiram
+            self.active = True
+            return True
 
         self.elapsed += dt
         self.transition_progress = min(1.0, self.elapsed / self.duration)
@@ -64,36 +70,23 @@ class DayNightState:
         return names.get(self.type, "Dia")
 
     def get_filter_color(self) -> tuple:
-        """
-        Retorna a cor do filtro para o período atual.
-        Usa RGBA com opacidade.
-        """
+        """Retorna a cor do filtro para o período atual. Usa RGBA com opacidade."""
         if self.type == DayNightType.DAY:
-            # Dia: sem filtro (transparente)
             return (0, 0, 0, 0)
         elif self.type == DayNightType.NIGHT:
-            # Noite: filtro escuro com tom azulado profundo
             return (5, 10, 35, 200)
         elif self.type == DayNightType.DUSK:
-            # Entardecer: tons alaranjados/quentes
             return (200, 120, 50, 100)
         elif self.type == DayNightType.DAWN:
-            # Amanhecer: tons rosados/azuis claros
             return (255, 180, 150, 70)
         elif self.type == DayNightType.CAVE:
-            # Caverna: escuro com tom acinzentado/verde
             return (20, 25, 30, 220)
         elif self.type == DayNightType.DEEP:
-            # Fundo do Mar: azul profundo com tons verdes
             return (0, 30, 60, 200)
-
         return (0, 0, 0, 0)
 
     def get_ambient_light(self) -> float:
-        """
-        Retorna o fator de luz ambiente (0.0 a 1.0).
-        1.0 = dia, 0.0 = noite escura.
-        """
+        """Retorna o fator de luz ambiente (0.0 a 1.0)"""
         if self.type == DayNightType.DAY:
             return 1.0
         elif self.type == DayNightType.NIGHT:
@@ -131,3 +124,10 @@ class DayNightState:
     def is_dawn(self) -> bool:
         """Verifica se é amanhecer"""
         return self.type == DayNightType.DAWN
+
+    def is_transitional(self) -> bool:
+        """
+        Verifica se este período faz parte do ciclo dia/noite (transiciona).
+        CAVE e DEEP são ambientes fixos e NÃO transicionam.
+        """
+        return self.type not in [DayNightType.CAVE, DayNightType.DEEP]
