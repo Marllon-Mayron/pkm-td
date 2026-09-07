@@ -94,6 +94,47 @@ class PokemonModal:
         "Quirky": (None, None, "", ""),
     }
 
+    def _can_release(self) -> bool:
+        """
+        Verifica se o Pokémon pode ser libertado.
+        Regras:
+        1. Se for o ÚNICO Pokémon no time E na box -> NÃO PODE
+        2. Se for o único no time mas tem outros na box -> PODE (mas com aviso)
+        3. Se tiver outros no time -> PODE
+        """
+        total_team = len(self.game.player.team)
+        total_box = len(self.game.player.pc_box)
+        total_pokemon = total_team + total_box
+
+        # Se for o único Pokémon (time + box), não pode liberar
+        if total_pokemon <= 1:
+            return False
+
+        # Se está no time e é o único do time, mas tem outros na box
+        if self.pokemon.is_in_team and total_team == 1 and total_box > 0:
+            return True
+
+        # Se está no time e tem outros no time
+        if self.pokemon.is_in_team and total_team > 1:
+            return True
+
+        # Se está na box e tem outros Pokémon (no time ou na box)
+        if not self.pokemon.is_in_team and total_pokemon > 1:
+            return True
+
+        return False
+
+    def _get_release_warning(self) -> str:
+        """
+        Retorna um aviso específico para o caso de libertação
+        """
+        total_team = len(self.game.player.team)
+        total_box = len(self.game.player.pc_box)
+
+        if self.pokemon.is_in_team and total_team == 1 and total_box > 0:
+            return "⚠️ Último Pokémon do time! ⚠️"
+        return None
+
     def _get_iv_rank(self, value):
         if value == 31:
             return "PERFEITO", self.colors['iv_perfect']
@@ -266,8 +307,14 @@ class PokemonModal:
 
             if self.confirmation_active:
                 if self.confirm_yes_button.collidepoint(event.pos):
-                    self.confirmation_active = False
-                    return "release_confirm"
+                    # Verifica novamente se pode liberar (segurança)
+                    if self._can_release():
+                        self.confirmation_active = False
+                        return "release_confirm"
+                    else:
+                        # Se não pode, fecha o diálogo e mostra aviso
+                        self.confirmation_active = False
+                        return None
                 elif self.confirm_no_button.collidepoint(event.pos):
                     self.confirmation_active = False
                     return None
@@ -279,7 +326,15 @@ class PokemonModal:
                 return "action"
 
             if self.release_button.collidepoint(event.pos):
-                self.confirmation_active = True
+                # Verifica se pode liberar antes de abrir o diálogo
+                if self._can_release():
+                    self.confirmation_active = True
+                else:
+                    # Não pode liberar - mostra aviso rápido
+                    self.confirmation_active = False
+                    # Armazena o estado de erro para mostrar mensagem
+                    self._release_blocked = True
+                    self._blocked_timer = 2.0  # Mostra por 2 segundos
                 return None
 
             if not self.rect.collidepoint(event.pos):
@@ -485,6 +540,10 @@ class PokemonModal:
         screen.blit(prev_text, (self.prev_page_button.centerx - 8, self.prev_page_button.centery - 11))
         screen.blit(next_text, (self.next_page_button.centerx - 8, self.next_page_button.centery - 11))
 
+        # ===== VERIFICA SE PODE LIBERTAR =====
+        can_release = self._can_release()
+        release_warning = self._get_release_warning()
+
         if self.confirmation_active:
             confirm_overlay = pygame.Surface((self.width, self.height))
             confirm_overlay.set_alpha(200)
@@ -510,11 +569,24 @@ class PokemonModal:
             warning_rect = warning_text.get_rect(center=(confirm_box.centerx, confirm_box.y + 55))
             screen.blit(warning_text, warning_rect)
 
-            pokemon_font = pygame.font.Font(None, 18)
-            pokemon_text = pokemon_font.render(f"{self.pokemon.name} Lv.{self.pokemon.level}", True,
-                                               self.colors['text_accent'])
-            pokemon_rect = pokemon_text.get_rect(center=(confirm_box.centerx, confirm_box.y + 78))
-            screen.blit(pokemon_text, pokemon_rect)
+            # ===== AVISO ESPECIAL SE FOR O ÚLTIMO DO TIME =====
+            if release_warning:
+                warn_font = pygame.font.Font(None, 16)
+                warn_text = warn_font.render(release_warning, True, (255, 200, 50))
+                warn_rect = warn_text.get_rect(center=(confirm_box.centerx, confirm_box.y + 78))
+                screen.blit(warn_text, warn_rect)
+
+                pokemon_font = pygame.font.Font(None, 16)
+                pokemon_text = pokemon_font.render(f"{self.pokemon.name} Lv.{self.pokemon.level}", True,
+                                                   self.colors['text_accent'])
+                pokemon_rect = pokemon_text.get_rect(center=(confirm_box.centerx, confirm_box.y + 100))
+                screen.blit(pokemon_text, pokemon_rect)
+            else:
+                pokemon_font = pygame.font.Font(None, 18)
+                pokemon_text = pokemon_font.render(f"{self.pokemon.name} Lv.{self.pokemon.level}", True,
+                                                   self.colors['text_accent'])
+                pokemon_rect = pokemon_text.get_rect(center=(confirm_box.centerx, confirm_box.y + 78))
+                screen.blit(pokemon_text, pokemon_rect)
 
             self._draw_rounded_rect(screen, (180, 60, 60), self.confirm_yes_button, radius=8)
             self._draw_rounded_rect(screen, (220, 80, 80), self.confirm_yes_button, radius=8, border=1)
@@ -550,14 +622,38 @@ class PokemonModal:
         action_rect = action_surf.get_rect(center=self.action_button.center)
         screen.blit(action_surf, action_rect)
 
-        release_color = (150, 40, 40) if self.pokemon.is_in_team else (180, 50, 50)
-        self._draw_rounded_rect(screen, release_color, self.release_button, radius=10)
-        self._draw_rounded_rect(screen, (200, 70, 70), self.release_button, radius=10, border=1)
+        # ===== BOTÃO LIBERTAR - DESABILITADO SE FOR O ÚNICO POKEMON =====
+        if can_release:
+            release_color = (150, 40, 40) if self.pokemon.is_in_team else (180, 50, 50)
+            self._draw_rounded_rect(screen, release_color, self.release_button, radius=10)
+            self._draw_rounded_rect(screen, (200, 70, 70), self.release_button, radius=10, border=1)
+            release_font = pygame.font.Font(None, 15)
+            release_surf = release_font.render("LIBERTAR", True, (255, 255, 255))
+            release_rect = release_surf.get_rect(center=self.release_button.center)
+            screen.blit(release_surf, release_rect)
+        else:
+            # Botão desabilitado (cinza)
+            release_color = (45, 40, 40)
+            self._draw_rounded_rect(screen, release_color, self.release_button, radius=10)
+            self._draw_rounded_rect(screen, (60, 55, 55), self.release_button, radius=10, border=1)
+            release_font = pygame.font.Font(None, 13)
+            release_surf = release_font.render("BLOQUEADO", True, (120, 100, 100))
+            release_rect = release_surf.get_rect(center=self.release_button.center)
+            screen.blit(release_surf, release_rect)
 
-        release_font = pygame.font.Font(None, 15)
-        release_surf = release_font.render("LIBERTAR", True, (255, 255, 255))
-        release_rect = release_surf.get_rect(center=self.release_button.center)
-        screen.blit(release_surf, release_rect)
+            # ===== MOSTRA AVISO DE BLOQUEIO =====
+            if hasattr(self, '_release_blocked') and self._release_blocked:
+                if hasattr(self, '_blocked_timer') and self._blocked_timer > 0:
+                    warn_font = pygame.font.Font(None, 16)
+                    warn_text = warn_font.render("❌ ÚLTIMO POKÉMON - NÃO PODE SER LIBERTADO!", True, (255, 100, 100))
+                    warn_x = self.x + (self.width - warn_text.get_width()) // 2
+                    warn_y = self.release_button.y - 35
+                    screen.blit(warn_text, (warn_x, warn_y))
+                    self._blocked_timer -= 0.016  # Aproximadamente 1 frame
+                    if self._blocked_timer <= 0:
+                        self._release_blocked = False
+                else:
+                    self._release_blocked = False
 
     def _calculate_actual_ev_bonus(self, stat: str) -> int:
         ev_value = self.pokemon.evs.get(stat, 0)

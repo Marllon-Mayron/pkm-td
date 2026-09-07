@@ -5,6 +5,8 @@ Cena do menu principal
 """
 import pygame
 import random
+import os
+import json
 
 from src.scenes.base_scene import BaseScene
 from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
@@ -98,6 +100,12 @@ class MenuScene(BaseScene):
         else:
             start_text = "Iniciar Jogo"
 
+        # ===== ESTADO DE CONFIRMAÇÃO DE RESET =====
+        self.reset_confirmation_active = False
+        self.reset_confirmation_timer = 0
+        self._confirm_yes_rect = None
+        self._confirm_no_rect = None
+
         # Botões
         self.buttons = [
             Button(0.3, 0.5, 0.4, 0.08, start_text,
@@ -108,6 +116,9 @@ class MenuScene(BaseScene):
                    (100, 100, 0), (150, 150, 0), self.open_editor, None),
             Button(0.015, 0.86, 0.15, 0.06, "Mystery Gift",
                    (100, 50, 100), (150, 80, 150), self.open_mystery_gift, None),
+            # ===== BOTÃO DE RESET (VERMELHO) =====
+            Button(0.83, 0.86, 0.15, 0.06, "RESETAR",
+                   (120, 20, 20), (180, 30, 30), self.show_reset_confirmation, None),
             Button(0.3, 0.7, 0.4, 0.08, "Sair",
                    (100, 0, 0), (150, 0, 0), self.quit_game, None)
         ]
@@ -177,9 +188,188 @@ class MenuScene(BaseScene):
                 self.toggle_pause()
             elif event.key == pygame.K_RETURN:
                 self.start_game()
+            # Tecla ESC fecha a confirmação de reset
+            elif event.key == pygame.K_ESCAPE and self.reset_confirmation_active:
+                self.reset_confirmation_active = False
+                sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
+        # Se a confirmação está ativa, processa os botões de confirmação
+        if self.reset_confirmation_active:
+            self._handle_reset_confirmation_event(event)
+            # Não processa outros eventos enquanto a confirmação está ativa
+            return
 
         for button in self.buttons:
             button.handle_event(event)
+
+    def _handle_reset_confirmation_event(self, event):
+        """Processa eventos da confirmação de reset"""
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mouse_pos = event.pos
+
+            # Verifica se o botão SIM foi clicado
+            if self._confirm_yes_rect and self._confirm_yes_rect.collidepoint(mouse_pos):
+                sound_manager.play_effect(SoundEffect.CLICK)
+                self._execute_reset()
+                return
+
+            # Verifica se o botão NÃO foi clicado
+            if self._confirm_no_rect and self._confirm_no_rect.collidepoint(mouse_pos):
+                sound_manager.play_effect(SoundEffect.CLICK)
+                self.reset_confirmation_active = False
+                return
+
+        # Tecla ESC também fecha
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.reset_confirmation_active = False
+            sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
+    def show_reset_confirmation(self):
+        """Mostra o diálogo de confirmação de reset"""
+        if not self.reset_confirmation_active:
+            self.reset_confirmation_active = True
+            self.reset_confirmation_timer = 0
+            sound_manager.play_effect(SoundEffect.CLICK)
+
+    def _execute_reset(self):
+        """Executa o reset do progresso"""
+        print("[MENU] === INICIANDO RESET DE PROGRESSO ===")
+
+        try:
+            # ===== 1. RESETA O JOGADOR =====
+            # Limpa time e box
+            self.game.player.team.clear()
+            self.game.player.pc_box.clear()
+
+            # Reseta recursos
+            self.game.player.money = 100
+            self.game.player.score = 0
+
+            # Reseta Pokédex
+            self.game.player.seen_pokemon.clear()
+            self.game.player.caught_pokemon.clear()
+
+            # Reseta conquistas
+            self.game.player.achievements = {
+                "unlocked": [],
+                "counters": {},
+                "unlocked_data": {}
+            }
+
+            # Reseta desfossilizadores
+            self.game.player.desfossilizadores.clear()
+            if hasattr(self.game.player, '_add_initial_desfossilizador'):
+                self.game.player._add_initial_desfossilizador()
+
+            # Reseta flags
+            self.game.player.has_chosen_starter = False
+            self.game.player.total_playtime = 0.0
+
+            # Reseta Mystery Gift
+            self.game.player.redeemed_codes = {}
+            self.game.player.mystery_gift_history = []
+
+            # Reseta posição
+            self.game.player.x = 100
+            self.game.player.y = 100
+
+            # Reseta bag
+            self.game.player.bag.items = {}
+            if hasattr(self.game.player.bag, '_update_filtered_items'):
+                self.game.player.bag._update_filtered_items()
+
+            print("[MENU] Dados do jogador resetados em memória")
+
+            # ===== 2. DELETA OS ARQUIVOS DE SAVE =====
+            saves_dir = "saves"
+            deleted_count = 0
+
+            if os.path.exists(saves_dir):
+                for i in range(1, 4):  # Slots 1-3
+                    save_file = os.path.join(saves_dir, f"save_{i}.json")
+                    if os.path.exists(save_file):
+                        try:
+                            os.remove(save_file)
+                            deleted_count += 1
+                            print(f"[MENU] Save {i} deletado: {save_file}")
+                        except Exception as e:
+                            print(f"[MENU] Erro ao deletar save {i}: {e}")
+
+                # Também deleta arquivos pickle se existirem
+                for i in range(1, 4):
+                    pickle_file = os.path.join(saves_dir, f"save_{i}.pkl")
+                    if os.path.exists(pickle_file):
+                        try:
+                            os.remove(pickle_file)
+                            print(f"[MENU] Pickle {i} deletado: {pickle_file}")
+                        except Exception as e:
+                            pass
+            else:
+                print("[MENU] Pasta de saves não encontrada")
+
+            print(f"[MENU] {deleted_count} arquivo(s) de save deletado(s)")
+
+            # ===== 3. RESETA O SAVE_MANAGER =====
+            from src.managers.save_manager import save_manager
+            save_manager.current_save_file = None
+            save_manager.save_data = save_manager._get_default_save_data()
+            print("[MENU] SaveManager resetado")
+
+            # ===== 4. CRIA UM NOVO SAVE INICIAL =====
+            from src.config.progress import progress_manager
+            game_state = {
+                "current_chapter": 1,
+                "current_phase": 1,
+                "unlocked_chapters": [1],
+                "unlocked_phases": ["1-1"],
+                "completed_phases": [],
+                "stars": {}
+            }
+
+            success = save_manager.save_game(
+                self.game.player,
+                game_state,
+                save_name="Save 1",
+                slot=1
+            )
+
+            if success:
+                print("[MENU] Novo save inicial criado com sucesso!")
+                progress_manager._load_settings_from_save()
+            else:
+                print("[MENU] ERRO: Não foi possível criar o novo save inicial!")
+
+            # ===== 5. FECHA A CONFIRMAÇÃO =====
+            self.reset_confirmation_active = False
+
+            # ===== 6. ATUALIZA O MENU =====
+            # Recria os botões com o novo estado
+            self._refresh_buttons()
+
+            print("[MENU] === RESET DE PROGRESSO CONCLUÍDO ===")
+
+            # Toca som de confirmação
+            sound_manager.play_effect(SoundEffect.CLICK)
+
+        except Exception as e:
+            print(f"[MENU] ERRO durante o reset: {e}")
+            import traceback
+            traceback.print_exc()
+            self.reset_confirmation_active = False
+
+    def _refresh_buttons(self):
+        """Recria os botões com o estado atualizado do jogador"""
+        has_starter = getattr(self.game.player, 'has_chosen_starter', False)
+
+        if has_starter:
+            start_text = "Continuar Jogo"
+        else:
+            start_text = "Iniciar Jogo"
+
+        # Atualiza o texto do primeiro botão
+        self.buttons[0].text = start_text
+        # Força a re-renderização do texto
+        self.buttons[0].text_surface = None
 
     def fixed_update(self, dt):
         """Update para animações"""
@@ -192,6 +382,10 @@ class MenuScene(BaseScene):
                 particle['vel'].x *= -1
             if particle['x'].y < 0 or particle['x'].y > self.screen_manager.render_height:
                 particle['vel'].y *= -1
+
+        # Atualiza timer da confirmação
+        if self.reset_confirmation_active:
+            self.reset_confirmation_timer += dt
 
     def render(self, screen):
         """Renderiza o menu"""
@@ -232,8 +426,120 @@ class MenuScene(BaseScene):
         version_y = self.screen_manager.viewport_y + self.screen_manager.viewport_height - 25
         screen.blit(version_text, (version_x, version_y))
 
+        # ===== RENDERIZA DIÁLOGO DE CONFIRMAÇÃO DE RESET =====
+        if self.reset_confirmation_active:
+            self._render_reset_confirmation(screen)
+
         if self.paused:
             self._render_pause_overlay(screen)
+
+    def _render_reset_confirmation(self, screen):
+        """Renderiza o diálogo de confirmação de reset"""
+        vx = self.screen_manager.viewport_x
+        vy = self.screen_manager.viewport_y
+        vw = self.screen_manager.viewport_width
+        vh = self.screen_manager.viewport_height
+
+        # Overlay escuro
+        overlay = pygame.Surface((self.screen_manager.window_width, self.screen_manager.window_height))
+        overlay.set_alpha(180)
+        overlay.fill((0, 0, 0))
+        screen.blit(overlay, (0, 0))
+
+        # Container do diálogo
+        container_width = int(vw * 0.5)
+        container_height = int(vh * 0.4)
+        container_x = vx + (vw - container_width) // 2
+        container_y = vy + (vh - container_height) // 2 - 40
+
+        container_rect = pygame.Rect(container_x, container_y, container_width, container_height)
+
+        # Fundo do container com borda vermelha
+        pygame.draw.rect(screen, (30, 20, 20), container_rect, border_radius=15)
+        pygame.draw.rect(screen, (200, 40, 40), container_rect, 3, border_radius=15)
+        pygame.draw.rect(screen, (255, 60, 60), container_rect.inflate(-6, -6), 1, border_radius=12)
+
+        # ===== TÍTULO =====
+        title_font = pygame.font.Font(None, int(vh * 0.045))
+        title_text = title_font.render("RESETAR PROGRESSO", True, (255, 80, 80))
+        title_x = container_x + (container_width - title_text.get_width()) // 2
+        title_y = container_y + int(container_height * 0.08)
+        screen.blit(title_text, (title_x, title_y))
+
+        # ===== MENSAGEM DE AVISO =====
+        warn_font = pygame.font.Font(None, int(vh * 0.022))
+
+        warn_lines = [
+            "Voce esta prestes a APAGAR TODO o seu progresso!",
+            "",
+            "Isso ira:",
+            "- Deletar todos os seus Pokemon",
+            "- Resetar seu dinheiro e itens",
+            "- Apagar todas as conquistas",
+            "- Deletar todos os saves",
+            "",
+            "Esta acao e IRREVERSIVEL!",
+        ]
+
+        line_y = title_y + title_text.get_height() + int(container_height * 0.05)
+        line_spacing = int(vh * 0.025)
+
+        for line in warn_lines:
+            if line:
+                if "IRREVERSIVEL" in line:
+                    color = (255, 80, 80)
+                    warn_font_bold = pygame.font.Font(None, int(vh * 0.026))
+                    text_surface = warn_font_bold.render(line, True, color)
+                elif "APAGAR TODO" in line:
+                    color = (255, 200, 100)
+                    text_surface = warn_font.render(line, True, color)
+                else:
+                    color = (200, 200, 200)
+                    text_surface = warn_font.render(line, True, color)
+                text_x = container_x + (container_width - text_surface.get_width()) // 2
+                screen.blit(text_surface, (text_x, line_y))
+            line_y += line_spacing
+
+        # ===== BOTÕES DE CONFIRMAÇÃO =====
+        button_width = 120
+        button_height = 50
+        spacing = 20
+        total_width = button_width * 2 + spacing
+        start_x = container_x + (container_width - total_width) // 2
+        button_y = container_y + container_height - button_height - int(container_height * 0.08)
+
+        # Botão SIM (vermelho)
+        yes_rect = pygame.Rect(start_x, button_y, button_width, button_height)
+        mouse_pos = pygame.mouse.get_pos()
+        yes_hover = yes_rect.collidepoint(mouse_pos)
+
+        yes_color = (180, 40, 40) if yes_hover else (140, 30, 30)
+        pygame.draw.rect(screen, yes_color, yes_rect, border_radius=10)
+        pygame.draw.rect(screen, (255, 80, 80) if yes_hover else (200, 60, 60), yes_rect, 2, border_radius=10)
+
+        yes_font = pygame.font.Font(None, int(vh * 0.03))
+        yes_text = yes_font.render("SIM", True, (255, 255, 255))
+        yes_text_x = yes_rect.x + (yes_rect.width - yes_text.get_width()) // 2
+        yes_text_y = yes_rect.y + (yes_rect.height - yes_text.get_height()) // 2
+        screen.blit(yes_text, (yes_text_x, yes_text_y))
+
+        # Botão NÃO (cinza)
+        no_rect = pygame.Rect(start_x + button_width + spacing, button_y, button_width, button_height)
+        no_hover = no_rect.collidepoint(mouse_pos)
+
+        no_color = (80, 80, 80) if no_hover else (60, 60, 60)
+        pygame.draw.rect(screen, no_color, no_rect, border_radius=10)
+        pygame.draw.rect(screen, (120, 120, 120) if no_hover else (100, 100, 100), no_rect, 2, border_radius=10)
+
+        no_font = pygame.font.Font(None, int(vh * 0.03))
+        no_text = no_font.render("NAO", True, (255, 255, 255))
+        no_text_x = no_rect.x + (no_rect.width - no_text.get_width()) // 2
+        no_text_y = no_rect.y + (no_rect.height - no_text.get_height()) // 2
+        screen.blit(no_text, (no_text_x, no_text_y))
+
+        # Armazena os rects para detecção de clique
+        self._confirm_yes_rect = yes_rect
+        self._confirm_no_rect = no_rect
 
     def _draw_gradient_background(self, screen):
         """Desenha fundo com gradiente"""
