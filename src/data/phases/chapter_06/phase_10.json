@@ -1852,7 +1852,27 @@
         ]
     },
     "events": {
-        "triggers": [],
+        "triggers": [
+            {
+                "trigger_type": "start_phase",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 1.0,
+                        "pause_game": true,
+                        "message_text": "Me mostre o fogo que tem dentro de voce, e eu te mostro como se apaga fogo com fogo!",
+                        "speaker_name": "Blaine",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/LEADER_Blaine.png",
+                        "action_label": "Vamos lá!",
+                        "action_trigger": ""
+                    }
+                ]
+            }
+        ],
         "selected_trigger": 0
     },
     "rewards": {

@@ -1854,7 +1854,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 51,
-                        "percentage": 100
+                        "percentage": 100.0
                     }
                 ],
                 "min_level": 57,
@@ -1863,7 +1863,10 @@
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             },
             {
                 "wave_index": 1,
@@ -1873,7 +1876,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 111,
-                        "percentage": 100
+                        "percentage": 100.0
                     }
                 ],
                 "min_level": 57,
@@ -1882,7 +1885,10 @@
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             },
             {
                 "wave_index": 2,
@@ -1892,7 +1898,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 31,
-                        "percentage": 100
+                        "percentage": 100.0
                     }
                 ],
                 "min_level": 60,
@@ -1901,7 +1907,10 @@
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             },
             {
                 "wave_index": 3,
@@ -1911,7 +1920,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 34,
-                        "percentage": 100
+                        "percentage": 100.0
                     }
                 ],
                 "min_level": 60,
@@ -1920,7 +1929,10 @@
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             },
             {
                 "wave_index": 4,
@@ -1930,7 +1942,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 112,
-                        "percentage": 100
+                        "percentage": 100.0
                     }
                 ],
                 "min_level": 62,
@@ -1939,10 +1951,16 @@
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             }
         ],
-        "selected_wave": 3
+        "selected_wave": 3,
+        "templates": {
+            "templates": []
+        }
     },
     "tower_spots": {
         "spot_size": 24,
@@ -2095,7 +2113,27 @@
         ]
     },
     "events": {
-        "triggers": [],
+        "triggers": [
+            {
+                "trigger_type": "start_phase",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 1.0,
+                        "pause_game": true,
+                        "message_text": "Então... você finalmente chegou até aqui. Não vou mentir, estou impressionado que um treinador comum tenha derrotado meus melhores subordinados. Mas agora você está diante do verdadeiro líder de Viridian. E, mais importante... diante do verdadeiro líder da Equipe Rocket. Vamos ver se sua jornada termina em glória... ou em ruínas.",
+                        "speaker_name": "Giovanni",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/LEADER_Giovanni.png",
+                        "action_label": "Vamos lá!",
+                        "action_trigger": ""
+                    }
+                ]
+            }
+        ],
         "selected_trigger": 0
     },
     "rewards": {
@@ -2103,5 +2141,7 @@
         "experience": 700
     },
     "localization_type": "default",
-    "custom_folder": ""
+    "custom_folder": "",
+    "day_night_mode": "random",
+    "base_weather": "random"
 }

@@ -712,7 +712,27 @@
         ]
     },
     "events": {
-        "triggers": [],
+        "triggers": [
+            {
+                "trigger_type": "start_phase",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 1.0,
+                        "pause_game": true,
+                        "message_text": "Sinta o peso do chão sob seus pés. Sinta a firmeza que antecede o desmoronamento. Cada golpe seu vai ser absorvido pela minha defesa... cada hesitação sua vai ser uma avalanche te soterrando. Que a batalha comece... e que você aprenda que a montanha nunca se curva ao vento.",
+                        "speaker_name": "Brock",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/LEADER_Brock.png",
+                        "action_label": "Vamos lá!",
+                        "action_trigger": ""
+                    }
+                ]
+            }
+        ],
         "selected_trigger": 0
     },
     "rewards": {

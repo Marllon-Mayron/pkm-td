@@ -908,7 +908,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 25,
-                        "percentage": 100
+                        "percentage": 100.0
                     }
                 ],
                 "min_level": 22,
@@ -917,7 +917,10 @@
                 "spawn_interval": 6.0,
                 "initial_delay": 6.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             },
             {
                 "wave_index": 1,
@@ -927,7 +930,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 100,
-                        "percentage": 100
+                        "percentage": 100.0
                     }
                 ],
                 "min_level": 25,
@@ -936,7 +939,10 @@
                 "spawn_interval": 3.0,
                 "initial_delay": 16.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             },
             {
                 "wave_index": 2,
@@ -946,7 +952,7 @@
                 "enemies": [
                     {
                         "pokemon_id": 26,
-                        "percentage": 100
+                        "percentage": 100.0
                     }
                 ],
                 "min_level": 27,
@@ -955,10 +961,16 @@
                 "spawn_interval": 3.0,
                 "initial_delay": 16.0,
                 "repeat_wave": false,
-                "repeat_count": 1
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
             }
         ],
-        "selected_wave": 2
+        "selected_wave": 2,
+        "templates": {
+            "templates": []
+        }
     },
     "tower_spots": {
         "spot_size": 24,
@@ -997,7 +1009,27 @@
         ]
     },
     "events": {
-        "triggers": [],
+        "triggers": [
+            {
+                "trigger_type": "start_phase",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 1.0,
+                        "pause_game": true,
+                        "message_text": "SVocê entrou no meu circuito. Aqui, a batalha não espera ninguém... ela começa e termina num piscar de olhos. Pronto para sentir a descarga de uma verdade que chega mais rápido que seus olhos podem ver? ",
+                        "speaker_name": "Surge",
+                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/LEADER_Surge.png",
+                        "action_label": "Vamos lá!",
+                        "action_trigger": ""
+                    }
+                ]
+            }
+        ],
         "selected_trigger": 0
     },
     "rewards": {
@@ -1005,5 +1037,7 @@
         "experience": 0
     },
     "localization_type": "default",
-    "custom_folder": ""
+    "custom_folder": "",
+    "day_night_mode": "random",
+    "base_weather": "random"
 }
