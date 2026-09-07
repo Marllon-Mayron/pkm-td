@@ -431,6 +431,21 @@ class ItemBagCatalog:
                 "unlock_chapter": None
             }
 
+        items["escaperope"] = {
+            "id": "escaperope",
+            "name": "ESCAPEROPE",
+            "sprite_path": battle_items_path / "ESCAPEROPE.png",
+            "description": "Foge da fase sem penalidades. O Pokémon precisa estar vivo!",
+            "category": "battle_item",
+            "usable_in_battle": False,
+            "usable_on_map": True,
+            "effect": "escape_phase",
+            "effect_value": None,
+            "price": 400,
+            "unlock_phase": "1-3",
+            "unlock_chapter": None
+        }
+
         fossils = [
             ("helix_fossil", "HELIX FOSSIL", "HELIXFOSSIL.png", "Omanyte/Omastar"),
             ("dome_fossil", "DOME FOSSIL", "DOMEFOSSIL.png", "Kabuto/Kabutops"),

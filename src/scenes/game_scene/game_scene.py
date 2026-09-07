@@ -619,9 +619,21 @@ class GameScene(BaseScene):
                     return True
                 return False
 
+        # ===== ITENS DE BATALHA =====
         elif effect == "battle_stat_boost":
             if target_type == "ally":
                 return self._apply_battle_item(target, item_data)
+
+        elif effect == "escape_phase":
+            if target_type == "ally":
+                # Verifica se o Pokémon está vivo
+                if not target.is_alive():
+                    toast_warning(f"{target.name} está derrotado! Não pode usar ESCAPEROPE.", duration=2.0)
+                    return {"consume_item": False, "success": False}
+
+                # Fuga sem penalidades
+                self.escape_phase()
+                return {"consume_item": True, "success": True}
 
         # ===== PEDRA DE EVOLUÇÃO =====
         elif effect == "evolution":
@@ -1047,6 +1059,54 @@ class GameScene(BaseScene):
             return True
 
         return False
+
+    def escape_phase(self):
+        """
+        Escapa da fase usando ESCAPEROPE - SEM penalidades.
+        Não remove felicidade, não conta como derrota.
+        Volta para a tela de seleção de time.
+        """
+        from src.managers.sounds.sound_manager import sound_manager
+        from src.ui.toast_renderer import toast_info
+
+        print(f"[ESCAPEROPE] Jogador fugiu da fase {self.phase_id}!")
+
+        # Para a música
+        sound_manager.stop_music(fade_ms=500)
+
+        # Reseta Dittos transformados
+        self.reset_all_transformed_dittos()
+
+        # Fecha qualquer overlay ativo
+        self.overlay_manager.hide()
+        if hasattr(self, 'move_learn_overlay') and self.move_learn_overlay:
+            self.move_learn_overlay.active = False
+            self.move_learn_overlay = None
+        if hasattr(self, 'evolution_overlay') and self.evolution_overlay:
+            self.evolution_overlay.active = False
+            self.evolution_overlay = None
+        if hasattr(self, 'move_select_overlay') and self.move_select_overlay:
+            self.move_select_overlay.active = False
+            self.move_select_overlay = None
+
+        # Reseta o estado da fase
+        self.paused = False
+        self.game_paused = False
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = False
+
+        # Reseta os Pokémon (cura)
+        for pokemon in self.player.team:
+            pokemon.reset(self)
+
+        # Volta para a tela de seleção de time
+        from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
+        self.game.current_scene = TeamSelectScene(self.game, self.chapter_id, self.phase_number)
+
+        # Mensagem de confirmação
+        toast_info("Você fugiu da fase sem penalidades!", duration=3.0)
+
+        print(f"[ESCAPEROPE] Fuga concluída com sucesso, voltando para seleção de time!")
 
     # ===== MÉTODOS DE POSICIONAMENTO =====
 
@@ -1522,6 +1582,41 @@ class GameScene(BaseScene):
 
         return None
 
+    def handle_give_up(self):
+        """
+        Lida com a desistência do jogador (via botão DESISTIR! no pause overlay).
+        Conta como derrota: remove felicidade e mostra game over.
+        """
+        from src.managers.sounds.sound_manager import sound_manager
+
+        print(f"[GAME_SCENE] Jogador desistiu da fase {self.phase_id}!")
+
+        # Remove felicidade dos Pokémon (penalidade por desistir)
+        for pokemon in self.player.team:
+            pokemon.add_happiness(-15, "Desistiu da fase")
+
+        # Reseta Dittos transformados
+        self.reset_all_transformed_dittos()
+
+        # Reseta o estado da fase
+        self.paused = False
+        self.game_paused = False
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = False
+
+        # Reseta os Pokémon (cura) para o próximo jogo
+        for pokemon in self.player.team:
+            pokemon.reset(self)
+
+        # Marca como game over (motivo: desistência)
+        self.game_state = "game_over"
+
+        # Mostra overlay de game over com motivo "team_defeated" (ou um motivo específico)
+        # Vamos passar "team_defeated" porque a desistência é similar a ser derrotado
+        self.overlay_manager.show(OverlayType.GAME_OVER, reason="team_defeated")
+
+        print(f"[GAME_SCENE] Desistência registrada como derrota!")
+
     # ===== MÉTODO FIXED_UPDATE  =====
 
     def fixed_update(self, dt):
@@ -1657,7 +1752,8 @@ class GameScene(BaseScene):
             self.game_state = "game_over"
             for pokemon in self.player.team:
                 pokemon.add_happiness(-5, "Fase perdida")
-            self.overlay_manager.show(OverlayType.GAME_OVER)
+            # ===== PASSA O MOTIVO CORRETO =====
+            self.overlay_manager.show(OverlayType.GAME_OVER, reason="team_defeated")
 
             for pokemon in self.player.team:
                 pokemon.reset(self)
@@ -1670,7 +1766,8 @@ class GameScene(BaseScene):
             self.game_state = "game_over"
             for pokemon in self.player.team:
                 pokemon.add_happiness(-5, "Fase perdida")
-            self.overlay_manager.show(OverlayType.GAME_OVER)
+            # ===== PASSA O MOTIVO CORRETO =====
+            self.overlay_manager.show(OverlayType.GAME_OVER, reason="items_stolen")
 
             for pokemon in self.player.team:
                 pokemon.reset(self)
@@ -1714,7 +1811,8 @@ class GameScene(BaseScene):
                     else:
                         print("[GAME] GAME OVER! Todos os itens foram roubados!")
                         self.game_state = "game_over"
-                        self.overlay_manager.show(OverlayType.GAME_OVER)
+                        # ===== PASSA O MOTIVO CORRETO =====
+                        self.overlay_manager.show(OverlayType.GAME_OVER, reason="items_stolen")
 
         perf_monitor.end_section()
 

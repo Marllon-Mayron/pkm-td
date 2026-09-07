@@ -156,18 +156,19 @@ class ItemDragManager:
             self._check_tm_target(allied_pokemon, screen_pos, camera)
 
         elif self.drag_item_data["category"] == "battle_item":
-            self._check_battle_item_target(allied_pokemon, screen_pos, camera)
+            # Verifica se é ESCAPEROPE (efeito especial)
+            if self.drag_item_data.get("effect") == "escape_phase":
+                self._check_escape_target(allied_pokemon, screen_pos, camera)
+            else:
+                self._check_battle_item_target(allied_pokemon, screen_pos, camera)
 
         # ===== LIMPA MENSAGEM DE ERRO SE O ALVO MUDOU =====
-        # Se não tem alvo hovered OU o alvo mudou, limpa a mensagem de erro
         if self.hovered_target is None:
-            # Não está mais sobre nenhum alvo
             if self.error_message is not None:
                 self.error_message = None
                 self.error_message_timer = 0
                 self.error_message_target = None
         elif self.error_message_target is not None and self.error_message_target != self.hovered_target:
-            # Mudou de alvo, limpa mensagem de erro antiga
             self.error_message = None
             self.error_message_timer = 0
             self.error_message_target = None
@@ -265,6 +266,29 @@ class ItemDragManager:
         """Verifica alvo para itens de batalha (aliados)"""
         for ally in allies:
             if self._is_target_valid(ally, screen_pos, camera):
+                self.hovered_target = ally
+                self.target_type = "ally"
+                self.valid_target = True
+                if self.error_message_target == ally:
+                    self.error_message = None
+                    self.error_message_timer = 0
+                    self.error_message_target = None
+                break
+
+    def _check_escape_target(self, allies, screen_pos, camera):
+        """Verifica alvo para ESCAPEROPE (aliado vivo)"""
+        for ally in allies:
+            if self._is_target_valid(ally, screen_pos, camera):
+                # Verifica se o Pokémon está vivo
+                if not ally.is_alive():
+                    self.error_message = f"{ally.name} está derrotado! ESCAPEROPE não funciona."
+                    self.error_message_timer = 0.5
+                    self.error_message_target = ally
+                    self.valid_target = False
+                    self.hovered_target = ally
+                    self.target_type = "ally"
+                    return
+
                 self.hovered_target = ally
                 self.target_type = "ally"
                 self.valid_target = True
@@ -595,7 +619,6 @@ class ItemDragManager:
             ]
             color = (255, 100, 100)
         elif self.error_message and self.error_message_target == self.hovered_target:
-            # Mostra instrução de erro
             instructions = [
                 self.error_message[:40],
                 "Clique DIREITO para cancelar",
@@ -603,7 +626,16 @@ class ItemDragManager:
             ]
             color = (255, 150, 150)
         elif self.drag_item_data:
-            if self.drag_item_data["category"] == "pokeball":
+            # ===== ESCAPEROPE =====
+            if self.drag_item_data.get("effect") == "escape_phase":
+                instructions = [
+                    f"{self.drag_item_data['name']} - Fuja da fase sem penalidades!",
+                    "Arraste até um Pokémon VIVO",
+                    "Clique DIREITO para soltar",
+                    "ESC para cancelar"
+                ]
+                color = (255, 215, 0)
+            elif self.drag_item_data["category"] == "pokeball":
                 instructions = [
                     f"{self.drag_item_data['name']} - Arraste até um Pokémon selvagem",
                     "Clique DIREITO para soltar",
@@ -624,6 +656,13 @@ class ItemDragManager:
                     "ESC para cancelar"
                 ]
                 color = (255, 215, 0)
+            elif self.drag_item_data["category"] == "battle_item":
+                instructions = [
+                    f"{self.drag_item_data['name']} - Arraste até um Pokémon aliado",
+                    "Clique DIREITO para soltar",
+                    "ESC para cancelar"
+                ]
+                color = (255, 200, 100)
             else:
                 instructions = [
                     f"{self.drag_item_data['name']}",
@@ -632,13 +671,6 @@ class ItemDragManager:
                 ]
                 color = (255, 255, 255)
 
-        elif self.drag_item_data["category"] == "battle_item":
-            instructions = [
-                f"{self.drag_item_data['name']} - Arraste até um Pokémon aliado",
-                "Clique DIREITO para soltar",
-                "ESC para cancelar"
-            ]
-            color = (255, 200, 100)
         else:
             instructions = ["Arraste o item", "Clique DIREITO para soltar", "ESC para cancelar"]
             color = (255, 255, 255)
@@ -662,7 +694,8 @@ class ItemDragManager:
 
         y = bg_y + 5
         for text in instructions:
-            text_color = color if "BOSS" in text or "Arraste" in text or "Pokémon" in text else (200, 200, 200)
+            text_color = color if "BOSS" in text or "Arraste" in text or "Pokémon" in text or "fuja" in text.lower() else (
+                200, 200, 200)
             text_surf = font.render(text, True, text_color)
             screen.blit(text_surf, (bg_x + 10, y))
             y += 22

@@ -38,7 +38,7 @@ class PauseOverlay(BaseOverlay):
         self.buttons = [
             {"text": "VOLTAR AO JOGO", "callback": self._resume_game},
             {"text": "CONFIGURAÇÕES", "callback": self._open_settings},
-            {"text": "VOLTAR AO MENU", "callback": self._return_to_menu},
+            {"text": "DESISTIR!", "callback": self._give_up},  # Mudado de "VOLTAR AO MENU"
         ]
 
     def _get_font(self, size, bold=False):
@@ -79,6 +79,7 @@ class PauseOverlay(BaseOverlay):
             self.game_scene.wave_manager.paused = True
 
         self.active = True
+        # Import local para evitar circular
         from src.scenes.game_scene.components.managers.overlay_manager import OverlayType
         self.game_scene.overlay_manager.current_overlay = self
         self.game_scene.overlay_manager.current_type = OverlayType.PAUSE
@@ -88,11 +89,21 @@ class PauseOverlay(BaseOverlay):
         from src.managers.sounds.sound_manager import sound_manager
         sound_manager.play_random_battle_music()
 
-    def _return_to_menu(self):
-        self.game_scene.cleanup()
+    def _give_up(self):
+        """
+        DESISTIR - Delega para a game_scene tratar.
+        """
+        from src.managers.sounds.sound_manager import sound_manager
+
+        # Para a música
+        sound_manager.stop_music(fade_ms=500)
+
+        # Fecha o overlay de pausa
         self.active = False
         self.game_scene.overlay_manager.hide()
-        self.game_scene.game.current_scene = self.game_scene.game.menu_scene
+
+        # Delega para a game_scene lidar com a desistência
+        self.game_scene.handle_give_up()
 
     def handle_event(self, event):
         if not self.active:
@@ -216,7 +227,7 @@ class PauseOverlay(BaseOverlay):
 
         num_buttons = len(self.buttons)
         btn_w = int(panel_w * 0.72)
-        btn_h = int(panel_h * 0.16)   # mais altos
+        btn_h = int(panel_h * 0.16)
 
         available_height = panel_h - (line_y + 30 - panel_y) - int(panel_h * 0.06)
         total_height = num_buttons * btn_h
@@ -243,13 +254,23 @@ class PauseOverlay(BaseOverlay):
 
             # Fundo – hover amarelo
             if is_hovered:
-                bg_color = self.colors['button_bg_hover']  # amarelo
+                bg_color = self.colors['button_bg_hover']
                 border_color = (255, 255, 255)
-                text_color = self.colors['button_text_hover']  # preto
+                text_color = self.colors['button_text_hover']
             else:
                 bg_color = self.colors['button_bg']
                 border_color = (140, 150, 200)
                 text_color = self.colors['button_text']
+
+            # Para o botão "DESISTIR!", destaque especial
+            if i == 2:  # Índice do botão DESISTIR
+                if not is_hovered:
+                    bg_color = (120, 30, 30)
+                    border_color = (200, 80, 80)
+                else:
+                    bg_color = (255, 100, 100)
+                    border_color = (255, 255, 255)
+                    text_color = (0, 0, 0)
 
             # Gradiente
             for j in range(btn_h):
