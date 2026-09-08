@@ -167,7 +167,7 @@ class ShopItemCard:
 
         # Se está bloqueado, mostra a fase necessária
         if self.is_locked and self.unlock_phase:
-            lock_text = fonts['small'].render(f"🔒 Desbloqueia na fase {self.unlock_phase}", True, (200, 180, 100))
+            lock_text = fonts['small'].render(f"Desbloqueia na fase {self.unlock_phase}", True, (200, 180, 100))
             screen.blit(lock_text, (self.rect.x + 60, self.rect.y + 52))
 
         # DESCRIÇÃO
@@ -332,6 +332,7 @@ class CategorySelector:
             ("tm", "TMs/HMs"),
             ("items", "Itens"),
             ("fossil", "Fósseis"),
+            ("held_item", "Seguráveis"),
         ]
         self.categories_per_page = 3
         self.current_page = 0

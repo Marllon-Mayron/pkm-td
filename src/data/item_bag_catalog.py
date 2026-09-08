@@ -482,6 +482,67 @@ class ItemBagCatalog:
                 "unlock_phase": "999-999",
                 "unlock_chapter": None
             }
+
+        # ===== HELD ITEMS (ITENS SEGURÁVEIS) =====
+        # Adicione esta seção após os fósseis (fossils) e antes do return items
+
+        held_items_path = self.base_path / "held-itens"
+
+        held_items = [
+            # Inseto
+            ("silverpowder", "SILVERPOWDER", "Aumenta o poder de golpes do tipo Inseto em 10%.", "held_item", 6000),
+            # Fogo
+            ("charcoal", "CHARCOAL", "Aumenta o poder de golpes do tipo Fogo em 10%.", "held_item", 6000),
+            # Dragão (na 2ª geração, Dragon Scale é o que funciona)
+            ("dragonfang", "DRAGONFANG", "Aumenta o poder de golpes do tipo Dragão em 10%.", "held_item", 6000),
+            # Pedra
+            ("hardstone", "HARDSTONE", "Aumenta o poder de golpes do tipo Pedra em 10%.", "held_item"),
+            # Elétrico
+            ("magnet", "MAGNET", "Aumenta o poder de golpes do tipo Elétrico em 10%.", "held_item"),
+            # Aço
+            ("metalcoat", "METALCOAT", "Aumenta o poder de golpes do tipo Aço em 10%.", "held_item"),
+            # Grama
+            ("miracleseed", "MIRACLESEED", "Aumenta o poder de golpes do tipo Grama em 10%.", "held_item"),
+            # Água
+            ("mysticwater", "MYSTICWATER", "Aumenta o poder de golpes do tipo Água em 10%.", "held_item"),
+            # Gelo
+            ("nevermeltice", "NEVERMELTICE", "Aumenta o poder de golpes do tipo Gelo em 10%.", "held_item"),
+            # Veneno
+            ("poisonbarb", "POISONBARB", "Aumenta o poder de golpes do tipo Veneno em 10%.", "held_item"),
+            # Voador
+            ("sharpbeak", "SHARPBEAK", "Aumenta o poder de golpes do tipo Voador em 10%.", "held_item"),
+            # Terrestre
+            ("softsand", "SOFTSAND", "Aumenta o poder de golpes do tipo Terrestre em 10%.", "held_item"),
+            # Normal
+            ("silkscarf", "SILKSCARF", "Aumenta o poder de golpes do tipo Normal em 10%.", "held_item"),
+            # Psíquico
+            ("twistedspoon", "TWISTEDSPOON", "Aumenta o poder de golpes do tipo Psíquico em 10%.", "held_item"),
+            # Lutador
+            ("blackbelt", "BLACKBELT", "Aumenta o poder de golpes do tipo Lutador em 10%.", "held_item"),
+            # Sombrio
+            ("blackglasses", "BLACKGLASSES", "Aumenta o poder de golpes do tipo Sombrio em 10%.", "held_item"),
+            # Fantasma
+            ("spelltag", "SPELLTAG", "Aumenta o poder de golpes do tipo Fantasma em 10%.", "held_item"),
+        ]
+
+        for item_id, name, description, category in held_items:
+            items[item_id] = {
+                "id": item_id,
+                "name": name,
+                "sprite_path": held_items_path / f"{name}.png",
+                "description": description,
+                "category": category,  # "held_item"
+                "usable_in_battle": False,
+                "usable_on_map": False,
+                "effect": "held_item_boost",
+                "effect_value": {
+                    "type_boost": 1.1,  # 10% de aumento
+                },
+                "price": 6000,
+                "unlock_phase": None,
+                "unlock_chapter": None
+            }
+
         # ===== TMs/HMs =====
         # Lista de TMs: (id, nome, sprite_file, move_name, unlock_phase, price)
         tms = [

@@ -3,6 +3,9 @@
 import pygame
 import random
 import math
+
+from data.item_bag_catalog import item_bag_catalog
+from src.scenes.team_select_scene.components.held_item_dropdown import HeldItemDropdown
 from src.data.pokedex import Pokedex
 from src.battle.effects.effect_factory import EffectFactory
 from src.data.move_data import MoveData
@@ -25,6 +28,27 @@ class PokemonModal:
         self.total_pages = 3
         self.confirmation_active = False
         self._setup_dimensions()
+
+        # ===== ITEM SEGURÁVEL =====
+        self.held_item_dropdown = HeldItemDropdown(
+            x=0,
+            y=0,
+            width=280,
+            max_visible=4
+        )
+        self.held_item_dropdown.on_select = self._on_held_item_selected
+        self.held_item_dropdown.on_close = self._on_held_item_closed
+
+        # Botão para abrir o dropdown
+        self.dropdown_button_rect = pygame.Rect(0, 0, 100, 28)
+
+        # Atualiza a lista de itens disponíveis
+        self._update_held_items_list()
+
+        # Mensagem de feedback
+        self.feedback_message = None
+        self.feedback_timer = 0.0
+        self.feedback_color = (255, 255, 255)
 
         # ===== CACHE DE SPRITE (PARA ATUALIZAR APÓS EVOLUÇÃO) =====
         self._cached_sprite = None
@@ -322,6 +346,207 @@ class PokemonModal:
 
         return "Um movimento que causa dano ao oponente."
 
+    def _update_held_items_list(self):
+        """Atualiza a lista de itens seguráveis disponíveis"""
+        held_items = self.game.player.bag.get_held_items()
+
+        items = []
+        current_held = self.pokemon.held_item
+
+        for item in held_items:
+            if current_held and item["id"] == current_held:
+                continue
+            if item["quantity"] <= 0:
+                continue
+            items.append({
+                "id": item["id"],
+                "data": item["data"],
+                "quantity": item["quantity"]
+            })
+
+        self.held_item_dropdown.set_items(items)
+
+    def _on_held_item_selected(self, selected_item):
+        """Callback quando um item segurável é selecionado"""
+        item_id = selected_item["id"]
+        success, message = self.game.player.bag.equip_held_item(self.pokemon, item_id)
+
+        if success:
+            self._update_held_items_list()
+            # Remove os botões antigos
+            if hasattr(self, '_remove_button_rect'):
+                self._remove_button_rect = None
+            if hasattr(self, '_equip_button_rect'):
+                self._equip_button_rect = None
+            print(f"[HELD_ITEM] {self.pokemon.name} agora segura {selected_item['data']['name']}")
+
+    def _on_held_item_closed(self):
+        """Callback quando o dropdown é fechado"""
+        pass
+
+    def _show_feedback(self, message, color):
+        """Mostra uma mensagem de feedback temporária"""
+        self.feedback_message = message
+        self.feedback_timer = 2.0  # 2 segundos
+        self.feedback_color = color
+
+    def _render_held_item_section(self, screen, x, y, width):
+        """Renderiza a seção de item segurável (destacada, com sprite grande)"""
+        from src.data.item_bag_catalog import item_bag_catalog
+
+        # ===== FONTES MAIORES =====
+        title_font = pygame.font.Font(None, 18)
+        label_font = pygame.font.Font(None, 15)
+        value_font = pygame.font.Font(None, 17)
+        button_font = pygame.font.Font(None, 15)
+
+        # ===== TÍTULO DA SEÇÃO (DESTACADO) =====
+        title_text = title_font.render("ITEM SEGURÁVEL", True, self.colors['text_accent'])
+        screen.blit(title_text, (x, y))
+
+        # Linha separadora mais grossa
+        pygame.draw.line(screen, self.colors['border_light'], (x, y + 24), (x + width, y + 24), 2)
+
+        y += 36
+
+        # ===== ITEM ATUAL =====
+        if self.pokemon.held_item and self.pokemon.held_item_data:
+            item_data = self.pokemon.held_item_data
+
+            # Card do item (mais alto para sprite grande)
+            card_rect = pygame.Rect(x, y, width, 65)
+            self._draw_rounded_rect(screen, (45, 48, 58), card_rect, radius=10)
+            self._draw_rounded_rect(screen, self.colors['border_light'], card_rect, radius=10, border=2)
+
+            # ===== SPRITE GRANDE (40x40) =====
+            sprite = item_bag_catalog.get_sprite(self.pokemon.held_item, scaled=True)
+            if sprite:
+                # Aumenta para 40x40
+                sprite_scaled = pygame.transform.scale(sprite, (40, 40))
+                # Desenha um fundo brilhante atrás do sprite
+                sprite_bg_rect = pygame.Rect(x + 8, y + 12, 44, 44)
+                self._draw_rounded_rect(screen, (60, 65, 80), sprite_bg_rect, radius=8)
+                pygame.draw.rect(screen, (100, 110, 140), sprite_bg_rect, 1, border_radius=8)
+                # Desenha o sprite
+                screen.blit(sprite_scaled, (x + 10, y + 14))
+                text_x = x + 60
+            else:
+                text_x = x + 12
+
+            # Nome (fonte maior)
+            name_text = value_font.render(item_data['name'], True, self.colors['text_primary'])
+            screen.blit(name_text, (text_x, y + 8))
+
+            # Descrição (fonte maior)
+            desc = item_data.get('description', '')
+            if len(desc) > 100:
+                desc = desc[:29] + "..."
+            desc_surf = label_font.render(desc, True, self.colors['text_secondary'])
+            screen.blit(desc_surf, (text_x, y + 32))
+
+            # Efeito do item (se for type_boost)
+            effect_value = item_data.get("effect_value", {})
+            if isinstance(effect_value, dict) and "type_boost" in effect_value:
+                boost = effect_value["type_boost"]
+                boost_text = f"+{int((boost - 1) * 100)}% dano do tipo"
+                boost_surf = label_font.render(boost_text, True, (100, 220, 100))
+                screen.blit(boost_surf, (text_x, y + 52))
+
+            # Botão REMOVER (maior)
+            remove_rect = pygame.Rect(x + width - 70, y + 16, 60, 34)
+            self._draw_rounded_rect(screen, (180, 60, 60), remove_rect, radius=8)
+            self._draw_rounded_rect(screen, (220, 80, 80), remove_rect, radius=8, border=2)
+            remove_text = button_font.render("REMOVER", True, (255, 255, 255))
+            screen.blit(remove_text, remove_text.get_rect(center=remove_rect.center))
+            self._remove_button_rect = remove_rect
+
+            y += 78
+        else:
+            # Nenhum item (com ícone vazio)
+            empty_rect = pygame.Rect(x, y, width, 45)
+            self._draw_rounded_rect(screen, (35, 38, 48), empty_rect, radius=8)
+            self._draw_rounded_rect(screen, self.colors['border'], empty_rect, radius=8, border=1)
+
+            # Ícone vazio
+            empty_font = pygame.font.Font(None, 24)
+            empty_icon = empty_font.render("○", True, self.colors['text_secondary'])
+            screen.blit(empty_icon, (x + 12, y + 8))
+
+            no_item_text = value_font.render("Nenhum item sendo segurado", True, self.colors['text_secondary'])
+            screen.blit(no_item_text, (x + 40, y + 12))
+            y += 55
+
+        # ===== BOTÃO EQUIPAR (maior e mais destacado) =====
+        held_items = self.game.player.bag.get_held_items()
+        available_items = [item for item in held_items if item["quantity"] > 0]
+        if self.pokemon.held_item:
+            available_items = [item for item in available_items if item["id"] != self.pokemon.held_item]
+
+        if available_items:
+            button_rect = pygame.Rect(x + (width - 150) // 2, y, 150, 38)
+            self._draw_rounded_rect(screen, (60, 90, 160), button_rect, radius=10)
+            self._draw_rounded_rect(screen, (100, 140, 210), button_rect, radius=10, border=2)
+            button_text = button_font.render("EQUIPAR ITEM", True, (255, 255, 255))
+            screen.blit(button_text, button_text.get_rect(center=button_rect.center))
+            self._equip_button_rect = button_rect
+
+            # Contagem de itens disponíveis (mais visível)
+            count_text = label_font.render(f"{len(available_items)} itens disponíveis", True,
+                                           self.colors['text_secondary'])
+            screen.blit(count_text, (x + width - count_text.get_width() - 12, y + 10))
+        else:
+            button_rect = pygame.Rect(x + (width - 150) // 2, y, 150, 38)
+            self._draw_rounded_rect(screen, (55, 55, 65), button_rect, radius=10)
+            self._draw_rounded_rect(screen, (80, 80, 90), button_rect, radius=10, border=2)
+            button_text = button_font.render("SEM ITENS", True, (150, 150, 160))
+            screen.blit(button_text, button_text.get_rect(center=button_rect.center))
+            self._equip_button_rect = None
+
+        y += 50
+
+        # ===== DROPDOWN =====
+        if self.held_item_dropdown.is_visible():
+            dropdown_x = x + (width - self.held_item_dropdown.width) // 2
+            dropdown_y = y
+            self.held_item_dropdown.set_position(dropdown_x, dropdown_y)
+            self.held_item_dropdown.render(screen)
+
+    def _handle_held_item_click(self, event):
+        """Processa cliques na seção de itens seguráveis"""
+        if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
+            return False
+
+        if self.held_item_dropdown.is_visible():
+            return self.held_item_dropdown.handle_event(event)
+
+        # Botão REMOVER
+        if hasattr(self, '_remove_button_rect') and self._remove_button_rect:
+            if self._remove_button_rect.collidepoint(event.pos):
+                success, message = self.game.player.bag.unequip_held_item(self.pokemon)
+                if success:
+                    self._update_held_items_list()
+                    self._remove_button_rect = None
+                    self._equip_button_rect = None
+                    print(f"[HELD_ITEM] Item removido de {self.pokemon.name}")
+                return True
+
+        # Botão EQUIPAR
+        if hasattr(self, '_equip_button_rect') and self._equip_button_rect:
+            if self._equip_button_rect.collidepoint(event.pos):
+                held_items = self.game.player.bag.get_held_items()
+                available_items = [item for item in held_items if item["quantity"] > 0]
+                if self.pokemon.held_item:
+                    available_items = [item for item in available_items if item["id"] != self.pokemon.held_item]
+                if available_items:
+                    self.held_item_dropdown.show()
+                    self.held_item_dropdown.set_items([
+                        {"id": item["id"], "data": item["data"], "quantity": item["quantity"]}
+                        for item in available_items
+                    ])
+                return True
+
+        return False
+
     def handle_event(self, event):
         if not self.visible:
             return None
@@ -378,6 +603,10 @@ class PokemonModal:
                 self.visible = False
                 self.confirmation_active = False
                 return "close"
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self._handle_held_item_click(event):
+                return None
 
         return None
 
@@ -791,36 +1020,31 @@ class PokemonModal:
             title_font = pygame.font.Font(None, 14)
             text_font = pygame.font.Font(None, 16)
 
-            # "NATUREZA:" em text_accent
             title_text = title_font.render("NATUREZA:", True, self.colors['text_accent'])
 
             if effects[0] is not None:
                 boost_stat = effects[2]
                 reduce_stat = effects[3]
 
-                # Divide em partes para colorir
                 name_part = f" {self.pokemon.nature} ("
                 boost_part = f"+10% {boost_stat}"
                 slash_part = " / "
                 reduce_part = f"-10% {reduce_stat})"
 
                 name_text = text_font.render(name_part, True, self.colors['text_primary'])
-                boost_text = text_font.render(boost_part, True, (100, 255, 100))  # VERDE
+                boost_text = text_font.render(boost_part, True, (100, 255, 100))
                 slash_text = text_font.render(slash_part, True, self.colors['text_secondary'])
-                reduce_text = text_font.render(reduce_part, True, (255, 100, 100))  # VERMELHO
+                reduce_text = text_font.render(reduce_part, True, (255, 100, 100))
 
-                # Calcula larguras
                 name_w = name_text.get_width()
                 boost_w = boost_text.get_width()
                 slash_w = slash_text.get_width()
                 reduce_w = reduce_text.get_width()
                 total_w = title_text.get_width() + name_w + boost_w + slash_w + reduce_w
 
-                # Posição inicial centralizada
                 start_x = nature_card.centerx - total_w // 2
                 y_pos = nature_card.centery - name_text.get_height() // 2
 
-                # Renderiza sequencialmente
                 x_offset = start_x
                 screen.blit(title_text, (x_offset, y_pos))
                 x_offset += title_text.get_width()
@@ -837,7 +1061,6 @@ class PokemonModal:
                 screen.blit(reduce_text, (x_offset, y_pos))
 
             else:
-                # Nature neutra
                 value_text = text_font.render(f" {self.pokemon.nature}", True, self.colors['text_primary'])
                 total_w = title_text.get_width() + value_text.get_width()
                 start_x = nature_card.centerx - total_w // 2
@@ -845,6 +1068,15 @@ class PokemonModal:
 
                 screen.blit(title_text, (start_x, y_pos))
                 screen.blit(value_text, (start_x + title_text.get_width(), y_pos))
+
+            # ===== ADICIONA ITEM SEGURÁVEL ABAIXO DA NATUREZA =====
+            held_item_y = nature_y + 60
+            held_item_width = left_col.width - 20
+            held_item_x = left_col.x + 10
+
+            # Verifica se há espaço
+            if held_item_y + 150 < left_col.bottom:
+                self._render_held_item_section(screen, held_item_x, held_item_y, held_item_width)
 
         iv_title = section_font.render("VALORES INDIVIDUAIS", True, self.colors['text_accent'])
         iv_title_x = right_col.x + (right_col.width - iv_title.get_width()) // 2

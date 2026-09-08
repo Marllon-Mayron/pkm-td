@@ -170,6 +170,7 @@ class SaveManager:
                 "moves": moves_data,
                 "custom_name": getattr(pokemon, 'custom_name', None),
                 "happiness": getattr(pokemon, 'happiness', 0),
+                "held_item": getattr(pokemon, 'held_item', None),
             }
 
             return pokemon_dict
@@ -210,6 +211,7 @@ class SaveManager:
             "gender": pokemon.gender,
             "custom_name": pokemon.custom_name,
             "happiness": pokemon.happiness,
+            "held_item": getattr(pokemon, 'held_item', None),
         }
 
         return pokemon_dict
@@ -245,6 +247,23 @@ class SaveManager:
         pokemon.custom_name = data.get("custom_name")
         pokemon.happiness = data.get("happiness", 0)
         pokemon.happiness = max(0, min(255, pokemon.happiness))
+
+        # ===== RESTAURA ITEM SEGURÁVEL =====
+        held_item_id = data.get("held_item")
+        if held_item_id:
+            from src.data.item_bag_catalog import item_bag_catalog
+            item_data = item_bag_catalog.get_item(held_item_id)
+            if item_data:
+                pokemon.held_item = held_item_id
+                pokemon.held_item_data = item_data
+                print(f"[SAVE] {pokemon.name} carregado com item: {item_data['name']}")
+            else:
+                print(f"[SAVE] Aviso: Item {held_item_id} não encontrado para {pokemon.name}")
+                pokemon.held_item = None
+                pokemon.held_item_data = None
+        else:
+            pokemon.held_item = None
+            pokemon.held_item_data = None
 
         # Restaura os moves
         moves_data = data.get("moves", [])

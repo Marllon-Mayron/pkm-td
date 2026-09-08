@@ -216,6 +216,9 @@ class Pokemon(Entity):
         # ===== 18. ITENS =====
         self.is_carrying = None
         self.capture_range = 20
+        # ===== ITEM SEGURÁVEL =====
+        self.held_item = None  # ID do item que o Pokémon está segurando
+        self.held_item_data = None  # Dados completos do item (cache)
 
         # ===== 19. ATRIBUTOS DE COMBATE =====
         self.attack_range = 90

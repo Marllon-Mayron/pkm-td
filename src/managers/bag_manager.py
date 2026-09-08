@@ -22,13 +22,11 @@ class BagManager:
         self.filtered_items = []
 
         # Ordem das categorias
-        self.categories_order = ["all", "pokeball", "medicine", "battle_item", "tm", "items"]
+        self.categories_order = ["all", "pokeball", "medicine", "battle_item", "tm", "held_item", "items"]
 
         # Garante que o pygame está inicializado
         self._ensure_pygame()
 
-        # Itens iniciais
-        self._add_initial_items()
         self._update_filtered_items()
 
     def _ensure_pygame(self):
@@ -37,14 +35,6 @@ class BagManager:
             pygame.init()
         if not pygame.font.get_init():
             pygame.font.init()
-
-    def _add_initial_items(self):
-        """Adiciona itens iniciais para o jogador"""
-        # 8 Pokebolas
-        self.add_item("pokeball", 6)
-
-        # 2 Poções
-        self.add_item("potion", 2)
 
     def add_item(self, item_id, quantity=1):
         """Adiciona item à mochila (stack até 9999)"""
@@ -210,3 +200,89 @@ class BagManager:
     def get_unique_item_count(self):
         """Retorna número de tipos diferentes de itens"""
         return len(self.items)
+
+    def get_held_items(self):
+        """Retorna apenas itens seguráveis (held_item) com quantidade > 0"""
+        held_items = []
+        for item_id, quantity in self.items.items():
+            if quantity <= 0:
+                continue
+            item_data = self.catalog.get_item(item_id)
+            if item_data and item_data.get("category") == "held_item":
+                held_items.append({
+                    "id": item_id,
+                    "data": item_data,
+                    "quantity": quantity
+                })
+        return held_items
+
+    def get_held_item_quantity(self, item_id):
+        """Retorna quantidade de um item segurável específico"""
+        item_data = self.catalog.get_item(item_id)
+        if not item_data or item_data.get("category") != "held_item":
+            return 0
+        return self.items.get(item_id, 0)
+
+    def equip_held_item(self, pokemon, item_id):
+        """
+        Equipa um item segurável em um Pokémon.
+        Retorna (sucesso, mensagem)
+        """
+        # Verifica se o item existe e é segurável
+        item_data = self.catalog.get_item(item_id)
+        if not item_data:
+            return False, "Item não encontrado"
+
+        if item_data.get("category") != "held_item":
+            return False, f"{item_data['name']} não é um item segurável"
+
+        # Verifica se tem o item na mochila
+        if self.get_quantity(item_id) <= 0:
+            return False, f"Você não tem {item_data['name']}"
+
+        # Se o Pokémon já tem um item, devolve para a mochila primeiro
+        if pokemon.held_item:
+            old_item_id = pokemon.held_item
+            self.add_item(old_item_id, 1)
+            print(f"[BAG] {old_item_id} devolvido à mochila de {pokemon.name}")
+
+        # Remove o item da mochila
+        self.remove_item(item_id, 1)
+
+        # Equipa no Pokémon
+        pokemon.held_item = item_id
+        pokemon.held_item_data = item_data
+
+        # ===== SALVA O JOGO AUTOMATICAMENTE =====
+        if hasattr(self, 'player') and self.player:
+            self.player.auto_save()
+            print(f"[BAG] Jogo salvo automaticamente após equipar {item_data['name']} em {pokemon.name}")
+
+        print(f"[BAG] {pokemon.name} agora segura {item_data['name']}")
+        return True, f"{pokemon.name} agora segura {item_data['name']}!"
+
+    def unequip_held_item(self, pokemon):
+        """
+        Remove o item segurável de um Pokémon e devolve à mochila.
+        Retorna (sucesso, mensagem)
+        """
+        if not pokemon.held_item:
+            return False, f"{pokemon.name} não está segurando nada"
+
+        item_id = pokemon.held_item
+        item_data = pokemon.held_item_data
+
+        # Devolve para a mochila
+        self.add_item(item_id, 1)
+
+        # Remove do Pokémon
+        pokemon.held_item = None
+        pokemon.held_item_data = None
+
+        # ===== SALVA O JOGO AUTOMATICAMENTE =====
+        if hasattr(self, 'player') and self.player:
+            self.player.auto_save()
+            print(f"[BAG] Jogo salvo automaticamente após remover {item_data['name']} de {pokemon.name}")
+
+        print(f"[BAG] {item_data['name']} removido de {pokemon.name}")
+        return True, f"{item_data['name']} removido de {pokemon.name}!"
