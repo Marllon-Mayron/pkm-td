@@ -9,6 +9,7 @@ class PokemonGridItem:
         self.rect = pygame.Rect(x, y, width, height)
         self.is_hovered = False
         self._portrait_cache = None
+        self._is_in_team_cache = None
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
@@ -19,6 +20,7 @@ class PokemonGridItem:
         return None
 
     def _get_portrait(self, pokedex):
+        """Obtém o retrato do Pokémon com cache"""
         if self._portrait_cache is None:
             pokemon_id = self.pokemon_data["id"]
             is_shiny = self.pokemon_data.get("is_shiny", False)
@@ -40,16 +42,12 @@ class PokemonGridItem:
         self._draw_portrait_and_id(screen, pokedex, font)
         self._draw_info(screen, font)
 
+        # ===== USA O VALOR DO DICT, NÃO O OBJETO =====
         if self.pokemon_data.get("is_in_team", False):
             self._draw_team_overlay(screen, font)
 
-    def _draw_shadow(self, screen):
-        shadow_rect = self.rect.copy()
-        shadow_rect.x += 2
-        shadow_rect.y += 2
-        pygame.draw.rect(screen, COLORS['GRID']['SHADOW'], shadow_rect, border_radius=6)
-
     def _draw_card_background(self, screen):
+        # ===== USA O VALOR DO DICT =====
         if self.pokemon_data.get("is_in_team", False):
             color = COLORS['GRID']['IN_TEAM']
             border_color = COLORS['GRID']['BORDER_IN_TEAM']
@@ -62,6 +60,12 @@ class PokemonGridItem:
 
         pygame.draw.rect(screen, color, self.rect, border_radius=6)
         pygame.draw.rect(screen, border_color, self.rect, 1, border_radius=6)
+
+    def _draw_shadow(self, screen):
+        shadow_rect = self.rect.copy()
+        shadow_rect.x += 2
+        shadow_rect.y += 2
+        pygame.draw.rect(screen, COLORS['GRID']['SHADOW'], shadow_rect, border_radius=6)
 
     def _draw_portrait_and_id(self, screen, pokedex, font):
         portrait = self._get_portrait(pokedex)

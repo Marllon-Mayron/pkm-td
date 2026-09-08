@@ -72,7 +72,7 @@ class SaveManager:
                 },
                 "desfossilizadores": [],
                 "total_playtime": 0,
-                "has_chosen_starter": False  # NOVO
+                "has_chosen_starter": False
             },
             "game_state": {
                 "current_chapter": 1,

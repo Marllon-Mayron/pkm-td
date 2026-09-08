@@ -146,7 +146,6 @@ class PokemonCompleteGenerator:
                 "base_happiness": species_data['base_happiness'],
                 "abilities": abilities,
                 "hidden_ability": hidden_ability,
-                # ===== NOVOS CAMPOS =====
                 "weight_kg": weight_kg,
                 "height_m": height_m,
                 "gender_ratio": gender_ratio,

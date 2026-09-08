@@ -233,7 +233,7 @@ class DamageCalculator:
         # 5. STAB (Same Type Attack Bonus)
         stab = 1.5 if move.type in attacker.types else 1.0
 
-        # ===== NOVO: MODIFICADORES DE CLIMA =====
+        # ===== MODIFICADORES DE CLIMA =====
         weather_multiplier = 1.0
         weather = None
 

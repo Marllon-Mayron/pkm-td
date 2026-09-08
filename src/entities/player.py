@@ -290,7 +290,7 @@ class Player(Entity):
         self.caught_pokemon.add(starter_id)
         self.register_seen(starter_id)
 
-        # NOVO: Marca que o jogador escolheu o inicial
+        # Marca que o jogador escolheu o inicial
         self.has_chosen_starter = True
 
         print(f"[PLAYER] Pokémon inicial adicionado: {starter.name} (ID: {starter_id})")

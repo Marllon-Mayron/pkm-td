@@ -78,7 +78,7 @@ class EditorScene(BaseScene):
         self.wave_manager = WaveManager()
         self.path_manager.set_wave_manager(self.wave_manager)
 
-        # Recompensas da fase (NOVO)
+        # Recompensas da fase
         self.phase_rewards = {
             "money": 100,
             "experience": 50,
@@ -198,7 +198,7 @@ class EditorScene(BaseScene):
             print("DEBUG: Abrindo gerenciador de tilesets")
             self._open_tileset_manager_dialog()
 
-        elif mode == "rewards":  # NOVO
+        elif mode == "rewards":
             print("DEBUG: Abrindo configuração de recompensas")
             self._open_rewards_config_dialog()
 
@@ -515,7 +515,7 @@ class EditorScene(BaseScene):
                 self.tileset_manager_dialog = None
             return True
 
-        # Diálogo de recompensas (NOVO)
+        # Diálogo de recompensas
         if self.rewards_config_dialog and self.rewards_config_dialog.visible:
             result = self.rewards_config_dialog.handle_event(event)
             if result is not None and isinstance(result, dict):

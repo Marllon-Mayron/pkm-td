@@ -23,7 +23,7 @@ class Game:
         # Cria o jogador
         self.player = Player(100, 100)
 
-        # ===== NOVO: CARREGA OU CRIA SAVE AUTOMATICAMENTE =====
+        # ===== CARREGA OU CRIA SAVE AUTOMATICAMENTE =====
         self._initialize_save()
 
         # Câmera

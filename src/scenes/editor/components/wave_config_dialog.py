@@ -1178,7 +1178,7 @@ class WaveConfigDialog:
                                           self.colors['text_muted'])
         screen.blit(arrow, (cond_rect.right - 20, cond_rect.y + 3))
 
-        # ===== SELETOR DE TEMPLATE (NOVO) =====
+        # ===== SELETOR DE TEMPLATE =====
         templates = WaveTemplateManager.get_all_templates()
 
         template_label = self._get_font(13).render("Template:", True, self.colors['text_dim'])
@@ -2044,10 +2044,6 @@ class WaveConfigDialog:
             self.templates_scroll = max(0, min(max_scroll, self.templates_scroll + direction))
             return True
         return False
-
-    # ========================================================================
-    # NOVO SELETOR DE POKÉMON (totalmente reformulado)
-    # ========================================================================
 
     def _handle_pokemon_selector_event(self, event, mouse_x, mouse_y):
         """Processa eventos exclusivamente do seletor de Pokémon."""

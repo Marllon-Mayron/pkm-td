@@ -1117,47 +1117,37 @@ class GameScene(BaseScene):
     def escape_phase(self):
         """
         Escapa da fase usando ESCAPEROPE - SEM penalidades.
-        Não remove felicidade, não conta como derrota.
-        Volta para a tela de seleção de time.
         """
         from src.managers.sounds.sound_manager import sound_manager
         from src.ui.toast_renderer import toast_info
 
         print(f"[ESCAPEROPE] Jogador fugiu da fase {self.phase_id}!")
 
-        # ===== CONQUISTAS: "Saindo no ultimo momento" =====
-        # Verifica se é uma "última chance": apenas 1 Pokémon vivo com menos da metade da vida
+        # ===== CONQUISTAS =====
         alive_pokemon = [p for p in self.player.team if p.is_alive()]
         is_last_stand = False
 
         if len(alive_pokemon) == 1:
             pokemon = alive_pokemon[0]
             hp_percentage = pokemon.current_hp / pokemon.max_hp
-            if hp_percentage < 0.5:  # Menos da metade da vida
+            if hp_percentage < 0.5:
                 is_last_stand = True
 
-        # ===== INCREMENTA CONTADORES DO ESCAPEROPE =====
         if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
             phase_id = f"{self.chapter_id}-{self.phase_number}"
             ach_mgr = self.player.achievement_manager
 
-            # Primeiro uso
             ach_mgr.increment_counter("escaperope_use_count")
             ach_mgr.check_and_unlock("first_escaperope_use", phase_id)
 
-            # Última chance (se for o caso)
             if is_last_stand:
                 ach_mgr.increment_counter("escaperope_last_stand_count")
                 ach_mgr.check_and_unlock("escaperope_last_stand", phase_id)
 
-        # Para a música
         sound_manager.stop_music(fade_ms=500)
-
-        # Reseta Dittos transformados
         self.reset_all_transformed_dittos()
-
-        # Fecha qualquer overlay ativo
         self.overlay_manager.hide()
+
         if hasattr(self, 'move_learn_overlay') and self.move_learn_overlay:
             self.move_learn_overlay.active = False
             self.move_learn_overlay = None
@@ -1168,21 +1158,22 @@ class GameScene(BaseScene):
             self.move_select_overlay.active = False
             self.move_select_overlay = None
 
-        # Reseta o estado da fase
         self.paused = False
         self.game_paused = False
         if hasattr(self, 'wave_manager'):
             self.wave_manager.paused = False
 
-        # Reseta os Pokémon (cura)
         for pokemon in self.player.team:
             pokemon.reset(self)
 
-        # Volta para a tela de seleção de time
+        # ===== VAI PARA O TEAM_SELECT E FORÇA REFRESH =====
         from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
-        self.game.current_scene = TeamSelectScene(self.game, self.chapter_id, self.phase_number)
 
-        # Mensagem de confirmação
+        # Cria a cena com flag de refresh
+        team_scene = TeamSelectScene(self.game, self.chapter_id, self.phase_number)
+        team_scene._needs_refresh = True  # Força refresh ao entrar
+        self.game.current_scene = team_scene
+
         toast_info("Você fugiu da fase sem penalidades!", duration=3.0)
 
     # ===== MÉTODOS DE POSICIONAMENTO =====

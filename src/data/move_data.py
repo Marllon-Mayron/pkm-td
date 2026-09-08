@@ -26,7 +26,7 @@ class MoveData:
         self._initialized = True
         self._load_moves_data()
         self._load_pokemon_learnset()
-        self._load_pokemon_tm_hm()  # NOVO
+        self._load_pokemon_tm_hm()
 
     def _find_data_path(self, filename: str) -> Optional[Path]:
         """Encontra o caminho do arquivo de dados de forma robusta"""

@@ -27,7 +27,7 @@ class BattleSystem:
         self.weather_manager = WeatherManager(self)
         self.weather_filter = None
 
-        # ===== NOVO: RASTREAMENTO DE PARTICIPANTES DA BATALHA =====
+        # ===== RASTREAMENTO DE PARTICIPANTES DA BATALHA =====
         self.battle_participants: Set[int] = set()  # IDs dos Pokémon que participaram
 
     def set_effect_manager_for_pokemon(self, pokemon):

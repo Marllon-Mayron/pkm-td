@@ -26,6 +26,11 @@ class PokemonModal:
         self.confirmation_active = False
         self._setup_dimensions()
 
+        # ===== CACHE DE SPRITE (PARA ATUALIZAR APÓS EVOLUÇÃO) =====
+        self._cached_sprite = None
+        self._cached_sprite_id = None
+        self._cached_shiny = None
+
         self.particle_timer = 0
         self.particles = []
 
@@ -73,6 +78,32 @@ class PokemonModal:
             'iv_very_bad': (180, 60, 60),
             'iv_horrible': (160, 80, 200)
         }
+
+    NATURE_EFFECTS = {
+        # Nome: (aumento, diminuição, aumento_text, diminuicao_text)
+        "Hardy": (None, None, "", ""),
+        "Lonely": ("attack", "defense", "Atk", "Def"),
+        "Brave": ("attack", "speed", "Atk", "Spd"),
+        "Adamant": ("attack", "sp_attack", "Atk", "SpAtk"),
+        "Naughty": ("attack", "sp_defense", "Atk", "SpDef"),
+        "Bold": ("defense", "attack", "Def", "Atk"),
+        "Relaxed": ("defense", "speed", "Def", "Spd"),
+        "Impish": ("defense", "sp_attack", "Def", "SpAtk"),
+        "Lax": ("defense", "sp_defense", "Def", "SpDef"),
+        "Timid": ("speed", "attack", "Spd", "Atk"),
+        "Hasty": ("speed", "defense", "Spd", "Def"),
+        "Jolly": ("speed", "sp_attack", "Spd", "SpAtk"),
+        "Naive": ("speed", "sp_defense", "Spd", "SpDef"),
+        "Modest": ("sp_attack", "attack", "SpAtk", "Atk"),
+        "Mild": ("sp_attack", "defense", "SpAtk", "Def"),
+        "Quiet": ("sp_attack", "speed", "SpAtk", "Spd"),
+        "Rash": ("sp_attack", "sp_defense", "SpAtk", "SpDef"),
+        "Calm": ("sp_defense", "attack", "SpDef", "Atk"),
+        "Gentle": ("sp_defense", "defense", "SpDef", "Def"),
+        "Sassy": ("sp_defense", "speed", "SpDef", "Spd"),
+        "Careful": ("sp_defense", "sp_attack", "SpDef", "SpAtk"),
+        "Quirky": (None, None, "", ""),
+    }
 
     NATURE_EFFECTS = {
         # Nome: (aumento, diminuição, aumento_text, diminuicao_text)
@@ -354,6 +385,22 @@ class PokemonModal:
         color_key = f"type_{type_name.lower()}"
         return self.colors.get(color_key, (128, 128, 128))
 
+    def _get_current_sprite(self):
+        """Obtém o sprite atualizado do Pokémon com cache"""
+        # Verifica se o Pokémon mudou (evolução)
+        current_id = self.pokemon.id
+        current_shiny = self.pokemon.is_shiny
+
+        if (self._cached_sprite is None or
+                self._cached_sprite_id != current_id or
+                self._cached_shiny != current_shiny):
+            # Recarrega o sprite
+            self._cached_sprite = self.pokedex.get_sprite(current_id, "front", current_shiny)
+            self._cached_sprite_id = current_id
+            self._cached_shiny = current_shiny
+
+        return self._cached_sprite
+
     def _draw_rounded_rect(self, screen, color, rect, radius=8, border=0, border_color=None):
         pygame.draw.rect(screen, color, rect, border_radius=radius)
         if border > 0 and border_color:
@@ -483,7 +530,7 @@ class PokemonModal:
 
         header_height = 160
 
-        sprite = self.pokedex.get_sprite(self.pokemon.id, "front", self.pokemon.is_shiny)
+        sprite = self._get_current_sprite()
         sprite_size = 160
         if sprite:
             sprite_big = pygame.transform.scale(sprite, (sprite_size, sprite_size))

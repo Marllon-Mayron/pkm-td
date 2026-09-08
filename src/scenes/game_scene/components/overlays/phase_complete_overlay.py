@@ -18,6 +18,7 @@ class PhaseCompleteOverlay(BaseOverlay):
         self.phase_info = game_scene.phase_info
         self.phase_id = game_scene.phase_id
         self.phase_number = game_scene.phase_number
+        self.chapter_id = game_scene.chapter_id
         self.music_played = False
 
         # Dados da conclusão
@@ -49,10 +50,10 @@ class PhaseCompleteOverlay(BaseOverlay):
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.button_rect and self.button_rect.collidepoint(event.pos):
-                self._return_to_phase_select()
+                self._return_to_team_select()
                 return True
         elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self._return_to_phase_select()
+            self._return_to_team_select()
             return True
         elif event.type == pygame.MOUSEMOTION:
             if self.button_rect:
@@ -415,7 +416,7 @@ class PhaseCompleteOverlay(BaseOverlay):
 
         icon_size = 64
         spacing = 12
-        name_height = 14 # espaço reservado para o nome abaixo do ícone
+        name_height = 14
 
         vertical_step = icon_size + spacing + name_height
         horizontal_step = icon_size + spacing
@@ -508,11 +509,27 @@ class PhaseCompleteOverlay(BaseOverlay):
         pygame.draw.polygon(screen, color, points)
         pygame.draw.polygon(screen, (200, 170, 0), points, 1)
 
-    def _return_to_phase_select(self):
-        from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
+    def _return_to_team_select(self):
+        """
+        Retorna para a tela de seleção de time com refresh forçado.
+        """
+        from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
+
         self._stop_music()
+
+        # Limpa a cena do jogo
         if hasattr(self.game_scene, 'cleanup'):
             self.game_scene.cleanup()
-        phase_select = PhaseSelectScene(self.game)
-        phase_select.refresh_data()
-        self.game.current_scene = phase_select
+
+        # Cria a cena de seleção de time com refresh forçado
+        team_scene = TeamSelectScene(
+            self.game,
+            self.chapter_id,
+            self.phase_number
+        )
+        team_scene._needs_refresh = True
+
+        # Define como cena atual
+        self.game.current_scene = team_scene
+
+        print(f"[PHASE_COMPLETE] Retornando ao TeamSelectScene com refresh forçado")

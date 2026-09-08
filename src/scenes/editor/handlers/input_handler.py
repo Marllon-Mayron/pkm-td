@@ -14,12 +14,12 @@ class EditorInputHandler:
 
         # Controle de arrasto para pintura contínua
         self.painting = False  # Se está pintando (botão esquerdo pressionado)
-        self.erasing = False   # Se está apagando (botão direito pressionado)  # NOVO
+        self.erasing = False   # Se está apagando (botão direito pressionado)
         self.last_paint_pos = None  # Última posição pintada
-        self.last_erase_pos = None  # Última posição apagada  # NOVO
+        self.last_erase_pos = None  # Última posição apagada
         self.paint_cooldown = 0.05  # Cooldown entre pinturas (evita pintar no mesmo frame)
         self.last_paint_time = 0
-        self.last_erase_time = 0  # NOVO
+        self.last_erase_time = 0
 
     def handle_event(self, event):
         """Processa eventos do editor"""

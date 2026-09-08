@@ -36,6 +36,11 @@ class TeamSelectScene(BaseScene):
         self.current_page = 0
         self.total_pages = 1
         self.layout_initialized = False
+        self._needs_refresh = True
+
+        # ===== INICIALIZA AS LISTAS VAZIAS =====
+        self.team_slots = []
+        self.grid_items = []
 
         # Controle de resize
         self.last_window_size = (self.game.screen_manager.window_width, self.game.screen_manager.window_height)
@@ -60,7 +65,6 @@ class TeamSelectScene(BaseScene):
                 self._music_started = True
                 print("[TEAM_SELECT] Música iniciada: Come_Along")
             else:
-                # Tenta Title_Theme como fallback
                 print("[TEAM_SELECT] Tentando música alternativa...")
                 success = sound_manager.play_menu_music("Title_Theme", loop=True)
                 if success:
@@ -75,7 +79,49 @@ class TeamSelectScene(BaseScene):
             return True
         return False
 
+    def on_enter(self):
+        """
+        Chamado quando a cena é ativada - FORÇA REFRESH DOS DADOS.
+        """
+        self._needs_refresh = True
+
+        if not self._music_started or not pygame.mixer.music.get_busy():
+            self._start_team_select_music()
+
+    def _refresh_all_data(self):
+        """
+        Força a atualização completa de todos os dados.
+        """
+        print("[TEAM_SELECT] Forçando refresh de dados...")
+
+        # ===== 1. ATUALIZA O CACHE E A BOX =====
+        self.pokemon_manager.refresh_all_pokemon_data()
+
+        # ===== 2. ATUALIZA OS SLOTS DO TIME (se já existirem) =====
+        if hasattr(self, 'team_slots') and self.team_slots:
+            for i, slot in enumerate(self.team_slots):
+                if i < len(self.game.player.team):
+                    slot.set_pokemon(self.game.player.team[i])
+                else:
+                    slot.set_pokemon(None)
+
+        # ===== 3. MARCA PARA RECRIAR O LAYOUT =====
+        self.layout_initialized = False
+
+        # ===== 4. RESETA A PÁGINA ATUAL =====
+        self.current_page = 0
+
+        self._needs_refresh = False
+        print("[TEAM_SELECT] Refresh de dados concluído!")
+
     def _initialize_layout(self):
+        """Inicializa o layout da cena"""
+        # Se precisar de refresh, faz primeiro
+        if self._needs_refresh:
+            self._refresh_all_data()
+            # Depois do refresh, não marca mais como precisando
+            self._needs_refresh = False
+
         available_pokemon = self.pokemon_manager.get_available_pokemon(
             self.current_page,
             self.layout_manager.items_per_page
@@ -107,8 +153,14 @@ class TeamSelectScene(BaseScene):
         self.layout_initialized = True
 
     def _refresh_grid(self):
+        """Atualiza apenas a grid (mantendo slots)"""
         if not self.layout_initialized:
             return
+
+        # Se precisar de refresh, faz primeiro
+        if self._needs_refresh:
+            self._refresh_all_data()
+            self._needs_refresh = False
 
         available_pokemon = self.pokemon_manager.get_available_pokemon(
             self.current_page,
@@ -153,11 +205,22 @@ class TeamSelectScene(BaseScene):
         self.total_pages = self.pokemon_manager.get_page_count(self.layout_manager.items_per_page)
 
     def _refresh_all_pokemon_status(self):
+        """Atualiza o status is_in_team em todos os Pokémon"""
         team_ids = {p.unique_id for p in self.game.player.team}
+
         for pokemon in self.game.player.team:
             pokemon.is_in_team = True
+
         for data in self.game.player.pc_box:
-            data["is_in_team"] = data.get("unique_id") in team_ids
+            unique_id = data.get("unique_id")
+            if unique_id:
+                data["is_in_team"] = unique_id in team_ids
+
+        for unique_id, pokemon in self.game.player._pokemon_cache.items():
+            if hasattr(pokemon, 'is_in_team'):
+                pokemon.is_in_team = unique_id in team_ids
+
+        self.layout_initialized = False
 
     def handle_event(self, event):
         self._check_resize()
@@ -189,7 +252,6 @@ class TeamSelectScene(BaseScene):
         if modal.pokemon.is_in_team:
             self.pokemon_manager.remove_from_team(modal.pokemon)
         else:
-            # modal.pokemon é um objeto Pokemon
             self.pokemon_manager.add_to_team(modal.pokemon)
 
         for i, slot in enumerate(self.team_slots):
@@ -254,12 +316,11 @@ class TeamSelectScene(BaseScene):
             for s in self.team_slots:
                 s.is_selected = (s.slot_index == action['slot_index'])
             if slot.pokemon:
-                # slot.pokemon é um objeto Pokemon - passamos seu unique_id
                 modal = PokemonModal(self.game, slot.pokemon.unique_id)
                 self.event_handler.set_modal(modal)
 
         elif action_type == 'GRID_CLICK':
-            pokemon_data = action['pokemon']  # dict
+            pokemon_data = action['pokemon']
             unique_id = pokemon_data["unique_id"]
             modal = PokemonModal(self.game, unique_id)
             self.event_handler.set_modal(modal)
@@ -377,11 +438,6 @@ class TeamSelectScene(BaseScene):
         # Modal
         if self.event_handler.modal and self.event_handler.modal.visible:
             self.event_handler.modal.render(screen)
-
-    def on_enter(self):
-        """Chamado quando a cena é ativada - inicia a música do team select se não estiver tocando"""
-        if not self._music_started or not pygame.mixer.music.get_busy():
-            self._start_team_select_music()
 
     def on_exit(self):
         """Chamado quando a cena é desativada - para a música"""

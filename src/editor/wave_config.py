@@ -102,7 +102,7 @@ class WaveVariant:
         self.enemies = enemies or []
         self.min_level = 1
         self.max_level = 5
-        self.template_id = None  # NOVO: pode usar um template
+        self.template_id = None  # pode usar um template
 
     def to_dict(self):
         return {
@@ -110,14 +110,14 @@ class WaveVariant:
             "enemies": [e.to_dict() for e in self.enemies],
             "min_level": self.min_level,
             "max_level": self.max_level,
-            "template_id": self.template_id  # NOVO
+            "template_id": self.template_id
         }
 
     def from_dict(self, data):
         self.condition = data.get("condition", "any")
         self.min_level = data.get("min_level", 1)
         self.max_level = data.get("max_level", 5)
-        self.template_id = data.get("template_id")  # NOVO
+        self.template_id = data.get("template_id")
 
         self.enemies = []
         for e_data in data.get("enemies", []):
@@ -139,10 +139,10 @@ class Wave:
         self.name = f"Wave {wave_index + 1}"
         self.enabled = True
 
-        # ===== NOVO: Templates =====
+        # ===== Templates =====
         self.template_id = None  # Se definido, usa os inimigos do template
 
-        # ===== NOVO: Variantes por período =====
+        # ===== Variantes por período =====
         self.variants: List[WaveVariant] = []
         self.use_variants = False  # Se True, usa variants em vez de enemies direto
 
@@ -251,7 +251,6 @@ class Wave:
             "initial_delay": self.initial_delay,
             "repeat_wave": self.repeat_wave,
             "repeat_count": self.repeat_count,
-            # ===== NOVOS CAMPOS =====
             "template_id": self.template_id,
             "use_variants": self.use_variants,
             "variants": [v.to_dict() for v in self.variants]
@@ -277,8 +276,6 @@ class Wave:
         self.initial_delay = data.get("initial_delay", 2.0)
         self.repeat_wave = data.get("repeat_wave", False)
         self.repeat_count = data.get("repeat_count", 1)
-
-        # ===== NOVOS CAMPOS (COM FALLBACK PARA COMPATIBILIDADE) =====
         self.template_id = data.get("template_id")
         self.use_variants = data.get("use_variants", False)
 
