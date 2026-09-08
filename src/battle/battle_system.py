@@ -7,6 +7,7 @@ from src.battle.effects.residual_effect import ResidualEffectManager
 from src.battle.damage_calculator import DamageCalculator
 from src.battle.effects import EffectManager, EffectTiming, StatType, StatusType
 from src.battle.projectile import Projectile
+from src.battle.held_item_special_effects import HeldItemSpecialEffects
 
 from typing import List, Set
 
@@ -910,6 +911,25 @@ class BattleSystem:
 
         # Aplica o dano ao alvo
         target.take_damage(damage, attacker=attacker)
+
+        # ===== KING'S ROCK - CHANCE DE FLINCH (APÓS O DANO) =====
+        # Verifica se o ataque causou dano e o alvo ainda está vivo
+        if damage > 0 and target.is_alive() and not target.is_defeated:
+            # Verifica se o atacante está segurando King's Rock
+            if hasattr(attacker, 'held_item') and attacker.held_item == "kings_rock":
+                # Verifica se o movimento é um ataque (não status)
+                if move.category != "status":
+                    import random
+                    if random.random() < 0.10:
+                        # Reseta o cooldown do alvo (faz perder o turno)
+                        target.attack_cooldown = max(0.5, 1.0 - (target.speed_stat / 500))
+
+                        self.effect_manager.add_status_text(
+                            target,
+                            f"King's Rock fez {target.name} hesitar!",
+                            duration=1.5
+                        )
+                        print(f"[KING'S_ROCK] {attacker.name} causou flinch em {target.name} com King's Rock!")
 
         # Log do dano causado
         print(f"[DAMAGE] {attacker.name} causou {damage} de dano a {target.name} com {move.name}!")

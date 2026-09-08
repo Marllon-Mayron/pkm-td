@@ -469,7 +469,7 @@ class PokemonModal:
 
             # Ícone vazio
             empty_font = pygame.font.Font(None, 24)
-            empty_icon = empty_font.render("X", True, self.colors['text_secondary'])
+            empty_icon = empty_font.render("○", True, self.colors['text_secondary'])
             screen.blit(empty_icon, (x + 12, y + 8))
 
             no_item_text = value_font.render("Nenhum item sendo segurado", True, self.colors['text_secondary'])
@@ -482,8 +482,10 @@ class PokemonModal:
         if self.pokemon.held_item:
             available_items = [item for item in available_items if item["id"] != self.pokemon.held_item]
 
+        button_y = y
+
         if available_items:
-            button_rect = pygame.Rect(x + (width - 150) // 2, y, 150, 38)
+            button_rect = pygame.Rect(x + (width - 150) // 2, button_y, 150, 38)
             self._draw_rounded_rect(screen, (60, 90, 160), button_rect, radius=10)
             self._draw_rounded_rect(screen, (100, 140, 210), button_rect, radius=10, border=2)
             button_text = button_font.render("EQUIPAR ITEM", True, (255, 255, 255))
@@ -493,21 +495,25 @@ class PokemonModal:
             # Contagem de itens disponíveis (mais visível)
             count_text = label_font.render(f"{len(available_items)} itens disponíveis", True,
                                            self.colors['text_secondary'])
-            screen.blit(count_text, (x + width - count_text.get_width() - 12, y + 10))
+            screen.blit(count_text, (x + width - count_text.get_width() - 12, button_y + 10))
         else:
-            button_rect = pygame.Rect(x + (width - 150) // 2, y, 150, 38)
+            button_rect = pygame.Rect(x + (width - 150) // 2, button_y, 150, 38)
             self._draw_rounded_rect(screen, (55, 55, 65), button_rect, radius=10)
             self._draw_rounded_rect(screen, (80, 80, 90), button_rect, radius=10, border=2)
             button_text = button_font.render("SEM ITENS", True, (150, 150, 160))
             screen.blit(button_text, button_text.get_rect(center=button_rect.center))
             self._equip_button_rect = None
 
-        y += 50
+        button_y += 50
 
-        # ===== DROPDOWN =====
+        # ===== RENDERIZA DROPDOWN =====
         if self.held_item_dropdown.is_visible():
+            # Posiciona o dropdown abaixo do botão
             dropdown_x = x + (width - self.held_item_dropdown.width) // 2
-            dropdown_y = y
+            dropdown_y = button_y
+
+            # ===== PASSA A ALTURA DA TELA PARA O DROPDOWN =====
+            self.held_item_dropdown.set_screen_height(self.game.screen_manager.window_height)
             self.held_item_dropdown.set_position(dropdown_x, dropdown_y)
             self.held_item_dropdown.render(screen)
 
@@ -516,6 +522,7 @@ class PokemonModal:
         if event.type != pygame.MOUSEBUTTONDOWN or event.button != 1:
             return False
 
+        # Se o dropdown está visível, deixa ele processar primeiro
         if self.held_item_dropdown.is_visible():
             return self.held_item_dropdown.handle_event(event)
 
@@ -528,6 +535,10 @@ class PokemonModal:
                     self._remove_button_rect = None
                     self._equip_button_rect = None
                     print(f"[HELD_ITEM] Item removido de {self.pokemon.name}")
+
+                    # ===== SALVA O JOGO =====
+                    self.game.player.auto_save()
+                    print(f"[HELD_ITEM] Jogo salvo após remover item")
                 return True
 
         # Botão EQUIPAR
@@ -537,7 +548,10 @@ class PokemonModal:
                 available_items = [item for item in held_items if item["quantity"] > 0]
                 if self.pokemon.held_item:
                     available_items = [item for item in available_items if item["id"] != self.pokemon.held_item]
+
                 if available_items:
+                    # ===== PASSA A ALTURA DA TELA ANTES DE MOSTRAR =====
+                    self.held_item_dropdown.set_screen_height(self.game.screen_manager.window_height)
                     self.held_item_dropdown.show()
                     self.held_item_dropdown.set_items([
                         {"id": item["id"], "data": item["data"], "quantity": item["quantity"]}

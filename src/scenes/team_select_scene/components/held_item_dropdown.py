@@ -20,6 +20,10 @@ class HeldItemDropdown:
         self.padding = 8
         self.visible = False
 
+        # ===== DIRECÃO DO DROPDOWN =====
+        self.direction = "down"  # "down" ou "up"
+        self.screen_height = 0  # Será definido quando o dropdown for mostrado
+
         # Scroll
         self.scroll_offset = 0
 
@@ -80,10 +84,29 @@ class HeldItemDropdown:
         self.x = x
         self.y = y
 
+    def set_screen_height(self, screen_height: int):
+        """Define a altura da tela para calcular a direção do dropdown"""
+        self.screen_height = screen_height
+
     def show(self):
-        """Mostra o dropdown"""
+        """Mostra o dropdown, calculando a direção automaticamente"""
         self.visible = True
         self.scroll_offset = 0
+
+        # ===== CALCULA A DIREÇÃO BASEADO NO ESPAÇO DISPONÍVEL =====
+        if self.screen_height > 0:
+            # Verifica espaço abaixo
+            space_below = self.screen_height - self.y - 50
+            # Verifica espaço acima
+            space_above = self.y - 50
+
+            # Se não há espaço embaixo mas há espaço em cima, abre para cima
+            if self.total_height > space_below and space_above >= self.total_height:
+                self.direction = "up"
+                print(f"[DROPDOWN] Abrindo para CIMA (espaço abaixo: {space_below:.0f}px, acima: {space_above:.0f}px)")
+            else:
+                self.direction = "down"
+                print(f"[DROPDOWN] Abrindo para BAIXO (espaço abaixo: {space_below:.0f}px, acima: {space_above:.0f}px)")
 
     def hide(self):
         """Esconde o dropdown"""
@@ -94,6 +117,18 @@ class HeldItemDropdown:
         self.visible = not self.visible
         if self.visible:
             self.scroll_offset = 0
+            self._calculate_direction()
+
+    def _calculate_direction(self):
+        """Calcula a direção do dropdown baseado no espaço disponível"""
+        if self.screen_height > 0:
+            space_below = self.screen_height - self.y - 50
+            space_above = self.y - 50
+
+            if self.total_height > space_below and space_above >= self.total_height:
+                self.direction = "up"
+            else:
+                self.direction = "down"
 
     def is_visible(self) -> bool:
         return self.visible
@@ -160,16 +195,31 @@ class HeldItemDropdown:
 
     def _is_inside(self, x: int, y: int) -> bool:
         """Verifica se o clique foi dentro do dropdown"""
-        return (self.x <= x <= self.x + self.width and
-                self.y <= y <= self.y + self.total_height)
+        # O dropdown pode estar acima ou abaixo do botão
+        if self.direction == "up":
+            # O dropdown está acima do botão
+            dropdown_y = self.y - self.total_height
+            return (self.x <= x <= self.x + self.width and
+                    dropdown_y <= y <= dropdown_y + self.total_height)
+        else:
+            # O dropdown está abaixo do botão
+            return (self.x <= x <= self.x + self.width and
+                    self.y <= y <= self.y + self.total_height)
 
     def _get_item_at_pos(self, x: int, y: int) -> Optional[int]:
         """Retorna o índice do item na posição do mouse"""
-        if not self._is_inside(x, y):
+        # Calcula a posição do dropdown baseado na direção
+        if self.direction == "up":
+            dropdown_y = self.y - self.total_height
+        else:
+            dropdown_y = self.y
+
+        if not (self.x <= x <= self.x + self.width and
+                dropdown_y <= y <= dropdown_y + self.total_height):
             return None
 
         # Ajusta para scroll
-        item_y = y - self.y - self.padding
+        item_y = y - dropdown_y - self.padding
         index = item_y // self.item_height + self.scroll_offset
 
         if 0 <= index < len(self.items):
@@ -203,10 +253,111 @@ class HeldItemDropdown:
         elif self.selected_index >= self.scroll_offset + self.max_visible:
             self.scroll_offset = self.selected_index - self.max_visible + 1
 
-    def _render_scrollbar(self, screen: pygame.Surface):
+    def render(self, screen: pygame.Surface) -> pygame.Rect:
+        """Renderiza o dropdown, retorna o rect da área"""
+        if not self.visible or not self.items:
+            return pygame.Rect(self.x, self.y, 0, 0)
+
+        # ===== DETERMINA A POSIÇÃO BASEADO NA DIREÇÃO =====
+        if self.direction == "up":
+            # Dropdown aparece ACIMA do botão
+            dropdown_x = self.x
+            dropdown_y = self.y - self.total_height
+        else:
+            # Dropdown aparece ABAIXO do botão
+            dropdown_x = self.x
+            dropdown_y = self.y
+
+        # Sombra
+        shadow_surf = pygame.Surface((self.width, self.total_height), pygame.SRCALPHA)
+        shadow_surf.fill((0, 0, 0, 120))
+        screen.blit(shadow_surf, (dropdown_x + 4, dropdown_y + 4))
+
+        # Fundo
+        rect = pygame.Rect(dropdown_x, dropdown_y, self.width, self.total_height)
+        pygame.draw.rect(screen, self.colors["bg"], rect, border_radius=8)
+        pygame.draw.rect(screen, self.colors["border"], rect, 2, border_radius=8)
+
+        # Clip para scroll
+        clip_rect = pygame.Rect(dropdown_x + 2, dropdown_y + 2, self.width - 4, self.total_height - 4)
+        old_clip = screen.get_clip()
+        screen.set_clip(clip_rect)
+
+        # Desenha itens visíveis
+        start_idx = self.scroll_offset
+        end_idx = min(start_idx + self.max_visible, len(self.items))
+
+        for i in range(start_idx, end_idx):
+            item = self.items[i]
+            item_y = dropdown_y + self.padding + (i - start_idx) * self.item_height
+
+            # Fundo do item
+            item_rect = pygame.Rect(dropdown_x + 4, item_y, self.width - 8, self.item_height - 2)
+
+            # Cor do fundo
+            if i == self.selected_index:
+                color = self.colors["bg_selected"]
+            elif i == self.hover_index:
+                color = self.colors["bg_hover"]
+            else:
+                color = self.colors["bg"]
+
+            pygame.draw.rect(screen, color, item_rect, border_radius=4)
+            pygame.draw.rect(screen, (50, 55, 70), item_rect, 1, border_radius=4)
+
+            # Sprite do item (36x36)
+            sprite = self._get_item_sprite(item["id"])
+            if sprite:
+                sprite_rect = sprite.get_rect()
+                sprite_rect.topleft = (dropdown_x + 10, item_y + (self.item_height - 36) // 2)
+                # Fundo brilhante atrás do sprite
+                sprite_bg_rect = pygame.Rect(sprite_rect.x - 4, sprite_rect.y - 4, 44, 44)
+                pygame.draw.rect(screen, (50, 55, 70), sprite_bg_rect, border_radius=6)
+                screen.blit(sprite, sprite_rect)
+                text_x = dropdown_x + 60
+            else:
+                text_x = dropdown_x + 12
+
+            # Nome do item
+            name_text = item["data"]["name"]
+            if len(name_text) > 20:
+                name_text = name_text[:17] + "..."
+            name_surf = self.font_name.render(name_text, True, self.colors["text"])
+            screen.blit(name_surf, (text_x, item_y + 4))
+
+            # Quantidade
+            qty_text = f"x{item['quantity']}"
+            qty_surf = self.font_small.render(qty_text, True, self.colors["text_quantity"])
+            qty_x = dropdown_x + self.width - qty_surf.get_width() - 12
+            screen.blit(qty_surf, (qty_x, item_y + 6))
+
+            # Descrição (versão curta)
+            desc = item["data"].get("description", "")
+            if len(desc) > 35:
+                desc = desc[:32] + "..."
+            desc_surf = self.font_small.render(desc, True, self.colors["text_dim"])
+            screen.blit(desc_surf, (text_x, item_y + 26))
+
+            # Efeito do item (type_boost)
+            effect_value = item["data"].get("effect_value", {})
+            if isinstance(effect_value, dict) and "type_boost" in effect_value:
+                boost = effect_value["type_boost"]
+                boost_text = f"+{int((boost - 1) * 100)}%"
+                boost_surf = self.font_small.render(boost_text, True, (100, 220, 100))
+                screen.blit(boost_surf, (text_x + 160, item_y + 26))
+
+        screen.set_clip(old_clip)
+
+        # Scrollbar (se necessário)
+        if len(self.items) > self.max_visible:
+            self._render_scrollbar(screen, dropdown_x, dropdown_y)
+
+        return rect
+
+    def _render_scrollbar(self, screen: pygame.Surface, dropdown_x: int, dropdown_y: int):
         """Renderiza a barra de scroll"""
-        scroll_x = self.x + self.width - 8
-        scroll_y = self.y + 4
+        scroll_x = dropdown_x + self.width - 8
+        scroll_y = dropdown_y + 4
         scroll_height = self.total_height - 8
 
         # Fundo
@@ -226,102 +377,10 @@ class HeldItemDropdown:
         """Retorna o sprite do item (escalado para 36x36)"""
         sprite = item_bag_catalog.get_sprite(item_id, scaled=True)
         if sprite:
-            # Aumenta para 36x36
             current_size = sprite.get_size()
             if current_size != (36, 36):
                 sprite = pygame.transform.scale(sprite, (36, 36))
         return sprite
-
-    def render(self, screen: pygame.Surface) -> pygame.Rect:
-        """Renderiza o dropdown, retorna o rect da área"""
-        if not self.visible or not self.items:
-            return pygame.Rect(self.x, self.y, 0, 0)
-
-        # Sombra
-        shadow_surf = pygame.Surface((self.width, self.total_height), pygame.SRCALPHA)
-        shadow_surf.fill((0, 0, 0, 120))
-        screen.blit(shadow_surf, (self.x + 4, self.y + 4))
-
-        # Fundo
-        rect = pygame.Rect(self.x, self.y, self.width, self.total_height)
-        pygame.draw.rect(screen, self.colors["bg"], rect, border_radius=8)
-        pygame.draw.rect(screen, self.colors["border"], rect, 2, border_radius=8)
-
-        # Clip para scroll
-        clip_rect = pygame.Rect(self.x + 2, self.y + 2, self.width - 4, self.total_height - 4)
-        old_clip = screen.get_clip()
-        screen.set_clip(clip_rect)
-
-        # Desenha itens visíveis
-        start_idx = self.scroll_offset
-        end_idx = min(start_idx + self.max_visible, len(self.items))
-
-        for i in range(start_idx, end_idx):
-            item = self.items[i]
-            item_y = self.y + self.padding + (i - start_idx) * self.item_height
-
-            # Fundo do item
-            item_rect = pygame.Rect(self.x + 4, item_y, self.width - 8, self.item_height - 2)
-
-            # Cor do fundo
-            if i == self.selected_index:
-                color = self.colors["bg_selected"]
-            elif i == self.hover_index:
-                color = self.colors["bg_hover"]
-            else:
-                color = self.colors["bg"]
-
-            pygame.draw.rect(screen, color, item_rect, border_radius=4)
-            pygame.draw.rect(screen, (50, 55, 70), item_rect, 1, border_radius=4)
-
-            # ===== SPRITE GRANDE (36x36) =====
-            sprite = self._get_item_sprite(item["id"])
-            if sprite:
-                sprite_rect = sprite.get_rect()
-                sprite_rect.topleft = (self.x + 10, item_y + (self.item_height - 36) // 2)
-                # Fundo brilhante atrás do sprite
-                sprite_bg_rect = pygame.Rect(sprite_rect.x - 4, sprite_rect.y - 4, 44, 44)
-                pygame.draw.rect(screen, (50, 55, 70), sprite_bg_rect, border_radius=6)
-                screen.blit(sprite, sprite_rect)
-                text_x = self.x + 60
-            else:
-                text_x = self.x + 12
-
-            # Nome do item (fonte maior)
-            name_text = item["data"]["name"]
-            if len(name_text) > 20:
-                name_text = name_text[:17] + "..."
-            name_surf = pygame.font.Font(None, 16).render(name_text, True, self.colors["text"])
-            screen.blit(name_surf, (text_x, item_y + 4))
-
-            # Quantidade (mais visível)
-            qty_text = f"x{item['quantity']}"
-            qty_surf = pygame.font.Font(None, 14).render(qty_text, True, self.colors["text_quantity"])
-            qty_x = self.x + self.width - qty_surf.get_width() - 12
-            screen.blit(qty_surf, (qty_x, item_y + 6))
-
-            # Descrição (versão curta)
-            desc = item["data"].get("description", "")
-            if len(desc) > 35:
-                desc = desc[:32] + "..."
-            desc_surf = pygame.font.Font(None, 13).render(desc, True, self.colors["text_dim"])
-            screen.blit(desc_surf, (text_x, item_y + 26))
-
-            # Efeito do item (type_boost)
-            effect_value = item["data"].get("effect_value", {})
-            if isinstance(effect_value, dict) and "type_boost" in effect_value:
-                boost = effect_value["type_boost"]
-                boost_text = f"+{int((boost - 1) * 100)}%"
-                boost_surf = pygame.font.Font(None, 13).render(boost_text, True, (100, 220, 100))
-                screen.blit(boost_surf, (text_x + 160, item_y + 26))
-
-        screen.set_clip(old_clip)
-
-        # Scrollbar (se necessário)
-        if len(self.items) > self.max_visible:
-            self._render_scrollbar(screen)
-
-        return rect
 
     def get_selected_item(self) -> Optional[Dict]:
         """Retorna o item selecionado atualmente"""

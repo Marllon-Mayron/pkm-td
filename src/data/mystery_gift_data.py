@@ -43,7 +43,16 @@ MYSTERY_GIFT_CODES = {
         "invalid": False,
         "event_name": "Introdução 2 geração",
         "event_date": "2026-05-07"
-    }
+    },
+    "HBMQXUAO": {
+        "pokemon_id": 133,
+        "pokemon_name": "Eevee",
+        "description": "Eevee Especial Brilhante!",
+        "is_shiny": True,
+        "invalid": False,
+        "event_name": "Lançamento do primeiro video do jogo no canal do FIRST",
+        "event_date": "2026-09-08"
+    },
 }
 
 

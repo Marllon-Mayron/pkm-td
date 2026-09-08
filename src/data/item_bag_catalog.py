@@ -523,6 +523,10 @@ class ItemBagCatalog:
             ("blackglasses", "BLACKGLASSES", "Aumenta o poder de golpes do tipo Sombrio em 10%.", "held_item", 6000),
             # Fantasma
             ("spelltag", "SPELLTAG", "Aumenta o poder de golpes do tipo Fantasma em 10%.", "held_item", 6000),
+            # DEMAIS ITENS SEGURAVEIS
+            ("kings_rock", "KINGSROCK", "Dá 10% de chance de fazer o oponente hesitar ao usar um ataque que causa dano.", "held_item", 6000),
+            ("dragon_scale", "DRAGONSCALE", "Escama especial que faz o Seadra evoluir para Kingdra.", "held_item", 6000),
+            ("upgrade", "UPGRADE", "Dispositivo avançado que faz o Porygon evoluir para Porygon2.", "held_item", 6000),
         ]
 
         for item_id, name, description, category, price in held_items:
@@ -538,8 +542,8 @@ class ItemBagCatalog:
                 "effect_value": {
                     "type_boost": 1.1,  # 10% de aumento
                 },
-                "price": 6000,
-                "unlock_phase": None,
+                "price": price,
+                "unlock_phase": "4-5",
                 "unlock_chapter": None
             }
 
