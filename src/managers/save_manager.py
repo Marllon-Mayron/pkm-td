@@ -641,6 +641,7 @@ class SaveManager:
         Migra dados de save de versões antigas para o formato atual (0.1.7)
         """
         import copy
+        import os
         migrated = copy.deepcopy(save_data)
 
         current_version = SAVE_FORMAT_VERSION
@@ -804,51 +805,114 @@ class SaveManager:
             version = "0.1.6"
             print("[MIGRATE] Migracao para 0.1.6 concluida: has_chosen_starter adicionado")
 
-        # ===== NOVA MIGRAÇÃO: CORREÇÃO DO CAMPO "speed" (0.1.6 → 0.1.7) =====
-        # Esta migração converte o campo 'speed' (que é usado no JSON) para
-        # garantir que ele exista em todos os Pokémon. Na verdade, o campo
-        # 'speed' é o correto - o problema era que o from_dict esperava 'speed_stat'.
-        # Agora corrigimos o from_dict para usar 'speed', então esta migração
-        # apenas garante que o campo 'speed' existe em todos os Pokémon.
+        # ===== MIGRAÇÃO DE 0.1.6 para 0.1.7 (CAMINHOS RELATIVOS DE SPRITE + SPEED) =====
         if version in ["0.1.4", "0.1.5", "0.1.6"]:
-            print("[MIGRATE] Verificando/corrigindo campo 'speed' em todos os Pokémon...")
+            from src.config.paths import PROJECT_ROOT
+
+            print("[MIGRATE] Iniciando migração para 0.1.7...")
+
+            # ===== 1. CONVERTE CAMINHOS DE SPRITE PARA RELATIVOS =====
+            print("[MIGRATE] Convertendo caminhos de sprite para relativos...")
+
+            # Percorre todos os triggers e eventos
+            if "events" in migrated and "triggers" in migrated["events"]:
+                for trigger in migrated["events"]["triggers"]:
+                    if "events" in trigger:
+                        for event in trigger["events"]:
+                            if "speaker_sprite_path" in event:
+                                old_path = event["speaker_sprite_path"]
+                                if old_path:
+                                    old_path = old_path.strip()
+                                    # Verifica se é caminho absoluto
+                                    is_abs = os.path.isabs(old_path) or old_path.startswith(
+                                        "C:") or old_path.startswith("/")
+
+                                    if is_abs:
+                                        try:
+                                            rel_path = os.path.relpath(old_path, str(PROJECT_ROOT))
+                                            rel_path = rel_path.replace('\\', '/')
+                                            event["speaker_sprite_path"] = rel_path
+                                            print(
+                                                f"[MIGRATE] Sprite convertido: {os.path.basename(old_path)} -> {rel_path}")
+                                        except ValueError:
+                                            # Se não for possível (ex: unidades diferentes), mantém o caminho
+                                            event["speaker_sprite_path"] = old_path.replace('\\', '/')
+                                            print(
+                                                f"[MIGRATE] Sprite não pode ser convertido (unidade diferente): {old_path}")
+                                    elif '\\' in old_path:
+                                        # Já é relativo, mas com barras invertidas
+                                        new_path = old_path.replace('\\', '/')
+                                        event["speaker_sprite_path"] = new_path
+                                        print(f"[MIGRATE] Barras corrigidas: {old_path} -> {new_path}")
+
+            # ===== 2. CORRIGE CAMPO 'speed' EM TODOS OS POKÉMON =====
+            print("[MIGRATE] Verificando/corrigindo campo 'speed'...")
 
             # Corrige no time
             team = migrated.get("player", {}).get("team", [])
             for pokemon_data in team:
-                # Se não tem 'speed', tenta usar 'speed_stat' e renomeia
-                if "speed" not in pokemon_data and "speed_stat" in pokemon_data:
-                    pokemon_data["speed"] = pokemon_data["speed_stat"]
-                    del pokemon_data["speed_stat"]
-                    print(
-                        f"[MIGRATE] Renomeado 'speed_stat' para 'speed' no time: {pokemon_data.get('name', 'Unknown')}")
-                # Se não tem nenhum, define padrão
+                # Verifica se tem 'speed', senão tenta criar
                 if "speed" not in pokemon_data:
-                    pokemon_data["speed"] = 50
-                    print(f"[MIGRATE] 'speed' padrão adicionado no time: {pokemon_data.get('name', 'Unknown')}")
+                    if "speed_stat" in pokemon_data:
+                        pokemon_data["speed"] = pokemon_data["speed_stat"]
+                        del pokemon_data["speed_stat"]
+                        print(
+                            f"[MIGRATE] Renomeado 'speed_stat' para 'speed' no time: {pokemon_data.get('name', 'Unknown')}")
+                    else:
+                        pokemon_data["speed"] = 50
+                        print(
+                            f"[MIGRATE] 'speed' padrão (50) adicionado no time: {pokemon_data.get('name', 'Unknown')}")
                 # Remove speed_stat se existir (para evitar duplicidade)
                 if "speed_stat" in pokemon_data:
                     del pokemon_data["speed_stat"]
+                    print(f"[MIGRATE] 'speed_stat' removido do time: {pokemon_data.get('name', 'Unknown')}")
 
             # Corrige na pc_box
             pc_box = migrated.get("player", {}).get("pc_box", [])
             for pokemon_data in pc_box:
-                if "speed" not in pokemon_data and "speed_stat" in pokemon_data:
-                    pokemon_data["speed"] = pokemon_data["speed_stat"]
-                    del pokemon_data["speed_stat"]
-                    print(
-                        f"[MIGRATE] Renomeado 'speed_stat' para 'speed' na box: {pokemon_data.get('name', 'Unknown')}")
                 if "speed" not in pokemon_data:
-                    pokemon_data["speed"] = 50
-                    print(f"[MIGRATE] 'speed' padrão adicionado na box: {pokemon_data.get('name', 'Unknown')}")
+                    if "speed_stat" in pokemon_data:
+                        pokemon_data["speed"] = pokemon_data["speed_stat"]
+                        del pokemon_data["speed_stat"]
+                        print(
+                            f"[MIGRATE] Renomeado 'speed_stat' para 'speed' na box: {pokemon_data.get('name', 'Unknown')}")
+                    else:
+                        pokemon_data["speed"] = 50
+                        print(f"[MIGRATE] 'speed' padrão (50) adicionado na box: {pokemon_data.get('name', 'Unknown')}")
                 if "speed_stat" in pokemon_data:
                     del pokemon_data["speed_stat"]
+                    print(f"[MIGRATE] 'speed_stat' removido da box: {pokemon_data.get('name', 'Unknown')}")
+
+            # ===== 3. GARANTE has_chosen_starter =====
+            if "has_chosen_starter" not in migrated.get("player", {}):
+                has_team = len(migrated.get("player", {}).get("team", [])) > 0
+                has_box = len(migrated.get("player", {}).get("pc_box", [])) > 0
+                migrated["player"]["has_chosen_starter"] = has_team or has_box
+                print(
+                    f"[MIGRATE] has_chosen_starter definido como {migrated['player']['has_chosen_starter']} (fallback)")
+
+            # ===== 4. GARANTE QUE OS CAMPOS OBRIGATÓRIOS EXISTEM =====
+            if "seen_pokemon" not in migrated.get("player", {}):
+                migrated["player"]["seen_pokemon"] = []
+            if "caught_pokemon" not in migrated.get("player", {}):
+                migrated["player"]["caught_pokemon"] = []
+            if "desfossilizadores" not in migrated.get("player", {}):
+                migrated["player"]["desfossilizadores"] = []
+            if "total_playtime" not in migrated.get("player", {}):
+                migrated["player"]["total_playtime"] = 0.0
+            if "mystery_gift" not in migrated.get("player", {}):
+                migrated["player"]["mystery_gift"] = {"redeemed_codes": {}, "history": []}
+            if "achievements" not in migrated.get("player", {}):
+                migrated["player"]["achievements"] = {"unlocked": [], "counters": {}, "unlocked_data": {}}
 
             # Atualiza versão
-            migrated["meta"]["version"] = current_version
-            print("[MIGRATE] Migracao para versao atual concluida: campo speed verificado/corrigido")
+            migrated["meta"]["version"] = "0.1.7"
+            version = "0.1.7"
+            print(
+                "[MIGRATE] Migracao para 0.1.7 concluida: sprites relativos, speed corrigido, has_chosen_starter garantido")
 
-        # ===== VALIDAÇÃO PÓS-MIGRAÇÃO =====
+        # ===== VALIDAÇÃO PÓS-MIGRAÇÃO (FALLBACK) =====
+        # Garante que todos os campos obrigatórios existem
         if "player" not in migrated:
             migrated["player"] = {}
 
@@ -884,10 +948,19 @@ class SaveManager:
             has_team = len(migrated["player"].get("team", [])) > 0
             has_box = len(migrated["player"].get("pc_box", [])) > 0
             migrated["player"]["has_chosen_starter"] = has_team or has_box
-            print(f"[MIGRATE] has_chosen_starter definido como {migrated['player']['has_chosen_starter']} (fallback)")
+            print(
+                f"[MIGRATE] has_chosen_starter definido como {migrated['player']['has_chosen_starter']} (fallback final)")
 
-        # ===== CORREÇÃO FINAL: Garante que 'speed' existe em todos os Pokémon =====
-        print("[MIGRATE] Verificando se todos os Pokémon têm 'speed'...")
+        if "achievements" not in migrated["player"]:
+            migrated["player"]["achievements"] = {"unlocked": [], "counters": {}, "unlocked_data": {}}
+
+        if "unlocked_data" not in migrated["player"]["achievements"]:
+            migrated["player"]["achievements"]["unlocked_data"] = {}
+
+        # ===== CORREÇÃO FINAL: Garante que 'speed' existe em TODOS os Pokémon =====
+        print("[MIGRATE] Verificação final: garantindo que todos os Pokémon têm 'speed'...")
+
+        # Corrige no time
         team = migrated.get("player", {}).get("team", [])
         for pokemon_data in team:
             if "speed" not in pokemon_data:
@@ -896,8 +969,12 @@ class SaveManager:
                     del pokemon_data["speed_stat"]
                 else:
                     pokemon_data["speed"] = 50
-                print(f"[MIGRATE] 'speed' adicionado (fallback) para {pokemon_data.get('name', 'Unknown')}")
+                print(
+                    f"[MIGRATE] 'speed' adicionado (fallback final) para {pokemon_data.get('name', 'Unknown')} no time")
+            elif "speed_stat" in pokemon_data:
+                del pokemon_data["speed_stat"]
 
+        # Corrige na pc_box
         pc_box = migrated.get("player", {}).get("pc_box", [])
         for pokemon_data in pc_box:
             if "speed" not in pokemon_data:
@@ -906,7 +983,10 @@ class SaveManager:
                     del pokemon_data["speed_stat"]
                 else:
                     pokemon_data["speed"] = 50
-                print(f"[MIGRATE] 'speed' adicionado (fallback) para {pokemon_data.get('name', 'Unknown')}")
+                print(
+                    f"[MIGRATE] 'speed' adicionado (fallback final) para {pokemon_data.get('name', 'Unknown')} na box")
+            elif "speed_stat" in pokemon_data:
+                del pokemon_data["speed_stat"]
 
         print(f"[MIGRATE] Migracao concluida! Versao final: {migrated['meta']['version']}")
         return migrated

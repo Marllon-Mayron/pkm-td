@@ -1049,6 +1049,9 @@ class EventEditDialog:
 
     def _select_sprite(self):
         from tkinter import filedialog, Tk
+        from src.config.paths import PROJECT_ROOT
+        import os
+
         root = Tk()
         root.withdraw()
         file_path = filedialog.askopenfilename(
@@ -1056,8 +1059,20 @@ class EventEditDialog:
             filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.gif")]
         )
         if file_path:
-            self.event.speaker_sprite_path = file_path
-            self.input_texts["sprite_input"] = file_path
+            # Converte o caminho absoluto para caminho relativo à raiz do projeto
+            try:
+                # Tenta tornar o caminho relativo a PROJECT_ROOT
+                rel_path = os.path.relpath(file_path, str(PROJECT_ROOT))
+                # Garante que usa barras normais (não barras invertidas)
+                rel_path = rel_path.replace('\\', '/')
+                self.event.speaker_sprite_path = rel_path
+                self.input_texts["sprite_input"] = rel_path
+                print(f"[SPRITE] Caminho relativo salvo: {rel_path}")
+            except ValueError:
+                # Se não for possível (ex: unidades de disco diferentes), mantém o absoluto
+                self.event.speaker_sprite_path = file_path
+                self.input_texts["sprite_input"] = file_path
+                print(f"[SPRITE] AVISO: Não foi possível tornar relativo, mantendo absoluto: {file_path}")
 
     def _change_event_type(self, direction):
         types = [EventType.MESSAGE, EventType.CAMERA, EventType.TUTORIAL,
@@ -1067,26 +1082,133 @@ class EventEditDialog:
         self.event.event_type = types[new_idx]
 
     def _save_event(self):
+        """Salva o evento atual, normalizando caminhos de sprite para relativos."""
+        from src.config.paths import PROJECT_ROOT
+        import os
+
+        # ===== DELAY =====
         try:
             self.event.delay = float(self.input_texts.get("delay", "0"))
         except ValueError:
             self.event.delay = 0
 
-        # Pause Game - preserva o valor atual
-        # Não sobrescrever se não foi alterado explicitamente
-        if hasattr(self.event, 'pause_game'):
-            # Mantém o valor atual, já que o checkbox altera diretamente
-            pass
-
+        # ===== NORMALIZAÇÃO DE CAMINHOS DE SPRITE =====
         if self.event.event_type == EventType.MESSAGE:
-            # Só atualiza se houver texto nos inputs, senão mantém o valor existente
+            # Atualiza speaker_name se houver input
             if "speaker_input" in self.input_texts and self.input_texts["speaker_input"]:
                 self.event.speaker_name = self.input_texts["speaker_input"]
+
+            # Atualiza message_text se houver input
             if "message_input" in self.input_texts and self.input_texts["message_input"]:
                 self.event.message_text = self.input_texts["message_input"]
+
+            # ===== NORMALIZA O CAMINHO DO SPRITE =====
             if "sprite_input" in self.input_texts and self.input_texts["sprite_input"]:
-                self.event.speaker_sprite_path = self.input_texts["sprite_input"]
-            # ... e assim por diante
+                sprite_path = self.input_texts["sprite_input"]
+
+                # Remove espaços em branco extras
+                sprite_path = sprite_path.strip()
+
+                if sprite_path:
+                    # Verifica se é um caminho absoluto (Windows ou Unix)
+                    is_abs = os.path.isabs(sprite_path) or sprite_path.startswith("C:") or sprite_path.startswith("/")
+
+                    if is_abs:
+                        # Tenta converter para caminho relativo à raiz do projeto
+                        try:
+                            rel_path = os.path.relpath(sprite_path, str(PROJECT_ROOT))
+                            # Garante barras normais (usa / em vez de \)
+                            rel_path = rel_path.replace('\\', '/')
+                            self.event.speaker_sprite_path = rel_path
+                            print(f"[EVENT_EDIT] Sprite normalizado: {sprite_path} -> {rel_path}")
+                        except ValueError:
+                            # Se não for possível (ex: unidades de disco diferentes), mantém o caminho
+                            self.event.speaker_sprite_path = sprite_path.replace('\\', '/')
+                            print(f"[EVENT_EDIT] AVISO: Não foi possível tornar relativo: {sprite_path}")
+                    else:
+                        # Já é relativo, só garante barras normais
+                        self.event.speaker_sprite_path = sprite_path.replace('\\', '/')
+                        print(f"[EVENT_EDIT] Sprite já relativo: {self.event.speaker_sprite_path}")
+
+            # Atualiza action_label se houver input
+            if "action_label_input" in self.input_texts and self.input_texts["action_label_input"]:
+                self.event.action_label = self.input_texts["action_label_input"]
+
+            # Atualiza action_trigger se houver input
+            if "action_trigger_input" in self.input_texts and self.input_texts["action_trigger_input"]:
+                self.event.action_trigger = self.input_texts["action_trigger_input"]
+
+        # ===== CÂMERA =====
+        elif self.event.event_type == EventType.CAMERA:
+            if "intensity_input" in self.input_texts and self.input_texts["intensity_input"]:
+                try:
+                    self.event.camera_intensity = float(self.input_texts["intensity_input"])
+                except ValueError:
+                    pass
+
+            if "duration_input" in self.input_texts and self.input_texts["duration_input"]:
+                try:
+                    self.event.camera_duration = float(self.input_texts["duration_input"])
+                except ValueError:
+                    pass
+
+        # ===== TUTORIAL =====
+        elif self.event.event_type == EventType.TUTORIAL:
+            if "highlight_input" in self.input_texts and self.input_texts["highlight_input"]:
+                self.event.tutorial_highlight = self.input_texts["highlight_input"]
+
+        # ===== GAME STATE =====
+        elif self.event.event_type == EventType.GAME_STATE:
+            if "state_params_input" in self.input_texts and self.input_texts["state_params_input"]:
+                try:
+                    # Tenta converter para dicionário se for JSON
+                    import json
+                    params_str = self.input_texts["state_params_input"].strip()
+                    if params_str:
+                        self.event.state_params = json.loads(params_str)
+                    else:
+                        self.event.state_params = {}
+                except:
+                    # Se não for JSON, mantém como string
+                    self.event.state_params = self.input_texts["state_params_input"]
+
+        # ===== SPAWN =====
+        elif self.event.event_type == EventType.SPAWN:
+            if "spawn_params_input" in self.input_texts and self.input_texts["spawn_params_input"]:
+                try:
+                    import json
+                    params_str = self.input_texts["spawn_params_input"].strip()
+                    if params_str:
+                        self.event.spawn_params = json.loads(params_str)
+                    else:
+                        self.event.spawn_params = {}
+                except:
+                    self.event.spawn_params = self.input_texts["spawn_params_input"]
+
+        # ===== CUSTOM ACTION =====
+        elif self.event.event_type == EventType.CUSTOM_ACTION:
+            if "custom_name_input" in self.input_texts and self.input_texts["custom_name_input"]:
+                self.event.custom_action_name = self.input_texts["custom_name_input"]
+
+            if "custom_params_input" in self.input_texts and self.input_texts["custom_params_input"]:
+                try:
+                    import json
+                    params_str = self.input_texts["custom_params_input"].strip()
+                    if params_str:
+                        self.event.custom_action_params = json.loads(params_str)
+                    else:
+                        self.event.custom_action_params = {}
+                except:
+                    self.event.custom_action_params = self.input_texts["custom_params_input"]
+
+        # ===== SALVA O PAUSE_GAME =====
+        # O pause_game já é atualizado diretamente pelo checkbox no handle_event
+        # Se não existir, define como False
+        if not hasattr(self.event, 'pause_game'):
+            self.event.pause_game = False
+
+        print(
+            f"[EVENT_EDIT] Evento salvo: {self.event.event_type} - {self.event.message_text[:30] if self.event.event_type == EventType.MESSAGE else ''}")
 
     def _handle_keydown(self, event):
         if event.key == pygame.K_RETURN:

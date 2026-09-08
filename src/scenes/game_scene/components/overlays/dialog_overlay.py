@@ -1,4 +1,6 @@
-import pygame
+import pygame, os
+
+from config.paths import PROJECT_ROOT
 
 
 class DialogOverlay:
@@ -30,11 +32,43 @@ class DialogOverlay:
         self.text = text
         self.speaker = speaker
         self.sprite = None
+
+        # ===== CARREGA SPRITE COM CAMINHO RELATIVO =====
         if sprite_path:
             try:
-                self.sprite = pygame.image.load(sprite_path).convert_alpha()
-            except Exception:
-                pass
+                # Limpa o caminho
+                sprite_path = sprite_path.strip()
+
+                # Verifica se é um caminho absoluto
+                is_abs = os.path.isabs(sprite_path) or sprite_path.startswith("C:") or sprite_path.startswith("/")
+
+                if is_abs:
+                    # Tenta carregar diretamente (fallback)
+                    self.sprite = pygame.image.load(sprite_path).convert_alpha()
+                    print(f"[DIALOG] Sprite carregado (absoluto): {sprite_path}")
+                else:
+                    # Caminho relativo - resolve a partir do PROJECT_ROOT
+                    full_path = PROJECT_ROOT / sprite_path
+                    if full_path.exists():
+                        self.sprite = pygame.image.load(str(full_path)).convert_alpha()
+                        print(f"[DIALOG] Sprite carregado (relativo): {sprite_path}")
+                    else:
+                        # Tenta procurar o arquivo na pasta res
+                        filename = os.path.basename(sprite_path)
+                        found = False
+                        for root, dirs, files in os.walk(str(PROJECT_ROOT / "res")):
+                            if filename in files:
+                                full_path = os.path.join(root, filename)
+                                self.sprite = pygame.image.load(full_path).convert_alpha()
+                                print(f"[DIALOG] Sprite encontrado na res: {filename}")
+                                found = True
+                                break
+
+                        if not found:
+                            print(f"[DIALOG] Sprite não encontrado: {sprite_path}")
+            except Exception as e:
+                print(f"[DIALOG] Erro ao carregar sprite: {e}")
+
         self.action_label = action_label
         self.action_callback = action_callback
         self.active = True
