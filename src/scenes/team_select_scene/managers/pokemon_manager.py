@@ -3,54 +3,54 @@
 class PokemonManager:
     def __init__(self, player):
         self.player = player
-        self.current_sort = "capture"  # capture, name_asc, name_desc, id_asc, id_desc
-        self.current_filter = "all"    # all, shiny, normal
+        self.current_sort = "capture"
+        self.current_filter = "all"
         self.current_search = ""
 
     def _apply_filters_and_sort(self, pokemon_list):
-        """Aplica busca, filtro e ordenação à lista de Pokémon"""
+        """Aplica busca, filtro e ordenação a uma lista de dicionários."""
         filtered_list = pokemon_list
 
-        # Aplica filtro de shiny
+        # Filtro de shiny
         if self.current_filter == "shiny":
-            filtered_list = [p for p in filtered_list if p.is_shiny]
+            filtered_list = [p for p in filtered_list if p.get("is_shiny", False)]
         elif self.current_filter == "normal":
-            filtered_list = [p for p in filtered_list if not p.is_shiny]
+            filtered_list = [p for p in filtered_list if not p.get("is_shiny", False)]
 
-        # Aplica busca por nome OU apelido (custom_name)
+        # Busca por nome ou apelido
         if self.current_search:
             search_lower = self.current_search.lower()
             filtered_list = [
                 p for p in filtered_list
-                if search_lower in p.name.lower() or
-                   (p.custom_name and search_lower in p.custom_name.lower())
+                if search_lower in p.get("name", "").lower() or
+                   (p.get("custom_name") and search_lower in p["custom_name"].lower())
             ]
 
-        # Aplica ordenação
+        # Ordenação
         if self.current_sort == "name_asc":
-            filtered_list.sort(key=lambda p: p.name.lower())
+            filtered_list.sort(key=lambda p: p.get("name", "").lower())
         elif self.current_sort == "name_desc":
-            filtered_list.sort(key=lambda p: p.name.lower(), reverse=True)
+            filtered_list.sort(key=lambda p: p.get("name", "").lower(), reverse=True)
         elif self.current_sort == "id_asc":
-            filtered_list.sort(key=lambda p: p.id)
+            filtered_list.sort(key=lambda p: p.get("id", 0))
         elif self.current_sort == "id_desc":
-            filtered_list.sort(key=lambda p: p.id, reverse=True)
+            filtered_list.sort(key=lambda p: p.get("id", 0), reverse=True)
         # "capture" mantém a ordem original
 
         return filtered_list
 
     def get_available_pokemon(self, page=0, items_per_page=30):
-        all_pokemon = list(self.player.pc_box)
+        all_pokemon = list(self.player.pc_box)  # já são dicts
         filtered_list = self._apply_filters_and_sort(all_pokemon)
-
         start_idx = page * items_per_page
         end_idx = start_idx + items_per_page
-
         return filtered_list[start_idx:end_idx]
 
     def get_page_count(self, items_per_page):
         all_pokemon = list(self.player.pc_box)
         filtered_list = self._apply_filters_and_sort(all_pokemon)
+        if not filtered_list:
+            return 1
         return max(1, (len(filtered_list) + items_per_page - 1) // items_per_page)
 
     def get_total_filtered_count(self):
@@ -68,43 +68,69 @@ class PokemonManager:
         self.current_search = search_text
 
     def update_team_status(self):
-        for pokemon in self.player.pc_box:
-            pokemon.is_in_team = any(p is pokemon for p in self.player.team)
+        """Atualiza is_in_team nos Pokémon do time e na box."""
+        team_ids = {p.unique_id for p in self.player.team}
+        for pokemon in self.player.team:
+            pokemon.is_in_team = True
+        for data in self.player.pc_box:
+            data["is_in_team"] = data.get("unique_id") in team_ids
 
-    def add_to_team(self, pokemon):
-        if len(self.player.team) < 6:
-            if pokemon in self.player.pc_box:
-                success, _ = self.player.add_to_team(pokemon)
-                if success:
-                    pokemon.is_in_team = True
-                    self.update_team_status()
-                    self.player.auto_save()
-                return success
-        return False
+    def add_to_team(self, pokemon_or_data):
+        """
+        Adiciona um Pokémon à equipe.
+        Pode receber um objeto Pokemon ou um dicionário com os dados.
+        """
+        if len(self.player.team) >= 6:
+            return False
+
+        # Determina se é um objeto ou dict
+        if hasattr(pokemon_or_data, 'unique_id'):  # é um objeto Pokemon
+            pokemon = pokemon_or_data
+            unique_id = pokemon.unique_id
+        else:  # é um dict
+            unique_id = pokemon_or_data["unique_id"]
+            pokemon = self.player.get_pokemon_instance(unique_id)
+            if not pokemon:
+                return False
+
+        # Remove da pc_box (se estiver lá)
+        self.player.pc_box = [d for d in self.player.pc_box if d.get("unique_id") != unique_id]
+
+        # Adiciona ao time
+        self.player.team.append(pokemon)
+        pokemon.is_in_team = True
+        self.update_team_status()
+        self.player.auto_save()
+        return True
 
     def remove_from_team(self, pokemon):
-        for i, p in enumerate(self.player.team):
-            if p is pokemon:
-                removed = self.player.remove_from_team(i)
-                if removed:
-                    pokemon.is_in_team = False
-                    if pokemon not in self.player.pc_box:
-                        self.player.pc_box.append(pokemon)
-                    self.update_team_status()
-                    self.player.auto_save()
-                    return True
-        return False
+        """Remove um Pokémon da equipe e o coloca na PC Box."""
+        if pokemon not in self.player.team:
+            return False
+
+        # Remove do time
+        self.player.team.remove(pokemon)
+        pokemon.is_in_team = False
+
+        # Converte para dict e adiciona à pc_box
+        pokemon_dict = pokemon.to_dict()
+        self.player.pc_box.append(pokemon_dict)
+
+        # Mantém no cache (opcional)
+        self.player._pokemon_cache[pokemon.unique_id] = pokemon
+
+        self.update_team_status()
+        self.player.auto_save()
+        return True
 
     def release_pokemon(self, pokemon):
-        if pokemon.is_in_team:
-            for i, p in enumerate(self.player.team):
-                if p is pokemon:
-                    self.player.remove_from_team(i)
-                    break
-
-        if pokemon in self.player.pc_box:
-            self.player.pc_box.remove(pokemon)
-
+        """Liberta um Pokémon (remove do time e da box)."""
+        if pokemon in self.player.team:
+            self.player.team.remove(pokemon)
+        # Remove da box (procurando por unique_id)
+        self.player.pc_box = [d for d in self.player.pc_box if d.get("unique_id") != pokemon.unique_id]
+        if pokemon.unique_id in self.player._pokemon_cache:
+            del self.player._pokemon_cache[pokemon.unique_id]
         pokemon.is_in_team = False
         self.player.auto_save()
         return True

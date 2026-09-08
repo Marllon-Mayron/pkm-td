@@ -1759,3 +1759,134 @@ class Pokemon(Entity):
         print(f"[DESERIALIZE] Moves: {[m.name for m in self.moves]}")
 
         return True
+
+    # ===== MÉTODOS DE SERIALIZAÇÃO =====
+    def to_dict(self) -> dict:
+        """Converte a instância para dicionário para salvar."""
+        # Dados básicos
+        data = {
+            "unique_id": self.unique_id,
+            "id": self.id,
+            "name": self.name,
+            "level": self.level,
+            "is_shiny": self.is_shiny,
+            "is_boss": self.is_boss,
+            "current_hp": self.current_hp,
+            "max_hp": self.max_hp,
+            "xp": self.xp,
+            "ivs": self.ivs.copy(),
+            "evs": self.evs.copy(),
+            "nature": self.nature,
+            "types": self.types.copy(),
+            "attack": self.attack,
+            "defense": self.defense,
+            "sp_attack": self.sp_attack,
+            "sp_defense": self.sp_defense,
+            "speed_stat": self.speed_stat,
+            "is_in_team": self.is_in_team,
+            "is_placed": self.is_placed,
+            "spot_id": self.spot_id,
+            "weight_kg": self.weight_kg,
+            "height_m": self.height_m,
+            "gender": self.gender,
+            "custom_name": self.custom_name,
+            "happiness": self.happiness,
+            # Moves
+            "moves": [
+                {
+                    "name": move.name,
+                    "current_pp": move.current_pp,
+                    "max_pp": move.max_pp,
+                    "type": move.type,
+                    "power": move.power,
+                    "accuracy": move.accuracy,
+                    "category": move.category,
+                }
+                for move in self.moves
+            ],
+        }
+
+        # Se o Pokémon estiver transformado (Ditto), serializa o estado
+        if hasattr(self, '_is_transformed') and self._is_transformed:
+            transform_state = self.serialize_transform_state()
+            if transform_state:
+                data["_transform_state"] = transform_state
+
+        return data
+
+    @staticmethod
+    def from_dict(data: dict, pokedex=None, move_data=None) -> 'Pokemon':
+        """Cria uma instância de Pokemon a partir de um dicionário (JSON)."""
+        from src.entities.move import Move
+        from src.data.pokedex import Pokedex
+        from src.data.move_data import MoveData
+
+        if pokedex is None:
+            pokedex = Pokedex()
+        if move_data is None:
+            move_data = MoveData()
+
+        # Cria uma instância básica com parâmetros mínimos
+        pokemon = Pokemon(
+            x=0,
+            y=0,
+            pokemon_id=data["id"],
+            level=data.get("level", 5),
+            is_wild=False,
+            shiny=data.get("is_shiny", False),
+            is_boss=data.get("is_boss", False)
+        )
+
+        # Sobrescreve atributos com os dados do dicionário
+        pokemon.unique_id = data["unique_id"]
+        pokemon.name = data["name"]
+        pokemon.level = data["level"]
+        pokemon.is_shiny = data.get("is_shiny", False)
+        pokemon.is_boss = data.get("is_boss", False)
+        pokemon.current_hp = data["current_hp"]
+        pokemon.max_hp = data["max_hp"]
+        pokemon.xp = data["xp"]
+        pokemon.ivs = data["ivs"].copy()
+        pokemon.evs = data["evs"].copy()
+        pokemon.nature = data["nature"]
+        pokemon.types = data["types"].copy()
+        pokemon.attack = data["attack"]
+        pokemon.defense = data["defense"]
+        pokemon.sp_attack = data["sp_attack"]
+        pokemon.sp_defense = data["sp_defense"]
+        pokemon.speed_stat = data["speed"]
+        pokemon.is_in_team = data.get("is_in_team", False)
+        pokemon.is_placed = data.get("is_placed", False)
+        pokemon.spot_id = data.get("spot_id")
+        pokemon.weight_kg = data.get("weight_kg", 10.0)
+        pokemon.height_m = data.get("height_m", 1.0)
+        pokemon.gender = data.get("gender")
+        pokemon.custom_name = data.get("custom_name")
+        pokemon.happiness = data.get("happiness", 0)
+
+        # Restaura moves
+        pokemon.moves = []
+        for move_dict in data.get("moves", []):
+            move_info = move_data.get_move_info(move_dict["name"])
+            if not move_info:
+                move_info = {
+                    "type": move_dict.get("type", "normal"),
+                    "power": move_dict.get("power", 40),
+                    "accuracy": move_dict.get("accuracy", 100),
+                    "pp": move_dict.get("max_pp", 35),
+                    "category": move_dict.get("category", "physical"),
+                    "description": f"Usa {move_dict['name']}."
+                }
+            move = Move(move_dict["name"], move_info)
+            move.current_pp = move_dict.get("current_pp", move.max_pp)
+            move.max_pp = move_dict.get("max_pp", move.max_pp)
+            pokemon.moves.append(move)
+
+        # Se houver estado de transformação, restaura
+        if "_transform_state" in data:
+            pokemon.deserialize_transform_state(data["_transform_state"])
+
+        # Recalcula stats (caso IVs/EVs tenham mudado)
+        pokemon.stats.calculate_stats()
+
+        return pokemon

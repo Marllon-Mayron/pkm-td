@@ -1,6 +1,9 @@
 # src/entities/player.py
+from typing import Optional
+
 import pygame
 
+from src.entities.pokemon import Pokemon
 from src.entities.base import Entity
 from src.data.pokedex import Pokedex
 from src.managers.bag_manager import BagManager
@@ -39,6 +42,8 @@ class Player(Entity):
         # PC Box (armazenamento)
         self.pc_box = []
 
+        self._pokemon_cache = {}
+
         # Lista de conquistas do jogador
         self.achievements = {
             "unlocked": [],
@@ -73,6 +78,102 @@ class Player(Entity):
         self._playtime_accumulator = 0.0  # para acumular dt
 
         self.save_manager = SaveManager()
+
+    def get_pokemon_instance(self, unique_id: str) -> Optional['Pokemon']:
+        """
+        Retorna a instância do Pokemon, criando-a se necessário.
+        Busca primeiro no time, depois no cache, depois cria a partir dos dados da box.
+        """
+        # 1. Verifica no time
+        for p in self.team:
+            if p.unique_id == unique_id:
+                return p
+
+        # 2. Verifica no cache
+        if unique_id in self._pokemon_cache:
+            return self._pokemon_cache[unique_id]
+
+        # 3. Busca nos dados da box
+        for data in self.pc_box:
+            if data.get("unique_id") == unique_id:
+                # Cria a instância usando from_dict
+                pokemon = Pokemon.from_dict(data)
+                # Armazena no cache
+                self._pokemon_cache[unique_id] = pokemon
+                return pokemon
+
+        return None
+
+    def get_pokemon_data(self, unique_id: str) -> Optional[dict]:
+        """Retorna o dicionário de dados de um Pokémon pelo unique_id."""
+        for data in self.pc_box:
+            if data.get("unique_id") == unique_id:
+                return data
+        return None
+
+    def add_to_team(self, pokemon_or_unique_id, slot=None):
+        """Adiciona Pokémon ao time. Pode receber objeto ou unique_id."""
+        if isinstance(pokemon_or_unique_id, str):
+            pokemon = self.get_pokemon_instance(pokemon_or_unique_id)
+            if not pokemon:
+                return False, "Pokémon não encontrado"
+        else:
+            pokemon = pokemon_or_unique_id
+
+        if len(self.team) >= 6:
+            return False, "Time cheio!"
+
+        if slot is not None and 0 <= slot < 6:
+            if slot < len(self.team):
+                self.team[slot] = pokemon
+            else:
+                self.team.append(pokemon)
+        else:
+            self.team.append(pokemon)
+
+        pokemon.is_in_team = True
+
+        # Remove da pc_box (se estiver lá)
+        self.pc_box = [d for d in self.pc_box if d.get("unique_id") != pokemon.unique_id]
+
+        # Remove do cache? Não necessário, pois pode ser mantido
+        return True, f"{pokemon.name} adicionado ao time"
+
+    def remove_from_team(self, slot):
+        """Remove Pokémon do time e o coloca na PC Box como dict."""
+        if 0 <= slot < len(self.team):
+            pokemon = self.team.pop(slot)
+            pokemon.is_in_team = False
+
+            # Converte para dict e adiciona à pc_box
+            pokemon_dict = pokemon.to_dict()
+            self.pc_box.append(pokemon_dict)
+
+            # Mantém no cache (opcional)
+            self._pokemon_cache[pokemon.unique_id] = pokemon
+
+            return pokemon
+        return None
+
+    def add_to_box(self, pokemon):
+        """Adiciona Pokémon à PC Box (como dict)."""
+        if not hasattr(pokemon, 'unique_id'):
+            import uuid
+            pokemon.unique_id = str(uuid.uuid4())
+
+        pokemon.is_in_team = False
+        pokemon.is_placed = False
+        pokemon.is_wild = False
+
+        # Converte para dict e adiciona
+        pokemon_dict = pokemon.to_dict()
+        self.pc_box.append(pokemon_dict)
+
+        # Armazena no cache
+        self._pokemon_cache[pokemon.unique_id] = pokemon
+
+        self.caught_pokemon.add(pokemon.id)
+        print(f"[PLAYER] {pokemon.name} adicionado à PC Box. Total: {len(self.pc_box)}")
 
     def update_bag_ui_config(self, **kwargs):
         """Atualiza a configuração da UI da bolsa e salva no arquivo"""
@@ -117,45 +218,6 @@ class Player(Entity):
                     bag_renderer._sync_page_with_category()
 
         print(f"[PLAYER] Configuração da UI da bolsa aplicada: {config}")
-
-    def add_to_team(self, pokemon, slot=None):
-        """Adiciona Pokémon ao time"""
-        if len(self.team) >= 6:
-            return False, "Time cheio!"
-
-        if slot is not None and 0 <= slot < 6:
-            if slot < len(self.team):
-                self.team[slot] = pokemon
-            else:
-                self.team.append(pokemon)
-        else:
-            self.team.append(pokemon)
-
-        pokemon.is_in_team = True
-        return True, f"{pokemon.name} adicionado ao time"
-
-    def remove_from_team(self, slot):
-        """Remove Pokémon do time"""
-        if 0 <= slot < len(self.team):
-            pokemon = self.team.pop(slot)
-            pokemon.is_in_team = False
-            return pokemon
-        return None
-
-    def add_to_box(self, pokemon):
-        """Adiciona Pokémon ao PC Box"""
-        # Garante que o unique_id é preservado
-        if not hasattr(pokemon, 'unique_id'):
-            import uuid
-            pokemon.unique_id = str(uuid.uuid4())
-
-        pokemon.is_in_team = False
-        pokemon.is_placed = False
-        pokemon.is_wild = False
-
-        self.pc_box.append(pokemon)
-        self.caught_pokemon.add(pokemon.id)
-        print(f"[PLAYER] {pokemon.name} (ID: {pokemon.unique_id[:8]}) adicionado à PC Box. Total: {len(self.pc_box)}")
 
     def register_seen(self, pokemon_id):
         """Registra Pokémon como visto"""

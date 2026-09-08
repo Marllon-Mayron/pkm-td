@@ -36,11 +36,11 @@ class PhaseCompleteOverlay(BaseOverlay):
         self.title_scale = 0.0
         self.fade_in = 0.0
 
-        # --- NOVO: Obtém a lista de Pokémon da fase usando o phase_loader global ---
+        # --- Obtém a lista de Pokémon da fase usando o phase_loader global ---
         self.pokemon_ids = phase_loader.get_all_pokemon_ids_from_phase()
         self.pokemon_ids.sort()  # ordena por ID
 
-        # --- NOVO: Cria uma Pokedex para consultar nomes e sprites ---
+        # --- Cria uma Pokedex para consultar nomes e sprites ---
         self.pokedex = Pokedex()
 
         # --- Cache para o sprite de desconhecido ---
@@ -121,7 +121,7 @@ class PhaseCompleteOverlay(BaseOverlay):
         font_large = pygame.font.Font(None, max(32, int(base_size * 0.06)))
         font_medium = pygame.font.Font(None, max(24, int(base_size * 0.045)))
         font_small = pygame.font.Font(None, max(18, int(base_size * 0.035)))
-        font_tiny = pygame.font.Font(None, max(16, int(base_size * 0.03)))
+        font_tiny = pygame.font.Font(None, max(16, int(base_size * 0.025)))
 
         # ============================================================
         # 1. COLETA DE DADOS (para calcular a altura total)

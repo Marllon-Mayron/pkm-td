@@ -255,20 +255,21 @@ class SaveManager:
 
     def save_game(self, player, game_state=None, save_name="save", slot=1) -> bool:
         """
-        Salva o estado completo do jogo
+        Salva o estado completo do jogo.
+        player.pc_box: lista de dicionários (dados leves)
+        player.team: lista de objetos Pokemon (instâncias completas)
         """
         import os
+        from src.managers.save_manager import SAVE_FORMAT_VERSION
 
         # Define o slot atual
         self.current_save_file = slot
 
-        # ===== SEMPRE TENTA CARREGAR O SAVE EXISTENTE PRIMEIRO =====
         filename = f"save_{slot}.json"
         filepath = os.path.join(self.save_dir, filename)
 
+        # Carrega save existente se houver
         existing_data = None
-
-        # Tenta carregar o save existente
         if os.path.exists(filepath):
             try:
                 with open(filepath, 'r', encoding='utf-8') as f:
@@ -278,80 +279,107 @@ class SaveManager:
                 print(f"[SAVE] Erro ao carregar save existente: {e}")
                 existing_data = None
 
-        # Se não existe save, cria novo
         if not existing_data:
             existing_data = self._get_default_save_data()
             print(f"[SAVE] Criando novo save para slot {slot}")
 
-        # Mantém metadados importantes
+        # Atualiza metadados
         existing_data["meta"]["last_save"] = datetime.now().isoformat()
         existing_data["meta"]["save_name"] = save_name
+        existing_data["meta"]["version"] = SAVE_FORMAT_VERSION
 
-        # ===== ATUALIZA DADOS DO JOGADOR =====
-        existing_data["player"]["money"] = player.money
-        existing_data["player"]["score"] = player.score
-        existing_data["player"]["position"] = {"x": player.x, "y": player.y}
-        existing_data["player"]["bag"] = dict(player.bag.items)
-        existing_data["player"]["seen_pokemon"] = list(player.seen_pokemon)
-        existing_data["player"]["caught_pokemon"] = list(player.caught_pokemon)
-        existing_data["player"]["desfossilizadores"] = player.desfossilizadores
-        existing_data["player"]["total_playtime"] = player.total_playtime
-        existing_data["player"]["has_chosen_starter"] = getattr(player, 'has_chosen_starter', False)
+        # ===== DADOS DO JOGADOR =====
+        player_data = existing_data["player"]
+        player_data["money"] = player.money
+        player_data["score"] = player.score
+        player_data["position"] = {"x": player.x, "y": player.y}
+        player_data["bag"] = dict(player.bag.items) if hasattr(player.bag, 'items') else {}
+        player_data["seen_pokemon"] = list(player.seen_pokemon)
+        player_data["caught_pokemon"] = list(player.caught_pokemon)
+        player_data["desfossilizadores"] = player.desfossilizadores
+        player_data["total_playtime"] = player.total_playtime
+        player_data["has_chosen_starter"] = getattr(player, 'has_chosen_starter', False)
 
-        # ===== PRESERVA MYSTERY GIFT =====
-        existing_data["player"]["mystery_gift"] = {
+        # ===== MYSTERY GIFT =====
+        player_data["mystery_gift"] = {
             "redeemed_codes": getattr(player, 'redeemed_codes', {}),
             "history": getattr(player, 'mystery_gift_history', [])
         }
 
-        # ===== SALVA ACHIEVEMENTS =====
+        # ===== ACHIEVEMENTS =====
         if hasattr(player, 'achievements'):
-            existing_data["player"]["achievements"] = {
+            player_data["achievements"] = {
                 "unlocked": list(player.achievements.get("unlocked", [])),
                 "counters": dict(player.achievements.get("counters", {})),
                 "unlocked_data": dict(player.achievements.get("unlocked_data", {}))
             }
-            print(f"[SAVE] Achievements salvos: {len(player.achievements.get('unlocked', []))} desbloqueadas")
         else:
-            existing_data["player"]["achievements"] = {
-                "unlocked": [],
-                "counters": {},
-                "unlocked_data": {}
-            }
+            player_data["achievements"] = {"unlocked": [], "counters": {}, "unlocked_data": {}}
 
-        # ===== SALVA POKÉMONS =====
-        box_ids = set()
-        unique_box = []
+        # ===== PC BOX - já é uma lista de dicionários =====
+        # Garante que todos os dicionários tenham unique_id
+        for data in player.pc_box:
+            if "unique_id" not in data:
+                data["unique_id"] = str(uuid.uuid4())
 
-        # Primeiro, adiciona todos os Pokémon da box atual
-        for p in player.pc_box:
-            if p.unique_id not in box_ids:
-                box_ids.add(p.unique_id)
-                unique_box.append(p)
+        # ===== TIME - converte objetos para dicionários =====
+        team_dicts = []
+        for pokemon in player.team:
+            # Converte o objeto Pokemon para dict
+            p_dict = self._pokemon_to_dict(pokemon)
+            # Garante que o unique_id existe
+            if "unique_id" not in p_dict:
+                p_dict["unique_id"] = str(uuid.uuid4())
+            team_dicts.append(p_dict)
 
-        # Depois, adiciona os Pokémon do time que não estão na box
-        for p in player.team:
-            if p.unique_id not in box_ids:
-                box_ids.add(p.unique_id)
-                unique_box.append(p)
-                print(f"[SAVE] Pokémon {p.name} do time não estava na box, adicionando...")
+        # ===== CONSOLIDA: time + pc_box sem duplicatas =====
+        # Cria um dicionário para deduplicar por unique_id
+        all_pokemon_dicts = {}
+        # Adiciona os da pc_box primeiro
+        for data in player.pc_box:
+            uid = data.get("unique_id")
+            if uid:
+                all_pokemon_dicts[uid] = data
+        # Adiciona os do time (sobrescreve se houver duplicata, garantindo que o time prevalece)
+        for p_dict in team_dicts:
+            uid = p_dict.get("unique_id")
+            if uid:
+                all_pokemon_dicts[uid] = p_dict
 
-        # Salva a box completa
-        existing_data["player"]["pc_box"] = [
-            self._pokemon_to_dict(p) for p in unique_box
-        ]
+        # Agora, all_pokemon_dicts contém todos os Pokémon únicos
+        # Precisamos separar: os que estão no time devem ter is_in_team=True
+        # Atualiza is_in_team baseado no time real
+        team_ids = {p.unique_id for p in player.team}
+        for uid, data in all_pokemon_dicts.items():
+            data["is_in_team"] = uid in team_ids
 
-        # Salva o time (apenas as referências)
-        existing_data["player"]["team"] = [
-            self._pokemon_to_dict(p) for p in player.team
-        ]
+        # Converte para lista de dicts (a ordem não importa)
+        box_list = list(all_pokemon_dicts.values())
 
-        # ===== ATUALIZA ESTADO DO JOGO =====
+        # ===== SALVA =====
+        player_data["pc_box"] = box_list
+        # O time é salvo como uma lista de dicts também (referências)
+        # Mas o time deve ser salvo como uma lista de dicts na ordem do time
+        # Para preservar a ordem, salvamos o time como lista de unique_ids? Ou como dicts completos?
+        # Vamos salvar o time como lista de dicts completos (na ordem do time)
+        team_order = []
+        for pokemon in player.team:
+            # Busca o dict correspondente
+            uid = pokemon.unique_id
+            if uid in all_pokemon_dicts:
+                team_order.append(all_pokemon_dicts[uid])
+            else:
+                # Fallback: converte novamente
+                team_order.append(self._pokemon_to_dict(pokemon))
+
+        player_data["team"] = team_order
+
+        # ===== ESTADO DO JOGO =====
         if game_state:
             for key, value in game_state.items():
                 existing_data["game_state"][key] = value
 
-        # ===== SALVA CONFIGURAÇÕES =====
+        # ===== CONFIGURAÇÕES =====
         from src.config.settings import settings
         existing_data["settings"] = {
             "sfx_volume": settings.sfx_volume,
@@ -363,17 +391,13 @@ class SaveManager:
             "target_fps": settings.target_fps
         }
 
-        # Atualiza o save_data interno
         self.save_data = existing_data
 
-        # Salva em arquivo
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(self.save_data, f, indent=2, ensure_ascii=False)
             print(f"[SAVE] Jogo salvo em {filepath}")
-            print(f"[SAVE] Box: {len(unique_box)} Pokemon | Time: {len(player.team)} Pokemon")
-            print(f"[SAVE] Itens salvos: {self.save_data['player']['bag']}")
-            print(f"[SAVE] Achievements: {len(self.save_data['player']['achievements']['unlocked'])} desbloqueadas")
+            print(f"[SAVE] Box: {len(box_list)} Pokemon | Time: {len(player.team)} Pokemon")
             return True
         except Exception as e:
             print(f"[ERRO] Falha ao salvar: {e}")
@@ -413,7 +437,8 @@ class SaveManager:
 
     def load_game(self, player, slot=1) -> bool:
         """
-        Carrega um save e aplica ao jogador
+        Carrega um save e aplica ao jogador.
+        Agora: pc_box será preenchida com dicionários, team com objetos Pokemon.
         """
         filename = f"save_{slot}.json"
         filepath = os.path.join(self.save_dir, filename)
@@ -426,7 +451,6 @@ class SaveManager:
             with open(filepath, 'r', encoding='utf-8') as f:
                 raw_data = json.load(f)
 
-            # ===== VERIFICA VERSÃO E MIGRA SE NECESSÁRIO =====
             save_version = raw_data.get("meta", {}).get("version", "0.1.1")
             current_version = SAVE_FORMAT_VERSION
 
@@ -435,11 +459,8 @@ class SaveManager:
                 raw_data = self.migrate_save_data(raw_data, save_version)
 
             self.save_data = raw_data
-
-            # Define o slot atual
             self.current_save_file = slot
 
-            # Aplica dados ao jogador
             player_data = self.save_data["player"]
 
             # Dados básicos
@@ -449,46 +470,43 @@ class SaveManager:
             player.y = player_data["position"]["y"]
             player.has_chosen_starter = player_data.get("has_chosen_starter", False)
 
-            # Carrega a bag
+            # Bag
             player.bag.items = player_data.get("bag", {})
             if hasattr(player.bag, '_update_filtered_items'):
                 player.bag._update_filtered_items()
 
-            # Carrega Pokémons
-            player.pc_box = []
-            for pokemon_data in player_data["pc_box"]:
-                pokemon = self._dict_to_pokemon(pokemon_data)
-                player.pc_box.append(pokemon)
+            # ===== CARREGA PC BOX COMO DICIONÁRIOS =====
+            box_data = player_data.get("pc_box", [])
+            player.pc_box = box_data  # já são dicts
 
-            # Carrega o time
+            # ===== CARREGA TIME COMO OBJETOS POKEMON =====
+            team_data = player_data.get("team", [])
             player.team = []
-            for pokemon_data in player_data["team"]:
-                found = False
-                for p in player.pc_box:
-                    if p.unique_id == pokemon_data.get("unique_id"):
-                        player.team.append(p)
-                        p.is_in_team = True
-                        found = True
-                        break
-                if not found:
-                    pokemon = self._dict_to_pokemon(pokemon_data)
-                    player.team.append(pokemon)
-                    pokemon.is_in_team = True
-                    player.pc_box.append(pokemon)
+            for p_dict in team_data:
+                # Converte dict para objeto Pokemon
+                pokemon = self._dict_to_pokemon(p_dict)
+                # Garante que unique_id está presente
+                if not hasattr(pokemon, 'unique_id') or not pokemon.unique_id:
+                    pokemon.unique_id = p_dict.get("unique_id", str(uuid.uuid4()))
+                # Marca como no time
+                pokemon.is_in_team = True
+                player.team.append(pokemon)
 
-            # Carrega Pokédex
+            # ===== ATUALIZA STATUS DE is_in_team NA BOX =====
+            team_ids = {p.unique_id for p in player.team}
+            for data in player.pc_box:
+                data["is_in_team"] = data.get("unique_id") in team_ids
+
+            # ===== POKEDEX =====
             player.seen_pokemon = set(player_data.get("seen_pokemon", []))
             player.caught_pokemon = set(player_data.get("caught_pokemon", []))
 
-            # ===== CARREGA DESFOSSILIZADORES =====
+            # ===== DESFOSSILIZADORES =====
             player.desfossilizadores = player_data.get("desfossilizadores", [])
-
-            # Se não tiver desfossilizadores, cria um inicial
             if not player.desfossilizadores:
                 if hasattr(player, '_add_initial_desfossilizador'):
                     player._add_initial_desfossilizador()
                 else:
-                    # Fallback: cria desfossilizador manualmente
                     player.desfossilizadores = [{
                         "id": 1,
                         "level": 1,
@@ -500,50 +518,38 @@ class SaveManager:
                         "time_elapsed": 0.0
                     }]
 
-            # Garante que cada desfossilizador tenha os campos necessários
-            durations = {1: 60, 2: 2700, 3: 1200}  # 1 minuto para testes
+            # Garante campos nos desfossilizadores
             for desfossilizador in player.desfossilizadores:
                 if "time_elapsed" not in desfossilizador:
                     desfossilizador["time_elapsed"] = 0.0
                 if "start_time" not in desfossilizador:
                     desfossilizador["start_time"] = None
-                level = desfossilizador.get("level", 1)
-                if "duration_minutes" not in desfossilizador or desfossilizador["duration_minutes"] == 0:
-                    desfossilizador["duration_minutes"] = durations.get(level, 60)
+                if "duration_minutes" not in desfossilizador:
+                    desfossilizador["duration_minutes"] = 60
                 if "status" not in desfossilizador:
                     desfossilizador["status"] = "empty"
-                if "fossil_id" not in desfossilizador:
-                    desfossilizador["fossil_id"] = None
-                if "pokemon_id" not in desfossilizador:
-                    desfossilizador["pokemon_id"] = None
 
-                # ===== Verifica se já passou do tempo =====
+            # Verifica se algum desfossilizador já está pronto
+            for desfossilizador in player.desfossilizadores:
                 if desfossilizador["status"] == "processing":
-                    # Se o tempo já passou, marca como pronto
                     if desfossilizador["time_elapsed"] >= desfossilizador["duration_minutes"]:
                         desfossilizador["status"] = "ready"
                         desfossilizador["start_time"] = None
                         desfossilizador["time_elapsed"] = desfossilizador["duration_minutes"]
-                        print(f"[DESFOSSILIZADOR] {desfossilizador['id']} já estava pronto ao carregar!")
-                    else:
-                        print(
-                            f"[DESFOSSILIZADOR] {desfossilizador['id']} processando: {desfossilizador['time_elapsed']:.0f}s / {desfossilizador['duration_minutes']:.0f}s")
 
-            # Carrega tempo de jogo
+            # ===== TEMPO DE JOGO =====
             player.total_playtime = player_data.get("total_playtime", 0.0)
 
-            # Carrega Mystery Gift
+            # ===== MYSTERY GIFT =====
             mg_data = player_data.get("mystery_gift", {})
             player.redeemed_codes = mg_data.get("redeemed_codes", {})
             player.mystery_gift_history = mg_data.get("history", [])
 
-            # ===== CARREGA E APLICA AS CONFIGURAÇÕES DE ÁUDIO DO SAVE =====
+            # ===== CONFIGURAÇÕES =====
             settings_data = self.save_data.get("settings", {})
             if settings_data:
                 from src.config.settings import settings
                 from src.managers.sounds.sound_manager import sound_manager
-
-                # Aplica as configurações salvas ao objeto settings
                 settings.sfx_volume = settings_data.get("sfx_volume", 0.7)
                 settings.music_volume = settings_data.get("music_volume", 0.5)
                 settings.music_enabled = settings_data.get("music_enabled", True)
@@ -552,7 +558,6 @@ class SaveManager:
                 settings.vsync = settings_data.get("vsync", True)
                 settings.target_fps = settings_data.get("target_fps", 60)
 
-                # APLICA IMEDIATAMENTE AO SOUND_MANAGER
                 if settings.music_enabled:
                     sound_manager.set_music_volume(settings.music_volume)
                 else:
@@ -563,28 +568,19 @@ class SaveManager:
                 else:
                     sound_manager.set_sfx_volume(0)
 
-            # ===== CARREGA ACHIEVEMENTS =====
+            # ===== ACHIEVEMENTS =====
             achievements_data = player_data.get("achievements", {})
-
-            # Garante que a estrutura existe no player
             if not hasattr(player, 'achievements'):
-                player.achievements = {
-                    "unlocked": [],
-                    "counters": {},
-                    "unlocked_data": {}
-                }
-
-            # Carrega os dados
+                player.achievements = {"unlocked": [], "counters": {}, "unlocked_data": {}}
             player.achievements["unlocked"] = list(achievements_data.get("unlocked", []))
             player.achievements["counters"] = dict(achievements_data.get("counters", {}))
             player.achievements["unlocked_data"] = dict(achievements_data.get("unlocked_data", {}))
 
-            # ===== RECARREGA O ACHIEVEMENT_MANAGER =====
             if hasattr(player, 'achievement_manager'):
                 player.achievement_manager.load_from_player()
-                print(f"[SAVE] Achievements carregados: {len(player.achievements['unlocked'])} desbloqueadas")
 
             print(f"[SAVE] Jogo carregado de {filepath}")
+            print(f"[SAVE] Box: {len(player.pc_box)} Pokemon | Time: {len(player.team)} Pokemon")
             return True
 
         except Exception as e:

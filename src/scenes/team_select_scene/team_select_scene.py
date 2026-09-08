@@ -153,10 +153,11 @@ class TeamSelectScene(BaseScene):
         self.total_pages = self.pokemon_manager.get_page_count(self.layout_manager.items_per_page)
 
     def _refresh_all_pokemon_status(self):
+        team_ids = {p.unique_id for p in self.game.player.team}
         for pokemon in self.game.player.team:
             pokemon.is_in_team = True
-        for pokemon in self.game.player.pc_box:
-            pokemon.is_in_team = pokemon in self.game.player.team
+        for data in self.game.player.pc_box:
+            data["is_in_team"] = data.get("unique_id") in team_ids
 
     def handle_event(self, event):
         self._check_resize()
@@ -188,6 +189,7 @@ class TeamSelectScene(BaseScene):
         if modal.pokemon.is_in_team:
             self.pokemon_manager.remove_from_team(modal.pokemon)
         else:
+            # modal.pokemon é um objeto Pokemon
             self.pokemon_manager.add_to_team(modal.pokemon)
 
         for i, slot in enumerate(self.team_slots):
@@ -227,18 +229,14 @@ class TeamSelectScene(BaseScene):
             self._refresh_grid()
 
         elif action_type == 'GO_BACK':
-            # Toca som de clique
             sound_manager.play_effect(SoundEffect.CLICK)
-            # Para a música do team select com fade
             sound_manager.stop_music(fade_ms=300)
             from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
             self.game.phase_select_scene = PhaseSelectScene(self.game)
             self.game.current_scene = self.game.phase_select_scene
 
         elif action_type == 'START_GAME':
-            # Toca som de clique
             sound_manager.play_effect(SoundEffect.CLICK)
-            # Para a música do team select com fade
             sound_manager.stop_music(fade_ms=300)
             self.game.game_scene = GameScene(self.game, self.chapter, self.phase)
             self.game.current_scene = self.game.game_scene
@@ -256,12 +254,14 @@ class TeamSelectScene(BaseScene):
             for s in self.team_slots:
                 s.is_selected = (s.slot_index == action['slot_index'])
             if slot.pokemon:
-                modal = PokemonModal(self.game, slot.pokemon)
+                # slot.pokemon é um objeto Pokemon - passamos seu unique_id
+                modal = PokemonModal(self.game, slot.pokemon.unique_id)
                 self.event_handler.set_modal(modal)
 
         elif action_type == 'GRID_CLICK':
-            pokemon = action['pokemon']
-            modal = PokemonModal(self.game, pokemon)
+            pokemon_data = action['pokemon']  # dict
+            unique_id = pokemon_data["unique_id"]
+            modal = PokemonModal(self.game, unique_id)
             self.event_handler.set_modal(modal)
 
         elif action_type == 'MODAL_ACTION':

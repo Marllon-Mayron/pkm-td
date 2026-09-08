@@ -456,7 +456,8 @@ class CategorySelector:
             right_points = [
                 (self.right_arrow_rect.x + self.right_arrow_rect.width - 5, self.right_arrow_rect.centery),
                 (self.right_arrow_rect.x + self.right_arrow_rect.width - 12, self.right_arrow_rect.y + 5),
-                (self.right_arrow_rect.x + self.right_arrow_rect.width - 12, self.right_arrow_rect.y + self.right_arrow_rect.height - 5)
+                (self.right_arrow_rect.x + self.right_arrow_rect.width - 12,
+                 self.right_arrow_rect.y + self.right_arrow_rect.height - 5)
             ]
             pygame.draw.polygon(screen, right_color, right_points)
 
@@ -679,9 +680,7 @@ class ShopScene(BaseScene):
         self.category_offset = 30  # Ajuste este valor (20-40 pixels)
 
         # Já carrega os itens no início
-        self.filter_shop()
-        self.refresh_inventory()
-        self.filter_inventory()
+        self._refresh_all_data()
 
     def _create_responsive_fonts(self):
         """Cria fontes com tamanhos baseados na resolução"""
@@ -712,9 +711,35 @@ class ShopScene(BaseScene):
         # Verifica se a fase foi completada
         return self.progress.is_phase_completed(unlock_phase)
 
-    def refresh_inventory(self):
+    def _refresh_all_data(self):
+        """ATUALIZA TODOS OS DADOS DA LOJA - Chamado sempre que houver mudança"""
+        print("[SHOP] Atualizando todos os dados da loja...")
+
+        # 1. Recarrega os itens da loja do catálogo
+        self._load_shop_items()
+
+        # 2. Atualiza os cards do inventário com os dados mais recentes da bag
+        self._refresh_inventory_cards()
+
+        # 3. Atualiza os cards da loja
+        self._refresh_shop_cards()
+
+        # 4. Aplica os filtros
+        self.filter_shop()
+        self.filter_inventory()
+
+        # 5. Recalcula os scrolls
+        self._recalculate_scrolls()
+
+        print(
+            f"[SHOP] Dados atualizados: {len(self.shop_cards)} itens na loja, {len(self.inventory_cards)} itens no inventário")
+
+    def _refresh_inventory_cards(self):
+        """Recria os cards do inventário com os dados atuais da bag"""
         self.inventory_cards = []
         items = self.player.bag.get_items_for_render()
+
+        print(f"[SHOP] Criando {len(items)} cards de inventário...")
 
         for i, item in enumerate(items):
             card = InventoryItemCard(
@@ -725,11 +750,48 @@ class ShopScene(BaseScene):
             )
             self.inventory_cards.append(card)
 
+        # Atualiza a quantidade nos cards da loja
         for card in self.shop_cards:
             card.update_owned(self.player.bag.items)
 
+    def _refresh_shop_cards(self):
+        """Recria os cards da loja"""
+        self.shop_cards = []
+
+        print(f"[SHOP] Criando {len(self.filtered_shop_items)} cards de loja...")
+
+        for i, item_data in enumerate(self.filtered_shop_items):
+            card = ShopItemCard(item_data, i)
+            card.is_locked = not self._is_item_available(item_data)
+            card.update_owned(self.player.bag.items)
+            self.shop_cards.append(card)
+
+    def _recalculate_scrolls(self):
+        """Recalcula os valores máximos de scroll"""
+        card_height = 80
+        card_margin = 8
+
+        # Shop scroll
+        visible_height = self.shop_panel_rect.height - 60 - self.category_offset if self.shop_panel_rect else 0
+        self.max_shop_scroll = max(0, len(self.shop_cards) * (card_height + card_margin) - visible_height)
+        self.shop_scroll_target = min(self.shop_scroll_target, self.max_shop_scroll)
+
+        # Inventory scroll
+        visible_height = self.inventory_panel_rect.height - 60 - self.category_offset if self.inventory_panel_rect else 0
+        self.max_inventory_scroll = max(0, len(self.filtered_inventory_items) * (
+                    card_height + card_margin) - visible_height)
+        self.inventory_scroll_target = min(self.inventory_scroll_target, self.max_inventory_scroll)
+
+    def refresh_inventory(self):
+        """Método público para forçar atualização do inventário"""
+        self._refresh_inventory_cards()
+        self.filter_inventory()
+        self._recalculate_scrolls()
+
     def filter_shop(self):
         """Filtra itens da loja por categoria e disponibilidade"""
+        print(f"[SHOP] Filtrando loja - Categoria: {self.shop_category}")
+
         # Primeiro filtra por categoria
         if self.shop_category == "all":
             category_filtered = self.shop_items
@@ -745,19 +807,24 @@ class ShopScene(BaseScene):
             if self._is_item_available(item)
         ]
 
-        # Atualiza o flag de bloqueio nos cards
-        for card in self.shop_cards:
-            if hasattr(card, 'is_locked'):
-                card.is_locked = not self._is_item_available(card.item_data)
+        print(f"[SHOP] Itens filtrados: {len(self.filtered_shop_items)}")
+
+        # Atualiza o flag de bloqueio nos cards e recria
+        self._refresh_shop_cards()
 
     def filter_inventory(self):
+        """Filtra itens do inventário por categoria"""
+        print(f"[SHOP] Filtrando inventário - Categoria: {self.inventory_category}")
+
         if self.inventory_category == "all":
-            self.filtered_inventory_items = self.inventory_cards
+            self.filtered_inventory_items = self.inventory_cards.copy()
         else:
             self.filtered_inventory_items = [
                 card for card in self.inventory_cards
                 if card.category == self.inventory_category
             ]
+
+        print(f"[SHOP] Itens no inventário: {len(self.filtered_inventory_items)}")
 
     def _create_layout(self):
         """Cria layout responsivo"""
@@ -826,49 +893,47 @@ class ShopScene(BaseScene):
         self.fonts = self._create_responsive_fonts()
 
         # Cria os cards
-        self._create_shop_cards()
-        self._create_inventory_cards()
+        self._refresh_all_data()
 
         self.layout_initialized = True
 
-    def _create_shop_cards(self):
-        self.shop_cards = []
+    def _create_shop_cards_visual(self):
+        """Cria a posição visual dos cards da loja"""
+        if not self.shop_panel_rect:
+            return
 
         card_height = 80
         card_margin = 8
         start_y = self.shop_panel_rect.y + 50 + self.category_offset
+
+        # Recalcula scroll máximo
         visible_height = self.shop_panel_rect.height - 60 - self.category_offset
+        self.max_shop_scroll = max(0, len(self.shop_cards) * (card_height + card_margin) - visible_height)
+        self.shop_scroll_target = min(self.shop_scroll_target, self.max_shop_scroll)
 
-        self.max_shop_scroll = max(0, len(self.filtered_shop_items) * (card_height + card_margin) - visible_height)
-
-        for i, item_data in enumerate(self.filtered_shop_items):
+        for i, card in enumerate(self.shop_cards):
             card_y = start_y + i * (card_height + card_margin) - self.shop_scroll_y
-
-            card = ShopItemCard(item_data, i)
-
-            # Verifica se o item está desbloqueado
-            card.is_locked = not self._is_item_available(item_data)
-
             card.update_position(
                 self.shop_panel_rect.x + 10,
                 card_y,
                 self.shop_panel_rect.width - 25,
                 card_height
             )
-            card.update_owned(self.player.bag.items)
-            self.shop_cards.append(card)
 
-    def _create_inventory_cards(self):
-        if not hasattr(self, 'inventory_panel_rect') or self.inventory_panel_rect is None:
+    def _create_inventory_cards_visual(self):
+        """Cria a posição visual dos cards do inventário"""
+        if not self.inventory_panel_rect:
             return
 
         card_height = 80
         card_margin = 8
         start_y = self.inventory_panel_rect.y + 50 + self.category_offset
-        visible_height = self.inventory_panel_rect.height - 60 - self.category_offset
 
+        # Recalcula scroll máximo
+        visible_height = self.inventory_panel_rect.height - 60 - self.category_offset
         self.max_inventory_scroll = max(0, len(self.filtered_inventory_items) * (
-                card_height + card_margin) - visible_height)
+                    card_height + card_margin) - visible_height)
+        self.inventory_scroll_target = min(self.inventory_scroll_target, self.max_inventory_scroll)
 
         for i, card in enumerate(self.filtered_inventory_items):
             card_y = start_y + i * (card_height + card_margin) - self.inventory_scroll_y
@@ -925,7 +990,7 @@ class ShopScene(BaseScene):
                 if new_category:
                     self.shop_category = new_category
                     self.filter_shop()
-                    self._create_shop_cards()
+                    self._create_shop_cards_visual()
                     self.shop_scroll_target = 0
                     self.selected_shop_index = 0
                     return
@@ -935,7 +1000,7 @@ class ShopScene(BaseScene):
                 if new_category:
                     self.inventory_category = new_category
                     self.filter_inventory()
-                    self._create_inventory_cards()
+                    self._create_inventory_cards_visual()
                     self.inventory_scroll_target = 0
                     self.selected_inventory_index = 0
                     return
@@ -1025,38 +1090,10 @@ class ShopScene(BaseScene):
                 return
 
         # ========== FORÇA ATUALIZAÇÃO COMPLETA DA UI ==========
-        # 1. Atualiza os cards do inventário com os dados mais recentes
-        self.refresh_inventory()
-
-        # 2. Reaplica os filtros no inventário
-        self.filter_inventory()
-
-        # 3. Recria os cards visuais do inventário
-        self._create_inventory_cards()
-
-        # 4. Atualiza a quantidade nos cards da loja
-        for card in self.shop_cards:
-            card.update_owned(self.player.bag.items)
-
-        # 5. Recria os cards da loja
-        self._create_shop_cards()
-
-        # 6. Atualiza os filtros da loja (caso necessário)
-        self.filter_shop()
-
-        # 7. Ajusta o scroll para valores válidos
-        self.inventory_scroll_target = min(self.inventory_scroll_target, self.max_inventory_scroll)
-        self.shop_scroll_target = min(self.shop_scroll_target, self.max_shop_scroll)
-
-        # 8. Garante que a seleção ainda é válida
-        if self.selected_inventory_index >= len(self.filtered_inventory_items):
-            self.selected_inventory_index = max(0, len(self.filtered_inventory_items) - 1)
-        if self.selected_shop_index >= len(self.filtered_shop_items):
-            self.selected_shop_index = max(0, len(self.filtered_shop_items) - 1)
-        # ===================================================
+        self._refresh_all_data()
+        # =====================================================
 
         self.game.player.auto_save()
-
         selector.hide()
 
     def fixed_update(self, dt):
@@ -1072,11 +1109,11 @@ class ShopScene(BaseScene):
         # Scroll suave
         if abs(self.shop_scroll_y - self.shop_scroll_target) > 0.1:
             self.shop_scroll_y += (self.shop_scroll_target - self.shop_scroll_y) * min(1, dt * 10)
-            self._create_shop_cards()
+            self._create_shop_cards_visual()
 
         if abs(self.inventory_scroll_y - self.inventory_scroll_target) > 0.1:
             self.inventory_scroll_y += (self.inventory_scroll_target - self.inventory_scroll_y) * min(1, dt * 10)
-            self._create_inventory_cards()
+            self._create_inventory_cards_visual()
 
         # Feedback
         if self.feedback_timer > 0:
@@ -1090,6 +1127,7 @@ class ShopScene(BaseScene):
 
         if not self.layout_initialized:
             self._create_layout()
+            return
 
         # Título
         title = self.fonts['title'].render("LOJA", True, (255, 215, 0))
@@ -1122,6 +1160,9 @@ class ShopScene(BaseScene):
             self._render_pause_overlay(screen)
 
     def _render_money(self, screen):
+        if not self.money_rect:
+            return
+
         pygame.draw.rect(screen, (30, 35, 45), self.money_rect, border_radius=6)
         pygame.draw.rect(screen, (80, 120, 180), self.money_rect, 1, border_radius=6)
 
@@ -1153,6 +1194,9 @@ class ShopScene(BaseScene):
         )
 
     def _render_panel(self, screen, rect, title, category_selector, cards, color):
+        if not rect:
+            return
+
         # Fundo
         pygame.draw.rect(screen, (25, 28, 32, 240), rect, border_radius=8)
         pygame.draw.rect(screen, color, rect, 1, border_radius=8)
@@ -1182,6 +1226,12 @@ class ShopScene(BaseScene):
         )
         screen.set_clip(clip_rect)
 
+        # Atualiza posição dos cards antes de renderizar
+        if title == "COMPRAR":
+            self._create_shop_cards_visual()
+        else:
+            self._create_inventory_cards_visual()
+
         # Cards
         for i, card in enumerate(cards):
             if hasattr(card, 'rect') and card.rect.bottom > clip_rect.top and card.rect.top < clip_rect.bottom:
@@ -1203,6 +1253,9 @@ class ShopScene(BaseScene):
             self._render_scroll_bar(screen, rect, scroll_y, max_scroll, color)
 
     def _render_scroll_bar(self, screen, panel_rect, scroll_y, max_scroll, color):
+        if not panel_rect:
+            return
+
         bar_x = panel_rect.right - 8
         bar_y = panel_rect.y + 45 + self.category_offset
         bar_height = panel_rect.height - 50 - self.category_offset
@@ -1221,6 +1274,9 @@ class ShopScene(BaseScene):
         pygame.draw.rect(screen, color, scroll_rect)
 
     def _render_feedback(self, screen):
+        if self.feedback_alpha <= 0:
+            return
+
         text = self.fonts['small'].render(self.feedback_message, True, (255, 255, 255))
         text.set_alpha(self.feedback_alpha)
 

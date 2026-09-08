@@ -9,9 +9,15 @@ from src.data.move_data import MoveData
 
 
 class PokemonModal:
-    def __init__(self, game, pokemon):
+    def __init__(self, game, unique_id):
         self.game = game
-        self.pokemon = pokemon
+        self.unique_id = unique_id
+
+        # ===== OBTÉM A INSTÂNCIA COMPLETA DO POKEMON =====
+        self.pokemon = self.game.player.get_pokemon_instance(unique_id)
+        if not self.pokemon:
+            raise ValueError(f"Pokémon com unique_id {unique_id} não encontrado")
+
         self.pokedex = Pokedex()
         self.move_data = MoveData()
         self.visible = True

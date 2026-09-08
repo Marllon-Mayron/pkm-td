@@ -370,19 +370,38 @@ class GameScene(BaseScene):
             perf_monitor.reset()
 
     def update_box_happiness(self):
-        """Atualiza felicidade dos Pokémon na Box (-1 por fase)."""
+        """Diminui felicidade dos Pokémon na PC Box em -1 por fase."""
         if not hasattr(self.player, 'pc_box'):
             return
 
-        box_pokemon = self.player.pc_box
-        if not box_pokemon:
+        box_data = self.player.pc_box  # lista de dicionários
+        if not box_data:
             return
 
-        team_ids = set(id(p) for p in self.player.team)
+        # Conjunto de unique_ids dos Pokémon no time para saber quais estão na box
+        team_ids = {p.unique_id for p in self.player.team}
 
-        for pokemon in box_pokemon:
-            if id(pokemon) not in team_ids:
+        for data in box_data:
+            unique_id = data.get("unique_id")
+            if not unique_id:
+                continue
+
+            # Se o Pokémon está no time, não está na box (não deve perder felicidade)
+            if unique_id in team_ids:
+                continue
+
+            # Tenta obter a instância para usar add_happiness
+            pokemon = self.player.get_pokemon_instance(unique_id)
+            if pokemon:
+                # Aplica a lógica de felicidade (que também pode disparar evolução)
                 pokemon.add_happiness(-1, "Na Box")
+                # Atualiza o dict com o novo valor de felicidade
+                data["happiness"] = pokemon.happiness
+            else:
+                # Fallback: decrementa diretamente no dict
+                current = data.get("happiness", 0)
+                if current > 0:
+                    data["happiness"] = current - 1
 
     def is_team_defeated(self) -> bool:
         """
