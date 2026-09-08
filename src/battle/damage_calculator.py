@@ -5,6 +5,7 @@ Calculadora de dano baseada nos jogos Pokémon originais
 from typing import Dict
 import random
 
+from src.data.held_item_data import get_boosted_type
 from src.battle.effects.specific.weather.weather_state import WeatherType
 from src.battle.effects import StatusType
 from src.battle.effects.critical_hit import CriticalHitSystem
@@ -233,6 +234,18 @@ class DamageCalculator:
         # 5. STAB (Same Type Attack Bonus)
         stab = 1.5 if move.type in attacker.types else 1.0
 
+        # ===== BÔNUS DE ITEM SEGURÁVEL =====
+        item_boost_message = None
+        item_multiplier = 1.0
+
+        if hasattr(attacker, 'held_item') and attacker.held_item:
+            boosted_type = get_boosted_type(attacker.held_item)
+            if boosted_type and move.type.lower() == boosted_type:
+                item_multiplier = 1.1
+                item_boost_message = f"{attacker.held_item_data['name']} aumentou o poder!"
+                print(
+                    f"[HELD_ITEM] {attacker.name} segura {attacker.held_item_data['name']} - +10% de dano para {move.type}!")
+
         # ===== MODIFICADORES DE CLIMA =====
         weather_multiplier = 1.0
         weather = None
@@ -329,7 +342,10 @@ class DamageCalculator:
             "hit": True,
             "message": message,
             "stab": stab > 1.0,
-            "critical": is_critical
+            "critical": is_critical,
+            "item_boost": item_multiplier > 1.0,
+            "item_boost_message": item_boost_message if item_multiplier > 1.0 else None,
+            "item_multiplier": item_multiplier
         }
 
     @classmethod

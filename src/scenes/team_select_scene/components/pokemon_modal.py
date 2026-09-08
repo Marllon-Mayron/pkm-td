@@ -469,7 +469,7 @@ class PokemonModal:
 
             # Ícone vazio
             empty_font = pygame.font.Font(None, 24)
-            empty_icon = empty_font.render("○", True, self.colors['text_secondary'])
+            empty_icon = empty_font.render("X", True, self.colors['text_secondary'])
             screen.blit(empty_icon, (x + 12, y + 8))
 
             no_item_text = value_font.render("Nenhum item sendo segurado", True, self.colors['text_secondary'])
