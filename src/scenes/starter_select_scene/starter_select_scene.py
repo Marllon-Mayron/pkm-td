@@ -73,8 +73,8 @@ class StarterSelectScene(BaseScene):
             "up", "up-left", "left", "down-left"
         ]
         self.direction_change_interval = 1.5  # segundos
-        self.animation_speed = 0.15           # segundos por frame
-        self.inmap_scale_multiplier = 3.0     # multiplicador para o tamanho do sprite
+        self.animation_speed = 0.15  # segundos por frame
+        self.inmap_scale_multiplier = 3.0  # multiplicador para o tamanho do sprite
 
         # Estado de animação para cada card (índice 0,1,2)
         self.inmap_states = [
@@ -181,7 +181,8 @@ class StarterSelectScene(BaseScene):
         btn_h = int(dialog_h * 0.15)
         btn_y_dialog = dialog_y + dialog_h - btn_h - int(dialog_h * 0.08)
         self.confirm_nick_button = pygame.Rect(dialog_x + int(dialog_w * 0.1), btn_y_dialog, btn_w, btn_h)
-        self.skip_nick_button = pygame.Rect(dialog_x + dialog_w - btn_w - int(dialog_w * 0.1), btn_y_dialog, btn_w, btn_h)
+        self.skip_nick_button = pygame.Rect(dialog_x + dialog_w - btn_w - int(dialog_w * 0.1), btn_y_dialog, btn_w,
+                                            btn_h)
 
     def handle_event(self, event):
         if self.show_nickname_dialog:
@@ -277,18 +278,41 @@ class StarterSelectScene(BaseScene):
         nickname = self.nickname_input.strip() or None
         starter = self.starters[self.selected_index]
         pokemon = self.game.player.add_starter(starter["id"])
-        if pokemon and nickname:
-            pokemon.nickname = nickname
-            pokemon.name = nickname
+
         if pokemon:
-            # ===== MARCA QUE ESCOLHEU O INICIAL =====
+            if nickname:
+                pokemon.nickname = nickname
+                pokemon.name = nickname
+
+            # ===== GANHA 6 POKEBOLAS AO ESCOLHER O INICIAL =====
+            self._give_starting_items()
+
+            # Marca que escolheu o inicial e salva
             self.game.player.has_chosen_starter = True
             self.game.player.save_game(1)
+
             from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
             self.game.current_scene = PhaseSelectScene(self.game)
         else:
             self.confirmed = False
             self.show_nickname_dialog = False
+
+    def _give_starting_items(self):
+        """
+        Dá os itens iniciais ao jogador:
+        - 6 Pokébolas
+        """
+        print("[STARTER_SELECT] Dando itens iniciais ao jogador...")
+
+        # Adiciona 6 Pokébolas
+        current_pokeballs = self.game.player.bag.items.get("pokeball", 0)
+        self.game.player.bag.items["pokeball"] = current_pokeballs + 6
+
+        # Atualiza a lista filtrada da bag
+        if hasattr(self.game.player.bag, '_update_filtered_items'):
+            self.game.player.bag._update_filtered_items()
+
+        print(f"[STARTER_SELECT] Jogador ganhou 6 Pokébolas! Total: {self.game.player.bag.items['pokeball']}")
 
     def _skip_nickname(self):
         self._apply_nickname()
@@ -548,7 +572,7 @@ class StarterSelectScene(BaseScene):
         # ===== INFORMAÇÕES =====
         info_font = pygame.font.Font(None, 14)
         current_dir = self.directions[state["direction_index"]].upper()
-        dir_text = f"{current_dir}  {state['frame']+1}/{len(frames)}"
+        dir_text = f"{current_dir}  {state['frame'] + 1}/{len(frames)}"
         dir_surf = info_font.render(dir_text, True, (200, 200, 200))
         screen.blit(dir_surf, (rect.x + 8, rect.y + 8))
 
