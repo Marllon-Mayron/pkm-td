@@ -1,7 +1,9 @@
 # src/scenes/team_select_scene/components/pokemon_grid_item.py
 
 import pygame
+from src.ui.utils.icon_loader import get_held_icon
 from src.scenes.team_select_scene.utils.constants import COLORS
+
 
 class PokemonGridItem:
     def __init__(self, pokemon_data, x, y, width, height):
@@ -10,13 +12,14 @@ class PokemonGridItem:
         self.is_hovered = False
         self._portrait_cache = None
         self._is_in_team_cache = None
+        self._held_icon_cache = None
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
             self.is_hovered = self.rect.collidepoint(event.pos)
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered and not self.pokemon_data.get("is_in_team", False):
-                return self.pokemon_data  # retorna o dict
+                return self.pokemon_data
         return None
 
     def _get_portrait(self, pokedex):
@@ -36,18 +39,42 @@ class PokemonGridItem:
                 self._portrait_cache = portrait
         return self._portrait_cache
 
+    def _get_held_icon(self):
+        """Retorna o ícone de item segurável em cache"""
+        if self._held_icon_cache is None:
+            self._held_icon_cache = get_held_icon()
+        return self._held_icon_cache
+
     def render(self, screen, font, pokedex):
         self._draw_shadow(screen)
         self._draw_card_background(screen)
         self._draw_portrait_and_id(screen, pokedex, font)
         self._draw_info(screen, font)
 
-        # ===== USA O VALOR DO DICT, NÃO O OBJETO =====
+        # ===== ÍCONE DE ITEM SEGURÁVEL (canto inferior direito) =====
+        if self.pokemon_data.get("held_item"):
+            self._draw_held_item_icon(screen)
+
         if self.pokemon_data.get("is_in_team", False):
             self._draw_team_overlay(screen, font)
 
+    def _draw_held_item_icon(self, screen):
+        """Desenha o ícone de item segurável no canto inferior direito"""
+        icon = self._get_held_icon()
+        if icon:
+            # 15x15
+            icon_scaled = pygame.transform.scale(icon, (15, 15))
+            icon_x = self.rect.right - 20
+            icon_y = self.rect.bottom - 20
+
+            # Fundo
+            bg_rect = pygame.Rect(icon_x - 2, icon_y - 2, 19, 19)
+            pygame.draw.rect(screen, (0, 0, 0, 200), bg_rect, border_radius=4)
+            pygame.draw.rect(screen, (255, 215, 0, 180), bg_rect, 1, border_radius=4)
+
+            screen.blit(icon_scaled, (icon_x, icon_y))
+
     def _draw_card_background(self, screen):
-        # ===== USA O VALOR DO DICT =====
         if self.pokemon_data.get("is_in_team", False):
             color = COLORS['GRID']['IN_TEAM']
             border_color = COLORS['GRID']['BORDER_IN_TEAM']
@@ -75,13 +102,13 @@ class PokemonGridItem:
         # ID
         formatted_id = f"#{self.pokemon_data['id']:03d}"
         is_shiny = self.pokemon_data.get("is_shiny", False)
-        id_color = COLORS['TEXT']['YELLOW'] if is_shiny else COLORS['TEXT'].get('GRAY', (128,128,128))
+        id_color = COLORS['TEXT']['YELLOW'] if is_shiny else COLORS['TEXT'].get('GRAY', (128, 128, 128))
         id_font = pygame.font.Font(None, font.get_height() + 4)
         id_text = id_font.render(formatted_id, True, id_color)
         id_x = portrait_x + (40 - id_text.get_width()) // 2
         id_y = portrait_y - id_text.get_height() - 4
 
-        id_shadow = id_font.render(formatted_id, True, (0,0,0))
+        id_shadow = id_font.render(formatted_id, True, (0, 0, 0))
         screen.blit(id_shadow, (id_x + 1, id_y + 1))
         screen.blit(id_text, (id_x, id_y))
 
@@ -119,7 +146,7 @@ class PokemonGridItem:
             "fairy": (238, 153, 172),
         }
         for i, type_name in enumerate(self.pokemon_data.get("types", [])):
-            color = type_colors.get(type_name.lower(), (128,128,128))
+            color = type_colors.get(type_name.lower(), (128, 128, 128))
             type_text = type_font.render(type_name.upper(), True, color)
             screen.blit(type_text, (name_x + (i * 45), self.rect.y + 50))
 

@@ -1,6 +1,7 @@
 # src/scenes/team_select_scene/components/team_slot.py
 
 import pygame
+from src.ui.utils.icon_loader import get_held_icon
 from src.scenes.team_select_scene.utils.constants import COLORS
 
 
@@ -12,20 +13,19 @@ class TeamSlot:
         self.is_hovered = False
         self.is_selected = False
         self._portrait_cache = None
+        self._held_icon_cache = None
 
     def set_pokemon(self, pokemon):
         self.pokemon = pokemon
-        self._portrait_cache = None  # Limpa cache quando o Pokémon muda
+        self._portrait_cache = None
 
     def _get_portrait(self, pokedex):
-        """Obtém o retrato do Pokémon com cache"""
         if not self.pokemon:
             return None
 
         if self._portrait_cache is None:
             portrait = pokedex.get_portrait(self.pokemon.id, "normal", self.pokemon.is_shiny)
 
-            # Se for shiny, adiciona efeito de brilho
             if self.pokemon.is_shiny and portrait:
                 shiny_portrait = portrait.copy()
                 overlay = pygame.Surface((40, 40), pygame.SRCALPHA)
@@ -36,6 +36,11 @@ class TeamSlot:
                 self._portrait_cache = portrait
 
         return self._portrait_cache
+
+    def _get_held_icon(self):
+        if self._held_icon_cache is None:
+            self._held_icon_cache = get_held_icon()
+        return self._held_icon_cache
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
@@ -88,7 +93,7 @@ class TeamSlot:
             portrait_y = self.rect.y + (self.rect.height - 40) // 2
             screen.blit(portrait, (portrait_x, portrait_y))
 
-        # Nome - ajustado para começar depois do retrato
+        # Nome
         name_x = self.rect.x + 58
         name_text = self.pokemon.name[:8] + ("." if len(self.pokemon.name) > 8 else "")
         name_surf = font.render(name_text, True, COLORS['TEXT']['WHITE'])
@@ -101,9 +106,28 @@ class TeamSlot:
         # HP Bar (mais compacta)
         self._draw_hp_bar(screen)
 
+        # ===== ÍCONE DE ITEM SEGURÁVEL (canto inferior direito) =====
+        if self.pokemon.held_item:
+            self._draw_held_item_icon(screen)
+
         # Shiny effect
         if self.pokemon.is_shiny:
             pygame.draw.rect(screen, COLORS['TEXT']['YELLOW'], self.rect, 3, border_radius=8)
+
+    def _draw_held_item_icon(self, screen):
+        """Desenha o ícone de item segurável no canto inferior direito do slot"""
+        icon = self._get_held_icon()
+        if icon:
+            # 14x14
+            icon_scaled = pygame.transform.scale(icon, (14, 14))
+            icon_x = self.rect.right - 18
+            icon_y = self.rect.bottom - 18
+
+            bg_rect = pygame.Rect(icon_x - 2, icon_y - 2, 18, 18)
+            pygame.draw.rect(screen, (0, 0, 0, 200), bg_rect, border_radius=4)
+            pygame.draw.rect(screen, (255, 215, 0, 180), bg_rect, 1, border_radius=4)
+
+            screen.blit(icon_scaled, (icon_x, icon_y))
 
     def _draw_hp_bar(self, screen):
         hp_percent = self.pokemon.current_hp / self.pokemon.max_hp
@@ -112,10 +136,8 @@ class TeamSlot:
         bar_x = self.rect.x + 58
         bar_y = self.rect.y + 55
 
-        # Fundo
         pygame.draw.rect(screen, (40, 40, 40), (bar_x, bar_y, bar_width, bar_height))
 
-        # Barra colorida
         if hp_percent > 0.5:
             hp_color = COLORS['TEXT']['HP_GREEN']
         elif hp_percent > 0.25:

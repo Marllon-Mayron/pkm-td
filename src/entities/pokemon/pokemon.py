@@ -19,6 +19,7 @@ from src.entities.pokemon.evolution import PokemonEvolution
 from src.entities.pokemon.rendering import PokemonRendering
 from src.managers.notification_manager import notification_manager
 from src.ui.toast_renderer import toast_battle
+from src.ui.utils.icon_loader import get_held_icon
 
 # Cache global de sprites e fontes para reduzir recriação
 _SPRITE_CACHE = {}
@@ -533,12 +534,8 @@ class Pokemon(Entity):
         bar_height = self.hp_bar_height
 
         # ===== POSICIONAMENTO RELATIVO AO TAMANHO DO SPRITE =====
-        # Calcula a altura do sprite na tela
         sprite_height = sprite_rect.height
-
-        # Offset relativo: 10% da altura do sprite acima do topo
-        # Isso mantém a proporção independente do zoom
-        relative_offset = -sprite_height * 0.35  # 15% da altura do sprite acima
+        relative_offset = -sprite_height * 0.35
 
         # Escala para a tela
         if hasattr(self, 'screen_manager') and hasattr(self, 'camera'):
@@ -546,19 +543,49 @@ class Pokemon(Entity):
             camera_zoom = self.camera.zoom if self.camera else 1.0
             total_scale = render_scale * camera_zoom
 
-            # Tamanho da barra na tela
             screen_bar_width = int(bar_width * total_scale)
             screen_bar_height = max(3, int(bar_height * total_scale))
 
-            # Posição da barra (centralizada horizontalmente, com offset relativo)
             bar_x = sprite_rect.centerx - screen_bar_width // 2
             bar_y = sprite_rect.top + relative_offset
+
+            # ===== ÍCONE DE ITEM SEGURÁVEL (ao lado da HP) =====
+            if hasattr(self, 'held_item') and self.held_item:
+                icon = get_held_icon()
+                if icon:
+                    # Tamanho reduzido pela metade
+                    icon_size = max(6, int(8 * total_scale))
+                    icon_scaled = pygame.transform.scale(icon, (icon_size, icon_size))
+
+                    icon_x = bar_x + screen_bar_width + 3
+                    icon_y = bar_y - (icon_size - screen_bar_height) // 2
+
+                    bg_rect = pygame.Rect(icon_x - 1, icon_y - 1, icon_size + 2, icon_size + 2)
+                    pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect, border_radius=2)
+                    pygame.draw.rect(screen, (255, 215, 0, 150), bg_rect, 1, border_radius=2)
+
+                    screen.blit(icon_scaled, (icon_x, icon_y))
 
         else:
             screen_bar_width = int(bar_width * zoom_scale)
             screen_bar_height = max(3, int(bar_height * zoom_scale))
             bar_x = sprite_rect.centerx - screen_bar_width // 2
             bar_y = sprite_rect.top + relative_offset
+
+            # ===== ÍCONE DE ITEM SEGURÁVEL (fallback sem camera) =====
+            if hasattr(self, 'held_item') and self.held_item:
+                icon = get_held_icon()
+                if icon:
+                    icon_size = max(12, int(16 * zoom_scale))
+                    icon_scaled = pygame.transform.scale(icon, (icon_size, icon_size))
+                    icon_x = bar_x + screen_bar_width + 4
+                    icon_y = bar_y - (icon_size - screen_bar_height) // 2
+
+                    bg_rect = pygame.Rect(icon_x - 1, icon_y - 1, icon_size + 2, icon_size + 2)
+                    pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect, border_radius=3)
+                    pygame.draw.rect(screen, (255, 215, 0, 150), bg_rect, 1, border_radius=3)
+
+                    screen.blit(icon_scaled, (icon_x, icon_y))
 
         # Fundo da barra
         pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, screen_bar_width, screen_bar_height))

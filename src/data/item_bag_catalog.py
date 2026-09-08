@@ -496,36 +496,36 @@ class ItemBagCatalog:
             # Dragão (na 2ª geração, Dragon Scale é o que funciona)
             ("dragonfang", "DRAGONFANG", "Aumenta o poder de golpes do tipo Dragão em 10%.", "held_item", 6000),
             # Pedra
-            ("hardstone", "HARDSTONE", "Aumenta o poder de golpes do tipo Pedra em 10%.", "held_item"),
+            ("hardstone", "HARDSTONE", "Aumenta o poder de golpes do tipo Pedra em 10%.", "held_item", 6000),
             # Elétrico
-            ("magnet", "MAGNET", "Aumenta o poder de golpes do tipo Elétrico em 10%.", "held_item"),
+            ("magnet", "MAGNET", "Aumenta o poder de golpes do tipo Elétrico em 10%.", "held_item", 6000),
             # Aço
-            ("metalcoat", "METALCOAT", "Aumenta o poder de golpes do tipo Aço em 10%.", "held_item"),
+            ("metalcoat", "METALCOAT", "Aumenta o poder de golpes do tipo Aço em 10%.", "held_item", 6000),
             # Grama
-            ("miracleseed", "MIRACLESEED", "Aumenta o poder de golpes do tipo Grama em 10%.", "held_item"),
+            ("miracleseed", "MIRACLESEED", "Aumenta o poder de golpes do tipo Grama em 10%.", "held_item", 6000),
             # Água
-            ("mysticwater", "MYSTICWATER", "Aumenta o poder de golpes do tipo Água em 10%.", "held_item"),
+            ("mysticwater", "MYSTICWATER", "Aumenta o poder de golpes do tipo Água em 10%.", "held_item", 6000),
             # Gelo
-            ("nevermeltice", "NEVERMELTICE", "Aumenta o poder de golpes do tipo Gelo em 10%.", "held_item"),
+            ("nevermeltice", "NEVERMELTICE", "Aumenta o poder de golpes do tipo Gelo em 10%.", "held_item", 6000),
             # Veneno
-            ("poisonbarb", "POISONBARB", "Aumenta o poder de golpes do tipo Veneno em 10%.", "held_item"),
+            ("poisonbarb", "POISONBARB", "Aumenta o poder de golpes do tipo Veneno em 10%.", "held_item", 6000),
             # Voador
-            ("sharpbeak", "SHARPBEAK", "Aumenta o poder de golpes do tipo Voador em 10%.", "held_item"),
+            ("sharpbeak", "SHARPBEAK", "Aumenta o poder de golpes do tipo Voador em 10%.", "held_item", 6000),
             # Terrestre
-            ("softsand", "SOFTSAND", "Aumenta o poder de golpes do tipo Terrestre em 10%.", "held_item"),
+            ("softsand", "SOFTSAND", "Aumenta o poder de golpes do tipo Terrestre em 10%.", "held_item", 6000),
             # Normal
-            ("silkscarf", "SILKSCARF", "Aumenta o poder de golpes do tipo Normal em 10%.", "held_item"),
+            ("silkscarf", "SILKSCARF", "Aumenta o poder de golpes do tipo Normal em 10%.", "held_item", 6000),
             # Psíquico
-            ("twistedspoon", "TWISTEDSPOON", "Aumenta o poder de golpes do tipo Psíquico em 10%.", "held_item"),
+            ("twistedspoon", "TWISTEDSPOON", "Aumenta o poder de golpes do tipo Psíquico em 10%.", "held_item", 6000),
             # Lutador
-            ("blackbelt", "BLACKBELT", "Aumenta o poder de golpes do tipo Lutador em 10%.", "held_item"),
+            ("blackbelt", "BLACKBELT", "Aumenta o poder de golpes do tipo Lutador em 10%.", "held_item", 6000),
             # Sombrio
-            ("blackglasses", "BLACKGLASSES", "Aumenta o poder de golpes do tipo Sombrio em 10%.", "held_item"),
+            ("blackglasses", "BLACKGLASSES", "Aumenta o poder de golpes do tipo Sombrio em 10%.", "held_item", 6000),
             # Fantasma
-            ("spelltag", "SPELLTAG", "Aumenta o poder de golpes do tipo Fantasma em 10%.", "held_item"),
+            ("spelltag", "SPELLTAG", "Aumenta o poder de golpes do tipo Fantasma em 10%.", "held_item", 6000),
         ]
 
-        for item_id, name, description, category in held_items:
+        for item_id, name, description, category, price in held_items:
             items[item_id] = {
                 "id": item_id,
                 "name": name,
