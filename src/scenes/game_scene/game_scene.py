@@ -153,6 +153,8 @@ class GameScene(BaseScene):
         # Controle de arrasto da câmera
         self.dragging_camera = False
         self.last_mouse_pos = None
+        self.ui_minimized = False  # estado minimizado da UI superior
+        self.ui_panel_rect = None  # para detectar clique no botão
 
         # Cache de referências para otimização
         self._cached_spot_renderer = None
@@ -181,6 +183,9 @@ class GameScene(BaseScene):
                 self.wave_manager.paused = True
             self.overlay_manager.show(OverlayType.PAUSE)  # Mostra o overlay de pausa
             print("Jogo pausado")
+
+    def toggle_ui_minimize(self):
+        self.ui_minimized = not self.ui_minimized
 
     def _start_test_weather(self):
         """
@@ -1543,6 +1548,12 @@ class GameScene(BaseScene):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = pygame.mouse.get_pos()
 
+            if hasattr(self, 'ui_panel_rect') and self.ui_panel_rect:
+                btn_rect = pygame.Rect(self.ui_panel_rect.right - 30, self.ui_panel_rect.y + 8, 22, 22)
+                if btn_rect.collidepoint(event.pos):
+                    self.toggle_ui_minimize()
+                    return None
+
             # Verifica clique na bag
             if bag_renderer and hasattr(bag_renderer, 'mouse_over_ui') and bag_renderer.mouse_over_ui:
                 hovered_index = bag_renderer.hovered_index
@@ -2191,49 +2202,107 @@ class GameScene(BaseScene):
         perf_monitor.end_section()
 
     def _render_game_ui(self, screen):
-        """Renderiza a UI do jogo"""
-        font = self._get_ui_font(24)
-        font_small = self._get_ui_font(18)
+        """Renderiza a UI do jogo – com botão de minimizar funcional e layout compacto."""
+        viewport_x = self.screen_manager.viewport_x
+        viewport_y = self.screen_manager.viewport_y
+        font = self._get_ui_font(20)
+        font_small = self._get_ui_font(14)
+        font_tiny = self._get_ui_font(12)
 
-        wave_info = self.wave_manager.get_current_wave_info()
-        target_mgr = self.target_item_manager
-        screen_mgr = self.screen_manager
-        wave_mgr = self.wave_manager
+        # Dimensões do painel
+        if self.ui_minimized:
+            panel_width = 240
+            panel_height = 40
+        else:
+            panel_width = 380
+            panel_height = 140
 
-        viewport_x = screen_mgr.viewport_x
-        viewport_y = screen_mgr.viewport_y
+        panel_x = viewport_x + 12
+        panel_y = viewport_y + 12
 
-        ui_bg = pygame.Surface((400, 180))  # Aumentado para acomodar clima
-        ui_bg.set_alpha(180)
-        ui_bg.fill((20, 20, 30))
-        screen.blit(ui_bg, (viewport_x + 10, viewport_y + 10))
+        # Salva o retângulo do painel para detecção de clique
+        self.ui_panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
 
-        y_offset = viewport_y + 15
+        # Sombra
+        shadow_rect = pygame.Rect(panel_x + 4, panel_y + 4, panel_width, panel_height)
+        pygame.draw.rect(screen, (0, 0, 0, 80), shadow_rect, border_radius=10)
 
+        # Fundo gradiente
+        bg_surf = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
+        for i in range(panel_height):
+            alpha = int(200 - (i / panel_height) * 60)
+            color = (10, 15, 30, alpha)
+            pygame.draw.line(bg_surf, color, (0, i), (panel_width, i))
+        pygame.draw.rect(bg_surf, (80, 120, 200, 80), bg_surf.get_rect(), 2, border_radius=10)
+        screen.blit(bg_surf, (panel_x, panel_y))
+
+        # Botão de minimizar – calculado com base no estado atual
+        btn_size = 20
+        if self.ui_minimized:
+            btn_x = panel_x + panel_width - btn_size - 4
+            btn_y = panel_y + (panel_height - btn_size) // 2
+        else:
+            btn_x = panel_x + panel_width - btn_size - 8
+            btn_y = panel_y + 6
+        btn_rect = pygame.Rect(btn_x, btn_y, btn_size, btn_size)
+
+        mouse_pos = pygame.mouse.get_pos()
+        hover = btn_rect.collidepoint(mouse_pos)
+        pygame.draw.rect(screen, (60, 70, 90) if not hover else (100, 120, 180), btn_rect, border_radius=4)
+        pygame.draw.rect(screen, (180, 180, 200), btn_rect, 1, border_radius=4)
+        icon = "−" if not self.ui_minimized else "+"
+        icon_font = pygame.font.Font(None, 18)
+        icon_surf = icon_font.render(icon, True, (255, 255, 255))
+        icon_rect = icon_surf.get_rect(center=btn_rect.center)
+        screen.blit(icon_surf, icon_rect)
+
+        # ===== MODO MINIMIZADO =====
+        if self.ui_minimized:
+            if self.game_state == "in_wave":
+                wave_info = self.wave_manager.get_current_wave_info()
+                progress = wave_info.get('progress', 0)
+                # Barra ocupa o espaço disponível (deixando margem)
+                bar_x = panel_x + 8
+                bar_y = panel_y + (panel_height - 16) // 2
+                bar_width = panel_width - 32  # margem para o botão
+                bar_height = 16
+                pygame.draw.rect(screen, (40, 45, 60), (bar_x, bar_y, bar_width, bar_height), border_radius=5)
+                if progress > 0:
+                    pygame.draw.rect(screen, (0, 200, 0), (bar_x, bar_y, int(bar_width * progress), bar_height),
+                                     border_radius=5)
+                pygame.draw.rect(screen, (100, 100, 120), (bar_x, bar_y, bar_width, bar_height), 1, border_radius=5)
+                # Texto resumido
+                text = f"{wave_info['enemies_spawned']}/{wave_info['enemies_total']}"
+                txt = font_tiny.render(text, True, (255, 255, 255))
+                text_x = bar_x + (bar_width - txt.get_width()) // 2
+                text_y = bar_y + (bar_height - txt.get_height()) // 2
+                screen.blit(txt, (text_x, text_y))
+            return
+
+        # ===== MODO COMPLETO =====
+        x_offset = panel_x + 14
+        y_offset = panel_y + 8
+
+        # Linha 1: Nome da fase
         phase_text = font.render(self.phase_info.get("name", f"Fase {self.phase_number}"), True, (255, 215, 0))
-        screen.blit(phase_text, (viewport_x + 15, y_offset))
-        y_offset += 25
+        screen.blit(phase_text, (x_offset, y_offset))
+        y_offset += 20
 
-        # ===== PERIODO (DIA/NOITE) =====
-        if hasattr(self, 'day_night_weather'):
-            day_night = self.day_night_weather.day_night_state
-            if day_night:
-                period_text = day_night.get_display_name()
-                # Cores específicas para cada tipo
-                period_colors = {
-                    "Dia": (255, 200, 100),
-                    "Noite": (100, 150, 255),
-                    "Entardecer": (255, 180, 80),
-                    "Amanhecer": (255, 200, 200),
-                    "Caverna": (150, 150, 150),
-                    "Fundo do Mar": (80, 180, 255),
-                }
-                period_color = period_colors.get(period_text, (255, 200, 100))
-                period_display = font_small.render(f"Periodo: {period_text}", True, period_color)
-                screen.blit(period_display, (viewport_x + 15, y_offset))
-                y_offset += 20
+        # Linha 2: Período e Clima
+        info_parts = []
+        if hasattr(self, 'day_night_weather') and self.day_night_weather.day_night_state:
+            dn = self.day_night_weather.day_night_state
+            period_text = dn.get_display_name()
+            period_colors = {
+                "Dia": (255, 200, 100),
+                "Noite": (100, 150, 255),
+                "Entardecer": (255, 180, 80),
+                "Amanhecer": (255, 200, 200),
+                "Caverna": (150, 150, 150),
+                "Fundo do Mar": (80, 180, 255),
+            }
+            info_parts.append((period_text, period_colors.get(period_text, (255, 200, 100))))
 
-        # ===== CLIMA =====
         if hasattr(self, 'battle_system') and self.battle_system:
             weather = self.battle_system.weather_manager.current_weather
             if weather and weather.active:
@@ -2243,67 +2312,131 @@ class GameScene(BaseScene):
                     "rain": (100, 150, 255),
                     "sunny": (255, 215, 0)
                 }.get(weather.type.value, (200, 200, 200))
+                info_parts.append((weather_name, weather_color))
 
-                weather_display = font_small.render(f"Clima: {weather_name}", True, weather_color)
-                screen.blit(weather_display, (viewport_x + 15, y_offset))
-                y_offset += 20
+        info_x = x_offset
+        for text, color in info_parts:
+            txt = font_small.render(text, True, color)
+            screen.blit(txt, (info_x, y_offset))
+            info_x += txt.get_width() + 10
+        y_offset += 18
 
-        # ===== ITENS =====
-        items_color = (100, 255, 100) if target_mgr.items_protected > 0 else (255, 100, 100)
+        # Linha 3: Itens
+        items_color = (100, 255, 100) if self.target_item_manager.items_protected > 0 else (255, 100, 100)
         items_text = font_small.render(
-            f"Itens: {target_mgr.items_protected} protegidos | {target_mgr.items_stolen} levados",
-            True, items_color
-        )
-        screen.blit(items_text, (viewport_x + 15, y_offset))
+            f"Itens: {self.target_item_manager.items_protected} protegidos  •  {self.target_item_manager.items_stolen} levados",
+            True, items_color)
+        screen.blit(items_text, (x_offset, y_offset))
         y_offset += 20
 
-        # ===== ESTADO DO JOGO =====
+        # Wave info
         if self.game_state == "waiting":
-            state_text = font_small.render("Aguardando inicio...", True, (200, 200, 200))
-            screen.blit(state_text, (viewport_x + 15, y_offset))
-
+            state_text = font_small.render("Aguardando início...", True, (200, 200, 200))
+            screen.blit(state_text, (x_offset, y_offset))
         elif self.game_state == "in_wave":
-            active_paths = wave_info.get('active_paths', 0)
-            if active_paths > 1:
-                wave_text = font_small.render(
-                    f"{active_paths} paths ativos | {wave_info['name']}",
-                    True, (100, 255, 100))
-            else:
-                wave_text = font_small.render(
-                    f"Wave {wave_info['index']}/{wave_info['total']}: {wave_info['name']}",
-                    True, (100, 255, 100))
-            screen.blit(wave_text, (viewport_x + 15, y_offset))
-            y_offset += 20
-
-            # ===== BARRA DE PROGRESSO =====
-            bar_x = viewport_x + 15
-            bar_y = y_offset
-            bar_width = 370
-            bar_height = 15
-
-            pygame.draw.rect(screen, (60, 60, 70), (bar_x, bar_y, bar_width, bar_height))
-            progress_width = int(bar_width * wave_info['progress'])
-            pygame.draw.rect(screen, (0, 200, 0), (bar_x, bar_y, progress_width, bar_height))
-            pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, bar_width, bar_height), 1)
-
-            progress_text = font_small.render(
-                f"{wave_info['enemies_spawned']}/{wave_info['enemies_total']}",
-                True, (255, 255, 255))
-            text_x = bar_x + (bar_width - progress_text.get_width()) // 2
-            screen.blit(progress_text, (text_x, bar_y + 2))
-
-            y_offset += 25
-
-            # ===== INIMIGOS VIVOS =====
-            enemies_color = (255, 100, 100) if wave_mgr.active_enemies else (100, 255, 100)
-            enemies_text = font_small.render(
-                f"Inimigos vivos: {len(wave_mgr.active_enemies)}",
-                True, enemies_color)
-            screen.blit(enemies_text, (viewport_x + 15, y_offset))
-
+            # Calcula altura máxima para as barras
+            max_bar_height = panel_height - y_offset - 6
+            self._draw_wave_progress_bars(screen, x_offset, y_offset, panel_width - 30, max_bar_height)
         elif self.game_state == "completed":
             complete_text = font.render("FASE COMPLETA!", True, (255, 215, 0))
-            screen.blit(complete_text, (viewport_x + 15, y_offset))
+            screen.blit(complete_text, (x_offset, y_offset))
+
+    def _draw_minimized_progress(self, screen, x, y, width, height):
+        """Desenha a barra de progresso resumida (modo minimizado)."""
+        if self.game_state != "in_wave":
+            return
+
+        wave_info = self.wave_manager.get_current_wave_info()
+        progress = wave_info.get('progress', 0)
+
+        pygame.draw.rect(screen, (40, 45, 60), (x, y, width, height), border_radius=5)
+        if progress > 0:
+            pygame.draw.rect(screen, (0, 200, 0), (x, y, int(width * progress), height), border_radius=5)
+        pygame.draw.rect(screen, (100, 100, 120), (x, y, width, height), 1, border_radius=5)
+
+        # Texto resumido
+        font = self._get_ui_font(12)
+        text = f"{wave_info['enemies_spawned']}/{wave_info['enemies_total']}"
+        txt = font.render(text, True, (255, 255, 255))
+        text_x = x + (width - txt.get_width()) // 2
+        text_y = y + (height - txt.get_height()) // 2
+        screen.blit(txt, (text_x, text_y))
+
+    def _draw_wave_progress_bars(self, screen, x, y, max_width, max_height):
+        """Desenha barras de progresso para cada path/wave ativo – com divisores verticais."""
+        spawner = self.wave_manager.spawner
+        bars_data = []
+
+        # Itera sobre todos os paths com waves
+        for path_idx, waves in spawner.waves.items():
+            wave_idx = spawner.current_wave_idx.get(path_idx, 0)
+            if wave_idx >= len(waves):
+                continue
+            wave = waves[wave_idx]
+            active = spawner.wave_active.get(path_idx, False)
+            if not active:
+                continue
+
+            spawned = spawner.spawned_count.get(path_idx, 0)
+            wave_size = wave.wave_size
+            progress = min(1.0, spawned / wave_size) if wave_size > 0 else 0
+
+            path_name = f"P{path_idx + 1}"
+            bars_data.append((path_name, progress, spawned, wave_size))
+
+        # Se não houver active, mostra uma única barra consolidada
+        if not bars_data:
+            wave_info = self.wave_manager.get_current_wave_info()
+            progress = wave_info.get('progress', 0)
+            bars_data = [("W", progress, wave_info['enemies_spawned'], wave_info['enemies_total'])]
+
+        # Calcula altura disponível e distribui
+        bar_height = 14
+        spacing = 4
+        total_height = len(bars_data) * (bar_height + spacing) - spacing
+        if total_height > max_height:
+            # Se não couber, reduz a altura
+            bar_height = max(8, (max_height - (len(bars_data) - 1) * spacing) // len(bars_data))
+            total_height = len(bars_data) * (bar_height + spacing) - spacing
+
+        y_offset = y
+
+        for i, (name, progress, spawned, total) in enumerate(bars_data):
+            # Nome da wave
+            name_font = self._get_ui_font(13)
+            name_surf = name_font.render(name, True, (200, 200, 220))
+            screen.blit(name_surf, (x, y_offset))
+            name_width = name_surf.get_width() + 6
+
+            # Barra
+            bar_x = x + name_width
+            bar_width = max_width - name_width - 10
+            bar_y = y_offset + (bar_height - 14) // 2  # centraliza verticalmente
+
+            # Fundo da barra
+            pygame.draw.rect(screen, (40, 45, 60), (bar_x, bar_y, bar_width, 14), border_radius=4)
+            # Preenchimento
+            if progress > 0:
+                pygame.draw.rect(screen, (0, 200, 0), (bar_x, bar_y, int(bar_width * progress), 14), border_radius=4)
+            # Borda
+            pygame.draw.rect(screen, (100, 100, 120), (bar_x, bar_y, bar_width, 14), 1, border_radius=4)
+
+            # ===== DIVISORES VERTICAIS (em toda a largura da barra) =====
+            if total > 0:
+                segment_width = bar_width / total
+                for seg in range(1, total):
+                    line_x = bar_x + int(segment_width * seg)
+                    pygame.draw.line(screen, (60, 70, 80), (line_x, bar_y), (line_x, bar_y + 14), 1)
+
+            # Texto da contagem
+            count_text = f"{spawned}/{total}"
+            count_font = self._get_ui_font(11)
+            count_surf = count_font.render(count_text, True, (255, 255, 255))
+            count_x = bar_x + (bar_width - count_surf.get_width()) // 2
+            count_y = bar_y + (14 - count_surf.get_height()) // 2
+            screen.blit(count_surf, (count_x, count_y))
+
+            y_offset += bar_height + spacing
 
     def _render_debug_info(self, screen):
         """Informações de debug"""

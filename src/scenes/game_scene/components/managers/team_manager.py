@@ -23,6 +23,7 @@ class GameTeamManager:
         self.selected_slot_index = -1
 
         # Estado
+        self.minimized = False
         self.visible = True
         self.expanded = False
 
@@ -63,17 +64,26 @@ class GameTeamManager:
     def set_game_scene(self, game_scene):
         self.game_scene = game_scene
 
+    def toggle_minimize(self):
+        self.minimized = not self.minimized
+        self._calculate_dimensions()
+        self._create_slots()
+        self._needs_cache_rebuild = True
+
     def _calculate_dimensions(self):
-        """Calcula dimensões e marca para rebuild do cache"""
         self.window_width = self.game.screen_manager.window_width
         self.window_height = self.game.screen_manager.window_height
 
-        self.slot_width = max(140, min(220, int(self.window_width * self.slot_width_ratio)))
-        self.slot_height = max(90, min(140, int(self.window_height * self.slot_height_ratio)))
-        self.slot_spacing = max(6, min(20, int(self.window_width * self.slot_spacing_ratio)))
-        self.bottom_margin = int(self.window_height * self.bottom_margin_ratio)
+        if self.minimized:
+            # Modo compacto: altura reduzida
+            self.slot_height = max(40, int(self.window_height * 0.06))
+            self.slot_width = max(100, int(self.window_width * 0.12))
+        else:
+            self.slot_width = max(140, min(220, int(self.window_width * 0.16)))
+            self.slot_height = max(90, min(140, int(self.window_height * 0.14)))
 
-        # Marca para rebuild do cache
+        self.slot_spacing = max(6, min(20, int(self.window_width * 0.012)))
+        self.bottom_margin = int(self.window_height * self.bottom_margin_ratio)
         self._needs_cache_rebuild = True
 
     def _rebuild_cache(self):
@@ -153,6 +163,12 @@ class GameTeamManager:
         if not self.visible:
             return None
 
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if hasattr(self, '_minimize_button_rect') and self._minimize_button_rect:
+                if self._minimize_button_rect.collidepoint(event.pos):
+                    self.toggle_minimize()
+                    return None
+
         if self.drag_manager.is_dragging:
             if event.type == pygame.MOUSEMOTION:
                 world_pos = self.game.screen_manager.get_mouse_world_position(event.pos, camera)
@@ -164,7 +180,6 @@ class GameTeamManager:
                         placement_manager.placed_pokemon if placement_manager else [],
                         camera, placement_manager
                     )
-
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                 return self.drag_manager.stop_drag(
                     tower_spots,
@@ -204,7 +219,7 @@ class GameTeamManager:
         return None
 
     def render(self, screen, camera, tower_spots):
-        """Renderiza o time manager - OTIMIZADO com cache"""
+        """Renderiza a barra do time – com botão de minimizar e suporte a modo compacto."""
         if not self.visible or not self.team_slots:
             return
 
@@ -212,29 +227,55 @@ class GameTeamManager:
         if self._needs_cache_rebuild:
             self._rebuild_cache()
 
-        # Render fundo via Cache
-        hud_y = self.team_slots[0].rect.y - 20
+        # Posição Y da barra (baseada no primeiro slot)
+        base_y = self.team_slots[0].rect.y - 20
+        hud_height = self.slot_height + 40
 
+        # Renderiza fundo gradiente (cacheado)
         if self._bg_surface:
-            screen.blit(self._bg_surface, (0, hud_y))
+            screen.blit(self._bg_surface, (0, base_y))
         if self._glow_surface:
-            screen.blit(self._glow_surface, (0, hud_y - 2))
+            screen.blit(self._glow_surface, (0, base_y - 2))
 
-        # Linha decorativa via Cache
+        # Linha decorativa (cacheada)
         if self._deco_line_surface:
             line_x = (self.window_width - self._deco_line_surface.get_width()) // 2
-            screen.blit(self._deco_line_surface, (line_x, hud_y + 5))
+            screen.blit(self._deco_line_surface, (line_x, base_y + 5))
 
-        # Renderiza slots
+        # ===== BOTÃO DE MINIMIZAR =====
+        btn_x = self.window_width - 50
+        btn_y = base_y + 2
+        btn_size = 28
+        btn_rect = pygame.Rect(btn_x, btn_y, btn_size, btn_size)
+
+        # Salva o retângulo do botão para detecção de clique (opcional, mas útil)
+        self._minimize_button_rect = btn_rect
+
+        mouse_pos = pygame.mouse.get_pos()
+        hover = btn_rect.collidepoint(mouse_pos)
+
+        # Fundo do botão
+        pygame.draw.rect(screen, (60, 70, 90) if not hover else (100, 120, 180), btn_rect, border_radius=6)
+        pygame.draw.rect(screen, (180, 180, 200), btn_rect, 1, border_radius=6)
+
+        # Ícone: "-" ou "+"
+        icon = "−" if not self.minimized else "+"
+        icon_font = pygame.font.Font(None, 22)
+        icon_surf = icon_font.render(icon, True, (255, 255, 255))
+        icon_rect = icon_surf.get_rect(center=btn_rect.center)
+        screen.blit(icon_surf, icon_rect)
+
+        # ===== RENDERIZA OS SLOTS (passando o estado minimized) =====
         for slot in self.team_slots:
-            slot.render(screen)
+            # O método render do slot agora aceita um parâmetro 'minimized'
+            slot.render(screen, minimized=self.minimized)
 
-        # Drag manager (só renderiza se estiver arrastando)
+        # Drag manager (só se estiver arrastando)
         if self.drag_manager.is_dragging:
             self.drag_manager.render(screen, camera)
 
-        # Expanded info (só se necessário)
-        if self.expanded and self.selected_slot_index >= 0:
+        # Informações expandidas (apenas se não minimizado e selecionado)
+        if not self.minimized and self.expanded and self.selected_slot_index >= 0:
             self._render_expanded_info(screen)
 
     def _render_expanded_info(self, screen):

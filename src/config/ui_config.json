@@ -1,10 +1,10 @@
 {
   "bag": {
-    "x": 27,
-    "y": 184,
+    "x": 366,
+    "y": 31,
     "width": 250,
-    "height": 400,
-    "minimized": false,
+    "height": 40,
+    "minimized": true,
     "category": "all"
   }
 }

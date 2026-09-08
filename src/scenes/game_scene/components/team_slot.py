@@ -226,19 +226,28 @@ class GameTeamSlot:
         self.animation_offset = 10
         self._cached_bg = None
 
-    def render(self, screen):
-        """Renderiza o slot com visual melhorado - OTIMIZADO"""
+    def render(self, screen, minimized=False):
         pokemon = self.pokemon
-
         animated_rect = self.rect.copy()
         animated_rect.y -= int(self.animation_offset)
 
-        self._draw_background(screen, animated_rect, pokemon)
+        # Desenha fundo (pode ser mais fino se minimizado)
+        if minimized:
+            # Fundo mais compacto
+            bg_color = (25, 30, 40, 200) if not self.is_hovered else (35, 45, 60, 220)
+            pygame.draw.rect(screen, bg_color, animated_rect, border_radius=8)
+            pygame.draw.rect(screen, (70, 80, 100), animated_rect, 1, border_radius=8)
+        else:
+            self._draw_background(screen, animated_rect, pokemon)
 
         if pokemon:
-            self._draw_pokemon_info(screen, animated_rect, pokemon)
-            if self.is_placed:
-                self._draw_placed_indicator(screen, animated_rect)
+            if minimized:
+                # Modo simplificado: apenas nome e HP
+                self._draw_minimized_info(screen, animated_rect, pokemon)
+            else:
+                self._draw_pokemon_info(screen, animated_rect, pokemon)
+                if self.is_placed:
+                    self._draw_placed_indicator(screen, animated_rect)
         else:
             self._draw_empty_slot(screen, animated_rect)
 
@@ -358,6 +367,42 @@ class GameTeamSlot:
         # Barras
         self._draw_hp_bar(screen, rect, self._hp_y, pokemon)
         self._draw_xp_bar(screen, rect, self._xp_y, pokemon)
+
+    def _draw_minimized_info(self, screen, rect, pokemon):
+        """Desenha apenas nome e barra de HP (modo compacto e achatado)."""
+        # Nome em cima
+        name_text = pokemon.custom_name if pokemon.custom_name else pokemon.name
+        name_font = self._get_font(max(16, int(rect.height * 0.45)))  # fonte um pouco maior
+        name_surf = name_font.render(name_text, True, (255, 255, 255))
+        name_x = rect.x + 10
+        name_y = rect.y + 4  # colado no topo
+        screen.blit(name_surf, (name_x, name_y))
+
+        # Barra de HP abaixo, mais grossa e com fonte centralizada maior
+        hp_percent = pokemon.current_hp / pokemon.max_hp
+        bar_width = rect.width - 20
+        bar_height = 20  # mais alta
+        bar_x = rect.x + 10
+        bar_y = rect.y + rect.height - bar_height - 4  # colado na base
+
+        pygame.draw.rect(screen, (40, 45, 55), (bar_x, bar_y, bar_width, bar_height), border_radius=6)
+        if hp_percent > 0.6:
+            hp_color = (78, 201, 96)
+        elif hp_percent > 0.3:
+            hp_color = (255, 209, 102)
+        else:
+            hp_color = (255, 107, 107)
+        current_width = max(2, int(bar_width * hp_percent))
+        pygame.draw.rect(screen, hp_color, (bar_x, bar_y, current_width, bar_height), border_radius=6)
+        pygame.draw.rect(screen, (100, 100, 120), (bar_x, bar_y, bar_width, bar_height), 1, border_radius=6)
+
+        # Texto HP centralizado com fonte maior
+        hp_text = f"{pokemon.current_hp}/{pokemon.max_hp}"
+        hp_font = self._get_font(14, bold=True)  # fonte maior e em negrito
+        hp_surf = hp_font.render(hp_text, True, (255, 255, 255))
+        hp_x = bar_x + (bar_width - hp_surf.get_width()) // 2
+        hp_y = bar_y + (bar_height - hp_surf.get_height()) // 2
+        screen.blit(hp_surf, (hp_x, hp_y))
 
     def _get_cached_sprite(self, pokemon):
         """Obtém sprite do cache"""
