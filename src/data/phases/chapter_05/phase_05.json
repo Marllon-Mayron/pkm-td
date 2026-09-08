@@ -933,7 +933,7 @@
                         "pause_game": false,
                         "message_text": "Antes mesmo de você sentir o primeiro ardor, meu veneno já está correndo nas suas veias. A pergunta é: você vai cair de pé, ou vai se arrastar até o fim implorando por um antídoto que eu não vou te dar?",
                         "speaker_name": "Koga",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/LEADER_Koga.png",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/LEADER_Koga.png",
                         "action_label": "Vamos lá!",
                         "action_trigger": ""
                     }

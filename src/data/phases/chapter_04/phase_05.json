@@ -1198,7 +1198,7 @@
                         "pause_game": true,
                         "message_text": "Sinta o cheiro da terra. Sinta a calma antes da tempestade. Cada movimento seu vai nutrir minhas plantas... cada hesitação sua vai ser uma raiz a mais me prendendo ao chão. Que a batalha comece... e que você aprenda que a natureza sempre vence no final.",
                         "speaker_name": "Erika",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/LEADER_Erika.png",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/LEADER_Erika.png",
                         "action_label": "Vamos lá!",
                         "action_trigger": ""
                     }

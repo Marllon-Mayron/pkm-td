@@ -478,7 +478,7 @@ class ItemBagCatalog:
                 "usable_on_map": True,
                 "effect": "revive_fossil",
                 "effect_value": pokemon_name,
-                "price": 10000,
+                "price": 2000,
                 "unlock_phase": "999-999",
                 "unlock_chapter": None
             }

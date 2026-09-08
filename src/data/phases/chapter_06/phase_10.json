@@ -1866,7 +1866,7 @@
                         "pause_game": true,
                         "message_text": "Me mostre o fogo que tem dentro de voce, e eu te mostro como se apaga fogo com fogo!",
                         "speaker_name": "Blaine",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/LEADER_Blaine.png",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/LEADER_Blaine.png",
                         "action_label": "Vamos lá!",
                         "action_trigger": ""
                     }

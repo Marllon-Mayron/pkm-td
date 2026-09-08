@@ -1727,7 +1727,7 @@
                         "pause_game": true,
                         "message_text": "Você entrou no meu domínio. Aqui, a batalha não começa quando eu libero meu Pokémon... ela começou no momento em que você duvidou de si mesmo. Pronto para encarar o que sua mente já te mostrou?",
                         "speaker_name": "Sabrina",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/LEADER_Sabrina.png",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/LEADER_Sabrina.png",
                         "action_label": "Vamos lá!",
                         "action_trigger": ""
                     }

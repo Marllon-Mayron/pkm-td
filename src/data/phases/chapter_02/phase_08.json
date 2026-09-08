@@ -761,7 +761,7 @@
                         "pause_game": true,
                         "message_text": "Eu não preciso te vencer com truques. Eu só preciso te levar pro meu território. Porque cada ataque seu perde força na água... e cada erro seu é mais um mergulho rumo à derrota. Vamos ver em qual rodada você pede pra sair da piscina.",
                         "speaker_name": "Misty",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/LEADER_Misty.png",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/LEADER_Misty.png",
                         "action_label": "Vamos lá!",
                         "action_trigger": ""
                     }

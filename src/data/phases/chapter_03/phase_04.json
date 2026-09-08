@@ -1023,7 +1023,7 @@
                         "pause_game": true,
                         "message_text": "SVocê entrou no meu circuito. Aqui, a batalha não espera ninguém... ela começa e termina num piscar de olhos. Pronto para sentir a descarga de uma verdade que chega mais rápido que seus olhos podem ver? ",
                         "speaker_name": "Surge",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/LEADER_Surge.png",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/LEADER_Surge.png",
                         "action_label": "Vamos lá!",
                         "action_trigger": ""
                     }

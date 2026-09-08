@@ -2127,7 +2127,7 @@
                         "pause_game": true,
                         "message_text": "Então... você finalmente chegou até aqui. Não vou mentir, estou impressionado que um treinador comum tenha derrotado meus melhores subordinados. Mas agora você está diante do verdadeiro líder de Viridian. E, mais importante... diante do verdadeiro líder da Equipe Rocket. Vamos ver se sua jornada termina em glória... ou em ruínas.",
                         "speaker_name": "Giovanni",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/LEADER_Giovanni.png",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/LEADER_Giovanni.png",
                         "action_label": "Vamos lá!",
                         "action_trigger": ""
                     }

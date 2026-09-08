@@ -565,7 +565,7 @@
                         "pause_game": true,
                         "message_text": "Seja bem-vindo! Esse é o pokemon tower defese! Já vi que escolheu seu primeiro pokemon, vamos coloca-lo no mapa! Arraste a imagem do seu pokemon que está no seu time, e coloque no circulo no mapa.",
                         "speaker_name": "Professor Carvalho",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/introOak.png",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/introOak.png",
                         "action_label": "Entendi",
                         "action_trigger": ""
                     }
@@ -584,7 +584,7 @@
                         "pause_game": true,
                         "message_text": "Perfeito! Você também consegue arrastar o pokemon de um circulo para outro. Em cima do seu pokémon, você consegue ver a vida dele, ele parece estar um pouco machucado... que tal dar uma potion para ele? É só arrastar da sua bolsa e coloca-la em cima do seu pokemon.",
                         "speaker_name": "Professor Carvalho",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/introOak.png",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/introOak.png",
                         "action_label": "Entendi!",
                         "action_trigger": ""
                     }
@@ -603,7 +603,7 @@
                         "pause_game": true,
                         "message_text": "Muito melhor! Que tal dar uma olhadinha nos ataques disponiveis pro seu pokemon? É só clicar na imagem do seu pokemon no time, mas não esqueça que o painel só abre se seu pokemon estiver posicionado no mapa!",
                         "speaker_name": "Professor Carvalho",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/introOak.png",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/introOak.png",
                         "action_label": "Vou olhar",
                         "action_trigger": ""
                     }
@@ -621,8 +621,8 @@
                         "delay": 0,
                         "pause_game": true,
                         "message_text": "É um bom começo... sempre que possivel verifique os PPs e Prioridade de ataque do seu pokemon para fortalecer suas estratégias. Vamos começar a batalha, feche a tela e se prepare!",
-                        "speaker_name": "Professor Venossauro",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/introOak.png",
+                        "speaker_name": "Professor Carvalho",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/introOak.png",
                         "action_label": "Vamos lá! ",
                         "action_trigger": ""
                     }
@@ -640,8 +640,8 @@
                         "delay": 0.0,
                         "pause_game": false,
                         "message_text": "Parabens, voce já está pronto para seguir jornada sozinho!",
-                        "speaker_name": "Professor Venossauro",
-                        "speaker_sprite_path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/PokemonSprites/characters/introOak.png",
+                        "speaker_name": "Professor Carvalho",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/introOak.png",
                         "action_label": "Obrigado! ",
                         "action_trigger": ""
                     }
