@@ -98,7 +98,7 @@ class PokemonEvolution:
                 data["defense"] = self.pokemon.defense
                 data["sp_attack"] = self.pokemon.sp_attack
                 data["sp_defense"] = self.pokemon.sp_defense
-                data["speed_stat"] = self.pokemon.speed_stat
+                data["speed"] = self.pokemon.speed_stat
                 data["level"] = self.pokemon.level
                 data["xp"] = self.pokemon.xp
                 data["moves"] = [

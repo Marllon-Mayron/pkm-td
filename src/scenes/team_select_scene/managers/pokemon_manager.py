@@ -135,7 +135,7 @@ class PokemonManager:
                 data["defense"] = cached_pokemon.defense
                 data["sp_attack"] = cached_pokemon.sp_attack
                 data["sp_defense"] = cached_pokemon.sp_defense
-                data["speed_stat"] = cached_pokemon.speed_stat
+                data["speed"] = cached_pokemon.speed_stat
                 data["happiness"] = cached_pokemon.happiness
                 data["moves"] = [
                     {
@@ -265,7 +265,7 @@ class PokemonManager:
                 data["defense"] = pokemon.defense
                 data["sp_attack"] = pokemon.sp_attack
                 data["sp_defense"] = pokemon.sp_defense
-                data["speed_stat"] = pokemon.speed_stat
+                data["speed"] = pokemon.speed_stat
                 data["level"] = pokemon.level
                 data["xp"] = pokemon.xp
                 data["moves"] = [

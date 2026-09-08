@@ -375,7 +375,11 @@ class GameScene(BaseScene):
             perf_monitor.reset()
 
     def update_box_happiness(self):
-        """Diminui felicidade dos Pokémon na PC Box em -1 por fase."""
+        """
+        Diminui felicidade dos Pokémon na PC Box em -1 por fase.
+        SIMULA O ABANDONO: Pokémon na box perdem felicidade.
+        OTIMIZADO: Trabalha diretamente com dicionários e salva as alterações.
+        """
         if not hasattr(self.player, 'pc_box'):
             return
 
@@ -383,30 +387,51 @@ class GameScene(BaseScene):
         if not box_data:
             return
 
-        # Conjunto de unique_ids dos Pokémon no time para saber quais estão na box
+        # Conjunto de unique_ids dos Pokémon no time (para saber quem está na box)
         team_ids = {p.unique_id for p in self.player.team}
+
+        updated_count = 0
+        skipped_count = 0
 
         for data in box_data:
             unique_id = data.get("unique_id")
             if not unique_id:
                 continue
 
-            # Se o Pokémon está no time, não está na box (não deve perder felicidade)
+            # Se o Pokémon está no time, NÃO está na box (não perde felicidade)
             if unique_id in team_ids:
+                skipped_count += 1
                 continue
 
-            # Tenta obter a instância para usar add_happiness
-            pokemon = self.player.get_pokemon_instance(unique_id)
-            if pokemon:
-                # Aplica a lógica de felicidade (que também pode disparar evolução)
-                pokemon.add_happiness(-1, "Na Box")
-                # Atualiza o dict com o novo valor de felicidade
-                data["happiness"] = pokemon.happiness
+            # ===== TRABALHA DIRETAMENTE COM O DICIONÁRIO =====
+            # Pega a felicidade atual (padrão 0 se não existir)
+            current_happiness = data.get("happiness", 0)
+
+            # Aplica -1 (mínimo 0)
+            if current_happiness > 0:
+                data["happiness"] = current_happiness - 1
+                updated_count += 1
+
+                # Se a felicidade caiu abaixo de 255, remove flag de evolução pendente
+                if data["happiness"] < 255 and data.get("pending_happiness_evolution"):
+                    data["pending_happiness_evolution"] = False
+                    print(f"[BOX] {data.get('name', 'Unknown')} perdeu a condição de evoluir por felicidade")
+            # Se já está em 0, mantém
+
+        if updated_count > 0:
+            print(
+                f"[BOX_HAPPINESS] {updated_count} Pokémon perderam -1 de felicidade | {skipped_count} no time ignorados")
+
+            # ===== SALVA AS ALTERAÇÕES =====
+            # Importante: Salva para persistir a mudança de felicidade
+            self.player.auto_save()
+            print(f"[BOX_HAPPINESS] Save atualizado com novas felicidades da box")
+        else:
+            if skipped_count > 0:
+                print(
+                    f"[BOX_HAPPINESS] Nenhum Pokémon na box para perder felicidade. {skipped_count} no time ignorados")
             else:
-                # Fallback: decrementa diretamente no dict
-                current = data.get("happiness", 0)
-                if current > 0:
-                    data["happiness"] = current - 1
+                print(f"[BOX_HAPPINESS] Nenhum Pokémon na box para perder felicidade")
 
     def is_team_defeated(self) -> bool:
         """

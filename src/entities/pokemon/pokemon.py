@@ -1812,7 +1812,7 @@ class Pokemon(Entity):
             "defense": self.defense,
             "sp_attack": self.sp_attack,
             "sp_defense": self.sp_defense,
-            "speed_stat": self.speed_stat,
+            "speed": self.speed_stat,
             "is_in_team": self.is_in_team,
             "is_placed": self.is_placed,
             "spot_id": self.spot_id,
