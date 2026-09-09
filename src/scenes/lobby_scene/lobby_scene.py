@@ -20,13 +20,14 @@ class LobbyScene(BaseScene):
 
         # ===== DADOS =====
         self.my_name = network.my_name
-        self.players = []
+        self.players = [self.my_name]  # Começa com o próprio nome
         self.opponent_name = None
         self.chat_messages = []
         self.chat_input = ""
         self.chat_active = False
         self.pending_trade_from = None
         self._animation_timer = 0
+        self.players_received = False
 
         # ===== UI =====
         self.back_btn = pygame.Rect(0, 0, 120, 40)
@@ -50,12 +51,8 @@ class LobbyScene(BaseScene):
         self.font_chat = pygame.font.Font(None, 18)
 
         # ===== ENVIA O NOME DO JOGADOR =====
-        # Isso é CRUCIAL - envia o nome imediatamente ao entrar no lobby
         self.network.send_to_all(create_message("PLAYER_INFO", {"name": self.my_name}))
         print(f"[LOBBY] {self.my_name} entrou no lobby (host={self.is_host})")
-
-        # Adiciona o próprio jogador à lista (para exibição imediata)
-        self.players.append(self.my_name)
 
     # ======================================================================
     # INICIALIZAÇÃO
@@ -83,19 +80,11 @@ class LobbyScene(BaseScene):
         vx = self.screen_manager.viewport_x
         vy = self.screen_manager.viewport_y
 
-        # Botão Voltar (canto superior esquerdo)
         self.back_btn.topleft = (vx + 15, vy + 15)
-
-        # Botão Trade (abaixo da lista de jogadores)
         self.trade_btn.topleft = (vx + 25, vy + 200)
-
-        # Chat Input
         self.chat_input_rect = pygame.Rect(vx + 280, vy + vh - 45, vw - 410, 32)
-
-        # Botão Enviar (ao lado do input)
         self.send_btn.topleft = (self.chat_input_rect.right + 10, self.chat_input_rect.y)
 
-        # Botões de resposta (centralizados)
         center_x = vx + vw // 2
         center_y = vy + vh // 2 + 60
         self.accept_btn.center = (center_x - 110, center_y)
@@ -113,7 +102,6 @@ class LobbyScene(BaseScene):
 
         if msg_type == "PLAYER_INFO":
             name = payload.get("name", "Desconhecido")
-            # Adiciona à lista se não for o próprio jogador e já não estiver na lista
             if name != self.my_name and name not in self.players:
                 self.players.append(name)
                 self.opponent_name = name
@@ -121,19 +109,29 @@ class LobbyScene(BaseScene):
                 print(f"[LOBBY] Lista atualizada: {self.players}")
 
         elif msg_type == "PLAYER_LIST":
-            players_data = payload.get("players", {})
-            # Converte para lista de nomes
-            new_players = list(players_data.values())
-            if new_players:
-                self.players = new_players
-                # Encontra o oponente (alguém que não seja eu)
-                for name in self.players:
-                    if name != self.my_name:
-                        self.opponent_name = name
-                        break
-                print(f"[LOBBY] Lista recebida do servidor: {self.players}")
-                if len(self.players) > 1:
-                    toast_info(f"Jogadores na sala: {len(self.players)}")
+            players_data = payload.get("players", [])
+            # Pode ser lista ou dicionário - tratamos ambos
+            if isinstance(players_data, dict):
+                new_players = list(players_data.values())
+            else:
+                new_players = players_data
+
+            # Atualiza a lista mantendo o próprio nome
+            self.players = [self.my_name]
+            for name in new_players:
+                if name != self.my_name and name not in self.players:
+                    self.players.append(name)
+
+            # Encontra o oponente
+            for name in self.players:
+                if name != self.my_name:
+                    self.opponent_name = name
+                    break
+
+            self.players_received = True
+            print(f"[LOBBY] Lista recebida: {self.players}")
+            if len(self.players) > 1:
+                toast_info(f"Jogadores na sala: {len(self.players)}")
 
         elif msg_type == "CHAT_MESSAGE":
             sender = payload.get("sender", "Desconhecido")
@@ -158,7 +156,6 @@ class LobbyScene(BaseScene):
 
         elif msg_type == "DISCONNECT":
             toast_warning("O outro jogador desconectou.")
-            # Remove o oponente da lista
             if self.opponent_name and self.opponent_name in self.players:
                 self.players.remove(self.opponent_name)
                 self.opponent_name = None
@@ -218,6 +215,7 @@ class LobbyScene(BaseScene):
                     pasted = self._paste_from_clipboard()
                     if pasted:
                         self.chat_input += pasted
+                        toast_info("Texto colado!")
                 else:
                     if len(self.chat_input) < 60 and event.unicode.isprintable():
                         self.chat_input += event.unicode
@@ -234,29 +232,24 @@ class LobbyScene(BaseScene):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = event.pos
 
-            # Botão Voltar
             if self.back_btn.collidepoint(mouse_pos):
                 sound_manager.play_effect(SoundEffect.CLICK)
                 self.network.send_to_all(create_message("DISCONNECT"))
                 self._return_to_menu()
                 return
 
-            # Botão Solicitar Troca
             if self.trade_btn.collidepoint(mouse_pos) and self.opponent_name:
                 self._request_trade()
                 return
 
-            # Botão Enviar
             if self.send_btn.collidepoint(mouse_pos):
                 self._send_chat()
                 return
 
-            # Campo de chat
             if self.chat_input_rect.collidepoint(mouse_pos):
                 self.chat_active = True
                 return
 
-            # Botões de resposta
             if self.pending_trade_from:
                 if self.accept_btn.collidepoint(mouse_pos):
                     self._handle_trade_response(True)
@@ -265,7 +258,6 @@ class LobbyScene(BaseScene):
                     self._handle_trade_response(False)
                     return
 
-            # Clique fora = desativa chat
             self.chat_active = False
 
     # ======================================================================
@@ -275,7 +267,6 @@ class LobbyScene(BaseScene):
     def fixed_update(self, dt):
         self._animation_timer += dt
 
-        # Processa mensagens da fila
         try:
             while not self.network.incoming_queue.empty():
                 item = self.network.incoming_queue.get_nowait()
@@ -293,7 +284,6 @@ class LobbyScene(BaseScene):
     # ======================================================================
 
     def render(self, screen):
-        # Fundo
         screen.fill((18, 20, 35))
 
         vw = self.screen_manager.viewport_width
@@ -301,7 +291,6 @@ class LobbyScene(BaseScene):
         vx = self.screen_manager.viewport_x
         vy = self.screen_manager.viewport_y
 
-        # Atualiza posições dos botões
         self._update_button_positions()
 
         # ===== TÍTULO =====
@@ -309,22 +298,18 @@ class LobbyScene(BaseScene):
         title_rect = title.get_rect(center=(vx + vw // 2, vy + 40))
         screen.blit(title, title_rect)
 
-        # Linha decorativa
         pygame.draw.line(screen, (60, 60, 80),
                          (vx + vw // 4, vy + 65),
                          (vx + vw * 3 // 4, vy + 65), 2)
 
         # ===== LISTA DE JOGADORES =====
-        # Fundo da lista
         list_rect = pygame.Rect(vx + 15, vy + 90, 240, 250)
         pygame.draw.rect(screen, (25, 27, 45), list_rect, border_radius=8)
         pygame.draw.rect(screen, (60, 60, 80), list_rect, 1, border_radius=8)
 
-        # Título da lista
         list_title = self.font.render("Jogadores", True, (200, 200, 200))
         screen.blit(list_title, (vx + 25, vy + 100))
 
-        # Lista de jogadores
         if self.players:
             y_pos = vy + 135
             for name in self.players:
@@ -356,16 +341,13 @@ class LobbyScene(BaseScene):
         pygame.draw.rect(screen, (25, 27, 45), chat_rect, border_radius=8)
         pygame.draw.rect(screen, (60, 60, 80), chat_rect, 1, border_radius=8)
 
-        # Título do chat
         chat_title = self.font_small.render("Chat", True, (200, 200, 200))
         screen.blit(chat_title, (chat_rect.x + 12, chat_rect.y + 8))
 
-        # Linha separadora
         pygame.draw.line(screen, (50, 50, 70),
                          (chat_rect.x + 10, chat_rect.y + 32),
                          (chat_rect.right - 10, chat_rect.y + 32), 1)
 
-        # Mensagens
         y_offset = chat_rect.y + 40
         for msg in self.chat_messages[-14:]:
             color = (255, 215, 0) if msg.startswith(self.my_name + ":") else (220, 220, 220)
@@ -391,10 +373,8 @@ class LobbyScene(BaseScene):
         txt = self.font_small.render(display_text, True, color)
         screen.blit(txt, (self.chat_input_rect.x + 10, self.chat_input_rect.y + 7))
 
-        # ===== BOTÃO ENVIAR =====
+        # ===== BOTÕES =====
         self._draw_button(screen, self.send_btn, "Enviar", (50, 100, 50), (80, 160, 80))
-
-        # ===== BOTÃO VOLTAR =====
         self._draw_button(screen, self.back_btn, "Voltar", (80, 40, 40), (140, 60, 60))
 
         # ===== SOLICITAÇÃO DE TROCA PENDENTE =====
@@ -423,25 +403,21 @@ class LobbyScene(BaseScene):
         vx = self.screen_manager.viewport_x
         vy = self.screen_manager.viewport_y
 
-        # Overlay
         overlay = pygame.Surface((vw, vh))
         overlay.set_alpha(180)
         overlay.fill((0, 0, 0))
         screen.blit(overlay, (vx, vy))
 
-        # Caixa de diálogo
         dialog_rect = pygame.Rect(vx + vw // 2 - 220, vy + vh // 2 - 80, 440, 160)
         pygame.draw.rect(screen, (35, 30, 50), dialog_rect, border_radius=12)
         pygame.draw.rect(screen, (255, 215, 0), dialog_rect, 2, border_radius=12)
 
-        # Texto
         txt = self.font.render(f"{self.pending_trade_from} quer trocar com voce!", True, (255, 255, 255))
         screen.blit(txt, (dialog_rect.x + 20, dialog_rect.y + 25))
 
         txt2 = self.font_small.render("Selecione uma opcao:", True, (180, 180, 200))
         screen.blit(txt2, (dialog_rect.x + 20, dialog_rect.y + 60))
 
-        # Botões
         self.accept_btn.center = (dialog_rect.centerx - 110, dialog_rect.bottom - 45)
         self.decline_btn.center = (dialog_rect.centerx + 110, dialog_rect.bottom - 45)
 

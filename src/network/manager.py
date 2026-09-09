@@ -13,7 +13,8 @@ class NetworkManager:
         self.server = None
         self.client = None
         self.incoming_queue = queue.Queue()
-        self.players = {}  # Dicionário de jogadores {conn_id: name}
+        self.players = {}  # {conn: name}
+        self.players_list = []  # Lista simples de nomes para exibição
         self.my_name = "Jogador"
         self.opponent_name = None
         self.connection_established = False
@@ -50,38 +51,35 @@ class NetworkManager:
 
         if msg_type == "PLAYER_INFO":
             name = msg.get("payload", {}).get("name", "Desconhecido")
-            # Armazena o nome do jogador pela conexão
             self.players[conn] = name
+            self.players_list = list(self.players.values())
             print(f"[SERVER] Jogador '{name}' registrado. Total: {len(self.players)}")
-            # Envia lista atualizada para todos
             self._broadcast_player_list()
 
         self.incoming_queue.put((msg, conn))
 
     def _on_server_connect(self, conn, addr):
-        # Envia handshake para o cliente
         self.server.send_to_client(conn, create_message("HANDSHAKE", {"role": "host"}))
 
     def _on_server_disconnect(self, conn, addr):
-        # Remove jogador da lista
         if conn in self.players:
             name = self.players.pop(conn)
+            self.players_list = list(self.players.values())
             print(f"[SERVER] Jogador '{name}' desconectou.")
-            # Notifica todos sobre a nova lista
             self._broadcast_player_list()
 
     def _on_client_message(self, msg):
-        # Processa mensagens do cliente
         msg_type = msg.get("type")
 
-        # Se for PLAYER_LIST, atualiza a lista local
         if msg_type == "PLAYER_LIST":
-            players_data = msg.get("payload", {}).get("players", {})
-            # Converte de dict para lista de nomes
-            self.players = list(players_data.values())
-            print(f"[CLIENT] Lista de jogadores atualizada: {self.players}")
+            players_data = msg.get("payload", {}).get("players", [])
+            # Pode vir como lista ou dicionário - tratamos ambos
+            if isinstance(players_data, dict):
+                self.players_list = list(players_data.values())
+            else:
+                self.players_list = players_data
+            print(f"[CLIENT] Lista de jogadores atualizada: {self.players_list}")
 
-        # Coloca na fila para a UI processar
         self.incoming_queue.put((msg, None))
 
     def _on_client_disconnect(self):
@@ -90,13 +88,11 @@ class NetworkManager:
 
     def _broadcast_player_list(self):
         """Envia a lista de jogadores para todos os clientes"""
-        # Converte para um formato serializável
-        players_list = list(self.players.values())
-
-        msg = create_message("PLAYER_LIST", {"players": players_list})
+        # Envia como uma LISTA simples
+        msg = create_message("PLAYER_LIST", {"players": self.players_list})
         if self.is_host and self.server:
             self.server.send_to_all(msg)
-            print(f"[SERVER] Lista enviada: {players_list}")
+            print(f"[SERVER] Lista enviada: {self.players_list}")
 
     def send_to_all(self, msg):
         if self.is_host and self.server:
