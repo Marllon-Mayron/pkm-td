@@ -2,6 +2,7 @@
 
 import pygame
 import socket
+import tkinter as tk
 from src.scenes.base_scene import BaseScene
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 from src.network.manager import NetworkManager
@@ -10,6 +11,8 @@ from src.ui.toast_renderer import toast_info, toast_warning
 
 
 class MultiplayerMenuScene(BaseScene):
+    """Tela de multiplayer com design limpo e funcional"""
+
     def __init__(self, game):
         super().__init__(game)
         self.network = NetworkManager()
@@ -18,25 +21,65 @@ class MultiplayerMenuScene(BaseScene):
         self.host_ip = self._get_local_ip()
         self.port = 12345
 
-        # Botões
-        self.create_btn = pygame.Rect(0, 0, 250, 50)
-        self.join_btn = pygame.Rect(0, 0, 250, 50)
-        self.connect_btn = pygame.Rect(0, 0, 120, 40)
-        self.back_btn = pygame.Rect(0, 0, 150, 40)
-
-        # Campo de IP
+        # ===== ESTADO =====
         self.ip_input = ""
         self.input_active = False
-        self.input_rect = pygame.Rect(0, 0, 300, 40)
-
-        self._center_buttons()
-
-        self.mode = None
-        self.connecting = False
-
-        # Feedback visual
         self.status_message = ""
         self.status_timer = 0
+        self.connecting = False
+
+        # ===== UI =====
+        self.create_btn = pygame.Rect(0, 0, 220, 45)
+        self.join_btn = pygame.Rect(0, 0, 220, 45)
+        self.connect_btn = pygame.Rect(0, 0, 120, 40)
+        self.copy_btn = pygame.Rect(0, 0, 150, 32)
+        self.back_btn = pygame.Rect(0, 0, 120, 40)
+        self.input_rect = pygame.Rect(0, 0, 280, 38)
+
+        self._update_button_positions()
+
+        # ===== CLIPBOARD =====
+        self._init_clipboard()
+
+        # ===== FONTES =====
+        self.font_title = pygame.font.Font(None, 42)
+        self.font = pygame.font.Font(None, 26)
+        self.font_small = pygame.font.Font(None, 20)
+        self.font_btn = pygame.font.Font(None, 24)
+
+        # Status inicial
+        self._update_status("Pronto para jogar!", (180, 180, 200))
+
+    # ======================================================================
+    # INICIALIZAÇÃO
+    # ======================================================================
+
+    def _init_clipboard(self):
+        try:
+            self._root = tk.Tk()
+            self._root.withdraw()
+            self._clipboard_available = True
+        except:
+            self._clipboard_available = False
+
+    def _copy_to_clipboard(self, text):
+        if not self._clipboard_available:
+            return False
+        try:
+            self._root.clipboard_clear()
+            self._root.clipboard_append(text)
+            self._root.update()
+            return True
+        except:
+            return False
+
+    def _paste_from_clipboard(self):
+        if not self._clipboard_available:
+            return ""
+        try:
+            return self._root.clipboard_get()
+        except:
+            return ""
 
     def _get_local_ip(self):
         try:
@@ -48,157 +91,277 @@ class MultiplayerMenuScene(BaseScene):
         except:
             return "127.0.0.1"
 
-    def _center_buttons(self):
+    def _update_status(self, text, color=(180, 180, 200)):
+        self.status_message = text
+        self.status_color = color
+        self.status_timer = 3.0
+
+    def _update_button_positions(self):
         vw = self.screen_manager.viewport_width
         vh = self.screen_manager.viewport_height
         vx = self.screen_manager.viewport_x
         vy = self.screen_manager.viewport_y
 
-        self.create_btn.center = (vx + vw//2, vy + vh//2 - 80)
-        self.join_btn.center = (vx + vw//2, vy + vh//2 - 20)
-        self.input_rect.center = (vx + vw//2 - 70, vy + vh//2 + 40)
-        self.connect_btn.center = (vx + vw//2 + 160, vy + vh//2 + 40)
-        self.back_btn.center = (vx + vw//2, vy + vh//2 + 120)
+        # Botão Voltar (canto superior esquerdo)
+        self.back_btn.topleft = (vx + 15, vy + 15)
 
-    def handle_event(self, event):
-        if event.type == pygame.VIDEORESIZE:
-            self._center_buttons()
-            return
+        # Título centralizado
+        center_x = vx + vw // 2
+        center_y = vy + vh // 2
 
-        if event.type == pygame.KEYDOWN:
-            if self.input_active:
-                if event.key == pygame.K_RETURN:
-                    self._try_join()
-                elif event.key == pygame.K_BACKSPACE:
-                    self.ip_input = self.ip_input[:-1]
-                else:
-                    if len(self.ip_input) < 20 and event.unicode.isprintable():
-                        self.ip_input += event.unicode
-                return
+        # Botão Criar Sala
+        self.create_btn.center = (center_x, center_y - 100)
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mouse_pos = event.pos
+        # Botão Entrar em Sala
+        self.join_btn.center = (center_x, center_y - 40)
 
-            if self.create_btn.collidepoint(mouse_pos):
-                self._create_room()
-                return
+        # Campo de IP
+        self.input_rect.center = (center_x - 80, center_y + 25)
 
-            if self.connect_btn.collidepoint(mouse_pos):
-                self._try_join()
-                return
+        # Botão Conectar
+        self.connect_btn.center = (center_x + 160, center_y + 25)
 
-            if self.join_btn.collidepoint(mouse_pos):
-                self.input_active = True
-                self.status_message = "Digite o IP e clique em CONECTAR"
-                self.status_timer = 3.0
-                return
+        # Botão Copiar IP (abaixo)
+        self.copy_btn.center = (center_x, center_y + 85)
 
-            if self.back_btn.collidepoint(mouse_pos):
-                sound_manager.play_effect(SoundEffect.CLICK)
-                self.game.current_scene = self.game.menu_scene
-                return
+        # Botão Voltar (já definido)
 
-            if self.input_rect.collidepoint(mouse_pos):
-                self.input_active = True
-                return
-
-            self.input_active = False
+    # ======================================================================
+    # AÇÕES
+    # ======================================================================
 
     def _create_room(self):
-        self.status_message = "Criando sala..."
-        self.status_timer = 2.0
+        self._update_status("Criando sala...", (255, 215, 0))
+        self.connecting = True
 
         request_firewall_permission(self.port, "Pokemon TD Multiplayer")
         if self.network.start_host(self.port):
             toast_info(f"Sala criada! IP: {self.host_ip}:{self.port}")
+            self._update_status(f"Sala criada em {self.host_ip}:{self.port}", (100, 255, 100))
             from src.scenes.lobby_scene.lobby_scene import LobbyScene
             self.game.current_scene = LobbyScene(self.game, is_host=True, network=self.network)
         else:
-            self.status_message = "Falha ao criar sala!"
-            self.status_timer = 3.0
+            self._update_status("Falha ao criar sala!", (255, 100, 100))
             toast_warning("Falha ao criar sala. Verifique a porta.")
+            self.connecting = False
 
     def _try_join(self):
         if not self.ip_input:
-            self.status_message = "Digite um IP válido!"
-            self.status_timer = 2.0
-            toast_warning("Digite um IP válido.")
+            self._update_status("Digite um IP valido!", (255, 200, 100))
+            toast_warning("Digite um IP valido.")
             return
 
-        # Remove espaços e possível porta
+        # Limpa o IP
         clean_ip = self.ip_input.strip()
         if ':' in clean_ip:
             clean_ip = clean_ip.split(':')[0]
             self.ip_input = clean_ip
             toast_info(f"IP ajustado para: {clean_ip}")
 
-        self.status_message = f"Conectando a {clean_ip}..."
-        self.status_timer = 2.0
+        self._update_status(f"Conectando a {clean_ip}...", (255, 215, 0))
         self.input_active = False
+        self.connecting = True
 
         if self.network.connect_to_host(clean_ip, self.port):
             toast_info(f"Conectado ao servidor {clean_ip}:{self.port}")
+            self._update_status(f"Conectado a {clean_ip}!", (100, 255, 100))
             from src.scenes.lobby_scene.lobby_scene import LobbyScene
             self.game.current_scene = LobbyScene(self.game, is_host=False, network=self.network)
         else:
-            self.status_message = "Falha ao conectar!"
-            self.status_timer = 3.0
-            toast_warning("Não foi possível conectar. Verifique IP e se o servidor está rodando.")
+            self._update_status("Falha ao conectar!", (255, 100, 100))
+            toast_warning("Nao foi possivel conectar. Verifique IP e se o servidor esta rodando.")
+            self.connecting = False
+
+    def _copy_ip(self):
+        if self._copy_to_clipboard(self.host_ip):
+            self._update_status(f"IP {self.host_ip} copiado!", (100, 255, 100))
+            toast_info(f"IP {self.host_ip} copiado para a area de transferencia!")
+        else:
+            self._update_status("Nao foi possivel copiar o IP", (255, 200, 100))
+            toast_warning("Nao foi possivel copiar o IP.")
+
+    # ======================================================================
+    # EVENTOS
+    # ======================================================================
+
+    def handle_event(self, event):
+        if event.type == pygame.VIDEORESIZE:
+            self._update_button_positions()
+            return
+
+        # ===== TECLADO =====
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self._return_to_menu()
+                return
+
+            if self.input_active:
+                if event.key == pygame.K_RETURN:
+                    self._try_join()
+                elif event.key == pygame.K_BACKSPACE:
+                    self.ip_input = self.ip_input[:-1]
+                elif event.key == pygame.K_v and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    pasted = self._paste_from_clipboard()
+                    if pasted:
+                        self.ip_input += pasted
+                        self._update_status("IP colado!", (100, 255, 100))
+                else:
+                    if len(self.ip_input) < 20 and event.unicode.isprintable():
+                        self.ip_input += event.unicode
+                return
+
+            # Atalhos
+            if event.key == pygame.K_c and not self.connecting:
+                self._copy_ip()
+
+        # ===== MOUSE =====
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mouse_pos = event.pos
+
+            # Botão Voltar
+            if self.back_btn.collidepoint(mouse_pos):
+                sound_manager.play_effect(SoundEffect.CLICK)
+                self._return_to_menu()
+                return
+
+            # Botão Criar Sala
+            if self.create_btn.collidepoint(mouse_pos) and not self.connecting:
+                self._create_room()
+                return
+
+            # Botão Entrar em Sala
+            if self.join_btn.collidepoint(mouse_pos) and not self.connecting:
+                self.input_active = True
+                self._update_status("Digite o IP e clique em Conectar", (255, 215, 0))
+                return
+
+            # Botão Conectar
+            if self.connect_btn.collidepoint(mouse_pos) and not self.connecting:
+                self._try_join()
+                return
+
+            # Botão Copiar IP
+            if self.copy_btn.collidepoint(mouse_pos) and not self.connecting:
+                self._copy_ip()
+                return
+
+            # Campo de IP
+            if self.input_rect.collidepoint(mouse_pos):
+                self.input_active = True
+                return
+
+            # Clique fora = desativa input
+            self.input_active = False
+
+    def _return_to_menu(self):
+        self.network.stop()
+        self.game.current_scene = self.game.menu_scene
+
+    # ======================================================================
+    # UPDATE
+    # ======================================================================
 
     def fixed_update(self, dt):
         if self.status_timer > 0:
             self.status_timer -= dt
 
+    # ======================================================================
+    # RENDERIZAÇÃO
+    # ======================================================================
+
     def render(self, screen):
-        screen.fill((20, 20, 30))
+        # Fundo
+        screen.fill((18, 20, 35))
 
         vw = self.screen_manager.viewport_width
         vh = self.screen_manager.viewport_height
         vx = self.screen_manager.viewport_x
         vy = self.screen_manager.viewport_y
 
-        font = pygame.font.Font(None, 48)
-        title = font.render("MULTIPLAYER", True, (255, 215, 0))
-        title_rect = title.get_rect(center=(vx + vw//2, vy + 80))
+        # Atualiza posições
+        self._update_button_positions()
+
+        # ===== TÍTULO =====
+        title = self.font_title.render("MULTIPLAYER", True, (255, 215, 0))
+        title_rect = title.get_rect(center=(vx + vw // 2, vy + 65))
         screen.blit(title, title_rect)
 
-        font_small = pygame.font.Font(None, 24)
+        # Linha decorativa
+        pygame.draw.line(screen, (60, 60, 80),
+                         (vx + vw // 4, vy + 90),
+                         (vx + vw * 3 // 4, vy + 90), 2)
+
+        # ===== STATUS DO SERVIDOR =====
         if self.network.is_host:
-            status_text = f"🟢 Servidor rodando em: {self.host_ip}:{self.port}"
-            screen.blit(font_small.render(status_text, True, (100, 255, 100)), (vx + 30, vy + 130))
+            status_text = f"Servidor rodando em: {self.host_ip}:{self.port}"
+            color = (100, 255, 100)
+        else:
+            status_text = " "
+            color = (80, 80, 80)
 
-        font_btn = pygame.font.Font(None, 32)
-        self._draw_button(screen, self.create_btn, "CRIAR SALA", (50, 150, 50), (100, 200, 100))
-        self._draw_button(screen, self.join_btn, "ENTRAR EM SALA", (50, 50, 150), (100, 100, 200))
+        status = self.font_small.render(status_text, True, color)
+        screen.blit(status, (vx + 25, vy + 105))
 
-        border_color = (200, 200, 50) if self.input_active else (200, 200, 200)
-        pygame.draw.rect(screen, (60, 60, 80), self.input_rect, border_radius=5)
-        pygame.draw.rect(screen, border_color, self.input_rect, 2, border_radius=5)
+        # ===== BOTÕES PRINCIPAIS =====
+        # Criar Sala
+        self._draw_button(screen, self.create_btn, "Criar Sala", (50, 100, 50), (80, 160, 80))
 
-        ip_display = self.ip_input if self.ip_input else "Digite o IP..."
-        color = (255, 255, 255) if self.ip_input else (150, 150, 150)
-        ip_text = font_btn.render(ip_display, True, color)
-        screen.blit(ip_text, (self.input_rect.x + 10, self.input_rect.y + 8))
+        # Entrar em Sala
+        self._draw_button(screen, self.join_btn, "Entrar em Sala", (50, 50, 120), (80, 80, 180))
 
-        self._draw_button(screen, self.connect_btn, "CONECTAR", (50, 100, 50), (100, 150, 100))
-        self._draw_button(screen, self.back_btn, "VOLTAR", (100, 50, 50), (150, 80, 80))
+        # ===== CAMPO DE IP =====
+        border_color = (255, 215, 0) if self.input_active else (60, 60, 80)
+        pygame.draw.rect(screen, (20, 22, 40), self.input_rect, border_radius=6)
+        pygame.draw.rect(screen, border_color, self.input_rect, 2, border_radius=6)
 
+        if self.input_active:
+            display_text = self.ip_input if self.ip_input else "Digite o IP... (Ctrl+V para colar)"
+            color = (255, 255, 255) if self.ip_input else (120, 120, 150)
+        else:
+            display_text = self.ip_input if self.ip_input else "Clique aqui para digitar..."
+            color = (255, 255, 255) if self.ip_input else (80, 80, 110)
+
+        txt = self.font_small.render(display_text, True, color)
+        screen.blit(txt, (self.input_rect.x + 12, self.input_rect.y + 9))
+
+        # ===== BOTÃO CONECTAR =====
+        self._draw_button(screen, self.connect_btn, "Conectar", (50, 100, 50), (80, 160, 80))
+
+        # ===== BOTÃO COPIAR IP =====
+        self._draw_button(screen, self.copy_btn, "Copiar IP", (60, 60, 100), (100, 100, 160))
+
+        # ===== BOTÃO VOLTAR =====
+        self._draw_button(screen, self.back_btn, "Voltar", (80, 40, 40), (140, 60, 60))
+
+        # ===== MENSAGEM DE STATUS =====
         if self.status_timer > 0 and self.status_message:
-            status_font = pygame.font.Font(None, 24)
-            color = (255, 200, 100) if "Falha" not in self.status_message else (255, 100, 100)
-            status_text = status_font.render(self.status_message, True, color)
-            screen.blit(status_text, (vx + vw//2 - status_text.get_width()//2, vy + vh - 80))
+            color = self.status_color if hasattr(self, 'status_color') else (180, 180, 200)
+            txt = self.font_small.render(self.status_message, True, color)
+            txt_rect = txt.get_rect(center=(vx + vw // 2, vy + vh - 60))
+            screen.blit(txt, txt_rect)
 
-        small_font = pygame.font.Font(None, 18)
-        info = small_font.render("Certifique-se de que ambos estão na mesma rede (VPN ou LAN).", True, (180, 180, 180))
-        screen.blit(info, (vx + vw//2 - info.get_width()//2, vy + vh - 30))
+        # ===== INSTRUÇÕES =====
+        instr = self.font_small.render("C = Copiar IP | Ctrl+V = colar no campo", True, (80, 80, 110))
+        screen.blit(instr, (vx + 25, vy + vh - 25))
 
     def _draw_button(self, screen, rect, text, color, hover_color):
         mouse = pygame.mouse.get_pos()
         hover = rect.collidepoint(mouse)
-        pygame.draw.rect(screen, hover_color if hover else color, rect, border_radius=10)
-        pygame.draw.rect(screen, (255, 255, 255), rect, 2, border_radius=10)
-        font = pygame.font.Font(None, 28 if len(text) > 8 else 32)
+        pygame.draw.rect(screen, hover_color if hover else color, rect, border_radius=8)
+        pygame.draw.rect(screen, (200, 200, 200), rect, 1, border_radius=8)
+
+        font_size = 22 if len(text) < 12 else 18
+        font = pygame.font.Font(None, font_size)
         txt = font.render(text, True, (255, 255, 255))
         txt_rect = txt.get_rect(center=rect.center)
         screen.blit(txt, txt_rect)
+
+    # ======================================================================
+    # CICLO DE VIDA
+    # ======================================================================
+
+    def on_enter(self):
+        pass
+
+    def on_exit(self):
+        pass
