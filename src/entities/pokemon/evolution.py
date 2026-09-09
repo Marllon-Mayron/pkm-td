@@ -20,7 +20,7 @@ class PokemonEvolution:
             return True
         return False
 
-    def _perform_evolution(self, new_id):
+    def _perform_evolution(self, new_id, is_normal_game = True):
         """Realiza a evolução mantendo os moves compatíveis"""
         old_name = self.pokemon.name
         custom_name = self.pokemon.custom_name
@@ -32,14 +32,15 @@ class PokemonEvolution:
         if not new_pokemon_data:
             return
 
-        # ===== REGISTRA NA POKEDEX ANTES DE ALTERAR O ID =====
-        if hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
-            game_scene = self.pokemon.game_scene
-            if hasattr(game_scene, 'player'):
-                player = game_scene.player
-                player.register_seen(new_id)
-                player.caught_pokemon.add(new_id)
-                print(f"[POKEDEX] {new_pokemon_data['name']} (ID: {new_id}) registrado como visto e capturado!")
+        if is_normal_game:
+            # ===== REGISTRA NA POKEDEX ANTES DE ALTERAR O ID =====
+            if hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
+                game_scene = self.pokemon.game_scene
+                if hasattr(game_scene, 'player'):
+                    player = game_scene.player
+                    player.register_seen(new_id)
+                    player.caught_pokemon.add(new_id)
+                    print(f"[POKEDEX] {new_pokemon_data['name']} (ID: {new_id}) registrado como visto e capturado!")
 
         # ===== ATUALIZA O POKEMON =====
         self.pokemon.id = new_id
@@ -64,7 +65,7 @@ class PokemonEvolution:
         self.pokemon.custom_name = custom_name
 
         # ===== SINCRONIZA A BOX SE O POKEMON ESTIVER NA BOX =====
-        if hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
+        if hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene and is_normal_game:
             game_scene = self.pokemon.game_scene
             player = game_scene.player
 

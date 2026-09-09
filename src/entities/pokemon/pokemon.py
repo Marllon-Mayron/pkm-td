@@ -499,8 +499,8 @@ class Pokemon(Entity):
     def check_and_evolve(self):
         return self.evolution.check_and_evolve()
 
-    def _perform_evolution(self, new_id):
-        self.evolution._perform_evolution(new_id)
+    def _perform_evolution(self, new_id, is_normal_game = True):
+        self.evolution._perform_evolution(new_id, is_normal_game)
 
     def gain_xp(self, amount):
         return self.evolution.gain_xp(amount)

@@ -1,6 +1,9 @@
 # src/scenes/game_scene/components/managers/placement_manager.py
 import pygame
 
+from src.ui.toast_renderer import toast_warning
+
+
 class PlacementManager:
     """Gerencia os Pokémon colocados no mapa"""
 
@@ -140,6 +143,12 @@ class PlacementManager:
 
     def remove_pokemon_by_right_click(self, world_x, world_y, tolerance=20):
         """Remove o Pokémon na posição do mundo (para clique direito)"""
+        if (hasattr(self.game, 'chapter_id') and hasattr(self.game, 'phase_number') and
+                self.game.chapter_id == 1 and self.game.phase_number == 1):
+            from src.ui.toast_renderer import toast_warning
+            toast_warning("Não é possível remover Pokémon durante o tutorial, siga as etapas informadas!", duration=3.0)
+            return False
+
         pokemon = self.get_pokemon_at_world_pos(world_x, world_y, tolerance)
 
         if pokemon:

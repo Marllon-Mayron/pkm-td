@@ -10,8 +10,9 @@ _FONT_CACHE = {}
 class EvolutionOverlay(BaseOverlay):
     """Overlay exibido quando um Pokémon está apto para evoluir"""
 
-    def __init__(self, game_scene, pokemon, evolution_data):
+    def __init__(self, game_scene, pokemon, evolution_data, is_normal_game = True):
         super().__init__(game_scene)
+        self.is_normal_game = is_normal_game
         self.pokemon = pokemon
         self.evolution_data = evolution_data
         self.evolve_to_id = evolution_data["evolve_to"]
@@ -142,13 +143,14 @@ class EvolutionOverlay(BaseOverlay):
     def complete_evolution(self):
         """Completa a evolução"""
         # Aplica a evolução
-        self.pokemon._perform_evolution(self.evolve_to_id)
+        self.pokemon._perform_evolution(self.evolve_to_id, self.is_normal_game)
 
         # Atualiza dados do jogador
-        if hasattr(self.game_scene, 'player'):
-            self.game_scene.player.caught_pokemon.add(self.evolve_to_id)
-            self.game_scene.player.register_seen(self.evolve_to_id)
-            self.game_scene.player.auto_save()
+        if self.is_normal_game:
+            if hasattr(self.game_scene, 'player'):
+                self.game_scene.player.caught_pokemon.add(self.evolve_to_id)
+                self.game_scene.player.register_seen(self.evolve_to_id)
+                self.game_scene.player.auto_save()
 
         self.animation_state = "complete"
         self.animation_timer = 0
@@ -157,18 +159,19 @@ class EvolutionOverlay(BaseOverlay):
         """Cancela a evolução"""
         self.active = False
 
-        # ===== CONQUISTAS: Bloqueio de Evolução =====
-        game_scene = self.game_scene
-        if game_scene and hasattr(game_scene, 'player'):
-            player = game_scene.player
-            phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
-            if hasattr(player, 'achievement_manager'):
-                ach_mgr = player.achievement_manager
-                ach_mgr.increment_counter("evolution_blocked_count")
-                ach_mgr.check_and_unlock("first_evolution_blocked", phase_id)
-                ach_mgr.check_and_unlock("evolution_blocked_10", phase_id)
-                print(
-                    f"[ACHIEVEMENT] Bloqueio de evolução contado! Total: {ach_mgr.get_counter('evolution_blocked_count')}")
+        if self.is_normal_game:
+            # ===== CONQUISTAS: Bloqueio de Evolução =====
+            game_scene = self.game_scene
+            if game_scene and hasattr(game_scene, 'player'):
+                player = game_scene.player
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                if hasattr(player, 'achievement_manager'):
+                    ach_mgr = player.achievement_manager
+                    ach_mgr.increment_counter("evolution_blocked_count")
+                    ach_mgr.check_and_unlock("first_evolution_blocked", phase_id)
+                    ach_mgr.check_and_unlock("evolution_blocked_10", phase_id)
+                    print(
+                        f"[ACHIEVEMENT] Bloqueio de evolução contado! Total: {ach_mgr.get_counter('evolution_blocked_count')}")
 
         self.game_scene.close_evolution_overlay(cancel=True)
 

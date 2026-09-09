@@ -650,7 +650,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
     def open_evolution_overlay(self, pokemon, evolution_data):
         from src.scenes.game_scene.components.overlays.evolution_overlay import EvolutionOverlay
 
-        self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data)
+        self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data, False)
         self.evolution_overlay.active = True
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.paused = True
