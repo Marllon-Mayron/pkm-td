@@ -1,0 +1,2043 @@
+{
+    "project": {
+        "name": "pkm-td",
+        "path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td",
+        "generated_at": "2026-09-08T20:46:05.456371"
+    },
+    "statistics": {
+        "directories": 72,
+        "files": 262,
+        "total_items": 334,
+        "total_size_bytes": 7045941
+    },
+    "configuration": {
+        "ignored_extensions": [
+            ".png"
+        ],
+        "ignored_directories": [
+            ".angular",
+            ".git",
+            ".hg",
+            ".idea",
+            ".mypy_cache",
+            ".next",
+            ".pytest_cache",
+            ".svn",
+            ".venv",
+            ".vscode",
+            "__pycache__",
+            "build",
+            "coverage",
+            "dist",
+            "env",
+            "node_modules",
+            "res",
+            "target",
+            "venv"
+        ]
+    },
+    "architecture": {
+        "name": "pkm-td",
+        "type": "directory",
+        "children": [
+            {
+                "name": "data",
+                "type": "directory",
+                "children": [
+                    {
+                        "name": "reward_templates.json",
+                        "type": "file",
+                        "extension": ".json",
+                        "size_bytes": 1057
+                    }
+                ]
+            },
+            {
+                "name": "launcher",
+                "type": "directory",
+                "children": [
+                    {
+                        "name": "build_launcher.bat",
+                        "type": "file",
+                        "extension": ".bat",
+                        "size_bytes": 854
+                    },
+                    {
+                        "name": "launcher_pro.py",
+                        "type": "file",
+                        "extension": ".py",
+                        "size_bytes": 52616
+                    }
+                ]
+            },
+            {
+                "name": "src",
+                "type": "directory",
+                "children": [
+                    {
+                        "name": "battle",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "effects",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "especific_moves",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "hidden_power",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "hidden_power.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 4430
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "magnitude",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "magnitude_effect.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 8261
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "triple_kick",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "__init__.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 140
+                                                    },
+                                                    {
+                                                        "name": "triple_kick_state.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 8963
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "__init__.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 194
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "specific",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "day_night",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "day_night_filter.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 11968
+                                                    },
+                                                    {
+                                                        "name": "day_night_state.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 4509
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "hp_power_move",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "hp_power_move.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 8794
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "weather",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "weather_filter.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 3031
+                                                    },
+                                                    {
+                                                        "name": "weather_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 7786
+                                                    },
+                                                    {
+                                                        "name": "weather_state.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 3393
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "weather_heal",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "weather_heal.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 6545
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "__init__.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 516
+                                    },
+                                    {
+                                        "name": "animation_mapper.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 4016
+                                    },
+                                    {
+                                        "name": "confusion_effect.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 5090
+                                    },
+                                    {
+                                        "name": "critical_hit.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 6937
+                                    },
+                                    {
+                                        "name": "effect_factory.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 83781
+                                    },
+                                    {
+                                        "name": "effect_manager.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 27932
+                                    },
+                                    {
+                                        "name": "move_effect.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 244195
+                                    },
+                                    {
+                                        "name": "residual_effect.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 5266
+                                    },
+                                    {
+                                        "name": "stat_modifier.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 4833
+                                    },
+                                    {
+                                        "name": "status_effect.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 17705
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "__init__.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 0
+                            },
+                            {
+                                "name": "attack_pattern.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 3356
+                            },
+                            {
+                                "name": "attack_strategy.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 6758
+                            },
+                            {
+                                "name": "battle_system.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 57832
+                            },
+                            {
+                                "name": "damage_calculator.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 14560
+                            },
+                            {
+                                "name": "held_item_manager.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 4156
+                            },
+                            {
+                                "name": "held_item_special_effects.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 2684
+                            },
+                            {
+                                "name": "projectile.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 11707
+                            }
+                        ]
+                    },
+                    {
+                        "name": "config",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "paths.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 2103
+                            },
+                            {
+                                "name": "phase_catalog.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 3848
+                            },
+                            {
+                                "name": "progress.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 11194
+                            },
+                            {
+                                "name": "settings.json",
+                                "type": "file",
+                                "extension": ".json",
+                                "size_bytes": 266
+                            },
+                            {
+                                "name": "settings.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 2010
+                            },
+                            {
+                                "name": "ui_config.json",
+                                "type": "file",
+                                "extension": ".json",
+                                "size_bytes": 140
+                            }
+                        ]
+                    },
+                    {
+                        "name": "core",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "camera.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 4649
+                            },
+                            {
+                                "name": "game.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 7157
+                            },
+                            {
+                                "name": "performance_monitor.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 5935
+                            },
+                            {
+                                "name": "render_context.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 2701
+                            },
+                            {
+                                "name": "screen.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 11081
+                            }
+                        ]
+                    },
+                    {
+                        "name": "data",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "minigames",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "survival",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "index.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 238
+                                            },
+                                            {
+                                                "name": "level_01_01.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 58141
+                                            },
+                                            {
+                                                "name": "survival_data_01_01.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 3421
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "phases",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "chapter_01",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "index.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 130
+                                            },
+                                            {
+                                                "name": "phase_01.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 20117
+                                            },
+                                            {
+                                                "name": "phase_02.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 24525
+                                            },
+                                            {
+                                                "name": "phase_03.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 48897
+                                            },
+                                            {
+                                                "name": "phase_04.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 86685
+                                            },
+                                            {
+                                                "name": "phase_05.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 51880
+                                            },
+                                            {
+                                                "name": "phase_06.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 20919
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "chapter_02",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "index.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 142
+                                            },
+                                            {
+                                                "name": "phase_01.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 55138
+                                            },
+                                            {
+                                                "name": "phase_02.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 70671
+                                            },
+                                            {
+                                                "name": "phase_03.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 75665
+                                            },
+                                            {
+                                                "name": "phase_04.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 68799
+                                            },
+                                            {
+                                                "name": "phase_05.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 45833
+                                            },
+                                            {
+                                                "name": "phase_06.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 51609
+                                            },
+                                            {
+                                                "name": "phase_07.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 46342
+                                            },
+                                            {
+                                                "name": "phase_08.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 21881
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "chapter_03",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "index.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 118
+                                            },
+                                            {
+                                                "name": "phase_01.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 54237
+                                            },
+                                            {
+                                                "name": "phase_02.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 68824
+                                            },
+                                            {
+                                                "name": "phase_03.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 52511
+                                            },
+                                            {
+                                                "name": "phase_04.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 29151
+                                            },
+                                            {
+                                                "name": "phase_05.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 39097
+                                            },
+                                            {
+                                                "name": "phase_06.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 43944
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "chapter_04",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "index.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 106
+                                            },
+                                            {
+                                                "name": "phase_01.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 40131
+                                            },
+                                            {
+                                                "name": "phase_02.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 54966
+                                            },
+                                            {
+                                                "name": "phase_03.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 47974
+                                            },
+                                            {
+                                                "name": "phase_04.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 46019
+                                            },
+                                            {
+                                                "name": "phase_05.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 34205
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "chapter_05",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "index.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 106
+                                            },
+                                            {
+                                                "name": "phase_01.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 54855
+                                            },
+                                            {
+                                                "name": "phase_02.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 54767
+                                            },
+                                            {
+                                                "name": "phase_03.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 40946
+                                            },
+                                            {
+                                                "name": "phase_04.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 47347
+                                            },
+                                            {
+                                                "name": "phase_05.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 26834
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "chapter_06",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "index.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 167
+                                            },
+                                            {
+                                                "name": "phase_01.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 45587
+                                            },
+                                            {
+                                                "name": "phase_02.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 49827
+                                            },
+                                            {
+                                                "name": "phase_03.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 70491
+                                            },
+                                            {
+                                                "name": "phase_04.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 46429
+                                            },
+                                            {
+                                                "name": "phase_05.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 49012
+                                            },
+                                            {
+                                                "name": "phase_06.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 55003
+                                            },
+                                            {
+                                                "name": "phase_07.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 62185
+                                            },
+                                            {
+                                                "name": "phase_08.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 53314
+                                            },
+                                            {
+                                                "name": "phase_09.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 58425
+                                            },
+                                            {
+                                                "name": "phase_10.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 52577
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "chapter_07",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "index.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 94
+                                            },
+                                            {
+                                                "name": "phase_01.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 45792
+                                            },
+                                            {
+                                                "name": "phase_02.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 52519
+                                            },
+                                            {
+                                                "name": "phase_03.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 42621
+                                            },
+                                            {
+                                                "name": "phase_04.json",
+                                                "type": "file",
+                                                "extension": ".json",
+                                                "size_bytes": 60287
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "scripts",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "clean_shadow_img.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 1362
+                                    },
+                                    {
+                                        "name": "generate_moves_and_learnset_unified.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 19172
+                                    },
+                                    {
+                                        "name": "generate_mystery_code.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 1527
+                                    },
+                                    {
+                                        "name": "generate_pokemon_data.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 27187
+                                    },
+                                    {
+                                        "name": "PMD2TileEditor.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 30250
+                                    },
+                                    {
+                                        "name": "pokemon_completo.json",
+                                        "type": "file",
+                                        "extension": ".json",
+                                        "size_bytes": 436104
+                                    },
+                                    {
+                                        "name": "pokemon_gen1_learnset.json",
+                                        "type": "file",
+                                        "extension": ".json",
+                                        "size_bytes": 1042504
+                                    },
+                                    {
+                                        "name": "pokemon_moves_gen1.json",
+                                        "type": "file",
+                                        "extension": ".json",
+                                        "size_bytes": 132036
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "achievement_data.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 19519
+                            },
+                            {
+                                "name": "held_item_data.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 1490
+                            },
+                            {
+                                "name": "item_bag_catalog.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 33682
+                            },
+                            {
+                                "name": "item_catalog.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 7483
+                            },
+                            {
+                                "name": "move_data.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 11612
+                            },
+                            {
+                                "name": "mystery_gift_data.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 2984
+                            },
+                            {
+                                "name": "pokedex.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 24391
+                            },
+                            {
+                                "name": "sprite_loader.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 15443
+                            }
+                        ]
+                    },
+                    {
+                        "name": "editor",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "event_system.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 12314
+                            },
+                            {
+                                "name": "layer_manager.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 27432
+                            },
+                            {
+                                "name": "path_editor.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 6737
+                            },
+                            {
+                                "name": "phase_exporter.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 19985
+                            },
+                            {
+                                "name": "target_item_editor.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 7031
+                            },
+                            {
+                                "name": "tower_spot_editor.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 5832
+                            },
+                            {
+                                "name": "wave_config.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 13475
+                            }
+                        ]
+                    },
+                    {
+                        "name": "entities",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "pokemon",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "__init__.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 89
+                                    },
+                                    {
+                                        "name": "animation.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 27596
+                                    },
+                                    {
+                                        "name": "combat.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 51619
+                                    },
+                                    {
+                                        "name": "evolution.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 18148
+                                    },
+                                    {
+                                        "name": "movement.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 8021
+                                    },
+                                    {
+                                        "name": "moves.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 6075
+                                    },
+                                    {
+                                        "name": "pokemon.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 80305
+                                    },
+                                    {
+                                        "name": "rendering.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 10862
+                                    },
+                                    {
+                                        "name": "stats.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 11157
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "base.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 880
+                            },
+                            {
+                                "name": "move.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 2837
+                            },
+                            {
+                                "name": "player.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 15660
+                            },
+                            {
+                                "name": "target_item.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 6148
+                            }
+                        ]
+                    },
+                    {
+                        "name": "managers",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "sounds",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "base_sound_manager.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 3878
+                                    },
+                                    {
+                                        "name": "move_sound_manager.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 6390
+                                    },
+                                    {
+                                        "name": "sound_manager.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 14807
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "achievement_manager.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 23597
+                            },
+                            {
+                                "name": "bag_manager.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 10232
+                            },
+                            {
+                                "name": "evolution_manager.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 21770
+                            },
+                            {
+                                "name": "mystery_gift_manager.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 9457
+                            },
+                            {
+                                "name": "notification_manager.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 13817
+                            },
+                            {
+                                "name": "reward_template_manager.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 3925
+                            },
+                            {
+                                "name": "save_manager.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 48224
+                            },
+                            {
+                                "name": "ui_config_manager.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 2676
+                            }
+                        ]
+                    },
+                    {
+                        "name": "network",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "client.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 2442
+                            },
+                            {
+                                "name": "firewall_utils.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 1297
+                            },
+                            {
+                                "name": "manager.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 2691
+                            },
+                            {
+                                "name": "protocol.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 522
+                            },
+                            {
+                                "name": "server.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 3428
+                            }
+                        ]
+                    },
+                    {
+                        "name": "saves",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "save_1.json",
+                                "type": "file",
+                                "extension": ".json",
+                                "size_bytes": 4064
+                            }
+                        ]
+                    },
+                    {
+                        "name": "scenes",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "achievement_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "achievement_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 31572
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "editor",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "components",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "managers",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "path_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 4899
+                                                    },
+                                                    {
+                                                        "name": "undo_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 16796
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "__init__.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 24
+                                            },
+                                            {
+                                                "name": "brush_buttons.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 8485
+                                            },
+                                            {
+                                                "name": "event_config_dialog.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 72676
+                                            },
+                                            {
+                                                "name": "layer_selector.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 7205
+                                            },
+                                            {
+                                                "name": "load_phase_dialog.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 28732
+                                            },
+                                            {
+                                                "name": "map_config_dialog.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 37970
+                                            },
+                                            {
+                                                "name": "mode_buttons.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 3278
+                                            },
+                                            {
+                                                "name": "rewards_config_dialog.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 29295
+                                            },
+                                            {
+                                                "name": "target_item_dialog.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 12267
+                                            },
+                                            {
+                                                "name": "tile_palette.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 17419
+                                            },
+                                            {
+                                                "name": "tileset_manager_dialog.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 17009
+                                            },
+                                            {
+                                                "name": "wave_config_dialog.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 145044
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "handlers",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "__init__.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 24
+                                            },
+                                            {
+                                                "name": "input_handler.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 15496
+                                            },
+                                            {
+                                                "name": "map_handler.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 15614
+                                            },
+                                            {
+                                                "name": "render_handler.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 14979
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "__init__.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 175
+                                    },
+                                    {
+                                        "name": "editor_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 37238
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "game_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "components",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "managers",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "wave",
+                                                        "type": "directory",
+                                                        "children": [
+                                                            {
+                                                                "name": "enemy_spawner.py",
+                                                                "type": "file",
+                                                                "extension": ".py",
+                                                                "size_bytes": 23197
+                                                            },
+                                                            {
+                                                                "name": "item_decision.py",
+                                                                "type": "file",
+                                                                "extension": ".py",
+                                                                "size_bytes": 4658
+                                                            },
+                                                            {
+                                                                "name": "path_tracker.py",
+                                                                "type": "file",
+                                                                "extension": ".py",
+                                                                "size_bytes": 20438
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "name": "event_processor.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 17610
+                                                    },
+                                                    {
+                                                        "name": "game_layer_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 19992
+                                                    },
+                                                    {
+                                                        "name": "item_drag_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 28353
+                                                    },
+                                                    {
+                                                        "name": "overlay_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 3256
+                                                    },
+                                                    {
+                                                        "name": "placement_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 13886
+                                                    },
+                                                    {
+                                                        "name": "target_item_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 6779
+                                                    },
+                                                    {
+                                                        "name": "team_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 13428
+                                                    },
+                                                    {
+                                                        "name": "wave_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 24340
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "overlays",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "base_overlay.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 1367
+                                                    },
+                                                    {
+                                                        "name": "capture_overlay.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 33756
+                                                    },
+                                                    {
+                                                        "name": "dialog_overlay.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 21192
+                                                    },
+                                                    {
+                                                        "name": "evolution_overlay.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 20070
+                                                    },
+                                                    {
+                                                        "name": "game_over_overlay.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 6533
+                                                    },
+                                                    {
+                                                        "name": "move_learn_overlay.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 28951
+                                                    },
+                                                    {
+                                                        "name": "move_select_overlay.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 32053
+                                                    },
+                                                    {
+                                                        "name": "pause_overlay.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 11491
+                                                    },
+                                                    {
+                                                        "name": "phase_complete_overlay.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 23370
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "renderer",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "item_bag_renderer.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 30216
+                                                    },
+                                                    {
+                                                        "name": "map_renderer.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 1528
+                                                    },
+                                                    {
+                                                        "name": "path_renderer.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 2359
+                                                    },
+                                                    {
+                                                        "name": "pokemon_spot_renderer.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 5277
+                                                    },
+                                                    {
+                                                        "name": "target_item_renderer.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 3304
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "day_night_weather_system.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 8419
+                                            },
+                                            {
+                                                "name": "drag_drop.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 21457
+                                            },
+                                            {
+                                                "name": "phase_loader.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 8773
+                                            },
+                                            {
+                                                "name": "team_slot.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 26834
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "game_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 109431
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "incubator_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "incubator_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 40668
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "minigame_select_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "__init__.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 45
+                                    },
+                                    {
+                                        "name": "minigame_select_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 26612
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "minigames",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "survival",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "components",
+                                                "type": "directory",
+                                                "children": [
+                                                    {
+                                                        "name": "ui",
+                                                        "type": "directory",
+                                                        "children": [
+                                                            {
+                                                                "name": "__init__.py",
+                                                                "type": "file",
+                                                                "extension": ".py",
+                                                                "size_bytes": 165
+                                                            },
+                                                            {
+                                                                "name": "survival_ui.py",
+                                                                "type": "file",
+                                                                "extension": ".py",
+                                                                "size_bytes": 19189
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "name": "__init__.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 473
+                                                    },
+                                                    {
+                                                        "name": "card_deck.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 39305
+                                                    },
+                                                    {
+                                                        "name": "card_slot.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 9487
+                                                    },
+                                                    {
+                                                        "name": "path_assignment.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 8201
+                                                    },
+                                                    {
+                                                        "name": "placement_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 3439
+                                                    },
+                                                    {
+                                                        "name": "pokemon_input_handler.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 3990
+                                                    },
+                                                    {
+                                                        "name": "wave_manager.py",
+                                                        "type": "file",
+                                                        "extension": ".py",
+                                                        "size_bytes": 25801
+                                                    }
+                                                ]
+                                            },
+                                            {
+                                                "name": "__init__.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 227
+                                            },
+                                            {
+                                                "name": "survival_minigame_scene.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 61408
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "base_minigame_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 8054
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "multiplayer_menu_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "__init__.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 0
+                                    },
+                                    {
+                                        "name": "multiplayer_menu_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 6194
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "mystery_gift_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "mystery_gift_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 32719
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "phase_selector",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "phase_select_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 44891
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "pokedex_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "components",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "pokedex_list.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 16689
+                                            },
+                                            {
+                                                "name": "pokemon_detail.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 22923
+                                            },
+                                            {
+                                                "name": "search_bar.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 3709
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "utils",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "constants.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 2007
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "__init__.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 63
+                                    },
+                                    {
+                                        "name": "pokedex_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 16785
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "settings_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "settings_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 41338
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "shop_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "shop_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 52176
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "starter_select_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "starter_select_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 31119
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "team_select_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "components",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "__init__.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 716
+                                            },
+                                            {
+                                                "name": "gradient_background.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 693
+                                            },
+                                            {
+                                                "name": "held_item_dropdown.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 15188
+                                            },
+                                            {
+                                                "name": "navigation_buttons.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 2884
+                                            },
+                                            {
+                                                "name": "pokemon_filters.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 14904
+                                            },
+                                            {
+                                                "name": "pokemon_grid_item.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 6851
+                                            },
+                                            {
+                                                "name": "pokemon_modal.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 75544
+                                            },
+                                            {
+                                                "name": "team_slot.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 5968
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "handlers",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "__init__.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 106
+                                            },
+                                            {
+                                                "name": "event_handler.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 4026
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "managers",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "__init__.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 209
+                                            },
+                                            {
+                                                "name": "layout_manager.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 6613
+                                            },
+                                            {
+                                                "name": "pokemon_manager.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 12149
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "utils",
+                                        "type": "directory",
+                                        "children": [
+                                            {
+                                                "name": "__init__.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 131
+                                            },
+                                            {
+                                                "name": "constants.py",
+                                                "type": "file",
+                                                "extension": ".py",
+                                                "size_bytes": 3531
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "name": "__init__.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 107
+                                    },
+                                    {
+                                        "name": "team_select_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 17517
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "trade_scene",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "trade_scene.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 10998
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "__init__.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 6
+                            },
+                            {
+                                "name": "base_scene.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 1380
+                            },
+                            {
+                                "name": "menu_scene.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 26518
+                            }
+                        ]
+                    },
+                    {
+                        "name": "ui",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "utils",
+                                "type": "directory",
+                                "children": [
+                                    {
+                                        "name": "icon_loader.py",
+                                        "type": "file",
+                                        "extension": ".py",
+                                        "size_bytes": 1075
+                                    }
+                                ]
+                            },
+                            {
+                                "name": "notification.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 1664
+                            },
+                            {
+                                "name": "toast_renderer.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 1997
+                            }
+                        ]
+                    },
+                    {
+                        "name": "utils",
+                        "type": "directory",
+                        "children": [
+                            {
+                                "name": "crypto_utils.py",
+                                "type": "file",
+                                "extension": ".py",
+                                "size_bytes": 1209
+                            }
+                        ]
+                    },
+                    {
+                        "name": "__init__.py",
+                        "type": "file",
+                        "extension": ".py",
+                        "size_bytes": 0
+                    },
+                    {
+                        "name": "main.py",
+                        "type": "file",
+                        "extension": ".py",
+                        "size_bytes": 827
+                    }
+                ]
+            },
+            {
+                "name": ".gitignore",
+                "type": "file",
+                "extension": null,
+                "size_bytes": 209
+            },
+            {
+                "name": "game_version.txt",
+                "type": "file",
+                "extension": ".txt",
+                "size_bytes": 6
+            },
+            {
+                "name": "montarjsonprojeto.py",
+                "type": "file",
+                "extension": ".py",
+                "size_bytes": 7290
+            },
+            {
+                "name": "package-lock.json",
+                "type": "file",
+                "extension": ".json",
+                "size_bytes": 91
+            },
+            {
+                "name": "PokemonTD_Launcher.spec",
+                "type": "file",
+                "extension": ".spec",
+                "size_bytes": 726
+            }
+        ]
+    }
+}

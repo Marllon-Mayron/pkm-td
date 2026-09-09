@@ -1,0 +1,262 @@
+# src/scenes/trade_scene.py
+
+import pygame
+import uuid
+from src.scenes.base_scene import BaseScene
+from src.network.protocol import create_message
+from src.ui.toast_renderer import toast_info, toast_warning
+from src.managers.sounds.sound_manager import sound_manager, SoundEffect
+
+
+class TradeScene(BaseScene):
+    def __init__(self, game, is_host, network):
+        super().__init__(game)
+        self.network = network
+        self.is_host = is_host
+        self.network.current_scene_callback = self._on_network_message
+
+        # Estado
+        self.my_offer = None          # Pokemon dict
+        self.opponent_offer = None
+        self.my_accept = False
+        self.opponent_accept = False
+        self.trade_completed = False
+
+        # Lista de Pokémon do time
+        self.my_pokemon = game.player.team[:]  # cópia
+
+        # UI
+        self.back_btn = pygame.Rect(0, 0, 120, 40)
+        self.accept_btn = pygame.Rect(0, 0, 150, 40)
+        self.decline_btn = pygame.Rect(0, 0, 150, 40)
+        self.selected_index = -1
+
+        self._center_ui()
+
+    def _center_ui(self):
+        vw = self.screen_manager.viewport_width
+        vh = self.screen_manager.viewport_height
+        vx = self.screen_manager.viewport_x
+        vy = self.screen_manager.viewport_y
+
+        self.back_btn.topleft = (vx + 20, vy + 20)
+        self.accept_btn.center = (vx + vw//2 - 90, vy + vh - 60)
+        self.decline_btn.center = (vx + vw//2 + 90, vy + vh - 60)
+
+    def _on_network_message(self, msg, conn=None):
+        msg_type = msg.get("type")
+        payload = msg.get("payload", {})
+
+        if msg_type == "HANDSHAKE":
+            if not self.is_host:
+                # Envia nome do jogador
+                self.network.send_to_all(create_message("PLAYER_INFO", {"name": self.network.my_name}))
+        elif msg_type == "PLAYER_INFO":
+            self.network.opponent_name = payload.get("name", "Oponente")
+            toast_info(f"{self.network.opponent_name} entrou na sala!")
+            if self.is_host:
+                self.network.send_to_all(create_message("PLAYER_INFO", {"name": self.network.my_name}))
+        elif msg_type == "TRADE_OFFER":
+            self.opponent_offer = payload.get("pokemon_data")
+            self._check_both_offered()
+        elif msg_type == "TRADE_CANCEL":
+            self.opponent_offer = None
+            self.opponent_accept = False
+            toast_info(f"{self.network.opponent_name} cancelou a oferta.")
+        elif msg_type == "TRADE_ACCEPT":
+            self.opponent_accept = True
+            self._check_both_accepted()
+        elif msg_type == "TRADE_DECLINE":
+            self.opponent_accept = False
+            toast_info(f"{self.network.opponent_name} recusou a troca.")
+            self._reset_state()
+        elif msg_type == "TRADE_COMPLETE":
+            self._finalize_trade(payload.get("pokemon_data"))
+        elif msg_type == "DISCONNECT":
+            toast_warning("O outro jogador desconectou.")
+            self._return_to_menu()
+
+    def _check_both_offered(self):
+        if self.my_offer and self.opponent_offer:
+            toast_info("Ambos ofereceram! Clique em 'Aceitar' para confirmar.")
+
+    def _check_both_accepted(self):
+        if self.my_accept and self.opponent_accept:
+            self._execute_trade()
+
+    def _execute_trade(self):
+        self.network.send_to_all(create_message("TRADE_COMPLETE", {"pokemon_data": self.my_offer}))
+        toast_info("Troca realizada com sucesso!")
+
+    def _finalize_trade(self, received_data):
+        offered_unique_id = self.my_offer.get("unique_id")
+        # Remove do time
+        for i, p in enumerate(self.game.player.team):
+            if p.unique_id == offered_unique_id:
+                self.game.player.team.pop(i)
+                break
+        else:
+            # Busca na box
+            for i, data in enumerate(self.game.player.pc_box):
+                if data.get("unique_id") == offered_unique_id:
+                    self.game.player.pc_box.pop(i)
+                    break
+
+        # Cria o Pokémon recebido com novo unique_id
+        from src.entities.pokemon import Pokemon
+        new_pokemon = Pokemon.from_dict(received_data)
+        new_pokemon.unique_id = str(uuid.uuid4())
+
+        if len(self.game.player.team) < 6:
+            self.game.player.add_to_team(new_pokemon)
+        else:
+            self.game.player.add_to_box(new_pokemon)
+
+        self.game.player.auto_save()
+        self.trade_completed = True
+        toast_info(f"Você recebeu {new_pokemon.name}!")
+        self._reset_state()
+
+    def _reset_state(self):
+        self.my_offer = None
+        self.opponent_offer = None
+        self.my_accept = False
+        self.opponent_accept = False
+        self.selected_index = -1
+
+    def _return_to_menu(self):
+        self.network.stop()
+        self.game.current_scene = self.game.menu_scene
+
+    def handle_event(self, event):
+        if event.type == pygame.VIDEORESIZE:
+            self._center_ui()
+            return
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Verifica clique nos botões
+            if self.back_btn.collidepoint(event.pos):
+                sound_manager.play_effect(SoundEffect.CLICK)
+                self.network.send_to_all(create_message("DISCONNECT"))
+                self.network.stop()
+                self.game.current_scene = self.game.menu_scene
+                return
+
+            if self.my_offer and self.opponent_offer:
+                if self.accept_btn.collidepoint(event.pos):
+                    self.my_accept = True
+                    self.network.send_to_all(create_message("TRADE_ACCEPT"))
+                    self._check_both_accepted()
+                    return
+                if self.decline_btn.collidepoint(event.pos):
+                    self.network.send_to_all(create_message("TRADE_DECLINE"))
+                    self._reset_state()
+                    return
+
+            # Seleção de Pokémon (clique na lista)
+            list_x = self.screen_manager.viewport_x + 30
+            list_y = self.screen_manager.viewport_y + 120
+            item_height = 40
+            for i, pokemon in enumerate(self.my_pokemon):
+                rect = pygame.Rect(list_x, list_y + i*item_height, 200, item_height)
+                if rect.collidepoint(event.pos):
+                    if not self.my_offer:
+                        self.my_offer = pokemon.to_dict()
+                        self.network.send_to_all(create_message("TRADE_OFFER", {"pokemon_data": self.my_offer}))
+                        toast_info(f"Você ofereceu {pokemon.name}")
+                        self.selected_index = i
+                        self._check_both_offered()
+                    break
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self._return_to_menu()
+
+    def fixed_update(self, dt):
+        # Processa mensagens da fila
+        while not self.network.incoming_queue.empty():
+            item = self.network.incoming_queue.get()
+            if self.is_host:
+                msg, conn = item
+                self._on_network_message(msg, conn)
+            else:
+                msg, _ = item
+                self._on_network_message(msg, None)
+
+    def render(self, screen):
+        screen.fill((30, 30, 45))
+
+        vw = self.screen_manager.viewport_width
+        vh = self.screen_manager.viewport_height
+        vx = self.screen_manager.viewport_x
+        vy = self.screen_manager.viewport_y
+
+        font = pygame.font.Font(None, 36)
+        title = font.render("TROCA DE POKÉMON", True, (255, 215, 0))
+        screen.blit(title, (vx + vw//2 - title.get_width()//2, vy + 30))
+
+        font_small = pygame.font.Font(None, 24)
+        my_name = f"Você: {self.network.my_name}"
+        opp_name = f"Oponente: {self.network.opponent_name or 'Aguardando...'}"
+        screen.blit(font_small.render(my_name, True, (200, 200, 200)), (vx + 30, vy + 80))
+        screen.blit(font_small.render(opp_name, True, (200, 200, 200)), (vx + vw//2 + 30, vy + 80))
+
+        # Lista de Pokémon
+        list_x = vx + 30
+        list_y = vy + 120
+        item_height = 40
+        for i, pokemon in enumerate(self.my_pokemon):
+            rect = pygame.Rect(list_x, list_y + i*item_height, 200, item_height)
+            color = (60, 60, 80) if i != self.selected_index else (80, 80, 120)
+            pygame.draw.rect(screen, color, rect, border_radius=5)
+            pygame.draw.rect(screen, (200, 200, 200), rect, 1, border_radius=5)
+            name = f"{pokemon.name} Lv.{pokemon.level}"
+            txt = font_small.render(name, True, (255, 255, 255))
+            screen.blit(txt, (rect.x + 10, rect.y + 10))
+
+        # Área de oferta do oponente
+        offer_x = vx + vw//2 + 30
+        offer_y = vy + 120
+        offer_rect = pygame.Rect(offer_x, offer_y, 250, 150)
+        pygame.draw.rect(screen, (40, 40, 60), offer_rect, border_radius=5)
+        pygame.draw.rect(screen, (200, 200, 200), offer_rect, 1, border_radius=5)
+        if self.opponent_offer:
+            opp_pokemon = self.opponent_offer
+            txt = font_small.render(f"{opp_pokemon['name']} Lv.{opp_pokemon['level']}", True, (255, 255, 100))
+            screen.blit(txt, (offer_x + 10, offer_y + 20))
+        else:
+            txt = font_small.render("Nenhuma oferta", True, (150, 150, 150))
+            screen.blit(txt, (offer_x + 10, offer_y + 20))
+
+        # Minha oferta
+        my_offer_rect = pygame.Rect(list_x, offer_y + 170, 250, 150)
+        pygame.draw.rect(screen, (40, 40, 60), my_offer_rect, border_radius=5)
+        pygame.draw.rect(screen, (200, 200, 200), my_offer_rect, 1, border_radius=5)
+        if self.my_offer:
+            txt = font_small.render(f"{self.my_offer['name']} Lv.{self.my_offer['level']}", True, (100, 255, 100))
+            screen.blit(txt, (my_offer_rect.x + 10, my_offer_rect.y + 20))
+        else:
+            txt = font_small.render("Clique em um Pokémon para oferecer", True, (150, 150, 150))
+            screen.blit(txt, (my_offer_rect.x + 10, my_offer_rect.y + 20))
+
+        # Botões
+        self._draw_button(screen, self.back_btn, "VOLTAR", (100, 50, 50), (150, 80, 80))
+
+        if self.my_offer and self.opponent_offer:
+            self._draw_button(screen, self.accept_btn, "ACEITAR", (50, 150, 50), (100, 200, 100))
+            self._draw_button(screen, self.decline_btn, "CANCELAR", (150, 50, 50), (200, 80, 80))
+
+        if self.trade_completed:
+            msg = "Troca concluída! Pressione VOLTAR."
+            txt = font_small.render(msg, True, (255, 255, 0))
+            screen.blit(txt, (vx + vw//2 - txt.get_width()//2, vy + vh - 100))
+
+    def _draw_button(self, screen, rect, text, color, hover_color):
+        mouse = pygame.mouse.get_pos()
+        hover = rect.collidepoint(mouse)
+        pygame.draw.rect(screen, hover_color if hover else color, rect, border_radius=10)
+        pygame.draw.rect(screen, (255, 255, 255), rect, 2, border_radius=10)
+        font = pygame.font.Font(None, 28)
+        txt = font.render(text, True, (255, 255, 255))
+        txt_rect = txt.get_rect(center=rect.center)
+        screen.blit(txt, txt_rect)

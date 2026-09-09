@@ -108,19 +108,28 @@ class MenuScene(BaseScene):
 
         # Botões
         self.buttons = [
-            Button(0.3, 0.5, 0.4, 0.08, start_text,
+            # ===== BOTÕES PRINCIPAIS (CENTRO) =====
+            Button(0.3, 0.30, 0.4, 0.08, start_text,
                    (100, 100, 0), (150, 150, 0), self.start_game, None),
-            Button(0.3, 0.6, 0.4, 0.08, "Configurações",
+
+            Button(0.3, 0.40, 0.4, 0.08, "Multiplayer",
+                   (100, 100, 0), (150, 150, 0), self.open_multiplayer, None),
+
+            Button(0.3, 0.50, 0.4, 0.08, "Configurações",
                    (100, 100, 0), (150, 150, 0), self.open_settings, None),
-            Button(0.3, 0.4, 0.4, 0.08, "Editor de Fases",
+
+            Button(0.3, 0.60, 0.4, 0.08, "Editor de Fases",
                    (100, 100, 0), (150, 150, 0), self.open_editor, None),
+
+            Button(0.3, 0.72, 0.4, 0.08, "Sair",
+                   (100, 0, 0), (150, 0, 0), self.quit_game, None),
+
+            # ===== BOTÕES DOS CANTOS (INFERIOR) =====
             Button(0.015, 0.86, 0.15, 0.06, "Mystery Gift",
                    (100, 50, 100), (150, 80, 150), self.open_mystery_gift, None),
-            # ===== BOTÃO DE RESET (VERMELHO) =====
+
             Button(0.83, 0.86, 0.15, 0.06, "RESETAR",
                    (120, 20, 20), (180, 30, 30), self.show_reset_confirmation, None),
-            Button(0.3, 0.7, 0.4, 0.08, "Sair",
-                   (100, 0, 0), (150, 0, 0), self.quit_game, None)
         ]
 
         # Partículas
@@ -147,6 +156,10 @@ class MenuScene(BaseScene):
                 if success:
                     self._music_started = True
                     print("[MENU] Música do menu iniciada: Come_Along (fallback)")
+
+    def open_multiplayer(self):
+        from src.scenes.multiplayer_menu_scene.multiplayer_menu_scene import MultiplayerMenuScene
+        self.game.current_scene = MultiplayerMenuScene(self.game)
 
     def create_logo(self):
         """Cria um logo simples"""
