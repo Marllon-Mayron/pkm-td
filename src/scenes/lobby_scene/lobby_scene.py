@@ -1,10 +1,10 @@
-# src/scenes/lobby_scene.py
+# src/scenes/lobby_scene/lobby_scene.py
 
 import pygame
 from src.scenes.base_scene import BaseScene
-from src.network.protocol import create_message
 from src.ui.toast_renderer import toast_info, toast_warning
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
+from src.network.protocol import create_message
 
 
 class LobbyScene(BaseScene):
@@ -14,120 +14,159 @@ class LobbyScene(BaseScene):
         self.is_host = is_host
         self.network.current_scene_callback = self._on_network_message
 
-        # Estado do lobby
-        self.players = []
+        # Lista de jogadores (nome, is_ready, etc)
+        self.players = []  # lista de dicts: {"name": str, "is_ready": bool, "conn": conn}
         self.my_name = self.network.my_name
-        self.opponent_name = None
-        self.selected_mode = None  # "trade", "battle", "event"
+        self.selected_player_index = -1
 
-        # Opções disponíveis (apenas troca por enquanto)
-        self.modes = [
-            {"id": "trade", "label": "TROCAR POKÉMON", "enabled": True},
-            {"id": "battle", "label": "BATALHAR", "enabled": False},
-            {"id": "event", "label": "EVENTO", "enabled": False},
-        ]
+        # Estado de solicitação de troca
+        self.trade_request_from = None  # nome do jogador que solicitou
+        self.trade_request_timer = 0
 
-        # UI
-        self.back_btn = pygame.Rect(0, 0, 120, 40)
-        self.start_btn = pygame.Rect(0, 0, 150, 40)
-        self.mode_buttons = []
-        self.selected_index = -1
+        # Botões
+        self.back_btn = pygame.Rect(0, 0, 150, 40)
+        self.trade_btn = pygame.Rect(0, 0, 200, 50)
+        self.accept_btn = pygame.Rect(0, 0, 120, 40)
+        self.decline_btn = pygame.Rect(0, 0, 120, 40)
 
         self._center_ui()
-        self._create_mode_buttons()
-
-        # Envia informações do jogador ao entrar
-        self.network.send_to_all(create_message("PLAYER_INFO", {"name": self.my_name}))
 
     def _center_ui(self):
         vw = self.screen_manager.viewport_width
         vh = self.screen_manager.viewport_height
         vx = self.screen_manager.viewport_x
         vy = self.screen_manager.viewport_y
-
         self.back_btn.topleft = (vx + 20, vy + 20)
-        self.start_btn.center = (vx + vw//2, vy + vh - 60)
-
-    def _create_mode_buttons(self):
-        vw = self.screen_manager.viewport_width
-        vh = self.screen_manager.viewport_height
-        vx = self.screen_manager.viewport_x
-        vy = self.screen_manager.viewport_y
-
-        self.mode_buttons = []
-        total_height = len(self.modes) * 70
-        start_y = (vh - total_height) // 2 + vy
-
-        for i, mode in enumerate(self.modes):
-            rect = pygame.Rect(0, 0, 300, 50)
-            rect.center = (vx + vw//2, start_y + i * 70)
-            self.mode_buttons.append({
-                "rect": rect,
-                "mode": mode,
-                "hover": False
-            })
+        self.trade_btn.center = (vx + vw//2, vy + vh - 80)
+        self.accept_btn.center = (vx + vw//2 - 80, vy + vh - 80)
+        self.decline_btn.center = (vx + vw//2 + 80, vy + vh - 80)
 
     def _on_network_message(self, msg, conn=None):
         msg_type = msg.get("type")
         payload = msg.get("payload", {})
 
         if msg_type == "PLAYER_INFO":
-            name = payload.get("name", "Jogador")
-            if name != self.my_name:
-                self.opponent_name = name
+            name = payload.get("name", "Oponente")
+            # Adiciona jogador à lista se não existir
+            if not any(p["name"] == name for p in self.players):
+                self.players.append({"name": name, "is_ready": False, "conn": conn})
                 toast_info(f"{name} entrou na sala!")
-                # Atualiza a lista de jogadores
-                self.players = [self.my_name, self.opponent_name]
-        elif msg_type == "GAME_MODE_SELECT":
-            mode = payload.get("mode")
-            if mode == "trade":
-                # Inicia a troca
-                toast_info("Iniciando troca...")
+            # Se for host, envia a lista atualizada para todos
+            if self.is_host:
+                self._broadcast_player_list()
+
+        elif msg_type == "PLAYER_LIST":
+            # Atualiza a lista de jogadores (recebida do host)
+            self.players = payload.get("players", [])
+            # Remove o próprio nome da lista (já está separado)
+            self.players = [p for p in self.players if p["name"] != self.my_name]
+
+        elif msg_type == "TRADE_REQUEST":
+            from_name = payload.get("from")
+            if from_name and from_name != self.my_name:
+                self.trade_request_from = from_name
+                self.trade_request_timer = 10.0  # timeout de 10 segundos
+                toast_info(f"{from_name} quer trocar Pokémon! Aceita?")
+
+        elif msg_type == "TRADE_RESPONSE":
+            accepted = payload.get("accepted", False)
+            from_name = payload.get("from")
+            if accepted:
+                toast_info(f"{from_name} aceitou a troca! Abrindo tela...")
+                # Abre a tela de troca para ambos
                 from src.scenes.trade_scene.trade_scene import TradeScene
                 self.game.current_scene = TradeScene(self.game, is_host=self.is_host, network=self.network)
+            else:
+                toast_info(f"{from_name} recusou a troca.")
+
         elif msg_type == "DISCONNECT":
-            toast_warning("O outro jogador desconectou.")
-            self._return_to_menu()
+            # Remove jogador da lista
+            for p in self.players[:]:
+                if p["conn"] == conn:
+                    self.players.remove(p)
+                    toast_info(f"{p['name']} desconectou.")
+                    break
+            if self.is_host:
+                self._broadcast_player_list()
+
+    def _broadcast_player_list(self):
+        # Envia a lista de jogadores (exceto o próprio host) para todos
+        player_list = [{"name": p["name"], "is_ready": p["is_ready"]} for p in self.players]
+        self.network.send_to_all(create_message("PLAYER_LIST", {"players": player_list}))
 
     def handle_event(self, event):
         if event.type == pygame.VIDEORESIZE:
             self._center_ui()
-            self._create_mode_buttons()
             return
 
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_UP:
+                self.selected_player_index = max(0, self.selected_player_index - 1)
+            elif event.key == pygame.K_DOWN:
+                self.selected_player_index = min(len(self.players) - 1, self.selected_player_index + 1)
+            elif event.key == pygame.K_RETURN:
+                self._request_trade()
+            elif event.key == pygame.K_ESCAPE:
+                self._return_to_menu()
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # Botão voltar
-            if self.back_btn.collidepoint(event.pos):
+            mouse_pos = event.pos
+
+            if self.back_btn.collidepoint(mouse_pos):
                 sound_manager.play_effect(SoundEffect.CLICK)
                 self.network.send_to_all(create_message("DISCONNECT"))
-                self.network.stop()
-                self.game.current_scene = self.game.menu_scene
+                self._return_to_menu()
                 return
 
-            # Botão iniciar (apenas host)
-            if self.is_host and self.start_btn.collidepoint(event.pos):
-                if self.selected_mode:
-                    self.network.send_to_all(create_message("GAME_MODE_SELECT", {"mode": self.selected_mode}))
-                    # Inicia imediatamente para o host também
-                    if self.selected_mode == "trade":
-                        from src.scenes.trade_scene.trade_scene import TradeScene
-                        self.game.current_scene = TradeScene(self.game, is_host=True, network=self.network)
-                else:
-                    toast_warning("Selecione um modo primeiro!")
+            # Botão de troca
+            if self.trade_btn.collidepoint(mouse_pos):
+                self._request_trade()
+                return
 
-            # Seleção de modo
-            for btn in self.mode_buttons:
-                if btn["rect"].collidepoint(event.pos):
-                    if btn["mode"]["enabled"]:
-                        self.selected_index = self.mode_buttons.index(btn)
-                        self.selected_mode = btn["mode"]["id"]
-                        toast_info(f"Modo selecionado: {btn['mode']['label']}")
-                    else:
-                        toast_warning("Este modo ainda não está disponível!")
+            # Botões de aceitar/recusar solicitação
+            if self.trade_request_from:
+                if self.accept_btn.collidepoint(mouse_pos):
+                    self._respond_to_trade(True)
+                    return
+                if self.decline_btn.collidepoint(mouse_pos):
+                    self._respond_to_trade(False)
+                    return
 
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                self._return_to_menu()
+            # Selecionar jogador na lista (clique)
+            for i, player in enumerate(self.players):
+                rect = self._get_player_rect(i)
+                if rect.collidepoint(mouse_pos):
+                    self.selected_player_index = i
+                    break
+
+    def _request_trade(self):
+        if self.selected_player_index < 0 or self.selected_player_index >= len(self.players):
+            toast_warning("Selecione um jogador primeiro!")
+            return
+        target = self.players[self.selected_player_index]
+        # Envia solicitação de troca para o alvo
+        self.network.send_to_all(create_message("TRADE_REQUEST", {"from": self.my_name, "target": target["name"]}))
+        toast_info(f"Solicitação de troca enviada para {target['name']}")
+
+    def _respond_to_trade(self, accepted):
+        if not self.trade_request_from:
+            return
+        self.network.send_to_all(create_message("TRADE_RESPONSE", {
+            "from": self.my_name,
+            "accepted": accepted,
+            "target": self.trade_request_from
+        }))
+        if accepted:
+            # Abre a tela de troca
+            from src.scenes.trade_scene.trade_scene import TradeScene
+            self.game.current_scene = TradeScene(self.game, is_host=self.is_host, network=self.network)
+        else:
+            toast_info("Você recusou a troca.")
+        self.trade_request_from = None
+
+    def _return_to_menu(self):
+        self.network.stop()
+        self.game.current_scene = self.game.menu_scene
 
     def fixed_update(self, dt):
         # Processa mensagens da fila
@@ -140,8 +179,26 @@ class LobbyScene(BaseScene):
                 msg, _ = item
                 self._on_network_message(msg, None)
 
+        # Timeout da solicitação de troca
+        if self.trade_request_timer > 0:
+            self.trade_request_timer -= dt
+            if self.trade_request_timer <= 0:
+                self.trade_request_from = None
+
+    def _get_player_rect(self, index):
+        vw = self.screen_manager.viewport_width
+        vh = self.screen_manager.viewport_height
+        vx = self.screen_manager.viewport_x
+        vy = self.screen_manager.viewport_y
+
+        width = 300
+        height = 40
+        start_x = vx + (vw - width) // 2
+        start_y = vy + 150 + index * 50
+        return pygame.Rect(start_x, start_y, width, height)
+
     def render(self, screen):
-        screen.fill((25, 25, 40))
+        screen.fill((20, 20, 35))
 
         vw = self.screen_manager.viewport_width
         vh = self.screen_manager.viewport_height
@@ -151,72 +208,79 @@ class LobbyScene(BaseScene):
         # Título
         font = pygame.font.Font(None, 48)
         title = font.render("LOBBY", True, (255, 215, 0))
-        title_rect = title.get_rect(center=(vx + vw//2, vy + 60))
-        screen.blit(title, title_rect)
+        screen.blit(title, (vx + vw//2 - title.get_width()//2, vy + 50))
 
-        # Informações dos jogadores
+        # Lista de jogadores
         font_small = pygame.font.Font(None, 28)
-        if self.opponent_name:
-            info_text = f"Jogadores: {self.my_name} x {self.opponent_name}"
-        else:
-            info_text = f"Aguardando oponente... (você: {self.my_name})"
-        info_surf = font_small.render(info_text, True, (200, 200, 200))
-        screen.blit(info_surf, (vx + vw//2 - info_surf.get_width()//2, vy + 110))
+        # Mostra o próprio jogador
+        self._draw_player_entry(screen, self.my_name, is_self=True)
 
-        # Botões de modo
-        for btn in self.mode_buttons:
-            mode = btn["mode"]
-            rect = btn["rect"]
-            hover = rect.collidepoint(pygame.mouse.get_pos())
-            btn["hover"] = hover
+        # Mostra os outros jogadores
+        for i, player in enumerate(self.players):
+            rect = self._get_player_rect(i)
+            color = (60, 60, 80) if i != self.selected_player_index else (80, 80, 120)
+            pygame.draw.rect(screen, color, rect, border_radius=8)
+            pygame.draw.rect(screen, (200, 200, 200), rect, 2, border_radius=8)
 
-            # Cor base
-            if mode["enabled"]:
-                color = (60, 60, 80) if not hover else (80, 80, 120)
-                if self.selected_mode == mode["id"]:
-                    color = (50, 120, 50)  # verde para selecionado
-            else:
-                color = (40, 40, 40)  # cinza escuro para bloqueado
+            status = "🟢" if player.get("is_ready", False) else "⚪"
+            name_text = f"{status} {player['name']}"
+            txt = font_small.render(name_text, True, (255, 255, 255))
+            screen.blit(txt, (rect.x + 15, rect.y + 8))
 
-            pygame.draw.rect(screen, color, rect, border_radius=10)
-            pygame.draw.rect(screen, (200, 200, 200) if mode["enabled"] else (100, 100, 100), rect, 2, border_radius=10)
-
-            # Texto
-            font_mode = pygame.font.Font(None, 30)
-            label = mode["label"]
-            if not mode["enabled"]:
-                label += " (em breve)"
-            text_color = (255, 255, 255) if mode["enabled"] else (150, 150, 150)
-            txt = font_mode.render(label, True, text_color)
-            txt_rect = txt.get_rect(center=rect.center)
-            screen.blit(txt, txt_rect)
-
-        # Botão Iniciar (apenas host)
-        if self.is_host and self.opponent_name:
-            self._draw_button(screen, self.start_btn, "INICIAR", (50, 150, 50), (100, 200, 100))
-        elif self.is_host:
-            self._draw_button(screen, self.start_btn, "AGUARDANDO...", (80, 80, 80), (80, 80, 80))
-
-        # Botão voltar
-        self._draw_button(screen, self.back_btn, "VOLTAR", (100, 50, 50), (150, 80, 80))
-
-        # Status
-        if not self.is_host:
-            status = "Aguardando o host iniciar..."
-            status_font = pygame.font.Font(None, 24)
-            status_surf = status_font.render(status, True, (180, 180, 180))
-            screen.blit(status_surf, (vx + vw//2 - status_surf.get_width()//2, vy + vh - 40))
+            # Ícone de seleção
+            if i == self.selected_player_index:
+                sel = font_small.render("▶", True, (255, 215, 0))
+                screen.blit(sel, (rect.x - 25, rect.y + 8))
 
         # Instruções
-        if self.is_host and self.opponent_name and not self.selected_mode:
-            inst = "Selecione um modo e clique em INICIAR"
-            inst_font = pygame.font.Font(None, 22)
-            inst_surf = inst_font.render(inst, True, (255, 200, 100))
-            screen.blit(inst_surf, (vx + vw//2 - inst_surf.get_width()//2, vy + vh - 80))
+        font_tiny = pygame.font.Font(None, 18)
+        instr = "Use SETAS ↑↓ para selecionar, ENTER para solicitar troca."
+        screen.blit(font_tiny.render(instr, True, (180, 180, 180)), (vx + vw//2 - 200, vy + vh - 120))
 
-    def _return_to_menu(self):
-        self.network.stop()
-        self.game.current_scene = self.game.menu_scene
+        # Botões
+        self._draw_button(screen, self.back_btn, "VOLTAR", (100, 50, 50), (150, 80, 80))
+        self._draw_button(screen, self.trade_btn, "SOLICITAR TROCA", (50, 80, 150), (100, 130, 200))
+
+        # Solicitação de troca recebida
+        if self.trade_request_from:
+            # Mostra overlay de solicitação
+            overlay = pygame.Surface((vw, vh), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180))
+            screen.blit(overlay, (vx, vy))
+
+            # Caixa de diálogo
+            box_w, box_h = 400, 150
+            box_x = vx + (vw - box_w) // 2
+            box_y = vy + (vh - box_h) // 2
+            box_rect = pygame.Rect(box_x, box_y, box_w, box_h)
+            pygame.draw.rect(screen, (40, 40, 60), box_rect, border_radius=15)
+            pygame.draw.rect(screen, (255, 215, 0), box_rect, 3, border_radius=15)
+
+            msg_font = pygame.font.Font(None, 30)
+            msg_text = msg_font.render(f"{self.trade_request_from} quer trocar!", True, (255, 255, 255))
+            screen.blit(msg_text, (box_x + (box_w - msg_text.get_width())//2, box_y + 30))
+
+            # Botões Aceitar/Recusar
+            self.accept_btn.center = (box_x + box_w//2 - 80, box_y + box_h - 40)
+            self.decline_btn.center = (box_x + box_w//2 + 80, box_y + box_h - 40)
+            self._draw_button(screen, self.accept_btn, "ACEITAR", (50, 150, 50), (100, 200, 100))
+            self._draw_button(screen, self.decline_btn, "RECUSAR", (150, 50, 50), (200, 80, 80))
+
+    def _draw_player_entry(self, screen, name, is_self=False):
+        vw = self.screen_manager.viewport_width
+        vh = self.screen_manager.viewport_height
+        vx = self.screen_manager.viewport_x
+        vy = self.screen_manager.viewport_y
+
+        rect = pygame.Rect(vx + (vw - 300)//2, vy + 100, 300, 40)
+        color = (40, 60, 40) if is_self else (60, 60, 80)
+        pygame.draw.rect(screen, color, rect, border_radius=8)
+        pygame.draw.rect(screen, (200, 200, 200), rect, 2, border_radius=8)
+
+        font = pygame.font.Font(None, 28)
+        status = "🟢 (Você)"
+        txt = font.render(f"{status} {name}", True, (100, 255, 100))
+        screen.blit(txt, (rect.x + 15, rect.y + 8))
 
     def _draw_button(self, screen, rect, text, color, hover_color):
         mouse = pygame.mouse.get_pos()
