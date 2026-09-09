@@ -59,7 +59,10 @@ class NetworkManager:
         self.incoming_queue.put((msg, conn))
 
     def _on_server_connect(self, conn, addr):
+        # Envia handshake
         self.server.send_to_client(conn, create_message("HANDSHAKE", {"role": "host"}))
+        # ===== ENVIA A LISTA DE JOGADORES ATUAL PARA O NOVO CLIENTE =====
+        self._broadcast_player_list()
 
     def _on_server_disconnect(self, conn, addr):
         if conn in self.players:
