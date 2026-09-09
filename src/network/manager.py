@@ -46,10 +46,8 @@ class NetworkManager:
         return self.client.connect()
 
     def _on_server_message(self, msg, conn, addr):
-        # Processa mensagens do servidor
         msg_type = msg.get("type")
 
-        # Se for PLAYER_INFO, atualiza a lista de jogadores
         if msg_type == "PLAYER_INFO":
             name = msg.get("payload", {}).get("name", "Desconhecido")
             # Armazena o nome do jogador pela conexão
@@ -58,7 +56,6 @@ class NetworkManager:
             # Envia lista atualizada para todos
             self._broadcast_player_list()
 
-        # Coloca na fila para a UI processar
         self.incoming_queue.put((msg, conn))
 
     def _on_server_connect(self, conn, addr):
@@ -93,16 +90,13 @@ class NetworkManager:
 
     def _broadcast_player_list(self):
         """Envia a lista de jogadores para todos os clientes"""
-        # Converte para um formato serializável (dict com chaves string)
-        players_dict = {}
-        for conn, name in self.players.items():
-            # Usa o id da conexão como chave
-            players_dict[str(id(conn))] = name
+        # Converte para um formato serializável
+        players_list = list(self.players.values())
 
-        msg = create_message("PLAYER_LIST", {"players": players_dict})
+        msg = create_message("PLAYER_LIST", {"players": players_list})
         if self.is_host and self.server:
             self.server.send_to_all(msg)
-            print(f"[SERVER] Lista de jogadores enviada: {list(players_dict.values())}")
+            print(f"[SERVER] Lista enviada: {players_list}")
 
     def send_to_all(self, msg):
         if self.is_host and self.server:

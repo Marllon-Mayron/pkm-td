@@ -11,11 +11,16 @@ from src.ui.toast_renderer import toast_info, toast_warning
 
 
 class MultiplayerMenuScene(BaseScene):
-    """Tela de multiplayer com design limpo e funcional"""
+    """Tela de multiplayer com escolha de nome"""
 
     def __init__(self, game):
         super().__init__(game)
         self.network = NetworkManager()
+
+        # ===== NOME DO JOGADOR =====
+        self.player_name = "Jogador"
+        self.name_input = ""
+        self.name_active = True  # Começa editando o nome
         self.network.set_name("Jogador")
 
         self.host_ip = self._get_local_ip()
@@ -35,6 +40,7 @@ class MultiplayerMenuScene(BaseScene):
         self.copy_btn = pygame.Rect(0, 0, 150, 32)
         self.back_btn = pygame.Rect(0, 0, 120, 40)
         self.input_rect = pygame.Rect(0, 0, 280, 38)
+        self.name_rect = pygame.Rect(0, 0, 200, 35)
 
         self._update_button_positions()
 
@@ -48,7 +54,7 @@ class MultiplayerMenuScene(BaseScene):
         self.font_btn = pygame.font.Font(None, 24)
 
         # Status inicial
-        self._update_status("Pronto para jogar!", (180, 180, 200))
+        self._update_status("Digite seu nome e pressione ENTER", (255, 215, 0))
 
     # ======================================================================
     # INICIALIZAÇÃO
@@ -105,9 +111,12 @@ class MultiplayerMenuScene(BaseScene):
         # Botão Voltar (canto superior esquerdo)
         self.back_btn.topleft = (vx + 15, vy + 15)
 
-        # Título centralizado
+        # Campo de nome
         center_x = vx + vw // 2
         center_y = vy + vh // 2
+
+        # Campo de nome (acima dos botões)
+        self.name_rect.center = (center_x, center_y - 160)
 
         # Botão Criar Sala
         self.create_btn.center = (center_x, center_y - 100)
@@ -124,13 +133,27 @@ class MultiplayerMenuScene(BaseScene):
         # Botão Copiar IP (abaixo)
         self.copy_btn.center = (center_x, center_y + 85)
 
-        # Botão Voltar (já definido)
-
     # ======================================================================
     # AÇÕES
     # ======================================================================
 
+    def _confirm_name(self):
+        """Confirma o nome do jogador"""
+        name = self.name_input.strip()
+        if name:
+            self.player_name = name
+            self.network.set_name(name)
+            self.name_active = False
+            self._update_status(f"Bem-vindo, {name}!", (100, 255, 100))
+            toast_info(f"Seu nome: {name}")
+        else:
+            self._update_status("Digite um nome valido!", (255, 200, 100))
+
     def _create_room(self):
+        if self.name_active:
+            self._update_status("Confirme seu nome primeiro!", (255, 200, 100))
+            return
+
         self._update_status("Criando sala...", (255, 215, 0))
         self.connecting = True
 
@@ -146,12 +169,15 @@ class MultiplayerMenuScene(BaseScene):
             self.connecting = False
 
     def _try_join(self):
+        if self.name_active:
+            self._update_status("Confirme seu nome primeiro!", (255, 200, 100))
+            return
+
         if not self.ip_input:
             self._update_status("Digite um IP valido!", (255, 200, 100))
             toast_warning("Digite um IP valido.")
             return
 
-        # Limpa o IP
         clean_ip = self.ip_input.strip()
         if ':' in clean_ip:
             clean_ip = clean_ip.split(':')[0]
@@ -195,6 +221,18 @@ class MultiplayerMenuScene(BaseScene):
                 self._return_to_menu()
                 return
 
+            # ===== EDITANDO NOME =====
+            if self.name_active:
+                if event.key == pygame.K_RETURN:
+                    self._confirm_name()
+                elif event.key == pygame.K_BACKSPACE:
+                    self.name_input = self.name_input[:-1]
+                else:
+                    if len(self.name_input) < 20 and event.unicode.isprintable():
+                        self.name_input += event.unicode
+                return
+
+            # ===== EDITANDO IP =====
             if self.input_active:
                 if event.key == pygame.K_RETURN:
                     self._try_join()
@@ -224,6 +262,11 @@ class MultiplayerMenuScene(BaseScene):
                 self._return_to_menu()
                 return
 
+            # Campo de nome
+            if self.name_rect.collidepoint(mouse_pos):
+                self.name_active = True
+                return
+
             # Botão Criar Sala
             if self.create_btn.collidepoint(mouse_pos) and not self.connecting:
                 self._create_room()
@@ -250,8 +293,9 @@ class MultiplayerMenuScene(BaseScene):
                 self.input_active = True
                 return
 
-            # Clique fora = desativa input
+            # Clique fora = desativa inputs
             self.input_active = False
+            self.name_active = False
 
     def _return_to_menu(self):
         self.network.stop()
@@ -278,35 +322,46 @@ class MultiplayerMenuScene(BaseScene):
         vx = self.screen_manager.viewport_x
         vy = self.screen_manager.viewport_y
 
-        # Atualiza posições
         self._update_button_positions()
 
         # ===== TÍTULO =====
         title = self.font_title.render("MULTIPLAYER", True, (255, 215, 0))
-        title_rect = title.get_rect(center=(vx + vw // 2, vy + 65))
+        title_rect = title.get_rect(center=(vx + vw // 2, vy + 55))
         screen.blit(title, title_rect)
 
         # Linha decorativa
         pygame.draw.line(screen, (60, 60, 80),
-                         (vx + vw // 4, vy + 90),
-                         (vx + vw * 3 // 4, vy + 90), 2)
+                         (vx + vw // 4, vy + 80),
+                         (vx + vw * 3 // 4, vy + 80), 2)
+
+        # ===== CAMPO DE NOME =====
+        name_label = self.font_small.render("Seu nome:", True, (180, 180, 200))
+        screen.blit(name_label, (self.name_rect.x, self.name_rect.y - 25))
+
+        border_color = (255, 215, 0) if self.name_active else (60, 60, 80)
+        pygame.draw.rect(screen, (20, 22, 40), self.name_rect, border_radius=6)
+        pygame.draw.rect(screen, border_color, self.name_rect, 2, border_radius=6)
+
+        display_name = self.name_input if self.name_input else self.player_name
+        if self.name_active:
+            display_text = display_name + ("|" if pygame.time.get_ticks() % 1000 < 500 else " ")
+            color = (255, 255, 255)
+        else:
+            display_text = f"✓ {self.player_name}"
+            color = (100, 255, 100)
+
+        txt = self.font.render(display_text, True, color)
+        screen.blit(txt, (self.name_rect.x + 12, self.name_rect.y + 7))
 
         # ===== STATUS DO SERVIDOR =====
         if self.network.is_host:
-            status_text = f"Servidor rodando em: {self.host_ip}:{self.port}"
+            status_text = f"Servidor: {self.host_ip}:{self.port}"
             color = (100, 255, 100)
-        else:
-            status_text = " "
-            color = (80, 80, 80)
+            status = self.font_small.render(status_text, True, color)
+            screen.blit(status, (vx + 25, vy + 100))
 
-        status = self.font_small.render(status_text, True, color)
-        screen.blit(status, (vx + 25, vy + 105))
-
-        # ===== BOTÕES PRINCIPAIS =====
-        # Criar Sala
+        # ===== BOTÕES =====
         self._draw_button(screen, self.create_btn, "Criar Sala", (50, 100, 50), (80, 160, 80))
-
-        # Entrar em Sala
         self._draw_button(screen, self.join_btn, "Entrar em Sala", (50, 50, 120), (80, 80, 180))
 
         # ===== CAMPO DE IP =====
@@ -315,25 +370,21 @@ class MultiplayerMenuScene(BaseScene):
         pygame.draw.rect(screen, border_color, self.input_rect, 2, border_radius=6)
 
         if self.input_active:
-            display_text = self.ip_input if self.ip_input else "Digite o IP... (Ctrl+V para colar)"
+            display_text = self.ip_input if self.ip_input else "Digite o IP... (Ctrl+V)"
             color = (255, 255, 255) if self.ip_input else (120, 120, 150)
         else:
-            display_text = self.ip_input if self.ip_input else "Clique aqui para digitar..."
+            display_text = self.ip_input if self.ip_input else "Clique para digitar..."
             color = (255, 255, 255) if self.ip_input else (80, 80, 110)
 
         txt = self.font_small.render(display_text, True, color)
         screen.blit(txt, (self.input_rect.x + 12, self.input_rect.y + 9))
 
-        # ===== BOTÃO CONECTAR =====
+        # ===== BOTÕES =====
         self._draw_button(screen, self.connect_btn, "Conectar", (50, 100, 50), (80, 160, 80))
-
-        # ===== BOTÃO COPIAR IP =====
         self._draw_button(screen, self.copy_btn, "Copiar IP", (60, 60, 100), (100, 100, 160))
-
-        # ===== BOTÃO VOLTAR =====
         self._draw_button(screen, self.back_btn, "Voltar", (80, 40, 40), (140, 60, 60))
 
-        # ===== MENSAGEM DE STATUS =====
+        # ===== STATUS =====
         if self.status_timer > 0 and self.status_message:
             color = self.status_color if hasattr(self, 'status_color') else (180, 180, 200)
             txt = self.font_small.render(self.status_message, True, color)
@@ -341,7 +392,7 @@ class MultiplayerMenuScene(BaseScene):
             screen.blit(txt, txt_rect)
 
         # ===== INSTRUÇÕES =====
-        instr = self.font_small.render("C = Copiar IP | Ctrl+V = colar no campo", True, (80, 80, 110))
+        instr = self.font_small.render("ENTER = confirmar | C = copiar IP | Ctrl+V = colar", True, (80, 80, 110))
         screen.blit(instr, (vx + 25, vy + vh - 25))
 
     def _draw_button(self, screen, rect, text, color, hover_color):

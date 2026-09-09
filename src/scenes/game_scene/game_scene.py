@@ -54,6 +54,8 @@ class GameScene(BaseScene):
         self.move_learn_overlay = None
         self.game_paused = False
 
+        self.ui_hidden = False  # True = oculta todas as UIs
+
         self.chapter_id = chapter_id
         self.phase_number = phase_number
         self.phase_id = f"{chapter_id}-{phase_number}"
@@ -186,6 +188,26 @@ class GameScene(BaseScene):
 
     def toggle_ui_minimize(self):
         self.ui_minimized = not self.ui_minimized
+
+    def toggle_ui_hidden(self):
+        """Alterna a visibilidade de todas as UIs do jogo"""
+        self.ui_hidden = not self.ui_hidden
+
+        # Se ocultou, fecha overlays que possam estar abertos (exceto pausa e game over)
+        if self.ui_hidden:
+            # Fecha overlays não essenciais
+            if hasattr(self, 'move_select_overlay') and self.move_select_overlay:
+                self.move_select_overlay.active = False
+                self.move_select_overlay = None
+            if hasattr(self, 'move_learn_overlay') and self.move_learn_overlay:
+                self.move_learn_overlay.active = False
+                self.move_learn_overlay = None
+            if hasattr(self, 'evolution_overlay') and self.evolution_overlay:
+                self.evolution_overlay.active = False
+                self.evolution_overlay = None
+
+        status = "ocultada" if self.ui_hidden else "mostrada"
+        print(f"[UI] Todas as UIs foram {status}")
 
     def _start_test_weather(self):
         """
@@ -1523,6 +1545,9 @@ class GameScene(BaseScene):
                 if hasattr(player, 'bag'):
                     player.bag.cycle_category()
                 return None
+            elif event.key == pygame.K_h:
+                self.toggle_ui_hidden()
+                return None
             elif event.key == pygame.K_p:
                 self.toggle_pause()  # Agora usa o novo sistema de pausa
                 return None
@@ -2036,7 +2061,7 @@ class GameScene(BaseScene):
     # ===== MÉTODOS DE RENDER =====
 
     def render(self, screen):
-        """Renderiza o jogo - COM NOVO SISTEMA DE PERFORMANCE"""
+        """Renderiza o jogo - COM NOVO SISTEMA DE PERFORMANCE E OCULTAÇÃO DE UI"""
 
         perf_monitor.start_section("RENDER_TOTAL")
 
@@ -2120,7 +2145,6 @@ class GameScene(BaseScene):
         perf_monitor.end_section()
 
         # ===== RENDERIZAÇÃO DOS FILTROS DE CLIMA E DIA/NOITE =====
-        # IMPORTANTE: A ORDEM É: 1. CLIMA, 2. DIA/NOITE
         perf_monitor.start_section("RENDER_WEATHER_AND_DAYNIGHT")
 
         viewport_rect = pygame.Rect(
@@ -2130,13 +2154,13 @@ class GameScene(BaseScene):
             self.screen_manager.viewport_height
         )
 
-        # ===== 1. FILTRO DE CLIMA (CHUVA, AREIA, SOL) =====
+        # 1. FILTRO DE CLIMA (CHUVA, AREIA, SOL)
         if hasattr(self, 'battle_system') and self.battle_system:
             weather = self.battle_system.weather_manager.current_weather
             if weather and weather.active:
                 self.weather_filter.render(screen, weather, viewport_rect)
 
-        # ===== 2. FILTRO DE DIA/NOITE (POR CIMA DO CLIMA) =====
+        # 2. FILTRO DE DIA/NOITE (POR CIMA DO CLIMA)
         if hasattr(self, 'day_night_weather'):
             day_night = self.day_night_weather.day_night_state
             if day_night and day_night.active:
@@ -2144,37 +2168,38 @@ class GameScene(BaseScene):
 
         perf_monitor.end_section()
 
-        # UI do jogo
-        perf_monitor.start_section("RENDER_GAME_UI")
-        self._render_game_ui(screen)
-        perf_monitor.end_section()
+        # ===== UI DO JOGO (APENAS SE NÃO ESTIVER OCULTA) =====
+        if not self.ui_hidden:
+            perf_monitor.start_section("RENDER_GAME_UI")
+            self._render_game_ui(screen)
+            perf_monitor.end_section()
 
-        # Team Manager UI
-        perf_monitor.start_section("RENDER_TEAM_MANAGER")
-        if team_mgr:
-            team_mgr.render(screen, camera, spot_renderer.get_spots() if spot_renderer else [])
-        perf_monitor.end_section()
+            # Team Manager UI
+            perf_monitor.start_section("RENDER_TEAM_MANAGER")
+            if team_mgr:
+                team_mgr.render(screen, camera, spot_renderer.get_spots() if spot_renderer else [])
+            perf_monitor.end_section()
 
-        # Drag Manager
-        perf_monitor.start_section("RENDER_DRAG_MANAGER")
-        if drag_mgr:
-            drag_mgr.render(screen, camera)
-        perf_monitor.end_section()
+            # Drag Manager
+            perf_monitor.start_section("RENDER_DRAG_MANAGER")
+            if drag_mgr:
+                drag_mgr.render(screen, camera)
+            perf_monitor.end_section()
 
-        # Item Bag
-        perf_monitor.start_section("RENDER_ITEM_BAG")
-        if bag_renderer:
-            bag_renderer.render(screen)
-        perf_monitor.end_section()
+            # Item Bag
+            perf_monitor.start_section("RENDER_ITEM_BAG")
+            if bag_renderer:
+                bag_renderer.render(screen)
+            perf_monitor.end_section()
 
-        # Borda da viewport
-        perf_monitor.start_section("RENDER_VIEWPORT_BORDER")
-        pygame.draw.rect(screen, (80, 80, 80),
-                         (screen_mgr.viewport_x, screen_mgr.viewport_y,
-                          screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
-        perf_monitor.end_section()
+            # Borda da viewport
+            perf_monitor.start_section("RENDER_VIEWPORT_BORDER")
+            pygame.draw.rect(screen, (80, 80, 80),
+                             (screen_mgr.viewport_x, screen_mgr.viewport_y,
+                              screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
+            perf_monitor.end_section()
 
-        # Overlay Manager
+        # ===== NOTIFICATIONS (sempre renderizadas) =====
         viewport_rect = pygame.Rect(
             self.screen_manager.viewport_x,
             self.screen_manager.viewport_y,
@@ -2183,37 +2208,58 @@ class GameScene(BaseScene):
         )
         self.notification_manager.render(screen, viewport_rect)
 
+        # ===== OVERLAY MANAGER (sempre renderizado - pausa e game over são essenciais) =====
         perf_monitor.start_section("RENDER_OVERLAY_MANAGER")
         if overlay_mgr:
             overlay_mgr.render(screen)
-
-        if hasattr(self, 'event_processor') and self.event_processor.current_dialog:
-            self.event_processor.current_dialog.render(screen)
         perf_monitor.end_section()
 
-        # Move Learn Overlay
-        if self.move_learn_overlay and self.move_learn_overlay.active:
+        # ===== EVENT PROCESSOR DIALOG (sempre renderizado) =====
+        if hasattr(self, 'event_processor') and self.event_processor.current_dialog:
+            self.event_processor.current_dialog.render(screen)
+
+        # ===== MOVE LEARN OVERLAY (só se UI não estiver oculta) =====
+        if not self.ui_hidden and self.move_learn_overlay and self.move_learn_overlay.active:
             perf_monitor.start_section("RENDER_MOVE_LEARN")
             self.move_learn_overlay.render(screen)
             perf_monitor.end_section()
 
-        # Move Select Overlay
-        if self.move_select_overlay and self.move_select_overlay.active:
+        # ===== MOVE SELECT OVERLAY (só se UI não estiver oculta) =====
+        if not self.ui_hidden and self.move_select_overlay and self.move_select_overlay.active:
             perf_monitor.start_section("RENDER_MOVE_SELECT")
             self.move_select_overlay.render(screen)
             perf_monitor.end_section()
 
-        # Evolution Overlay
-        if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
+        # ===== EVOLUTION OVERLAY (só se UI não estiver oculta) =====
+        if not self.ui_hidden and hasattr(self,
+                                          'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
             perf_monitor.start_section("RENDER_EVOLUTION")
             self.evolution_overlay.render(screen)
             perf_monitor.end_section()
 
-        # Debug Info
+        # ===== DEBUG INFO (sempre renderizado se ativo) =====
         if show_debug:
             perf_monitor.start_section("RENDER_DEBUG")
             self._render_debug_info(screen)
             perf_monitor.end_section()
+
+        # ===== INDICADOR DE UI OCULTA (apenas se estiver oculta) =====
+        if self.ui_hidden:
+            # Mostra um pequeno indicador no canto superior direito
+            hint_font = pygame.font.Font(None, 20)
+            hint_text = hint_font.render("[H] Mostrar UI", True, (150, 150, 180))
+            hint_x = screen_mgr.viewport_x + screen_mgr.viewport_width - hint_text.get_width() - 15
+            hint_y = screen_mgr.viewport_y + 15
+
+            # Fundo semi-transparente para o texto
+            bg_rect = hint_text.get_rect(topleft=(hint_x - 8, hint_y - 4))
+            bg_rect.width += 16
+            bg_rect.height += 8
+            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+            bg_surface.fill((0, 0, 0, 150))
+            screen.blit(bg_surface, bg_rect)
+
+            screen.blit(hint_text, (hint_x, hint_y))
 
         perf_monitor.end_section()
 
@@ -2252,7 +2298,7 @@ class GameScene(BaseScene):
         pygame.draw.rect(bg_surf, (80, 120, 200, 80), bg_surf.get_rect(), 2, border_radius=10)
         screen.blit(bg_surf, (panel_x, panel_y))
 
-        # Botão de minimizar – calculado com base no estado atual
+        # Botão de minimizar
         btn_size = 20
         if self.ui_minimized:
             btn_x = panel_x + panel_width - btn_size - 4
@@ -2271,6 +2317,14 @@ class GameScene(BaseScene):
         icon_surf = icon_font.render(icon, True, (255, 255, 255))
         icon_rect = icon_surf.get_rect(center=btn_rect.center)
         screen.blit(icon_surf, icon_rect)
+
+        # ===== INDICADOR DE ATALHO PARA OCULTAR UI =====
+        # Mostra um pequeno texto informando que H oculta a UI
+        hint_font = pygame.font.Font(None, 13)
+        hint_text = hint_font.render("[H] Ocultar UI", True, (120, 120, 160))
+        hint_x = panel_x + panel_width - hint_text.get_width() - 8
+        hint_y = panel_y + panel_height - 18
+        screen.blit(hint_text, (hint_x, hint_y))
 
         # ===== MODO MINIMIZADO =====
         if self.ui_minimized:

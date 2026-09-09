@@ -30,7 +30,7 @@ class LobbyScene(BaseScene):
 
         # ===== UI =====
         self.back_btn = pygame.Rect(0, 0, 120, 40)
-        self.trade_btn = pygame.Rect(0, 0, 200, 35)
+        self.trade_btn = pygame.Rect(0, 0, 220, 35)
         self.send_btn = pygame.Rect(0, 0, 80, 32)
         self.chat_input_rect = pygame.Rect(0, 0, 0, 0)
 
@@ -49,9 +49,13 @@ class LobbyScene(BaseScene):
         self.font_small = pygame.font.Font(None, 20)
         self.font_chat = pygame.font.Font(None, 18)
 
-        # ===== ENVIA NOME =====
+        # ===== ENVIA O NOME DO JOGADOR =====
+        # Isso é CRUCIAL - envia o nome imediatamente ao entrar no lobby
         self.network.send_to_all(create_message("PLAYER_INFO", {"name": self.my_name}))
         print(f"[LOBBY] {self.my_name} entrou no lobby (host={self.is_host})")
+
+        # Adiciona o próprio jogador à lista (para exibição imediata)
+        self.players.append(self.my_name)
 
     # ======================================================================
     # INICIALIZAÇÃO
@@ -105,22 +109,31 @@ class LobbyScene(BaseScene):
         msg_type = msg.get("type")
         payload = msg.get("payload", {})
 
+        print(f"[LOBBY] Mensagem recebida: {msg_type}")
+
         if msg_type == "PLAYER_INFO":
             name = payload.get("name", "Desconhecido")
-            if name not in self.players and name != self.my_name:
+            # Adiciona à lista se não for o próprio jogador e já não estiver na lista
+            if name != self.my_name and name not in self.players:
                 self.players.append(name)
                 self.opponent_name = name
                 toast_info(f"{name} entrou na sala!")
+                print(f"[LOBBY] Lista atualizada: {self.players}")
 
         elif msg_type == "PLAYER_LIST":
             players_data = payload.get("players", {})
-            self.players = list(players_data.values())
-            for name in self.players:
-                if name != self.my_name:
-                    self.opponent_name = name
-                    break
-            if len(self.players) > 1:
-                toast_info(f"Jogadores na sala: {len(self.players)}")
+            # Converte para lista de nomes
+            new_players = list(players_data.values())
+            if new_players:
+                self.players = new_players
+                # Encontra o oponente (alguém que não seja eu)
+                for name in self.players:
+                    if name != self.my_name:
+                        self.opponent_name = name
+                        break
+                print(f"[LOBBY] Lista recebida do servidor: {self.players}")
+                if len(self.players) > 1:
+                    toast_info(f"Jogadores na sala: {len(self.players)}")
 
         elif msg_type == "CHAT_MESSAGE":
             sender = payload.get("sender", "Desconhecido")
@@ -145,6 +158,10 @@ class LobbyScene(BaseScene):
 
         elif msg_type == "DISCONNECT":
             toast_warning("O outro jogador desconectou.")
+            # Remove o oponente da lista
+            if self.opponent_name and self.opponent_name in self.players:
+                self.players.remove(self.opponent_name)
+                self.opponent_name = None
             self._return_to_menu()
 
     def _open_trade_scene(self):
@@ -258,7 +275,7 @@ class LobbyScene(BaseScene):
     def fixed_update(self, dt):
         self._animation_timer += dt
 
-        # Processa mensagens
+        # Processa mensagens da fila
         try:
             while not self.network.incoming_queue.empty():
                 item = self.network.incoming_queue.get_nowait()
@@ -307,6 +324,7 @@ class LobbyScene(BaseScene):
         list_title = self.font.render("Jogadores", True, (200, 200, 200))
         screen.blit(list_title, (vx + 25, vy + 100))
 
+        # Lista de jogadores
         if self.players:
             y_pos = vy + 135
             for name in self.players:
@@ -353,7 +371,6 @@ class LobbyScene(BaseScene):
             color = (255, 215, 0) if msg.startswith(self.my_name + ":") else (220, 220, 220)
             txt = self.font_chat.render(msg, True, color)
             if txt.get_width() > chat_rect.width - 24:
-                # Trunca mensagens longas
                 msg_short = msg[:35] + "..."
                 txt = self.font_chat.render(msg_short, True, color)
             screen.blit(txt, (chat_rect.x + 12, y_offset))
