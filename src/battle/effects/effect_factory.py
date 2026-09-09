@@ -211,7 +211,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "is_area": True,  # Área
             "params": {
-                "duration": 3.0,  # 15 segundos de iluminação
+                "duration": 15.0,  # 15 segundos de iluminação
                 "fade_duration": 3.0,  # 3 segundos de fade out
             },
             "description": "Ilumina a caverna por 15 segundos. O efeito desaparece gradualmente.",

@@ -559,7 +559,7 @@ class ItemBagCatalog:
             ("tm_dig", "TM28 - Dig", "machine_WATER.png", "dig", "2-7", 2000),
             ("tm_bubble_beam", "TM11 - Bubble Beam", "machine_WATER.png", "bubble-beam", "2-8", 2500),
             ("hm_cut", "HM01 - CUT", "machine_NORMAL.png", "cut", "2-8", 2000),
-            ("hm_flash", "HM05 - FLASH", "machine_NORMAL.png", "flash", "2-8", 1000),
+            ("hm_flash", "HM05 - FLASH", "machine_NORMAL.png", "flash", "2-3", 1000),
             ("hm_body_slam", "TM08 - Body Slam ", "machine_NORMAL.png", "body-slam", "3-1", 2000),
             ("hm_rest", "TM44 - Rest  ", "machine_NORMAL.png", "rest", "3-3", 2000),
             ("tm_thunderbolt", "TM24 - Thunderbolt", "machine_ELECTRIC.png", "thunderbolt", "3-4", 3000),

@@ -3,6 +3,7 @@ import pygame
 import uuid
 import random
 from typing import List, Dict, Optional
+from datetime import datetime
 
 from src.battle.attack_strategy import AttackPriority
 from src.battle.attack_pattern import AttackPattern, AttackPatternManager, AttackTypeCategory
@@ -48,6 +49,11 @@ class Pokemon(Entity):
         self.level = level
         self.is_shiny = shiny
         self.is_boss = is_boss
+
+        # ===== CAMPOS DE CAPTURA =====
+        now = datetime.now()
+        self.capture_date = now.isoformat()  # Data/hora ISO
+        self.capture_method = "unknown"  # "starter", "capture", "gift", "trade", "fossil", "evolution", "egg", "event", "migration"
 
         # ===== 2. STATUS E ATRIBUTOS BASE =====
         self.custom_name = None
@@ -1796,6 +1802,8 @@ class Pokemon(Entity):
         # Dados básicos
         data = {
             "unique_id": self.unique_id,
+            "capture_date": self.capture_date,
+            "capture_method": self.capture_method,
             "id": self.id,
             "name": self.name,
             "level": self.level,
@@ -1869,6 +1877,8 @@ class Pokemon(Entity):
 
         # Sobrescreve atributos com os dados do dicionário
         pokemon.unique_id = data["unique_id"]
+        pokemon.capture_date = data.get("capture_date", datetime.now().isoformat())
+        pokemon.capture_method = data.get("capture_method", "migration")
         pokemon.name = data["name"]
         pokemon.level = data["level"]
         pokemon.is_shiny = data.get("is_shiny", False)

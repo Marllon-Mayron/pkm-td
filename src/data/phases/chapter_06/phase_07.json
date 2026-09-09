@@ -2201,7 +2201,27 @@
         ]
     },
     "events": {
-        "triggers": [],
+        "triggers": [
+            {
+                "trigger_type": "start_phase",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 0.0,
+                        "pause_game": true,
+                        "message_text": "Como vai, meu jovem? Fique atento por esses lugares, tem fósseis por toda parte! Se você encontrar algum, leve-o para a  aba de desfossilizadores para obter pokmons extintos.",
+                        "speaker_name": "Arqueólogo Inácio",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/RUINMANIAC.png",
+                        "action_label": "Muito interessante!",
+                        "action_trigger": ""
+                    }
+                ]
+            }
+        ],
         "selected_trigger": 0
     },
     "rewards": {

@@ -7,7 +7,7 @@ import pickle
 from datetime import datetime
 from typing import Dict
 
-SAVE_FORMAT_VERSION = "0.1.7"  # Versão do FORMATO do save (ATUALIZADA)
+SAVE_FORMAT_VERSION = "0.1.8"  # Versão do FORMATO do save (ATUALIZADA)
 GAME_VERSION_COMPATIBLE = "0.1.15"  # Versão do jogo que usa este formato
 
 
@@ -44,7 +44,7 @@ class SaveManager:
             print(f"[SAVE] Pasta criada: {self.save_dir}")
 
     def _get_default_save_data(self) -> Dict:
-        """Retorna a estrutura padrão de save (versão 0.1.7)"""
+        """Retorna a estrutura padrão de save (versão 0.1.8)"""
         return {
             "meta": {
                 "version": SAVE_FORMAT_VERSION,
@@ -99,6 +99,7 @@ class SaveManager:
         Se o Pokémon for um Ditto transformado, usa os dados ORIGINAIS para salvar.
         """
         from src.data.move_data import MoveData
+        from datetime import datetime
 
         move_data = MoveData()
 
@@ -146,6 +147,8 @@ class SaveManager:
 
             pokemon_dict = {
                 "unique_id": getattr(pokemon, 'unique_id', str(uuid.uuid4())),
+                "capture_date": getattr(pokemon, 'capture_date', datetime.now().isoformat()),
+                "capture_method": getattr(pokemon, 'capture_method', "unknown"),
                 "id": pokemon_id,
                 "name": pokemon_name,
                 "level": pokemon.level,
@@ -186,6 +189,8 @@ class SaveManager:
 
         pokemon_dict = {
             "unique_id": getattr(pokemon, 'unique_id', str(uuid.uuid4())),
+            "capture_date": getattr(pokemon, 'capture_date', datetime.now().isoformat()),
+            "capture_method": getattr(pokemon, 'capture_method', "unknown"),
             "id": pokemon.id,
             "name": pokemon.name,
             "level": pokemon.level,
@@ -219,6 +224,7 @@ class SaveManager:
     def _dict_to_pokemon(self, data: Dict):
         """Converte dicionário para objeto Pokémon, incluindo moves e novos atributos"""
         from src.entities.pokemon import Pokemon
+        from datetime import datetime
 
         # Cria o Pokémon básico
         pokemon = Pokemon(
@@ -229,6 +235,8 @@ class SaveManager:
         )
 
         pokemon.unique_id = data.get("unique_id", str(uuid.uuid4()))
+        pokemon.capture_date = data.get("capture_date", datetime.now().isoformat())
+        pokemon.capture_method = data.get("capture_method", "migration")
 
         # Restaura os atributos
         pokemon.current_hp = data["current_hp"]
@@ -280,6 +288,7 @@ class SaveManager:
         player.team: lista de objetos Pokemon (instâncias completas)
         """
         import os
+        from datetime import datetime
         from src.managers.save_manager import SAVE_FORMAT_VERSION
 
         # Define o slot atual
@@ -337,10 +346,15 @@ class SaveManager:
             player_data["achievements"] = {"unlocked": [], "counters": {}, "unlocked_data": {}}
 
         # ===== PC BOX - já é uma lista de dicionários =====
-        # Garante que todos os dicionários tenham unique_id
+        # Garante que todos os dicionários tenham unique_id e capture_date
+        from datetime import datetime
         for data in player.pc_box:
             if "unique_id" not in data:
                 data["unique_id"] = str(uuid.uuid4())
+            if "capture_date" not in data:
+                data["capture_date"] = datetime.now().isoformat()
+            if "capture_method" not in data:
+                data["capture_method"] = "unknown"
 
         # ===== TIME - converte objetos para dicionários =====
         team_dicts = []
@@ -350,6 +364,10 @@ class SaveManager:
             # Garante que o unique_id existe
             if "unique_id" not in p_dict:
                 p_dict["unique_id"] = str(uuid.uuid4())
+            if "capture_date" not in p_dict:
+                p_dict["capture_date"] = datetime.now().isoformat()
+            if "capture_method" not in p_dict:
+                p_dict["capture_method"] = "unknown"
             team_dicts.append(p_dict)
 
         # ===== CONSOLIDA: time + pc_box sem duplicatas =====
@@ -638,10 +656,12 @@ class SaveManager:
 
     def migrate_save_data(self, save_data: Dict, version: str) -> Dict:
         """
-        Migra dados de save de versões antigas para o formato atual (0.1.7)
+        Migra dados de save de versões antigas para o formato atual (0.1.8)
         """
         import copy
         import os
+        from datetime import datetime
+
         migrated = copy.deepcopy(save_data)
 
         current_version = SAVE_FORMAT_VERSION
@@ -910,6 +930,62 @@ class SaveManager:
             version = "0.1.7"
             print(
                 "[MIGRATE] Migracao para 0.1.7 concluida: sprites relativos, speed corrigido, has_chosen_starter garantido")
+
+        # ===== MIGRAÇÃO PARA 0.1.8: CAPTURE_DATE E CAPTURE_METHOD =====
+        if version <= "0.1.7":  # Aplica a todos os saves anteriores a 0.1.8
+            print("[MIGRATE] Adicionando capture_date e capture_method aos Pokémon...")
+
+            now = datetime.now().isoformat()
+
+            # Adiciona à pc_box
+            pc_box = migrated.get("player", {}).get("pc_box", [])
+            for pokemon_data in pc_box:
+                if "capture_date" not in pokemon_data:
+                    pokemon_data["capture_date"] = now
+                if "capture_method" not in pokemon_data:
+                    # Tenta inferir se é inicial ou não
+                    # Pokémon com ID 1,4,7 são starters comuns
+                    pokemon_id = pokemon_data.get("id", 0)
+                    if pokemon_id in [1, 4, 7]:  # Bulbasaur, Charmander, Squirtle
+                        # Se for o único Pokémon, provavelmente é starter
+                        if len(pc_box) == 0 and len(migrated.get("player", {}).get("team", [])) == 0:
+                            pokemon_data["capture_method"] = "starter"
+                        else:
+                            pokemon_data["capture_method"] = "migration"
+                    else:
+                        pokemon_data["capture_method"] = "migration"
+
+            # Adiciona ao team
+            team = migrated.get("player", {}).get("team", [])
+            for pokemon_data in team:
+                if "capture_date" not in pokemon_data:
+                    pokemon_data["capture_date"] = now
+                if "capture_method" not in pokemon_data:
+                    pokemon_id = pokemon_data.get("id", 0)
+                    if pokemon_id in [1, 4, 7]:  # Bulbasaur, Charmander, Squirtle
+                        if len(team) == 1 and len(pc_box) == 0:
+                            pokemon_data["capture_method"] = "starter"
+                        else:
+                            pokemon_data["capture_method"] = "migration"
+                    else:
+                        pokemon_data["capture_method"] = "migration"
+
+            print(f"[MIGRATE] capture_date/method adicionados a {len(pc_box) + len(team)} Pokémon")
+
+            # ===== REMOVE CAPTURE_ORDER SE EXISTIR (não vamos mais usar) =====
+            for pokemon_data in pc_box:
+                if "capture_order" in pokemon_data:
+                    del pokemon_data["capture_order"]
+            for pokemon_data in team:
+                if "capture_order" in pokemon_data:
+                    del pokemon_data["capture_order"]
+
+            print("[MIGRATE] capture_order removido (substituído por capture_date)")
+
+            # Atualiza versão
+            migrated["meta"]["version"] = "0.1.8"
+            version = "0.1.8"
+            print("[MIGRATE] Migracao para 0.1.8 concluida: capture_date e capture_method adicionados")
 
         # ===== VALIDAÇÃO PÓS-MIGRAÇÃO (FALLBACK) =====
         # Garante que todos os campos obrigatórios existem

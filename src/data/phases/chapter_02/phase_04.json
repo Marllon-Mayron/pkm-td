@@ -2462,7 +2462,27 @@
         ]
     },
     "events": {
-        "triggers": [],
+        "triggers": [
+            {
+                "trigger_type": "start_phase",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "",
+                "events": [
+                    {
+                        "event_type": "message",
+                        "delay": 0.0,
+                        "pause_game": true,
+                        "message_text": "Eu amo as cavernas, elas são cheias de pokemons incríveis! Mas você deve tomar cuidado, tudo aqui é escuro, aconselho comprar um HM FLASH, estará disponivel na loja, e serve para iluminar a caverna por alguns segundos crucias. Boa sorte!",
+                        "speaker_name": "Explorador  Hiker",
+                        "speaker_sprite_path": "res/PokemonSprites/characters/HIKER.png",
+                        "action_label": "Obrigado pela dica!",
+                        "action_trigger": ""
+                    }
+                ]
+            }
+        ],
         "selected_trigger": 0
     },
     "rewards": {

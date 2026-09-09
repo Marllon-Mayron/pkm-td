@@ -271,17 +271,19 @@ class Player(Entity):
         return info
 
     def add_starter(self, starter_id=1):
-        """Adiciona Pokémon inicial (para testes ou seleção)"""
         from src.entities.pokemon import Pokemon
+        from datetime import datetime
 
-        # Verifica se o time está vazio
         if len(self.team) > 0:
             print(f"[PLAYER] Time já tem {len(self.team)} Pokémon. Limpando...")
             self.team.clear()
 
         starter = Pokemon(0, 0, starter_id, level=5, is_wild=False)
 
-        # Garante que o Pokémon está configurado corretamente
+        # ===== DEFINE DATA E MÉTODO =====
+        starter.capture_date = datetime.now().isoformat()
+        starter.capture_method = "starter"
+
         starter.is_in_team = True
         starter.is_placed = False
         starter.is_wild = False
@@ -290,7 +292,6 @@ class Player(Entity):
         self.caught_pokemon.add(starter_id)
         self.register_seen(starter_id)
 
-        # Marca que o jogador escolheu o inicial
         self.has_chosen_starter = True
 
         print(f"[PLAYER] Pokémon inicial adicionado: {starter.name} (ID: {starter_id})")
@@ -380,13 +381,16 @@ class Player(Entity):
 
     def collect_pokemon_from_desfossilizador(self, desfossilizador_index):
         """Coleta o Pokémon do desfossilizador pronto."""
+        from datetime import datetime
         desfossilizador = self.desfossilizadores[desfossilizador_index]
         if desfossilizador["status"] != "ready":
             return None
         pokemon_id = desfossilizador["pokemon_id"]
         from src.entities.pokemon import Pokemon
         pokemon = Pokemon(0, 0, pokemon_id, level=5, is_wild=False)
-
+        # ===== DEFINE DATA E MÉTODO =====
+        pokemon.capture_date = datetime.now().isoformat()
+        pokemon.capture_method = "fossil"
         if len(self.team) < 6:
             self.team.append(pokemon)
             pokemon.is_in_team = True

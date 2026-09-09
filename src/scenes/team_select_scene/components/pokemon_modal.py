@@ -1298,14 +1298,14 @@ class PokemonModal:
                     screen.blit(empty_text, text_rect)
 
     def _render_info_page(self, screen, content_rect):
-        """Renderiza página de informações - ORGANIZADA com Felicidade e Nome Personalizado"""
+        """Renderiza página de informações - ORGANIZADA com Felicidade, Nome Personalizado e Dados de Captura"""
 
         # ===== FONTES AUMENTADAS =====
-        title_font = pygame.font.Font(None, 28)  # Aumentado de 22 para 28
-        section_title_font = pygame.font.Font(None, 20)  # Aumentado de 16 para 20
-        label_font = pygame.font.Font(None, 16)  # Aumentado de 13 para 16
-        value_font = pygame.font.Font(None, 18)  # Aumentado de 15 para 18
-        type_font = pygame.font.Font(None, 13)  # Aumentado de 11 para 13
+        title_font = pygame.font.Font(None, 28)
+        section_title_font = pygame.font.Font(None, 20)
+        label_font = pygame.font.Font(None, 16)
+        value_font = pygame.font.Font(None, 18)
+        type_font = pygame.font.Font(None, 13)
 
         # Título da página
         info_title = title_font.render("INFORMAÇÕES DETALHADAS", True, self.colors['text_accent'])
@@ -1344,7 +1344,6 @@ class PokemonModal:
         label_text = label_font.render("ESPÉCIE", True, self.colors['text_secondary'])
         screen.blit(label_text, (left_card.x + 20, y_offset))
 
-        # Exibe o nome da espécie (nome real do Pokémon)
         species_name = self.pokemon.name
         species_text = value_font.render(species_name, True, self.colors['text_primary'])
         screen.blit(species_text, (left_card.x + 20, y_offset + 24))
@@ -1396,7 +1395,7 @@ class PokemonModal:
         value_text = value_font.render(exp_text, True, self.colors['text_primary'])
         screen.blit(value_text, (left_card.x + 20, y_offset + 24))
 
-        # Barra de XP (SOMENTE A BARRA, SEM TEXTO DENTRO)
+        # Barra de XP
         exp_percent = self.pokemon.xp / self.pokemon.xp_to_next if self.pokemon.xp_to_next > 0 else 0
         bar_width = left_card.width - 40
         bar_height = 12
@@ -1407,7 +1406,10 @@ class PokemonModal:
         if exp_percent > 0:
             pygame.draw.rect(screen, (100, 180, 100),
                              (bar_x, bar_y, int(bar_width * exp_percent), bar_height), border_radius=6)
-        y_offset += line_spacing
+
+        # Salva a posição Y após a barra de XP
+        xp_bar_bottom = y_offset + 44 + bar_height + 10
+        y_offset = xp_bar_bottom
 
         # ===== PRÓXIMO NÍVEL =====
         label_text = label_font.render("PRÓXIMO NÍVEL", True, self.colors['text_secondary'])
@@ -1416,6 +1418,112 @@ class PokemonModal:
         exp_needed = self.pokemon.xp_to_next - self.pokemon.xp
         value_text = value_font.render(f"{exp_needed} EXP restantes", True, self.colors['text_good'])
         screen.blit(value_text, (left_card.x + 20, y_offset + 34))
+        y_offset += line_spacing
+
+        # ===== ORIGEM (DATA E MÉTODO LADO A LADO) =====
+        if y_offset + 40 < left_card.bottom:
+            # Linha separadora
+            separator_y = y_offset - 8
+            pygame.draw.line(screen, self.colors['border'],
+                             (left_card.x + 15, separator_y),
+                             (left_card.x + left_card.width - 15, separator_y), 1)
+
+            # Título da seção
+            origin_title = section_title_font.render("ORIGEM", True, self.colors['text_accent'])
+            screen.blit(origin_title, (left_card.x + (left_card.width - origin_title.get_width()) // 2, y_offset))
+            y_offset += 32
+
+            # ===== DATA E MÉTODO NA MESMA LINHA =====
+            # Data
+            label_text = label_font.render("DATA", True, self.colors['text_secondary'])
+            screen.blit(label_text, (left_card.x + 20, y_offset))
+
+            capture_date = getattr(self.pokemon, 'capture_date', None)
+            if capture_date:
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(capture_date)
+                    date_str = dt.strftime("%d/%m/%Y %H:%M")
+                except:
+                    date_str = capture_date[:16] if len(capture_date) > 16 else capture_date
+            else:
+                date_str = "Data desconhecida"
+
+            date_color = self.colors['text_accent'] if capture_date else self.colors['text_secondary']
+            date_text = value_font.render(date_str, True, date_color)
+
+            # Posiciona a data ao lado do label "DATA"
+            date_x = left_card.x + 20 + label_text.get_width() + 10
+            screen.blit(date_text, (date_x, y_offset))
+
+            # Calcula a posição para o método (após a data + espaçamento)
+            method_start_x = date_x + date_text.get_width() + 30
+
+            # Método
+            method_label_text = label_font.render("MÉTODO", True, self.colors['text_secondary'])
+            screen.blit(method_label_text, (method_start_x, y_offset))
+
+            method_map = {
+                "starter": "Inicial",
+                "capture": "Captura",
+                "capture_pokeball": "Pokébola",
+                "capture_greatball": "Great Ball",
+                "capture_ultraball": "Ultra Ball",
+                "capture_masterball": "Master Ball",
+                "capture_friendball": "Friend Ball",
+                "gift": "Presente",
+                "trade": "Troca",
+                "fossil": "Fóssil",
+                "evolution": "Evolução",
+                "egg": "Ovo",
+                "event": "Evento",
+                "migration": "Migração",
+                "unknown": "Desconhecido"
+            }
+
+            method = getattr(self.pokemon, 'capture_method', 'unknown')
+            method_name = method_map.get(method, method)
+
+            method_colors = {
+                "starter": (255, 215, 0),
+                "fossil": (200, 180, 100),
+                "evolution": (100, 200, 255),
+                "capture": (100, 255, 100),
+                "capture_pokeball": (200, 200, 200),
+                "capture_greatball": (100, 150, 255),
+                "capture_ultraball": (255, 200, 100),
+                "capture_masterball": (255, 100, 100),
+                "capture_friendball": (255, 150, 255),
+                "gift": (255, 200, 0),
+                "trade": (100, 200, 255),
+                "egg": (255, 180, 200),
+                "event": (255, 100, 200),
+                "migration": (150, 150, 150),
+                "unknown": (150, 150, 150)
+            }
+
+            method_color = method_colors.get(method, self.colors['text_primary'])
+            method_text = value_font.render(method_name, True, method_color)
+
+            # Posiciona o método ao lado do label "MÉTODO"
+            method_x = method_start_x + method_label_text.get_width() + 10
+            screen.blit(method_text, (method_x, y_offset))
+
+            # Badge para o método (opcional) - ao lado do método
+            if method == "starter":
+                badge_rect = pygame.Rect(method_x + method_text.get_width() + 8, y_offset + 2, 50, 22)
+                self._draw_rounded_rect(screen, (255, 215, 0, 80), badge_rect, radius=4)
+                badge_font = pygame.font.Font(None, 10)
+                badge_text = badge_font.render("INICIAL", True, (255, 215, 0))
+                screen.blit(badge_text, (badge_rect.centerx - badge_text.get_width() // 2,
+                                         badge_rect.centery - badge_text.get_height() // 2))
+            elif method in ["capture_masterball", "masterball"]:
+                badge_rect = pygame.Rect(method_x + method_text.get_width() + 8, y_offset + 2, 50, 22)
+                self._draw_rounded_rect(screen, (255, 100, 100, 80), badge_rect, radius=4)
+                badge_font = pygame.font.Font(None, 10)
+                badge_text = badge_font.render("MASTER", True, (255, 255, 255))
+                screen.blit(badge_text, (badge_rect.centerx - badge_text.get_width() // 2,
+                                         badge_rect.centery - badge_text.get_height() // 2))
 
         # ===== COLUNA DIREITA: Características =====
         right_title = section_title_font.render("CARACTERÍSTICAS", True, self.colors['text_accent'])
@@ -1432,7 +1540,6 @@ class PokemonModal:
         label_text = label_font.render("TIPO(S)", True, self.colors['text_secondary'])
         screen.blit(label_text, (right_card.x + 20, right_y))
 
-        # Renderiza badges de tipo
         type_badge_x = right_card.x + 120
         for i, type_name in enumerate(self.pokemon.types):
             type_color = self._get_type_color(type_name)
@@ -1451,22 +1558,19 @@ class PokemonModal:
         effects = self.NATURE_EFFECTS.get(nature_name, (None, None, "", ""))
 
         if effects[0] is not None:
-            # Divide em partes para colorir
             boost_stat = effects[2]
             reduce_stat = effects[3]
 
-            # Renderiza as partes com cores diferentes
             name_part = f"{nature_name} ("
             boost_part = f"+10% {boost_stat}"
             slash_part = " / "
             reduce_part = f"-10% {reduce_stat})"
 
             name_text = value_font.render(name_part, True, self.colors['text_primary'])
-            boost_text = value_font.render(boost_part, True, (100, 255, 100))  # VERDE
+            boost_text = value_font.render(boost_part, True, (100, 255, 100))
             slash_text = value_font.render(slash_part, True, self.colors['text_secondary'])
-            reduce_text = value_font.render(reduce_part, True, (255, 100, 100))  # VERMELHO
+            reduce_text = value_font.render(reduce_part, True, (255, 100, 100))
 
-            # Posiciona sequencialmente na mesma linha
             start_x = right_card.x + 20
             y_pos = right_y + 24
 
@@ -1477,7 +1581,6 @@ class PokemonModal:
                         (start_x + name_text.get_width() + boost_text.get_width() + slash_text.get_width(), y_pos))
 
         else:
-            # Nature neutra (Hardy, Quirky)
             value_text = value_font.render(nature_name, True, self.colors['text_primary'])
             screen.blit(value_text, (right_card.x + 20, right_y + 24))
 
@@ -1511,7 +1614,6 @@ class PokemonModal:
 
         if hasattr(self.pokemon, 'height_m') and self.pokemon.height_m:
             height_value = f"{self.pokemon.height_m:.2f} m"
-            # Mostra categoria de tamanho
             if self.pokemon.height_m < 0.5:
                 height_category = "Muito pequeno"
             elif self.pokemon.height_m < 1.0:
@@ -1556,45 +1658,38 @@ class PokemonModal:
         screen.blit(category_text, (right_card.x + 80, right_y + 26))
         right_y += right_line_spacing
 
-        # ===== FELICIDADE (ALTERADO PARA 255) =====
+        # ===== FELICIDADE =====
         label_text = label_font.render("FELICIDADE", True, self.colors['text_secondary'])
         screen.blit(label_text, (right_card.x + 20, right_y))
 
         happiness = self.pokemon.get_happiness()
-        MAX_HAPPINESS = 255  # Valor máximo original dos jogos
+        MAX_HAPPINESS = 255
         happiness_text = f"{happiness} / {MAX_HAPPINESS}"
 
-        # Determina a cor baseada na felicidade (escala de 0-255)
         if happiness >= 200:
-            happiness_color = (255, 215, 0)  # Dourado
+            happiness_color = (255, 215, 0)
         elif happiness >= 150:
-            happiness_color = (100, 220, 100)  # Verde
+            happiness_color = (100, 220, 100)
         elif happiness >= 100:
-            happiness_color = (255, 220, 100)  # Amarelo
+            happiness_color = (255, 220, 100)
         elif happiness >= 50:
-            happiness_color = (255, 150, 100)  # Laranja
+            happiness_color = (255, 150, 100)
         else:
-            happiness_color = (255, 100, 100)  # Vermelho
+            happiness_color = (255, 100, 100)
 
-        # Mostra o valor numérico
         value_text = value_font.render(happiness_text, True, happiness_color)
         screen.blit(value_text, (right_card.x + 20 + 110, right_y + 2))
 
-        # Barra de felicidade (escala de 0-255)
         bar_width = right_card.width - 40
         bar_height = 12
         bar_x = right_card.x + 20
         bar_y = right_y + 32
 
-        # Fundo da barra
         pygame.draw.rect(screen, (45, 48, 55), (bar_x, bar_y, bar_width, bar_height), border_radius=6)
 
-        # Calcula largura da barra de felicidade (baseado em 255)
         happiness_width = int(bar_width * (happiness / MAX_HAPPINESS))
-
-        # Gradiente da barra (vermelho -> amarelo -> verde) baseado em 255
         if happiness_width > 0:
-            percent = happiness / MAX_HAPPINESS  # 0.0 a 1.0
+            percent = happiness / MAX_HAPPINESS
             if percent <= 0.5:
                 r = 255
                 g = int(255 * (percent / 0.5))
@@ -1603,14 +1698,11 @@ class PokemonModal:
                 r = int(255 * (1 - ((percent - 0.5) / 0.5)))
                 g = 255
                 b = 0
-
             bar_color = (r, g, b)
             pygame.draw.rect(screen, bar_color, (bar_x, bar_y, happiness_width, bar_height), border_radius=6)
 
-        # Borda da barra
         pygame.draw.rect(screen, self.colors['border_light'], (bar_x, bar_y, bar_width, bar_height), 2, border_radius=6)
 
-        # Nível de felicidade em texto (baseado em 255)
         if happiness >= 200:
             level_text = "Muito feliz!"
         elif happiness >= 150:
@@ -1630,6 +1722,6 @@ class PokemonModal:
             badge_y = right_card.y + right_card.height - 50
             boss_badge = pygame.Rect(right_card.x + 20, badge_y, right_card.width - 40, 40)
             self._draw_rounded_rect(screen, (180, 60, 60), boss_badge, radius=10)
-            boss_text = pygame.font.Font(None, 16).render("⚡ POKÉMON CHEFE ⚡", True, (255, 255, 255))
+            boss_text = pygame.font.Font(None, 16).render("POKEMON CHEFE", True, (255, 255, 255))
             screen.blit(boss_text, (boss_badge.centerx - boss_text.get_width() // 2,
                                     boss_badge.centery - boss_text.get_height() // 2))

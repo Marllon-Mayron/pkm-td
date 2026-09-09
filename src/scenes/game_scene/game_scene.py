@@ -3,6 +3,7 @@
 Cena principal do jogo - COM NOVA ARQUITETURA DE WAVES
 """
 import pygame
+from datetime import datetime
 
 from scenes.game_scene.components.managers.event_processor import EventProcessor
 from src.battle.effects.specific.weather.weather_state import WeatherType
@@ -1010,6 +1011,24 @@ class GameScene(BaseScene):
             is_wild=False,
             shiny=enemy.is_shiny
         )
+        # ===== DEFINE DATA E MÉTODO DE CAPTURA =====
+        caught.capture_date = datetime.now().isoformat()
+
+        # Verifica qual item foi usado para capturar
+        if hasattr(self, '_last_capture_item'):
+            if self._last_capture_item == "masterball":
+                caught.capture_method = "capture_masterball"
+            elif self._last_capture_item == "greatball":
+                caught.capture_method = "capture_greatball"
+            elif self._last_capture_item == "ultraball":
+                caught.capture_method = "capture_ultraball"
+            elif self._last_capture_item == "friendball":
+                caught.capture_method = "capture_friendball"
+            else:
+                caught.capture_method = "capture_pokeball"
+        else:
+            caught.capture_method = "capture"
+
         caught.current_hp = enemy.current_hp
         caught.max_hp = enemy.max_hp
         caught.ivs = enemy.ivs.copy()

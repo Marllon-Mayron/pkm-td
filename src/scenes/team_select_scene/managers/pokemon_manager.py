@@ -35,7 +35,9 @@ class PokemonManager:
             filtered_list.sort(key=lambda p: p.get("id", 0))
         elif self.current_sort == "id_desc":
             filtered_list.sort(key=lambda p: p.get("id", 0), reverse=True)
-        # "capture" mantém a ordem original
+        # "capture" - ORDENA POR DATA DE CAPTURA (mais antigo primeiro)
+        elif self.current_sort == "capture":
+            filtered_list.sort(key=lambda p: p.get("capture_date", ""))
 
         return filtered_list
 
