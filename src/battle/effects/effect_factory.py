@@ -206,16 +206,15 @@ class EffectFactory:
             "description": "Reduz a Precisão dos oponentes ao redor",
         },
         "flash": {
-            "effect_type": "stat_mod",
-            "target": EffectTarget.TARGET,
+            "effect_type": "flash_light",  # Novo tipo de efeito
+            "target": EffectTarget.BOTH,  # Afeta o ambiente
             "timing": EffectTiming.ON_HIT,
-            "is_area": True,
+            "is_area": True,  # Área
             "params": {
-                "stat": "accuracy",
-                "stages": -1,
-                "duration": 8.0
+                "duration": 3.0,  # 15 segundos de iluminação
+                "fade_duration": 3.0,  # 3 segundos de fade out
             },
-            "description": "Reduz a Precisão do oponente",
+            "description": "Ilumina a caverna por 15 segundos. O efeito desaparece gradualmente.",
         },
         "smokescreen": {
             "effect_type": "stat_mod",

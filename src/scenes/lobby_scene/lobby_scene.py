@@ -98,8 +98,6 @@ class LobbyScene(BaseScene):
         msg_type = msg.get("type")
         payload = msg.get("payload", {})
 
-        print(f"[LOBBY] Mensagem recebida: {msg_type}")
-
         if msg_type == "PLAYER_INFO":
             name = payload.get("name", "Desconhecido")
             if name != self.my_name and name not in self.players:
@@ -110,13 +108,13 @@ class LobbyScene(BaseScene):
 
         elif msg_type == "PLAYER_LIST":
             players_data = payload.get("players", [])
-            # Pode ser lista ou dicionário - tratamos ambos
+            # Se for dicionário, converte para lista
             if isinstance(players_data, dict):
                 new_players = list(players_data.values())
             else:
                 new_players = players_data
 
-            # Atualiza a lista mantendo o próprio nome
+            # Mantém o próprio nome e adiciona os outros
             self.players = [self.my_name]
             for name in new_players:
                 if name != self.my_name and name not in self.players:
@@ -128,38 +126,9 @@ class LobbyScene(BaseScene):
                     self.opponent_name = name
                     break
 
-            self.players_received = True
             print(f"[LOBBY] Lista recebida: {self.players}")
             if len(self.players) > 1:
                 toast_info(f"Jogadores na sala: {len(self.players)}")
-
-        elif msg_type == "CHAT_MESSAGE":
-            sender = payload.get("sender", "Desconhecido")
-            text = payload.get("text", "")
-            self.chat_messages.append(f"{sender}: {text}")
-            if len(self.chat_messages) > 50:
-                self.chat_messages.pop(0)
-
-        elif msg_type == "TRADE_REQUEST":
-            from_name = payload.get("from", "Desconhecido")
-            self.pending_trade_from = from_name
-            toast_info(f"{from_name} quer trocar com voce!")
-
-        elif msg_type == "TRADE_RESPONSE":
-            accepted = payload.get("accepted", False)
-            if accepted:
-                toast_info("Troca aceita! Abrindo tela de troca...")
-                self._open_trade_scene()
-            else:
-                toast_info("O outro jogador recusou a troca.")
-                self.pending_trade_from = None
-
-        elif msg_type == "DISCONNECT":
-            toast_warning("O outro jogador desconectou.")
-            if self.opponent_name and self.opponent_name in self.players:
-                self.players.remove(self.opponent_name)
-                self.opponent_name = None
-            self._return_to_menu()
 
     def _open_trade_scene(self):
         from src.scenes.trade_scene.trade_scene import TradeScene

@@ -4,6 +4,7 @@ from typing import Optional, Callable
 from dataclasses import dataclass, field
 import random, math
 
+from src.battle.effects.specific.day_night.day_night_state import DayNightType
 from src.battle.effects.especific_moves import TripleKickState
 from src.battle.effects import StatusType
 from src.battle.effects.residual_effect import ResidualEffect
@@ -194,6 +195,8 @@ class MoveEffect:
             return self._apply_fixed_damage(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "percent_damage":
             return self._apply_percent_damage(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "flash_light":
+            return self._apply_flash_light(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "heal":
             return self._apply_heal(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "rest":
@@ -921,6 +924,79 @@ class MoveEffect:
 
         return True
 
+    def _apply_flash_light(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica o efeito Flash - ilumina a caverna por 15 segundos.
+        """
+        if not hasattr(battle_system, 'game_scene'):
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
+        game_scene = battle_system.game_scene
+
+        day_night_weather = None
+
+        if hasattr(game_scene, 'day_night_weather'):
+            day_night_weather = game_scene.day_night_weather
+        elif hasattr(game_scene, 'day_night_weather_system'):
+            day_night_weather = game_scene.day_night_weather_system
+        elif hasattr(game_scene, 'day_night_system'):
+            day_night_weather = game_scene.day_night_system
+        elif hasattr(battle_system, 'day_night_weather'):
+            day_night_weather = battle_system.day_night_weather
+
+        if not day_night_weather:
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
+        if not hasattr(day_night_weather, 'day_night_state'):
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
+        day_night_state = day_night_weather.day_night_state
+
+        if not day_night_state:
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
+        if day_night_state.type != DayNightType.CAVE:
+            effect_manager.add_status_text(
+                attacker,
+                f"O Flash não tem efeito aqui!",
+                duration=1.5
+            )
+            return False
+
+        success = day_night_state.activate_flash()
+
+        if success:
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} usou Flash! A caverna foi iluminada!",
+                duration=2.0
+            )
+
+            duration = self.params.get("duration", 15.0)
+            effect_manager.add_status_text(
+                attacker,
+                f"A luz durará {duration:.0f} segundos!",
+                duration=1.5
+            )
+
+            from src.managers.sounds.move_sound_manager import move_sound_manager
+            move_sound_manager.play_attack_sound("flash")
+
+            current_move = attacker.get_current_move()
+            if current_move:
+                current_move.current_pp -= 1
+
+            attacker.attack_cooldown = attacker.attack_cooldown_max
+
+            return True
+        else:
+            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+            return False
+
     def _apply_leech_seed_tick(self, effect, battle_system, effect_manager):
         """Aplica o tick do Leech Seed (drena HP)"""
         target = effect.target
@@ -1466,6 +1542,101 @@ class MoveEffect:
 
             print(f"[AREA_EFFECT] {attacker.name} usou {self.name} em área! (tipo: {self.effect_type})")
 
+            # ===== CASO ESPECIAL: FLASH =====
+            if self.effect_type == "flash_light":
+                print(f"[FLASH] ⚡ Aplicando Flash no ambiente!")
+
+                # Consome PP
+                current_move = attacker.get_current_move()
+                if current_move:
+                    if current_move.current_pp > 0:
+                        current_move.current_pp -= 1
+                        print(f"[FLASH] PP consumido: {current_move.current_pp}")
+                    else:
+                        print(f"[FLASH] ❌ Sem PP!")
+                        attacker.attack_cooldown = attacker.attack_cooldown_max
+                        return False
+                else:
+                    print(f"[FLASH] ❌ current_move é None!")
+                    attacker.attack_cooldown = attacker.attack_cooldown_max
+                    return False
+
+                # Aplica o Flash no day_night_state
+                if hasattr(battle_system, 'game_scene'):
+                    game_scene = battle_system.game_scene
+                    print(f"[FLASH] game_scene encontrado: {game_scene}")
+
+                    if hasattr(game_scene, 'day_night_weather'):
+                        day_night_weather = game_scene.day_night_weather
+
+                        print(f"[FLASH] day_night_weather encontrado: {day_night_weather}")
+
+                        if day_night_weather and day_night_weather.day_night_state:
+                            print(f"[FLASH] day_night_state.type = {day_night_weather.day_night_state.type}")
+
+                            # Verifica se é uma caverna
+                            if day_night_weather.day_night_state.type == DayNightType.CAVE:
+                                # ===== ATIVA O FLASH DIRETAMENTE =====
+                                success = day_night_weather.day_night_state.activate_flash()
+                                if success:
+                                    effect_manager.add_status_text(
+                                        attacker,
+                                        f"{attacker.name} usou Flash! A caverna foi iluminada!",
+                                        duration=2.0
+                                    )
+
+                                    # Mensagem adicional sobre a duração
+                                    duration = self.params.get("duration", 15.0)
+                                    effect_manager.add_status_text(
+                                        attacker,
+                                        f"A luz durará {duration:.0f} segundos!",
+                                        duration=1.5
+                                    )
+
+                                    print(f"[FLASH] ✅ Flash ativado com sucesso!")
+
+                                    # Toca som do Flash
+                                    from src.managers.sounds.move_sound_manager import move_sound_manager
+                                    move_sound_manager.play_attack_sound("flash")
+
+                                    # Cooldown
+                                    attacker.attack_cooldown = attacker.attack_cooldown_max
+                                    return True
+                                else:
+                                    effect_manager.add_status_text(
+                                        attacker,
+                                        f"O Flash não tem efeito aqui!",
+                                        duration=1.5
+                                    )
+                                    print(f"[FLASH] ❌ activate_flash() retornou False!")
+                                    attacker.attack_cooldown = attacker.attack_cooldown_max
+                                    return False
+                            else:
+                                effect_manager.add_status_text(
+                                    attacker,
+                                    f"O Flash não tem efeito aqui!",
+                                    duration=1.5
+                                )
+                                print(f"[FLASH] ❌ Não é uma caverna! Tipo: {day_night_weather.day_night_state.type}")
+                                attacker.attack_cooldown = attacker.attack_cooldown_max
+                                return False
+                        else:
+                            print(f"[FLASH] ❌ day_night_state é None!")
+                            effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+                            attacker.attack_cooldown = attacker.attack_cooldown_max
+                            return False
+                    else:
+                        print(f"[FLASH] ❌ day_night_weather_system não encontrado!")
+                        effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+                        attacker.attack_cooldown = attacker.attack_cooldown_max
+                        return False
+                else:
+                    print(f"[FLASH] ❌ game_scene não encontrado!")
+                    effect_manager.add_status_text(attacker, f"Mas falhou!", duration=1.0)
+                    attacker.attack_cooldown = attacker.attack_cooldown_max
+                    return False
+
+            # ===== FLUXO NORMAL PARA OUTROS EFEITOS EM ÁREA =====
             all_targets = []
 
             if attacker.is_wild:
@@ -1596,7 +1767,6 @@ class MoveEffect:
                         # ===== APLICA FLINCH  =====
                         flinch_chance = self.params.get("flinch_chance", 0)
                         if flinch_chance > 0 and random.random() < flinch_chance:
-                            # Reseta o cooldown do alvo para fazê-lo perder o turno
                             target_entity.attack_cooldown = max(0.5, 1.0 - (target_entity.speed_stat / 500))
                             effect_manager.add_status_text(
                                 target_entity,
