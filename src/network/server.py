@@ -6,29 +6,36 @@ import json
 import time
 from src.network.protocol import create_message
 
+# src/network/server.py (trecho modificado)
+
 class TradeServer(threading.Thread):
-    def __init__(self, host='0.0.0.0', port=12345, on_message=None, on_connect=None, on_disconnect=None):
+    def __init__(self, host='0.0.0.0', port=12345, on_message=None, on_connect=None, on_disconnect=None, max_clients=2):
         super().__init__(daemon=True)
         self.host = host
         self.port = port
+        self.max_clients = max_clients
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.clients = []  # lista de (conn, addr)
         self.running = False
-        self.on_message = on_message   # callback quando recebe mensagem de qualquer cliente
-        self.on_connect = on_connect   # callback quando um cliente conecta
+        self.on_message = on_message
+        self.on_connect = on_connect
         self.on_disconnect = on_disconnect
         self.lock = threading.Lock()
 
     def run(self):
         try:
             self.socket.bind((self.host, self.port))
-            self.socket.listen(1)  # apenas 1 cliente (troca 1:1)
+            self.socket.listen(self.max_clients)
             self.running = True
-            print(f"[SERVER] Aguardando conexão em {self.host}:{self.port}")
+            print(f"[SERVER] Aguardando até {self.max_clients} conexões em {self.host}:{self.port}")
             while self.running:
                 try:
                     conn, addr = self.socket.accept()
+                    if len(self.clients) >= self.max_clients:
+                        print(f"[SERVER] Máximo de clientes atingido, recusando {addr}")
+                        conn.close()
+                        continue
                     print(f"[SERVER] Cliente conectado: {addr}")
                     with self.lock:
                         self.clients.append((conn, addr))
