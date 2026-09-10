@@ -1829,6 +1829,7 @@ class Pokemon(Entity):
             "gender": self.gender,
             "custom_name": self.custom_name,
             "happiness": self.happiness,
+            "held_item": getattr(self, 'held_item', None),
             # Moves
             "moves": [
                 {
@@ -1903,6 +1904,27 @@ class Pokemon(Entity):
         pokemon.gender = data.get("gender")
         pokemon.custom_name = data.get("custom_name")
         pokemon.happiness = data.get("happiness", 0)
+
+        # ===== RESTAURA ITEM SEGURADO =====
+        held_item_id = data.get("held_item")
+        if held_item_id:
+            try:
+                from src.data.item_bag_catalog import item_bag_catalog
+                item_data = item_bag_catalog.get_item(held_item_id)
+                if item_data and item_data.get("id") == held_item_id:
+                    pokemon.held_item = held_item_id
+                    pokemon.held_item_data = item_data
+                    print(f"[POKEMON] {pokemon.name} restaurado com item: {held_item_id}")
+                else:
+                    pokemon.held_item = None
+                    pokemon.held_item_data = None
+            except Exception as e:
+                print(f"[POKEMON] Erro ao restaurar held_item ({held_item_id}): {e}")
+                pokemon.held_item = None
+                pokemon.held_item_data = None
+        else:
+            pokemon.held_item = None
+            pokemon.held_item_data = None
 
         # Restaura moves
         pokemon.moves = []

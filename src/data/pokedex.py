@@ -1,4 +1,4 @@
-# src/data/pokedex.py - ATUALIZADO PARA CONSUMIR O NOVO JSON UNIFICADO
+# src/data/pokedex.py
 import json
 import os
 import pygame
@@ -66,6 +66,9 @@ class Pokedex:
         self.load_pokemon_data()
         self.load_sprites()
 
+    # =========================================================
+    # LOAD — dados do JSON unificado
+    # =========================================================
     def load_pokemon_data(self):
         """Carrega dados do arquivo JSON unificado (pokemon_completo.json)"""
         try:
@@ -87,30 +90,36 @@ class Pokedex:
             # Carrega os Pokémon do novo formato unificado
             for pokemon in data:
                 pokemon_id = pokemon["id"]
-
-                # Extrai informações de evolução
-                next_evolution_id = None
-                evolution_method = "none"
-                evolution_level = None
-
                 evo_data = pokemon.get("evolution", {})
-                family_members = evo_data.get("family_members", [])
 
-                # Encontra o próximo estágio na cadeia
+                # ===== Próximo estágio linear (compat com campos legados) =====
+                family_members = evo_data.get("family_members", [])
+                next_evolution_id = None
                 for i, member in enumerate(family_members):
                     if member.get("id") == pokemon_id and i + 1 < len(family_members):
                         next_evolution_id = family_members[i + 1].get("id")
                         break
 
-                # Pega o método e nível dos evolution_details
+                # ===== Método/level "primário" (só para campos legados) =====
                 evolution_details = evo_data.get("evolution_details", [])
-                if evolution_details:
-                    detail = evolution_details[0]
-                    evolution_method = detail.get("method", "none")
-                    if evolution_method == "level_up":
-                        evolution_level = detail.get("min_level")
-                    elif evolution_method == "use_item":
-                        evolution_method = detail.get("item", "none")
+                variants = evo_data.get("variants", [])
+
+                evolution_method = "none"
+                evolution_level = None
+                for d in evolution_details:
+                    if d.get("method") == "level_up":
+                        evolution_method = "level_up"
+                        evolution_level = d.get("min_level")
+                        break
+                else:
+                    if evolution_details:
+                        first = evolution_details[0]
+                        evolution_method = first.get("method", "none")
+                        if evolution_method == "use_item":
+                            evolution_method = first.get("item", "none")
+
+                # ===== Constrói lista COMPLETA (details + variants, deduplicado) =====
+                all_methods = self._build_evolution_methods(evolution_details, variants)
 
                 self.pokemon_data[pokemon_id] = {
                     "id": pokemon_id,
@@ -136,9 +145,12 @@ class Pokedex:
                     },
                     "catch_rate": pokemon.get("rate", pokemon.get("capture_rate", 120)),
                     "evolution": {
+                        # Campos legados (compat com código existente)
                         "EvolveTo": next_evolution_id,
                         "lvlMin": evolution_level if evolution_level is not None else "none",
-                        "method": evolution_method
+                        "method": evolution_method,
+                        # NOVO: lista completa
+                        "methods": all_methods,
                     },
                     "weight_kg": pokemon.get("weight_kg", 10.0),
                     "height_m": pokemon.get("height_m", 1.0),
@@ -153,6 +165,8 @@ class Pokedex:
 
         except Exception as e:
             print(f"✗ Erro ao carregar Pokémon data: {e}")
+            import traceback
+            traceback.print_exc()
             self._load_fallback_data()
 
     def load_sprites(self):
@@ -171,7 +185,6 @@ class Pokedex:
 
     def _load_front_sprite(self, pokemon_id, base_path):
         """Carrega sprite frontal (96x96) - MANTIDO ORIGINAL"""
-        # Normal
         filename = self._format_filename_front_back(pokemon_id, shiny=False)
         path = base_path / "front" / f"{filename}.png"
 
@@ -182,7 +195,6 @@ class Pokedex:
             except Exception as e:
                 print(f"Erro ao carregar front {pokemon_id}: {e}")
 
-        # Shiny
         filename_shiny = self._format_filename_front_back(pokemon_id, shiny=True)
         path_shiny = base_path / "front" / f"{filename_shiny}.png"
 
@@ -195,7 +207,6 @@ class Pokedex:
 
     def _load_back_sprite(self, pokemon_id, base_path):
         """Carrega sprite traseiro (96x96) - MANTIDO ORIGINAL"""
-        # Normal
         filename = self._format_filename_front_back(pokemon_id, shiny=False)
         path = base_path / "back" / f"{filename}.png"
 
@@ -206,7 +217,6 @@ class Pokedex:
             except Exception as e:
                 print(f"Erro ao carregar back {pokemon_id}: {e}")
 
-        # Shiny
         filename_shiny = self._format_filename_front_back(pokemon_id, shiny=True)
         path_shiny = base_path / "back" / f"{filename_shiny}.png"
 
@@ -224,8 +234,140 @@ class Pokedex:
             filename += "s"
         return filename
 
-    # ===== MÉTODOS PARA INMAP =====
+    # =========================================================
+    # EVOLUÇÃO — métodos completos
+    # =========================================================
+    @staticmethod
+    def _build_evolution_methods(evolution_details, variants):
+        """
+        Consolida evolution_details + variants numa lista única,
+        removendo duplicatas por (evolve_to, method, item, held_item, min_level).
+        """
+        methods = []
+        seen = set()
 
+        def _add(src):
+            entry = {
+                "evolve_to": src.get("evolves_to_id"),
+                "evolve_to_name": src.get("evolves_to_name"),
+                "method": src.get("method", "none"),
+            }
+            for key in ("min_level", "min_happiness", "min_beauty", "min_affection",
+                        "item", "held_item", "time_of_day", "gender",
+                        "location", "known_move", "known_move_type",
+                        "party_species", "party_type", "trade_species",
+                        "relative_physical_stats"):
+                if src.get(key) is not None:
+                    entry[key] = src[key]
+
+            if not entry["evolve_to"]:
+                return
+
+            dedup = (
+                entry["evolve_to"],
+                entry["method"],
+                entry.get("item"),
+                entry.get("held_item"),
+                entry.get("min_level"),
+            )
+            if dedup in seen:
+                return
+            seen.add(dedup)
+            methods.append(entry)
+
+        for d in evolution_details:
+            _add(d)
+        for v in variants:
+            _add(v)
+
+        return methods
+
+    @staticmethod
+    def normalize_item_id(item_id: str) -> Optional[str]:
+        """
+        Normaliza IDs de itens removendo `-` e `_` e baixando para lowercase.
+        Garante compatibilidade entre:
+          - PokeAPI:  'metal-coat', 'kings-rock', 'dragon-scale', 'up-grade'
+          - Catálogo: 'metalcoat',  'kings_rock', 'dragon_scale', 'upgrade'
+        Resultado: 'metalcoat', 'kingsrock', 'dragonscale', 'upgrade'
+        """
+        if not item_id:
+            return None
+        return item_id.replace("-", "").replace("_", "").lower()
+
+    def map_item_id(self, pokeapi_name: str) -> Optional[str]:
+        """Compat: converte nome PokeAPI → ID interno do catálogo."""
+        return self.normalize_item_id(pokeapi_name)
+
+    def build_normalized_catalog(self) -> Dict[str, Dict]:
+        """
+        Retorna o catálogo de itens da loja indexado pelo id NORMALIZADO.
+        Útil para comparar diretamente com os nomes da PokeAPI.
+
+        Uso:
+            catalog = self.pokedex.build_normalized_catalog()
+            item_data = catalog.get(self.pokedex.normalize_item_id("metal-coat"))
+            # → item_data do "metalcoat" no catálogo
+        """
+        try:
+            from src.data.item_bag_catalog import item_bag_catalog
+        except Exception as e:
+            print(f"[POKEDEX] Falha ao importar item_bag_catalog: {e}")
+            return {}
+
+        result = {}
+        for item_id, item_data in item_bag_catalog.items.items():
+            norm = self.normalize_item_id(item_id)
+            if norm:
+                result[norm] = item_data
+        return result
+
+    def get_evolution_methods(self, pokemon_id: int) -> List[Dict]:
+        """Retorna TODOS os métodos de evolução conhecidos para o Pokémon."""
+        poke = self.pokemon_data.get(pokemon_id)
+        if not poke:
+            return []
+        return poke.get("evolution", {}).get("methods", [])
+
+    def find_evolution_by_item(self, pokemon_id: int, item_id: str) -> Optional[Dict]:
+        """
+        Busca método de evolução que casa com o item informado.
+        Compara por id NORMALIZADO (ignora - e _).
+        Cobre tanto `use_item` quanto `trade` com held_item.
+        """
+        target = self.normalize_item_id(item_id)
+        if not target:
+            return None
+
+        for m in self.get_evolution_methods(pokemon_id):
+            raw = m.get("item") or m.get("held_item")
+            if not raw:
+                continue
+            if self.normalize_item_id(raw) == target:
+                return m
+        return None
+
+    def find_evolution_by_method(self, pokemon_id: int, method: str, **criteria) -> List[Dict]:
+        """
+        Busca métodos que casam com o method + critérios extras.
+        Ex: find_evolution_by_method(133, 'level_up', min_happiness=160)
+        """
+        results = []
+        for m in self.get_evolution_methods(pokemon_id):
+            if m.get("method") != method:
+                continue
+            ok = True
+            for k, v in criteria.items():
+                if m.get(k) != v:
+                    ok = False
+                    break
+            if ok:
+                results.append(m)
+        return results
+
+    # =========================================================
+    # MÉTODOS PARA INMAP
+    # =========================================================
     def get_inmap_animation(self, pokemon_id: int, shiny: bool = False) -> Dict:
         """
         Retorna animações COMPLETAS com 8 direções.
@@ -235,23 +377,17 @@ class Pokedex:
         if cache_key in self.inmap_animations_cache:
             return self.inmap_animations_cache[cache_key]
 
-        # Carrega os dados completos do SpriteLoader (já tem 8 direções)
         sprites_data = self.sprite_manager.loader.load_pokemon_sprites(pokemon_id, shiny)
 
-        # Pega a animação Walk (ou a primeira disponível)
         animations = sprites_data.get("animations", {})
         walk_frames = animations.get("walk", {})
 
-        # Se não tem Walk, tenta a primeira animação disponível
         if not walk_frames and animations:
             walk_frames = next(iter(animations.values()))
 
-        # Remove o metadado se existir
         if '_metadata' in walk_frames:
             del walk_frames['_metadata']
 
-        # AGORA RETORNA AS 8 DIREÇÕES DIRETAMENTE
-        # Garante que todas as 8 direções estão presentes (mesmo que vazias)
         all_directions = [
             "down", "down-right", "right", "up-right",
             "up", "up-left", "left", "down-left"
@@ -261,19 +397,15 @@ class Pokedex:
         for direction in all_directions:
             result[direction] = walk_frames.get(direction, [])
 
-        # SE SÓ TEM UMA DIREÇÃO, REPLICA PARA TODAS
-        # Isso acontece quando o spritesheet tem apenas 1 linha (direção única)
         non_empty = [d for d, frames in result.items() if frames]
 
         if len(non_empty) == 1:
-            # Só tem uma direção com frames - replica para todas
             source_frames = result[non_empty[0]]
             for direction in all_directions:
                 if direction != non_empty[0]:
                     result[direction] = source_frames.copy()
             print(f"[POKEDEX] {pokemon_id}: animação de direção única replicada para 8 direções")
         elif len(non_empty) == 4 and set(non_empty) == {"down", "right", "up", "left"}:
-            # Tem 4 direções principais - replica para diagonais
             diagonal_map = {
                 "down-right": "right",
                 "up-right": "right",
@@ -290,6 +422,7 @@ class Pokedex:
         print(f"[POKEDEX] get_inmap_animation: {pokemon_id} - "
               f"direções com frames: {[d for d in all_directions if result[d]]}")
         return result
+
     def get_pokemon_animations_info(self, pokemon_id: int, shiny: bool = False) -> Dict:
         cache_key = f"{pokemon_id}_{shiny}_info"
         if cache_key in self.pokemon_animations_info:
@@ -351,8 +484,9 @@ class Pokedex:
     def get_raw_inmap_data(self, pokemon_id: int, shiny: bool = False) -> Dict:
         return self.sprite_manager.loader.load_pokemon_sprites(pokemon_id, shiny)
 
-    # ===== MÉTODOS EXISTENTES (MANTIDOS) =====
-
+    # =========================================================
+    # MÉTODOS EXISTENTES (MANTIDOS)
+    # =========================================================
     def _cache_base_speed_limits(self):
         """Calcula e armazena os valores mínimo e máximo de base speed"""
         if not self.pokemon_data:
@@ -489,14 +623,17 @@ class Pokedex:
                 "ev_yield": {"hp": 0, "attack": 0, "defense": 0,
                              "special_attack": 0, "special_defense": 0, "speed": 0},
                 "catch_rate": 120,
-                "evolution": {"EvolveTo": "none", "lvlMin": "none", "method": "none"}
+                "evolution": {
+                    "EvolveTo": "none", "lvlMin": "none", "method": "none",
+                    "methods": [],
+                }
             }
         self._cache_base_speed_limits()
 
-    # ===== MÉTODOS PARA RETRATOS (PORTRAITS) =====
-
-    def get_portrait(self, pokemon_id: int, expression: str = "normal", shiny: bool = False) -> Optional[
-        pygame.Surface]:
+    # =========================================================
+    # MÉTODOS PARA RETRATOS (PORTRAITS)
+    # =========================================================
+    def get_portrait(self, pokemon_id: int, expression: str = "normal", shiny: bool = False) -> Optional[pygame.Surface]:
         if not hasattr(self, '_portrait_cache'):
             self._portrait_cache = {}
 

@@ -22,7 +22,7 @@ class Slider:
         self.dragging = False
         self.rect = pygame.Rect(0, 0, 0, 0)
         self.is_music = False
-        self.is_ambient = False  # NOVO: para diferenciar slider de ambiente
+        self.is_ambient = False  # para diferenciar slider de ambiente
 
         # Animações
         self.scale = 1.0
@@ -492,7 +492,7 @@ class SettingsScene(BaseScene):
                 self.sfx_slider.relative_width = rel_w
             self.sfx_slider.update_rect(vx, vy, vw, vh)
 
-        # ===== NOVO: Slider de AMBIENTE =====
+        # ===== Slider de AMBIENTE =====
         if self.ambient_slider_rect:
             rel_x = (self.ambient_slider_rect.x - vx) / vw
             rel_y = (self.ambient_slider_rect.y - vy) / vh
@@ -539,7 +539,7 @@ class SettingsScene(BaseScene):
                 self.sfx_volume = self.sfx_slider.value
                 self._apply_sfx_preview()
 
-            # ===== NOVO: Slider de ambiente =====
+            # ===== Slider de ambiente =====
             if self.ambient_slider and self.ambient_slider.handle_event(event):
                 self.ambient_volume = self.ambient_slider.value
                 self._apply_ambient_preview()

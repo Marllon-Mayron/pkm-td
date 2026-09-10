@@ -26,7 +26,7 @@ class Settings:
         self.music_enabled = True
         self.sfx_enabled = True
 
-        # ===== NOVO: Configurações de ambiente (clima) =====
+        # ===== Configurações de ambiente (clima) =====
         self.ambient_volume = 0.5
         self.ambient_enabled = True
 

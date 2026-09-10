@@ -40,18 +40,13 @@ class NetworkManager:
         self.connection_established = False
         self.current_scene_callback = None
 
-        self.allow_same_ip_players = True
-
         self.local_ip = self._detect_local_ip()
         self.remote_ips = []
         self._last_rejection_reason = ""
 
-        # ============================================================
-        # BLOQUEIO DE JOGADORES NO MESMO IP
-        # ============================================================
         # False (padrão): não permite duas conexões do mesmo IP.
         # True: útil apenas para TESTES locais na mesma máquina.
-        self.allow_same_ip_players = True
+        self.allow_same_ip_players = False
 
         self.local_ip = self._detect_local_ip()
         self.remote_ips = []

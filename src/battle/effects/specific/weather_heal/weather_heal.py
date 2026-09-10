@@ -29,7 +29,7 @@ class WeatherHealMove:
         WeatherType.SANDSTORM: 0.25,  # 25%
     }
 
-    # ===== NOVO: Efeito do dia/noite =====
+    # ===== Efeito do dia/noite =====
     # Morning Sun é afetado pelo dia/noite!
     # Noite: 25% em vez de 50%
     NIGHT_HEAL_MODIFIER = 0.5

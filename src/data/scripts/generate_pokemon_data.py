@@ -324,22 +324,39 @@ class PokemonCompleteGenerator:
                     "method": self.format_evolution_method(evo_detail)
                 }
 
+                # ===== Nível =====
                 if evo_detail.get('min_level'):
                     detail["min_level"] = evo_detail['min_level']
+
+                # ===== Felicidade / Beleza / Afeto =====
                 if evo_detail.get('min_happiness'):
                     detail["min_happiness"] = evo_detail['min_happiness']
                 if evo_detail.get('min_beauty'):
                     detail["min_beauty"] = evo_detail['min_beauty']
+                if evo_detail.get('min_affection'):
+                    detail["min_affection"] = evo_detail['min_affection']
+
+                # ===== Itens =====
+                # "item"       -> use-item (pedra, etc.)
+                # "held_item"  -> trade com item (NOVO)
                 if evo_detail.get('item'):
                     detail["item"] = evo_detail['item']['name']
-                if evo_detail.get('gender'):
+                if evo_detail.get('held_item'):
+                    detail["held_item"] = evo_detail['held_item']['name']
+
+                # ===== Condições auxiliares =====
+                if evo_detail.get('gender') is not None:
                     detail["gender"] = evo_detail['gender']
                 if evo_detail.get('location'):
                     detail["location"] = evo_detail['location']['name']
                 if evo_detail.get('known_move'):
                     detail["known_move"] = evo_detail['known_move']['name']
+                if evo_detail.get('known_move_type'):
+                    detail["known_move_type"] = evo_detail['known_move_type']['name']
                 if evo_detail.get('time_of_day'):
                     detail["time_of_day"] = evo_detail['time_of_day']
+                if evo_detail.get('relative_physical_stats') is not None:
+                    detail["relative_physical_stats"] = evo_detail['relative_physical_stats']
                 if evo_detail.get('party_species'):
                     detail["party_species"] = evo_detail['party_species']['name']
                 if evo_detail.get('party_type'):
@@ -382,12 +399,24 @@ class PokemonCompleteGenerator:
 
                     if evo_detail.get('item'):
                         variant["item"] = evo_detail['item']['name']
+                    # ===== NOVO: item segurado em trade =====
+                    if evo_detail.get('held_item'):
+                        variant["held_item"] = evo_detail['held_item']['name']
+
                     if evo_detail.get('min_happiness'):
                         variant["min_happiness"] = evo_detail['min_happiness']
+                    if evo_detail.get('min_beauty'):
+                        variant["min_beauty"] = evo_detail['min_beauty']
                     if evo_detail.get('time_of_day'):
                         variant["time_of_day"] = evo_detail['time_of_day']
                     if evo_detail.get('min_level'):
                         variant["min_level"] = evo_detail['min_level']
+                    if evo_detail.get('gender') is not None:
+                        variant["gender"] = evo_detail['gender']
+                    if evo_detail.get('location'):
+                        variant["location"] = evo_detail['location']['name']
+                    if evo_detail.get('known_move'):
+                        variant["known_move"] = evo_detail['known_move']['name']
 
                     variants.append(variant)
 
@@ -450,9 +479,10 @@ class PokemonCompleteGenerator:
                 item = evo.get('item', 'item desconhecido')
                 descriptions.append(f"Usar {item}")
             elif method == 'trade':
-                item = evo.get('item', None)
-                if item:
-                    descriptions.append(f"Trocar segurando {item}")
+                # ===== CORRIGIDO: usa held_item (não item) =====
+                held = evo.get('held_item')
+                if held:
+                    descriptions.append(f"Trocar segurando {held}")
                 else:
                     descriptions.append("Trocar")
             elif method == 'beauty':
@@ -527,6 +557,7 @@ class PokemonCompleteGenerator:
             "mythical": 0,
             "evolves": 0,
             "multiple_variants": 0,
+            "trade_with_item": 0,
             "evolution_methods": {}
         }
 
@@ -544,6 +575,10 @@ class PokemonCompleteGenerator:
                 method = evo.get('method', 'unknown')
                 stats["evolution_methods"][method] = stats["evolution_methods"].get(method, 0) + 1
 
+                # Conta trade com item
+                if method == 'trade' and evo.get('held_item'):
+                    stats["trade_with_item"] += 1
+
         # Estatísticas de gênero
         no_gender = sum(1 for p in pokemon_list if p.get('gender_ratio') == -1)
         male_only = sum(1 for p in pokemon_list if p.get('gender_ratio') == 1.0)
@@ -556,6 +591,7 @@ class PokemonCompleteGenerator:
         print(f"   ✨ Míticos: {stats['mythical']}")
         print(f"   📈 Pokémon que evoluem: {stats['evolves']}")
         print(f"   🔀 Pokémon com múltiplas variantes: {stats['multiple_variants']}")
+        print(f"   🎁 Evoluções por trade com item segurado: {stats['trade_with_item']}")
 
         print("\n⚥ GÊNERO (gender_ratio = chance de ser MACHO):")
         print(f"   🚫 Sem gênero (-1): {no_gender}")

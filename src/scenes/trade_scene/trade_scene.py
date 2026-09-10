@@ -738,26 +738,55 @@ class TradeScene(BaseScene):
 
     def _check_and_evolve_trade(self, pokemon):
         """
-        Verifica se o Pokémon evolui por troca e o evolui INSTANTANEAMENTE.
-        Sem overlay, sem game_scene, SEM som de evolução.
+        Aplica evolução por troca (com ou sem held_item) INSTANTANEAMENTE.
+        Compara IDs de item por NORMALIZAÇÃO (ignora '-' e '_' do item catalog).
         """
-        pokemon_data = self.pokedex.get_pokemon(pokemon.id)
-        if not pokemon_data:
+        methods = self.pokedex.get_evolution_methods(pokemon.id)
+
+        # Fallback legado
+        if not methods:
+            poke_data = self.pokedex.get_pokemon(pokemon.id)
+            if poke_data:
+                evo = poke_data.get("evolution", {})
+                if evo.get("method") == "trade":
+                    methods = [{"method": "trade", "evolve_to": evo.get("EvolveTo")}]
+
+        if not methods:
             return pokemon
 
-        evo_data = pokemon_data.get("evolution", {})
-        method = evo_data.get("method", "none")
+        held_norm = self.pokedex.normalize_item_id(getattr(pokemon, "held_item", None))
 
-        if method != "trade":
+        # ===== Escolhe o primeiro método "trade" válido =====
+        chosen = None
+        for m in methods:
+            if m.get("method") != "trade":
+                continue
+
+            evolve_to = m.get("evolve_to")
+            if not evolve_to or evolve_to == pokemon.id:
+                continue
+
+            required_raw = m.get("held_item") or m.get("item")
+            if required_raw:
+                required_norm = self.pokedex.normalize_item_id(required_raw)
+                # Só aceita se o Pokémon está segurando exatamente o item exigido
+                if not held_norm or held_norm != required_norm:
+                    continue
+
+            chosen = m
+            break
+
+        if not chosen:
             return pokemon
 
-        evolve_to_id = evo_data.get("EvolveTo")
-        if not evolve_to_id or evolve_to_id == "none" or evolve_to_id == pokemon.id:
-            return pokemon
-
-        print(f"[TRADE] {pokemon.name} (ID {pokemon.id}) evolui por troca → ID {evolve_to_id}")
+        evolve_to_id = chosen.get("evolve_to")
+        required_raw = chosen.get("held_item") or chosen.get("item")
+        required_norm = self.pokedex.normalize_item_id(required_raw) if required_raw else None
 
         old_name = pokemon.name
+
+        if required_norm:
+            self._consume_held_item(pokemon)
 
         if hasattr(pokemon, 'evolution'):
             pokemon.evolution._pending_evolution_method = "trade"
@@ -774,10 +803,53 @@ class TradeScene(BaseScene):
             ach.check_and_unlock("evolution_10", "trade")
             ach.check_and_unlock("evolution_50", "trade")
 
-        print(f"[TRADE] ✓ {old_name} evoluiu para {pokemon.name}!")
-        toast_info(f"{old_name} evoluiu para {pokemon.name} ao ser trocado!", duration=4.0)
+        item_note = f" (usou {pokemon.held_item})" if required_norm else ""
+        print(f"[TRADE] ✓ {old_name} evoluiu para {pokemon.name}{item_note}")
+
+        toast_info(
+            f"{old_name} evoluiu para {pokemon.name} ao ser trocado!",
+            duration=4.0,
+        )
 
         return pokemon
+
+    def _consume_held_item(self, pokemon):
+        """
+        Remove o item segurado do Pokémon após a evolução por trade.
+        Sincroniza time, box e cache para evitar resíduos.
+        """
+        try:
+            # 1. Limpa a instância em memória
+            pokemon.held_item = None
+            pokemon.held_item_data = None
+
+            uid = pokemon.unique_id
+            if not uid:
+                return
+
+            # 2. Sincroniza o time (caso o objeto não seja o mesmo da lista)
+            for p in self.game.player.team:
+                if p.unique_id == uid:
+                    p.held_item = None
+                    p.held_item_data = None
+                    break
+
+            # 3. Sincroniza a box (dict)
+            for data in self.game.player.pc_box:
+                if data.get("unique_id") == uid:
+                    data["held_item"] = None
+                    break
+
+            # 4. Sincroniza o cache
+            cache = self.game.player._pokemon_cache.get(uid)
+            if cache is not None:
+                cache.held_item = None
+                cache.held_item_data = None
+
+            print(f"[TRADE] Item consumido do Pokémon {pokemon.name} (uid={uid})")
+
+        except Exception as e:
+            print(f"[TRADE] Erro ao consumir held_item: {e}")
 
     def _remove_pokemon_from_player(self, unique_id):
         if not unique_id:
@@ -1343,7 +1415,7 @@ class TradeScene(BaseScene):
         pygame.draw.rect(screen, border, rect, border_w, border_radius=6)
 
         # Lupa / prefixo
-        prefix = self.font_tiny.render("🔍", True, COL_TEXT_DIM)
+        prefix = self.font_tiny.render("", True, COL_TEXT_DIM)
         # fallback caso a fonte não tenha o glifo
         try:
             if prefix.get_width() > 30:
