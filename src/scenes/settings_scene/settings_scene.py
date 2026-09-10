@@ -22,6 +22,7 @@ class Slider:
         self.dragging = False
         self.rect = pygame.Rect(0, 0, 0, 0)
         self.is_music = False
+        self.is_ambient = False  # NOVO: para diferenciar slider de ambiente
 
         # Animações
         self.scale = 1.0
@@ -69,6 +70,9 @@ class Slider:
             if self.is_music:
                 fill_color = (80, 180, 80)
                 fill_color_end = (50, 150, 50)
+            elif self.is_ambient:
+                fill_color = (180, 160, 80)  # Dourado/amarelo para ambiente
+                fill_color_end = (150, 130, 60)
             else:
                 fill_color = (80, 120, 200)
                 fill_color_end = (50, 90, 180)
@@ -142,6 +146,12 @@ class SettingsScene(BaseScene):
         self.sfx_hint_rect = None
         self.sfx_slider_rect = None
 
+        # ===== NOVO: Ambiente =====
+        self.ambient_label_rect = None
+        self.ambient_checkbox_rect = None
+        self.ambient_hint_rect = None
+        self.ambient_slider_rect = None
+
         self.fullscreen_label_rect = None
         self.fullscreen_checkbox_rect = None
         self.fullscreen_hint_rect = None
@@ -156,6 +166,7 @@ class SettingsScene(BaseScene):
         # ===== SLIDERS =====
         self.music_slider = None
         self.sfx_slider = None
+        self.ambient_slider = None  # NOVO
 
         # ===== CALLBACK =====
         self._on_back_callback = on_back_callback
@@ -164,10 +175,8 @@ class SettingsScene(BaseScene):
         self.has_save = self._check_any_save_exists()
         self.state = "normal" if self.has_save else "blocked"
 
-        if self.has_save:
-            self._load_settings_from_save()
-        else:
-            self._load_default_settings()
+        # ===== CARREGA CONFIGURAÇÕES =====
+        self._load_settings()
 
         # ===== HOVER STATES =====
         self.hover_back = False
@@ -175,6 +184,7 @@ class SettingsScene(BaseScene):
         self.hover_reset = False
         self.hover_music_check = False
         self.hover_sfx_check = False
+        self.hover_ambient_check = False  # NOVO
         self.hover_fullscreen_check = False
         self.hover_vsync_check = False
         self.hover_tab_audio = False
@@ -223,8 +233,8 @@ class SettingsScene(BaseScene):
 
         return False
 
-    def _load_settings_from_save(self):
-        """Carrega configurações do save"""
+    def _load_settings(self):
+        """Carrega configurações do save ou usa padrões"""
         from src.config.settings import settings as global_settings
         from src.managers.save_manager import save_manager
 
@@ -234,6 +244,8 @@ class SettingsScene(BaseScene):
             self.sfx_volume = settings_data.get("sfx_volume", 0.7)
             self.music_enabled = settings_data.get("music_enabled", True)
             self.sfx_enabled = settings_data.get("sfx_enabled", True)
+            self.ambient_volume = settings_data.get("ambient_volume", 0.5)
+            self.ambient_enabled = settings_data.get("ambient_enabled", True)
             self.fullscreen_enabled = settings_data.get("fullscreen", False)
             self.vsync_enabled = settings_data.get("vsync", True)
         else:
@@ -241,18 +253,10 @@ class SettingsScene(BaseScene):
             self.sfx_volume = global_settings.sfx_volume
             self.music_enabled = global_settings.music_enabled
             self.sfx_enabled = global_settings.sfx_enabled
+            self.ambient_volume = getattr(global_settings, 'ambient_volume', 0.5)
+            self.ambient_enabled = getattr(global_settings, 'ambient_enabled', True)
             self.fullscreen_enabled = global_settings.fullscreen
             self.vsync_enabled = global_settings.vsync
-
-    def _load_default_settings(self):
-        """Carrega configurações padrão"""
-        from src.config.settings import settings as global_settings
-        self.music_volume = global_settings.music_volume
-        self.sfx_volume = global_settings.sfx_volume
-        self.music_enabled = global_settings.music_enabled
-        self.sfx_enabled = global_settings.sfx_enabled
-        self.fullscreen_enabled = global_settings.fullscreen
-        self.vsync_enabled = global_settings.vsync
 
     def _get_font_size(self, base_size):
         """Calcula tamanho da fonte baseado no viewport"""
@@ -290,7 +294,7 @@ class SettingsScene(BaseScene):
         title_y = vy + int(vh * 0.025)
         self.title_rect = pygame.Rect(title_x, title_y, title_text.get_width(), title_text.get_height())
 
-        # ===== ABAS (abaixo do título com espaçamento) =====
+        # ===== ABAS =====
         tab_width = int(vw * 0.10)
         tab_height = int(vh * 0.045)
         tab_spacing = int(vw * 0.015)
@@ -379,6 +383,29 @@ class SettingsScene(BaseScene):
             left_x, slider_y, int(slider_width), int(row_height * 0.30)
         )
 
+        # ===== LINHA 3: AMBIENTE (NOVO) =====
+        row_y = start_y + row_height * 2.30
+
+        self.ambient_label_rect = pygame.Rect(
+            left_x, row_y, label_width, int(row_height * 0.35)
+        )
+
+        self.ambient_checkbox_rect = pygame.Rect(
+            left_x + label_width + 10,
+            row_y + (int(row_height * 0.35) - checkbox_size) // 2,
+            checkbox_size, checkbox_size
+        )
+
+        hint_y = row_y + int(row_height * 0.38)
+        self.ambient_hint_rect = pygame.Rect(
+            left_x, hint_y, int(vw * 0.22), int(row_height * 0.22)
+        )
+
+        slider_y = hint_y + int(row_height * 0.28)
+        self.ambient_slider_rect = pygame.Rect(
+            left_x, slider_y, int(slider_width), int(row_height * 0.30)
+        )
+
         # ===== COLUNA DIREITA - VÍDEO =====
         right_x = vx + vw * self.right_col_x
 
@@ -435,6 +462,7 @@ class SettingsScene(BaseScene):
 
     def _init_sliders(self, vx, vy, vw, vh):
         """Inicializa os sliders com posições relativas"""
+        # Slider de música
         if self.music_slider_rect:
             rel_x = (self.music_slider_rect.x - vx) / vw
             rel_y = (self.music_slider_rect.y - vy) / vh
@@ -449,6 +477,7 @@ class SettingsScene(BaseScene):
                 self.music_slider.relative_width = rel_w
             self.music_slider.update_rect(vx, vy, vw, vh)
 
+        # Slider de SFX
         if self.sfx_slider_rect:
             rel_x = (self.sfx_slider_rect.x - vx) / vw
             rel_y = (self.sfx_slider_rect.y - vy) / vh
@@ -462,6 +491,21 @@ class SettingsScene(BaseScene):
                 self.sfx_slider.relative_y = rel_y
                 self.sfx_slider.relative_width = rel_w
             self.sfx_slider.update_rect(vx, vy, vw, vh)
+
+        # ===== NOVO: Slider de AMBIENTE =====
+        if self.ambient_slider_rect:
+            rel_x = (self.ambient_slider_rect.x - vx) / vw
+            rel_y = (self.ambient_slider_rect.y - vy) / vh
+            rel_w = self.ambient_slider_rect.width / vw
+
+            if not self.ambient_slider:
+                self.ambient_slider = Slider(rel_x, rel_y, rel_w, self.ambient_volume)
+                self.ambient_slider.is_ambient = True
+            else:
+                self.ambient_slider.relative_x = rel_x
+                self.ambient_slider.relative_y = rel_y
+                self.ambient_slider.relative_width = rel_w
+            self.ambient_slider.update_rect(vx, vy, vw, vh)
 
     # ======================================================================
     # MÉTODOS DE EVENTOS
@@ -495,6 +539,11 @@ class SettingsScene(BaseScene):
                 self.sfx_volume = self.sfx_slider.value
                 self._apply_sfx_preview()
 
+            # ===== NOVO: Slider de ambiente =====
+            if self.ambient_slider and self.ambient_slider.handle_event(event):
+                self.ambient_volume = self.ambient_slider.value
+                self._apply_ambient_preview()
+
     def _update_hover_states(self, pos):
         """Atualiza estados de hover para todos os elementos"""
         self.hover_back = self.back_button.collidepoint(pos) if self.back_button else False
@@ -506,8 +555,8 @@ class SettingsScene(BaseScene):
         if self.current_tab == "audio":
             self.hover_music_check = self.music_checkbox_rect.collidepoint(pos) if self.music_checkbox_rect else False
             self.hover_sfx_check = self.sfx_checkbox_rect.collidepoint(pos) if self.sfx_checkbox_rect else False
-            self.hover_fullscreen_check = self.fullscreen_checkbox_rect.collidepoint(
-                pos) if self.fullscreen_checkbox_rect else False
+            self.hover_ambient_check = self.ambient_checkbox_rect.collidepoint(pos) if self.ambient_checkbox_rect else False
+            self.hover_fullscreen_check = self.fullscreen_checkbox_rect.collidepoint(pos) if self.fullscreen_checkbox_rect else False
             self.hover_vsync_check = self.vsync_checkbox_rect.collidepoint(pos) if self.vsync_checkbox_rect else False
 
     def _handle_click(self, pos):
@@ -548,6 +597,12 @@ class SettingsScene(BaseScene):
                 self._apply_sfx_preview()
                 sound_manager.play_effect(SoundEffect.CLICK)
 
+            # ===== NOVO: Checkbox de ambiente =====
+            if self.ambient_checkbox_rect and self.ambient_checkbox_rect.collidepoint(pos):
+                self.ambient_enabled = not self.ambient_enabled
+                self._apply_ambient_preview()
+                sound_manager.play_effect(SoundEffect.CLICK)
+
             if self.fullscreen_checkbox_rect and self.fullscreen_checkbox_rect.collidepoint(pos):
                 self.fullscreen_enabled = not self.fullscreen_enabled
                 sound_manager.play_effect(SoundEffect.CLICK)
@@ -580,6 +635,18 @@ class SettingsScene(BaseScene):
         else:
             sound_manager.set_sfx_volume(0)
 
+    def _apply_ambient_preview(self):
+        """Aplica preview dos sons ambiente"""
+        from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
+
+        if self.ambient_enabled and self.ambient_volume > 0:
+            ambient_sound_manager.set_ambient_volume(self.ambient_volume)
+            # Toca um preview curto (chuva)
+            if not ambient_sound_manager.is_playing():
+                ambient_sound_manager.play_ambient("rain", loop=True)
+        else:
+            ambient_sound_manager.stop_ambient()
+
     # ======================================================================
     # MÉTODOS DE AÇÃO
     # ======================================================================
@@ -588,6 +655,7 @@ class SettingsScene(BaseScene):
         """Aplica e salva as configurações"""
         from src.config.settings import settings as global_settings
         from src.managers.save_manager import save_manager
+        from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
 
         old_fullscreen = global_settings.fullscreen
         old_vsync = global_settings.vsync
@@ -596,10 +664,17 @@ class SettingsScene(BaseScene):
         global_settings.sfx_volume = self.sfx_volume
         global_settings.music_enabled = self.music_enabled
         global_settings.sfx_enabled = self.sfx_enabled
+        global_settings.ambient_volume = self.ambient_volume
+        global_settings.ambient_enabled = self.ambient_enabled
         global_settings.fullscreen = self.fullscreen_enabled
         global_settings.vsync = self.vsync_enabled
 
+        # Aplica ao sound_manager
         sound_manager.sync_all_managers()
+
+        # Aplica ao ambient_sound_manager
+        ambient_sound_manager.set_ambient_enabled(self.ambient_enabled)
+        ambient_sound_manager.set_ambient_volume(self.ambient_volume if self.ambient_enabled else 0)
 
         if global_settings.fullscreen != old_fullscreen:
             self.screen_manager.toggle_fullscreen()
@@ -618,6 +693,8 @@ class SettingsScene(BaseScene):
         self.sfx_volume = 0.7
         self.music_enabled = True
         self.sfx_enabled = True
+        self.ambient_volume = 0.5
+        self.ambient_enabled = True
         self.fullscreen_enabled = False
         self.vsync_enabled = True
 
@@ -625,15 +702,22 @@ class SettingsScene(BaseScene):
             self.music_slider.value = self.music_volume
         if self.sfx_slider:
             self.sfx_slider.value = self.sfx_volume
+        if self.ambient_slider:
+            self.ambient_slider.value = self.ambient_volume
 
         self._apply_music_preview()
         self._apply_sfx_preview()
+        self._apply_ambient_preview()
         sound_manager.play_effect(SoundEffect.CLICK)
 
     def _go_back(self):
         """Volta para a cena anterior"""
         sound_manager.stop_music()
         self.preview_music_timer = 0
+
+        # Para sons ambiente ao voltar
+        from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
+        ambient_sound_manager.stop_ambient()
 
         if self._on_back_callback is not None:
             callback = self._on_back_callback
@@ -723,7 +807,6 @@ class SettingsScene(BaseScene):
         border = (150, 150, 180) if is_active else (80, 80, 95)
         text_color = (255, 255, 255) if is_active else (180, 180, 190)
 
-        # Sombra
         shadow_rect = self.tab_audio_button.copy()
         shadow_rect.y += 3
         pygame.draw.rect(screen, (10, 10, 15), shadow_rect, border_radius=8)
@@ -732,7 +815,6 @@ class SettingsScene(BaseScene):
         pygame.draw.rect(screen, border, self.tab_audio_button, 2, border_radius=8)
 
         if is_active:
-            # Linha indicadora
             indicator_rect = pygame.Rect(
                 self.tab_audio_button.x + 15,
                 self.tab_audio_button.bottom - 3,
@@ -783,14 +865,19 @@ class SettingsScene(BaseScene):
             self.music_slider.render(screen, self.value_font)
         if self.sfx_slider:
             self.sfx_slider.render(screen, self.value_font)
+        # ===== NOVO: Slider de ambiente =====
+        if self.ambient_slider:
+            self.ambient_slider.render(screen, self.value_font)
 
         self._render_checkbox(screen, self.music_checkbox_rect, self.music_enabled, self.hover_music_check)
         self._render_checkbox(screen, self.sfx_checkbox_rect, self.sfx_enabled, self.hover_sfx_check)
-        self._render_checkbox(screen, self.fullscreen_checkbox_rect, self.fullscreen_enabled,
-                              self.hover_fullscreen_check)
+        # ===== NOVO: Checkbox de ambiente =====
+        self._render_checkbox(screen, self.ambient_checkbox_rect, self.ambient_enabled, self.hover_ambient_check)
+        self._render_checkbox(screen, self.fullscreen_checkbox_rect, self.fullscreen_enabled, self.hover_fullscreen_check)
         self._render_checkbox(screen, self.vsync_checkbox_rect, self.vsync_enabled, self.hover_vsync_check)
 
         self._render_audio_hints(screen)
+        self._render_ambient_hints(screen)  # NOVO
         self._render_video_hints(screen)
 
     def _render_shortcuts_tab(self, screen):
@@ -948,6 +1035,12 @@ class SettingsScene(BaseScene):
             sfx_label = self.label_font.render("EFEITOS", True, (220, 220, 230))
             screen.blit(sfx_label, (self.sfx_label_rect.x, self.sfx_label_rect.y))
 
+    def _render_ambient_labels(self, screen):
+        """Renderiza os labels da seção de ambiente"""
+        if self.ambient_label_rect:
+            ambient_label = self.label_font.render("AMBIENTE", True, (220, 220, 230))
+            screen.blit(ambient_label, (self.ambient_label_rect.x, self.ambient_label_rect.y))
+
     def _render_video_labels(self, screen):
         """Renderiza os labels da seção de vídeo"""
         if self.fullscreen_label_rect:
@@ -967,6 +1060,12 @@ class SettingsScene(BaseScene):
         if self.sfx_hint_rect:
             sfx_hint = self.hint_font.render("Volume dos efeitos", True, (110, 110, 130))
             screen.blit(sfx_hint, (self.sfx_hint_rect.x, self.sfx_hint_rect.y))
+
+    def _render_ambient_hints(self, screen):
+        """Renderiza as dicas da seção de ambiente"""
+        if self.ambient_hint_rect:
+            ambient_hint = self.hint_font.render("Volume dos sons de ambiente", True, (110, 110, 130))
+            screen.blit(ambient_hint, (self.ambient_hint_rect.x, self.ambient_hint_rect.y))
 
     def _render_video_hints(self, screen):
         """Renderiza as dicas da seção de vídeo"""
@@ -1007,12 +1106,10 @@ class SettingsScene(BaseScene):
         if not self.back_button:
             return
 
-        # Sombra
         shadow_rect = self.back_button.copy()
         shadow_rect.y += 3
         pygame.draw.rect(screen, (10, 10, 15), shadow_rect, border_radius=8)
 
-        # Fundo
         pygame.draw.rect(screen, (45, 45, 55), self.back_button, border_radius=8)
         pygame.draw.rect(screen, (100, 85, 55) if not self.hover_back else (140, 120, 80),
                          self.back_button, 2, border_radius=8)
@@ -1030,12 +1127,10 @@ class SettingsScene(BaseScene):
         if not rect:
             return
 
-        # Sombra
         shadow_rect = rect.copy()
         shadow_rect.y += 3
         pygame.draw.rect(screen, (15, 15, 25), shadow_rect, border_radius=8)
 
-        # Fundo
         if hover:
             bg_color = (80, 70, 55)
             border_color = (160, 140, 100)
@@ -1048,12 +1143,10 @@ class SettingsScene(BaseScene):
         pygame.draw.rect(screen, bg_color, rect, border_radius=8)
         pygame.draw.rect(screen, border_color, rect, 2, border_radius=8)
 
-        # Glow no hover
         if hover:
             glow_rect = rect.inflate(4, 4)
             pygame.draw.rect(screen, (120, 100, 70, 50), glow_rect, 1, border_radius=10)
 
-        # Texto
         font_size = int(rect.height * 0.45)
         button_font = pygame.font.Font(None, font_size)
         button_text = button_font.render(text, True, text_color)

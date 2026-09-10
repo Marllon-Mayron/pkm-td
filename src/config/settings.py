@@ -26,6 +26,10 @@ class Settings:
         self.music_enabled = True
         self.sfx_enabled = True
 
+        # ===== NOVO: Configurações de ambiente (clima) =====
+        self.ambient_volume = 0.5
+        self.ambient_enabled = True
+
         # Cores
         self.colors = {
             'black': (0, 0, 0),
@@ -37,16 +41,20 @@ class Settings:
             'light_gray': (200, 200, 200)
         }
 
-        # NÃO carrega mais de config.json
-        # As configurações serão carregadas DO SAVE quando o jogo iniciar
-
     def apply_to_sound_manager(self):
         """Aplica as configurações atuais ao SoundManager"""
         try:
             from src.managers.sounds.sound_manager import sound_manager
             sound_manager.set_music_volume(self.music_volume if self.music_enabled else 0)
             sound_manager.set_sfx_volume(self.sfx_volume if self.sfx_enabled else 0)
-            print(f"[SETTINGS] Aplicado ao SoundManager: música={self.music_volume} (enabled={self.music_enabled}), SFX={self.sfx_volume} (enabled={self.sfx_enabled})")
+
+            # ===== Sincroniza o ambient_sound_manager =====
+            from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
+            ambient_sound_manager.set_ambient_volume(self.ambient_volume if self.ambient_enabled else 0)
+
+            print(f"[SETTINGS] Aplicado: música={self.music_volume} (enabled={self.music_enabled}), "
+                  f"SFX={self.sfx_volume} (enabled={self.sfx_enabled}), "
+                  f"Ambiente={self.ambient_volume} (enabled={self.ambient_enabled})")
         except Exception as e:
             print(f"[SETTINGS] Não foi possível aplicar ao SoundManager: {e}")
 

@@ -145,7 +145,6 @@ class SoundManager(BaseSoundManager):
             sound = pygame.mixer.Sound(str(file_path))
             sound_id = file_path.stem
             self._sounds[sound_id] = sound
-            # print(f"[SOUND] Carregado: {sound_id}")
         except Exception as e:
             print(f"[SOUND] Erro ao carregar {file_path}: {e}")
 
@@ -195,7 +194,6 @@ class SoundManager(BaseSoundManager):
         if music_path.exists():
             for ext in ['.mp3', '.ogg', '.wav']:
                 files = list(music_path.glob(f"*{ext}"))
-                print(f"[MUSIC] Encontrados {len(files)} arquivos com extensão {ext}")
                 music_files.extend(files)
 
         if not music_files:
@@ -203,7 +201,6 @@ class SoundManager(BaseSoundManager):
 
         import random
         selected_music = random.choice(music_files)
-        print(f"[MUSIC] Música selecionada: {selected_music.name}")
         self.play_music(selected_music.stem, loop=True)
         return True
 
@@ -263,9 +260,7 @@ class SoundManager(BaseSoundManager):
             return False
 
     def play_team_select_music(self, loop: bool = True):
-        """
-        Toca a música da tela de seleção de time (Come_Along)
-        """
+        """Toca a música da tela de seleção de time (Come_Along)"""
         return self.play_menu_music("Come_Along", loop)
 
     def play_music(self, music_id: str, fade_ms: int = 1000, loop: bool = True):
@@ -366,9 +361,12 @@ class SoundManager(BaseSoundManager):
         """Sincroniza todos os gerenciadores de som com as configurações atuais"""
         from src.config.settings import settings
 
-        # CORRIGIDO: self em vez de sound_manager
         self.set_sfx_volume(settings.sfx_volume if settings.sfx_enabled else 0)
         self.set_music_volume(settings.music_volume if settings.music_enabled else 0)
+
+        # ===== SINCRONIZA AMBIENTE =====
+        from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
+        ambient_sound_manager.sync_with_main_manager()
 
         # Sincroniza o MoveSoundManager (já é feito no set_sfx_volume, mas garantimos)
         from src.managers.sounds.move_sound_manager import move_sound_manager
@@ -384,7 +382,6 @@ class SoundManager(BaseSoundManager):
             print(f"[SOUND] Música desabilitada")
             return False
 
-        # Toca a música Victory_Wild (uma vez, sem loop)
         self.play_music("Victory_Wild", fade_ms=500, loop=False)
         return True
 
@@ -396,7 +393,6 @@ class SoundManager(BaseSoundManager):
             print(f"[SOUND] Música desabilitada")
             return False
 
-        # Toca a música Defeat (uma vez, sem loop)
         self.play_music("Defeat", fade_ms=500, loop=False)
         return True
 

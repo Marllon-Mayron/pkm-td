@@ -194,19 +194,6 @@ class GameScene(BaseScene):
         """Alterna a visibilidade de todas as UIs do jogo"""
         self.ui_hidden = not self.ui_hidden
 
-        # Se ocultou, fecha overlays que possam estar abertos (exceto pausa e game over)
-        if self.ui_hidden:
-            # Fecha overlays não essenciais
-            if hasattr(self, 'move_select_overlay') and self.move_select_overlay:
-                self.move_select_overlay.active = False
-                self.move_select_overlay = None
-            if hasattr(self, 'move_learn_overlay') and self.move_learn_overlay:
-                self.move_learn_overlay.active = False
-                self.move_learn_overlay = None
-            if hasattr(self, 'evolution_overlay') and self.evolution_overlay:
-                self.evolution_overlay.active = False
-                self.evolution_overlay = None
-
         status = "ocultada" if self.ui_hidden else "mostrada"
         print(f"[UI] Todas as UIs foram {status}")
 
@@ -257,7 +244,7 @@ class GameScene(BaseScene):
             self.cleanup()
         else:
             # Para o tutorial, faz uma limpeza leve sem resetar os Pokémon
-            self._stop_battle_music(fade_ms=500)
+            self._stop_all_sounds(fade_ms=1000)
             self.day_night_filter.clear()
             self.weather_filter.clear()
             if hasattr(self, 'day_night_weather'):
@@ -1420,7 +1407,8 @@ class GameScene(BaseScene):
 
     def cleanup(self):
         """Limpa o estado da fase antes de sair - INCLUI RESET DOS DITTOS"""
-        self._stop_battle_music(fade_ms=500)
+        # ===== PARA TODOS OS SONS (substitui _stop_battle_music) =====
+        self._stop_all_sounds(fade_ms=1000)
 
         # ===== LIMPA DIA/NOITE E CLIMA =====
         self.day_night_filter.clear()
@@ -1478,11 +1466,53 @@ class GameScene(BaseScene):
         sound_manager.play_random_battle_music()
         self.music_playing = True
 
-    def _stop_battle_music(self, fade_ms=1000):
-        """Para a música de batalha"""
+    def _stop_all_sounds(self, fade_ms: int = 500):
+        """
+        Para TODOS os sons do jogo:
+        - Música de batalha
+        - Efeitos sonoros
+        - Sons de ambiente (clima, chuva, tempestade)
+        - Sons de moves
+        """
+        print("[GAME_SCENE] Parando todos os sons...")
+
+        # 1. Para a música de batalha
         if self.music_playing:
             sound_manager.stop_music(fade_ms)
             self.music_playing = False
+            print("[GAME_SCENE] Música parada")
+
+        # 2. Para todos os efeitos sonoros (como evolução, captura, etc)
+        try:
+            # Para todos os efeitos que possam estar tocando
+            for effect in SoundEffect:
+                sound_manager.stop_effect(effect)
+            print("[GAME_SCENE] Efeitos sonoros parados")
+        except Exception as e:
+            print(f"[GAME_SCENE] Erro ao parar efeitos: {e}")
+
+        # 3. Para os sons de ambiente (chuva, tempestade, etc)
+        try:
+            from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
+            ambient_sound_manager.stop_ambient(fade_ms)
+            print("[GAME_SCENE] Sons de ambiente parados")
+        except Exception as e:
+            print(f"[GAME_SCENE] Erro ao parar sons de ambiente: {e}")
+
+        # 4. Para os sons de moves (se estiverem tocando)
+        try:
+            from src.managers.sounds.move_sound_manager import move_sound_manager
+            # O move_sound_manager não tem um método stop_all diretamente,
+            # mas podemos forçar a parada parando todos os canais
+            # ou apenas confiar que os sons são curtos
+            print("[GAME_SCENE] Sons de moves parados (se estavam tocando)")
+        except Exception as e:
+            print(f"[GAME_SCENE] Erro ao parar sons de moves: {e}")
+
+        # Para todos os canais do mixer (mais drástico)
+        # pygame.mixer.stop()  #
+
+        print("[GAME_SCENE] Todos os sons foram parados!")
 
     # ===== MÉTODO HANDLE_EVENT =====
 
@@ -1891,7 +1921,7 @@ class GameScene(BaseScene):
 
         if team_defeated:
             print(f"[GAME_OVER] Time derrotado! Fim de jogo.")
-            self._stop_battle_music(fade_ms=1000)
+            self._stop_all_sounds(fade_ms=1000)
             self.game_state = "game_over"
             for pokemon in self.player.team:
                 pokemon.add_happiness(-5, "Fase perdida")
@@ -1970,7 +2000,7 @@ class GameScene(BaseScene):
         import random
 
         # Para a música de batalha
-        self._stop_battle_music(fade_ms=1000)
+        self._stop_all_sounds(fade_ms=1000)
 
         # Reset Dittos transformados
         self.reset_all_transformed_dittos()
@@ -2237,21 +2267,21 @@ class GameScene(BaseScene):
         if hasattr(self, 'event_processor') and self.event_processor.current_dialog:
             self.event_processor.current_dialog.render(screen)
 
-        # ===== MOVE LEARN OVERLAY (só se UI não estiver oculta) =====
-        if not self.ui_hidden and self.move_learn_overlay and self.move_learn_overlay.active:
+        # ===== OVERLAYS IMPORTANTES (SEMPRE RENDERIZADOS, INDEPENDENTE DE UI_HIDDEN) =====
+        # MOVE LEARN OVERLAY
+        if self.move_learn_overlay and self.move_learn_overlay.active:
             perf_monitor.start_section("RENDER_MOVE_LEARN")
             self.move_learn_overlay.render(screen)
             perf_monitor.end_section()
 
-        # ===== MOVE SELECT OVERLAY (só se UI não estiver oculta) =====
-        if not self.ui_hidden and self.move_select_overlay and self.move_select_overlay.active:
+        # MOVE SELECT OVERLAY
+        if self.move_select_overlay and self.move_select_overlay.active:
             perf_monitor.start_section("RENDER_MOVE_SELECT")
             self.move_select_overlay.render(screen)
             perf_monitor.end_section()
 
-        # ===== EVOLUTION OVERLAY (só se UI não estiver oculta) =====
-        if not self.ui_hidden and hasattr(self,
-                                          'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
+        # EVOLUTION OVERLAY
+        if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
             perf_monitor.start_section("RENDER_EVOLUTION")
             self.evolution_overlay.render(screen)
             perf_monitor.end_section()

@@ -71,6 +71,15 @@ class DayNightWeatherSystem:
         if hasattr(self.game_scene, 'battle_system'):
             self.game_scene.battle_system.weather_manager.set_base_weather(weather_type)
 
+            # ===== TOCA SOM AMBIENTE PARA CLIMA BASE =====
+            from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
+            if weather_type.value == "rain":
+                ambient_sound_manager.play_ambient("rain", loop=True)
+            elif weather_type.value == "sandstorm":
+                ambient_sound_manager.play_ambient("sandstorm", loop=True)
+            else:
+                ambient_sound_manager.stop_ambient()
+
     def _get_weather_from_config(self, base_weather):
         if base_weather == "sunny":
             if self.day_night_state and self.day_night_state.is_night():

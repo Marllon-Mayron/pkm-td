@@ -97,31 +97,44 @@ class WeatherManager:
         return self.current_weather and not self.current_weather.is_base_weather and self.current_weather.source is not None
 
     def _on_weather_start(self, weather: WeatherState):
+        from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
+
         if self.battle_system and self.battle_system.effect_manager:
             if weather.is_base_weather:
-                # Clima base: mensagem mais sutil
                 self.battle_system.effect_manager.add_status_text(
                     None,
                     f"{weather.get_display_name()} (clima da fase)",
                     duration=2.0
                 )
             else:
-                # Clima temporário: mensagem normal
                 self.battle_system.effect_manager.add_status_text(
                     None,
                     weather.get_display_name(),
                     duration=2.0
                 )
 
+        # ===== TOCA SOM AMBIENTE =====
+        if weather.type.value == "rain":
+            ambient_sound_manager.play_ambient("rain", loop=True)
+        elif weather.type.value == "sandstorm":
+            ambient_sound_manager.play_ambient("sandstorm", loop=True)
+        elif weather.type.value == "sunny":
+            # Para sons de chuva/tempestade se estiver sol
+            ambient_sound_manager.stop_ambient()
+
     def _on_weather_end(self, weather: WeatherState):
+        from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
+
         if self.battle_system and self.battle_system.effect_manager:
-            # Só mostra mensagem se não for clima base (que nunca acaba)
             if not weather.is_base_weather:
                 self.battle_system.effect_manager.add_status_text(
                     None,
                     f"{weather.get_display_name()} acabou!",
                     duration=2.0
                 )
+
+        # ===== PARA O SOM AMBIENTE =====
+        ambient_sound_manager.stop_ambient(fade_ms=500)
 
     def _apply_weather_damage(self, dt: float):
         """Aplica dano de clima a cada tick (a cada ~2 segundos)"""

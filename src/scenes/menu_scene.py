@@ -1,23 +1,135 @@
 # src/scenes/menu_scene.py
 
 """
-Cena do menu principal - Layout reformulado
+Cena do menu principal - Layout com preview de imagens
 """
 import pygame
 import random
 import os
 import json
+from pathlib import Path
 
+from config.paths import SPRITES_PATH
 from src.scenes.base_scene import BaseScene
 from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 from src.scenes.settings_scene.settings_scene import SettingsScene
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
+from src.config.paths import RES_PATH
+
+
+class ImageSlideshow:
+    """Gerenciador de slideshow de imagens para o menu"""
+
+    def __init__(self):
+        self.images = []
+        self.current_index = 0
+        self.timer = 0
+        self.switch_interval = 3.0  # Troca a cada 3 segundos
+        self.image_surfaces = []
+        self._loaded = False
+
+    def load_images(self):
+        """Carrega as imagens do diretório Res/screenshots"""
+        screenshots_path = SPRITES_PATH / "screenshots"
+
+        if not screenshots_path.exists():
+            print(f"[SLIDESHOW] Diretório não encontrado: {screenshots_path}")
+            return
+
+        # Busca todas as imagens Capturar1.png a Capturar5.png
+        image_files = []
+        for i in range(1, 8):
+            img_path = screenshots_path / f"Capturar{i}.png"
+            if img_path.exists():
+                image_files.append(img_path)
+            else:
+                # Tenta com extensão .jpg também
+                img_path_jpg = screenshots_path / f"Capturar{i}.jpg"
+                if img_path_jpg.exists():
+                    image_files.append(img_path_jpg)
+
+        if not image_files:
+            print(f"[SLIDESHOW] Nenhuma imagem encontrada em {screenshots_path}")
+            # Cria uma imagem de fallback
+            self._create_fallback_images()
+            return
+
+        # Carrega as imagens
+        for img_path in image_files:
+            try:
+                img = pygame.image.load(str(img_path))
+                if img:
+                    self.image_surfaces.append(img)
+                    print(f"[SLIDESHOW] Carregada: {img_path.name}")
+            except Exception as e:
+                print(f"[SLIDESHOW] Erro ao carregar {img_path.name}: {e}")
+
+        if not self.image_surfaces:
+            self._create_fallback_images()
+        else:
+            self._loaded = True
+
+    def _create_fallback_images(self):
+        """Cria imagens de fallback coloridas"""
+        print("[SLIDESHOW] Criando imagens de fallback")
+        colors = [
+            (40, 30, 80), (30, 50, 70), (50, 30, 60), (30, 60, 50), (60, 40, 30)
+        ]
+        for i, color in enumerate(colors):
+            surf = pygame.Surface((400, 300))
+            surf.fill(color)
+
+            # Texto "Screenshot {i+1}"
+            font = pygame.font.Font(None, 36)
+            text = font.render(f"Preview {i + 1}", True, (200, 200, 220))
+            text_rect = text.get_rect(center=(200, 150))
+            surf.blit(text, text_rect)
+
+            # Borda
+            pygame.draw.rect(surf, (100, 100, 140), surf.get_rect(), 2)
+
+            self.image_surfaces.append(surf)
+        self._loaded = True
+
+    def update(self, dt):
+        """Atualiza o timer do slideshow"""
+        if not self._loaded or len(self.image_surfaces) <= 1:
+            return
+
+        self.timer += dt
+        if self.timer >= self.switch_interval:
+            self.timer = 0
+            self.current_index = (self.current_index + 1) % len(self.image_surfaces)
+
+    def get_current_image(self):
+        """Retorna a imagem atual"""
+        if not self._loaded or not self.image_surfaces:
+            return None
+        return self.image_surfaces[self.current_index]
+
+    def next(self):
+        """Vai para a próxima imagem"""
+        if not self._loaded or len(self.image_surfaces) <= 1:
+            return
+        self.current_index = (self.current_index + 1) % len(self.image_surfaces)
+        self.timer = 0
+
+    def prev(self):
+        """Vai para a imagem anterior"""
+        if not self._loaded or len(self.image_surfaces) <= 1:
+            return
+        self.current_index = (self.current_index - 1) % len(self.image_surfaces)
+        self.timer = 0
+
+    def get_image_count(self):
+        """Retorna o número de imagens carregadas"""
+        return len(self.image_surfaces)
 
 
 class Button:
     """Botão estilizado com responsividade e efeitos visuais"""
 
-    def __init__(self, x, y, width, height, text, color, hover_color, callback, font=None):
+    def __init__(self, x, y, width, height, text, color, hover_color, callback, font=None, volume: float = None):
         # Coordenadas relativas (0-1) para responsividade
         self.relative_x = x
         self.relative_y = y
@@ -34,6 +146,10 @@ class Button:
         self.is_hovered = False
         self._was_hovered = False
 
+        # ===== VOLUME DO SOM DO BOTÃO =====
+        # Se None, usa o volume global. Se for um valor, usa esse volume diretamente
+        self.volume = volume
+
         # Texto pré-renderizado
         self.text_surface = None
         self.text_rect = None
@@ -43,6 +159,10 @@ class Button:
         self.glow_direction = 1
         self.scale = 1.0
         self.target_scale = 1.0
+
+        # Ícone (opcional)
+        self.icon = None
+        self.icon_rect = None
 
     def update_absolute_position(self, viewport_width, viewport_height, viewport_x, viewport_y):
         """Atualiza posição absoluta baseada no tamanho do viewport"""
@@ -54,7 +174,7 @@ class Button:
         self.rect = pygame.Rect(abs_x, abs_y, abs_width, abs_height)
 
         # Atualiza texto com tamanho responsivo
-        font_size = max(20, int(viewport_height * 0.035))
+        font_size = max(18, int(viewport_height * 0.032))
         if self.font is None:
             self.font = pygame.font.Font(None, font_size)
         self.text_surface = self.font.render(self.text, True, (255, 255, 255))
@@ -82,14 +202,14 @@ class Button:
 
             if self.is_hovered and not was_hovered:
                 self.target_scale = 1.05
-                sound_manager.play_effect(SoundEffect.CLICK)  # Volume controlado pelo SoundManager
+                sound_manager.play_effect(SoundEffect.CLICK, volume=self.volume)
 
             elif not self.is_hovered and was_hovered:
                 self.target_scale = 1.0
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered:
-                sound_manager.play_effect(SoundEffect.CLICK)
+                sound_manager.play_effect(SoundEffect.CLICK, volume=self.volume)
                 self.target_scale = 0.95
                 if self.callback:
                     self.callback()
@@ -113,8 +233,8 @@ class Button:
 
         # Sombra do botão
         shadow_rect = scaled_rect.copy()
-        shadow_rect.y += 4
-        pygame.draw.rect(screen, (10, 10, 20, 50), shadow_rect, border_radius=10)
+        shadow_rect.y += 3
+        pygame.draw.rect(screen, (10, 10, 20, 50), shadow_rect, border_radius=8)
 
         # Cor do botão
         color = self.hover_color if self.is_hovered else self.color
@@ -124,20 +244,20 @@ class Button:
             # Efeito de glow
             glow_surface = pygame.Surface((scaled_rect.width, scaled_rect.height), pygame.SRCALPHA)
             glow_rect = glow_surface.get_rect()
-            pygame.draw.rect(glow_surface, (*color[:3], self.glow_alpha), glow_rect, border_radius=10)
+            pygame.draw.rect(glow_surface, (*color[:3], self.glow_alpha), glow_rect, border_radius=8)
             screen.blit(glow_surface, scaled_rect)
 
             # Borda brilhante
-            pygame.draw.rect(screen, (255, 215, 0), scaled_rect, 3, border_radius=10)
+            pygame.draw.rect(screen, (255, 215, 0), scaled_rect, 3, border_radius=8)
         else:
-            pygame.draw.rect(screen, color, scaled_rect, border_radius=10)
-            pygame.draw.rect(screen, (80, 70, 50), scaled_rect, 2, border_radius=10)
+            pygame.draw.rect(screen, color, scaled_rect, border_radius=8)
+            pygame.draw.rect(screen, (80, 70, 50), scaled_rect, 2, border_radius=8)
 
         # Efeito de brilho interno
         if self.is_hovered:
-            inner_glow = pygame.Surface((scaled_rect.width - 10, scaled_rect.height - 10), pygame.SRCALPHA)
-            pygame.draw.rect(inner_glow, (255, 255, 255, 30), inner_glow.get_rect(), border_radius=8)
-            screen.blit(inner_glow, (scaled_rect.x + 5, scaled_rect.y + 5))
+            inner_glow = pygame.Surface((scaled_rect.width - 8, scaled_rect.height - 8), pygame.SRCALPHA)
+            pygame.draw.rect(inner_glow, (255, 255, 255, 25), inner_glow.get_rect(), border_radius=6)
+            screen.blit(inner_glow, (scaled_rect.x + 4, scaled_rect.y + 4))
 
         # Desenha texto
         text_surface_scaled = pygame.transform.scale(
@@ -150,7 +270,7 @@ class Button:
 
 
 class MenuScene(BaseScene):
-    """Cena do menu principal com layout reformulado"""
+    """Cena do menu principal com layout reformulado - botões à esquerda e preview à direita"""
 
     def __init__(self, game):
         super().__init__(game)
@@ -167,6 +287,10 @@ class MenuScene(BaseScene):
         self._music_started = False
         self._animation_timer = 0
 
+        # ===== SLIDESHOW =====
+        self.slideshow = ImageSlideshow()
+        self.slideshow.load_images()
+
         # ===== LOGO =====
         self.logo_surface = None
         self.logo_rect = None
@@ -182,6 +306,12 @@ class MenuScene(BaseScene):
 
         # ===== INICIA MÚSICA =====
         self._start_menu_music()
+
+        # ===== NAVEGAÇÃO DO SLIDESHOW =====
+        self._nav_left_rect = None
+        self._nav_right_rect = None
+        self._nav_hover_left = False
+        self._nav_hover_right = False
 
     # ======================================================================
     # INICIALIZAÇÃO
@@ -211,7 +341,7 @@ class MenuScene(BaseScene):
 
         # Título "POKEMON"
         font_large = pygame.font.Font(None, 60)
-        text_pokemon = font_large.render("POKÉMON", True, (255, 255, 255))
+        text_pokemon = font_large.render("POKEMON", True, (255, 255, 255))
         text_rect = text_pokemon.get_rect(center=(logo_width // 2, 55))
         self.logo_surface.blit(text_pokemon, text_rect)
 
@@ -226,36 +356,50 @@ class MenuScene(BaseScene):
                          (logo_width // 4, 80), (logo_width * 3 // 4, 80), 2)
 
     def _create_buttons(self):
-        """Cria os botões com layout melhorado"""
+        """Cria os botões com layout melhorado - posicionados à esquerda"""
+        # Ajuste para ocupar a metade esquerda da tela
+        left_margin = 0.05
+        button_width = 0.35
+
+        # Botão principal (mais espaçado)
+        main_btn_y = 0.30
+
+        # ===== VOLUME DOS BOTÕES (30% do volume global) =====
+        BTN_VOLUME = 0.3
+
         self.buttons = [
             # ===== BOTÃO PRINCIPAL (DESTAQUE) =====
-            Button(0.25, 0.42, 0.50, 0.08, self.start_text,
-                   (60, 60, 20), (120, 120, 30), self.start_game, None),
+            Button(left_margin, main_btn_y, button_width, 0.08, self.start_text,
+                   (60, 60, 20), (120, 120, 30), self.start_game, None,
+                   volume=BTN_VOLUME),
 
             # ===== BOTÕES SECUNDÁRIOS =====
-            Button(0.25, 0.52, 0.50, 0.07, "Multiplayer",
-                   (40, 40, 60), (80, 80, 120), self.open_multiplayer, None),
+            Button(left_margin, main_btn_y + 0.10, button_width, 0.07, "Multiplayer",
+                   (40, 40, 60), (80, 80, 120), self.open_multiplayer, None,
+                   volume=BTN_VOLUME),
 
-            Button(0.25, 0.61, 0.50, 0.07, "Configurações",
-                   (40, 40, 60), (80, 80, 120), self.open_settings, None),
+            Button(left_margin, main_btn_y + 0.19, button_width, 0.07, "Configuracoes",
+                   (40, 40, 60), (80, 80, 120), self.open_settings, None,
+                   volume=BTN_VOLUME),
 
-            Button(0.25, 0.70, 0.50, 0.07, "Editor de Fases",
-                   (40, 40, 60), (80, 80, 120), self.open_editor, None),
+            Button(left_margin, main_btn_y + 0.28, button_width, 0.07, "Editor de Fases",
+                   (40, 40, 60), (80, 80, 120), self.open_editor, None,
+                   volume=BTN_VOLUME),
 
-            Button(0.25, 0.79, 0.50, 0.07, "Sair",
-                   (60, 20, 20), (120, 30, 30), self.quit_game, None),
+            # ===== BOTÕES DE AÇÕES RÁPIDAS (lado a lado abaixo do Editor) =====
+            Button(left_margin, main_btn_y + 0.37, 0.17, 0.06, "Mystery Gift",
+                   (40, 20, 40), (80, 40, 80), self.open_mystery_gift, None,
+                   volume=BTN_VOLUME),
+
+            Button(left_margin + 0.18, main_btn_y + 0.37, 0.17, 0.06, "RESETAR",
+                   (60, 15, 15), (120, 25, 25), self.show_reset_confirmation, None,
+                   volume=BTN_VOLUME),
+
+            # ===== BOTÃO SAIR (mais abaixo) =====
+            Button(left_margin, main_btn_y + 0.46, button_width, 0.07, "Sair",
+                   (60, 20, 20), (120, 30, 30), self.quit_game, None,
+                   volume=BTN_VOLUME),
         ]
-
-        # ===== BOTÕES DOS CANTOS (menores) =====
-        # Mystery Gift (canto inferior esquerdo)
-        mg_button = Button(0.02, 0.88, 0.15, 0.05, "Mystery Gift",
-                           (40, 20, 40), (80, 40, 80), self.open_mystery_gift, None)
-        self.buttons.append(mg_button)
-
-        # Reset (canto inferior direito)
-        reset_button = Button(0.83, 0.88, 0.15, 0.05, "RESETAR",
-                              (60, 15, 15), (120, 25, 25), self.show_reset_confirmation, None)
-        self.buttons.append(reset_button)
 
     def _create_particles(self):
         """Cria partículas decorativas mais bonitas"""
@@ -335,7 +479,7 @@ class MenuScene(BaseScene):
         if not self.reset_confirmation_active:
             self.reset_confirmation_active = True
             self.reset_confirmation_timer = 0
-            sound_manager.play_effect(SoundEffect.CLICK)
+            sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
 
     def _execute_reset(self):
         """Executa o reset do progresso"""
@@ -397,7 +541,7 @@ class MenuScene(BaseScene):
 
             self.reset_confirmation_active = False
             self._refresh_buttons()
-            sound_manager.play_effect(SoundEffect.CLICK)
+            sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
             print("[MENU] === RESET DE PROGRESSO CONCLUÍDO ===")
 
         except Exception as e:
@@ -427,12 +571,28 @@ class MenuScene(BaseScene):
                 self.start_game()
             elif event.key == pygame.K_ESCAPE and self.reset_confirmation_active:
                 self.reset_confirmation_active = False
-                sound_manager.play_effect(SoundEffect.CLICK)
+                sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+            elif event.key == pygame.K_LEFT:
+                self.slideshow.prev()
+            elif event.key == pygame.K_RIGHT:
+                self.slideshow.next()
 
         if self.reset_confirmation_active:
             self._handle_reset_confirmation_event(event)
             return
 
+        # Eventos para os botões de navegação do slideshow
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._nav_left_rect and self._nav_left_rect.collidepoint(event.pos):
+                self.slideshow.prev()
+                sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+                return
+            if self._nav_right_rect and self._nav_right_rect.collidepoint(event.pos):
+                self.slideshow.next()
+                sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+                return
+
+        # Eventos dos botões
         for button in self.buttons:
             button.handle_event(event)
 
@@ -441,17 +601,17 @@ class MenuScene(BaseScene):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = event.pos
             if self._confirm_yes_rect and self._confirm_yes_rect.collidepoint(mouse_pos):
-                sound_manager.play_effect(SoundEffect.CLICK)
+                sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
                 self._execute_reset()
                 return
             if self._confirm_no_rect and self._confirm_no_rect.collidepoint(mouse_pos):
-                sound_manager.play_effect(SoundEffect.CLICK)
+                sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
                 self.reset_confirmation_active = False
                 return
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.reset_confirmation_active = False
-            sound_manager.play_effect(SoundEffect.CLICK)
+            sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
 
     # ======================================================================
     # UPDATE
@@ -478,6 +638,9 @@ class MenuScene(BaseScene):
         # Atualiza botões
         for button in self.buttons:
             button.update(dt)
+
+        # Atualiza slideshow
+        self.slideshow.update(dt)
 
         # Atualiza timer da confirmação
         if self.reset_confirmation_active:
@@ -515,13 +678,20 @@ class MenuScene(BaseScene):
 
             pygame.draw.circle(screen, color, (x, y), particle['size'])
 
-        # ===== LOGO =====
-        logo_width = int(vw * 0.35)
-        logo_height = int(logo_width * (150 / 500))  # Mantém proporção
-        logo_scaled = pygame.transform.scale(self.logo_surface, (logo_width, logo_height))
+        # ===== LOGO (centralizada com os botões) =====
+        # Calcula a largura total dos botões para centralizar o logo
+        button_width = int(vw * 0.35)
+        left_margin = int(vw * 0.05)
 
-        logo_x = vx + (vw - logo_width) // 2
-        logo_y = vy + int(vh * 0.08)
+        # A logo deve ficar centralizada em relação à largura dos botões
+        logo_width = int(vw * 0.30)
+        logo_height = int(logo_width * (150 / 500))
+
+        # Centraliza a logo na mesma área dos botões
+        logo_x = vx + left_margin + (button_width - logo_width) // 2
+        logo_y = vy + int(vh * 0.05)  # Um pouco mais acima
+
+        logo_scaled = pygame.transform.scale(self.logo_surface, (logo_width, logo_height))
 
         # Sombra do logo
         shadow_surface = pygame.Surface((logo_width + 10, logo_height + 10), pygame.SRCALPHA)
@@ -529,6 +699,9 @@ class MenuScene(BaseScene):
         screen.blit(shadow_surface, (logo_x - 5, logo_y + 5))
 
         screen.blit(logo_scaled, (logo_x, logo_y))
+
+        # ===== PAINEL DE PREVIEW (lado direito, paralelo à logo) =====
+        self._render_preview_panel(screen, vx, vy, vw, vh)
 
         # ===== BOTÕES =====
         for button in self.buttons:
@@ -547,6 +720,152 @@ class MenuScene(BaseScene):
 
         if self.paused:
             self._render_pause_overlay(screen)
+
+    def _render_preview_panel(self, screen, vx, vy, vw, vh):
+        """Renderiza o painel de preview com slideshow"""
+        # Define a área do preview (lado direito, paralelo à logo)
+        panel_x = vx + int(vw * 0.48)
+        panel_y = vy + int(vh * 0.05)  # Mesmo y da logo
+        panel_width = int(vw * 0.47)
+        panel_height = int(vh * 0.85)  # Um pouco mais alto para compensar
+
+        # Borda e fundo do painel
+        panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+
+        # Fundo escuro com transparência
+        panel_surface = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
+        panel_surface.fill((10, 10, 30, 200))
+        screen.blit(panel_surface, panel_rect)
+
+        # Borda
+        pygame.draw.rect(screen, (60, 50, 80), panel_rect, 2, border_radius=12)
+        pygame.draw.rect(screen, (100, 80, 130), panel_rect.inflate(-4, -4), 1, border_radius=10)
+
+        # Área interna da imagem (com margem)
+        margin = 15
+        img_x = panel_x + margin
+        img_y = panel_y + margin + 30  # Espaço para o título
+        img_width = panel_width - margin * 2
+        img_height = panel_height - margin * 2 - 60  # Espaço para título e indicadores
+
+        # Título do painel
+        title_font = pygame.font.Font(None, int(vh * 0.028))
+        title_text = title_font.render("PREVIEW DO JOGO", True, (220, 210, 240))
+        title_x = panel_x + (panel_width - title_text.get_width()) // 2
+        title_y = panel_y + 15
+        screen.blit(title_text, (title_x, title_y))
+
+        # Obtém a imagem atual
+        current_img = self.slideshow.get_current_image()
+
+        if current_img:
+            # Calcula o tamanho mantendo a proporção
+            img_ratio = current_img.get_width() / current_img.get_height()
+            target_ratio = img_width / img_height
+
+            if img_ratio > target_ratio:
+                # Imagem mais larga que o container
+                display_width = img_width
+                display_height = int(img_width / img_ratio)
+            else:
+                # Imagem mais alta que o container
+                display_height = img_height
+                display_width = int(img_height * img_ratio)
+
+            # Centraliza a imagem
+            display_x = img_x + (img_width - display_width) // 2
+            display_y = img_y + (img_height - display_height) // 2
+
+            # Redimensiona a imagem
+            try:
+                scaled_img = pygame.transform.smoothscale(current_img, (display_width, display_height))
+
+                # Adiciona uma borda sutil ao redor da imagem
+                img_rect = pygame.Rect(display_x - 2, display_y - 2, display_width + 4, display_height + 4)
+                pygame.draw.rect(screen, (80, 70, 100), img_rect, border_radius=4)
+
+                screen.blit(scaled_img, (display_x, display_y))
+            except Exception as e:
+                print(f"[MENU] Erro ao redimensionar imagem: {e}")
+                # Fallback: texto
+                fallback_font = pygame.font.Font(None, int(vh * 0.025))
+                fallback_text = fallback_font.render("Imagem indisponivel", True, (150, 150, 170))
+                text_x = img_x + (img_width - fallback_text.get_width()) // 2
+                text_y = img_y + (img_height - fallback_text.get_height()) // 2
+                screen.blit(fallback_text, (text_x, text_y))
+        else:
+            # Sem imagem
+            fallback_font = pygame.font.Font(None, int(vh * 0.025))
+            fallback_text = fallback_font.render("Nenhuma imagem disponivel", True, (150, 150, 170))
+            text_x = img_x + (img_width - fallback_text.get_width()) // 2
+            text_y = img_y + (img_height - fallback_text.get_height()) // 2
+            screen.blit(fallback_text, (text_x, text_y))
+
+        # ===== BOTÕES DE NAVEGAÇÃO =====
+        nav_size = int(vh * 0.04)
+        nav_y = panel_y + panel_height - nav_size - 10
+        nav_spacing = 20
+
+        # Botão esquerdo
+        left_x = panel_x + (panel_width - nav_size * 2 - nav_spacing) // 2
+        self._nav_left_rect = pygame.Rect(left_x, nav_y, nav_size, nav_size)
+
+        # Botão direito
+        right_x = left_x + nav_size + nav_spacing
+        self._nav_right_rect = pygame.Rect(right_x, nav_y, nav_size, nav_size)
+
+        mouse_pos = pygame.mouse.get_pos()
+
+        # Verifica hover
+        self._nav_hover_left = self._nav_left_rect.collidepoint(mouse_pos) if self._nav_left_rect else False
+        self._nav_hover_right = self._nav_right_rect.collidepoint(mouse_pos) if self._nav_right_rect else False
+
+        # Desenha botões de navegação
+        for rect, hover, symbol in [
+            (self._nav_left_rect, self._nav_hover_left, "<"),
+            (self._nav_right_rect, self._nav_hover_right, ">")
+        ]:
+            if rect:
+                # Fundo do botão
+                color = (80, 70, 100) if hover else (50, 40, 60)
+                pygame.draw.rect(screen, color, rect, border_radius=8)
+                pygame.draw.rect(screen, (120, 100, 150) if hover else (70, 60, 80), rect, 1, border_radius=8)
+
+                if hover:
+                    pygame.draw.rect(screen, (150, 130, 180, 30), rect.inflate(-4, -4), border_radius=6)
+
+                # Símbolo
+                nav_font = pygame.font.Font(None, int(nav_size * 0.7))
+                nav_text = nav_font.render(symbol, True, (220, 210, 240))
+                text_rect = nav_text.get_rect(center=rect.center)
+                screen.blit(nav_text, text_rect)
+
+        # ===== INDICADOR DE PÁGINA =====
+        count = self.slideshow.get_image_count()
+        if count > 1:
+            indicator_font = pygame.font.Font(None, int(vh * 0.018))
+            indicator_text = indicator_font.render(
+                f"{self.slideshow.current_index + 1} / {count}",
+                True, (180, 170, 200)
+            )
+            indicator_x = panel_x + (panel_width - indicator_text.get_width()) // 2
+            indicator_y = nav_y + nav_size + 15
+            screen.blit(indicator_text, (indicator_x, indicator_y))
+
+            # Bolinhas indicadoras
+            dot_size = 6
+            dot_spacing = 12
+            dots_width = count * dot_spacing - (dot_spacing - dot_size)
+            dots_x = panel_x + (panel_width - dots_width) // 2
+            dots_y = indicator_y + indicator_text.get_height() + 10
+
+            for i in range(count):
+                x = dots_x + i * dot_spacing
+                is_active = (i == self.slideshow.current_index)
+                color = (200, 180, 220) if is_active else (60, 50, 70)
+                pygame.draw.circle(screen, color, (x, dots_y), dot_size // 2)
+                if is_active:
+                    pygame.draw.circle(screen, (255, 215, 0, 100), (x, dots_y), dot_size // 2 + 2, 1)
 
     def _draw_gradient_background(self, screen):
         """Desenha fundo com gradiente e estrelas"""
@@ -624,7 +943,7 @@ class MenuScene(BaseScene):
 
         # Título
         title_font = pygame.font.Font(None, int(vh * 0.05))
-        title_text = title_font.render("⚠ RESETAR PROGRESSO", True, (255, 80, 80))
+        title_text = title_font.render("RESETAR PROGRESSO", True, (255, 80, 80))
         title_x = container_x + (container_width - title_text.get_width()) // 2
         title_y = container_y + int(container_height * 0.08)
         screen.blit(title_text, (title_x, title_y))
@@ -632,15 +951,15 @@ class MenuScene(BaseScene):
         # Mensagem
         warn_font = pygame.font.Font(None, int(vh * 0.025))
         lines = [
-            "Você está prestes a APAGAR TODO o seu progresso!",
+            "Voce esta prestes a APAGAR TODO o seu progresso!",
             "",
-            "Isso irá:",
-            "• Deletar todos os seus Pokémon",
-            "• Resetar seu dinheiro e itens",
-            "• Apagar todas as conquistas",
-            "• Deletar todos os saves",
+            "Isso ira:",
+            "* Deletar todos os seus Pokemon",
+            "* Resetar seu dinheiro e itens",
+            "* Apagar todas as conquistas",
+            "* Deletar todos os saves",
             "",
-            "Esta ação é IRREVERSÍVEL!",
+            "Esta acao e IRREVERSIVEL!",
         ]
 
         line_y = title_y + title_text.get_height() + int(container_height * 0.03)
@@ -648,13 +967,13 @@ class MenuScene(BaseScene):
 
         for line in lines:
             if line:
-                if "IRREVERSÍVEL" in line:
+                if "IRREVERSIVEL" in line:
                     color = (255, 80, 80)
                     font = pygame.font.Font(None, int(vh * 0.028))
                 elif "APAGAR TODO" in line:
                     color = (255, 200, 100)
                     font = warn_font
-                elif line.startswith("•"):
+                elif line.startswith("*"):
                     color = (200, 200, 200)
                     font = warn_font
                 else:
@@ -698,7 +1017,7 @@ class MenuScene(BaseScene):
         pygame.draw.rect(screen, (120, 120, 120) if no_hover else (100, 100, 100), no_rect, 2, border_radius=10)
 
         no_font = pygame.font.Font(None, int(vh * 0.03))
-        no_text = no_font.render("NÃO", True, (255, 255, 255))
+        no_text = no_font.render("NAO", True, (255, 255, 255))
         no_text_rect = no_text.get_rect(center=no_rect.center)
         screen.blit(no_text, no_text_rect)
 
@@ -713,7 +1032,7 @@ class MenuScene(BaseScene):
         screen.blit(overlay, (0, 0))
 
         font_large = pygame.font.Font(None, 74)
-        pause_text = font_large.render("⏸ PAUSADO", True, (255, 255, 255))
+        pause_text = font_large.render("PAUSADO", True, (255, 255, 255))
         text_rect = pause_text.get_rect(center=(
             self.screen_manager.window_width // 2,
             self.screen_manager.window_height // 2
