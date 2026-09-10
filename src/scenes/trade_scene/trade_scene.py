@@ -72,6 +72,58 @@ LAYOUT = {
 }
 
 
+# =========================================================
+# Wrapper leve para a lista de troca (evita instanciar Pokemon)
+# =========================================================
+class _TradeEntry:
+    """
+    Entrada leve usada na listagem da TradeScene.
+    Guarda apenas os campos necessários para renderizar a lista.
+    A instância completa (Pokemon) só é criada sob demanda:
+      - get_instance() para abrir DETALHES / oferecer / etc.
+    """
+
+    __slots__ = (
+        "unique_id", "id", "name", "level", "types", "is_shiny",
+        "is_in_team", "source", "_instance", "_raw_data",
+    )
+
+    def __init__(self, unique_id, pokemon_id, name, level, types,
+                 is_shiny, is_in_team, source,
+                 instance=None, raw_data=None):
+        self.unique_id = unique_id
+        self.id = pokemon_id
+        self.name = name
+        self.level = level
+        self.types = types
+        self.is_shiny = is_shiny
+        self.is_in_team = is_in_team
+        self.source = source          # "team" | "box"
+        self._instance = instance     # preenchido se veio do time
+        self._raw_data = raw_data     # preenchido se veio da box
+
+    def to_dict(self) -> dict:
+        """Retorna o dict serializado (para enviar na oferta)."""
+        if self._instance is not None:
+            return self._instance.to_dict()
+        return dict(self._raw_data) if self._raw_data else {}
+
+    def get_instance(self, player):
+        """Retorna a instância Pokemon (cria e cacheia se for da box)."""
+        if self._instance is not None:
+            return self._instance
+
+        cached = player._pokemon_cache.get(self.unique_id)
+        if cached is not None:
+            return cached
+
+        from src.entities.pokemon import Pokemon
+        inst = Pokemon.from_dict(self._raw_data)
+        inst.is_in_team = False
+        player._pokemon_cache[self.unique_id] = inst
+        return inst
+
+
 class TradeScene(BaseScene):
     """Tela de troca com fluxo em três etapas (ofertar, aceitar, confirmar)."""
 
@@ -112,12 +164,26 @@ class TradeScene(BaseScene):
         self._opponent_name = getattr(network, "opponent_name", None) or "Oponente"
         self._opponent_uuid = getattr(network, "opponent_uuid", None) or "unknown"
 
-        # ===== LISTA DE POKÉMON (TIME + BOX) =====
-        self.my_pokemon = []
-        self._my_pokemon_in_team = set()   # unique_ids que estão no time (para badge)
+        # ===== LISTA (dados leves / lazy) =====
+        self._all_entries = []       # lista completa (_TradeEntry)
+        self._filtered_entries = []  # lista após filtro
+        self.my_pokemon = []         # alias para _filtered_entries (compat)
+        self._my_pokemon_in_team = set()
+
         self.scroll_offset = 0
         self.visible_items = 5
-        self._refresh_my_pokemon_list()
+
+        # ===== PESQUISA =====
+        self._search_text = ""
+        self._search_active = False
+        self._search_rect = pygame.Rect(0, 0, 0, 0)
+        self._search_cursor_timer = 0.0
+
+        # ===== SCROLLBAR =====
+        self._scrollbar_track = pygame.Rect(0, 0, 0, 0)
+        self._scrollbar_thumb = pygame.Rect(0, 0, 0, 0)
+        self._scrollbar_dragging = False
+        self._scrollbar_drag_offset = 0
 
         # ===== MODAL =====
         self.modal = None
@@ -145,6 +211,9 @@ class TradeScene(BaseScene):
         self._my_panel_rect = pygame.Rect(0, 0, 0, 0)
         self._progress_rect = pygame.Rect(0, 0, 0, 0)
         self._item_height = LAYOUT["LIST_ITEM_H"]
+        self._list_items_w = 0
+        self._list_header_h = 32
+        self._search_h = 30
 
         # ===== FONTES (criadas no _layout) =====
         self.font_title = pygame.font.Font(None, 44)
@@ -157,59 +226,87 @@ class TradeScene(BaseScene):
         self.font_btn_sm = pygame.font.Font(None, 16)
 
         self._layout()
+        self._refresh_my_pokemon_list()
 
     # =========================================================
-    # Lista de Pokémon (Time + Box)
+    # Lista de Pokémon (Time + Box) — LAZY
     # =========================================================
     def _refresh_my_pokemon_list(self):
         """
-        Reconstrói a lista unificada de Pokémon disponíveis para troca:
-        primeiro os do TIME (como instâncias), depois os da BOX.
-        Deduplica por unique_id (a pc_box pode conter cópias do time).
+        Reconstrói a lista unificada (TIME + BOX) de forma LEVE.
+        NÃO instancia Pokemon para itens da box — apenas _TradeEntry.
+        A instância só é criada sob demanda em get_instance().
         """
-        from src.entities.pokemon import Pokemon
-
-        self.my_pokemon = []
-        self._my_pokemon_in_team = set()
+        all_entries = []
         seen_ids = set()
+        self._my_pokemon_in_team = set()
 
-        # ---- 1. Time (prioridade / ordem preservada) ----
+        # ---- 1. Time (a instância já existe) ----
         for p in self.game.player.team:
             if p.unique_id in seen_ids:
                 continue
-            self.my_pokemon.append(p)
+            all_entries.append(_TradeEntry(
+                unique_id=p.unique_id,
+                pokemon_id=p.id,
+                name=p.name,
+                level=p.level,
+                types=list(p.types) if p.types else [],
+                is_shiny=p.is_shiny,
+                is_in_team=True,
+                source="team",
+                instance=p,
+            ))
             self._my_pokemon_in_team.add(p.unique_id)
             seen_ids.add(p.unique_id)
 
-        # ---- 2. Box ----
+        # ---- 2. Box (dados leves, sem instanciar) ----
         for data in self.game.player.pc_box:
             uid = data.get("unique_id")
             if not uid or uid in seen_ids:
                 continue
-
-            # Tenta reutilizar instância já cacheada
-            pokemon = self.game.player._pokemon_cache.get(uid)
-            if pokemon is None:
-                try:
-                    pokemon = Pokemon.from_dict(data)
-                    pokemon.is_in_team = False
-                    self.game.player._pokemon_cache[uid] = pokemon
-                except Exception as e:
-                    print(f"[TRADE] Erro ao converter Pokémon da box ({uid}): {e}")
-                    continue
-
-            self.my_pokemon.append(pokemon)
+            all_entries.append(_TradeEntry(
+                unique_id=uid,
+                pokemon_id=data.get("id", 0),
+                name=data.get("name", "?"),
+                level=data.get("level", 1),
+                types=list(data.get("types", [])),
+                is_shiny=data.get("is_shiny", False),
+                is_in_team=False,
+                source="box",
+                raw_data=data,
+            ))
             seen_ids.add(uid)
 
-        # Reset de scroll caso a lista tenha encolhido
+        self._all_entries = all_entries
+        self._apply_filter()
+
+        print(f"[TRADE] Lista reconstruída (lazy): {len(all_entries)} Pokémon "
+              f"({len(self._my_pokemon_in_team)} no time, "
+              f"{len(all_entries) - len(self._my_pokemon_in_team)} na box)")
+
+    def _apply_filter(self):
+        """Aplica o filtro da barra de pesquisa."""
+        q = self._search_text.strip().lower()
+
+        if not q:
+            filtered = list(self._all_entries)
+        else:
+            filtered = []
+            for e in self._all_entries:
+                if q in e.name.lower():
+                    filtered.append(e)
+                elif q.isdigit() and str(e.id) == q:
+                    filtered.append(e)
+
+        self._filtered_entries = filtered
+        self.my_pokemon = filtered  # alias
+
+        # Reset/clamp scroll
         max_off = max(0, len(self.my_pokemon) - self.visible_items)
         if self.scroll_offset > max_off:
             self.scroll_offset = max_off
-
-        print(f"[TRADE] Lista de troca reconstruída: "
-              f"{len(self.my_pokemon)} Pokémon "
-              f"({len(self._my_pokemon_in_team)} no time, "
-              f"{len(self.my_pokemon) - len(self._my_pokemon_in_team)} na box)")
+        if self.scroll_offset < 0:
+            self.scroll_offset = 0
 
     # =========================================================
     # Layout responsivo
@@ -220,7 +317,6 @@ class TradeScene(BaseScene):
         vw = self.screen_manager.viewport_width
         vh = self.screen_manager.viewport_height
 
-        # ---- escala global (referência 1280x720) ----
         scale = min(vw / 1280.0, vh / 720.0)
         scale = max(0.65, min(1.25, scale))
         self._ui_scale = scale
@@ -228,19 +324,16 @@ class TradeScene(BaseScene):
 
         margin = max(10, int(LAYOUT["MARGIN"] * scale))
 
-        # Botão voltar (canto superior esquerdo)
         back_w = max(90, int(110 * scale))
         back_h = max(30, int(36 * scale))
         self.back_btn = pygame.Rect(vx + margin, vy + 16, back_w, back_h)
 
-        # Botões inferiores (centro)
         btn_h = max(36, int(LAYOUT["BUTTON_H"] * scale))
         footer_h = max(28, int(LAYOUT["FOOTER_H"] * scale))
         self._btn_y = vy + vh - footer_h - btn_h
         self._btn_center_x = vx + vw // 2
         self._btn_gap = max(8, int(12 * scale))
 
-        # ===== Área de conteúdo =====
         header_h = max(56, int(LAYOUT["HEADER_H"] * scale))
         gap = max(10, int(LAYOUT["GAP"] * scale))
         content_top = vy + header_h
@@ -253,7 +346,6 @@ class TradeScene(BaseScene):
             content_h,
         )
 
-        # ===== Divisão horizontal: lista (esquerda) vs ofertas (direita) =====
         total_w = self._content_rect.width
         list_min = max(220, int(LAYOUT["LIST_MIN_W"] * scale))
         offer_min = max(220, int(LAYOUT["OFFER_MIN_W"] * scale))
@@ -280,13 +372,39 @@ class TradeScene(BaseScene):
             self._content_rect.height,
         )
 
-        # ===== Lista: quantos itens cabem =====
+        # ===== Lista: header + search + área de itens =====
         list_header_h = max(28, int(32 * scale))
-        available_list_h = max(40, self._list_rect.height - list_header_h)
+        search_h = max(26, int(30 * scale))
+        self._list_header_h = list_header_h
+        self._search_h = search_h
+
+        items_top_offset = list_header_h + search_h + 8
+        available_list_h = max(40, self._list_rect.height - items_top_offset)
         item_h = max(50, int(LAYOUT["LIST_ITEM_H"] * scale))
         self._item_height = item_h
         self.visible_items = max(2, available_list_h // item_h)
-        self._list_header_h = list_header_h
+
+        scrollbar_w = max(8, int(10 * scale))
+        scrollbar_gap = 6
+
+        # Área de itens (largura) — desconta scrollbar
+        self._list_items_w = self._list_rect.width - 20 - scrollbar_w - scrollbar_gap
+
+        # Rect da search bar
+        self._search_rect = pygame.Rect(
+            self._list_rect.x + 10,
+            self._list_rect.y + list_header_h,
+            self._list_rect.width - 20,
+            search_h,
+        )
+
+        # Rect da trilha da scrollbar
+        self._scrollbar_track = pygame.Rect(
+            self._list_rect.right - scrollbar_w - 6,
+            self._list_rect.y + items_top_offset,
+            scrollbar_w,
+            available_list_h,
+        )
 
         # ===== Ofertas: dois painéis + progresso =====
         offers_header_h = max(24, int(30 * scale))
@@ -307,7 +425,6 @@ class TradeScene(BaseScene):
         self._progress_h = progress_h
         self._offers_header_h = offers_header_h
 
-        # Pre-calcula rects dos painéis de oferta
         y = self._offers_rect.y + offers_header_h
         self._opp_panel_rect = pygame.Rect(
             self._offers_rect.x, y, self._offers_rect.width, offer_h
@@ -320,6 +437,9 @@ class TradeScene(BaseScene):
         self._progress_rect = pygame.Rect(
             self._offers_rect.x, y, self._offers_rect.width, progress_h
         )
+
+        # Recalcula scrollbar thumb com o novo track
+        self._compute_scrollbar_thumb()
 
     def _rebuild_fonts(self, scale):
         def sz(base):
@@ -334,7 +454,6 @@ class TradeScene(BaseScene):
         self.font_btn_sm = pygame.font.Font(None, sz(16))
 
     def _truncate(self, text, font, max_w):
-        """Trunca texto com '...' se exceder max_w pixels."""
         if not text:
             return ""
         if max_w <= 0:
@@ -355,17 +474,18 @@ class TradeScene(BaseScene):
         return text[:lo] + ell
 
     # =========================================================
-    # Update (rede + animação)
+    # Update (rede + animação + cursor piscante)
     # =========================================================
     def fixed_update(self, dt):
-        # ---- Animação ----
         if self._anim_active:
             self._anim_time += dt
             if self._anim_time >= self._anim_duration:
                 self._anim_time = self._anim_duration
                 self._anim_active = False
 
-        # ---- Rede ----
+        if self._search_active:
+            self._search_cursor_timer += dt
+
         try:
             while not self.network.incoming_queue.empty():
                 item = self.network.incoming_queue.get_nowait()
@@ -398,7 +518,6 @@ class TradeScene(BaseScene):
                 self.network.opponent_uuid = self._opponent_uuid
 
             self.opponent_offer_pokemon = self._build_temp_pokemon(self.opponent_offer)
-
             print(f"[TRADE] Oferta recebida de {self._opponent_name}")
             self._refresh_state()
 
@@ -426,7 +545,6 @@ class TradeScene(BaseScene):
 
         elif msg_type == "TRADE_COMPLETE":
             if not self.is_host and not self.trade_completed:
-                # Captura para animação ANTES de limpar
                 anim_my = dict(self.my_offer) if self.my_offer else None
                 anim_opp = dict(self.opponent_offer) if self.opponent_offer else None
 
@@ -500,7 +618,6 @@ class TradeScene(BaseScene):
 
         self._stamp_trade_origin_on_offer()
 
-        # Captura para animação
         anim_my = dict(self.my_offer) if self.my_offer else None
         anim_opp = dict(self.opponent_offer) if self.opponent_offer else None
 
@@ -535,7 +652,6 @@ class TradeScene(BaseScene):
         self.my_offer_pokemon = None
         self.opponent_offer_pokemon = None
 
-        # ===== ATUALIZA LISTA (TIME + BOX) =====
         self._refresh_my_pokemon_list()
 
     def _stamp_trade_origin_on_offer(self):
@@ -604,7 +720,7 @@ class TradeScene(BaseScene):
         if not new_pokemon.capture_method:
             new_pokemon.capture_method = "trade"
 
-        # ===== EVOLUÇÃO POR TROCA (INSTANTÂNEA, SEM OVERLAY) =====
+        # ===== EVOLUÇÃO POR TROCA (INSTANTÂNEA, SEM OVERLAY / SEM SOM) =====
         new_pokemon = self._check_and_evolve_trade(new_pokemon)
 
         if len(self.game.player.team) < 6:
@@ -623,7 +739,7 @@ class TradeScene(BaseScene):
     def _check_and_evolve_trade(self, pokemon):
         """
         Verifica se o Pokémon evolui por troca e o evolui INSTANTANEAMENTE.
-        Sem overlay, sem game_scene, sem animação/som de evolução.
+        Sem overlay, sem game_scene, SEM som de evolução.
         """
         pokemon_data = self.pokedex.get_pokemon(pokemon.id)
         if not pokemon_data:
@@ -632,7 +748,6 @@ class TradeScene(BaseScene):
         evo_data = pokemon_data.get("evolution", {})
         method = evo_data.get("method", "none")
 
-        # Só interessa evolução por troca
         if method != "trade":
             return pokemon
 
@@ -644,18 +759,14 @@ class TradeScene(BaseScene):
 
         old_name = pokemon.name
 
-        # Marca método para conquistas (caso futuro)
         if hasattr(pokemon, 'evolution'):
             pokemon.evolution._pending_evolution_method = "trade"
 
-        # Executa direto — is_normal_game=False para pular checagens que dependem de game_scene
         pokemon._perform_evolution(evolve_to_id, is_normal_game=False)
 
-        # Registra na Pokédex do jogador
         self.game.player.register_seen(evolve_to_id)
         self.game.player.caught_pokemon.add(evolve_to_id)
 
-        # Contadores de conquista (evolution_count, first_evolution, etc.)
         if hasattr(self.game.player, 'achievement_manager'):
             ach = self.game.player.achievement_manager
             ach.increment_counter("evolution_count")
@@ -664,8 +775,6 @@ class TradeScene(BaseScene):
             ach.check_and_unlock("evolution_50", "trade")
 
         print(f"[TRADE] ✓ {old_name} evoluiu para {pokemon.name}!")
-
-        # ===== FEEDBACK VISUAL APENAS (SEM SOM DE EVOLUÇÃO) =====
         toast_info(f"{old_name} evoluiu para {pokemon.name} ao ser trocado!", duration=4.0)
 
         return pokemon
@@ -698,7 +807,6 @@ class TradeScene(BaseScene):
     # Animação de troca
     # =========================================================
     def _start_trade_animation(self, my_data, opp_data):
-        # Só anima se ambos os lados tinham oferta válida
         if my_data is None or opp_data is None:
             self._anim_active = False
             return
@@ -770,6 +878,51 @@ class TradeScene(BaseScene):
         self.modal = None
 
     # =========================================================
+    # Scrollbar helpers
+    # =========================================================
+    def _compute_scrollbar_thumb(self):
+        track = self._scrollbar_track
+        total = len(self.my_pokemon)
+
+        if track.height <= 0 or track.width <= 0:
+            self._scrollbar_thumb = pygame.Rect(0, 0, 0, 0)
+            return
+
+        if total <= self.visible_items or total == 0:
+            self._scrollbar_thumb = pygame.Rect(track.x, track.y, track.width, track.height)
+            return
+
+        ratio = self.visible_items / float(total)
+        thumb_h = max(24, int(track.height * ratio))
+        thumb_h = min(thumb_h, track.height)
+
+        max_off = total - self.visible_items
+        if max_off <= 0:
+            offset_ratio = 0.0
+        else:
+            offset_ratio = self.scroll_offset / float(max_off)
+
+        thumb_y = track.y + int((track.height - thumb_h) * offset_ratio)
+        self._scrollbar_thumb = pygame.Rect(track.x, thumb_y, track.width, thumb_h)
+
+    def _scrollbar_drag_update(self, mouse_y):
+        total = len(self.my_pokemon)
+        if total <= self.visible_items:
+            return
+        track = self._scrollbar_track
+        thumb_h = self._scrollbar_thumb.height
+        if thumb_h >= track.height:
+            return
+
+        top = mouse_y - self._scrollbar_drag_offset - track.y
+        top = max(0, min(track.height - thumb_h, top))
+
+        ratio = top / float(track.height - thumb_h) if (track.height - thumb_h) > 0 else 0.0
+        max_off = total - self.visible_items
+        self.scroll_offset = int(round(ratio * max_off))
+        self.scroll_offset = max(0, min(max_off, self.scroll_offset))
+
+    # =========================================================
     # Botões inferiores (dinâmicos por estado)
     # =========================================================
     def _get_visible_buttons(self):
@@ -830,32 +983,70 @@ class TradeScene(BaseScene):
             self._layout()
             return
 
-        # ----- Teclado -----
+        # ===== TEXTO (barra de pesquisa) =====
+        if self._search_active:
+            if event.type == pygame.TEXTINPUT:
+                self._search_text += event.text
+                self._apply_filter()
+                return
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE:
+                    self._search_text = self._search_text[:-1]
+                    self._apply_filter()
+                    return
+                elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_ESCAPE):
+                    # ESC/RETURN fecha o foco
+                    self._search_active = False
+                    pygame.key.stop_text_input()
+                    return
+
+        # ===== TECLADO =====
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self._handle_back_or_cancel()
                 return
-            if event.key == pygame.K_UP and self.scroll_offset > 0:
-                self.scroll_offset -= 1
-            elif event.key == pygame.K_DOWN:
-                max_off = max(0, len(self.my_pokemon) - self.visible_items)
-                if self.scroll_offset < max_off:
-                    self.scroll_offset += 1
 
-        # ----- Mouse -----
+        # ===== MOUSE WHEEL =====
+        if event.type == pygame.MOUSEWHEEL:
+            mouse_pos = pygame.mouse.get_pos()
+            if self._list_rect.collidepoint(mouse_pos):
+                max_off = max(0, len(self.my_pokemon) - self.visible_items)
+                if event.y > 0:
+                    self.scroll_offset = max(0, self.scroll_offset - 1)
+                elif event.y < 0:
+                    self.scroll_offset = min(max_off, self.scroll_offset + 1)
+                return
+
+        # ===== MOUSE DOWN =====
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             pos = event.pos
 
-            up_rect, down_rect = self._scroll_rects()
-            if up_rect.collidepoint(pos):
-                if self.scroll_offset > 0:
-                    self.scroll_offset -= 1
+            # 1) Clique na search bar → ativa
+            if self._search_rect.collidepoint(pos):
+                if not self._search_active:
+                    self._search_active = True
+                    self._search_cursor_timer = 0.0
+                    pygame.key.start_text_input()
+                    pygame.key.set_text_input_rect(self._search_rect)
                 return
-            if down_rect.collidepoint(pos):
-                max_off = max(0, len(self.my_pokemon) - self.visible_items)
-                if self.scroll_offset < max_off:
-                    self.scroll_offset += 1
+
+            # 2) Scrollbar drag (thumb)
+            if self._scrollbar_thumb.collidepoint(pos):
+                self._scrollbar_dragging = True
+                self._scrollbar_drag_offset = pos[1] - self._scrollbar_thumb.y
                 return
+
+            # 3) Clique na trilha (fora do thumb) → pulo + inicia drag
+            if self._scrollbar_track.collidepoint(pos):
+                self._scrollbar_drag_offset = self._scrollbar_thumb.height // 2
+                self._scrollbar_drag_update(pos[1])
+                self._scrollbar_dragging = True
+                return
+
+            # 4) Clicou fora da search → desativa
+            if self._search_active and not self._search_rect.collidepoint(pos):
+                self._search_active = False
+                pygame.key.stop_text_input()
 
             if self.back_btn.collidepoint(pos):
                 sound_manager.play_effect(SoundEffect.CLICK)
@@ -892,10 +1083,22 @@ class TradeScene(BaseScene):
                     self._select_pokemon(idx)
                     return
 
+        # ===== MOUSE MOTION (drag da scrollbar) =====
+        if event.type == pygame.MOUSEMOTION:
+            if self._scrollbar_dragging:
+                self._scrollbar_drag_update(event.pos[1])
+                return
+
+        # ===== MOUSE UP =====
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self._scrollbar_dragging:
+                self._scrollbar_dragging = False
+                return
+
     def _select_pokemon(self, idx):
-        pokemon = self.my_pokemon[idx]
-        self.my_offer = pokemon.to_dict()
-        self.my_offer_pokemon = pokemon
+        entry = self.my_pokemon[idx]
+        self.my_offer = entry.to_dict()
+        self.my_offer_pokemon = entry
 
         my_uuid = (
             getattr(self.game.player, 'uuid', None)
@@ -910,7 +1113,7 @@ class TradeScene(BaseScene):
                 "sender_uuid": my_uuid,
             },
         ))
-        toast_info(f"Você ofereceu {pokemon.name}")
+        toast_info(f"Você ofereceu {entry.name}")
         self._refresh_state()
 
     def _handle_back_or_cancel(self):
@@ -958,28 +1161,11 @@ class TradeScene(BaseScene):
     def _list_items_origin(self):
         return (
             self._list_rect.x + 10,
-            self._list_rect.y + self._list_header_h + 6,
+            self._list_rect.y + self._list_header_h + self._search_h + 8,
         )
-
-    def _scroll_rects(self):
-        x, y = self._list_items_origin()
-        btn_w = 28
-        btn_h = 28
-        up = pygame.Rect(
-            self._list_rect.right - btn_w - 8,
-            y,
-            btn_w, btn_h,
-        )
-        down = pygame.Rect(
-            self._list_rect.right - btn_w - 8,
-            y + self.visible_items * self._item_height + 4,
-            btn_w, btn_h,
-        )
-        return up, down
 
     def _get_pokemon_at_pos(self, pos):
         x0, y0 = self._list_items_origin()
-        list_w = self._list_rect.width - 20
 
         for i in range(self.visible_items):
             idx = i + self.scroll_offset
@@ -987,7 +1173,7 @@ class TradeScene(BaseScene):
                 break
             rect = pygame.Rect(
                 x0, y0 + i * self._item_height,
-                list_w, self._item_height - 4,
+                self._list_items_w, self._item_height - 4,
             )
             if rect.collidepoint(pos):
                 for btn_rect, _ in self._detail_buttons:
@@ -1017,7 +1203,6 @@ class TradeScene(BaseScene):
         self._render_status_messages(screen, cx)
         self._render_footer(screen, vx, vy, vw, vh, cx)
 
-        # Overlay de estado final (só quando NÃO está animando)
         if not self._anim_active:
             if self.state == self.ST_DONE:
                 self._render_overlay_message(
@@ -1032,7 +1217,6 @@ class TradeScene(BaseScene):
                     self.trade_error or "A troca não foi concluída.",
                 )
 
-        # ===== ANIMAÇÃO DE TROCA =====
         if self._anim_active:
             self._render_trade_animation(screen, vx, vy, vw, vh)
 
@@ -1051,7 +1235,6 @@ class TradeScene(BaseScene):
         my_name = self.network.my_name or "Você"
         opp_name = self._opponent_name or self.network.opponent_name or "Aguardando..."
 
-        # Área máxima por nome (metade do header - margens)
         max_name_w = max(80, vw // 2 - 140)
 
         my_name = self._truncate(my_name, self.font_small, max_name_w)
@@ -1095,26 +1278,33 @@ class TradeScene(BaseScene):
         self._draw_panel(screen, rect, bg=COL_PANEL, border=COL_BORDER, radius=10)
 
         # Header
-        hdr_h = self._draw_section_header(
+        self._draw_section_header(
             screen, rect.x + 14, rect.y + 8, "Seus Pokémon"
         )
 
-        # Contador (Time | Box)
+        # Contador (com info de filtro)
+        total_all = len(self._all_entries)
         team_count = len(self.game.player.team)
-        box_count = len(self.my_pokemon) - len(self._my_pokemon_in_team)
-        count_txt = self.font_tiny.render(
-            f"{len(self.my_pokemon)} disponíveis  (Time: {team_count} | Box: {box_count})",
-            True, COL_TEXT_MUTED
-        )
-        screen.blit(count_txt, (
-            rect.right - count_txt.get_width() - 14,
+        box_count = max(0, total_all - team_count)
+        shown = len(self.my_pokemon)
+
+        if self._search_text.strip():
+            count_txt = f"{shown}/{total_all} (filtro)  Time: {team_count} | Box: {box_count}"
+        else:
+            count_txt = f"{total_all} disponíveis  (Time: {team_count} | Box: {box_count})"
+
+        count_surf = self.font_tiny.render(count_txt, True, COL_TEXT_MUTED)
+        screen.blit(count_surf, (
+            rect.right - count_surf.get_width() - 14,
             rect.y + 12,
         ))
+
+        # ===== Barra de pesquisa =====
+        self._render_search_bar(screen)
 
         self._detail_buttons = []
 
         x0, y0 = self._list_items_origin()
-        list_w = rect.width - 20
         mouse = pygame.mouse.get_pos()
 
         for i in range(self.visible_items):
@@ -1122,30 +1312,113 @@ class TradeScene(BaseScene):
             if idx >= len(self.my_pokemon):
                 break
 
-            pokemon = self.my_pokemon[idx]
+            entry = self.my_pokemon[idx]
             item_rect = pygame.Rect(
                 x0, y0 + i * self._item_height,
-                list_w, self._item_height - 4,
+                self._list_items_w, self._item_height - 4,
             )
-            self._draw_list_item(screen, item_rect, pokemon, mouse)
+            self._draw_list_item(screen, item_rect, entry, mouse)
 
-        # Scroll
-        if len(self.my_pokemon) > self.visible_items:
-            up, down = self._scroll_rects()
-            max_off = max(0, len(self.my_pokemon) - self.visible_items)
-            self._draw_scroll_btn(screen, up, "^", self.scroll_offset > 0)
-            self._draw_scroll_btn(screen, down, "v", self.scroll_offset < max_off)
+        # ===== Scrollbar =====
+        self._render_scrollbar(screen)
 
         if not self.my_pokemon:
-            empty = self.font.render(
-                "Nenhum Pokémon disponível.", True, COL_TEXT_MUTED
+            empty_text = "Nenhum Pokémon encontrado." if self._search_text.strip() else "Nenhum Pokémon disponível."
+            empty = self.font.render(empty_text, True, COL_TEXT_MUTED)
+            center_rect = pygame.Rect(
+                x0, y0,
+                self._list_items_w,
+                self.visible_items * self._item_height,
             )
-            screen.blit(empty, empty.get_rect(center=rect.center))
+            screen.blit(empty, empty.get_rect(center=center_rect.center))
 
-    def _draw_list_item(self, screen, rect, pokemon, mouse):
+    def _render_search_bar(self, screen):
+        rect = self._search_rect
+
+        bg = COL_PANEL_DARK
+        border = COL_BORDER_HL if self._search_active else COL_BORDER
+        border_w = 2 if self._search_active else 1
+
+        pygame.draw.rect(screen, bg, rect, border_radius=6)
+        pygame.draw.rect(screen, border, rect, border_w, border_radius=6)
+
+        # Lupa / prefixo
+        prefix = self.font_tiny.render("🔍", True, COL_TEXT_DIM)
+        # fallback caso a fonte não tenha o glifo
+        try:
+            if prefix.get_width() > 30:
+                prefix = self.font_tiny.render(">", True, COL_TEXT_DIM)
+        except Exception:
+            prefix = self.font_tiny.render(">", True, COL_TEXT_DIM)
+
+        pad_x = 8
+        prefix_x = rect.x + pad_x
+        prefix_y = rect.y + (rect.height - prefix.get_height()) // 2
+        screen.blit(prefix, (prefix_x, prefix_y))
+
+        text_left = prefix_x + max(14, prefix.get_width() + 4)
+        text_right = rect.right - pad_x
+        avail_w = max(10, text_right - text_left)
+
+        # Texto digitado ou placeholder
+        if self._search_text:
+            display = self._search_text
+            color = COL_TEXT
+        else:
+            display = "Buscar por nome ou ID..."
+            color = COL_TEXT_MUTED
+
+        display_trunc = self._truncate(display, self.font_small, avail_w - 6)
+        text_surf = self.font_small.render(display_trunc, True, color)
+        text_y = rect.y + (rect.height - text_surf.get_height()) // 2
+        screen.blit(text_surf, (text_left, text_y))
+
+        # Cursor piscante
+        if self._search_active and int(self._search_cursor_timer * 2) % 2 == 0:
+            cursor_x = text_left + text_surf.get_width() + 1
+            cursor_x = min(cursor_x, text_right - 2)
+            cursor_h = max(10, self.font_small.get_height() - 2)
+            pygame.draw.line(
+                screen, COL_ACCENT,
+                (cursor_x, rect.y + (rect.height - cursor_h) // 2),
+                (cursor_x, rect.y + (rect.height + cursor_h) // 2),
+                2,
+            )
+
+    def _render_scrollbar(self, screen):
+        track = self._scrollbar_track
+        if track.height <= 0 or track.width <= 0:
+            return
+
+        total = len(self.my_pokemon)
+        if total <= 0:
+            return
+
+        # Fundo da trilha
+        pygame.draw.rect(screen, COL_PANEL_DARK, track, border_radius=track.width // 2)
+
+        # Thumb (só desenha se há scroll a fazer)
+        self._compute_scrollbar_thumb()
+        if total > self.visible_items and self._scrollbar_thumb.height < track.height:
+            thumb = self._scrollbar_thumb
+            hover = thumb.collidepoint(pygame.mouse.get_pos())
+            dragging = self._scrollbar_dragging
+
+            if dragging:
+                color = COL_ACCENT
+            elif hover:
+                color = COL_BORDER_HL
+            else:
+                color = COL_PANEL_SOFT
+
+            pygame.draw.rect(screen, color, thumb, border_radius=thumb.width // 2)
+            pygame.draw.rect(screen, COL_BORDER, thumb, 1, border_radius=thumb.width // 2)
+
+    def _draw_list_item(self, screen, rect, entry, mouse):
+        # `entry` é um _TradeEntry
         is_selected = (
             self.my_offer
-            and pokemon.unique_id == self.my_offer.get("unique_id")
+            and entry.unique_id == self.my_offer.get("unique_id")
         )
         can_select = self.state == self.ST_OFFERING and not self.my_offer
         is_hover = rect.collidepoint(mouse) and can_select
@@ -1166,7 +1439,7 @@ class TradeScene(BaseScene):
         scale = getattr(self, "_ui_scale", 1.0)
         portrait_size = max(36, int(48 * scale))
         portrait = self.pokedex.get_portrait(
-            pokemon.id, "normal", pokemon.is_shiny
+            entry.id, "normal", entry.is_shiny
         )
         px = rect.x + 8
         py = rect.y + (rect.height - portrait_size) // 2
@@ -1175,7 +1448,7 @@ class TradeScene(BaseScene):
             px - 2, py - 2, portrait_size + 4, portrait_size + 4
         )
         pygame.draw.rect(screen, COL_PANEL_DARK, portrait_bg, border_radius=6)
-        if pokemon.is_shiny:
+        if entry.is_shiny:
             pygame.draw.rect(screen, COL_ACCENT, portrait_bg, 2, border_radius=6)
         else:
             pygame.draw.rect(screen, COL_BORDER, portrait_bg, 1, border_radius=6)
@@ -1186,7 +1459,7 @@ class TradeScene(BaseScene):
             )
             screen.blit(portrait_scaled, (px, py))
 
-        # ===== Área disponível para texto =====
+        # Área para texto
         detail_btn_w = max(70, int(78 * scale))
         detail_btn_h = max(22, int(26 * scale))
         detail_btn = pygame.Rect(
@@ -1200,20 +1473,20 @@ class TradeScene(BaseScene):
         info_w = max(20, info_right - info_x)
 
         # Nome
-        name_color = COL_ACCENT if pokemon.is_shiny else COL_TEXT
-        name = self._truncate(pokemon.name, self.font_h2, info_w)
+        name_color = COL_ACCENT if entry.is_shiny else COL_TEXT
+        name = self._truncate(entry.name, self.font_h2, info_w)
         name_surf = self.font_h2.render(name, True, name_color)
         screen.blit(name_surf, (info_x, rect.y + 6))
 
         # Nível
         lvl_y = rect.y + 6 + name_surf.get_height() + 2
         lvl_surf = self.font_small.render(
-            f"Nível {pokemon.level}", True, COL_TEXT_DIM
+            f"Nível {entry.level}", True, COL_TEXT_DIM
         )
         screen.blit(lvl_surf, (info_x, lvl_y))
 
-        # ===== Badge TIME / BOX =====
-        is_in_team = pokemon.unique_id in self._my_pokemon_in_team
+        # Badge TIME / BOX
+        is_in_team = entry.unique_id in self._my_pokemon_in_team
         badge_text = "TIME" if is_in_team else "BOX"
         badge_color = COL_SUCCESS if is_in_team else COL_TEXT_MUTED
 
@@ -1230,19 +1503,16 @@ class TradeScene(BaseScene):
             badge_surf.get_height() + badge_pad_y * 2,
         )
 
-        # Só desenha se couber antes do botão DETALHES
         if badge_bg.right <= info_right:
             pygame.draw.rect(screen, COL_PANEL_DARK, badge_bg, border_radius=3)
             pygame.draw.rect(screen, badge_color, badge_bg, 1, border_radius=3)
             screen.blit(badge_surf, (badge_x, lvl_y))
 
         # Tipos
-        type_font = pygame.font.Font(
-            None, max(11, int(14 * scale))
-        )
+        type_font = pygame.font.Font(None, max(11, int(14 * scale)))
         type_x = info_x
         type_y = rect.bottom - max(16, int(20 * scale)) - 6
-        for t in pokemon.types[:2]:
+        for t in entry.types[:2]:
             t_color = self._get_type_color(t)
             t_surf = type_font.render(f" {t.upper()} ", True, (255, 255, 255))
             t_w = t_surf.get_width() + 6
@@ -1261,15 +1531,7 @@ class TradeScene(BaseScene):
         btn_text = self.font_btn_sm.render("DETALHES", True, COL_TEXT)
         screen.blit(btn_text, btn_text.get_rect(center=detail_btn.center))
 
-        self._detail_buttons.append((detail_btn, pokemon.unique_id))
-
-    def _draw_scroll_btn(self, screen, rect, symbol, enabled):
-        bg = COL_PANEL_SOFT if enabled else COL_PANEL_DARK
-        fg = COL_TEXT if enabled else COL_TEXT_MUTED
-        pygame.draw.rect(screen, bg, rect, border_radius=5)
-        pygame.draw.rect(screen, COL_BORDER, rect, 1, border_radius=5)
-        surf = self.font_h2.render(symbol, True, fg)
-        screen.blit(surf, surf.get_rect(center=rect.center))
+        self._detail_buttons.append((detail_btn, entry.unique_id))
 
     # ---------- Ofertas + Progresso ----------
     def _render_offers(self, screen):
@@ -1278,7 +1540,6 @@ class TradeScene(BaseScene):
 
         gap = max(10, int(LAYOUT["GAP"] * getattr(self, "_ui_scale", 1.0)))
 
-        # Oponente
         self._draw_section_header(
             screen, rect.x, rect.y, "Oferta do Oponente", color=COL_INFO
         )
@@ -1286,7 +1547,6 @@ class TradeScene(BaseScene):
             screen, self._opp_panel_rect, self.opponent_offer, side="opp"
         )
 
-        # Minha oferta
         my_header_y = self._opp_panel_rect.bottom + gap
         self._draw_section_header(
             screen, rect.x, my_header_y, "Sua Oferta", color=COL_SUCCESS
@@ -1295,11 +1555,9 @@ class TradeScene(BaseScene):
             screen, self._my_panel_rect, self.my_offer, side="me"
         )
 
-        # Progresso
         self._render_progress(screen, self._progress_rect)
 
     def _draw_offer_panel(self, screen, rect, pokemon, side):
-        # Cor da borda leva em conta animação
         has_data = pokemon is not None
         if self._anim_active:
             anim_data = self._anim_my_data if side == "me" else self._anim_opp_data
@@ -1324,7 +1582,6 @@ class TradeScene(BaseScene):
                 )
                 screen.blit(empty, empty.get_rect(center=rect.center))
             else:
-                # Durante animação: texto sutil
                 empty = self.font_small.render(
                     "Trocando...", True, COL_TEXT_MUTED
                 )
@@ -1333,7 +1590,6 @@ class TradeScene(BaseScene):
 
         scale = getattr(self, "_ui_scale", 1.0)
 
-        # Portrait
         portrait_size = max(60, min(int(90 * scale), rect.height - 24))
         portrait = self.pokedex.get_portrait(
             pokemon.get("id", 0), "normal", pokemon.get("is_shiny", False)
@@ -1356,7 +1612,6 @@ class TradeScene(BaseScene):
             )
             screen.blit(portrait_scaled, (px, py))
 
-        # ===== Dados =====
         detail_btn_w = max(78, int(88 * scale))
         detail_btn_h = max(24, int(28 * scale))
         detail_btn = pygame.Rect(
@@ -1381,7 +1636,6 @@ class TradeScene(BaseScene):
         lvl_surf = self.font.render(f"Nível {level}", True, COL_TEXT_DIM)
         screen.blit(lvl_surf, (info_x, rect.y + 12 + name_surf.get_height() + 4))
 
-        # Tipos
         types = pokemon.get("types", [])
         type_font = pygame.font.Font(None, max(12, int(16 * scale)))
         type_x = info_x
@@ -1397,7 +1651,6 @@ class TradeScene(BaseScene):
             screen.blit(t_surf, (t_bg.x + 3, t_bg.y + 2))
             type_x = t_bg.right + 8
 
-        # Botão DETALHES
         mouse = pygame.mouse.get_pos()
         hover = detail_btn.collidepoint(mouse)
         btn_color = COL_BTN_INFO_H if hover else COL_BTN_INFO
@@ -1429,7 +1682,6 @@ class TradeScene(BaseScene):
         header = self.font_small.render(header_txt, True, header_color)
         screen.blit(header, (rect.x + 14, rect.y + 8))
 
-        # Colunas
         label_x = rect.x + 16
         me_x = rect.x + int(rect.width * 0.68)
         op_x = rect.x + int(rect.width * 0.86)
@@ -1497,7 +1749,7 @@ class TradeScene(BaseScene):
     # ---------- Rodapé ----------
     def _render_footer(self, screen, vx, vy, vw, vh, cx):
         instr = self.font_tiny.render(
-            "Clique em um Pokémon (Time ou Box) para oferecer   |   DETALHES abre informações   |   ESC = voltar",
+            "Clique para oferecer   |   Pesquise por nome/ID   |   DETALHES abre info   |   ESC = voltar",
             True, COL_TEXT_MUTED,
         )
         screen.blit(instr, instr.get_rect(center=(cx, vy + vh - 18)))
@@ -1532,8 +1784,6 @@ class TradeScene(BaseScene):
     # ---------- Animação de troca ----------
     def _render_trade_animation(self, screen, vx, vy, vw, vh):
         t = min(1.0, self._anim_time / self._anim_duration)
-
-        # Easing suave (smoothstep)
         et = t * t * (3 - 2 * t)
 
         my_rect = self._my_panel_rect
@@ -1544,7 +1794,6 @@ class TradeScene(BaseScene):
         opp_start = (opp_rect.centerx, opp_rect.centery)
         opp_end = (my_rect.centerx, my_rect.centery)
 
-        # Arco (sobe no meio do caminho)
         arc = max(50, min(120, (my_rect.height + opp_rect.height) // 4))
         arc_off = math.sin(math.pi * t) * arc
 
@@ -1554,10 +1803,8 @@ class TradeScene(BaseScene):
         opp_x = opp_start[0] + (opp_end[0] - opp_start[0]) * et
         opp_y = opp_start[1] + (opp_end[1] - opp_start[1]) * et - arc_off
 
-        # Pulse de escala
         pulse = 1.0 + 0.18 * math.sin(math.pi * t)
 
-        # Alpha fade no final
         alpha = 255
         if t > 0.85:
             alpha = int(255 * (1.0 - (t - 0.85) / 0.15))
@@ -1566,12 +1813,10 @@ class TradeScene(BaseScene):
         base_size = max(60, min(int(96 * getattr(self, "_ui_scale", 1.0)),
                                 my_rect.height - 10))
 
-        # Fundo escurecido para destacar
         overlay = pygame.Surface((vw, vh), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, int(90 * min(1.0, t * 3))))
         screen.blit(overlay, (vx, vy))
 
-        # Renderiza os dois portraits
         if self._anim_my_data:
             self._render_anim_portrait(
                 screen, self._anim_my_data,
@@ -1583,28 +1828,24 @@ class TradeScene(BaseScene):
                 opp_x, opp_y, base_size, pulse, alpha
             )
 
-        # Flash no cruzamento
         if 0.35 < t < 0.65:
             intensity = 1.0 - abs(t - 0.5) / 0.15
             flash_surf = pygame.Surface((vw, vh), pygame.SRCALPHA)
             flash_surf.fill((255, 255, 220, int(110 * intensity)))
             screen.blit(flash_surf, (vx, vy))
 
-        # Texto "Trocando..."
         if t < 0.85:
             label = self.font_h1.render("TROCANDO...", True, COL_ACCENT)
             cy = vy + int(vh * 0.12)
             screen.blit(label, label.get_rect(center=(vx + vw // 2, cy)))
 
     def _render_anim_portrait(self, screen, data, cx, cy, base_size, pulse, alpha):
-        """Renderiza um portrait em movimento com glow."""
         if alpha <= 0:
             return
 
         size = int(base_size * pulse)
         center = (int(cx), int(cy))
 
-        # Glow
         glow_r = size
         glow_surf = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
         base_color = COL_ACCENT if data.get("is_shiny") else COL_INFO
@@ -1616,7 +1857,6 @@ class TradeScene(BaseScene):
                                (glow_r, glow_r), r)
         screen.blit(glow_surf, (center[0] - glow_r, center[1] - glow_r))
 
-        # Portrait
         portrait = self.pokedex.get_portrait(
             data.get("id", 0), "normal", data.get("is_shiny", False)
         )
@@ -1644,7 +1884,6 @@ class TradeScene(BaseScene):
         is_hover = rect.collidepoint(mouse) and kind != "disabled"
         bg = hover if is_hover else base
 
-        # Sombra leve
         shadow = pygame.Surface((rect.width + 4, rect.height + 4), pygame.SRCALPHA)
         pygame.draw.rect(shadow, COL_SHADOW,
                          pygame.Rect(2, 2, rect.width, rect.height),
