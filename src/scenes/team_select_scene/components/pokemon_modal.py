@@ -1420,7 +1420,7 @@ class PokemonModal:
         screen.blit(value_text, (left_card.x + 20, y_offset + 34))
         y_offset += line_spacing
 
-        # ===== ORIGEM (DATA E MÉTODO ) =====
+        # ===== ORIGEM (DATA E MÉTODO) =====
         if y_offset + 40 < left_card.bottom:
             from src.utils.pokemon_origin import (
                 get_capture_label, get_capture_color,
@@ -1447,9 +1447,11 @@ class PokemonModal:
 
             if traded:
                 # ===== ORIGEM CONCATENADA (com trocas) =====
+                # split_origin_for_display já converte a chave base para label
                 lines = split_origin_for_display(method_raw, max_chars=42)
 
-                # Cor: usa a cor do método base (primeiro item antes do separador)
+                # Cor: get_capture_color aceita chave OU label (compatibilidade)
+                # Pega a parte base (antes do separador) e obtém a cor correta
                 base_method = method_raw.split(" | ")[0].strip()
                 method_color = get_capture_color(base_method)
 
@@ -1469,6 +1471,7 @@ class PokemonModal:
                 y_offset = line_y + 5
             else:
                 # ===== ORIGEM SIMPLES (sem trocas) =====
+                # get_capture_label aceita chave OU label
                 method_name = get_capture_label(method_raw)
                 method_color = get_capture_color(method_raw)
                 method_text = value_font.render(method_name, True, method_color)
