@@ -9,12 +9,11 @@ import os
 import json
 from pathlib import Path
 
-from config.paths import SPRITES_PATH
+from config.paths import SPRITES_PATH, RES_PATH
 from src.scenes.base_scene import BaseScene
 from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 from src.scenes.settings_scene.settings_scene import SettingsScene
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
-from src.config.paths import RES_PATH
 
 
 class ImageSlideshow:
@@ -294,6 +293,7 @@ class MenuScene(BaseScene):
         # ===== LOGO =====
         self.logo_surface = None
         self.logo_rect = None
+        self._logo_loaded_from_file = False
         self._create_logo()
 
         # ===== BOTÕES =====
@@ -318,12 +318,35 @@ class MenuScene(BaseScene):
     # ======================================================================
 
     def _create_logo(self):
-        """Cria um logo mais elaborado"""
-        # Tamanho base
+        """Cria o logo - carrega logo.png do diretório UI ou usa fallback desenhado"""
+        # ===== TENTA CARREGAR logo.png DO DIRETÓRIO UI =====
+        logo_paths = [
+            SPRITES_PATH / "UI" / "logo.png",
+            RES_PATH / "PokemonSprites" / "UI" / "logo.png",
+            SPRITES_PATH / "UI" / "Logo.png",
+            RES_PATH / "PokemonSprites" / "UI" / "Logo.png",
+            SPRITES_PATH / "screenshots" / "logo.png",  # fallback extra
+        ]
+
+        for logo_path in logo_paths:
+            if logo_path.exists():
+                try:
+                    loaded_logo = pygame.image.load(str(logo_path)).convert_alpha()
+                    if loaded_logo and loaded_logo.get_width() > 0:
+                        self.logo_surface = loaded_logo
+                        self._logo_loaded_from_file = True
+                        print(f"[MENU] Logo carregada: {logo_path}")
+                        return
+                except Exception as e:
+                    print(f"[MENU] Erro ao carregar logo {logo_path}: {e}")
+
+        # ===== FALLBACK: LOGO DESENHADA PROGRAMATICAMENTE =====
+        print("[MENU] logo.png não encontrada - usando logo desenhada (fallback)")
         logo_width = 500
         logo_height = 150
 
         self.logo_surface = pygame.Surface((logo_width, logo_height), pygame.SRCALPHA)
+        self._logo_loaded_from_file = False
 
         # Fundo do logo com gradiente
         for i in range(logo_height):
@@ -679,24 +702,24 @@ class MenuScene(BaseScene):
             pygame.draw.circle(screen, color, (x, y), particle['size'])
 
         # ===== LOGO (centralizada com os botões) =====
-        # Calcula a largura total dos botões para centralizar o logo
         button_width = int(vw * 0.35)
         left_margin = int(vw * 0.05)
 
-        # A logo deve ficar centralizada em relação à largura dos botões
+        # Calcula o tamanho da logo MANTENDO A PROPORÇÃO da imagem original
         logo_width = int(vw * 0.30)
-        logo_height = int(logo_width * (150 / 500))
+        orig_w, orig_h = self.logo_surface.get_size()
+        if orig_w <= 0:
+            orig_w = 1
+        logo_height = int(logo_width * (orig_h / orig_w))
 
         # Centraliza a logo na mesma área dos botões
         logo_x = vx + left_margin + (button_width - logo_width) // 2
-        logo_y = vy + int(vh * 0.05)  # Um pouco mais acima
+        logo_y = vy + int(vh * 0.05)
 
-        logo_scaled = pygame.transform.scale(self.logo_surface, (logo_width, logo_height))
-
-        # Sombra do logo
-        shadow_surface = pygame.Surface((logo_width + 10, logo_height + 10), pygame.SRCALPHA)
-        shadow_surface.fill((0, 0, 0, 30))
-        screen.blit(shadow_surface, (logo_x - 5, logo_y + 5))
+        try:
+            logo_scaled = pygame.transform.smoothscale(self.logo_surface, (logo_width, logo_height))
+        except Exception:
+            logo_scaled = pygame.transform.scale(self.logo_surface, (logo_width, logo_height))
 
         screen.blit(logo_scaled, (logo_x, logo_y))
 

@@ -48,10 +48,21 @@ class SoundManager(BaseSoundManager):
         self._sync_with_global_settings("sfx")
         self._sync_music_with_global_settings()
 
-    def _load_sounds(self):
-        """Carrega todos os sons (implementação do método abstrato)"""
-        self._load_all_sounds()
-        self._load_effects()
+    # ======================================================================
+    # SINCRONIZAÇÃO
+    # ======================================================================
+
+    def _ensure_music_synced(self) -> bool:
+        """
+        Garante que o volume da música está sincronizado com as configurações atuais.
+
+        Returns:
+            True se música está habilitada e com volume > 0, False caso contrário
+        """
+        from src.config.settings import settings
+        self._music_enabled = settings.music_enabled
+        self._music_volume = settings.music_volume if settings.music_enabled else 0
+        return self._music_enabled and self._music_volume > 0
 
     def _sync_music_with_global_settings(self):
         """Sincroniza especificamente a música com as configurações"""
@@ -67,6 +78,15 @@ class SoundManager(BaseSoundManager):
         """Sincroniza todos os sons (SFX e música) com as configurações"""
         self._sync_with_global_settings("sfx")
         self._sync_music_with_global_settings()
+
+    # ======================================================================
+    # CARREGAMENTO DE SONS
+    # ======================================================================
+
+    def _load_sounds(self):
+        """Carrega todos os sons (implementação do método abstrato)"""
+        self._load_all_sounds()
+        self._load_effects()
 
     def _load_effects(self):
         """Carrega os efeitos sonoros da pasta res/sounds/effects"""
@@ -148,9 +168,21 @@ class SoundManager(BaseSoundManager):
         except Exception as e:
             print(f"[SOUND] Erro ao carregar {file_path}: {e}")
 
+    # ======================================================================
+    # EFEITOS SONOROS
+    # ======================================================================
+
     def play_effect(self, effect: SoundEffect, volume: Optional[float] = None, loops: int = 0) -> bool:
         """
         Toca um efeito sonoro usando o enum SoundEffect
+
+        Args:
+            effect: O efeito sonoro a ser tocado
+            volume: Volume específico (0.0 a 1.0) - se None, usa o volume global
+            loops: Número de repetições (0 = toca uma vez)
+
+        Returns:
+            True se tocou, False caso contrário
         """
         if not self._enabled or self._volume == 0:
             return False
@@ -183,26 +215,9 @@ class SoundManager(BaseSoundManager):
                 return False
         return False
 
-    def play_random_battle_music(self):
-        """Toca uma música de batalha aleatória"""
-        if not self._music_enabled or self._music_volume == 0:
-            return False
-
-        music_path = self.sounds_path / "music" / "gameBattle"
-        music_files = []
-
-        if music_path.exists():
-            for ext in ['.mp3', '.ogg', '.wav']:
-                files = list(music_path.glob(f"*{ext}"))
-                music_files.extend(files)
-
-        if not music_files:
-            return False
-
-        import random
-        selected_music = random.choice(music_files)
-        self.play_music(selected_music.stem, loop=True)
-        return True
+    # ======================================================================
+    # MÚSICA DO MENU E TEAM SELECT
+    # ======================================================================
 
     def play_menu_music(self, music_id: str = "Title_Theme", loop: bool = True):
         """
@@ -212,12 +227,15 @@ class SoundManager(BaseSoundManager):
             music_id: Nome do arquivo sem extensão (padrão: "Title_Theme")
             loop: Se deve tocar em loop (padrão: True)
         """
-        if not self._music_enabled or self._music_volume == 0:
-            print(f"[MUSIC] Música do menu desabilitada")
+        # ===== SINCRONIZA COM AS CONFIGURAÇÕES ANTES DE TOCAR =====
+        if not self._ensure_music_synced():
+            print(f"[MUSIC] Música do menu desabilitada (enabled={self._music_enabled}, volume={self._music_volume})")
             return False
 
         # Verifica se a música já está tocando
         if self.music_playing == music_id and pygame.mixer.music.get_busy():
+            # Atualiza o volume mesmo se já estiver tocando
+            pygame.mixer.music.set_volume(self._music_volume)
             return True
 
         music_file = None
@@ -252,7 +270,7 @@ class SoundManager(BaseSoundManager):
                 pygame.mixer.music.play(fade_ms=500)
 
             self.music_playing = music_id
-            print(f"[MUSIC] Música do menu iniciada: {music_id}")
+            print(f"[MUSIC] Música do menu iniciada: {music_id} (volume={self._music_volume})")
             return True
 
         except Exception as e:
@@ -260,14 +278,22 @@ class SoundManager(BaseSoundManager):
             return False
 
     def play_team_select_music(self, loop: bool = True):
-        """Toca a música da tela de seleção de time (Come_Along)"""
+        """
+        Toca a música da tela de seleção de time (Come_Along).
+        Delega para play_menu_music, que já sincroniza com as configurações.
+        """
         return self.play_menu_music("Come_Along", loop)
 
+    # ======================================================================
+    # MÚSICA DE BATALHA E OUTRAS
+    # ======================================================================
+
     def play_music(self, music_id: str, fade_ms: int = 1000, loop: bool = True):
-        """Toca música de fundo"""
+        """Toca música de fundo (batalha, etc)"""
         print(f"[MUSIC] play_music chamado: music_id='{music_id}'")
 
-        if not self._music_enabled or self._music_volume == 0:
+        # ===== SINCRONIZA COM AS CONFIGURAÇÕES ANTES DE TOCAR =====
+        if not self._ensure_music_synced():
             print(f"[MUSIC] Música desabilitada (enabled={self._music_enabled}, volume={self._music_volume})")
             return
 
@@ -302,16 +328,65 @@ class SoundManager(BaseSoundManager):
                 pygame.mixer.music.play(fade_ms=fade_ms)
 
             self.music_playing = music_id
+            print(f"[MUSIC] Música iniciada: {music_id} (volume={self._music_volume})")
         except Exception as e:
             print(f"[MUSIC] Erro ao tocar música: {e}")
             import traceback
             traceback.print_exc()
+
+    def play_random_battle_music(self):
+        """Toca uma música de batalha aleatória"""
+        # ===== SINCRONIZA COM AS CONFIGURAÇÕES ANTES DE TOCAR =====
+        if not self._ensure_music_synced():
+            return False
+
+        music_path = self.sounds_path / "music" / "gameBattle"
+        music_files = []
+
+        if music_path.exists():
+            for ext in ['.mp3', '.ogg', '.wav']:
+                files = list(music_path.glob(f"*{ext}"))
+                print(f"[MUSIC] Encontrados {len(files)} arquivos com extensão {ext}")
+                music_files.extend(files)
+
+        if not music_files:
+            return False
+
+        import random
+        selected_music = random.choice(music_files)
+        print(f"[MUSIC] Música selecionada: {selected_music.name}")
+        self.play_music(selected_music.stem, loop=True)
+        return True
+
+    def play_victory_music(self):
+        """Toca a música de vitória (Victory_Wild.mp3)"""
+        # ===== SINCRONIZA COM AS CONFIGURAÇÕES ANTES DE TOCAR =====
+        if not self._ensure_music_synced():
+            print(f"[SOUND] Música desabilitada")
+            return False
+
+        self.play_music("Victory_Wild", fade_ms=500, loop=False)
+        return True
+
+    def play_defeat_music(self):
+        """Toca a música de derrota (Defeat.mp3)"""
+        # ===== SINCRONIZA COM AS CONFIGURAÇÕES ANTES DE TOCAR =====
+        if not self._ensure_music_synced():
+            print(f"[SOUND] Música desabilitada")
+            return False
+
+        self.play_music("Defeat", fade_ms=500, loop=False)
+        return True
 
     def stop_music(self, fade_ms: int = 500):
         """Para a música atual"""
         if pygame.mixer.music.get_busy():
             pygame.mixer.music.fadeout(fade_ms)
             self.music_playing = None
+
+    # ======================================================================
+    # CONTROLE DE VOLUME
+    # ======================================================================
 
     def set_sfx_volume(self, volume: float):
         """Define o volume dos efeitos sonoros"""
@@ -357,44 +432,30 @@ class SoundManager(BaseSoundManager):
         from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.sync_with_main_manager()
 
+    # ======================================================================
+    # SINCRONIZAÇÃO GERAL
+    # ======================================================================
+
     def sync_all_managers(self):
         """Sincroniza todos os gerenciadores de som com as configurações atuais"""
         from src.config.settings import settings
 
+        # self em vez de sound_manager
         self.set_sfx_volume(settings.sfx_volume if settings.sfx_enabled else 0)
         self.set_music_volume(settings.music_volume if settings.music_enabled else 0)
 
         # ===== SINCRONIZA AMBIENTE =====
-        from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
-        ambient_sound_manager.sync_with_main_manager()
+        try:
+            from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
+            ambient_sound_manager.sync_with_main_manager()
+        except ImportError:
+            pass  # AmbientSoundManager ainda não foi implementado
 
         # Sincroniza o MoveSoundManager (já é feito no set_sfx_volume, mas garantimos)
         from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.sync_with_main_manager()
 
         print("[SOUND] Todos os gerenciadores de som sincronizados")
-
-    def play_victory_music(self):
-        """Toca a música de vitória (Victory_Wild.mp3)"""
-        from src.config.settings import settings
-
-        if not settings.music_enabled:
-            print(f"[SOUND] Música desabilitada")
-            return False
-
-        self.play_music("Victory_Wild", fade_ms=500, loop=False)
-        return True
-
-    def play_defeat_music(self):
-        """Toca a música de derrota (Defeat.mp3)"""
-        from src.config.settings import settings
-
-        if not settings.music_enabled:
-            print(f"[SOUND] Música desabilitada")
-            return False
-
-        self.play_music("Defeat", fade_ms=500, loop=False)
-        return True
 
 
 # Instância global
