@@ -1,7 +1,6 @@
 # src/scenes/lobby_scene/lobby_scene.py
 
 import pygame
-import random
 import tkinter as tk
 from src.scenes.base_scene import BaseScene
 from src.ui.toast_renderer import toast_info, toast_warning
@@ -10,7 +9,7 @@ from src.network.protocol import create_message
 
 
 class LobbyScene(BaseScene):
-    """Lobby multiplayer com design limpo e funcional"""
+    """Lobby multiplayer com chat, lista de jogadores e solicitação de troca."""
 
     def __init__(self, game, is_host, network):
         super().__init__(game)
@@ -20,22 +19,20 @@ class LobbyScene(BaseScene):
 
         # ===== DADOS =====
         self.my_name = network.my_name
-        self.players = [self.my_name]  # Começa com o próprio nome
+        self.players = [self.my_name]
         self.opponent_name = None
+        self.opponent_uuid = None        # <-- UUID do oponente (via PLAYER_LIST)
         self.chat_messages = []
         self.chat_input = ""
         self.chat_active = False
         self.pending_trade_from = None
         self._animation_timer = 0
-        self.players_received = False
 
         # ===== UI =====
         self.back_btn = pygame.Rect(0, 0, 120, 40)
         self.trade_btn = pygame.Rect(0, 0, 220, 35)
         self.send_btn = pygame.Rect(0, 0, 80, 32)
         self.chat_input_rect = pygame.Rect(0, 0, 0, 0)
-
-        # Botões de resposta
         self.accept_btn = pygame.Rect(0, 0, 100, 40)
         self.decline_btn = pygame.Rect(0, 0, 100, 40)
 
@@ -50,20 +47,31 @@ class LobbyScene(BaseScene):
         self.font_small = pygame.font.Font(None, 20)
         self.font_chat = pygame.font.Font(None, 18)
 
-        # ===== ENVIA O NOME DO JOGADOR =====
-        self.network.send_to_all(create_message("PLAYER_INFO", {"name": self.my_name}))
-        print(f"[LOBBY] {self.my_name} entrou no lobby (host={self.is_host})")
+        # ===== ANUNCIA-SE (com UUID do player) =====
+        player_uuid = (
+            getattr(self.game.player, 'uuid', None)
+            or getattr(self.network, 'my_uuid', None)
+            or "unknown"
+        )
+        # Garante que o NetworkManager também tenha o uuid
+        if hasattr(self.network, 'set_uuid'):
+            self.network.set_uuid(player_uuid)
 
-    # ======================================================================
+        self.network.send_to_all(create_message(
+            "PLAYER_INFO",
+            {"name": self.my_name, "uuid": player_uuid},
+        ))
+        print(f"[LOBBY] {self.my_name} (UUID: {player_uuid}) entrou no lobby (host={self.is_host})")
+
+    # ==================================================================
     # INICIALIZAÇÃO
-    # ======================================================================
-
+    # ==================================================================
     def _init_clipboard(self):
         try:
             self._root = tk.Tk()
             self._root.withdraw()
             self._clipboard_available = True
-        except:
+        except Exception:
             self._clipboard_available = False
 
     def _paste_from_clipboard(self):
@@ -71,7 +79,7 @@ class LobbyScene(BaseScene):
             return ""
         try:
             return self._root.clipboard_get()
-        except:
+        except Exception:
             return ""
 
     def _update_button_positions(self):
@@ -90,86 +98,150 @@ class LobbyScene(BaseScene):
         self.accept_btn.center = (center_x - 110, center_y)
         self.decline_btn.center = (center_x + 110, center_y)
 
-    # ======================================================================
+    # ==================================================================
     # NETWORK
-    # ======================================================================
-
+    # ==================================================================
     def _on_network_message(self, msg, conn=None):
         msg_type = msg.get("type")
         payload = msg.get("payload", {})
 
         if msg_type == "PLAYER_INFO":
             name = payload.get("name", "Desconhecido")
+            uuid_str = payload.get("uuid", "unknown")
             if name != self.my_name and name not in self.players:
                 self.players.append(name)
                 self.opponent_name = name
+                self.opponent_uuid = uuid_str
                 toast_info(f"{name} entrou na sala!")
-                print(f"[LOBBY] Lista atualizada: {self.players}")
+                print(f"[LOBBY] Lista atualizada: {self.players} | Oponente UUID: {self.opponent_uuid}")
 
         elif msg_type == "PLAYER_LIST":
             players_data = payload.get("players", [])
-            # Se for dicionário, converte para lista
-            if isinstance(players_data, dict):
-                new_players = list(players_data.values())
-            else:
-                new_players = players_data
 
-            # Mantém o próprio nome e adiciona os outros
+            # Normaliza para lista de dicts {name, uuid}
+            normalized = []
+            if isinstance(players_data, list):
+                for entry in players_data:
+                    if isinstance(entry, dict):
+                        normalized.append({
+                            "name": entry.get("name", "?"),
+                            "uuid": entry.get("uuid", "unknown"),
+                        })
+                    else:
+                        # Compatibilidade retroativa
+                        normalized.append({"name": str(entry), "uuid": "unknown"})
+            elif isinstance(players_data, dict):
+                # Compatibilidade: dict {conn: name}
+                for name in players_data.values():
+                    normalized.append({"name": str(name), "uuid": "unknown"})
+
+            # Reconstrói a lista local
             self.players = [self.my_name]
-            for name in new_players:
-                if name != self.my_name and name not in self.players:
-                    self.players.append(name)
+            self.opponent_name = None
+            self.opponent_uuid = None
 
-            # Encontra o oponente
-            for name in self.players:
-                if name != self.my_name:
-                    self.opponent_name = name
-                    break
+            for entry in normalized:
+                if entry["name"] != self.my_name and entry["name"] not in self.players:
+                    self.players.append(entry["name"])
+                    if self.opponent_name is None:
+                        self.opponent_name = entry["name"]
+                        self.opponent_uuid = entry["uuid"]
 
-            print(f"[LOBBY] Lista recebida: {self.players}")
+            # Sincroniza no NetworkManager (para o TradeScene usar)
+            if hasattr(self.network, 'opponent_name'):
+                self.network.opponent_name = self.opponent_name
+            if hasattr(self.network, 'opponent_uuid'):
+                self.network.opponent_uuid = self.opponent_uuid
+
+            print(f"[LOBBY] Lista recebida: {self.players} | Oponente UUID: {self.opponent_uuid}")
             if len(self.players) > 1:
                 toast_info(f"Jogadores na sala: {len(self.players)}")
 
+        # ★ Chat recebido
+        elif msg_type == "CHAT_MESSAGE":
+            sender = payload.get("sender", "?")
+            text = payload.get("text", "")
+            if sender != self.my_name and text:
+                self.chat_messages.append(f"{sender}: {text}")
+
+        # ★ Pedido de troca recebido
+        elif msg_type == "TRADE_REQUEST":
+            from_name = payload.get("from", "Desconhecido")
+            if from_name != self.my_name:
+                self.pending_trade_from = from_name
+                toast_info(f"{from_name} quer trocar com voce!")
+
+        # ★ Resposta ao pedido de troca
+        elif msg_type == "TRADE_RESPONSE":
+            accepted = payload.get("accepted", False)
+            if accepted:
+                toast_info("Oponente aceitou! Abrindo tela de troca...")
+                self._open_trade_scene()
+            else:
+                toast_info("Oponente recusou a troca.")
+                self.pending_trade_from = None
+
+        # ★ Desconexão do outro jogador
+        elif msg_type == "DISCONNECT":
+            who = payload.get("name", "O outro jogador")
+            toast_warning(f"{who} desconectou.")
+            self._return_to_menu()
+
+    # ==================================================================
+    # AÇÕES
+    # ==================================================================
     def _open_trade_scene(self):
         from src.scenes.trade_scene.trade_scene import TradeScene
-        self.game.current_scene = TradeScene(self.game, is_host=self.is_host, network=self.network)
+        # Garante que o TradeScene tenha acesso ao nome/uuid do oponente
+        if hasattr(self.network, 'opponent_name'):
+            self.network.opponent_name = self.opponent_name
+        if hasattr(self.network, 'opponent_uuid'):
+            self.network.opponent_uuid = self.opponent_uuid
+        self.game.current_scene = TradeScene(
+            self.game, is_host=self.is_host, network=self.network
+        )
 
     def _return_to_menu(self):
         self.network.stop()
         self.game.current_scene = self.game.menu_scene
 
     def _send_chat(self):
-        if not self.chat_input.strip():
-            return
         text = self.chat_input.strip()
+        if not text:
+            return
         self.chat_input = ""
-        self.network.send_to_all(create_message("CHAT_MESSAGE", {"sender": self.my_name, "text": text}))
+        self.network.send_to_all(
+            create_message("CHAT_MESSAGE", {"sender": self.my_name, "text": text})
+        )
+        # Adiciona localmente (o outro lado recebe via relay)
         self.chat_messages.append(f"{self.my_name}: {text}")
 
     def _request_trade(self):
         if not self.opponent_name:
             toast_warning("Nenhum oponente conectado.")
             return
-        self.network.send_to_all(create_message("TRADE_REQUEST", {"from": self.my_name}))
+        self.network.send_to_all(
+            create_message("TRADE_REQUEST", {"from": self.my_name})
+        )
         toast_info(f"Solicitacao enviada para {self.opponent_name}.")
 
     def _handle_trade_response(self, accepted):
-        self.network.send_to_all(create_message("TRADE_RESPONSE", {"accepted": accepted}))
+        self.network.send_to_all(
+            create_message("TRADE_RESPONSE", {"accepted": accepted})
+        )
         if accepted:
             self._open_trade_scene()
         else:
             self.pending_trade_from = None
 
-    # ======================================================================
+    # ==================================================================
     # EVENTOS
-    # ======================================================================
-
+    # ==================================================================
     def handle_event(self, event):
         if event.type == pygame.VIDEORESIZE:
             self._update_button_positions()
             return
 
-        # ===== TECLADO =====
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self._return_to_menu()
@@ -197,13 +269,14 @@ class LobbyScene(BaseScene):
                 self._request_trade()
                 return
 
-        # ===== MOUSE =====
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = event.pos
 
             if self.back_btn.collidepoint(mouse_pos):
                 sound_manager.play_effect(SoundEffect.CLICK)
-                self.network.send_to_all(create_message("DISCONNECT"))
+                self.network.send_to_all(
+                    create_message("DISCONNECT", {"name": self.my_name})
+                )
                 self._return_to_menu()
                 return
 
@@ -229,10 +302,9 @@ class LobbyScene(BaseScene):
 
             self.chat_active = False
 
-    # ======================================================================
+    # ==================================================================
     # UPDATE
-    # ======================================================================
-
+    # ==================================================================
     def fixed_update(self, dt):
         self._animation_timer += dt
 
@@ -245,13 +317,12 @@ class LobbyScene(BaseScene):
                 else:
                     msg, _ = item
                     self._on_network_message(msg, None)
-        except:
+        except Exception:
             pass
 
-    # ======================================================================
-    # RENDERIZAÇÃO
-    # ======================================================================
-
+    # ==================================================================
+    # RENDER
+    # ==================================================================
     def render(self, screen):
         screen.fill((18, 20, 35))
 
@@ -262,7 +333,7 @@ class LobbyScene(BaseScene):
 
         self._update_button_positions()
 
-        # ===== TÍTULO =====
+        # Título
         title = self.font_title.render("LOBBY", True, (255, 215, 0))
         title_rect = title.get_rect(center=(vx + vw // 2, vy + 40))
         screen.blit(title, title_rect)
@@ -271,7 +342,7 @@ class LobbyScene(BaseScene):
                          (vx + vw // 4, vy + 65),
                          (vx + vw * 3 // 4, vy + 65), 2)
 
-        # ===== LISTA DE JOGADORES =====
+        # Lista de jogadores
         list_rect = pygame.Rect(vx + 15, vy + 90, 240, 250)
         pygame.draw.rect(screen, (25, 27, 45), list_rect, border_radius=8)
         pygame.draw.rect(screen, (60, 60, 80), list_rect, 1, border_radius=8)
@@ -279,20 +350,16 @@ class LobbyScene(BaseScene):
         list_title = self.font.render("Jogadores", True, (200, 200, 200))
         screen.blit(list_title, (vx + 25, vy + 100))
 
-        if self.players:
-            y_pos = vy + 135
-            for name in self.players:
-                is_me = name == self.my_name
-                color = (100, 255, 100) if is_me else (255, 255, 255)
-                text = f"{name} (voce)" if is_me else name
-                txt = self.font.render(text, True, color)
-                screen.blit(txt, (vx + 25, y_pos))
-                y_pos += 28
-        else:
-            txt = self.font_small.render("Aguardando jogadores...", True, (120, 120, 150))
-            screen.blit(txt, (vx + 25, vy + 135))
+        y_pos = vy + 135
+        for name in self.players:
+            is_me = name == self.my_name
+            color = (100, 255, 100) if is_me else (255, 255, 255)
+            text = f"{name} (voce)" if is_me else name
+            txt = self.font.render(text, True, color)
+            screen.blit(txt, (vx + 25, y_pos))
+            y_pos += 28
 
-        # ===== BOTÃO SOLICITAR TROCA =====
+        # Botão solicitar troca
         if self.opponent_name:
             btn_text = f"Solicitar Troca com {self.opponent_name}"
             color = (50, 100, 50)
@@ -305,7 +372,7 @@ class LobbyScene(BaseScene):
         self.trade_btn = pygame.Rect(vx + 25, vy + 200, 220, 35)
         self._draw_button(screen, self.trade_btn, btn_text, color, hover_color)
 
-        # ===== PAINEL DO CHAT =====
+        # Painel de chat
         chat_rect = pygame.Rect(vx + 280, vy + 90, vw - 310, vh - 150)
         pygame.draw.rect(screen, (25, 27, 45), chat_rect, border_radius=8)
         pygame.draw.rect(screen, (60, 60, 80), chat_rect, 1, border_radius=8)
@@ -327,7 +394,7 @@ class LobbyScene(BaseScene):
             screen.blit(txt, (chat_rect.x + 12, y_offset))
             y_offset += 22
 
-        # ===== CAMPO DE INPUT DO CHAT =====
+        # Campo de input do chat
         border_color = (255, 215, 0) if self.chat_active else (60, 60, 80)
         pygame.draw.rect(screen, (20, 22, 40), self.chat_input_rect, border_radius=6)
         pygame.draw.rect(screen, border_color, self.chat_input_rect, 2, border_radius=6)
@@ -342,16 +409,18 @@ class LobbyScene(BaseScene):
         txt = self.font_small.render(display_text, True, color)
         screen.blit(txt, (self.chat_input_rect.x + 10, self.chat_input_rect.y + 7))
 
-        # ===== BOTÕES =====
+        # Botões
         self._draw_button(screen, self.send_btn, "Enviar", (50, 100, 50), (80, 160, 80))
         self._draw_button(screen, self.back_btn, "Voltar", (80, 40, 40), (140, 60, 60))
 
-        # ===== SOLICITAÇÃO DE TROCA PENDENTE =====
+        # Solicitação de troca pendente
         if self.pending_trade_from:
             self._render_trade_request(screen)
 
-        # ===== INSTRUÇÕES =====
-        instr = self.font_small.render("C = chat | T = solicitar troca | Ctrl+V = colar", True, (80, 80, 110))
+        # Instruções
+        instr = self.font_small.render(
+            "C = chat | T = solicitar troca | Ctrl+V = colar", True, (80, 80, 110)
+        )
         screen.blit(instr, (vx + 25, vy + vh - 25))
 
     def _draw_button(self, screen, rect, text, color, hover_color):
@@ -393,10 +462,9 @@ class LobbyScene(BaseScene):
         self._draw_button(screen, self.accept_btn, "Aceitar", (50, 150, 50), (80, 200, 80))
         self._draw_button(screen, self.decline_btn, "Recusar", (150, 50, 50), (200, 80, 80))
 
-    # ======================================================================
+    # ==================================================================
     # CICLO DE VIDA
-    # ======================================================================
-
+    # ==================================================================
     def on_enter(self):
         pass
 

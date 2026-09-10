@@ -53,6 +53,7 @@ class SaveManager:
                 "save_name": "Novo Jogo"
             },
             "player": {
+                "uuid": str(uuid.uuid4()),
                 "money": 100,
                 "score": 0,
                 "position": {"x": 0, "y": 0},
@@ -320,6 +321,8 @@ class SaveManager:
 
         # ===== DADOS DO JOGADOR =====
         player_data = existing_data["player"]
+        # ===== UUID DO JOGADOR =====
+        player_data["uuid"] = getattr(player, 'uuid', None) or str(uuid.uuid4())
         player_data["money"] = player.money
         player_data["score"] = player.score
         player_data["position"] = {"x": player.x, "y": player.y}
@@ -489,6 +492,9 @@ class SaveManager:
             player_data = self.save_data["player"]
 
             # Dados básicos
+            player.uuid = player_data.get("uuid") or str(uuid.uuid4())
+            if "uuid" not in player_data:
+                player_data["uuid"] = player.uuid
             player.money = player_data["money"]
             player.score = player_data["score"]
             player.x = player_data["position"]["x"]
@@ -922,6 +928,10 @@ class SaveManager:
         # ===== MIGRAÇÃO PARA 0.1.9 (AMBIENTE) =====
         if version <= "0.1.8":
             print("[MIGRATE] Adicionando configurações de ambiente...")
+
+            if "uuid" not in migrated.get("player", {}):
+                migrated["player"]["uuid"] = str(uuid.uuid4())
+                print(f"[MIGRATE] UUID do jogador gerado: {migrated['player']['uuid']}")
 
             # Adiciona ambient_volume e ambient_enabled nas settings se não existirem
             if "settings" not in migrated:

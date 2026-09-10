@@ -18,6 +18,7 @@ class SoundEffect(Enum):
     CLICK = "Click"
     EVOLUTION = "Evolution"
     LEVELUP = "Levelup"
+    OBTAINED_RARE_ITEM = "ObtainedARareItem"
 
 
 class SoundManager(BaseSoundManager):
@@ -102,7 +103,8 @@ class SoundManager(BaseSoundManager):
             SoundEffect.CAUGHT: "Caught.mp3",
             SoundEffect.CLICK: "Click.mp3",
             SoundEffect.EVOLUTION: "Evolution.mp3",
-            SoundEffect.LEVELUP: "LevelUp.mp3"
+            SoundEffect.LEVELUP: "LevelUp.mp3",
+            SoundEffect.OBTAINED_RARE_ITEM: "ObtainedARareItem.mp3"
         }
 
         for effect, filename in effect_files.items():
@@ -110,6 +112,7 @@ class SoundManager(BaseSoundManager):
             if effect_path.exists():
                 try:
                     self.effects[effect] = pygame.mixer.Sound(str(effect_path))
+                    print(f"[SOUND] Carregado: {filename}")
                 except Exception as e:
                     print(f"[SOUND] Erro ao carregar {filename}: {e}")
             else:

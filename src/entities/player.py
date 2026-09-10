@@ -1,7 +1,7 @@
 # src/entities/player.py
 from typing import Optional
 
-import pygame
+import pygame, uuid
 
 from src.entities.pokemon import Pokemon
 from src.entities.base import Entity
@@ -19,6 +19,9 @@ class Player(Entity):
         sprite.fill((255, 0, 0))
 
         super().__init__(x, y, 20, 20, sprite)
+
+        # ===== UUID ÚNICO DO JOGADOR (persistente entre sessões) =====
+        self.uuid = str(uuid.uuid4())
 
         self.pokedex = Pokedex()
 
@@ -298,6 +301,26 @@ class Player(Entity):
         return starter
 
     #SALVAMENTOS
+
+    def stamp_pokemon_origin(self, pokemon, new_method: str):
+        """Atualiza o capture_method de um Pokémon (objeto ou dict)."""
+        if hasattr(pokemon, 'unique_id'):
+            # É um objeto Pokemon
+            pokemon.capture_method = new_method
+            # Atualiza no cache
+            if pokemon.unique_id in self._pokemon_cache:
+                self._pokemon_cache[pokemon.unique_id].capture_method = new_method
+            # Atualiza na box se estiver lá
+            for data in self.pc_box:
+                if data.get("unique_id") == pokemon.unique_id:
+                    data["capture_method"] = new_method
+                    break
+        elif isinstance(pokemon, dict):
+            # É um dict da box
+            pokemon["capture_method"] = new_method
+            uid = pokemon.get("unique_id")
+            if uid and uid in self._pokemon_cache:
+                self._pokemon_cache[uid].capture_method = new_method
 
     def save_game(self, slot=1):
         """Salva o jogo atual"""

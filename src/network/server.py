@@ -4,19 +4,23 @@ import socket
 import threading
 import json
 import time
+
 from src.network.protocol import create_message
 
-# src/network/server.py (trecho modificado)
 
 class TradeServer(threading.Thread):
-    def __init__(self, host='0.0.0.0', port=12345, on_message=None, on_connect=None, on_disconnect=None, max_clients=2):
+    """Servidor TCP que aceita até `max_clients` conexões."""
+
+    def __init__(self, host='0.0.0.0', port=12345,
+                 on_message=None, on_connect=None, on_disconnect=None,
+                 max_clients=2):
         super().__init__(daemon=True)
         self.host = host
         self.port = port
         self.max_clients = max_clients
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.clients = []  # lista de (conn, addr)
+        self.clients = []
         self.running = False
         self.on_message = on_message
         self.on_connect = on_connect
@@ -36,13 +40,33 @@ class TradeServer(threading.Thread):
                         print(f"[SERVER] Máximo de clientes atingido, recusando {addr}")
                         conn.close()
                         continue
+
                     print(f"[SERVER] Cliente conectado: {addr}")
                     with self.lock:
                         self.clients.append((conn, addr))
+
+                    # ★ on_connect pode retornar False para rejeitar
+                    accepted = True
                     if self.on_connect:
-                        self.on_connect(conn, addr)
-                    client_thread = threading.Thread(target=self._handle_client, args=(conn, addr), daemon=True)
-                    client_thread.start()
+                        result = self.on_connect(conn, addr)
+                        if result is False:
+                            accepted = False
+
+                    if not accepted:
+                        # ★ Dá um tempo para o cliente receber o HANDSHAKE
+                        time.sleep(0.1)
+                        with self.lock:
+                            if (conn, addr) in self.clients:
+                                self.clients.remove((conn, addr))
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+                        continue
+
+                    threading.Thread(
+                        target=self._handle_client, args=(conn, addr), daemon=True
+                    ).start()
                 except socket.error:
                     break
         except Exception as e:
@@ -51,22 +75,26 @@ class TradeServer(threading.Thread):
             self.stop()
 
     def _handle_client(self, conn, addr):
+        buffer = ""
         while self.running:
             try:
                 data = conn.recv(4096).decode('utf-8')
                 if not data:
                     break
-                # Pode receber múltiplas mensagens separadas por \n
-                for line in data.split('\n'):
+                buffer += data
+                while '\n' in buffer:
+                    line, buffer = buffer.split('\n', 1)
                     if line.strip():
-                        msg = json.loads(line)
-                        if self.on_message:
-                            self.on_message(msg, conn, addr)
-            except json.JSONDecodeError:
-                pass
+                        try:
+                            msg = json.loads(line)
+                            if self.on_message:
+                                self.on_message(msg, conn, addr)
+                        except json.JSONDecodeError as e:
+                            print(f"[SERVER] JSON inválido: {e}")
             except Exception as e:
                 print(f"[SERVER] Erro ao receber: {e}")
                 break
+
         conn.close()
         with self.lock:
             if (conn, addr) in self.clients:
@@ -77,25 +105,30 @@ class TradeServer(threading.Thread):
     def send_to_client(self, conn, msg):
         try:
             conn.send((json.dumps(msg) + '\n').encode('utf-8'))
-        except:
-            pass
+        except Exception as e:
+            print(f"[SERVER] Falha ao enviar para cliente: {e}")
 
     def send_to_all(self, msg):
         with self.lock:
             for conn, _ in self.clients:
                 self.send_to_client(conn, msg)
 
+    def send_to_others(self, exclude_conn, msg):
+        with self.lock:
+            for conn, _ in self.clients:
+                if conn is not exclude_conn:
+                    self.send_to_client(conn, msg)
+
     def stop(self):
         self.running = False
         try:
             self.socket.close()
-        except:
+        except Exception:
             pass
-        # Fecha conexões ativas
         with self.lock:
             for conn, _ in self.clients:
                 try:
                     conn.close()
-                except:
+                except Exception:
                     pass
             self.clients.clear()

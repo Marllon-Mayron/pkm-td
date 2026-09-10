@@ -3,6 +3,10 @@
 """
 Tela de Mystery Gift
 Permite ao jogador resgatar códigos para ganhar Pokémon especiais
+
+NOTA: O som de "item raro obtido" é tocado automaticamente pelo
+MysteryGiftManager ao resgatar com sucesso. Esta cena cuida apenas
+da UI e do estado visual.
 """
 
 import pygame
@@ -11,6 +15,7 @@ import time
 import os
 
 from src.scenes.base_scene import BaseScene
+from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 
 
 class MysteryGiftScene(BaseScene):
@@ -43,8 +48,10 @@ class MysteryGiftScene(BaseScene):
         # Controle de clique
         self._last_error_click = 0
 
+        # ===== CONTROLE DE MÚSICA =====
+        self._music_started = False
+
         # ===== VERIFICA SE HÁ SAVE CARREGADO =====
-        # Agora sempre deve ter save porque o Game inicializa automaticamente
         self.has_save = self._check_save_loaded()
 
         if not self.has_save:
@@ -58,6 +65,34 @@ class MysteryGiftScene(BaseScene):
         # Inicializa UI
         self._init_ui()
 
+        # ===== INICIA A MÚSICA DO MYSTERY GIFT =====
+        self._start_mystery_gift_music()
+
+    # MÚSICA
+    def _start_mystery_gift_music(self):
+        """
+        Inicia a música da tela de Mystery Gift.
+        Usa play_menu_music que já sincroniza com o volume das configurações.
+        """
+        if not self._music_started:
+            success = sound_manager.play_menu_music("Mystery_Gift", loop=True)
+            if success:
+                self._music_started = True
+                print("[MYSTERY_GIFT] Música iniciada: Mystery_Gift")
+            else:
+                success = sound_manager.play_menu_music("Title_Theme", loop=True)
+                if success:
+                    self._music_started = True
+                    print("[MYSTERY_GIFT] Música iniciada: Title_Theme (fallback)")
+
+    def _stop_mystery_gift_music(self, fade_ms=300):
+        """Para a música do Mystery Gift"""
+        if self._music_started:
+            sound_manager.stop_music(fade_ms=fade_ms)
+            self._music_started = False
+            print("[MYSTERY_GIFT] Música parada")
+
+    # VERIFICAÇÃO DE SAVE
     def _check_save_loaded(self):
         """Verifica se o jogador tem um save carregado"""
         # Verifica se existe um arquivo de save
@@ -75,6 +110,7 @@ class MysteryGiftScene(BaseScene):
         # Retorna True se tiver arquivo de save
         return has_save_file and has_save_manager
 
+    # UI
     def _init_ui(self):
         """Inicializa elementos de UI"""
 
@@ -107,6 +143,7 @@ class MysteryGiftScene(BaseScene):
                     self.is_hovered = self.rect.collidepoint(event.pos)
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.is_hovered:
+                        sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
                         self.callback()
 
             def render(self, screen, font):
@@ -196,6 +233,8 @@ class MysteryGiftScene(BaseScene):
                     self.is_hovered = self.rect.collidepoint(event.pos)
                 elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if self.is_hovered:
+                        # Som do clique do botão (volume reduzido para 0.3)
+                        sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
                         self.callback()
 
             def render(self, screen, font):
@@ -232,6 +271,7 @@ class MysteryGiftScene(BaseScene):
                 'size': random.randint(3, 8)
             })
 
+    # EVENTOS
     def handle_event(self, event):
         """Processa eventos"""
         # Se está bloqueado, só permite voltar
@@ -317,8 +357,11 @@ class MysteryGiftScene(BaseScene):
         else:
             print("[MYSTERY_GIFT] Não foi possível acessar a área de transferência ou o texto não é uma string válida")
 
+    # RESGATE DE CÓDIGO
     def redeem_code(self):
-        """Tenta resgatar o código"""
+        """
+        Tenta resgatar o código.
+        """
         # Verifica novamente se tem save
         if not self._check_save_loaded():
             self.state = "blocked"
@@ -339,13 +382,14 @@ class MysteryGiftScene(BaseScene):
         success, message, pokemon = mg_manager.redeem_code(self.code_input)
 
         if success:
+            # O som já foi tocado pelo manager! Não precisa tocar aqui.
+
             self.state = "success"
             self.success_message = message
             self.redeemed_pokemon = pokemon
 
             # Busca informações do evento do código resgatado
             from src.data.mystery_gift_data import get_code_info
-            from src.managers.mystery_gift_manager import MysteryGiftManager
 
             # Criptografa o código para buscar no banco
             from src.utils.crypto_utils import mystery_crypto
@@ -370,8 +414,28 @@ class MysteryGiftScene(BaseScene):
 
     def go_back(self):
         """Volta ao menu anterior"""
+        # ===== PARA A MÚSICA DO MYSTERY GIFT =====
+        self._stop_mystery_gift_music(fade_ms=300)
+
         from src.scenes.menu_scene import MenuScene
         self.game.current_scene = MenuScene(self.game)
+
+    # ======================================================================
+    # CICLO DE VIDA
+    # ======================================================================
+
+    def on_enter(self):
+        """Chamado quando a cena é ativada"""
+        if not self._music_started or not pygame.mixer.music.get_busy():
+            self._start_mystery_gift_music()
+
+    def on_exit(self):
+        """Chamado quando a cena é desativada"""
+        self._stop_mystery_gift_music(fade_ms=300)
+
+    # ======================================================================
+    # UPDATE
+    # ======================================================================
 
     def fixed_update(self, dt):
         """Atualiza animações"""
@@ -393,6 +457,10 @@ class MysteryGiftScene(BaseScene):
             particle['life'] -= dt
             if particle['life'] <= 0:
                 self.particles.remove(particle)
+
+    # ======================================================================
+    # RENDERIZAÇÃO
+    # ======================================================================
 
     def render(self, screen):
         """Renderiza a tela"""

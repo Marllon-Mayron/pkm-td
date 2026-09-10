@@ -1420,8 +1420,13 @@ class PokemonModal:
         screen.blit(value_text, (left_card.x + 20, y_offset + 34))
         y_offset += line_spacing
 
-        # ===== ORIGEM (DATA E MÉTODO LADO A LADO) =====
+        # ===== ORIGEM (DATA E MÉTODO ) =====
         if y_offset + 40 < left_card.bottom:
+            from src.utils.pokemon_origin import (
+                get_capture_label, get_capture_color,
+                format_capture_date, split_origin_for_display, is_traded,
+            )
+
             # Linha separadora
             separator_y = y_offset - 8
             pygame.draw.line(screen, self.colors['border'],
@@ -1433,97 +1438,53 @@ class PokemonModal:
             screen.blit(origin_title, (left_card.x + (left_card.width - origin_title.get_width()) // 2, y_offset))
             y_offset += 32
 
-            # ===== DATA E MÉTODO NA MESMA LINHA =====
-            # Data
+            # ===== MÉTODO (com suporte a concatenação) =====
+            label_text = label_font.render("MÉTODO", True, self.colors['text_secondary'])
+            screen.blit(label_text, (left_card.x + 20, y_offset))
+
+            method_raw = getattr(self.pokemon, 'capture_method', 'unknown') or 'unknown'
+            traded = is_traded(method_raw)
+
+            if traded:
+                # ===== ORIGEM CONCATENADA (com trocas) =====
+                lines = split_origin_for_display(method_raw, max_chars=42)
+
+                # Cor: usa a cor do método base (primeiro item antes do separador)
+                base_method = method_raw.split(" | ")[0].strip()
+                method_color = get_capture_color(base_method)
+
+                # Renderiza cada linha
+                line_y = y_offset + 24
+                for i, line in enumerate(lines):
+                    # A primeira linha é a origem original; as demais são trocas
+                    if i == 0:
+                        color = method_color
+                    else:
+                        color = (150, 200, 255)  # Azul claro para trocas
+
+                    line_surf = value_font.render(line, True, color)
+                    screen.blit(line_surf, (left_card.x + 20, line_y))
+                    line_y += 20
+
+                y_offset = line_y + 5
+            else:
+                # ===== ORIGEM SIMPLES (sem trocas) =====
+                method_name = get_capture_label(method_raw)
+                method_color = get_capture_color(method_raw)
+                method_text = value_font.render(method_name, True, method_color)
+                screen.blit(method_text, (left_card.x + 20, y_offset + 24))
+                y_offset += 45
+
+            # ===== DATA (abaixo do método) =====
             label_text = label_font.render("DATA", True, self.colors['text_secondary'])
             screen.blit(label_text, (left_card.x + 20, y_offset))
 
             capture_date = getattr(self.pokemon, 'capture_date', None)
-            if capture_date:
-                try:
-                    from datetime import datetime
-                    dt = datetime.fromisoformat(capture_date)
-                    date_str = dt.strftime("%d/%m/%Y %H:%M")
-                except:
-                    date_str = capture_date[:16] if len(capture_date) > 16 else capture_date
-            else:
-                date_str = "Data desconhecida"
-
+            date_str = format_capture_date(capture_date)
             date_color = self.colors['text_accent'] if capture_date else self.colors['text_secondary']
             date_text = value_font.render(date_str, True, date_color)
-
-            # Posiciona a data ao lado do label "DATA"
-            date_x = left_card.x + 20 + label_text.get_width() + 10
-            screen.blit(date_text, (date_x, y_offset))
-
-            # Calcula a posição para o método (após a data + espaçamento)
-            method_start_x = date_x + date_text.get_width() + 30
-
-            # Método
-            method_label_text = label_font.render("MÉTODO", True, self.colors['text_secondary'])
-            screen.blit(method_label_text, (method_start_x, y_offset))
-
-            method_map = {
-                "starter": "Inicial",
-                "capture": "Captura",
-                "capture_pokeball": "Pokébola",
-                "capture_greatball": "Great Ball",
-                "capture_ultraball": "Ultra Ball",
-                "capture_masterball": "Master Ball",
-                "capture_friendball": "Friend Ball",
-                "gift": "Presente",
-                "trade": "Troca",
-                "fossil": "Fóssil",
-                "evolution": "Evolução",
-                "egg": "Ovo",
-                "event": "Evento",
-                "migration": "Migração",
-                "unknown": "Desconhecido"
-            }
-
-            method = getattr(self.pokemon, 'capture_method', 'unknown')
-            method_name = method_map.get(method, method)
-
-            method_colors = {
-                "starter": (255, 215, 0),
-                "fossil": (200, 180, 100),
-                "evolution": (100, 200, 255),
-                "capture": (100, 255, 100),
-                "capture_pokeball": (200, 200, 200),
-                "capture_greatball": (100, 150, 255),
-                "capture_ultraball": (255, 200, 100),
-                "capture_masterball": (255, 100, 100),
-                "capture_friendball": (255, 150, 255),
-                "gift": (255, 200, 0),
-                "trade": (100, 200, 255),
-                "egg": (255, 180, 200),
-                "event": (255, 100, 200),
-                "migration": (150, 150, 150),
-                "unknown": (150, 150, 150)
-            }
-
-            method_color = method_colors.get(method, self.colors['text_primary'])
-            method_text = value_font.render(method_name, True, method_color)
-
-            # Posiciona o método ao lado do label "MÉTODO"
-            method_x = method_start_x + method_label_text.get_width() + 10
-            screen.blit(method_text, (method_x, y_offset))
-
-            # Badge para o método (opcional) - ao lado do método
-            if method == "starter":
-                badge_rect = pygame.Rect(method_x + method_text.get_width() + 8, y_offset + 2, 50, 22)
-                self._draw_rounded_rect(screen, (255, 215, 0, 80), badge_rect, radius=4)
-                badge_font = pygame.font.Font(None, 10)
-                badge_text = badge_font.render("INICIAL", True, (255, 215, 0))
-                screen.blit(badge_text, (badge_rect.centerx - badge_text.get_width() // 2,
-                                         badge_rect.centery - badge_text.get_height() // 2))
-            elif method in ["capture_masterball", "masterball"]:
-                badge_rect = pygame.Rect(method_x + method_text.get_width() + 8, y_offset + 2, 50, 22)
-                self._draw_rounded_rect(screen, (255, 100, 100, 80), badge_rect, radius=4)
-                badge_font = pygame.font.Font(None, 10)
-                badge_text = badge_font.render("MASTER", True, (255, 255, 255))
-                screen.blit(badge_text, (badge_rect.centerx - badge_text.get_width() // 2,
-                                         badge_rect.centery - badge_text.get_height() // 2))
+            screen.blit(date_text, (left_card.x + 20, y_offset + 24))
+            y_offset += 45
 
         # ===== COLUNA DIREITA: Características =====
         right_title = section_title_font.render("CARACTERÍSTICAS", True, self.colors['text_accent'])
