@@ -326,7 +326,7 @@ class Button:
         screen.blit(text_surface_scaled, text_rect)
 
     def _render_tooltip(self, screen, anchor_rect):
-        """Renderiza um pequeno tooltip abaixo do botão."""
+        """Renderiza tooltip preferencialmente acima do botão, com fallback abaixo."""
         font = pygame.font.Font(None, 18)
         text_surf = font.render(self.disabled_tooltip, True, (255, 230, 180))
         pad_x, pad_y = 10, 6
@@ -334,7 +334,12 @@ class Button:
         tt_h = text_surf.get_height() + pad_y * 2
 
         tt_x = anchor_rect.centerx - tt_w // 2
-        tt_y = anchor_rect.bottom + 6
+
+        # Tenta acima; se sair da tela, coloca abaixo
+        tt_y = anchor_rect.top - tt_h - 6
+        show_above = tt_y >= 0
+        if not show_above:
+            tt_y = anchor_rect.bottom + 6
 
         # Fundo
         bg = pygame.Surface((tt_w, tt_h), pygame.SRCALPHA)
@@ -342,6 +347,23 @@ class Button:
         screen.blit(bg, (tt_x, tt_y))
         pygame.draw.rect(screen, (200, 160, 60), (tt_x, tt_y, tt_w, tt_h), 1, border_radius=4)
         screen.blit(text_surf, (tt_x + pad_x, tt_y + pad_y))
+
+        # Seta apontando para o botão
+        arrow_size = 6
+        if show_above:
+            # Seta na base do tooltip apontando para baixo
+            pygame.draw.polygon(screen, (200, 160, 60), [
+                (anchor_rect.centerx - arrow_size, tt_y + tt_h),
+                (anchor_rect.centerx + arrow_size, tt_y + tt_h),
+                (anchor_rect.centerx, tt_y + tt_h + arrow_size),
+            ])
+        else:
+            # Seta no topo do tooltip apontando para cima
+            pygame.draw.polygon(screen, (200, 160, 60), [
+                (anchor_rect.centerx - arrow_size, tt_y),
+                (anchor_rect.centerx + arrow_size, tt_y),
+                (anchor_rect.centerx, tt_y - arrow_size),
+            ])
 
 
 class MenuScene(BaseScene):
