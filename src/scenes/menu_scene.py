@@ -14,6 +14,7 @@ from src.scenes.base_scene import BaseScene
 from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 from src.scenes.settings_scene.settings_scene import SettingsScene
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
+from src.ui.toast_renderer import toast_warning
 
 
 class ImageSlideshow:
@@ -163,6 +164,10 @@ class Button:
         self.icon = None
         self.icon_rect = None
 
+        # ===== ESTADO DE BLOQUEIO (ex: botão editor quando DEBUG_MODE=False) =====
+        self.disabled = False
+        self.disabled_tooltip = ""
+
     def update_absolute_position(self, viewport_width, viewport_height, viewport_x, viewport_y):
         """Atualiza posição absoluta baseada no tamanho do viewport"""
         abs_x = viewport_x + int(self.relative_x * viewport_width)
@@ -201,7 +206,11 @@ class Button:
 
             if self.is_hovered and not was_hovered:
                 self.target_scale = 1.05
-                sound_manager.play_effect(SoundEffect.CLICK, volume=self.volume)
+                if not self.disabled:
+                    sound_manager.play_effect(SoundEffect.CLICK, volume=self.volume)
+                else:
+                    # Som mais baixo/erro para botão bloqueado
+                    sound_manager.play_effect(SoundEffect.CLICK, volume=(self.volume or 0.3) * 0.5)
 
             elif not self.is_hovered and was_hovered:
                 self.target_scale = 1.0
@@ -210,6 +219,7 @@ class Button:
             if self.is_hovered:
                 sound_manager.play_effect(SoundEffect.CLICK, volume=self.volume)
                 self.target_scale = 0.95
+                # Se está bloqueado, ainda chama callback (o callback decide o que fazer)
                 if self.callback:
                     self.callback()
 
@@ -235,6 +245,54 @@ class Button:
         shadow_rect.y += 3
         pygame.draw.rect(screen, (10, 10, 20, 50), shadow_rect, border_radius=8)
 
+        # ===== APARÊNCIA QUANDO BLOQUEADO =====
+        if self.disabled:
+            # Botão acinzentado (aspecto "desabilitado")
+            base_color = (45, 45, 55)
+            hover_color = (60, 60, 70)
+            color = hover_color if self.is_hovered else base_color
+
+            pygame.draw.rect(screen, color, scaled_rect, border_radius=8)
+            border_color = (100, 90, 90) if self.is_hovered else (70, 70, 80)
+            pygame.draw.rect(screen, border_color, scaled_rect, 2, border_radius=8)
+
+            # Cadeado pequeno no canto superior direito
+            lock_size = max(10, int(scaled_rect.height * 0.28))
+            lock_x = scaled_rect.right - lock_size - 6
+            lock_y = scaled_rect.y + 6
+            # Corpo do cadeado
+            body_rect = pygame.Rect(lock_x, lock_y + lock_size // 3,
+                                    lock_size, int(lock_size * 0.7))
+            pygame.draw.rect(screen, (180, 160, 90), body_rect, border_radius=2)
+            # Arco do cadeado
+            arc_rect = pygame.Rect(lock_x + lock_size // 4,
+                                   lock_y,
+                                   lock_size // 2,
+                                   lock_size // 2)
+            pygame.draw.arc(screen, (180, 160, 90), arc_rect,
+                            3.14, 2 * 3.14, max(2, lock_size // 8))
+
+            # Texto com cor mais apagada
+            text_surface_scaled = pygame.transform.scale(
+                self.text_surface,
+                (int(self.text_surface.get_width() * self.scale),
+                 int(self.text_surface.get_height() * self.scale))
+            )
+            # Aplica uma camada escura ao texto pra parecer "apagado"
+            text_surface_scaled = text_surface_scaled.copy()
+            dark_overlay = pygame.Surface(text_surface_scaled.get_size(), pygame.SRCALPHA)
+            dark_overlay.fill((0, 0, 0, 90))
+            text_surface_scaled.blit(dark_overlay, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+
+            text_rect = text_surface_scaled.get_rect(center=scaled_rect.center)
+            screen.blit(text_surface_scaled, text_rect)
+
+            # Tooltip quando hover
+            if self.is_hovered and self.disabled_tooltip:
+                self._render_tooltip(screen, scaled_rect)
+            return
+
+        # ===== APARÊNCIA NORMAL =====
         # Cor do botão
         color = self.hover_color if self.is_hovered else self.color
 
@@ -267,9 +325,33 @@ class Button:
         text_rect = text_surface_scaled.get_rect(center=scaled_rect.center)
         screen.blit(text_surface_scaled, text_rect)
 
+    def _render_tooltip(self, screen, anchor_rect):
+        """Renderiza um pequeno tooltip abaixo do botão."""
+        font = pygame.font.Font(None, 18)
+        text_surf = font.render(self.disabled_tooltip, True, (255, 230, 180))
+        pad_x, pad_y = 10, 6
+        tt_w = text_surf.get_width() + pad_x * 2
+        tt_h = text_surf.get_height() + pad_y * 2
+
+        tt_x = anchor_rect.centerx - tt_w // 2
+        tt_y = anchor_rect.bottom + 6
+
+        # Fundo
+        bg = pygame.Surface((tt_w, tt_h), pygame.SRCALPHA)
+        bg.fill((20, 20, 30, 230))
+        screen.blit(bg, (tt_x, tt_y))
+        pygame.draw.rect(screen, (200, 160, 60), (tt_x, tt_y, tt_w, tt_h), 1, border_radius=4)
+        screen.blit(text_surf, (tt_x + pad_x, tt_y + pad_y))
+
 
 class MenuScene(BaseScene):
     """Cena do menu principal com layout reformulado - botões à esquerda e preview à direita"""
+
+    # =====================================================================
+    # MODO DEBUG — mude para True para liberar ferramentas internas
+    # (Editor de Fases). Em builds públicas, mantenha False.
+    # =====================================================================
+    DEBUG_MODE = False
 
     def __init__(self, game):
         super().__init__(game)
@@ -390,6 +472,16 @@ class MenuScene(BaseScene):
         # ===== VOLUME DOS BOTÕES (30% do volume global) =====
         BTN_VOLUME = 0.3
 
+        # ===== BOTÃO EDITOR DE FASES (bloqueado se DEBUG_MODE=False) =====
+        editor_btn = Button(
+            left_margin, main_btn_y + 0.28, button_width, 0.07, "Editor de Fases",
+            (40, 40, 60), (80, 80, 120), self.open_editor, None,
+            volume=BTN_VOLUME
+        )
+        if not MenuScene.DEBUG_MODE:
+            editor_btn.disabled = True
+            editor_btn.disabled_tooltip = "Disponível apenas em modo debug"
+
         self.buttons = [
             # ===== BOTÃO PRINCIPAL (DESTAQUE) =====
             Button(left_margin, main_btn_y, button_width, 0.08, self.start_text,
@@ -405,9 +497,8 @@ class MenuScene(BaseScene):
                    (40, 40, 60), (80, 80, 120), self.open_settings, None,
                    volume=BTN_VOLUME),
 
-            Button(left_margin, main_btn_y + 0.28, button_width, 0.07, "Editor de Fases",
-                   (40, 40, 60), (80, 80, 120), self.open_editor, None,
-                   volume=BTN_VOLUME),
+            # Editor (potencialmente bloqueado)
+            editor_btn,
 
             # ===== BOTÕES DE AÇÕES RÁPIDAS (lado a lado abaixo do Editor) =====
             Button(left_margin, main_btn_y + 0.37, 0.17, 0.06, "Mystery Gift",
@@ -468,6 +559,15 @@ class MenuScene(BaseScene):
         self.game.current_scene = SettingsScene(self.game)
 
     def open_editor(self):
+        """Abre o editor de fases — bloqueado quando DEBUG_MODE=False."""
+        if not MenuScene.DEBUG_MODE:
+            toast_warning(
+                "Editor de Fases indisponível (modo debug desativado).",
+                duration=3.5,
+            )
+            print("[MENU] Editor bloqueado: DEBUG_MODE=False")
+            return
+
         from src.scenes.editor.editor_scene import EditorScene
         self.game.current_scene = EditorScene(self.game)
 
