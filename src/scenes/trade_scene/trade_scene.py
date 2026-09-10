@@ -112,10 +112,12 @@ class TradeScene(BaseScene):
         self._opponent_name = getattr(network, "opponent_name", None) or "Oponente"
         self._opponent_uuid = getattr(network, "opponent_uuid", None) or "unknown"
 
-        # ===== LISTA DE POKÉMON =====
-        self.my_pokemon = list(game.player.team)
+        # ===== LISTA DE POKÉMON (TIME + BOX) =====
+        self.my_pokemon = []
+        self._my_pokemon_in_team = set()   # unique_ids que estão no time (para badge)
         self.scroll_offset = 0
         self.visible_items = 5
+        self._refresh_my_pokemon_list()
 
         # ===== MODAL =====
         self.modal = None
@@ -155,6 +157,59 @@ class TradeScene(BaseScene):
         self.font_btn_sm = pygame.font.Font(None, 16)
 
         self._layout()
+
+    # =========================================================
+    # Lista de Pokémon (Time + Box)
+    # =========================================================
+    def _refresh_my_pokemon_list(self):
+        """
+        Reconstrói a lista unificada de Pokémon disponíveis para troca:
+        primeiro os do TIME (como instâncias), depois os da BOX.
+        Deduplica por unique_id (a pc_box pode conter cópias do time).
+        """
+        from src.entities.pokemon import Pokemon
+
+        self.my_pokemon = []
+        self._my_pokemon_in_team = set()
+        seen_ids = set()
+
+        # ---- 1. Time (prioridade / ordem preservada) ----
+        for p in self.game.player.team:
+            if p.unique_id in seen_ids:
+                continue
+            self.my_pokemon.append(p)
+            self._my_pokemon_in_team.add(p.unique_id)
+            seen_ids.add(p.unique_id)
+
+        # ---- 2. Box ----
+        for data in self.game.player.pc_box:
+            uid = data.get("unique_id")
+            if not uid or uid in seen_ids:
+                continue
+
+            # Tenta reutilizar instância já cacheada
+            pokemon = self.game.player._pokemon_cache.get(uid)
+            if pokemon is None:
+                try:
+                    pokemon = Pokemon.from_dict(data)
+                    pokemon.is_in_team = False
+                    self.game.player._pokemon_cache[uid] = pokemon
+                except Exception as e:
+                    print(f"[TRADE] Erro ao converter Pokémon da box ({uid}): {e}")
+                    continue
+
+            self.my_pokemon.append(pokemon)
+            seen_ids.add(uid)
+
+        # Reset de scroll caso a lista tenha encolhido
+        max_off = max(0, len(self.my_pokemon) - self.visible_items)
+        if self.scroll_offset > max_off:
+            self.scroll_offset = max_off
+
+        print(f"[TRADE] Lista de troca reconstruída: "
+              f"{len(self.my_pokemon)} Pokémon "
+              f"({len(self._my_pokemon_in_team)} no time, "
+              f"{len(self.my_pokemon) - len(self._my_pokemon_in_team)} na box)")
 
     # =========================================================
     # Layout responsivo
@@ -480,6 +535,9 @@ class TradeScene(BaseScene):
         self.my_offer_pokemon = None
         self.opponent_offer_pokemon = None
 
+        # ===== ATUALIZA LISTA (TIME + BOX) =====
+        self._refresh_my_pokemon_list()
+
     def _stamp_trade_origin_on_offer(self):
         if not self.my_offer:
             return
@@ -546,6 +604,9 @@ class TradeScene(BaseScene):
         if not new_pokemon.capture_method:
             new_pokemon.capture_method = "trade"
 
+        # ===== EVOLUÇÃO POR TROCA (INSTANTÂNEA, SEM OVERLAY) =====
+        new_pokemon = self._check_and_evolve_trade(new_pokemon)
+
         if len(self.game.player.team) < 6:
             self.game.player.team.append(new_pokemon)
         else:
@@ -558,6 +619,56 @@ class TradeScene(BaseScene):
         self.game.player.auto_save()
 
         print(f"[TRADE] Pokémon recebido: {new_pokemon.name}")
+
+    def _check_and_evolve_trade(self, pokemon):
+        """
+        Verifica se o Pokémon evolui por troca e o evolui INSTANTANEAMENTE.
+        Sem overlay, sem game_scene, sem animação/som de evolução.
+        """
+        pokemon_data = self.pokedex.get_pokemon(pokemon.id)
+        if not pokemon_data:
+            return pokemon
+
+        evo_data = pokemon_data.get("evolution", {})
+        method = evo_data.get("method", "none")
+
+        # Só interessa evolução por troca
+        if method != "trade":
+            return pokemon
+
+        evolve_to_id = evo_data.get("EvolveTo")
+        if not evolve_to_id or evolve_to_id == "none" or evolve_to_id == pokemon.id:
+            return pokemon
+
+        print(f"[TRADE] {pokemon.name} (ID {pokemon.id}) evolui por troca → ID {evolve_to_id}")
+
+        old_name = pokemon.name
+
+        # Marca método para conquistas (caso futuro)
+        if hasattr(pokemon, 'evolution'):
+            pokemon.evolution._pending_evolution_method = "trade"
+
+        # Executa direto — is_normal_game=False para pular checagens que dependem de game_scene
+        pokemon._perform_evolution(evolve_to_id, is_normal_game=False)
+
+        # Registra na Pokédex do jogador
+        self.game.player.register_seen(evolve_to_id)
+        self.game.player.caught_pokemon.add(evolve_to_id)
+
+        # Contadores de conquista (evolution_count, first_evolution, etc.)
+        if hasattr(self.game.player, 'achievement_manager'):
+            ach = self.game.player.achievement_manager
+            ach.increment_counter("evolution_count")
+            ach.check_and_unlock("first_evolution", "trade")
+            ach.check_and_unlock("evolution_10", "trade")
+            ach.check_and_unlock("evolution_50", "trade")
+
+        print(f"[TRADE] ✓ {old_name} evoluiu para {pokemon.name}!")
+
+        # ===== FEEDBACK VISUAL APENAS (SEM SOM DE EVOLUÇÃO) =====
+        toast_info(f"{old_name} evoluiu para {pokemon.name} ao ser trocado!", duration=4.0)
+
+        return pokemon
 
     def _remove_pokemon_from_player(self, unique_id):
         if not unique_id:
@@ -988,9 +1099,12 @@ class TradeScene(BaseScene):
             screen, rect.x + 14, rect.y + 8, "Seus Pokémon"
         )
 
-        # Contador
+        # Contador (Time | Box)
+        team_count = len(self.game.player.team)
+        box_count = len(self.my_pokemon) - len(self._my_pokemon_in_team)
         count_txt = self.font_tiny.render(
-            f"{len(self.my_pokemon)} disponíveis", True, COL_TEXT_MUTED
+            f"{len(self.my_pokemon)} disponíveis  (Time: {team_count} | Box: {box_count})",
+            True, COL_TEXT_MUTED
         )
         screen.blit(count_txt, (
             rect.right - count_txt.get_width() - 14,
@@ -1024,7 +1138,7 @@ class TradeScene(BaseScene):
 
         if not self.my_pokemon:
             empty = self.font.render(
-                "Nenhum Pokémon no time.", True, COL_TEXT_MUTED
+                "Nenhum Pokémon disponível.", True, COL_TEXT_MUTED
             )
             screen.blit(empty, empty.get_rect(center=rect.center))
 
@@ -1092,10 +1206,35 @@ class TradeScene(BaseScene):
         screen.blit(name_surf, (info_x, rect.y + 6))
 
         # Nível
+        lvl_y = rect.y + 6 + name_surf.get_height() + 2
         lvl_surf = self.font_small.render(
             f"Nível {pokemon.level}", True, COL_TEXT_DIM
         )
-        screen.blit(lvl_surf, (info_x, rect.y + 6 + name_surf.get_height() + 2))
+        screen.blit(lvl_surf, (info_x, lvl_y))
+
+        # ===== Badge TIME / BOX =====
+        is_in_team = pokemon.unique_id in self._my_pokemon_in_team
+        badge_text = "TIME" if is_in_team else "BOX"
+        badge_color = COL_SUCCESS if is_in_team else COL_TEXT_MUTED
+
+        badge_font = pygame.font.Font(None, max(11, int(13 * scale)))
+        badge_surf = badge_font.render(badge_text, True, badge_color)
+
+        badge_x = info_x + lvl_surf.get_width() + 8
+        badge_pad_x = 5
+        badge_pad_y = 1
+        badge_bg = pygame.Rect(
+            badge_x - badge_pad_x,
+            lvl_y - badge_pad_y,
+            badge_surf.get_width() + badge_pad_x * 2,
+            badge_surf.get_height() + badge_pad_y * 2,
+        )
+
+        # Só desenha se couber antes do botão DETALHES
+        if badge_bg.right <= info_right:
+            pygame.draw.rect(screen, COL_PANEL_DARK, badge_bg, border_radius=3)
+            pygame.draw.rect(screen, badge_color, badge_bg, 1, border_radius=3)
+            screen.blit(badge_surf, (badge_x, lvl_y))
 
         # Tipos
         type_font = pygame.font.Font(
@@ -1358,7 +1497,7 @@ class TradeScene(BaseScene):
     # ---------- Rodapé ----------
     def _render_footer(self, screen, vx, vy, vw, vh, cx):
         instr = self.font_tiny.render(
-            "Clique em um Pokémon para oferecer   |   DETALHES abre informações   |   ESC = voltar",
+            "Clique em um Pokémon (Time ou Box) para oferecer   |   DETALHES abre informações   |   ESC = voltar",
             True, COL_TEXT_MUTED,
         )
         screen.blit(instr, instr.get_rect(center=(cx, vy + vh - 18)))
