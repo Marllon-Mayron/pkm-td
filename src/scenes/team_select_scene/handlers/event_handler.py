@@ -14,24 +14,46 @@ class EventHandler:
                      back_button, start_button, prev_button, next_button,
                      current_page, total_pages):
 
-        # Processa eventos dos filtros PRIMEIRO (inclui teclado)
+        # =================================================================
+        # MODAL ABERTO -> PRIORIDADE ABSOLUTA
+        # =================================================================
+        if self.modal and self.modal.visible:
+            forwarded_types = (
+                pygame.MOUSEMOTION,
+                pygame.MOUSEWHEEL,
+                pygame.MOUSEBUTTONDOWN,
+                pygame.MOUSEBUTTONUP,
+                pygame.KEYDOWN,
+                pygame.KEYUP,
+            )
+            if event.type in forwarded_types:
+                result = self.modal.handle_event(event)
+                if result:
+                    return self._handle_modal_action(result)
+                # Consome o evento para não vazar para grid/filtros
+                return None
+            # Outros eventos (VIDEORESIZE) seguem normalmente
+            if event.type == pygame.VIDEORESIZE:
+                return self._handle_resize(event)
+            return None
+
+        # =================================================================
+        # SEM MODAL -> FLUXO NORMAL
+        # =================================================================
         if filters:
             filter_result = filters.handle_event(event)
             if filter_result:
                 return filter_result
 
-        # Processa outros eventos
         if event.type == pygame.KEYDOWN:
             return self._handle_keyboard(event)
-
         elif event.type == pygame.VIDEORESIZE:
             return self._handle_resize(event)
-
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             return self._handle_click(event, team_slots, grid_items,
-                                      back_button, start_button, prev_button, next_button,
+                                      back_button, start_button,
+                                      prev_button, next_button,
                                       current_page, total_pages)
-
         elif event.type == pygame.MOUSEMOTION:
             self._handle_hover(event, team_slots, grid_items)
 
@@ -40,7 +62,6 @@ class EventHandler:
     def _handle_hover(self, event, team_slots, grid_items):
         for slot in team_slots:
             slot.handle_event(event)
-
         for item in grid_items:
             item.handle_event(event)
 
@@ -62,14 +83,8 @@ class EventHandler:
     def _handle_click(self, event, team_slots, grid_items,
                       back_button, start_button, prev_button, next_button,
                       current_page, total_pages):
-
-        # REMOVIDA a chamada duplicada a filters.handle_event aqui
-        # pois já foi processado em handle_event
-
+        # Modal já foi tratado em handle_event; aqui só chega com modal fechado
         if self.modal and self.modal.visible:
-            result = self.modal.handle_event(event)
-            if result:
-                return self._handle_modal_action(result)
             return None
 
         if back_button and back_button.collidepoint(event.pos):
@@ -88,13 +103,11 @@ class EventHandler:
                 return {'type': 'NEXT_PAGE'}
 
         for slot in team_slots:
-            slot.handle_event(event)
             result = slot.handle_event(event)
             if result is not None:
                 return {'type': 'SLOT_CLICK', 'slot': slot, 'slot_index': result}
 
         for item in grid_items:
-            item.handle_event(event)
             result = item.handle_event(event)
             if result:
                 return {'type': 'GRID_CLICK', 'pokemon': result}
