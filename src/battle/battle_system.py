@@ -63,6 +63,9 @@ class BattleSystem:
         # ===== ATUALIZA CLIMA =====
         self.weather_manager.update(dt)
 
+        # ===== ATUALIZA ITENS SEGURADOS =====
+        self._update_held_item_effects(dt)
+
     def register_participant(self, pokemon: 'Pokemon'):
         """Registra um Pokémon como participante da batalha"""
         if pokemon and not pokemon.is_wild and pokemon.is_alive():
@@ -1165,6 +1168,11 @@ class BattleSystem:
             if pokemon._disabled_turns <= 0:
                 # Remove o disable
                 self._remove_disable(pokemon)
+
+    def _update_held_item_effects(self, dt: float):
+        """Processa efeitos automáticos de itens segurados (berries, etc)."""
+        from src.battle.held_item_effects import HeldItemEffectProcessor
+        HeldItemEffectProcessor.process_battle(self)
 
     def _remove_disable(self, pokemon):
         """Remove o efeito Disable do Pokémon"""
