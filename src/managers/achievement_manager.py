@@ -451,7 +451,7 @@ class AchievementManager:
                 return self.unlock(achievement_id, phase_id)
 
                 # ===== TROCA =====
-                elif achievement_id == "first_trade":
+            elif achievement_id == "first_trade":
                 if self.get_counter("trade_count") >= 1:
                     return self.unlock(achievement_id, phase_id)
 
