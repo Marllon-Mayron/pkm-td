@@ -998,6 +998,30 @@ class GameScene(BaseScene):
             is_wild=False,
             shiny=enemy.is_shiny
         )
+
+        if enemy.held_item:
+            # Copia o ID
+            caught.held_item = enemy.held_item
+
+            # Copia os dados completos (name, description, sprite_path, etc)
+            # Se por algum motivo enemy.held_item_data estiver vazio (ex: save antigo),
+            # recarrega direto do catálogo como fallback.
+            if getattr(enemy, 'held_item_data', None):
+                caught.held_item_data = enemy.held_item_data
+            else:
+                from src.data.item_bag_catalog import item_bag_catalog
+                item_data = item_bag_catalog.get_item(enemy.held_item)
+                if item_data and item_data.get("id") == enemy.held_item:
+                    caught.held_item_data = item_data
+                else:
+                    # Item não existe mais no catálogo — limpa pra não quebrar
+                    print(f"[CAPTURE] Aviso: item '{enemy.held_item}' não está no catálogo, ignorando.")
+                    caught.held_item = None
+                    caught.held_item_data = None
+        else:
+            caught.held_item = None
+            caught.held_item_data = None
+
         # ===== DEFINE DATA E MÉTODO DE CAPTURA =====
         caught.capture_date = datetime.now().isoformat()
 

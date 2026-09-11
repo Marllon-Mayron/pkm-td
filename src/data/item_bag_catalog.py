@@ -98,14 +98,20 @@ class ItemBagCatalog:
         """Constrói o catálogo de itens usando Path objects"""
         items = {}
 
-        # Define subpastas
+        # ============================================================
+        # PATHS DAS SUBPASTAS
+        # ============================================================
         pokeballs_path = self.base_path / "pokeballs"
         medicine_path = self.base_path / "medicine"
         evo_stones_path = self.base_path / "evo-stones"
         tm_hm_path = self.base_path / "tm-hm"
         battle_items_path = self.base_path / "battle-item"
+        held_items_path = self.base_path / "held-itens"
+        fossils_path = self.base_path / "Fosseis"
 
-        # ===== POKÉBOLAS =====
+        # ============================================================
+        # POKÉBOLAS
+        # ============================================================
         items["pokeball"] = {
             "id": "pokeball",
             "name": "POKEBALL",
@@ -118,8 +124,9 @@ class ItemBagCatalog:
             "effect_value": 1.0,
             "price": 200,
             "unlock_phase": None,
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["greatball"] = {
             "id": "greatball",
             "name": "GREATBALL",
@@ -132,8 +139,9 @@ class ItemBagCatalog:
             "effect_value": 1.5,
             "price": 600,
             "unlock_phase": "1-6",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["ultraball"] = {
             "id": "ultraball",
             "name": "ULTRABALL",
@@ -146,8 +154,9 @@ class ItemBagCatalog:
             "effect_value": 2,
             "price": 1200,
             "unlock_phase": "3-4",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["masterball"] = {
             "id": "masterball",
             "name": "MASTERBALL",
@@ -159,9 +168,11 @@ class ItemBagCatalog:
             "effect": "capture",
             "effect_value": 3,
             "price": 20000,
-            "unlock_phase": "999-999",
-            "unlock_chapter": None
+            "not_for_sale": True,  # Não aparece na loja, mas pode ser vendido
+            "unlock_phase": None,
+            "unlock_chapter": None,
         }
+
         items["safariball"] = {
             "id": "safariball",
             "name": "SAFARIBALL",
@@ -173,9 +184,11 @@ class ItemBagCatalog:
             "effect": "capture",
             "effect_value": 1,
             "price": 999999,
-            "unlock_phase": "999-999",
-            "unlock_chapter": None
+            "not_for_sale": True,
+            "unlock_phase": None,
+            "unlock_chapter": None,
         }
+
         items["friendball"] = {
             "id": "friendball",
             "name": "FRIENDBALL",
@@ -189,9 +202,12 @@ class ItemBagCatalog:
             "happiness_bonus": 60,
             "price": 400,
             "unlock_phase": "1-6",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
-        # ===== POÇÕES =====
+
+        # ============================================================
+        # POÇÕES
+        # ============================================================
         items["potion"] = {
             "id": "potion",
             "name": "POTION",
@@ -204,8 +220,9 @@ class ItemBagCatalog:
             "effect_value": 20,
             "price": 200,
             "unlock_phase": None,
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["superpotion"] = {
             "id": "superpotion",
             "name": "SUPERPOTION",
@@ -218,8 +235,9 @@ class ItemBagCatalog:
             "effect_value": 50,
             "price": 450,
             "unlock_phase": "1-6",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["hyperpotion"] = {
             "id": "hyperpotion",
             "name": "HYPERPOTION",
@@ -232,9 +250,12 @@ class ItemBagCatalog:
             "effect_value": 200,
             "price": 1200,
             "unlock_phase": "3-4",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
-        # ===== ITENS DE CURA DE STATUS =====
+
+        # ============================================================
+        # ITENS DE CURA DE STATUS
+        # ============================================================
         items["antidote"] = {
             "id": "antidote",
             "name": "ANTIDOTE",
@@ -247,8 +268,9 @@ class ItemBagCatalog:
             "effect_value": "poison",
             "price": 100,
             "unlock_phase": None,
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["paralyze_heal"] = {
             "id": "paralyze_heal",
             "name": "PARALYZEHEAL",
@@ -261,8 +283,9 @@ class ItemBagCatalog:
             "effect_value": "paralysis",
             "price": 200,
             "unlock_phase": "1-6",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["awakening"] = {
             "id": "awakening",
             "name": "AWAKENING",
@@ -275,8 +298,9 @@ class ItemBagCatalog:
             "effect_value": "sleep",
             "price": 250,
             "unlock_phase": "1-6",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["burn_heal"] = {
             "id": "burn_heal",
             "name": "BURNHEAL",
@@ -289,8 +313,9 @@ class ItemBagCatalog:
             "effect_value": "burn",
             "price": 250,
             "unlock_phase": "4-5",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["ice_heal"] = {
             "id": "ice_heal",
             "name": "ICEHEAL",
@@ -303,8 +328,9 @@ class ItemBagCatalog:
             "effect_value": "freeze",
             "price": 250,
             "unlock_phase": "4-5",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["full_heal"] = {
             "id": "full_heal",
             "name": "FULLHEAL",
@@ -317,8 +343,9 @@ class ItemBagCatalog:
             "effect_value": None,
             "price": 600,
             "unlock_phase": "1-6",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["rare_candy"] = {
             "id": "rare_candy",
             "name": "RARE CANDY",
@@ -330,10 +357,14 @@ class ItemBagCatalog:
             "effect": "level_up",
             "effect_value": 1,
             "price": 4800,
-            "unlock_phase": "999-999",
-            "unlock_chapter": None
+            "not_for_sale": True,
+            "unlock_phase": None,
+            "unlock_chapter": None,
         }
-        # ===== REVIVES =====
+
+        # ============================================================
+        # REVIVES
+        # ============================================================
         items["revive"] = {
             "id": "revive",
             "name": "REVIVE",
@@ -346,8 +377,9 @@ class ItemBagCatalog:
             "effect_value": 0.5,  # 50% do HP máximo
             "price": 1000,
             "unlock_phase": "1-6",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["max_revive"] = {
             "id": "max_revive",
             "name": "MAX REVIVE",
@@ -360,9 +392,12 @@ class ItemBagCatalog:
             "effect_value": 1.0,  # 100% do HP máximo
             "price": 1900,
             "unlock_phase": "2-8",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
-        # ===== PP ITEMS =====
+
+        # ============================================================
+        # PP ITEMS
+        # ============================================================
         items["pp_up"] = {
             "id": "pp_up",
             "name": "PP UP",
@@ -375,8 +410,9 @@ class ItemBagCatalog:
             "effect_value": 0.2,
             "price": 100,
             "unlock_phase": "1-4",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
+
         items["pp_max"] = {
             "id": "pp_max",
             "name": "PP MAX",
@@ -389,9 +425,12 @@ class ItemBagCatalog:
             "effect_value": 1.0,
             "price": 450,
             "unlock_phase": "2-8",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
-        # ===== PEDRAS DE EVOLUÇÃO =====
+
+        # ============================================================
+        # PEDRAS DE EVOLUÇÃO
+        # ============================================================
         stones = [
             ("firestone", "FIRESTONE", "2-8"),
             ("thunderstone", "THUNDERSTONE", "2-8"),
@@ -400,7 +439,7 @@ class ItemBagCatalog:
             ("moonstone", "MOONSTONE", "3-4"),
             ("sunstone", "SUNSTONE", "4-5"),
             ("shinystone", "SHINYSTONE", "4-5"),
-            ("dawnstone", "DAWNSTONE", "4-5")
+            ("dawnstone", "DAWNSTONE", "4-5"),
         ]
         for stone_id, stone_name, unlock_phase in stones:
             items[stone_id] = {
@@ -415,9 +454,12 @@ class ItemBagCatalog:
                 "effect_value": 0,
                 "price": 5000,
                 "unlock_phase": unlock_phase,
-                "unlock_chapter": None
+                "unlock_chapter": None,
             }
-        # ===== ITENS DE BATALHA (X-ITEMS) =====
+
+        # ============================================================
+        # ITENS DE BATALHA (X-ITEMS)
+        # ============================================================
         battle_items = [
             ("x_accuracy", "X ACCURACY", "XACCURACY.png", "Precisão", "accuracy"),
             ("x_attack", "X ATTACK", "XATTACK.png", "Ataque", "attack"),
@@ -443,7 +485,7 @@ class ItemBagCatalog:
                 },
                 "price": 500,
                 "unlock_phase": "1-6",
-                "unlock_chapter": None
+                "unlock_chapter": None,
             }
 
         items["escaperope"] = {
@@ -458,75 +500,78 @@ class ItemBagCatalog:
             "effect_value": None,
             "price": 400,
             "unlock_phase": "1-3",
-            "unlock_chapter": None
+            "unlock_chapter": None,
         }
 
+        # ============================================================
+        # FÓSSEIS (não vendidos na loja)
+        # ============================================================
         fossils = [
             ("helix_fossil", "HELIX FOSSIL", "HELIXFOSSIL.png", "Omanyte/Omastar"),
             ("dome_fossil", "DOME FOSSIL", "DOMEFOSSIL.png", "Kabuto/Kabutops"),
-            ("old_amber", "OLD AMBER", "OLDAMBER.png", "Aerodactyl")
+            ("old_amber", "OLD AMBER", "OLDAMBER.png", "Aerodactyl"),
         ]
-
         for fossil_id, fossil_name, filename, pokemon_name in fossils:
             items[fossil_id] = {
                 "id": fossil_id,
                 "name": fossil_name,
-                "sprite_path": self.base_path / "Fosseis" / filename,
+                "sprite_path": fossils_path / filename,
                 "description": f"Fóssil antigo que pode ser revivido em {pokemon_name}.",
                 "category": "fossil",
                 "usable_in_battle": False,
                 "usable_on_map": True,
                 "effect": "revive_fossil",
                 "effect_value": pokemon_name,
-                "price": 2000,
-                "unlock_phase": "999-999",
-                "unlock_chapter": None
+                "price": 1500,
+                "not_for_sale": True,
+                "unlock_phase": None,
+                "unlock_chapter": None,
             }
 
-        # ===== HELD ITEMS (ITENS SEGURÁVEIS) =====
-        # Adicione esta seção após os fósseis (fossils) e antes do return items
-
-        held_items_path = self.base_path / "held-itens"
-
+        # ============================================================
+        # HELD ITEMS (ITENS SEGURÁVEIS)
+        # ============================================================
         held_items = [
             # Inseto
-            ("silverpowder", "SILVERPOWDER", "Aumenta o poder de golpes do tipo Inseto em 10%.", "held_item", 6000),
+            ("silverpowder", "SILVERPOWDER", "Aumenta o poder de golpes do tipo Inseto em 10%.", "held_item", 8000),
             # Fogo
-            ("charcoal", "CHARCOAL", "Aumenta o poder de golpes do tipo Fogo em 10%.", "held_item", 6000),
-            # Dragão (na 2ª geração, Dragon Scale é o que funciona)
-            ("dragonfang", "DRAGONFANG", "Aumenta o poder de golpes do tipo Dragão em 10%.", "held_item", 6000),
+            ("charcoal", "CHARCOAL", "Aumenta o poder de golpes do tipo Fogo em 10%.", "held_item", 8000),
+            # Dragão
+            ("dragonfang", "DRAGONFANG", "Aumenta o poder de golpes do tipo Dragão em 10%.", "held_item", 8000),
             # Pedra
-            ("hardstone", "HARDSTONE", "Aumenta o poder de golpes do tipo Pedra em 10%.", "held_item", 6000),
+            ("hardstone", "HARDSTONE", "Aumenta o poder de golpes do tipo Pedra em 10%.", "held_item", 8000),
             # Elétrico
-            ("magnet", "MAGNET", "Aumenta o poder de golpes do tipo Elétrico em 10%.", "held_item", 6000),
+            ("magnet", "MAGNET", "Aumenta o poder de golpes do tipo Elétrico em 10%.", "held_item", 8000),
             # Aço
-            ("metalcoat", "METALCOAT", "Aumenta o poder de golpes do tipo Aço em 10%.", "held_item", 6000),
+            ("metalcoat", "METALCOAT", "Aumenta o poder de golpes do tipo Aço em 10%.", "held_item", 8000),
             # Grama
-            ("miracleseed", "MIRACLESEED", "Aumenta o poder de golpes do tipo Grama em 10%.", "held_item", 6000),
+            ("miracleseed", "MIRACLESEED", "Aumenta o poder de golpes do tipo Grama em 10%.", "held_item", 8000),
             # Água
-            ("mysticwater", "MYSTICWATER", "Aumenta o poder de golpes do tipo Água em 10%.", "held_item", 6000),
+            ("mysticwater", "MYSTICWATER", "Aumenta o poder de golpes do tipo Água em 10%.", "held_item", 8000),
             # Gelo
-            ("nevermeltice", "NEVERMELTICE", "Aumenta o poder de golpes do tipo Gelo em 10%.", "held_item", 6000),
+            ("nevermeltice", "NEVERMELTICE", "Aumenta o poder de golpes do tipo Gelo em 10%.", "held_item", 8000),
             # Veneno
-            ("poisonbarb", "POISONBARB", "Aumenta o poder de golpes do tipo Veneno em 10%.", "held_item", 6000),
+            ("poisonbarb", "POISONBARB", "Aumenta o poder de golpes do tipo Veneno em 10%.", "held_item", 8000),
             # Voador
-            ("sharpbeak", "SHARPBEAK", "Aumenta o poder de golpes do tipo Voador em 10%.", "held_item", 6000),
+            ("sharpbeak", "SHARPBEAK", "Aumenta o poder de golpes do tipo Voador em 10%.", "held_item", 8000),
             # Terrestre
-            ("softsand", "SOFTSAND", "Aumenta o poder de golpes do tipo Terrestre em 10%.", "held_item", 6000),
+            ("softsand", "SOFTSAND", "Aumenta o poder de golpes do tipo Terrestre em 10%.", "held_item", 8000),
             # Normal
-            ("silkscarf", "SILKSCARF", "Aumenta o poder de golpes do tipo Normal em 10%.", "held_item", 6000),
+            ("silkscarf", "SILKSCARF", "Aumenta o poder de golpes do tipo Normal em 10%.", "held_item", 8000),
             # Psíquico
-            ("twistedspoon", "TWISTEDSPOON", "Aumenta o poder de golpes do tipo Psíquico em 10%.", "held_item", 6000),
+            ("twistedspoon", "TWISTEDSPOON", "Aumenta o poder de golpes do tipo Psíquico em 10%.", "held_item", 8000),
             # Lutador
-            ("blackbelt", "BLACKBELT", "Aumenta o poder de golpes do tipo Lutador em 10%.", "held_item", 6000),
+            ("blackbelt", "BLACKBELT", "Aumenta o poder de golpes do tipo Lutador em 10%.", "held_item", 8000),
             # Sombrio
-            ("blackglasses", "BLACKGLASSES", "Aumenta o poder de golpes do tipo Sombrio em 10%.", "held_item", 6000),
+            ("blackglasses", "BLACKGLASSES", "Aumenta o poder de golpes do tipo Sombrio em 10%.", "held_item", 8000),
             # Fantasma
-            ("spelltag", "SPELLTAG", "Aumenta o poder de golpes do tipo Fantasma em 10%.", "held_item", 6000),
-            # DEMAIS ITENS SEGURAVEIS
-            ("kings_rock", "KINGSROCK", "Dá 10% de chance de fazer o oponente hesitar ao usar um ataque que causa dano.", "held_item", 6000),
-            ("dragon_scale", "DRAGONSCALE", "Escama especial que faz o Seadra evoluir para Kingdra.", "held_item", 6000),
-            ("upgrade", "UPGRADE", "Dispositivo avançado que faz o Porygon evoluir para Porygon2.", "held_item", 6000),
+            ("spelltag", "SPELLTAG", "Aumenta o poder de golpes do tipo Fantasma em 10%.", "held_item", 8000),
+            # Demais itens seguráveis
+            ("kings_rock", "KINGSROCK",
+             "Dá 10% de chance de fazer o oponente hesitar ao usar um ataque que causa dano.", "held_item", 9000),
+            ("dragon_scale", "DRAGONSCALE", "Escama especial que faz o Seadra evoluir para Kingdra.", "held_item",
+             9000),
+            ("upgrade", "UPGRADE", "Dispositivo avançado que faz o Porygon evoluir para Porygon2.", "held_item", 9000),
         ]
 
         for item_id, name, description, category, price in held_items:
@@ -544,11 +589,58 @@ class ItemBagCatalog:
                 },
                 "price": price,
                 "unlock_phase": "4-5",
-                "unlock_chapter": None
+                "unlock_chapter": None,
             }
 
-        # ===== TMs/HMs =====
-        # Lista de TMs: (id, nome, sprite_file, move_name, unlock_phase, price)
+        # ============================================================
+        # ITENS ESPECIAIS (não vendidos na loja, mas revendíveis pelo jogador)
+        # ============================================================
+        # A flag "not_for_sale": True remove o item da vitrine da loja,
+        # mas o jogador ainda pode vendê-lo pelo preço de venda (price * 0.5).
+        special_items = [
+            (
+                "nugget", "NUGGET",
+                "Um pedaço de ouro puro. Pode ser vendido por um preço alto.",
+                "held_item", 5000,
+            ),
+            (
+                "pearl", "PEARL",
+                "Uma pérola bonita. Pode ser vendida por um preço alto.",
+                "held_item", 2000,
+            ),
+            (
+                "oranberry", "ORANBERRY",
+                "Um Pokémon segurando esta baga recupera 10 HP quando estiver com pouco HP.",
+                "held_item", 200,
+            ),
+            (
+                "leppaberry", "LEPPABERRY",
+                "Um Pokémon segurando esta baga recupera 10 PP de um movimento quando estiver com pouco PP.",
+                "held_item", 400,
+            ),
+        ]
+
+        for item_id, name, description, category, price in special_items:
+            items[item_id] = {
+                "id": item_id,
+                "name": name,
+                "sprite_path": held_items_path / f"{name}.png",
+                "description": description,
+                "category": category,  # "held_item"
+                "usable_in_battle": False,
+                "usable_on_map": False,
+                "effect": None,
+                "effect_value": None,
+                "price": price,
+                "not_for_sale": True,  # ← fora da loja, mas revendível
+                "unlock_phase": None,
+                "unlock_chapter": None,
+            }
+
+        # ============================================================
+        # TMs / HMs
+        # ============================================================
+        # (id, nome, sprite_file, move_name, unlock_phase, price)
         tms = [
             ("tm_bide", "TM01 - Bide", "machine_NORMAL.png", "bide", "1-6", 2000),
             ("tm_thunder_wave", "TM45 - Thunder Wave", "machine_ELECTRIC.png", "thunder-wave", "2-2", 1500),
@@ -560,12 +652,12 @@ class ItemBagCatalog:
             ("tm_bubble_beam", "TM11 - Bubble Beam", "machine_WATER.png", "bubble-beam", "2-8", 2500),
             ("hm_cut", "HM01 - CUT", "machine_NORMAL.png", "cut", "2-8", 2000),
             ("hm_flash", "HM05 - FLASH", "machine_NORMAL.png", "flash", "2-3", 1000),
-            ("hm_body_slam", "TM08 - Body Slam ", "machine_NORMAL.png", "body-slam", "3-1", 2000),
-            ("hm_rest", "TM44 - Rest  ", "machine_NORMAL.png", "rest", "3-3", 2000),
+            ("hm_body_slam", "TM08 - Body Slam", "machine_NORMAL.png", "body-slam", "3-1", 2000),
+            ("hm_rest", "TM44 - Rest", "machine_NORMAL.png", "rest", "3-3", 2000),
             ("tm_thunderbolt", "TM24 - Thunderbolt", "machine_ELECTRIC.png", "thunderbolt", "3-4", 3000),
-            ("tm_swift", "TM39  - Swift ", "machine_NORMAL.png", "swift", "3-5", 2500),
-            ("tm_pay-_ay", "TM16  - Pay Day ", "machine_NORMAL.png", "pay-day", "3-5", 5000),
-            ("tm_double_edge", "TM10  - Double Edge ", "machine_NORMAL.png", "double-edge", "4-1", 3000),
+            ("tm_swift", "TM39 - Swift", "machine_NORMAL.png", "swift", "3-5", 2500),
+            ("tm_pay_day", "TM16 - Pay Day", "machine_NORMAL.png", "pay-day", "3-5", 5000),
+            ("tm_double_edge", "TM10 - Double Edge", "machine_NORMAL.png", "double-edge", "4-1", 3000),
             ("tm_razor_wind", "TM02 - Razor Wind", "machine_NORMAL.png", "razor-wind", "4-1", 1500),
             ("tm_horn_drill", "TM07 - Horn Drill", "machine_NORMAL.png", "horn-drill", "4-1", 4500),
             ("tm_teleport", "TM30 - Teleport", "machine_PSYCHIC.png", "teleport", "4-4", 750),
@@ -574,11 +666,9 @@ class ItemBagCatalog:
             ("tm_rock_slide", "TM48 - Rock Slide", "machine_ICE.png", "rock-slide", "4-6", 3000),
             ("tm_tri_attack", "TM49 Tri Attack", "machine_ICE.png", "tri-attack", "4-6", 3333),
             ("hm_surf", "HM03 - Surf", "machine_WATER.png", "surf", "4-6", 4500),
-
             ("tm_swords_dance", "TM03 - Swords Dance", "machine_NORMAL.png", "swords-dance", "4-6", 1500),
             ("tm_mega_kick", "TM05 - Mega Kick", "machine_NORMAL.png", "mega-kick", "4-6", 2000),
             ("tm_earthquake", "TM26 - Earthquake", "machine_GROUND.png", "earthquake", "4-6", 4000),
-
         ]
 
         for tm_id, tm_name, sprite_file, move_name, unlock_phase, price in tms:
@@ -589,7 +679,7 @@ class ItemBagCatalog:
                 "id": tm_id,
                 "name": tm_name,
                 "sprite_path": tm_hm_path / sprite_file,
-                "description": move_description,  # Usa a melhor descrição disponível
+                "description": move_description,
                 "category": "tm",
                 "usable_in_battle": False,
                 "usable_on_map": True,
@@ -598,7 +688,7 @@ class ItemBagCatalog:
                 "price": price,
                 "unlock_phase": unlock_phase,
                 "unlock_chapter": None,
-                "move_name": move_name,  # Guarda o nome do movimento para referência
+                "move_name": move_name,
             }
 
         return items

@@ -771,6 +771,15 @@ class PokemonModal:
             boost_key, reduce_key = eff[0], eff[1]
             boost_pt, reduce_pt = eff[2], eff[3]
 
+            # ===== Normaliza chaves curtas do NATURE_EFFECTS para as chaves
+            # completas usadas em priorities / evs / base_stats =====
+            _NATURE_KEY_ALIASES = {
+                'sp_attack': 'special_attack',
+                'sp_defense': 'special_defense',
+            }
+            boost_key = _NATURE_KEY_ALIASES.get(boost_key, boost_key)
+            reduce_key = _NATURE_KEY_ALIASES.get(reduce_key, reduce_key)
+
             # ---------------------------------------------------------
             # Prioridade de cada stat = base + moves + EVs
             # ---------------------------------------------------------
@@ -1811,7 +1820,7 @@ class PokemonModal:
 
         if self.pokemon.held_item and self.pokemon.held_item_data:
             data = self.pokemon.held_item_data
-            card_h = 62
+            card_h = 82
             card = pygame.Rect(inner.x, inner.y, inner.width, card_h)
             self._rounded(surf, self.C['bg_row'], card, radius=8)
             self._rounded(surf, self.C['border_light'], card, radius=8, border=1)
@@ -1827,18 +1836,28 @@ class PokemonModal:
                 surf.blit(s, (bg.x, bg.y))
                 tx = bg.right + 12
 
+            # Botão REMOVER calculado antes para reservar espaço ao texto
+            rw = max(70, int(inner.width * 0.22))
+            rh = 34
+            rem = pygame.Rect(card.right - rw - 8, card.y + 10, rw, rh)
+
             nm = self.fonts['value'].render(_sanitize(data['name']),
-                                             True, self.C['text'])
+                                            True, self.C['text'])
             surf.blit(nm, (tx, card.y + 8))
 
+            # Largura disponível = até antes do botão REMOVER
+            avail_w = max(60, rem.x - tx - 10)
             d = _sanitize(data.get('description', ''))
-            if len(d) > 42: d = d[:40] + "..."
-            ds = self.fonts['small'].render(d, True, self.C['text_dim'])
-            surf.blit(ds, (tx, card.y + 8 + nm.get_height() + 3))
+            lines = self._wrap_text(d, self.fonts['small'], avail_w)
 
-            rw = max(70, int(inner.width * 0.22))
-            rh = card_h - 16
-            rem = pygame.Rect(card.right - rw - 8, card.centery - rh // 2, rw, rh)
+            dy = card.y + 8 + nm.get_height() + 4
+            line_h = self.fonts['small'].get_height() + 1
+            max_lines = max(1, (card.bottom - dy - 6) // line_h)
+            for line in lines[:max_lines]:
+                s = self.fonts['small'].render(line, True, self.C['text_dim'])
+                surf.blit(s, (tx, dy))
+                dy += line_h
+
             self._rounded(surf, (150, 50, 50), rem, radius=6)
             self._rounded(surf, (220, 90, 90), rem, radius=6, border=1)
             rt = self.fonts['small'].render("REMOVER", True, (255, 255, 255))
@@ -2462,34 +2481,50 @@ class PokemonModal:
         screen.blit(ov, (self.x, self.y))
 
         bw = int(self.width * 0.58)
-        bh = int(self.height * 0.30)
+        bh = int(self.height * 0.32)
         box = pygame.Rect(0, 0, bw, bh)
         box.center = self.rect.center
 
-        self._rounded(screen, self.C['bg_panel'], box, radius=14)
-        self._rounded(screen, (200, 80, 80), box, radius=14, border=2)
+        # Painel padrão do modal (fundo escuro + borda dourada + borda interna)
+        self._rounded(screen, self.C['bg_modal'], box, radius=14)
+        self._rounded(screen, self.C['gold'], box, radius=14, border=2)
+        self._rounded(screen, self.C['border_panel'],
+                      box.inflate(-6, -6), radius=12, border=1)
 
-        y = box.y + int(bh * 0.14)
-        t = self.fonts['title'].render("Tem certeza que deseja LIBERTAR?",
-                                       True, (255, 200, 200))
-        screen.blit(t, t.get_rect(center=(box.centerx, y)))
-        y += int(bh * 0.18)
+        y = box.y + int(bh * 0.13)
 
-        t2 = self.fonts['small'].render("Esta acao e IRREVERSIVEL!",
-                                        True, (255, 100, 100))
-        screen.blit(t2, t2.get_rect(center=(box.centerx, y)))
-        y += int(bh * 0.16)
+        # Título no padrão do modal
+        title = self.fonts['title'].render("LIBERTAR POKEMON",
+                                           True, self.C['gold'])
+        screen.blit(title, title.get_rect(center=(box.centerx, y)))
+        y += int(bh * 0.15)
 
-        warn = self._get_release_warning()
-        if warn:
-            t3 = self.fonts['small'].render(_sanitize(warn), True, (255, 200, 50))
-            screen.blit(t3, t3.get_rect(center=(box.centerx, y)))
+        # Pergunta com o nome do Pokemon
+        question = self.fonts['section'].render(
+            _sanitize(f"Tem certeza que deseja libertar {self.pokemon.name}?"),
+            True, self.C['text'])
+        screen.blit(question, question.get_rect(center=(box.centerx, y)))
+        y += int(bh * 0.14)
 
-        for r, label, color in [
-            (self.confirm_yes_button, "SIM, LIBERTAR", (160, 50, 50)),
-            (self.confirm_no_button,  "NAO, CANCELAR",  (55, 55, 75)),
+        # Aviso de irreversibilidade (âmbar, legível sobre fundo escuro)
+        warn_txt = self.fonts['small'].render(
+            "Esta acao e IRREVERSIVEL!", True, (255, 180, 90))
+        screen.blit(warn_txt, warn_txt.get_rect(center=(box.centerx, y)))
+
+        # Aviso extra (ex: "Ultimo Pokemon do time!")
+        extra = self._get_release_warning()
+        if extra:
+            y += int(bh * 0.10)
+            t_extra = self.fonts['small'].render(
+                _sanitize(extra), True, self.C['gold_bright'])
+            screen.blit(t_extra, t_extra.get_rect(center=(box.centerx, y)))
+
+        # Botões
+        for r, label, bg, bd in [
+            (self.confirm_yes_button, "SIM, LIBERTAR", (150, 42, 42), (230, 90, 90)),
+            (self.confirm_no_button, "NAO, CANCELAR", (55, 75, 110), (100, 150, 220)),
         ]:
-            self._rounded(screen, color, r, radius=8)
-            self._rounded(screen, (255, 255, 255), r, radius=8, border=1)
+            self._rounded(screen, bg, r, radius=10)
+            self._rounded(screen, bd, r, radius=10, border=2)
             t = self.fonts['button'].render(label, True, (255, 255, 255))
             screen.blit(t, t.get_rect(center=r.center))

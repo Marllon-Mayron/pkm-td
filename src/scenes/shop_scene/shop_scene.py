@@ -695,21 +695,24 @@ class ShopScene(BaseScene):
         }
 
     def _load_shop_items(self):
-        """Carrega todos os itens do catálogo"""
+        """Carrega todos os itens do catálogo (exceto os marcados como not_for_sale)"""
         all_items = self.catalog.get_all_items()
-        self.shop_items = [item for item in all_items if "price" in item]
+        self.shop_items = [
+            item for item in all_items
+            if "price" in item and not item.get("not_for_sale", False)
+        ]
         self.shop_items.sort(key=lambda x: (x["category"], x["price"]))
 
     def _is_item_available(self, item_data):
         """Verifica se um item está disponível para compra baseado no progresso"""
-        # Verifica se tem requisito de desbloqueio
-        unlock_phase = item_data.get("unlock_phase") or item_data.get("unlock_chapter")
+        # Itens com not_for_sale nunca aparecem na loja (mas podem ser vendidos pelo jogador)
+        if item_data.get("not_for_sale", False):
+            return False
 
-        # Se não tem requisito, sempre disponível
+        unlock_phase = item_data.get("unlock_phase") or item_data.get("unlock_chapter")
         if unlock_phase is None:
             return True
 
-        # Verifica se a fase foi completada
         return self.progress.is_phase_completed(unlock_phase)
 
     def _refresh_all_data(self):

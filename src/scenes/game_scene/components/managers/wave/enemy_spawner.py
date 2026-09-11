@@ -3,6 +3,8 @@ import random
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 
+from src.data.item_bag_catalog import item_bag_catalog
+from src.data.wild_held_items import roll_wild_held_item
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 from src.ui.toast_renderer import toast_battle
 
@@ -465,6 +467,9 @@ class EnemySpawner:
         # ===== GARANTE QUE O INIMIGO ESTÁ VIVO =====
         pokemon.current_hp = pokemon.max_hp
 
+        # ===== ITEM SEGURÁVEL ALEATÓRIO (5% dos selvagens) =====
+        self._try_assign_wild_held_item(pokemon, is_boss)
+
         # ===== DEFINE PADRÃO DE ATAQUE =====
         from src.battle.attack_pattern import AttackPatternManager
         attack_pattern = AttackPatternManager.get_pattern_for_enemy(
@@ -488,6 +493,29 @@ class EnemySpawner:
         print(f"[Spawner]   - Moves: {[m.name for m in pokemon.moves]}")
 
         return pokemon
+
+    def _try_assign_wild_held_item(self, pokemon, is_boss: bool):
+        """
+        Duas rolagens:
+          - Rolagem A: 5% de chance de segurar algo.
+          - Rolagem B: escolhe o item por peso.
+        Bosses ficam de fora por padrão (remova o `if is_boss` se quiser que também segurem).
+        """
+        if is_boss:
+            return
+
+        item_id = roll_wild_held_item()
+        if not item_id:
+            return
+
+        item_data = item_bag_catalog.get_item(item_id)
+        if not item_data or item_data.get("id") != item_id:
+            print(f"[Spawner] Item '{item_id}' não encontrado — pulando.")
+            return
+
+        pokemon.held_item = item_id
+        pokemon.held_item_data = item_data
+        print(f"[Spawner] {pokemon.name} selvagem está segurando: {item_data['name']} ({item_id})")
 
     def _choose_enemy(self, enemies: List[dict]) -> Optional[dict]:
         """
