@@ -75,3 +75,16 @@ SIZES = {
     'padding': 15,
     'gap': 10,
 }
+
+# ===== REGIÕES / GERAÇÕES =====
+REGIONS = {
+    'ALL': 'all',
+    'KANTO': 'kanto',
+    'JOHTO': 'johto',
+}
+
+# Faixas de IDs por região
+REGION_RANGES = {
+    'kanto': (1, 151),    # Geração 1
+    'johto': (152, 251),  # Geração 2
+}

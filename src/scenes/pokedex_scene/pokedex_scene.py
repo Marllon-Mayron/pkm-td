@@ -1,15 +1,16 @@
 # src/scenes/pokedex_scene/pokedex_scene.py
 
 """
-Tela da Pokédex - LAYOUT ORGANIZADO COM LOGS
+Tela da Pokédex
 """
 import pygame
 from src.scenes.base_scene import BaseScene
 from src.data.pokedex import Pokedex
-from src.scenes.pokedex_scene.utils.constants import COLORS, FILTERS, SIZES
+from src.scenes.pokedex_scene.utils.constants import ( COLORS, FILTERS, SIZES, REGIONS)
 from src.scenes.pokedex_scene.components.search_bar import SearchBar
 from src.scenes.pokedex_scene.components.pokedex_list import PokedexList
 from src.scenes.pokedex_scene.components.pokemon_detail import PokemonDetail
+from src.scenes.pokedex_scene.components.dropdown import Dropdown
 
 
 class PokedexScene(BaseScene):
@@ -19,14 +20,19 @@ class PokedexScene(BaseScene):
         self.pokedex = Pokedex()
         self.player = game.player
         self.filter_type = FILTERS['ALL']
+        self.region = REGIONS['ALL']
 
         self.search_bar = None
         self.pokedex_list = None
         self.pokemon_detail = None
-        self.filter_buttons = []
+        self.filter_dropdown = None
+        self.region_dropdown = None
 
         self.layout_initialized = False
-        self.last_window_size = (self.screen_manager.window_width, self.screen_manager.window_height)
+        self.last_window_size = (
+            self.screen_manager.window_width,
+            self.screen_manager.window_height,
+        )
 
         self.fonts = self._create_fonts()
 
@@ -41,6 +47,9 @@ class PokedexScene(BaseScene):
 
         print("[POKEDEX_SCENE] Inicializada")
 
+    # ==========================================================
+    # FONTES E RESIZE
+    # ==========================================================
     def _create_fonts(self):
         base_size = max(14, self.screen_manager.window_height // 40)
         return {
@@ -48,11 +57,12 @@ class PokedexScene(BaseScene):
             'large': pygame.font.Font(None, base_size + 4),
             'medium': pygame.font.Font(None, base_size),
             'small': pygame.font.Font(None, base_size - 2),
-            'tiny': pygame.font.Font(None, base_size - 4)
+            'tiny': pygame.font.Font(None, base_size - 4),
         }
 
     def _check_resize(self):
-        current_size = (self.screen_manager.window_width, self.screen_manager.window_height)
+        current_size = (self.screen_manager.window_width,
+                        self.screen_manager.window_height)
         if current_size != self.last_window_size:
             self.last_window_size = current_size
             self.layout_initialized = False
@@ -60,6 +70,9 @@ class PokedexScene(BaseScene):
             return True
         return False
 
+    # ==========================================================
+    # LAYOUT
+    # ==========================================================
     def _create_layout(self):
         print("[POKEDEX_SCENE] Criando layout...")
         vx = self.screen_manager.viewport_x
@@ -68,55 +81,54 @@ class PokedexScene(BaseScene):
         vh = self.screen_manager.viewport_height
 
         padding = SIZES['padding']
-        header_height = SIZES['header_height']
-        filter_height = SIZES['filter_height']
         gap = SIZES['gap']
 
         # ===== HEADER =====
         header_y = vy + padding
-
-        # Botão voltar
         back_size = 40
         self.back_button = pygame.Rect(vx + padding, header_y, back_size, back_size)
 
         # ===== SEARCH BAR =====
         search_y = header_y + back_size + gap
-        search_width = min(350, vw * 0.28)
+        search_width = min(350, vw * 0.35)
         search_height = 34
         search_x = vx + padding
         self.search_bar = SearchBar(search_x, search_y, search_width, search_height)
-        print(f"[POKEDEX_SCENE] Search bar: {search_x}, {search_y}, {search_width}x{search_height}")
 
-        # ===== FILTERS =====
-        filter_y = search_y + search_height + gap
-        filter_spacing = 12
-        filter_width = 150
-        filter_height = 30
-        filter_start_x = vx + padding
+        # ===== DROPDOWNS (Região + Filtro) =====
+        dd_y = search_y + search_height + gap
+        dd_height = 32
 
-        self.filter_buttons = []
-        filter_keys = [
-            (FILTERS['ALL'], "TODOS"),
-            (FILTERS['CAUGHT'], "CAPTURADOS"),
-            (FILTERS['SEEN'], "VISTOS"),
-            (FILTERS['NOT_CAUGHT'], "NÃO CAPTURADOS"),
-            (FILTERS['UNSEEN'], "NÃO VISTOS")
+        region_options = [
+            {'key': REGIONS['ALL'],   'label': "TODAS AS REGIÕES"},
+            {'key': REGIONS['KANTO'], 'label': "KANTO (GEN 1)"},
+            {'key': REGIONS['JOHTO'], 'label': "JOHTO (GEN 2)"},
+        ]
+        filter_options = [
+            {'key': FILTERS['ALL'],        'label': "TODOS"},
+            {'key': FILTERS['CAUGHT'],     'label': "CAPTURADOS"},
+            {'key': FILTERS['SEEN'],       'label': "VISTOS"},
+            {'key': FILTERS['NOT_CAUGHT'], 'label': "NÃO CAPTURADOS"},
+            {'key': FILTERS['UNSEEN'],     'label': "NÃO VISTOS"},
         ]
 
-        for i, (filter_key, filter_name) in enumerate(filter_keys):
-            btn_x = filter_start_x + i * (filter_width + filter_spacing)
-            btn_rect = pygame.Rect(btn_x, filter_y, filter_width, filter_height)
-            self.filter_buttons.append({
-                'key': filter_key,
-                'name': filter_name,
-                'rect': btn_rect,
-                'active': filter_key == self.filter_type,
-                'hover': False
-            })
-            print(f"[POKEDEX_SCENE] Filtro {filter_name}: {btn_rect}")
+        region_w = 200
+        filter_w = 200
+
+        self.region_dropdown = Dropdown(
+            vx + padding, dd_y, region_w, dd_height,
+            region_options, default_key=self.region
+        )
+        self.region_dropdown.on_change = self._on_region_change
+
+        self.filter_dropdown = Dropdown(
+            vx + padding + region_w + gap, dd_y, filter_w, dd_height,
+            filter_options, default_key=self.filter_type
+        )
+        self.filter_dropdown.on_change = self._on_filter_change
 
         # ===== LISTA E DETALHE =====
-        list_y = filter_y + filter_height + gap
+        list_y = dd_y + dd_height + gap
         bottom_margin = 50
         list_height = vh - (list_y - vy) - bottom_margin - padding
 
@@ -125,9 +137,6 @@ class PokedexScene(BaseScene):
 
         detail_width = vw - list_width - padding * 3
         detail_x = list_x + list_width + padding
-
-        print(f"[POKEDEX_SCENE] Lista: {list_x}, {list_y}, {list_width}x{list_height}")
-        print(f"[POKEDEX_SCENE] Detalhe: {detail_x}, {list_y}, {detail_width}x{list_height}")
 
         self.pokedex_list = PokedexList(list_x, list_y, list_width, list_height)
         self.pokedex_list.on_item_click = self._on_list_item_click
@@ -138,60 +147,85 @@ class PokedexScene(BaseScene):
         self._update_counts()
 
         self.layout_initialized = True
-        print("[POKEDEX_SCENE] Layout criado com sucesso!")
+        print("[POKEDEX_SCENE] Layout criado!")
 
+    # ==========================================================
+    # CALLBACKS
+    # ==========================================================
     def _on_list_item_click(self, pokemon_id):
-        """Callback quando um item da lista é clicado"""
-        print(f"[POKEDEX_SCENE] === CALLBACK RECEBIDO: {pokemon_id} ===")
         self.current_selected_id = pokemon_id
         self._update_detail(pokemon_id)
-        print(f"[POKEDEX_SCENE] Callback finalizado")
 
+    def _on_filter_change(self, new_filter):
+        print(f"[POKEDEX_SCENE] Filtro -> {new_filter}")
+        self.filter_type = new_filter
+        self._update_pokedex_list()
+
+    def _on_region_change(self, new_region):
+        print(f"[POKEDEX_SCENE] Região -> {new_region}")
+        self.region = new_region
+        self._update_pokedex_list()
+
+    # ==========================================================
+    # UPDATES
+    # ==========================================================
     def _update_counts(self):
         self.total_seen = len(self.player.seen_pokemon)
         self.total_caught = len(self.player.caught_pokemon)
         self.total_pokemon = len(self.pokedex.pokemon_data)
 
     def _update_pokedex_list(self):
-        if self.pokedex_list:
-            search_text = self.search_bar.get_search_text() if self.search_bar else ""
-            self.pokedex_list.update_items(
-                self.pokedex.pokemon_data,
-                self.player,
-                search_text,
-                self.filter_type
-            )
+        if not self.pokedex_list:
+            return
+        search_text = self.search_bar.get_search_text() if self.search_bar else ""
+        region = self.region_dropdown.get_selected_key() if self.region_dropdown else 'all'
 
-            selected_item = self.pokedex_list.get_selected_item()
-            if selected_item:
-                pokemon_id = selected_item.pokemon_id
-                self.current_selected_id = pokemon_id
-                self._update_detail(pokemon_id)
+        self.pokedex_list.update_items(
+            self.pokedex.pokemon_data,
+            self.player,
+            search_text,
+            self.filter_type,
+            region,
+        )
+
+        selected_item = self.pokedex_list.get_selected_item()
+        if selected_item:
+            self.current_selected_id = selected_item.pokemon_id
+            self._update_detail(selected_item.pokemon_id)
 
     def _update_detail(self, pokemon_id):
-        """Atualiza o painel de detalhes com o Pokémon selecionado"""
-        print(f"[POKEDEX_SCENE] _update_detail: {pokemon_id}")
         if not self.pokemon_detail:
-            print(f"[POKEDEX_SCENE] pokemon_detail é None!")
             return
-
         is_caught = pokemon_id in self.player.caught_pokemon
         is_seen = pokemon_id in self.player.seen_pokemon
-        print(f"[POKEDEX_SCENE] is_caught: {is_caught}, is_seen: {is_seen}")
-
         pokemon_data = self.pokedex.get_pokemon(pokemon_id)
         self.pokemon_detail.set_pokemon(pokemon_id, pokemon_data, is_caught, is_seen)
 
         if self.pokedex_list:
             self.pokedex_list.selected_id = pokemon_id
-            print(f"[POKEDEX_SCENE] selected_id atualizado para {pokemon_id}")
 
+    def _close_open_dropdown(self):
+        closed = False
+        if self.filter_dropdown and self.filter_dropdown.is_open:
+            self.filter_dropdown.close()
+            closed = True
+        if self.region_dropdown and self.region_dropdown.is_open:
+            self.region_dropdown.close()
+            closed = True
+        return closed
+
+    # ==========================================================
+    # EVENTOS
+    # ==========================================================
     def handle_event(self, event):
         if self._check_resize():
             self._create_layout()
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
+                # Se algum dropdown estiver aberto, só fecha
+                if self._close_open_dropdown():
+                    return
                 self._go_back()
                 return
             elif event.key == pygame.K_p:
@@ -201,77 +235,62 @@ class PokedexScene(BaseScene):
             self.layout_initialized = False
             return
 
-        # ===== BARRA DE PESQUISA =====
+        # ===== DROPDOWNS (prioridade) =====
+        dropdowns = [d for d in (self.filter_dropdown, self.region_dropdown) if d]
+        for dd in dropdowns:
+            if dd.handle_event(event):
+                # Se um abriu, fecha os outros
+                for other in dropdowns:
+                    if other is not dd and other.is_open:
+                        other.close()
+                return
+
+        # ===== BOTÃO VOLTAR =====
+        if event.type == pygame.MOUSEMOTION and self.back_button:
+            self.back_hover = self.back_button.collidepoint(event.pos)
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.back_button and self.back_button.collidepoint(event.pos):
+                self._go_back()
+                return
+
+        # ===== SEARCH BAR =====
         if self.search_bar:
             result = self.search_bar.handle_event(event)
             if result is not None:
-                print(f"[POKEDEX_SCENE] Busca atualizada: '{self.search_bar.text}'")
                 self._update_pokedex_list()
-
-        # ===== FILTROS =====
-        if event.type == pygame.MOUSEMOTION:
-            for btn in self.filter_buttons:
-                btn['hover'] = btn['rect'].collidepoint(event.pos)
-
-            if self.back_button:
-                self.back_hover = self.back_button.collidepoint(event.pos)
-
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mouse_pos = event.pos
-            print(f"[POKEDEX_SCENE] Clique em: {mouse_pos}")
-
-            # Verifica filtros
-            for btn in self.filter_buttons:
-                if btn['rect'].collidepoint(mouse_pos):
-                    print(f"[POKEDEX_SCENE] Clique no filtro: {btn['name']}")
-                    self.filter_type = btn['key']
-                    for b in self.filter_buttons:
-                        b['active'] = (b['key'] == self.filter_type)
-                    self._update_pokedex_list()
-                    return
-
-            # Verifica botão voltar
-            if self.back_button and self.back_button.collidepoint(mouse_pos):
-                print(f"[POKEDEX_SCENE] Clique no botão voltar")
-                self._go_back()
-                return
 
         # ===== LISTA =====
         if self.pokedex_list:
             result = self.pokedex_list.handle_event(event)
             if result and isinstance(result, int):
-                print(f"[POKEDEX_SCENE] RESULTADO DA LISTA: {result}")
                 self.current_selected_id = result
                 self._update_detail(result)
 
         # ===== DETALHE =====
         if self.pokemon_detail:
             result = self.pokemon_detail.handle_event(event, self.pokedex)
-            if result:
-                if result.get('action') == 'navigate':
-                    new_id = result['pokemon_id']
-                    print(f"[POKEDEX_SCENE] Navegação para: {new_id}")
-                    self.current_selected_id = new_id
-                    self._update_detail(new_id)
-                    if self.pokedex_list:
-                        self.pokedex_list.update(
-                            self.screen_manager.get_delta_time()
-                        )
+            if result and result.get('action') == 'navigate':
+                new_id = result['pokemon_id']
+                self.current_selected_id = new_id
+                self._update_detail(new_id)
+                if self.pokedex_list:
+                    self.pokedex_list.update(self.screen_manager.get_delta_time())
 
     def fixed_update(self, dt):
         if not self.layout_initialized:
             self._create_layout()
             return
-
         if self.search_bar:
             self.search_bar.update(dt)
-
         if self.pokedex_list:
             self.pokedex_list.update(dt)
-
         if self.pokemon_detail:
             self.pokemon_detail.update(dt)
 
+    # ==========================================================
+    # RENDER
+    # ==========================================================
     def render(self, screen):
         self._draw_gradient_background(screen)
 
@@ -285,20 +304,20 @@ class PokedexScene(BaseScene):
         # ===== HEADER =====
         self._render_back_button(screen)
 
-        # Título
         title = self.fonts['title'].render("POKEDEX", True, COLORS['text_accent'])
         title_x = vx + (vw - title.get_width()) // 2
         title_y = vy + SIZES['padding'] + 5
         screen.blit(title, (title_x, title_y))
 
-        # Linha decorativa
         line_y = title_y + title.get_height() + 6
         line_width = 120
         line_x = vx + (vw - line_width) // 2
-        pygame.draw.line(screen, COLORS['border_gold'], (line_x, line_y), (line_x + line_width, line_y), 2)
+        pygame.draw.line(screen, COLORS['border_gold'],
+                         (line_x, line_y), (line_x + line_width, line_y), 2)
 
-        # Estatísticas
-        stats_text = f"Total: {self.total_pokemon}  |  Vistos: {self.total_seen}  |  Capturados: {self.total_caught}"
+        stats_text = (f"Total: {self.total_pokemon}  |  "
+                      f"Vistos: {self.total_seen}  |  "
+                      f"Capturados: {self.total_caught}")
         stats_font = pygame.font.Font(None, 24)
         stats_surf = stats_font.render(stats_text, True, COLORS['text_secondary'])
         stats_x = vx + vw - SIZES['padding'] - stats_surf.get_width()
@@ -309,26 +328,30 @@ class PokedexScene(BaseScene):
         if self.search_bar:
             self.search_bar.render(screen, self.fonts['medium'])
 
-        # ===== FILTERS =====
-        self._render_filters(screen)
+        # ===== DROPDOWN HEADERS =====
+        if self.region_dropdown:
+            self.region_dropdown.render_header(screen, self.fonts['medium'])
+        if self.filter_dropdown:
+            self.filter_dropdown.render_header(screen, self.fonts['medium'])
 
         # ===== LISTA =====
         if self.pokedex_list:
             self.pokedex_list.render(
                 screen, self.pokedex,
                 self.fonts['medium'],
-                self.fonts['small']
+                self.fonts['small'],
             )
 
         # ===== DETALHE =====
         if self.pokemon_detail:
             self.pokemon_detail.render(screen, self.pokedex, self.fonts)
 
-        # ===== CONTADOR DA LISTA =====
+        # ===== CONTADOR =====
         if self.pokedex_list:
             count = self.pokedex_list.get_count()
             count_text = f"Mostrando {count} de {self.total_pokemon} Pokemon"
-            count_surf = self.fonts['tiny'].render(count_text, True, COLORS['text_secondary'])
+            count_surf = self.fonts['tiny'].render(
+                count_text, True, COLORS['text_secondary'])
             count_x = vx + SIZES['padding']
             count_y = self.pokedex_list.rect.bottom + 5
             screen.blit(count_surf, (count_x, count_y))
@@ -336,48 +359,33 @@ class PokedexScene(BaseScene):
         # ===== INSTRUÇÕES =====
         self._render_instructions(screen)
 
+        # ===== DROPDOWN OPTIONS (por último = acima de tudo) =====
+        if self.region_dropdown:
+            self.region_dropdown.render_options(screen, self.fonts['medium'])
+        if self.filter_dropdown:
+            self.filter_dropdown.render_options(screen, self.fonts['medium'])
+
         if self.paused:
             self._render_pause_overlay(screen)
 
+    # ==========================================================
+    # RENDER HELPERS
+    # ==========================================================
     def _render_back_button(self, screen):
         if not self.back_button:
             return
-
         bg_color = (50, 50, 55) if not self.back_hover else (70, 70, 80)
         border_color = (90, 90, 100) if not self.back_hover else COLORS['text_accent']
-
         pygame.draw.rect(screen, bg_color, self.back_button, border_radius=6)
         pygame.draw.rect(screen, border_color, self.back_button, 2, border_radius=6)
-
-        back_text = pygame.font.Font(None, 32).render("<", True, COLORS['text_primary'])
-        text_rect = back_text.get_rect(center=self.back_button.center)
-        screen.blit(back_text, text_rect)
-
-    def _render_filters(self, screen):
-        for btn in self.filter_buttons:
-            if btn['active']:
-                bg_color = COLORS['bg_list_item_selected']
-                border_color = COLORS['text_accent']
-                text_color = COLORS['text_primary']
-            elif btn['hover']:
-                bg_color = COLORS['bg_list_item_hover']
-                border_color = COLORS['border_light']
-                text_color = COLORS['text_primary']
-            else:
-                bg_color = COLORS['bg_list_item']
-                border_color = COLORS['border']
-                text_color = COLORS['text_secondary']
-
-            pygame.draw.rect(screen, bg_color, btn['rect'], border_radius=4)
-            pygame.draw.rect(screen, border_color, btn['rect'], 2, border_radius=4)
-
-            text = self.fonts['small'].render(btn['name'], True, text_color)
-            text_rect = text.get_rect(center=btn['rect'].center)
-            screen.blit(text, text_rect)
+        back_text = pygame.font.Font(None, 32).render(
+            "<", True, COLORS['text_primary'])
+        screen.blit(back_text, back_text.get_rect(center=self.back_button.center))
 
     def _render_instructions(self, screen):
         inst_font = pygame.font.Font(None, 13)
-        inst_text = "ESC voltar  |  P pausar  |  Clique no Pokemon para ver detalhes"
+        inst_text = ("ESC voltar  |  P pausar  |  "
+                     "Use os dropdowns para filtrar por Região e Status")
         inst_surf = inst_font.render(inst_text, True, COLORS['text_secondary'])
 
         vx = self.screen_manager.viewport_x
@@ -390,12 +398,12 @@ class PokedexScene(BaseScene):
         screen.blit(inst_surf, (inst_x, inst_y))
 
     def _draw_gradient_background(self, screen):
-        if (not hasattr(self, '_bg_cache') or
-                self._bg_cache.get_width() != self.screen_manager.window_width or
-                self._bg_cache.get_height() != self.screen_manager.window_height):
-
+        if (not hasattr(self, '_bg_cache')
+                or self._bg_cache.get_width() != self.screen_manager.window_width
+                or self._bg_cache.get_height() != self.screen_manager.window_height):
             self._bg_cache = pygame.Surface(
-                (self.screen_manager.window_width, self.screen_manager.window_height)
+                (self.screen_manager.window_width,
+                 self.screen_manager.window_height)
             )
             for i in range(self.screen_manager.window_height):
                 t = i / self.screen_manager.window_height
@@ -404,17 +412,14 @@ class PokedexScene(BaseScene):
                 b = int(20 + t * 25)
                 pygame.draw.line(self._bg_cache, (r, g, b), (0, i),
                                  (self.screen_manager.window_width, i))
-
         screen.blit(self._bg_cache, (0, 0))
 
     def _render_pause_overlay(self, screen):
         overlay = pygame.Surface(
-            (self.screen_manager.window_width, self.screen_manager.window_height)
-        )
+            (self.screen_manager.window_width, self.screen_manager.window_height))
         overlay.set_alpha(180)
         overlay.fill((10, 10, 10))
         screen.blit(overlay, (0, 0))
-
         pause_font = pygame.font.Font(None, 60)
         pause_text = pause_font.render("PAUSADO", True, COLORS['text_primary'])
         text_x = (self.screen_manager.window_width - pause_text.get_width()) // 2

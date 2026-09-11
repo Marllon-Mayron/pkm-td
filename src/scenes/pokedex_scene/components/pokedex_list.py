@@ -152,8 +152,10 @@ class PokedexList:
         self.on_item_click = None
         print(f"[POKEDEX_LIST] Inicializada em: {x}, {y}, {width}x{height}")
 
-    def update_items(self, pokedex_data, player, search_text="", filter_type="all"):
-        print(f"[POKEDEX_LIST] update_items chamado - filtro: {filter_type}, busca: '{search_text}'")
+    def update_items(self, pokedex_data, player, search_text="", filter_type="all",
+                     region="all"):
+        print(f"[POKEDEX_LIST] update_items - filtro: {filter_type}, "
+              f"região: {region}, busca: '{search_text}'")
         self.items = []
 
         for pokemon_id, data in pokedex_data.items():
@@ -162,7 +164,7 @@ class PokedexList:
             item = PokemonListItem(pokemon_id, data, is_caught, is_seen)
             self.items.append(item)
 
-        self.filtered_items = self._apply_filters(search_text, filter_type)
+        self.filtered_items = self._apply_filters(search_text, filter_type, region)
         self.filtered_items.sort(key=lambda x: x.pokemon_id)
         print(f"[POKEDEX_LIST] {len(self.filtered_items)} itens após filtros")
 
@@ -170,35 +172,43 @@ class PokedexList:
         total_height = len(self.filtered_items) * SIZES['list_item_height']
         self.max_scroll = max(0, total_height - visible_height)
         self.scroll_target = min(self.scroll_target, self.max_scroll)
-        print(f"[POKEDEX_LIST] max_scroll: {self.max_scroll}")
 
         if self.filtered_items and not self.selected_id:
             self.selected_id = self.filtered_items[0].pokemon_id
-            print(f"[POKEDEX_LIST] Selecionado automaticamente: {self.selected_id}")
 
-    def _apply_filters(self, search_text, filter_type):
+    def _apply_filters(self, search_text, filter_type, region="all"):
+        from src.scenes.pokedex_scene.utils.constants import REGION_RANGES
+
         filtered = self.items
 
+        # ===== FILTRO POR REGIÃO =====
+        if region and region != 'all':
+            id_range = REGION_RANGES.get(region)
+            if id_range:
+                min_id, max_id = id_range
+                filtered = [item for item in filtered
+                            if min_id <= item.pokemon_id <= max_id]
+                print(f"[POKEDEX_LIST] Região {region}: {len(filtered)} itens")
+
+        # ===== FILTRO POR STATUS =====
         if filter_type == "caught":
             filtered = [item for item in filtered if item.is_caught]
-            print(f"[POKEDEX_LIST] Filtro CAPTURADOS: {len(filtered)} itens")
         elif filter_type == "seen":
             filtered = [item for item in filtered if item.is_seen]
-            print(f"[POKEDEX_LIST] Filtro VISTOS: {len(filtered)} itens")
         elif filter_type == "not_caught":
-            filtered = [item for item in filtered if item.is_seen and not item.is_caught]
-            print(f"[POKEDEX_LIST] Filtro VISTOS NÃO CAPTURADOS: {len(filtered)} itens")
+            filtered = [item for item in filtered
+                        if item.is_seen and not item.is_caught]
         elif filter_type == "unseen":
-            filtered = [item for item in filtered if not item.is_seen and not item.is_caught]
-            print(f"[POKEDEX_LIST] Filtro NÃO VISTOS: {len(filtered)} itens")
+            filtered = [item for item in filtered
+                        if not item.is_seen and not item.is_caught]
 
+        # ===== BUSCA =====
         if search_text:
             filtered = [
                 item for item in filtered
-                if search_text in item.name.lower() or
-                   str(item.pokemon_id) == search_text
+                if search_text in item.name.lower()
+                   or str(item.pokemon_id) == search_text
             ]
-            print(f"[POKEDEX_LIST] Após busca '{search_text}': {len(filtered)} itens")
 
         return filtered
 
