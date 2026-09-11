@@ -1101,7 +1101,15 @@ class GameScene(BaseScene):
                 ach_mgr.increment_counter("shiny_capture_count")
                 ach_mgr.check_and_unlock("first_shiny_capture", phase_id)
 
+            # ===== CONQUISTAS: CAPTURA COM ITEM =====
+            ach_mgr = self.player.achievement_manager
+            ach_mgr.increment_counter("capture_with_item_count")
+            ach_mgr.check_and_unlock("capture_with_item", phase_id)
+            print(f"[CAPTURE] Pokémon capturado segurando item! Conquista verificada.")
+
         self.show_capture_overlay(caught, is_to_team)
+
+
 
     @staticmethod
     def use_medicine(pokemon, item_data):

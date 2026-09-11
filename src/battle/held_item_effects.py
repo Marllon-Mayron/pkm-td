@@ -192,35 +192,29 @@ class HeldItemEffectProcessor:
         """Processa o item segurado de um Pokémon individual."""
         if not pokemon:
             return
-
-        # Não processa Pokémon derrotado/morto
         if getattr(pokemon, 'is_defeated', False):
             return
         if not pokemon.is_alive():
             return
 
-        # Obtém o item segurado
         item_id = getattr(pokemon, 'held_item', None)
         if not item_id:
             return
 
-        # Verifica se é uma berry registrada
         berry_class = BERRY_REGISTRY.get(item_id)
         if not berry_class:
-            return  # Não é berry, ignora (outros sistemas tratam)
+            return
 
         berry = berry_class(item_id, pokemon.held_item_data)
 
-        # Verifica condição de trigger
         if not berry.should_trigger(pokemon):
             return
 
-        # Aplica o efeito
         if berry.apply(pokemon, effect_manager, battle_system):
-            cls._consume_item(pokemon)
+            cls._consume_item(pokemon, battle_system)
 
     @classmethod
-    def _consume_item(cls, pokemon) -> None:
+    def _consume_item(cls, pokemon, battle_system=None) -> None:
         """Remove o item segurado permanentemente após o consumo."""
         item_name = "Item"
         if pokemon.held_item_data:
@@ -230,3 +224,14 @@ class HeldItemEffectProcessor:
         pokemon.held_item_data = None
 
         print(f"[BERRY] {pokemon.name} consumiu {item_name} permanentemente!")
+
+        # ===== CONQUISTA: PRIMEIRA BERRY CONSUMIDA =====
+        # Só conta para Pokémon aliados (não selvagens)
+        if not pokemon.is_wild and battle_system and battle_system.game_scene:
+            game_scene = battle_system.game_scene
+            if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+                ach_mgr = game_scene.player.achievement_manager
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                ach_mgr.increment_counter("berry_consumed_count")
+                ach_mgr.check_and_unlock("first_berry_consumed", phase_id)
+                print(f"[BERRY] Total de berries consumidas: {ach_mgr.get_counter('berry_consumed_count')}")

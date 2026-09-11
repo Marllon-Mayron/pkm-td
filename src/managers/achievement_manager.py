@@ -450,6 +450,28 @@ class AchievementManager:
             if self.get_counter("incubator_upgrade_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
 
+                # ===== TROCA =====
+                elif achievement_id == "first_trade":
+                if self.get_counter("trade_count") >= 1:
+                    return self.unlock(achievement_id, phase_id)
+
+            elif achievement_id == "trade_10":
+                if self.get_counter("trade_count") >= 10:
+                    return self.unlock(achievement_id, phase_id)
+
+            elif achievement_id == "first_trade_evolution":
+                if self.get_counter("trade_evolution_count") >= 1:
+                    return self.unlock(achievement_id, phase_id)
+
+            # ===== ITENS SEGURADOS =====
+            elif achievement_id == "first_berry_consumed":
+                if self.get_counter("berry_consumed_count") >= 1:
+                    return self.unlock(achievement_id, phase_id)
+
+            elif achievement_id == "capture_with_item":
+                if self.get_counter("capture_with_item_count") >= 1:
+                    return self.unlock(achievement_id, phase_id)
+
         return False
 
     def check_all_counters(self, phase_id: Optional[str] = None):
@@ -538,6 +560,15 @@ class AchievementManager:
             "first_incubator_revive": ("incubator_revive_count", 1),
             "buy_second_incubator": ("second_incubator_bought", 1),
             "first_incubator_upgrade": ("incubator_upgrade_count", 1),
+
+            # ===== TROCA =====
+            "first_trade": ("trade_count", 1),
+            "trade_10": ("trade_count", 10),
+            "first_trade_evolution": ("trade_evolution_count", 1),
+
+            # ===== ITENS SEGURADOS =====
+            "first_berry_consumed": ("berry_consumed_count", 1),
+            "capture_with_item": ("capture_with_item_count", 1),
         }
 
         if achievement_id in progress_map:

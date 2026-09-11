@@ -647,6 +647,14 @@ class TradeScene(BaseScene):
         if received_data:
             self._add_pokemon_to_player(received_data)
 
+        # ===== CONQUISTAS: TROCA =====
+        if hasattr(self.game.player, 'achievement_manager'):
+            ach_mgr = self.game.player.achievement_manager
+            ach_mgr.increment_counter("trade_count")
+            ach_mgr.check_and_unlock("first_trade", "trade")
+            ach_mgr.check_and_unlock("trade_10", "trade")
+            print(f"[TRADE] Total de trocas: {ach_mgr.get_counter('trade_count')}")
+
         self.my_offer = None
         self.opponent_offer = None
         self.my_offer_pokemon = None
@@ -796,12 +804,17 @@ class TradeScene(BaseScene):
         self.game.player.register_seen(evolve_to_id)
         self.game.player.caught_pokemon.add(evolve_to_id)
 
+        # ===== CONQUISTAS: TROCA (EXISTENTES) =====
         if hasattr(self.game.player, 'achievement_manager'):
             ach = self.game.player.achievement_manager
             ach.increment_counter("evolution_count")
             ach.check_and_unlock("first_evolution", "trade")
             ach.check_and_unlock("evolution_10", "trade")
             ach.check_and_unlock("evolution_50", "trade")
+
+            # ===== CONQUISTA: EVOLUÇÃO POR TROCA =====
+            ach.increment_counter("trade_evolution_count")
+            ach.check_and_unlock("first_trade_evolution", "trade")
 
         item_note = f" (usou {pokemon.held_item})" if required_norm else ""
         print(f"[TRADE] ✓ {old_name} evoluiu para {pokemon.name}{item_note}")

@@ -492,6 +492,48 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         rarity=AchievementRarity.UNCOMMON,
         rewards={"gold": 500, "xp": 200}
     ),
+    # ============================================================
+    # 14. TROCA DE POKEMON (MULTIPLAYER)
+    # ============================================================
+    "first_trade": Achievement(
+        id="first_trade",
+        title="Negociador Iniciante",
+        description="Troque um Pokemon com outro jogador pela primeira vez",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 200, "xp": 100}
+    ),
+    "trade_10": Achievement(
+        id="trade_10",
+        title="Comerciante de Kanto",
+        description="Troque 10 Pokemon com seus amigos",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 1500, "xp": 800, "items": {"rare_candy": 1}}
+    ),
+    "first_trade_evolution": Achievement(
+        id="first_trade_evolution",
+        title="Evolucao Compartilhada",
+        description="Evolua um Pokemon por troca (com ou sem item segurado)",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 500, "xp": 400}
+    ),
+
+    # ============================================================
+    # 15. ITENS SEGURADOS (BERRIES E CAPTURAS ESPECIAIS)
+    # ============================================================
+    "first_berry_consumed": Achievement(
+        id="first_berry_consumed",
+        title="Primeira Mordida",
+        description="Faca um Pokemon consumir uma berry equipada em batalha",
+        rarity=AchievementRarity.COMMON,
+        rewards={"gold": 100, "xp": 50, "items": {"oran_berry": 3}}
+    ),
+    "capture_with_item": Achievement(
+        id="capture_with_item",
+        title="Cacador de Tesouros",
+        description="Capture um Pokemon selvagem que esta carregando um item",
+        rarity=AchievementRarity.UNCOMMON,
+        rewards={"gold": 400, "xp": 250}
+    ),
 }
 
 # ============================================================
