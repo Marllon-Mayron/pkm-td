@@ -1100,9 +1100,6 @@ class Pokemon(Entity):
         oneshot = getattr(self, '_oneshot_animation_active', False)
         attacking = getattr(self, '_attack_animation_active', False)
 
-        print(f"[LOOK] {self.name} | alive={self.is_alive()} placed={self.is_placed} "
-              f"target={has_target} state={state} oneshot={oneshot} atk={attacking}")
-
         # ===== SÓ OLHA SE ESTIVER VIVO E COLOCADO =====
         if not self.is_alive() or self.is_defeated:
             return False
@@ -1115,7 +1112,6 @@ class Pokemon(Entity):
 
         # ===== SÓ QUANDO ESTÁ PARADO NO SPOT =====
         if state not in ('idle', 'attacking'):
-            print(f"[LOOK] {self.name} → bloqueado por state={state}")
             return False
 
         if state == 'attacking':
@@ -1127,9 +1123,6 @@ class Pokemon(Entity):
         distance_sq = dx * dx + dy * dy
         range_sq = self.attack_range * self.attack_range
 
-        print(f"[LOOK] {self.name} → dist²={distance_sq:.0f} range²={range_sq:.0f} "
-              f"dx={dx:.0f} dy={dy:.0f}")
-
         if distance_sq > range_sq:
             return False
 
@@ -1139,8 +1132,6 @@ class Pokemon(Entity):
 
         # ===== SEMPRE ATUALIZA O SPRITE =====
         self.animation._update_sprite_from_current_animation()
-
-        print(f"[LOOK] {self.name} → dir {old_direction} → {self.current_direction}")
 
         return self.current_direction != old_direction
 

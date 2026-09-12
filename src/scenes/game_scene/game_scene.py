@@ -1494,24 +1494,19 @@ class GameScene(BaseScene):
         se ele estiver dentro do attack_range deles.
         """
         if not placed_pokemon:
-            print("[LOOK] Nenhum pokémon colocado")
             return
 
         mouse_pos = pygame.mouse.get_pos()
         screen_mgr = self.screen_manager
 
         if not screen_mgr.is_mouse_in_viewport(mouse_pos):
-            print(f"[LOOK] Mouse fora do viewport: {mouse_pos}")
             return
 
         world_pos = screen_mgr.get_mouse_world_position(mouse_pos, self.camera)
         if world_pos is None:
-            print(f"[LOOK] world_pos inválido para {mouse_pos}")
             return
 
         mouse_world_x, mouse_world_y = world_pos
-        print(f"[LOOK] Mouse screen={mouse_pos} world=({mouse_world_x:.0f},{mouse_world_y:.0f}) "
-              f"pokemons={len(placed_pokemon)}")
 
         for pokemon in placed_pokemon:
             pokemon.look_at_mouse(mouse_world_x, mouse_world_y)
