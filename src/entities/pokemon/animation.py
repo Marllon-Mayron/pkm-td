@@ -80,31 +80,41 @@ class PokemonAnimation:
         """
         # ===== PRIORIDADE 0: VICTORY HOP (COMEMORAÇÃO) =====
         if getattr(self, '_victory_hop_active', False):
+            self.cancel_oneshot_animation()  # ← cancela pose se houver
             self._update_victory_hop(dt)
             return
 
         # ===== PRIORIDADE 1: HURT ANIMATION =====
         if hasattr(self.pokemon, '_hurt_animation_active') and self.pokemon._hurt_animation_active:
+            self.cancel_oneshot_animation()  # ← cancela pose se houver
             self._update_hurt_animation_frame(dt)
             return
 
         # ===== PRIORIDADE 2: DERROTADO =====
         if self.pokemon.is_defeated:
+            self.cancel_oneshot_animation()  # ← cancela pose se houver
             self._update_defeated_animation(dt)
             return
 
         # ===== PRIORIDADE 3: ANIMAÇÃO DE ATAQUE =====
         if hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active:
+            self.cancel_oneshot_animation()  # ← cancela pose se houver
             self._update_attack_animation(dt)
             return
 
         # ===== PRIORIDADE 4: STATUS EFFECTS =====
         status_anim = self._get_status_animation()
         if status_anim:
+            self.cancel_oneshot_animation()  # ← cancela pose se houver
             self._update_status_animation(status_anim, dt)
             return
 
-        # ===== PRIORIDADE 5: ANIMAÇÃO NORMAL (IDLE/WALK) =====
+        # ===== PRIORIDADE 5: ONESHOT ANIMATION (POSE/HOP/DANCE) =====
+        if getattr(self.pokemon, '_oneshot_animation_active', False):
+            self._update_oneshot_animation(dt)
+            return
+
+        # ===== PRIORIDADE 6: ANIMAÇÃO NORMAL (IDLE/WALK) =====
         self._update_normal_animation(dt)
 
     def _update_victory_hop(self, dt):
@@ -697,6 +707,7 @@ class PokemonAnimation:
         self.pokemon.animation_timer = 0
         print(f"[VICTORY] {self.pokemon.name} iniciou animação de comemoração (hop)!")
 
+    # ANIMAÇÕES PARA FOTOS
     def stop_victory_hop(self):
         """Para a animação de comemoração e restaura o estado normal."""
         if not self._victory_hop_active:
@@ -715,3 +726,145 @@ class PokemonAnimation:
             self.set_animation("idle")
 
         print(f"[VICTORY] {self.pokemon.name} parou a comemoração.")
+
+    # ===== ANIMAÇÃO ONE-SHOT (POSE / HOP / DANCE) =====
+
+    def play_oneshot_animation(self, animation_name: str) -> bool:
+        """
+        Toca uma animação UMA VEZ e depois volta ao normal.
+        Ideal para pose/hop/dance quando o jogador clica no pokémon.
+
+        Args:
+            animation_name: nome da animação (pose, hop, dance)
+
+        Returns:
+            True se a animação foi iniciada, False caso contrário.
+        """
+        if not self.has_animation(animation_name):
+            return False
+
+        # Se já tem uma oneshot ativa, não reinicia
+        if getattr(self.pokemon, '_oneshot_animation_active', False):
+            return False
+
+        # Se está derrotado, não anima
+        if self.pokemon.is_defeated:
+            return False
+
+        # Salva a animação atual para restaurar depois
+        self.pokemon._saved_animation_before_oneshot = self.pokemon.current_animation
+
+        # Ativa modo oneshot
+        self.pokemon._oneshot_animation_active = True
+        self.pokemon._oneshot_animation_name = animation_name
+
+        self.set_animation(animation_name)
+        self.pokemon.current_frame = 0
+        self.pokemon.animation_timer = 0
+
+        print(f"[POSE] {self.pokemon.name} iniciou animação one-shot: {animation_name}")
+        return True
+
+    def cancel_oneshot_animation(self):
+        """Cancela qualquer oneshot em andamento e limpa as flags."""
+        if not getattr(self.pokemon, '_oneshot_animation_active', False):
+            return
+
+        self.pokemon._oneshot_animation_active = False
+        if hasattr(self.pokemon, '_oneshot_animation_name'):
+            delattr(self.pokemon, '_oneshot_animation_name')
+        if hasattr(self.pokemon, '_saved_animation_before_oneshot'):
+            delattr(self.pokemon, '_saved_animation_before_oneshot')
+
+        print(f"[POSE] {self.pokemon.name} oneshot cancelada por interrupção")
+
+    def _update_oneshot_animation(self, dt):
+        """Avança os frames da oneshot. Quando passa do último, finaliza."""
+        max_frames = self._get_current_animation_frame_count()
+        if max_frames <= 0:
+            self._finish_oneshot_animation()
+            return
+
+        # ===== JÁ ESTÁ NO ÚLTIMO FRAME: SÓ ESPERA O TEMPO DELE PASSAR =====
+        if self.pokemon.current_frame >= max_frames - 1:
+            # Pega o tempo do último frame
+            frame_time = self.pokemon.animation_speed
+            if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
+                last_idx = min(len(self.pokemon.frame_durations) - 1, max_frames - 1)
+                frame_time = self.pokemon.frame_durations[last_idx]
+
+            # Acumula o tempo
+            self.pokemon.animation_timer += dt * 60
+
+            if self.pokemon.animation_timer >= frame_time:
+                # Terminou o último frame → finaliza
+                self._finish_oneshot_animation()
+            return
+
+        # ===== AINDA NÃO ESTÁ NO ÚLTIMO: AVANÇA NORMALMENTE =====
+        self.pokemon.animation_timer += dt * 60
+
+        frame_time = self.pokemon.animation_speed
+        if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
+            current_frame = getattr(self.pokemon, 'current_frame', 0)
+            if current_frame < len(self.pokemon.frame_durations):
+                frame_time = self.pokemon.frame_durations[current_frame]
+
+        if self.pokemon.animation_timer >= frame_time:
+            self.pokemon.animation_timer = 0
+            self.pokemon.current_frame += 1
+            self._update_sprite_from_current_animation()
+
+    def _advance_frame_oneshot(self, dt):
+        """Avança o frame sem loop (para oneshot)"""
+        self.pokemon.animation_timer += dt * 60
+
+        frame_time = self.pokemon.animation_speed
+        if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
+            current_frame = getattr(self.pokemon, 'current_frame', 0)
+            if current_frame < len(self.pokemon.frame_durations):
+                frame_time = self.pokemon.frame_durations[current_frame]
+
+        if self.pokemon.animation_timer >= frame_time:
+            self.pokemon.animation_timer = 0
+            max_frames = self._get_current_animation_frame_count()
+
+            if max_frames > 0:
+                next_frame = self.pokemon.current_frame + 1
+                if next_frame >= max_frames:
+                    # Mantém no último (não loopa)
+                    self.pokemon.current_frame = max_frames - 1
+                else:
+                    self.pokemon.current_frame = next_frame
+                self._update_sprite_from_current_animation()
+
+    def _finish_oneshot_animation(self):
+        """Restaura a animação anterior depois da oneshot."""
+        saved = getattr(self.pokemon, '_saved_animation_before_oneshot', 'idle')
+
+        # ===== LIMPA TODAS AS FLAGS ANTES DE TROCAR DE ANIMAÇÃO =====
+        self.pokemon._oneshot_animation_active = False
+        if hasattr(self.pokemon, '_oneshot_animation_name'):
+            delattr(self.pokemon, '_oneshot_animation_name')
+        if hasattr(self.pokemon, '_saved_animation_before_oneshot'):
+            delattr(self.pokemon, '_saved_animation_before_oneshot')
+
+        # ===== LIMPA COOLDOWN (permite nova pose imediata) =====
+        if hasattr(self.pokemon, '_pose_cooldown'):
+            self.pokemon._pose_cooldown = 0.0
+
+        # ===== FORÇA RESTAURAÇÃO DA ANIMAÇÃO ANTERIOR =====
+        # Não use set_animation aqui, porque ele tem uma guarda que só troca
+        # se a animação for diferente. Como pode ser a mesma (idle→idle),
+        # forçamos direto:
+        self.pokemon.current_animation = saved
+        self.pokemon.current_frame = 0
+        self.pokemon.animation_timer = 0
+        self._update_current_durations()
+        self._update_sprite_from_current_animation()
+
+        print(f"[POSE] {self.pokemon.name} finalizou animação one-shot (voltou para '{saved}')")
+
+    def is_oneshot_active(self) -> bool:
+        """Retorna True se uma animação one-shot está em andamento."""
+        return getattr(self.pokemon, '_oneshot_animation_active', False)

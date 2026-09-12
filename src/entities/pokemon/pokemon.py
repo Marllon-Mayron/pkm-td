@@ -154,6 +154,8 @@ class Pokemon(Entity):
         self.walk_frame_durations = []
         self.idle_frame_durations = []
         self.frame_durations = []
+        # ===== INTERAÇÃO DE POSE PARA FOTO =====
+        self._pose_cooldown = 0.0
 
         # ===== 12. CARREGAR SPRITES =====
         self.animation.load_sprites(pokemon_id, shiny)
@@ -1024,6 +1026,89 @@ class Pokemon(Entity):
 
         return False
 
+    # ===== INTERAÇÃO DE POSE PARA FOTO =====
+    def can_pose_for_photo(self) -> bool:
+        """
+        Verifica se este pokémon pode posar para uma foto.
+        """
+        if not self.is_alive() or self.is_defeated:
+            return False
+
+        if not getattr(self, 'is_placed', False):
+            return False
+
+        # Se tem alvo ativo, não pose
+        if hasattr(self, 'target') and self.target is not None:
+            return False
+
+        # Se não está ocioso (retornando, atacando), não pose
+        if getattr(self, 'combat_state', 'idle') != 'idle':
+            return False
+
+        # ===== NÃO POSA SE JÁ ESTÁ POSANDO =====
+        if getattr(self, '_oneshot_animation_active', False):
+            return False
+
+        # Tem alguma animação de pose?
+        if not (self.has_animation("pose") or
+                self.has_animation("hop") or
+                self.has_animation("dance")):
+            return False
+
+        return True
+
+    def try_pose_for_photo(self, force: bool = False) -> bool:
+        """..."""
+        # ===== SÓ POSA SE A CÂMERA ESTIVER ABERTA/GRAVANDO =====
+        if not self._is_camera_recording():
+            return False
+
+        if not self.can_pose_for_photo():
+            return False
+
+        candidates = []
+        if self.has_animation("pose"):
+            candidates.append("pose")
+        if self.has_animation("hop"):
+            candidates.append("hop")
+        if self.has_animation("dance"):
+            candidates.append("dance")
+
+        if not candidates:
+            return False
+
+        chosen = random.choice(candidates)
+
+        started = self.animation.play_oneshot_animation(chosen)
+
+        if started:
+            # ===== SEM COOLDOWN: o controle de "não spammar" fica no game_scene
+            # (só dispara quando o hover ENTRA no spot, não enquanto está parado)
+            pass
+
+        return started
+
+    def _is_camera_recording(self) -> bool:
+        """
+        Verifica se a câmera está aberta/gravando (não minimizada).
+        Usa o game_scene para acessar o camera_renderer.
+        """
+        gs = getattr(self, 'game_scene', None)
+        if gs is None:
+            return False
+
+        renderer = getattr(gs, 'camera_renderer', None)
+        if renderer is None:
+            return False
+
+        # Câmera precisa estar visível E não minimizada
+        return bool(getattr(renderer, 'visible', False)) and not bool(getattr(renderer, 'minimized', True))
+
+    def update_pose_cooldown(self, dt):
+        """Reduz o cooldown de pose. Chamado no update do Pokémon."""
+        if getattr(self, '_pose_cooldown', 0.0) > 0:
+            self._pose_cooldown = max(0.0, self._pose_cooldown - dt)
+
     def stop_celebrating(self):
         """Para a animação de comemoração."""
         if hasattr(self, 'animation') and self.animation:
@@ -1087,6 +1172,9 @@ class Pokemon(Entity):
 
         # ===== 2. DELEGA TODA LÓGICA DE ANIMAÇÃO =====
         self.animation.update(dt)
+
+        # ===== ATUALIZA COOLDOWN DE POSE =====
+        self.update_pose_cooldown(dt)
 
         # ===== 3. SE ESTÁ DERROTADO, NÃO PROCESSA MAIS NADA =====
         if self.is_defeated:

@@ -1115,8 +1115,6 @@ class GameScene(BaseScene):
 
         self.show_capture_overlay(caught, is_to_team)
 
-
-
     @staticmethod
     def use_medicine(pokemon, item_data):
         """Usa poção ou revive em um Pokémon aliado - COM SISTEMA DE CONQUISTAS"""
@@ -1439,6 +1437,36 @@ class GameScene(BaseScene):
 
         to_spot.occupied = True
         print(f"[MOVE] {pokemon.name} movido para novo spot ({to_spot.x}, {to_spot.y})")
+
+    def _try_pose_on_spot_hover(self, spot):
+        """
+        Tenta fazer o pokémon que está no spot posar para a foto quando o
+        jogador passa o mouse em cima.
+
+        Regras:
+        - Não faz nada se estiver arrastando algo (item, pokémon, câmera)
+        - Não faz nada se o pokémon não está ocioso
+        - Cooldown de 3s por pokémon evita spam
+        """
+        if spot is None:
+            return
+
+        # ===== NÃO POSA DURANTE DRAG =====
+        if self.item_drag_manager and self.item_drag_manager.is_dragging:
+            return
+        if self.team_manager and self.team_manager.is_dragging():
+            return
+        if self.dragging_camera:
+            return
+
+        # ===== BUSCA O POKÉMON DO SPOT =====
+        pokemon = self.placement_manager.get_pokemon_at_spot(spot)
+        if pokemon is None:
+            return
+
+        # ===== TENTA POSAR =====
+        # O próprio pokémon verifica cooldown, estado ocioso e se tem animação
+        pokemon.try_pose_for_photo()
 
     # ===== MÉTODOS DE LIMPEZA =====
 
@@ -1780,28 +1808,50 @@ class GameScene(BaseScene):
                 pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
                 return None
 
+
+
         elif event.type == pygame.MOUSEMOTION:
+
             if self.dragging_camera and self.last_mouse_pos:
                 dx = event.pos[0] - self.last_mouse_pos[0]
+
                 dy = event.pos[1] - self.last_mouse_pos[1]
+
                 camera.x -= dx / camera.zoom
+
                 camera.y -= dy / camera.zoom
+
                 camera._clamp_position()
+
                 self.last_mouse_pos = event.pos
+
                 return None
 
             if self.game_state != "game_over":
+
                 if bag_renderer and hasattr(bag_renderer, 'update_hover'):
                     bag_renderer.update_hover(event.pos)
 
                 mouse_pos = pygame.mouse.get_pos()
-                if screen_mgr.is_mouse_in_viewport(mouse_pos):
-                    world_pos = screen_mgr.get_mouse_world_position(mouse_pos, camera)
-                    if world_pos:
-                        self.hovered_spot = spot_renderer.get_spot_at_world_pos(world_pos[0], world_pos[1])
-            return None
 
-        return None
+                if screen_mgr.is_mouse_in_viewport(mouse_pos):
+
+                    world_pos = screen_mgr.get_mouse_world_position(mouse_pos, camera)
+
+                    if world_pos:
+
+                        # ===== DETECTA MUDANÇA DE SPOT (entrou em um novo) =====
+
+                        previous_spot = self.hovered_spot
+
+                        self.hovered_spot = spot_renderer.get_spot_at_world_pos(world_pos[0], world_pos[1])
+
+                        # Só tenta posar se ENTROU em um spot DIFERENTE do anterior
+
+                        if self.hovered_spot is not None and self.hovered_spot is not previous_spot:
+                            self._try_pose_on_spot_hover(self.hovered_spot)
+
+            return None
 
     def handle_give_up(self):
         """
