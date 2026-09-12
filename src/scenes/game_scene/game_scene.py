@@ -5,7 +5,9 @@ Cena principal do jogo - COM NOVA ARQUITETURA DE WAVES
 import pygame
 from datetime import datetime
 
-from scenes.game_scene.components.managers.event_processor import EventProcessor
+from src.scenes.game_scene.components.managers.event_processor import EventProcessor
+from src.scenes.game_scene.components.managers.photo_capture_manager import PhotoCaptureManager
+from src.scenes.game_scene.components.renderer.camera_photo_renderer import CameraPhotoRenderer
 from src.battle.effects.specific.weather.weather_state import WeatherType
 from src.battle.battle_system import BattleSystem
 from src.config.paths import PROJECT_ROOT
@@ -114,6 +116,13 @@ class GameScene(BaseScene):
         # Renderizadores
         self.item_bag_renderer = ItemBagRenderer(game, self.player.bag)
         self.item_drag_manager = ItemDragManager(game, self.player.bag)
+
+        self.photo_manager = PhotoCaptureManager(self)
+        self.camera_renderer = CameraPhotoRenderer(
+            self.game,
+            self.item_bag_renderer,
+            self.photo_manager
+        )
 
         # Salvar configurações da bolsa
         self.player.apply_bag_ui_config(self.item_bag_renderer)
@@ -1446,6 +1455,11 @@ class GameScene(BaseScene):
         if hasattr(self, 'day_night_weather'):
             self.day_night_weather._initialized = False
 
+        # Reseta câmera
+        if hasattr(self, 'camera_renderer'):
+            self.camera_renderer.flash_active = False
+            self.camera_renderer.flash_alpha = 0
+
         # ===== RESETA TODOS OS DITTOS TRANSFORMADOS =====
         self.reset_all_transformed_dittos()
 
@@ -1616,6 +1630,10 @@ class GameScene(BaseScene):
 
         # ===== ITEM BAG =====
         if bag_renderer and bag_renderer.handle_event(event):
+            return None
+
+        # ===== CÂMERA FOTOGRÁFICA =====
+        if self.camera_renderer and self.camera_renderer.handle_event(event):
             return None
 
         # ===== TECLADO =====
@@ -1888,6 +1906,10 @@ class GameScene(BaseScene):
                 if self.team_manager:
                     self.team_manager.update(dt)
 
+                # ===== CÂMERA FOTOGRÁFICA =====
+                if hasattr(self, 'camera_renderer'):
+                    self.camera_renderer.update(dt)
+
                 perf_monitor.end_section()
                 perf_monitor.end_frame()
                 return
@@ -1932,6 +1954,12 @@ class GameScene(BaseScene):
         perf_monitor.start_section("BAG_RENDERER_UPDATE")
         if bag_renderer:
             bag_renderer.update(dt)
+        perf_monitor.end_section()
+
+        # ===== CÂMERA FOTOGRÁFICA =====
+        perf_monitor.start_section("CAMERA_RENDERER_UPDATE")
+        if hasattr(self, 'camera_renderer'):
+            self.camera_renderer.update(dt)
         perf_monitor.end_section()
 
         # Team Manager
@@ -2304,7 +2332,15 @@ class GameScene(BaseScene):
                 drag_mgr.render(screen, camera)
             perf_monitor.end_section()
 
-            # Item Bag
+            # ===== CÂMERA FOTOGRÁFICA (ATRÁS DA BOLSA) =====
+            # Renderizada ANTES da bolsa para ficar visualmente atrás dela.
+            # A moldura da área de captura é desenhada aqui também.
+            perf_monitor.start_section("RENDER_CAMERA")
+            if hasattr(self, 'camera_renderer'):
+                self.camera_renderer.render(screen)
+            perf_monitor.end_section()
+
+            # Item Bag (na frente da câmera, acoplada por cima)
             perf_monitor.start_section("RENDER_ITEM_BAG")
             if bag_renderer:
                 bag_renderer.render(screen)

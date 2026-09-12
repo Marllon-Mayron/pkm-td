@@ -19,6 +19,7 @@ class SoundEffect(Enum):
     EVOLUTION = "Evolution"
     LEVELUP = "Levelup"
     OBTAINED_RARE_ITEM = "ObtainedARareItem"
+    CAMERA_CLICK = "CameraClick"
 
 
 class SoundManager(BaseSoundManager):
@@ -104,7 +105,8 @@ class SoundManager(BaseSoundManager):
             SoundEffect.CLICK: "Click.mp3",
             SoundEffect.EVOLUTION: "Evolution.mp3",
             SoundEffect.LEVELUP: "LevelUp.mp3",
-            SoundEffect.OBTAINED_RARE_ITEM: "ObtainedARareItem.mp3"
+            SoundEffect.OBTAINED_RARE_ITEM: "ObtainedARareItem.mp3",
+            SoundEffect.CAMERA_CLICK: "CameraClick.mp3",
         }
 
         for effect, filename in effect_files.items():
