@@ -349,11 +349,34 @@ class PokemonCombat:
             self._handle_returning_state(dt)
             return
 
-        # ===== PRIORIDADE 2: VERIFICAÇÕES DE STATUS =====
+        # ===== PRIORIDADE 2: FORÇA IDLE SE NÃO TEM ALVO E JÁ ESTÁ NO SPOT =====
+        # Isso resolve o caso em que o pokémon ficou com combat_state="attacking"
+        # residual após perder o alvo e não passou pelo fluxo normal de "sem alvos"
+        if self.pokemon.combat_state == "attacking" and self.pokemon.target is None:
+            # Verifica se está perto do spot original
+            has_spot = (hasattr(self.pokemon, 'original_spot_x') and
+                        hasattr(self.pokemon, 'original_spot_y'))
+            if has_spot:
+                dx_spot = self.pokemon.original_spot_x - self.pokemon.x
+                dy_spot = self.pokemon.original_spot_y - self.pokemon.y
+                dist_sq = dx_spot * dx_spot + dy_spot * dy_spot
+                if dist_sq < 25:  # ~5px de distância do spot
+                    self.pokemon.combat_state = "idle"
+                    if self.pokemon.has_animation("idle"):
+                        self.pokemon.set_animation("idle")
+                    # Continua o update (não retorna) para que a busca de alvo
+                    # rode normalmente logo abaixo
+            else:
+                # Sem spot definido, força idle
+                self.pokemon.combat_state = "idle"
+                if self.pokemon.has_animation("idle"):
+                    self.pokemon.set_animation("idle")
+
+        # ===== PRIORIDADE 3: VERIFICAÇÕES DE STATUS =====
         if not self._can_act(dt):
             return
 
-        # ===== PRIORIDADE 3: EM ANIMAÇÃO DE ATAQUE =====
+        # ===== PRIORIDADE 4: EM ANIMAÇÃO DE ATAQUE =====
         is_attacking = hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active
         if is_attacking:
             return
@@ -1029,6 +1052,13 @@ class PokemonCombat:
                     self.pokemon.current_direction = "up-left"
                 else:
                     self.pokemon.current_direction = "up"
+
+    def update_direction_from_vector(self, dx: float, dy: float):
+        """
+        Método público para atualizar a direção com base em um vetor (dx, dy).
+        Reutiliza o mesmo mapeamento de 8 direções usado no combate.
+        """
+        self._update_direction_to_target(dx, dy)
 
     def _handle_no_moves(self):
         """Lida com a situação onde não há moves disponíveis (sem PP)"""

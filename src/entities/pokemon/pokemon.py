@@ -1088,6 +1088,62 @@ class Pokemon(Entity):
 
         return started
 
+    def look_at_mouse(self, mouse_world_x: float, mouse_world_y: float) -> bool:
+        """
+        Faz o pokémon olhar na direção do mouse, se ele estiver dentro do
+        attack_range. Só funciona quando o pokémon está ocioso (sem alvo,
+        parado no spot).
+        """
+        # ===== DEBUG: sempre loga a entrada =====
+        state = getattr(self, 'combat_state', 'idle')
+        has_target = getattr(self, 'target', None) is not None
+        oneshot = getattr(self, '_oneshot_animation_active', False)
+        attacking = getattr(self, '_attack_animation_active', False)
+
+        print(f"[LOOK] {self.name} | alive={self.is_alive()} placed={self.is_placed} "
+              f"target={has_target} state={state} oneshot={oneshot} atk={attacking}")
+
+        # ===== SÓ OLHA SE ESTIVER VIVO E COLOCADO =====
+        if not self.is_alive() or self.is_defeated:
+            return False
+        if not getattr(self, 'is_placed', False):
+            return False
+        if has_target:
+            return False
+        if oneshot or attacking:
+            return False
+
+        # ===== SÓ QUANDO ESTÁ PARADO NO SPOT =====
+        if state not in ('idle', 'attacking'):
+            print(f"[LOOK] {self.name} → bloqueado por state={state}")
+            return False
+
+        if state == 'attacking':
+            self.combat_state = 'idle'
+
+        # ===== VERIFICA SE O MOUSE ESTÁ NO RANGE =====
+        dx = mouse_world_x - self.x
+        dy = mouse_world_y - self.y
+        distance_sq = dx * dx + dy * dy
+        range_sq = self.attack_range * self.attack_range
+
+        print(f"[LOOK] {self.name} → dist²={distance_sq:.0f} range²={range_sq:.0f} "
+              f"dx={dx:.0f} dy={dy:.0f}")
+
+        if distance_sq > range_sq:
+            return False
+
+        # ===== ATUALIZA A DIREÇÃO =====
+        old_direction = getattr(self, 'current_direction', 'down')
+        self.combat.update_direction_from_vector(dx, dy)
+
+        # ===== SEMPRE ATUALIZA O SPRITE =====
+        self.animation._update_sprite_from_current_animation()
+
+        print(f"[LOOK] {self.name} → dir {old_direction} → {self.current_direction}")
+
+        return self.current_direction != old_direction
+
     def _is_camera_recording(self) -> bool:
         """
         Verifica se a câmera está aberta/gravando (não minimizada).

@@ -1267,6 +1267,26 @@ class GameScene(BaseScene):
 
     # ===== MÉTODOS DE POSICIONAMENTO =====
 
+    @property
+    def placed_pokemon(self):
+        """
+        Lista real de pokémons colocados no mapa.
+        Delegado ao PlacementManager para evitar duas listas separadas.
+        """
+        if hasattr(self, 'placement_manager') and self.placement_manager is not None:
+            return self.placement_manager.placed_pokemon
+        return self.__dict__.get('_placed_pokemon_fallback', [])
+
+    @placed_pokemon.setter
+    def placed_pokemon(self, value):
+        """
+        Setter para compatibilidade com `self.placed_pokemon = []` no __init__.
+        """
+        if hasattr(self, 'placement_manager') and self.placement_manager is not None:
+            self.placement_manager.placed_pokemon = value
+        else:
+            self.__dict__['_placed_pokemon_fallback'] = value
+
     def _process_evolution_drag(self, evolution_result):
         """
         Processa a evolução resultante de um drag and drop.
@@ -1467,6 +1487,34 @@ class GameScene(BaseScene):
         # ===== TENTA POSAR =====
         # O próprio pokémon verifica cooldown, estado ocioso e se tem animação
         pokemon.try_pose_for_photo()
+
+    def _update_pokemon_look_at_mouse(self, placed_pokemon):
+        """
+        Faz os pokémons ociosos olharem na direção do mouse,
+        se ele estiver dentro do attack_range deles.
+        """
+        if not placed_pokemon:
+            print("[LOOK] Nenhum pokémon colocado")
+            return
+
+        mouse_pos = pygame.mouse.get_pos()
+        screen_mgr = self.screen_manager
+
+        if not screen_mgr.is_mouse_in_viewport(mouse_pos):
+            print(f"[LOOK] Mouse fora do viewport: {mouse_pos}")
+            return
+
+        world_pos = screen_mgr.get_mouse_world_position(mouse_pos, self.camera)
+        if world_pos is None:
+            print(f"[LOOK] world_pos inválido para {mouse_pos}")
+            return
+
+        mouse_world_x, mouse_world_y = world_pos
+        print(f"[LOOK] Mouse screen={mouse_pos} world=({mouse_world_x:.0f},{mouse_world_y:.0f}) "
+              f"pokemons={len(placed_pokemon)}")
+
+        for pokemon in placed_pokemon:
+            pokemon.look_at_mouse(mouse_world_x, mouse_world_y)
 
     # ===== MÉTODOS DE LIMPEZA =====
 
@@ -2034,6 +2082,15 @@ class GameScene(BaseScene):
         perf_monitor.start_section("POKEMON_UPDATES")
         for pokemon in placed_pokemon:
             pokemon.update(dt)
+        perf_monitor.end_section()
+
+        # ===== POKÉMONS OLHAM PARA O MOUSE (SE ESTIVER NO RANGE) =====
+        # IMPORTANTE: executar DEPOIS do placement_mgr.update(), pois é lá
+        # que o combat.update_combat() roda. Assim o combat_state já foi
+        # atualizado (idle/returning/attacking) e podemos sobrescrever a
+        # direção quando o pokémon estiver ocioso.
+        perf_monitor.start_section("POKEMON_LOOK_AT_MOUSE")
+        self._update_pokemon_look_at_mouse(placed_pokemon)
         perf_monitor.end_section()
 
         # Target Items Update
