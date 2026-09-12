@@ -136,9 +136,6 @@ class GameScene(BaseScene):
         self.between_waves_timer = 3.0
         self.show_debug = False
 
-        # Weather filter
-        self.weather_filter = WeatherFilter()
-
         # Day/Night filter
         self.day_night_filter = DayNightFilter()
 
@@ -1829,6 +1826,9 @@ class GameScene(BaseScene):
 
         perf_monitor.start_frame()
 
+        # ===== GUARDA O DT PARA USO NO RENDER (partículas de clima) =====
+        self._last_dt = dt
+
         # ===== OVERLAYS =====
         perf_monitor.start_section("OVERLAYS")
 
@@ -1874,7 +1874,6 @@ class GameScene(BaseScene):
         placed_pokemon = self.placed_pokemon
         screen_mgr = self.screen_manager
         path_renderer = self.path_renderer
-
 
         # Battle System
         perf_monitor.start_section("BATTLE_SYSTEM")
@@ -1940,7 +1939,6 @@ class GameScene(BaseScene):
             perf_monitor.start_section("EFFECT_MANAGER")
             self.battle_system.effect_manager.update(dt)
             perf_monitor.end_section()
-
 
         self.notification_manager.update(dt)
         # ===== GAME OVER CHECK - MODIFICADO =====
@@ -2235,11 +2233,21 @@ class GameScene(BaseScene):
             self.screen_manager.viewport_height
         )
 
-        # 1. FILTRO DE CLIMA (CHUVA, AREIA, SOL)
+        # 1. FILTRO DE CLIMA (CHUVA, AREIA, SOL) + PARTÍCULAS
+        #    O dt é necessário para mover as partículas de chuva.
         if hasattr(self, 'battle_system') and self.battle_system:
             weather = self.battle_system.weather_manager.current_weather
             if weather and weather.active:
-                self.weather_filter.render(screen, weather, viewport_rect)
+                self.weather_filter.render(
+                    screen, weather, viewport_rect,
+                    dt=getattr(self, '_last_dt', 0.0),
+                )
+            else:
+                # Garante que o sistema de partículas é parado quando o clima acaba
+                self.weather_filter.render(
+                    screen, None, viewport_rect,
+                    dt=getattr(self, '_last_dt', 0.0),
+                )
 
         # 2. FILTRO DE DIA/NOITE (POR CIMA DO CLIMA)
         if hasattr(self, 'day_night_weather'):

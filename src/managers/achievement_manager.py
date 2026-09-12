@@ -450,27 +450,27 @@ class AchievementManager:
             if self.get_counter("incubator_upgrade_count") >= 1:
                 return self.unlock(achievement_id, phase_id)
 
-                # ===== TROCA =====
-            elif achievement_id == "first_trade":
-                if self.get_counter("trade_count") >= 1:
-                    return self.unlock(achievement_id, phase_id)
+        # ===== TROCA =====
+        elif achievement_id == "first_trade":
+            if self.get_counter("trade_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
 
-            elif achievement_id == "trade_10":
-                if self.get_counter("trade_count") >= 10:
-                    return self.unlock(achievement_id, phase_id)
+        elif achievement_id == "trade_10":
+            if self.get_counter("trade_count") >= 10:
+                return self.unlock(achievement_id, phase_id)
 
-            elif achievement_id == "first_trade_evolution":
-                if self.get_counter("trade_evolution_count") >= 1:
-                    return self.unlock(achievement_id, phase_id)
+        elif achievement_id == "first_trade_evolution":
+            if self.get_counter("trade_evolution_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
 
-            # ===== ITENS SEGURADOS =====
-            elif achievement_id == "first_berry_consumed":
-                if self.get_counter("berry_consumed_count") >= 1:
-                    return self.unlock(achievement_id, phase_id)
+        # ===== ITENS SEGURADOS =====
+        elif achievement_id == "first_berry_consumed":
+            if self.get_counter("berry_consumed_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
 
-            elif achievement_id == "capture_with_item":
-                if self.get_counter("capture_with_item_count") >= 1:
-                    return self.unlock(achievement_id, phase_id)
+        elif achievement_id == "capture_with_item":
+            if self.get_counter("capture_with_item_count") >= 1:
+                return self.unlock(achievement_id, phase_id)
 
         return False
 

@@ -10,6 +10,10 @@ _FONT_CACHE = {}
 class CaptureOverlay(BaseOverlay):
     """Overlay exibido quando um Pokémon é capturado - COM OPÇÃO DE APELIDO"""
 
+    # Dimensões "de design" usadas como referência para escala
+    DESIGN_WIDTH = 800
+    DESIGN_HEIGHT = 650
+
     def __init__(self, game_scene, pokemon, is_to_team=True):
         super().__init__(game_scene)
         self.pokemon = pokemon
@@ -43,19 +47,19 @@ class CaptureOverlay(BaseOverlay):
         if hasattr(self.game_scene, 'wave_manager'):
             self.game_scene.wave_manager.paused = True
 
-        # Dimensões base
+        # Dimensões — todas recalculadas em _recalculate_dimensions
+        self.scale = 1.0
         self.modal_width = 0
         self.modal_height = 0
-        self.modal_padding = 25
+        self.modal_padding = 0
+        self.section_spacing = 0
 
-        # Alturas das seções (otimizadas)
-        self.title_height = 55
-        self.pokemon_section_height = 210
-        self.info_section_height = 95  # Reduzido (Natureza + IVs compactos)
-        self.moves_section_height = 140
-        self.name_section_height = 55
-        self.button_section_height = 65
-        self.section_spacing = 8
+        self.title_height = 0
+        self.pokemon_section_height = 0
+        self.info_section_height = 0
+        self.moves_section_height = 0
+        self.name_section_height = 0
+        self.button_section_height = 0
 
         self._recalculate_dimensions()
 
@@ -95,29 +99,74 @@ class CaptureOverlay(BaseOverlay):
             'dark': (112, 88, 72), 'steel': (184, 184, 208), 'fairy': (238, 153, 238)
         }
 
+    # ------------------------------------------------------------------ #
+    # Dimensões e escala
+    # ------------------------------------------------------------------ #
+
     def _recalculate_dimensions(self):
-        """Recalcula dimensões baseado no tamanho da tela atual"""
-        screen_width = self.game_scene.screen_manager.window_width
-        screen_height = self.game_scene.screen_manager.window_height
+        """Recalcula todas as dimensões proporcionalmente ao tamanho da tela."""
+        sw = self.game_scene.screen_manager.window_width
+        sh = self.game_scene.screen_manager.window_height
 
-        self.modal_width = min(int(screen_width * 0.7), 800)
-        self.modal_height = min(int(screen_height * 0.82), 650)
-        self.modal_width = max(self.modal_width, 650)
-        self.modal_height = max(self.modal_height, 580)
-        self.modal_padding = max(20, int(self.modal_width * 0.04))
+        # Modal: ~70% da tela, respeitando limites absolutos e nunca maior que a tela
+        target_w = int(sw * 0.7)
+        target_h = int(sh * 0.85)
+        self.modal_width = max(min(target_w, 900), min(560, sw - 30))
+        self.modal_height = max(min(target_h, 750), min(520, sh - 30))
+        self.modal_width = min(self.modal_width, sw - 20)
+        self.modal_height = min(self.modal_height, sh - 20)
 
-    def _get_font(self, size, bold=False):
-        """Obtém fonte do cache"""
-        key = (size, bold)
+        # Fator de escala em relação ao design base (800x650)
+        self.scale = min(
+            self.modal_width / self.DESIGN_WIDTH,
+            self.modal_height / self.DESIGN_HEIGHT,
+        )
+        # Evita escalas extremas que quebram o layout
+        self.scale = max(0.7, min(self.scale, 1.25))
+
+        self.modal_padding = int(22 * self.scale)
+        self.section_spacing = int(7 * self.scale)
+
+        # Alturas proporcionais à área de conteúdo disponível
+        content_h = self.modal_height - 2 * self.modal_padding
+        avail_h = content_h - 5 * self.section_spacing  # 6 seções = 5 gaps
+
+        self.title_height          = int(avail_h * 0.08)
+        self.pokemon_section_height = int(avail_h * 0.32)
+        self.info_section_height   = int(avail_h * 0.15)
+        self.moves_section_height  = int(avail_h * 0.27)
+        self.name_section_height   = int(avail_h * 0.10)
+        self.button_section_height = int(avail_h * 0.08)
+
+    def _px(self, value):
+        """Converte um valor de design (px @ escala 1.0) para pixels reais."""
+        return int(value * self.scale)
+
+    def _get_font(self, base_size, bold=False):
+        """Fonte escalada. `base_size` é o tamanho no design 800x650."""
+        actual = max(8, int(round(base_size * self.scale)))
+        key = (actual, bold)
         if key not in _FONT_CACHE:
-            font = pygame.font.Font(None, size)
+            font = pygame.font.Font(None, actual)
             if bold:
                 font.set_bold(True)
             _FONT_CACHE[key] = font
         return _FONT_CACHE[key]
 
+    @staticmethod
+    def _truncate_text(font, text, max_width):
+        """Trunca texto com '...' se ultrapassar max_width."""
+        if font.size(text)[0] <= max_width:
+            return text
+        while text and font.size(text + "...")[0] > max_width:
+            text = text[:-1]
+        return text + "..."
+
+    # ------------------------------------------------------------------ #
+    # Eventos
+    # ------------------------------------------------------------------ #
+
     def handle_event(self, event):
-        """Processa eventos"""
         if not self.active:
             return False
 
@@ -146,7 +195,7 @@ class CaptureOverlay(BaseOverlay):
             return False
 
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE or event.key == pygame.K_RETURN:
+            if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
                 self.close()
                 return True
 
@@ -209,90 +258,86 @@ class CaptureOverlay(BaseOverlay):
         try:
             from src.managers.sounds.sound_manager import sound_manager
             sound_manager.play_capture_sound()
-        except:
+        except Exception:
             pass
 
     def close(self):
         self.active = False
         self.game_scene.close_capture_overlay()
 
+    # ------------------------------------------------------------------ #
+    # Render
+    # ------------------------------------------------------------------ #
+
     def render(self, screen):
         if not self.active:
             return
 
         self._recalculate_dimensions()
-
         viewport = self.get_viewport_rect()
 
-        # Fundo escuro
+        # Fundo escurecido
         overlay = pygame.Surface((viewport.width, viewport.height))
         overlay.set_alpha(200)
         overlay.fill((0, 0, 0))
         screen.blit(overlay, (viewport.x, viewport.y))
 
-        # Centraliza o modal
+        # Modal centralizado
         modal_x = viewport.x + (viewport.width - self.modal_width) // 2
         modal_y = viewport.y + (viewport.height - self.modal_height) // 2
         modal_rect = pygame.Rect(modal_x, modal_y, self.modal_width, self.modal_height)
 
-        # Fundo e borda
+        # Fundo e bordas
         self._render_modal_background(screen, modal_rect)
-        pygame.draw.rect(screen, self.colors['primary'], modal_rect, 3, border_radius=20)
-        pygame.draw.rect(screen, self.colors['accent'], modal_rect.inflate(-6, -6), 1, border_radius=18)
+        pygame.draw.rect(screen, self.colors['primary'], modal_rect, 3, border_radius=self._px(20))
+        pygame.draw.rect(screen, self.colors['accent'], modal_rect.inflate(-6, -6), 1,
+                         border_radius=self._px(18))
 
-        # Botão fechar
         self._render_close_button(screen, modal_rect)
 
         # Área de conteúdo
         content_rect = pygame.Rect(
             modal_rect.x + self.modal_padding,
             modal_rect.y + self.modal_padding,
-            modal_rect.width - (self.modal_padding * 2),
-            modal_rect.height - (self.modal_padding * 2)
+            modal_rect.width - self.modal_padding * 2,
+            modal_rect.height - self.modal_padding * 2,
         )
 
-        # Calcula posições Y sequenciais
-        current_y = content_rect.y
+        cy = content_rect.y
+        cx, cw = content_rect.x, content_rect.width
 
-        # Título
-        self._render_title(screen, content_rect.x, current_y, content_rect.width)
-        current_y += self.title_height + self.section_spacing
+        self._render_title(screen, cx, cy, cw)
+        cy += self.title_height + self.section_spacing
 
-        # Pokémon
-        self._render_pokemon_section(screen, content_rect.x, current_y, content_rect.width)
-        current_y += self.pokemon_section_height + self.section_spacing
+        self._render_pokemon_section(screen, cx, cy, cw)
+        cy += self.pokemon_section_height + self.section_spacing
 
-        # Informações (Natureza + IVs compactos)
-        self._render_info_section(screen, content_rect.x, current_y, content_rect.width)
-        current_y += self.info_section_height + self.section_spacing
+        self._render_info_section(screen, cx, cy, cw)
+        cy += self.info_section_height + self.section_spacing
 
-        # Moves
-        self._render_moves_section(screen, content_rect.x, current_y, content_rect.width)
-        current_y += self.moves_section_height + self.section_spacing
+        self._render_moves_section(screen, cx, cy, cw)
+        cy += self.moves_section_height + self.section_spacing
 
-        # Apelido
         if self.naming_mode:
-            self._render_naming_section(screen, content_rect.x, current_y, content_rect.width)
+            self._render_naming_section(screen, cx, cy, cw)
         else:
-            self._render_name_section(screen, content_rect.x, current_y, content_rect.width)
-        current_y += self.name_section_height + self.section_spacing
+            self._render_name_section(screen, cx, cy, cw)
+        cy += self.name_section_height + self.section_spacing
 
-        # Botão
-        self._render_button(screen, content_rect.x, current_y, content_rect.width)
+        self._render_button(screen, cx, cy, cw)
 
-        # Mensagem de destino
         self._render_status_message(screen, viewport)
 
+    # --------------------- Componentes do modal ----------------------- #
+
     def _render_modal_background(self, screen, modal_rect):
-        """Fundo do modal"""
         bg_rect = modal_rect.inflate(-2, -2)
-        pygame.draw.rect(screen, self.colors['bg_dark'], bg_rect, border_radius=20)
+        pygame.draw.rect(screen, self.colors['bg_dark'], bg_rect, border_radius=self._px(20))
 
     def _render_close_button(self, screen, modal_rect):
-        """Botão X"""
-        size = 30
-        x = modal_rect.right - size - 10
-        y = modal_rect.y + 10
+        size = self._px(30)
+        x = modal_rect.right - size - self._px(10)
+        y = modal_rect.y + self._px(10)
         self.close_button_rect = pygame.Rect(x, y, size, size)
 
         if self.close_button_hovered:
@@ -302,315 +347,350 @@ class CaptureOverlay(BaseOverlay):
             bg_color = (*self.colors['bg_light'], 180)
             border_color = self.colors['border']
 
-        pygame.draw.rect(screen, bg_color, self.close_button_rect, border_radius=8)
-        pygame.draw.rect(screen, border_color, self.close_button_rect, 1, border_radius=8)
+        pygame.draw.rect(screen, bg_color, self.close_button_rect, border_radius=self._px(8))
+        pygame.draw.rect(screen, border_color, self.close_button_rect, 1, border_radius=self._px(8))
 
         font = self._get_font(22, True)
-        x_text = font.render("X", True, self.colors['text_dim'])
-        text_x = x + (size - x_text.get_width()) // 2
-        text_y = y + (size - x_text.get_height()) // 2
-        screen.blit(x_text, (text_x, text_y))
+        txt = font.render("X", True, self.colors['text_dim'])
+        screen.blit(txt, (
+            x + (size - txt.get_width()) // 2,
+            y + (size - txt.get_height()) // 2,
+        ))
 
     def _render_title(self, screen, x, y, width):
-        """Título"""
         font = self._get_font(30, True)
         title = font.render("CAPTURADO", True, self.colors['success'])
-        title_x = x + (width - title.get_width()) // 2
-        screen.blit(title, (title_x, y))
+        screen.blit(title, (x + (width - title.get_width()) // 2, y))
 
-        line_y = y + title.get_height() + 4
-        line_width = 140
-        line_x = x + (width - line_width) // 2
-        pygame.draw.line(screen, self.colors['success'], (line_x, line_y), (line_x + line_width, line_y), 2)
+        line_y = y + title.get_height() + self._px(4)
+        line_w = self._px(140)
+        line_x = x + (width - line_w) // 2
+        pygame.draw.line(screen, self.colors['success'],
+                         (line_x, line_y), (line_x + line_w, line_y), 2)
+
+    # ---------- Seção do Pokémon (layout horizontal) ---------- #
 
     def _render_pokemon_section(self, screen, x, y, width):
-        """Seção do Pokémon"""
         section_rect = pygame.Rect(x, y, width, self.pokemon_section_height)
+        pygame.draw.rect(screen, (*self.colors['bg_card'], 200), section_rect,
+                         border_radius=self._px(15))
+        pygame.draw.rect(screen, (*self.colors['border'], 150), section_rect, 2,
+                         border_radius=self._px(15))
 
-        pygame.draw.rect(screen, (*self.colors['bg_card'], 200), section_rect, border_radius=15)
-        pygame.draw.rect(screen, (*self.colors['border'], 150), section_rect, 2, border_radius=15)
-
-        center_x = section_rect.centerx
+        # Layout horizontal: sprite à esquerda, infos à direita
+        sprite_area_w = int(width * 0.36)
+        info_x = section_rect.x + sprite_area_w + self._px(12)
+        info_w = section_rect.right - info_x - self._px(14)
 
         # Sprite
-        sprite_size = 90
-        self._render_pokemon_sprite(screen, center_x, section_rect.y + 50, sprite_size, section_rect)
+        sprite_center_x = section_rect.x + sprite_area_w // 2
+        sprite_center_y = section_rect.centery
+        sprite_size = int(min(sprite_area_w * 0.68, self.pokemon_section_height * 0.62))
+        self._render_pokemon_sprite(screen, sprite_center_x, sprite_center_y, sprite_size)
 
-        # Informações abaixo do sprite
-        info_y = section_rect.y + 105
+        # Divisor vertical sutil
+        sep_x = section_rect.x + sprite_area_w + self._px(2)
+        pygame.draw.line(screen, (*self.colors['border'], 90),
+                         (sep_x, section_rect.y + self._px(14)),
+                         (sep_x, section_rect.bottom - self._px(14)), 1)
 
-        # Espécie e Level e Gênero
-        species_font = self._get_font(22, True)
-        level_font = self._get_font(18)
+        # ---------- Informações ---------- #
+        gap = self._px(8)
 
-        species_text = self.pokemon.name.upper()
-        species_surf = species_font.render(species_text, True, self.colors['accent'])
+        name_font = self._get_font(26, True)
+        name_surf = name_font.render(self.pokemon.name.upper(), True, self.colors['accent'])
 
-        level_text = f"Lv.{self.pokemon.level}"
-        level_surf = level_font.render(level_text, True, self.colors['text_dim'])
+        status_font = self._get_font(15)
+        level_surf = status_font.render(f"Lv.{self.pokemon.level}", True, self.colors['text_dim'])
 
-        # Gênero como texto
-        if hasattr(self.pokemon, 'gender'):
-            if self.pokemon.gender == "male":
-                gender_text = "MACHO"
-                gender_color = self.colors['gender_male']
-            elif self.pokemon.gender == "female":
-                gender_text = "FÊMEA"
-                gender_color = self.colors['gender_female']
-            else:
-                gender_text = ""
-                gender_color = self.colors['text_muted']
-        else:
-            gender_text = ""
-            gender_color = self.colors['text_muted']
+        id_surf = self._get_font(12).render(f"#{self.pokemon.id:04d}", True,
+                                            self.colors['text_muted'])
 
-        total_width = species_surf.get_width() + 10 + level_surf.get_width()
+        # Gênero
+        gender_text, gender_color = "", self.colors['text_muted']
+        if getattr(self.pokemon, 'gender', None) == "male":
+            gender_text, gender_color = "MACHO", self.colors['gender_male']
+        elif getattr(self.pokemon, 'gender', None) == "female":
+            gender_text, gender_color = "FÊMEA", self.colors['gender_female']
+        gender_surf = self._get_font(13, True).render(gender_text, True, gender_color) \
+            if gender_text else None
 
-        if gender_text:
-            gender_font = self._get_font(14, True)
-            gender_surf = gender_font.render(gender_text, True, gender_color)
-            total_width += 12 + gender_surf.get_width()
+        # Tipos
+        type_height = self._px(26)
+        type_font = self._get_font(13, True)
+        type_surfs = []
+        for t in (self.pokemon.types or []):
+            color = self.type_colors.get(t.lower(), (150, 150, 150))
+            surf = type_font.render(t.capitalize(), True, (255, 255, 255))
+            type_surfs.append((surf, color))
 
-        start_x = center_x - total_width // 2
+        types_row_h = type_height if type_surfs else 0
 
-        screen.blit(species_surf, (start_x, info_y))
-        level_y = info_y + (species_surf.get_height() - level_surf.get_height()) // 2
-        screen.blit(level_surf, (start_x + species_surf.get_width() + 10, level_y))
+        # Altura total para centralizar verticalmente
+        total_h = name_surf.get_height() + gap + level_surf.get_height()
+        if types_row_h:
+            total_h += gap + types_row_h
 
-        if gender_text:
-            gender_y = info_y + (species_surf.get_height() - gender_surf.get_height()) // 2
-            screen.blit(gender_surf, (start_x + species_surf.get_width() + 10 + level_surf.get_width() + 12, gender_y))
+        cursor_y = section_rect.centery - total_h // 2
 
-        # ID
-        id_font = self._get_font(11)
-        id_text = f"#{self.pokemon.id:04d}"
-        id_surf = id_font.render(id_text, True, self.colors['text_muted'])
-        id_x = center_x - id_surf.get_width() // 2
-        screen.blit(id_surf, (id_x, info_y + species_surf.get_height() + 4))
+        # Linha 1: nome
+        screen.blit(name_surf, (info_x, cursor_y))
+        cursor_y += name_surf.get_height() + gap
 
-        # Tipos (acima do sprite)
-        types_y = section_rect.y - 6
-        self._render_types(screen, center_x, types_y, self.pokemon.types)
+        # Linha 2: level | gênero | ID
+        row_cy = cursor_y + level_surf.get_height() // 2
+        cursor_x = info_x
 
-    def _render_pokemon_sprite(self, screen, center_x, center_y, target_size, section_rect):
-        """Sprite com animação"""
-        sprite_to_use = self.pokemon.ui_sprite
+        screen.blit(level_surf, (cursor_x, cursor_y))
+        cursor_x += level_surf.get_width() + self._px(14)
 
-        if sprite_to_use:
-            orig_w, orig_h = sprite_to_use.get_width(), sprite_to_use.get_height()
-            scale = min(target_size / orig_w, target_size / orig_h)
-            new_w = int(orig_w * scale)
-            new_h = int(orig_h * scale)
+        if gender_surf:
+            gy = row_cy - gender_surf.get_height() // 2
+            screen.blit(gender_surf, (cursor_x, gy))
+            cursor_x += gender_surf.get_width() + self._px(14)
 
-            scaled_sprite = pygame.transform.scale(sprite_to_use, (new_w, new_h))
+        iy = row_cy - id_surf.get_height() // 2
+        screen.blit(id_surf, (cursor_x, iy))
 
-            sprite_x = center_x - new_w // 2
-            sprite_y = center_y - new_h // 2
+        cursor_y += level_surf.get_height() + gap
 
-            # Efeito de brilho
-            glow_radius = max(new_w, new_h) // 2 + 12
-            pulse = abs(math.sin(self.animation_time * 5)) * 4
-            glow_alpha = int(70 + pulse * 4)
+        # Linha 3: tipos
+        if type_surfs:
+            t_spacing = self._px(6)
+            tx = info_x
+            for surf, color in type_surfs:
+                w = surf.get_width() + self._px(20)
+                rect = pygame.Rect(tx, cursor_y, w, type_height)
+                pygame.draw.rect(screen, color, rect, border_radius=self._px(8))
+                pygame.draw.rect(screen, (255, 255, 255, 100), rect, 1,
+                                 border_radius=self._px(8))
+                screen.blit(surf, (
+                    tx + (w - surf.get_width()) // 2,
+                    cursor_y + (type_height - surf.get_height()) // 2,
+                ))
+                tx += w + t_spacing
 
-            for i in range(2):
-                radius = glow_radius - i * 3
-                alpha = glow_alpha - i * 15
-                if alpha > 0:
-                    glow_surface = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-                    pygame.draw.circle(glow_surface, (*self.colors['success'], alpha),
-                                       (radius, radius), radius)
-                    screen.blit(glow_surface, (center_x - radius, center_y - radius))
-
-            # Fundo circular
-            circle_radius = max(new_w, new_h) // 2 + 6
-            pygame.draw.circle(screen, (*self.colors['bg_light'], 180), (center_x, center_y), circle_radius)
-            pygame.draw.circle(screen, (*self.colors['border'], 200), (center_x, center_y), circle_radius, 2)
-
-            screen.blit(scaled_sprite, (sprite_x, sprite_y))
-
-            # Estrelas
-            star_time = self.animation_time * 6
-            for i in range(5):
-                angle = star_time + (i * math.pi * 2 / 5)
-                radius = max(new_w, new_h) // 2 + 18
-                star_x = center_x + math.cos(angle) * radius
-                star_y = center_y + math.sin(angle) * radius
-                star_size = int(2 + math.sin(self.animation_time * 12 + i) * 1.5)
-                pygame.draw.circle(screen, (255, 215, 0), (int(star_x), int(star_y)), star_size)
-
-    def _render_types(self, screen, center_x, y, types):
-        """Renderiza os tipos"""
-        if not types:
+    def _render_pokemon_sprite(self, screen, center_x, center_y, target_size):
+        """Sprite com animação de brilho e estrelas."""
+        sprite = self.pokemon.ui_sprite
+        if not sprite:
             return
 
-        type_font = self._get_font(11, True)
-        type_spacing = 6
-        type_height = 24
+        ow, oh = sprite.get_width(), sprite.get_height()
+        scale = min(target_size / ow, target_size / oh)
+        nw, nh = int(ow * scale), int(oh * scale)
+        scaled = pygame.transform.scale(sprite, (nw, nh))
+        sx = center_x - nw // 2
+        sy = center_y - nh // 2
 
-        type_surfs = []
-        type_colors_list = []
-        type_widths = []
+        # Glow pulsante
+        glow_radius = max(nw, nh) // 2 + self._px(12)
+        pulse = abs(math.sin(self.animation_time * 5)) * 4
+        glow_alpha = int(70 + pulse * 4)
 
-        for t in types:
-            type_name = t.capitalize()
-            color = self.type_colors.get(t.lower(), (150, 150, 150))
-            surf = type_font.render(type_name, True, (255, 255, 255))
-            width = surf.get_width() + 18
-            type_surfs.append(surf)
-            type_colors_list.append(color)
-            type_widths.append(width)
+        for i in range(2):
+            radius = glow_radius - i * 3
+            alpha = glow_alpha - i * 15
+            if alpha > 0:
+                glow = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
+                pygame.draw.circle(glow, (*self.colors['success'], alpha),
+                                   (radius, radius), radius)
+                screen.blit(glow, (center_x - radius, center_y - radius))
 
-        total_width = sum(type_widths) + (len(types) - 1) * type_spacing
-        start_x = center_x - total_width // 2
+        # Fundo circular
+        circle_radius = max(nw, nh) // 2 + self._px(6)
+        pygame.draw.circle(screen, (*self.colors['bg_light'], 180),
+                           (center_x, center_y), circle_radius)
+        pygame.draw.circle(screen, (*self.colors['border'], 200),
+                           (center_x, center_y), circle_radius, 2)
 
-        current_x = start_x
-        for surf, color, width in zip(type_surfs, type_colors_list, type_widths):
-            bg_rect = pygame.Rect(current_x, y, width, type_height)
-            pygame.draw.rect(screen, color, bg_rect, border_radius=8)
-            pygame.draw.rect(screen, (255, 255, 255, 100), bg_rect, 1, border_radius=8)
+        screen.blit(scaled, (sx, sy))
 
-            text_x = current_x + (width - surf.get_width()) // 2
-            text_y = y + (type_height - surf.get_height()) // 2
-            screen.blit(surf, (text_x, text_y))
-            current_x += width + type_spacing
+        # Estrelas orbitando
+        star_time = self.animation_time * 6
+        for i in range(5):
+            angle = star_time + (i * math.pi * 2 / 5)
+            radius = max(nw, nh) // 2 + self._px(18)
+            star_x = center_x + math.cos(angle) * radius
+            star_y = center_y + math.sin(angle) * radius
+            star_size = int(2 + math.sin(self.animation_time * 12 + i) * 1.5)
+            pygame.draw.circle(screen, (255, 215, 0),
+                               (int(star_x), int(star_y)), max(1, star_size))
+
+    # ---------- Seção Natureza + IVs ---------- #
 
     def _render_info_section(self, screen, x, y, width):
-        """Seção Natureza + IVs (compacta)"""
         section_rect = pygame.Rect(x, y, width, self.info_section_height)
+        pygame.draw.rect(screen, (*self.colors['bg_card'], 180), section_rect,
+                         border_radius=self._px(12))
+        pygame.draw.rect(screen, (*self.colors['border'], 150), section_rect, 1,
+                         border_radius=self._px(12))
 
-        pygame.draw.rect(screen, (*self.colors['bg_card'], 180), section_rect, border_radius=12)
-        pygame.draw.rect(screen, (*self.colors['border'], 150), section_rect, 1, border_radius=12)
+        pad = self._px(12)
+        label_font = self._get_font(11, True)
 
-        # ===== NATUREZA (linha única) =====
-        nature_label = self._get_font(11).render("NATUREZA", True, self.colors['text_muted'])
-        screen.blit(nature_label, (section_rect.x + 12, section_rect.y + 8))
+        # Split: 32% natureza / 68% IVs
+        nature_w = int(width * 0.32)
+        iv_x = section_rect.x + nature_w + pad
+        iv_area_w = section_rect.right - iv_x - pad
 
-        nature_name = self.pokemon.nature if hasattr(self.pokemon.nature, 'name') else str(self.pokemon.nature)
-        nature_surf = self._get_font(16, True).render(nature_name.capitalize(), True, self.colors['accent'])
-        screen.blit(nature_surf, (section_rect.x + 12, section_rect.y + 28))
+        # ---- Natureza ----
+        label = label_font.render("NATUREZA", True, self.colors['text_muted'])
+        screen.blit(label, (section_rect.x + pad, section_rect.y + self._px(8)))
 
-        # ===== IVS (compactos em linha) =====
-        iv_label = self._get_font(11).render("IVS", True, self.colors['text_muted'])
-        screen.blit(iv_label, (section_rect.x + section_rect.width // 2 + 10, section_rect.y + 8))
+        nature_name = (self.pokemon.nature.name
+                       if hasattr(self.pokemon.nature, 'name')
+                       else str(self.pokemon.nature))
+        nature_surf = self._get_font(17, True).render(
+            nature_name.capitalize(), True, self.colors['accent'])
+        screen.blit(nature_surf, (section_rect.x + pad, section_rect.y + self._px(28)))
 
-        if hasattr(self.pokemon, 'ivs') and self.pokemon.ivs:
-            ivs = self.pokemon.ivs
-            iv_font = self._get_font(13, True)
+        # Divisor vertical
+        sep_x = section_rect.x + nature_w + pad // 2
+        pygame.draw.line(screen, (*self.colors['border'], 120),
+                         (sep_x, section_rect.y + self._px(8)),
+                         (sep_x, section_rect.bottom - self._px(8)), 1)
 
-            # Lista de stats
-            iv_stats = [
-                ('HP', ivs.get('hp', 0)),
-                ('ATK', ivs.get('attack', 0)),
-                ('DEF', ivs.get('defense', 0)),
-                ('SpA', ivs.get('special_attack', 0)),
-                ('SpD', ivs.get('special_defense', 0)),
-                ('SPD', ivs.get('speed', 0))
-            ]
+        # ---- IVs ----
+        iv_label = label_font.render("IVS", True, self.colors['text_muted'])
+        screen.blit(iv_label, (iv_x, section_rect.y + self._px(8)))
 
-            start_x = section_rect.x + section_rect.width // 2 + 10
-            current_x = start_x
-            current_y = section_rect.y + 28
+        if not (hasattr(self.pokemon, 'ivs') and self.pokemon.ivs):
+            return
 
-            for i, (name, value) in enumerate(iv_stats):
-                # Cor baseada no valor
-                if value >= 31:
-                    color = self.colors['iv_high']
-                elif value >= 20:
-                    color = self.colors['iv_med']
-                else:
-                    color = self.colors['iv_low']
+        ivs = self.pokemon.ivs
+        stats = [
+            ('HP',  ivs.get('hp', 0)),
+            ('ATK', ivs.get('attack', 0)),
+            ('DEF', ivs.get('defense', 0)),
+            ('SpA', ivs.get('special_attack', 0)),
+            ('SpD', ivs.get('special_defense', 0)),
+            ('SPD', ivs.get('speed', 0)),
+        ]
 
-                iv_text = f"{name}:{value:02d}"
-                iv_surf = iv_font.render(iv_text, True, color)
+        iv_font = self._get_font(13, True)
+        cols = 3
+        col_w = iv_area_w // cols
+        start_y = section_rect.y + self._px(28)
+        row_h = self._px(22)
 
-                # Posiciona em 2 linhas (3 colunas cada)
-                if i < 3:
-                    screen.blit(iv_surf, (current_x, current_y))
-                    current_x += 65
-                else:
-                    if i == 3:
-                        current_x = start_x
-                        current_y += 22
-                    screen.blit(iv_surf, (current_x, current_y))
-                    current_x += 65
+        for i, (name, value) in enumerate(stats):
+            col = i % cols
+            row = i // cols
+            ix = iv_x + col * col_w
+            iy = start_y + row * row_h
+
+            if value >= 31:
+                color = self.colors['iv_high']
+            elif value >= 20:
+                color = self.colors['iv_med']
+            else:
+                color = self.colors['iv_low']
+
+            # Nome da stat
+            name_surf = iv_font.render(name, True, self.colors['text_muted'])
+            ny = iy + (row_h - name_surf.get_height()) // 2
+            screen.blit(name_surf, (ix, ny))
+
+            # Valor
+            val_surf = iv_font.render(f"{value:02d}", True, color)
+            vx = ix + self._px(32)
+            screen.blit(val_surf, (vx, ny))
+
+            # Mini barra
+            bar_x = vx + val_surf.get_width() + self._px(6)
+            bar_w = max(self._px(20), col_w - (bar_x - ix) - self._px(6))
+            bar_h = self._px(5)
+            bar_y = iy + row_h // 2 - bar_h // 2
+
+            pygame.draw.rect(screen, (40, 45, 65), (bar_x, bar_y, bar_w, bar_h),
+                             border_radius=self._px(2))
+            fill_w = int(bar_w * (value / 31.0))
+            if fill_w > 0:
+                pygame.draw.rect(screen, color, (bar_x, bar_y, fill_w, bar_h),
+                                 border_radius=self._px(2))
+
+    # ---------- Seção de Movimentos ---------- #
 
     def _render_moves_section(self, screen, x, y, width):
-        """Seção de Moves"""
         section_rect = pygame.Rect(x, y, width, self.moves_section_height)
+        pygame.draw.rect(screen, (*self.colors['bg_card'], 180), section_rect,
+                         border_radius=self._px(12))
+        pygame.draw.rect(screen, (*self.colors['border'], 150), section_rect, 1,
+                         border_radius=self._px(12))
 
-        pygame.draw.rect(screen, (*self.colors['bg_card'], 180), section_rect, border_radius=12)
-        pygame.draw.rect(screen, (*self.colors['border'], 150), section_rect, 1, border_radius=12)
+        pad = self._px(10)
 
         # Título
         title_font = self._get_font(13, True)
         title = title_font.render("MOVIMENTOS", True, self.colors['primary'])
-        title_x = section_rect.centerx - title.get_width() // 2
-        screen.blit(title, (title_x, section_rect.y + 6))
+        screen.blit(title, (section_rect.centerx - title.get_width() // 2,
+                            section_rect.y + self._px(6)))
+
+        title_h = title.get_height() + self._px(6)
 
         if not self.pokemon.moves:
             no_font = self._get_font(12)
-            no_moves = no_font.render("Nenhum ataque conhecido", True, self.colors['text_muted'])
-            no_x = section_rect.centerx - no_moves.get_width() // 2
-            no_y = section_rect.centery - no_moves.get_height() // 2
-            screen.blit(no_moves, (no_x, no_y))
+            txt = no_font.render("Nenhum ataque conhecido", True, self.colors['text_muted'])
+            screen.blit(txt, (section_rect.centerx - txt.get_width() // 2,
+                              section_rect.centery - txt.get_height() // 2))
             return
 
-        # Grid 2x2
-        grid_x = section_rect.x + 10
-        grid_y = section_rect.y + 28
-        slot_width = (section_rect.width - 25) // 2
-        slot_height = 48
-        slot_spacing = 8
+        # Grid 2x2 proporcional
+        grid_top = section_rect.y + title_h + self._px(4)
+        grid_h = section_rect.bottom - grid_top - pad
+        grid_x = section_rect.x + pad
+        grid_w = section_rect.width - pad * 2
+
+        spacing = self._px(8)
+        slot_w = (grid_w - spacing) // 2
+        slot_h = (grid_h - spacing) // 2
 
         for i, move in enumerate(self.pokemon.moves[:4]):
             row = i // 2
             col = i % 2
-            slot_x = grid_x + col * (slot_width + slot_spacing)
-            slot_y = grid_y + row * (slot_height + slot_spacing)
-
-            if slot_y + slot_height < section_rect.bottom - 4:
-                self._render_move_slot(screen, slot_x, slot_y, slot_width, slot_height, move)
+            sx = grid_x + col * (slot_w + spacing)
+            sy = grid_top + row * (slot_h + spacing)
+            self._render_move_slot(screen, sx, sy, slot_w, slot_h, move)
 
     def _render_move_slot(self, screen, x, y, width, height, move):
-        """Slot de movimento - com PP em fonte maior"""
+        """Slot de movimento individual."""
         type_color = self.type_colors.get(move.type.lower(), (150, 150, 150))
 
         bg_rect = pygame.Rect(x, y, width, height)
-        pygame.draw.rect(screen, type_color, bg_rect, border_radius=8)
-        pygame.draw.rect(screen, (255, 255, 255, 100), bg_rect, 1, border_radius=8)
+        pygame.draw.rect(screen, type_color, bg_rect, border_radius=self._px(8))
+        pygame.draw.rect(screen, (255, 255, 255, 100), bg_rect, 1,
+                         border_radius=self._px(8))
 
-        # Nome do move
+        pad = self._px(6)
+
+        # Nome (truncado por largura real)
         name_font = self._get_font(14, True)
-        move_name = move.name.upper()
-        max_len = 11 if width < 200 else 14
-        if len(move_name) > max_len:
-            move_name = move_name[:max_len] + "..."
-
+        max_name_w = width - self._px(50)  # deixa espaço p/ badge de tipo
+        move_name = self._truncate_text(name_font, move.name.upper(), max_name_w)
         name_surf = name_font.render(move_name, True, (255, 255, 255))
-        text_x = x + (width - name_surf.get_width()) // 2
-        text_y = y + 6
-        screen.blit(name_surf, (text_x, text_y))
+        screen.blit(name_surf, (x + pad, y + pad))
 
-        # Tipo (canto superior direito)
+        # Badge de tipo (canto superior direito)
         type_font = self._get_font(9, True)
-        type_name = move.type.upper()[:4]
-        type_surf = type_font.render(type_name, True, (255, 255, 255))
+        type_txt = type_font.render(move.type.upper()[:4], True, (255, 255, 255))
+        badge_w = type_txt.get_width() + self._px(6)
+        badge_h = type_txt.get_height() + self._px(2)
+        badge_x = x + width - badge_w - self._px(4)
+        badge_y = y + self._px(3)
 
-        type_bg_w = type_surf.get_width() + 5
-        type_bg_h = type_surf.get_height() + 2
-        type_bg_x = x + width - type_bg_w - 4
-        type_bg_y = y + 3
+        badge_surf = pygame.Surface((badge_w, badge_h), pygame.SRCALPHA)
+        pygame.draw.rect(badge_surf, (0, 0, 0, 140), (0, 0, badge_w, badge_h),
+                         border_radius=self._px(4))
+        screen.blit(badge_surf, (badge_x, badge_y))
+        screen.blit(type_txt, (
+            badge_x + (badge_w - type_txt.get_width()) // 2,
+            badge_y + (badge_h - type_txt.get_height()) // 2,
+        ))
 
-        pygame.draw.rect(screen, (0, 0, 0, 140), (type_bg_x, type_bg_y, type_bg_w, type_bg_h), border_radius=4)
-        type_x = type_bg_x + (type_bg_w - type_surf.get_width()) // 2
-        type_y = type_bg_y + (type_bg_h - type_surf.get_height()) // 2
-        screen.blit(type_surf, (type_x, type_y))
-
-        # PP (fonte maior e mais destacada)
-        pp_font = self._get_font(12, True)  # Aumentado de 10 para 12 e bold
+        # PP
+        pp_font = self._get_font(12, True)
         pp_text = f"PP {move.current_pp}/{move.max_pp}"
-
-        # Cor do PP (amarelo se estiver baixo)
         pp_ratio = move.current_pp / move.max_pp if move.max_pp > 0 else 0
         if pp_ratio <= 0.25:
             pp_color = self.colors['danger']
@@ -620,187 +700,194 @@ class CaptureOverlay(BaseOverlay):
             pp_color = (200, 220, 200)
 
         pp_surf = pp_font.render(pp_text, True, pp_color)
-        pp_x = x + width - pp_surf.get_width() - 5
-        pp_y = y + height - pp_surf.get_height() - 4
-        screen.blit(pp_surf, (pp_x, pp_y))
+        screen.blit(pp_surf, (
+            x + width - pp_surf.get_width() - pad,
+            y + height - pp_surf.get_height() - self._px(4),
+        ))
+
+    # ---------- Seção de apelido ---------- #
 
     def _render_name_section(self, screen, x, y, width):
-        """Seção para definir apelido"""
         section_rect = pygame.Rect(x, y, width, self.name_section_height)
+        pygame.draw.rect(screen, (*self.colors['bg_card'], 150), section_rect,
+                         border_radius=self._px(10))
+        pygame.draw.rect(screen, (*self.colors['border'], 120), section_rect, 1,
+                         border_radius=self._px(10))
 
-        pygame.draw.rect(screen, (*self.colors['bg_card'], 150), section_rect, border_radius=10)
-        pygame.draw.rect(screen, (*self.colors['border'], 120), section_rect, 1, border_radius=10)
+        pad = self._px(12)
 
+        # Pergunta
         info_font = self._get_font(12)
-        info_text = info_font.render("Deseja dar um apelido?", True, self.colors['text_muted'])
-        screen.blit(info_text, (section_rect.x + 12, section_rect.y + 10))
+        info = info_font.render("Deseja dar um apelido?", True, self.colors['text_muted'])
+        screen.blit(info, (section_rect.x + pad, section_rect.y + self._px(8)))
 
-        # Botão
-        button_width = 75
-        button_height = 30
-        button_x = section_rect.right - button_width - 12
-        button_y = section_rect.y + (section_rect.height - button_height) // 2
-        self.name_button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+        # Botão APELIDO
+        btn_w = self._px(80)
+        btn_h = self._px(30)
+        btn_x = section_rect.right - btn_w - pad
+        btn_y = section_rect.y + (section_rect.height - btn_h) // 2
+        self.name_button_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
 
         if self.name_button_hovered:
-            button_color = (60, 100, 60)
-            border_color = (100, 180, 100)
+            bg, br = (60, 100, 60), (100, 180, 100)
         else:
-            button_color = (40, 70, 40)
-            border_color = (70, 120, 70)
+            bg, br = (40, 70, 40), (70, 120, 70)
 
-        pygame.draw.rect(screen, button_color, self.name_button_rect, border_radius=8)
-        pygame.draw.rect(screen, border_color, self.name_button_rect, 1, border_radius=8)
+        pygame.draw.rect(screen, bg, self.name_button_rect, border_radius=self._px(8))
+        pygame.draw.rect(screen, br, self.name_button_rect, 1, border_radius=self._px(8))
 
-        button_font = self._get_font(12, True)
-        button_text = button_font.render("APELIDO", True, (255, 255, 255))
-        text_x = self.name_button_rect.centerx - button_text.get_width() // 2
-        text_y = self.name_button_rect.centery - button_text.get_height() // 2
-        screen.blit(button_text, (text_x, text_y))
+        bf = self._get_font(12, True)
+        bt = bf.render("APELIDO", True, (255, 255, 255))
+        screen.blit(bt, (
+            self.name_button_rect.centerx - bt.get_width() // 2,
+            self.name_button_rect.centery - bt.get_height() // 2,
+        ))
 
-        # Apelido atual
+        # Apelido atual (abaixo da pergunta)
         if self.pokemon.custom_name:
-            nick_font = self._get_font(11)
-            nick_text = nick_font.render(f"Atual: {self.pokemon.custom_name}", True, self.colors['accent'])
-            screen.blit(nick_text, (section_rect.x + 12, section_rect.y + 32))
+            nf = self._get_font(11)
+            nt = nf.render(f"Atual: {self.pokemon.custom_name}", True, self.colors['accent'])
+            screen.blit(nt, (section_rect.x + pad, section_rect.y + self._px(30)))
 
     def _render_naming_section(self, screen, x, y, width):
-        """Seção de input para o apelido"""
         section_rect = pygame.Rect(x, y, width, self.name_section_height)
+        pygame.draw.rect(screen, (*self.colors['bg_card'], 200), section_rect,
+                         border_radius=self._px(10))
+        pygame.draw.rect(screen, self.colors['primary'], section_rect, 2,
+                         border_radius=self._px(10))
 
-        pygame.draw.rect(screen, (*self.colors['bg_card'], 200), section_rect, border_radius=10)
-        pygame.draw.rect(screen, self.colors['primary'], section_rect, 2, border_radius=10)
+        pad = self._px(10)
+        btn_w = self._px(60)
+        btn_h = self._px(28)
+        btn_gap = self._px(8)
 
-        # Input
-        input_width = width - 170
-        input_height = 32
-        input_x = section_rect.x + 10
-        input_y = section_rect.y + (section_rect.height - input_height) // 2
-        self.input_rect = pygame.Rect(input_x, input_y, input_width, input_height)
+        # Input (ocupa o espaço restante à esquerda dos dois botões)
+        right_block = btn_w * 2 + btn_gap + pad * 2
+        input_w = max(self._px(80), width - right_block - pad)
+        input_h = self._px(32)
+        input_x = section_rect.x + pad
+        input_y = section_rect.y + (section_rect.height - input_h) // 2
+        self.input_rect = pygame.Rect(input_x, input_y, input_w, input_h)
 
-        if self.input_active:
-            border_color = self.colors['input_active']
-            cursor_visible = int(self.input_cursor_timer * 2) % 2 == 0
-        else:
-            border_color = self.colors['input_border']
-            cursor_visible = False
+        cursor_visible = (self.input_active and
+                          int(self.input_cursor_timer * 2) % 2 == 0)
+        border_color = (self.colors['input_active'] if self.input_active
+                        else self.colors['input_border'])
 
-        pygame.draw.rect(screen, self.colors['input_bg'], self.input_rect, border_radius=6)
-        pygame.draw.rect(screen, border_color, self.input_rect, 2, border_radius=6)
+        pygame.draw.rect(screen, self.colors['input_bg'], self.input_rect,
+                         border_radius=self._px(6))
+        pygame.draw.rect(screen, border_color, self.input_rect, 2,
+                         border_radius=self._px(6))
 
-        # Texto
         input_font = self._get_font(15)
-        display_text = self.input_text
-        if self.input_active and cursor_visible:
-            display_text += "_"
-
-        text_surf = input_font.render(display_text, True, self.colors['text'])
-        text_x = input_x + 8
-        text_y = input_y + (input_height - text_surf.get_height()) // 2
-        screen.blit(text_surf, (text_x, text_y))
+        display = self.input_text + ("_" if cursor_visible else "")
+        # Trunca visualmente se passar da largura
+        while input_font.size(display)[0] > input_w - self._px(16) and display:
+            display = display[1:]
+        text_surf = input_font.render(display, True, self.colors['text'])
+        screen.blit(text_surf, (
+            input_x + self._px(8),
+            input_y + (input_h - text_surf.get_height()) // 2,
+        ))
 
         # Contador
         counter_font = self._get_font(10)
-        counter_text = f"{len(self.input_text)}/{self.max_name_length}"
-        counter_color = self.colors['success'] if len(self.input_text) <= self.max_name_length else self.colors[
-            'danger']
-        counter_surf = counter_font.render(counter_text, True, counter_color)
-        screen.blit(counter_surf, (input_x + input_width - counter_surf.get_width() - 8, input_y + input_height - 14))
+        counter = counter_font.render(
+            f"{len(self.input_text)}/{self.max_name_length}", True,
+            self.colors['success'] if len(self.input_text) <= self.max_name_length
+            else self.colors['danger'])
+        screen.blit(counter, (
+            input_x + input_w - counter.get_width() - self._px(6),
+            input_y + input_h - counter.get_height() - self._px(2),
+        ))
 
-        # Botões
-        btn_width = 60
-        btn_height = 28
-        btn_y = section_rect.y + (section_rect.height - btn_height) // 2
-
-        # Confirmar
-        confirm_x = section_rect.right - btn_width - 10
-        self.confirm_name_rect = pygame.Rect(confirm_x, btn_y, btn_width, btn_height)
+        # Botão OK
+        btn_y = section_rect.y + (section_rect.height - btn_h) // 2
+        ok_x = section_rect.right - btn_w - pad
+        self.confirm_name_rect = pygame.Rect(ok_x, btn_y, btn_w, btn_h)
 
         if self.confirm_name_hovered:
-            confirm_color = (60, 100, 60)
-            confirm_border = (100, 180, 100)
+            ok_bg, ok_br = (60, 100, 60), (100, 180, 100)
         else:
-            confirm_color = (40, 70, 40)
-            confirm_border = (70, 120, 70)
+            ok_bg, ok_br = (40, 70, 40), (70, 120, 70)
 
-        pygame.draw.rect(screen, confirm_color, self.confirm_name_rect, border_radius=8)
-        pygame.draw.rect(screen, confirm_border, self.confirm_name_rect, 1, border_radius=8)
+        pygame.draw.rect(screen, ok_bg, self.confirm_name_rect, border_radius=self._px(8))
+        pygame.draw.rect(screen, ok_br, self.confirm_name_rect, 1, border_radius=self._px(8))
 
-        confirm_font = self._get_font(12, True)
-        confirm_text = confirm_font.render("OK", True, (255, 255, 255))
-        text_x = self.confirm_name_rect.centerx - confirm_text.get_width() // 2
-        text_y = self.confirm_name_rect.centery - confirm_text.get_height() // 2
-        screen.blit(confirm_text, (text_x, text_y))
+        bf = self._get_font(12, True)
+        ok_txt = bf.render("OK", True, (255, 255, 255))
+        screen.blit(ok_txt, (
+            self.confirm_name_rect.centerx - ok_txt.get_width() // 2,
+            self.confirm_name_rect.centery - ok_txt.get_height() // 2,
+        ))
 
-        # Pular
-        skip_x = confirm_x - btn_width - 8
-        self.skip_button_rect = pygame.Rect(skip_x, btn_y, btn_width, btn_height)
+        # Botão PULAR
+        skip_x = ok_x - btn_w - btn_gap
+        self.skip_button_rect = pygame.Rect(skip_x, btn_y, btn_w, btn_h)
 
         if self.skip_button_hovered:
-            skip_color = (70, 60, 60)
-            skip_border = (120, 80, 80)
+            sk_bg, sk_br = (70, 60, 60), (120, 80, 80)
         else:
-            skip_color = (50, 40, 40)
-            skip_border = (80, 60, 60)
+            sk_bg, sk_br = (50, 40, 40), (80, 60, 60)
 
-        pygame.draw.rect(screen, skip_color, self.skip_button_rect, border_radius=8)
-        pygame.draw.rect(screen, skip_border, self.skip_button_rect, 1, border_radius=8)
+        pygame.draw.rect(screen, sk_bg, self.skip_button_rect, border_radius=self._px(8))
+        pygame.draw.rect(screen, sk_br, self.skip_button_rect, 1, border_radius=self._px(8))
 
-        skip_font = self._get_font(12, True)
-        skip_text = skip_font.render("PULAR", True, (255, 200, 200))
-        text_x = self.skip_button_rect.centerx - skip_text.get_width() // 2
-        text_y = self.skip_button_rect.centery - skip_text.get_height() // 2
-        screen.blit(skip_text, (text_x, text_y))
+        sk_txt = bf.render("PULAR", True, (255, 200, 200))
+        screen.blit(sk_txt, (
+            self.skip_button_rect.centerx - sk_txt.get_width() // 2,
+            self.skip_button_rect.centery - sk_txt.get_height() // 2,
+        ))
+
+    # ---------- Botão CONTINUAR ---------- #
 
     def _render_button(self, screen, x, y, width):
-        """Botão CONTINUAR"""
-        button_width = 130
-        button_height = 38
-        button_x = x + (width - button_width) // 2
-        button_y = y + (self.button_section_height - button_height) // 2
+        btn_w = self._px(140)
+        btn_h = self._px(38)
+        btn_x = x + (width - btn_w) // 2
+        btn_y = y + (self.button_section_height - btn_h) // 2
 
-        self.button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+        self.button_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
 
         if self.button_hovered:
-            button_color = (70, 150, 70)
-            border_color = (100, 200, 100)
+            bg, br = (70, 150, 70), (100, 200, 100)
         else:
-            button_color = (40, 100, 40)
-            border_color = (70, 150, 70)
+            bg, br = (40, 100, 40), (70, 150, 70)
 
-        pygame.draw.rect(screen, button_color, self.button_rect, border_radius=12)
-        pygame.draw.rect(screen, border_color, self.button_rect, 2, border_radius=12)
+        pygame.draw.rect(screen, bg, self.button_rect, border_radius=self._px(12))
+        pygame.draw.rect(screen, br, self.button_rect, 2, border_radius=self._px(12))
 
         font = self._get_font(17, True)
-        button_text = font.render("CONTINUAR", True, (255, 255, 255))
-        text_x = self.button_rect.centerx - button_text.get_width() // 2
-        text_y = self.button_rect.centery - button_text.get_height() // 2
-        screen.blit(button_text, (text_x, text_y))
+        txt = font.render("CONTINUAR", True, (255, 255, 255))
+        screen.blit(txt, (
+            self.button_rect.centerx - txt.get_width() // 2,
+            self.button_rect.centery - txt.get_height() // 2,
+        ))
+
+    # ---------- Mensagem de destino ---------- #
 
     def _render_status_message(self, screen, viewport):
-        """Mensagem de destino"""
-        viewport_center_x = viewport.x + viewport.width // 2
+        viewport_cx = viewport.x + viewport.width // 2
 
-        msg_width = 90
-        msg_height = 28
-        msg_x = viewport_center_x - msg_width // 2
-        msg_y = viewport.y + viewport.height - 45
+        msg_w = self._px(96)
+        msg_h = self._px(28)
+        msg_x = viewport_cx - msg_w // 2
+        msg_y = viewport.y + viewport.height - msg_h - self._px(14)
 
-        msg_rect = pygame.Rect(msg_x, msg_y, msg_width, msg_height)
-
-        pygame.draw.rect(screen, (*self.colors['bg_dark'], 220), msg_rect, border_radius=12)
-        pygame.draw.rect(screen, self.colors['border'], msg_rect, 1, border_radius=12)
+        msg_rect = pygame.Rect(msg_x, msg_y, msg_w, msg_h)
+        pygame.draw.rect(screen, (*self.colors['bg_dark'], 220), msg_rect,
+                         border_radius=self._px(12))
+        pygame.draw.rect(screen, self.colors['border'], msg_rect, 1,
+                         border_radius=self._px(12))
 
         font = self._get_font(13, True)
-
         if self.is_to_team:
-            text = "TIME"
-            color = self.colors['success']
+            txt, color = "TIME", self.colors['success']
         else:
-            text = "BOX"
-            color = self.colors['warning']
+            txt, color = "BOX", self.colors['warning']
 
-        status_surf = font.render(text, True, color)
-        text_x = msg_rect.centerx - status_surf.get_width() // 2
-        text_y = msg_rect.centery - status_surf.get_height() // 2
-        screen.blit(status_surf, (text_x, text_y))
+        surf = font.render(txt, True, color)
+        screen.blit(surf, (
+            msg_rect.centerx - surf.get_width() // 2,
+            msg_rect.centery - surf.get_height() // 2,
+        ))

@@ -864,8 +864,6 @@ class Pokemon(Entity):
         Define um nome personalizado para o Pokémon.
         Retorna True se o nome foi alterado, False se inválido.
         """
-        # Remove espaços extras
-        new_name = new_name.strip()
 
         # Verifica limites
         if len(new_name) > 20:
