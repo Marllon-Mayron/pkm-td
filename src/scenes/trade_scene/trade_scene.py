@@ -616,8 +616,6 @@ class TradeScene(BaseScene):
             return
         self.trade_in_progress = True
 
-        self._stamp_trade_origin_on_offer()
-
         anim_my = dict(self.my_offer) if self.my_offer else None
         anim_opp = dict(self.opponent_offer) if self.opponent_offer else None
 
@@ -728,7 +726,21 @@ class TradeScene(BaseScene):
         if not new_pokemon.capture_method:
             new_pokemon.capture_method = "trade"
 
-        # ===== EVOLUÇÃO POR TROCA (INSTANTÂNEA, SEM OVERLAY / SEM SOM) =====
+        # ===== REDE DE SEGURANÇA: GARANTE O HELD_ITEM =====
+        expected_item_id = pokemon_data.get("held_item")
+        if expected_item_id and not new_pokemon.held_item:
+            try:
+                from src.data.item_bag_catalog import item_bag_catalog
+                item_data = item_bag_catalog.get_item(expected_item_id)
+                if item_data:
+                    new_pokemon.held_item = expected_item_id
+                    new_pokemon.held_item_data = item_data
+                    print(f"[TRADE] Fallback: held_item '{expected_item_id}' restaurado em {new_pokemon.name}")
+                else:
+                    print(f"[TRADE] AVISO: item '{expected_item_id}' não está no catálogo do receptor")
+            except Exception as e:
+                print(f"[TRADE] Erro no fallback de held_item: {e}")
+
         new_pokemon = self._check_and_evolve_trade(new_pokemon)
 
         if len(self.game.player.team) < 6:
@@ -738,11 +750,11 @@ class TradeScene(BaseScene):
 
         self.game.player.caught_pokemon.add(new_pokemon.id)
         self.game.player.register_seen(new_pokemon.id)
-
         self.game.player._pokemon_cache[new_pokemon.unique_id] = new_pokemon
         self.game.player.auto_save()
 
-        print(f"[TRADE] Pokémon recebido: {new_pokemon.name}")
+        print(f"[TRADE] Pokémon recebido: {new_pokemon.name} "
+              f"(item: {new_pokemon.held_item or 'nenhum'})")
 
     def _check_and_evolve_trade(self, pokemon):
         """
@@ -1182,13 +1194,20 @@ class TradeScene(BaseScene):
 
     def _select_pokemon(self, idx):
         entry = self.my_pokemon[idx]
-        self.my_offer = entry.to_dict()
+
+        # ===== SINCRONIZA held_item COM O CACHE (evita dado velho da box) =====
+        data = entry.to_dict()
+        cached = self.game.player._pokemon_cache.get(entry.unique_id)
+        if cached is not None:
+            data["held_item"] = getattr(cached, "held_item", None)
+
+        self.my_offer = data
         self.my_offer_pokemon = entry
 
         my_uuid = (
-            getattr(self.game.player, 'uuid', None)
-            or getattr(self.network, 'my_uuid', None)
-            or "unknown"
+                getattr(self.game.player, 'uuid', None)
+                or getattr(self.network, 'my_uuid', None)
+                or "unknown"
         )
         self.network.send_to_all(create_message(
             "TRADE_OFFER",

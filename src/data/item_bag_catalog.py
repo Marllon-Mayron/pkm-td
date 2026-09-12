@@ -632,7 +632,7 @@ class ItemBagCatalog:
                 "effect": None,
                 "effect_value": None,
                 "price": price,
-                "not_for_sale": True,  # ← fora da loja, mas revendível
+                "not_for_sale": True,
                 "unlock_phase": None,
                 "unlock_chapter": None,
             }

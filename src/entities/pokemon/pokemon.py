@@ -1911,11 +1911,26 @@ class Pokemon(Entity):
             try:
                 from src.data.item_bag_catalog import item_bag_catalog
                 item_data = item_bag_catalog.get_item(held_item_id)
-                if item_data and item_data.get("id") == held_item_id:
-                    pokemon.held_item = held_item_id
-                    pokemon.held_item_data = item_data
-                    print(f"[POKEMON] {pokemon.name} restaurado com item: {held_item_id}")
+
+                if item_data:
+                    canonical_id = item_data.get("id", held_item_id)
+
+                    def _norm(s):
+                        if not s:
+                            return ""
+                        return str(s).lower().replace("-", "").replace("_", "").replace(" ", "")
+
+                    if _norm(canonical_id) == _norm(held_item_id):
+                        pokemon.held_item = canonical_id
+                        pokemon.held_item_data = item_data
+                        print(f"[POKEMON] {pokemon.name} restaurado com item: {canonical_id}")
+                    else:
+                        # IDs divergem por formato (hífen vs underscore) — PRESERVA o item
+                        print(f"[POKEMON] AVISO: '{held_item_id}' != catálogo '{canonical_id}' — mantendo mesmo assim")
+                        pokemon.held_item = held_item_id
+                        pokemon.held_item_data = item_data
                 else:
+                    print(f"[POKEMON] AVISO: item '{held_item_id}' não existe no catálogo para {pokemon.name}")
                     pokemon.held_item = None
                     pokemon.held_item_data = None
             except Exception as e:

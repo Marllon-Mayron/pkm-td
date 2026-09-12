@@ -46,7 +46,7 @@ class NetworkManager:
 
         # False (padrão): não permite duas conexões do mesmo IP.
         # True: útil apenas para TESTES locais na mesma máquina.
-        self.allow_same_ip_players = True
+        self.allow_same_ip_players = False
 
         self.local_ip = self._detect_local_ip()
         self.remote_ips = []
