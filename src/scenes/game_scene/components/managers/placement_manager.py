@@ -1,5 +1,5 @@
 # src/scenes/game_scene/components/managers/placement_manager.py
-import pygame
+import pygame, random
 
 from src.ui.toast_renderer import toast_warning
 
@@ -11,6 +11,8 @@ class PlacementManager:
         self.game = game
         self.placed_pokemon = []  # Lista de Pokémon no mapa
         self.tile_size = 24
+        # ===== NOVO: flag de celebração de vitória =====
+        self._victory_celebration_active = False
 
     def _check_combination_evolution_on_placement(self, pokemon, spot):
         """
@@ -141,6 +143,65 @@ class PlacementManager:
                 return pokemon
         return None
 
+    # =========================================================
+    # NOVO: CELEBRAÇÃO DE VITÓRIA
+    # =========================================================
+    def start_victory_celebration(self):
+        """
+        Inicia a animação de comemoração (hop) para todos os Pokémon vivos
+        que estão colocados no mapa e possuem a animação 'hop'.
+        Cada Pokémon começa com um pequeno delay aleatório para não pular tudo junto.
+        """
+        if self._victory_celebration_active:
+            print("[VICTORY] Celebração já está ativa, ignorando chamada duplicada.")
+            return
+
+        self._victory_celebration_active = True
+        celebrating_count = 0
+
+        for pokemon in self.placed_pokemon:
+            if not pokemon.is_alive() or pokemon.is_defeated:
+                continue
+
+            # Delay aleatório entre 0.0 e 1.2 segundos
+            delay = random.uniform(0.0, 1.2)
+
+            if pokemon.celebrate_victory(delay=delay):
+                celebrating_count += 1
+
+        if celebrating_count > 0:
+            print(f"[VICTORY] {celebrating_count} Pokémon vão comemorar (com delay escalonado)!")
+        else:
+            print("[VICTORY] Nenhum Pokémon possui a animação 'hop' disponível.")
+
+    def stop_victory_celebration(self):
+        """Para a animação de comemoração de todos os Pokémon."""
+        if not self._victory_celebration_active:
+            return
+
+        self._victory_celebration_active = False
+
+        for pokemon in self.placed_pokemon:
+            pokemon.stop_celebrating()
+
+        print("[VICTORY] Celebração encerrada.")
+
+    def is_celebrating(self) -> bool:
+        """Retorna True se a celebração de vitória está ativa."""
+        return self._victory_celebration_active
+
+    def update_animations_only(self, dt):
+        """
+        Atualiza APENAS as animações dos Pokémon, sem lógica de combate.
+        Usado quando o gameplay está pausado mas queremos animações (ex: vitória).
+        """
+        for pokemon in self.placed_pokemon:
+            pokemon.update(dt, enemies=None)
+
+    # =========================================================
+    # FIM NOVO
+    # =========================================================
+
     def remove_pokemon_by_right_click(self, world_x, world_y, tolerance=20):
         """Remove o Pokémon na posição do mundo (para clique direito)"""
         if (hasattr(self.game, 'chapter_id') and hasattr(self.game, 'phase_number') and
@@ -222,11 +283,28 @@ class PlacementManager:
 
     def update(self, dt, enemies):
         """Atualiza todos os Pokémon colocados"""
-        for pokemon in self.placed_pokemon:
-            # SEMPRE atualiza o Pokémon (animação continua mesmo se morto)
-            pokemon.update(dt, enemies=enemies)
+        # ===== MODO CELEBRAÇÃO: Pokémon terminam ações pendentes mas não engajam novas =====
+        if self._victory_celebration_active:
+            for pokemon in self.placed_pokemon:
+                # Atualiza animação e lógica básica (sempre)
+                pokemon.update(dt, enemies=None)
 
-            # SISTEMA DE COMBATE SÓ PARA VIVOS
+                # Permite que Pokémon terminem ações pendentes (retorno/ataque em andamento)
+                # mas NÃO inicia novas buscas de alvo
+                if pokemon.is_alive():
+                    # Se está retornando ao spot, continua
+                    if getattr(pokemon, 'combat_state', None) == "returning":
+                        pokemon.update_combat(dt, [])  # sem inimigos, só termina o retorno
+                    # Se está no meio de um ataque (animação ativa), continua
+                    elif hasattr(pokemon, '_attack_animation_active') and pokemon._attack_animation_active:
+                        # A animação de ataque está sendo processada dentro de animation.update
+                        # (mas o hop tem prioridade 0, então na verdade ele já foi interrompido)
+                        pass
+            return
+
+        # ===== MODO NORMAL =====
+        for pokemon in self.placed_pokemon:
+            pokemon.update(dt, enemies=enemies)
             if pokemon.is_alive():
                 pokemon.update_combat(dt, enemies)
 
@@ -264,6 +342,10 @@ class PlacementManager:
 
     def clear(self):
         """Remove todos os Pokémon do mapa"""
+        # Para celebração se estiver ativa
+        if self._victory_celebration_active:
+            self.stop_victory_celebration()
+
         for pokemon in self.placed_pokemon:
             # Libera os spots usando coordenadas de tile
             if hasattr(pokemon, 'placed_tile_x') and hasattr(pokemon, 'placed_tile_y'):

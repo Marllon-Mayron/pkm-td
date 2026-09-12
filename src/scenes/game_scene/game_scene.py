@@ -1343,7 +1343,6 @@ class GameScene(BaseScene):
         """Callback para evolução via drag - chama o processador principal"""
         self._process_evolution_drag(evolution_result)
 
-
     def _on_pokemon_placed(self, placement_data):
         """Callback quando um Pokémon é colocado no mapa OU movido"""
         action = placement_data.get('action', 'place')
@@ -1438,6 +1437,8 @@ class GameScene(BaseScene):
         """Limpa o estado da fase antes de sair - INCLUI RESET DOS DITTOS"""
         # ===== PARA TODOS OS SONS (substitui _stop_battle_music) =====
         self._stop_all_sounds(fade_ms=1000)
+
+        self.placement_manager.stop_victory_celebration()
 
         # ===== LIMPA DIA/NOITE E CLIMA =====
         self.day_night_filter.clear()
@@ -1829,7 +1830,7 @@ class GameScene(BaseScene):
         # ===== GUARDA O DT PARA USO NO RENDER (partículas de clima) =====
         self._last_dt = dt
 
-        # ===== OVERLAYS =====
+        # ===== OVERLAYS PRIORITÁRIOS =====
         perf_monitor.start_section("OVERLAYS")
 
         if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
@@ -1850,7 +1851,48 @@ class GameScene(BaseScene):
             perf_monitor.end_frame()
             return
 
+        # ===== PHASE_COMPLETE: atualização PARCIAL (sem wave/transições/game over) =====
         if self.overlay_manager.is_active:
+            is_phase_complete = (
+                    hasattr(self.overlay_manager, 'current_type') and
+                    self.overlay_manager.current_type == OverlayType.PHASE_COMPLETE
+            )
+
+            if is_phase_complete:
+                # ---- Roda o overlay ----
+                self.overlay_manager.update(dt)
+
+                # ---- Battle System (projéteis, efeitos visuais, partículas) ----
+                if hasattr(self, 'battle_system') and self.battle_system:
+                    self.battle_system.update(dt)
+
+                # ---- Dia/Noite e clima continuam animando ----
+                if hasattr(self, 'day_night_weather'):
+                    self.day_night_weather.update(dt)
+
+                # ---- Effect Manager (partículas de status visuais) ----
+                if hasattr(self, 'battle_system') and self.battle_system:
+                    self.battle_system.effect_manager.update(dt)
+
+                # ---- Notification manager (toasts continuam) ----
+                self.notification_manager.update(dt)
+
+                # ---- Atualiza APENAS as animações dos Pokémon colocados ----
+                # (o modo celebração interna faz pokemon.update sem combate novo,
+                #  mas mantém retorno/ataque em andamento se configurado no manager)
+                self.placement_manager.update(dt, [])
+
+                # ---- Bag/Team renderers (para animações de UI) ----
+                if self.item_bag_renderer:
+                    self.item_bag_renderer.update(dt)
+                if self.team_manager:
+                    self.team_manager.update(dt)
+
+                perf_monitor.end_section()
+                perf_monitor.end_frame()
+                return
+
+            # ---- Outros overlays (PAUSE, GAME_OVER, CAPTURE): congelam tudo ----
             self.overlay_manager.update(dt)
             perf_monitor.end_section()
             perf_monitor.end_frame()
@@ -1926,11 +1968,9 @@ class GameScene(BaseScene):
             ach_mgr = self.player.achievement_manager
             phase_id = f"{self.chapter_id}-{self.phase_number}"
 
-            # Verifica conquista de felicidade máxima do time
             if not ach_mgr.is_unlocked("full_team_max_happiness"):
                 ach_mgr.check_and_unlock("full_team_max_happiness", phase_id)
 
-            # Verifica se algum Pokémon alcançou 100 de felicidade
             if not ach_mgr.is_unlocked("max_happiness"):
                 ach_mgr.check_and_unlock("max_happiness", phase_id)
 
@@ -1941,11 +1981,10 @@ class GameScene(BaseScene):
             perf_monitor.end_section()
 
         self.notification_manager.update(dt)
-        # ===== GAME OVER CHECK - MODIFICADO =====
+
+        # ===== GAME OVER CHECK =====
         perf_monitor.start_section("GAME_OVER_CHECK")
-        # Verifica se o time inteiro foi derrotado
         team_defeated = self.is_team_defeated()
-        # Verifica se todos os itens foram roubados
         items_lost = target_mgr.items_protected <= 0
         perf_monitor.end_section()
 
@@ -1955,12 +1994,9 @@ class GameScene(BaseScene):
             self.game_state = "game_over"
             for pokemon in self.player.team:
                 pokemon.add_happiness(-5, "Fase perdida")
-            # ===== PASSA O MOTIVO CORRETO =====
             self.overlay_manager.show(OverlayType.GAME_OVER, reason="team_defeated")
-
             for pokemon in self.player.team:
                 pokemon.reset(self)
-
             perf_monitor.end_frame()
             return
 
@@ -1969,12 +2005,9 @@ class GameScene(BaseScene):
             self.game_state = "game_over"
             for pokemon in self.player.team:
                 pokemon.add_happiness(-5, "Fase perdida")
-            # ===== PASSA O MOTIVO CORRETO =====
             self.overlay_manager.show(OverlayType.GAME_OVER, reason="items_stolen")
-
             for pokemon in self.player.team:
                 pokemon.reset(self)
-
             perf_monitor.end_frame()
             return
 
@@ -1985,9 +2018,7 @@ class GameScene(BaseScene):
 
         # ===== TRANSIÇÕES DE ESTADO =====
         if self.game_state == "in_wave":
-            # Verifica se a wave está completamente finalizada
             if wave_mgr.is_wave_completely_finished():
-                # Verifica se ainda há gatilhos AFTER_BOSS_DEFEAT não processados
                 has_after_boss_pending = False
                 for trigger in self.event_manager.triggers:
                     if trigger.trigger_type == "after_boss_defeat":
@@ -1996,17 +2027,14 @@ class GameScene(BaseScene):
                             has_after_boss_pending = True
                             break
 
-                # Verifica se há eventos pendentes aguardando execução
                 has_pending_events = bool(self.event_processor.pending_events)
 
                 if has_after_boss_pending or has_pending_events:
-                    # Ainda há eventos a serem processados – aguarda
                     if has_after_boss_pending:
                         print("[GAME] Aguardando gatilho AFTER_BOSS_DEFEAT antes de completar fase")
                     if has_pending_events:
                         print(f"[GAME] Aguardando {len(self.event_processor.pending_events)} evento(s) pendente(s)")
                 else:
-                    # Tudo pronto – completa a fase
                     if target_mgr.items_protected > 0:
                         print("[GAME] Fase COMPLETA! Todos os inimigos foram derrotados e eventos processados!")
                         self.game_state = "completed"
@@ -2014,7 +2042,6 @@ class GameScene(BaseScene):
                     else:
                         print("[GAME] GAME OVER! Todos os itens foram roubados!")
                         self.game_state = "game_over"
-                        # ===== PASSA O MOTIVO CORRETO =====
                         self.overlay_manager.show(OverlayType.GAME_OVER, reason="items_stolen")
 
         perf_monitor.end_section()
@@ -2038,6 +2065,8 @@ class GameScene(BaseScene):
         # Adiciona felicidade aos Pokémon do time
         for pokemon in self.player.team:
             pokemon.add_happiness(5, "Fase completada")
+
+        self.placement_manager.start_victory_celebration()
 
         # ===== VERIFICA SE É GINÁSIO =====
         if (self.chapter_id, self.phase_number) in GYM_PHASES:

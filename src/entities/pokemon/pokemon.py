@@ -1002,6 +1002,33 @@ class Pokemon(Entity):
 
         print(f"[LOAD] {self.name} restaurado com {len(self.moves)} moves")
 
+    def celebrate_victory(self, delay: float = 0.0) -> bool:
+        """
+        Inicia a animação de comemoração (hop) quando a fase é completada.
+        Só funciona se o Pokémon estiver vivo e tiver a animação 'hop'.
+
+        Args:
+            delay: tempo em segundos antes de começar a pular
+
+        Returns:
+            True se a comemoração foi iniciada, False caso contrário.
+        """
+        if not self.is_alive() or self.is_defeated:
+            return False
+
+        if not getattr(self, 'is_placed', False):
+            return False
+
+        if hasattr(self, 'animation') and self.animation:
+            return self.animation.play_victory_hop(delay)
+
+        return False
+
+    def stop_celebrating(self):
+        """Para a animação de comemoração."""
+        if hasattr(self, 'animation') and self.animation:
+            self.animation.stop_victory_hop()
+
     def update(self, dt, player=None, enemies=None, items=None):
         """Update do Pokémon - DELEGA ANIMAÇÃO PARA animation.py"""
 

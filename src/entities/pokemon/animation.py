@@ -8,6 +8,8 @@ class PokemonAnimation:
     def __init__(self, pokemon):
         self.pokemon = pokemon
         self._available_animations = []  # Cache de animações disponíveis
+        self._victory_hop_active = False
+        self._victory_hop_delay_remaining = 0.0
 
     def load_sprites(self, pokemon_id, shiny):
         """Carrega sprites com cache e todas as animações disponíveis"""
@@ -76,29 +78,76 @@ class PokemonAnimation:
         MÉTODO PRINCIPAL - Atualiza animação baseada no estado do Pokémon.
         Deve ser chamado TODO FRAME, independente do estado (vivo/morto).
         """
-        # ===== PRIORIDADE 0: HURT ANIMATION (MAIOR PRIORIDADE) =====
+        # ===== PRIORIDADE 0: VICTORY HOP (COMEMORAÇÃO) =====
+        if getattr(self, '_victory_hop_active', False):
+            self._update_victory_hop(dt)
+            return
+
+        # ===== PRIORIDADE 1: HURT ANIMATION =====
         if hasattr(self.pokemon, '_hurt_animation_active') and self.pokemon._hurt_animation_active:
             self._update_hurt_animation_frame(dt)
             return
 
-        # ===== PRIORIDADE 1: DERROTADO =====
+        # ===== PRIORIDADE 2: DERROTADO =====
         if self.pokemon.is_defeated:
             self._update_defeated_animation(dt)
             return
 
-        # ===== PRIORIDADE 2: ANIMAÇÃO DE ATAQUE =====
+        # ===== PRIORIDADE 3: ANIMAÇÃO DE ATAQUE =====
         if hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active:
             self._update_attack_animation(dt)
             return
 
-        # ===== PRIORIDADE 3: STATUS EFFECTS =====
+        # ===== PRIORIDADE 4: STATUS EFFECTS =====
         status_anim = self._get_status_animation()
         if status_anim:
             self._update_status_animation(status_anim, dt)
             return
 
-        # ===== PRIORIDADE 4: ANIMAÇÃO NORMAL (IDLE/WALK) =====
+        # ===== PRIORIDADE 5: ANIMAÇÃO NORMAL (IDLE/WALK) =====
         self._update_normal_animation(dt)
+
+    def _update_victory_hop(self, dt):
+        """Atualiza a animação de comemoração (com delay opcional antes do loop)."""
+        # ===== FASE 1: AGUARDANDO DELAY =====
+        if self._victory_hop_delay_remaining > 0.0:
+            self._victory_hop_delay_remaining -= dt
+            if self._victory_hop_delay_remaining > 0.0:
+                # Ainda esperando — continua com a animação normal
+                self._update_normal_animation(dt)
+                return
+            # Delay acabou: inicia o hop agora
+            self._start_hop_animation()
+
+        # ===== FASE 2: LOOP DE HOP (FORÇADO) =====
+        if self.pokemon.current_animation != "hop":
+            self.set_animation("hop")
+            self.pokemon.current_frame = 0
+            self.pokemon.animation_timer = 0
+
+        # Avança o timer
+        self.pokemon.animation_timer += dt * 60
+
+        # Determina a duração do frame atual
+        frame_time = self.pokemon.animation_speed
+        if hasattr(self.pokemon, 'frame_durations') and self.pokemon.frame_durations:
+            current_frame = getattr(self.pokemon, 'current_frame', 0)
+            if 0 <= current_frame < len(self.pokemon.frame_durations):
+                frame_time = self.pokemon.frame_durations[current_frame]
+
+        # Avançou o suficiente?
+        if self.pokemon.animation_timer >= frame_time:
+            self.pokemon.animation_timer = 0
+            max_frames = self._get_current_animation_frame_count()
+
+            if max_frames > 0:
+                next_frame = self.pokemon.current_frame + 1
+                if next_frame >= max_frames:
+                    # ===== LOOP FORÇADO: volta para 0 =====
+                    next_frame = 0
+
+                self.pokemon.current_frame = next_frame
+                self._update_sprite_from_current_animation()
 
     # ===== MÉTODOS PRIVADOS DE ATUALIZAÇÃO =====
 
@@ -608,3 +657,61 @@ class PokemonAnimation:
             dy = abs(self.pokemon.y - self.pokemon.last_y)
             return (dx + dy) > 0.5
         return False
+
+    def play_victory_hop(self, delay: float = 0.0) -> bool:
+        """
+        Inicia a animação de comemoração (hop) quando a fase é completada.
+        Só funciona se o Pokémon tiver a animação 'hop' disponível.
+
+        Args:
+            delay: tempo em segundos antes de começar a pular (para escalonar)
+
+        Returns:
+            True se a animação foi iniciada, False caso contrário.
+        """
+        if not self.has_animation("hop"):
+            return False
+
+        # Salva a animação anterior para restaurar depois
+        if not hasattr(self.pokemon, '_saved_animation_before_victory'):
+            self.pokemon._saved_animation_before_victory = self.pokemon.current_animation
+
+        # Ativa o modo de celebração
+        self._victory_hop_active = True
+        self.pokemon._victory_hop_active = True
+        self._victory_hop_delay_remaining = max(0.0, delay)
+
+        if self._victory_hop_delay_remaining > 0.0:
+            # Aguarda o delay antes de tocar o hop — continua na animação atual
+            print(f"[VICTORY] {self.pokemon.name} vai comemorar em {delay:.2f}s...")
+            return True
+
+        # Sem delay: começa imediatamente
+        self._start_hop_animation()
+        return True
+
+    def _start_hop_animation(self):
+        """Inicia de fato a animação hop (chamado após o delay)."""
+        self.set_animation("hop")
+        self.pokemon.current_frame = 0
+        self.pokemon.animation_timer = 0
+        print(f"[VICTORY] {self.pokemon.name} iniciou animação de comemoração (hop)!")
+
+    def stop_victory_hop(self):
+        """Para a animação de comemoração e restaura o estado normal."""
+        if not self._victory_hop_active:
+            return
+
+        self._victory_hop_active = False
+        self.pokemon._victory_hop_active = False
+        self._victory_hop_delay_remaining = 0.0
+
+        # Restaura a animação anterior
+        if hasattr(self.pokemon, '_saved_animation_before_victory'):
+            saved = self.pokemon._saved_animation_before_victory
+            delattr(self.pokemon, '_saved_animation_before_victory')
+            self.set_animation(saved)
+        elif self.has_animation("idle"):
+            self.set_animation("idle")
+
+        print(f"[VICTORY] {self.pokemon.name} parou a comemoração.")
