@@ -8,7 +8,6 @@ def get_project_root():
     """Retorna o caminho raiz do projeto corretamente (desenvolvimento ou executável)"""
     if getattr(sys, 'frozen', False):
         # Rodando como executável PyInstaller
-        # sys._MEIPASS já é um Path? Não, é string, mas vamos converter
         return Path(sys._MEIPASS)
     else:
         # Rodando como script Python normal
@@ -42,7 +41,7 @@ DATA_PATH = PROJECT_ROOT / "src" / "data"
 SCRIPTS_PATH = DATA_PATH / "scripts"
 POKEMON_JSON_PATH = SCRIPTS_PATH / "pokemon_completo.json"
 
-# Convertendo para string quando necessário (apenas para compatibilidade)
+# Convertendo para string quando necessário
 PROJECT_ROOT_STR = str(PROJECT_ROOT)
 RES_PATH_STR = str(RES_PATH)
 ALL_TILES_PATH_STR = str(ALL_TILES_PATH)

@@ -910,6 +910,8 @@ class SettingsScene(BaseScene):
             ("ESC", "Voltar / Fechar menus"),
             ("TAB", "Alternar categorias da Bolsa"),
             ("F1", "Ativar / Desativar debug"),
+            ("C", "Abrir / Fechar a Camera"),
+            ("SPACE", "Tirar foto (com a Camera aberta)"),
             ("U", "Desbloquear proxima fase (debug)"),
             ("A", "Desbloquear todas as fases (debug)"),
             ("CTRL+R", "Resetar progresso (debug)"),

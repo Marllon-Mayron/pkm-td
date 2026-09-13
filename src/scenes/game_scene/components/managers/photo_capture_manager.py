@@ -4,13 +4,40 @@ Gerencia a captura de fotos do jogo.
 - Captura apenas o mundo (pokémons + cenário + clima + dia/noite)
 - SEM UI
 - Salva em res/PokemonSprites/screenshots/player_screenshots/
+- Suporta formatos: RETANGULAR, QUADRADO, CIRCULO
 """
 import pygame
 import os
+import math
 from datetime import datetime
 from pathlib import Path
 
 from src.config.paths import SPRITES_PATH
+
+
+class PhotoFormat:
+    """Formatos disponíveis para a foto."""
+    RECTANGULAR = "rectangular"
+    QUADRADO = "quadrado"
+    CIRCULO = "circulo"
+
+    ALL = [RECTANGULAR, QUADRADO, CIRCULO]
+
+    @staticmethod
+    def get_display_name(fmt: str) -> str:
+        return {
+            PhotoFormat.RECTANGULAR: "Retangular",
+            PhotoFormat.QUADRADO: "Quadrado",
+            PhotoFormat.CIRCULO: "Círculo",
+        }.get(fmt, "Retangular")
+
+    @staticmethod
+    def get_icon(fmt: str) -> str:
+        return {
+            PhotoFormat.RECTANGULAR: "▭",
+            PhotoFormat.QUADRADO: "◻",
+            PhotoFormat.CIRCULO: "◯",
+        }.get(fmt, "▭")
 
 
 class PhotoCaptureManager:
@@ -32,11 +59,32 @@ class PhotoCaptureManager:
             "height": 0.50,   # 50% da altura
         }
 
+        # ===== FORMATO DA FOTO =====
+        self.photo_format = PhotoFormat.RECTANGULAR
+
         # Cooldown para evitar spam
         self._last_capture_time = 0.0
         self._capture_cooldown = 0.3  # segundos
 
         print(f"[PHOTO] Pasta de destino: {self.output_dir}")
+        print(f"[PHOTO] Formato inicial: {PhotoFormat.get_display_name(self.photo_format)}")
+
+    # ------------------------------------------------------------------
+    # FORMATO
+    # ------------------------------------------------------------------
+    def cycle_format(self):
+        """Alterna entre os formatos disponíveis."""
+        idx = PhotoFormat.ALL.index(self.photo_format)
+        idx = (idx + 1) % len(PhotoFormat.ALL)
+        self.photo_format = PhotoFormat.ALL[idx]
+        print(f"[PHOTO] Formato alterado para: {PhotoFormat.get_display_name(self.photo_format)}")
+        return self.photo_format
+
+    def set_format(self, fmt: str):
+        """Define um formato específico."""
+        if fmt in PhotoFormat.ALL:
+            self.photo_format = fmt
+            print(f"[PHOTO] Formato definido: {PhotoFormat.get_display_name(fmt)}")
 
     # ------------------------------------------------------------------
     # CONFIGURAÇÃO DA ÁREA
@@ -70,18 +118,55 @@ class PhotoCaptureManager:
         }
 
     def get_capture_rect_screen(self) -> pygame.Rect:
-        """Retorna o rect da área de captura em coordenadas de tela."""
+        """
+        Retorna o rect da área de captura em coordenadas de tela.
+
+        IMPORTANTE: em formato QUADRADO/CIRCULO, força o rect a ter
+        width_px == height_px. Sem isso, como a viewport é retangular
+        (ex: 1280x720), uma área de 50% x 50% viraria 640x360 px.
+        """
         sm = self.game_scene.screen_manager
         vx, vy = sm.viewport_x, sm.viewport_y
         vw, vh = sm.viewport_width, sm.viewport_height
 
         a = self.capture_area
-        return pygame.Rect(
-            int(vx + a["x"] * vw),
-            int(vy + a["y"] * vh),
-            int(a["width"] * vw),
-            int(a["height"] * vh),
-        )
+
+        if self.photo_format in (PhotoFormat.QUADRADO, PhotoFormat.CIRCULO):
+            # ===== FORÇA QUADRADO EM PIXELS =====
+            # Pega o menor lado em pixels para garantir que caiba
+            w_px = int(a["width"] * vw)
+            h_px = int(a["height"] * vh)
+            size_px = min(w_px, h_px)
+
+            # Centro em pixels
+            center_x_px = int(vx + (a["x"] + a["width"] / 2) * vw)
+            center_y_px = int(vy + (a["y"] + a["height"] / 2) * vh)
+
+            rect = pygame.Rect(
+                center_x_px - size_px // 2,
+                center_y_px - size_px // 2,
+                size_px, size_px,
+            )
+
+            # Clamp dentro da viewport
+            if rect.left < vx:
+                rect.x = vx
+            if rect.top < vy:
+                rect.y = vy
+            if rect.right > vx + vw:
+                rect.x = vx + vw - rect.width
+            if rect.bottom > vy + vh:
+                rect.y = vy + vh - rect.height
+
+            return rect
+        else:
+            # Retangular: comportamento normal
+            return pygame.Rect(
+                int(vx + a["x"] * vw),
+                int(vy + a["y"] * vh),
+                int(a["width"] * vw),
+                int(a["height"] * vh),
+            )
 
     # ------------------------------------------------------------------
     # CAPTURA
@@ -121,8 +206,46 @@ class PhotoCaptureManager:
             traceback.print_exc()
             return None
 
+        # ===== APLICA MÁSCARA CIRCULAR SE FOR O FORMATO CÍRCULO =====
+        if self.photo_format == PhotoFormat.CIRCULO:
+            clean_surface = self._apply_circle_mask(clean_surface)
+
         # Salva o arquivo
         return self._save_surface(clean_surface)
+
+    def _apply_circle_mask(self, surface: pygame.Surface) -> pygame.Surface:
+        """
+        Aplica uma máscara circular na superfície.
+        Os cantos ficam PRETOS OPACOS (não transparentes).
+        """
+        w, h = surface.get_size()
+        center = (w // 2, h // 2)
+        radius = min(w, h) // 2
+
+        # Cria superfície com fundo PRETO OPACO
+        circle_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        circle_surf.fill((0, 0, 0, 255))  # preto opaco
+
+        # Recorta a imagem original para o círculo
+        # Usa uma máscara temporária para extrair só o círculo
+        temp = pygame.Surface((w, h), pygame.SRCALPHA)
+        temp.fill((0, 0, 0, 0))
+        temp.blit(surface, (0, 0))
+
+        # Aplica máscara circular na temp (alpha 255 dentro, 0 fora)
+        mask = pygame.Surface((w, h), pygame.SRCALPHA)
+        mask.fill((0, 0, 0, 0))
+        pygame.draw.circle(mask, (255, 255, 255, 255), center, radius)
+        # Suaviza a borda (anti-aliasing manual)
+        pygame.draw.circle(mask, (255, 255, 255, 200), center, radius - 1)
+        pygame.draw.circle(mask, (255, 255, 255, 120), center, radius - 2)
+
+        temp.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+
+        # Cola a imagem circular (com alpha) sobre o fundo preto opaco
+        circle_surf.blit(temp, (0, 0))
+
+        return circle_surf
 
     def _render_world_only(self, target_surface: pygame.Surface, capture_rect: pygame.Rect):
         """
@@ -176,10 +299,6 @@ class PhotoCaptureManager:
 
         # ---- Inimigos (SEM nome, SEM HP bar) ----
         for enemy in gs.wave_manager.active_enemies:
-            # show_hp=False para não desenhar a barra de vida
-            # _render_wild_text é chamado dentro de enemy.render() apenas se show_debug
-            # ou se chamado explicitamente. Para garantir que o nome NÃO apareça,
-            # vamos renderizar apenas o sprite via _prepare_sprite + _render_sprite.
             self._render_pokemon_sprite_only(full_surface, enemy, camera, sm)
 
         # ---- Pokémons colocados (SEM nome, SEM HP bar) ----
@@ -207,7 +326,6 @@ class PhotoCaptureManager:
                     dt=getattr(gs, '_last_dt', 0.0),
                 )
             else:
-                # Garante que o sistema de partículas é parado quando o clima acaba
                 gs.weather_filter.render(
                     full_surface, None, viewport_rect_local,
                     dt=getattr(gs, '_last_dt', 0.0),
@@ -229,13 +347,10 @@ class PhotoCaptureManager:
     def _render_pokemon_sprite_only(self, surface, pokemon, camera, screen_manager):
         """
         Renderiza APENAS o sprite do pokémon (sem nome, sem HP bar),
-        mas MANTÉM os efeitos de status visuais (textos flutuantes,
-        modificadores de stat, indicadores de status).
+        mas MANTÉM os efeitos de status visuais.
         """
-        # Salva a referência da câmera (alguns métodos internos usam self.camera)
         pokemon.camera = camera
 
-        # Calcula posição na tela
         if camera and hasattr(pokemon, 'screen_manager') and pokemon.screen_manager:
             screen_x, screen_y = screen_manager.world_to_screen(pokemon.x, pokemon.y, camera)
             zoom_scale = camera.zoom * screen_manager.render_scale
@@ -244,7 +359,6 @@ class PhotoCaptureManager:
             screen_y = pokemon.y
             zoom_scale = 1.0
 
-        # Prepara e renderiza o sprite
         sprite_to_render = pokemon._prepare_sprite(zoom_scale)
         sprite_rect = None
 
@@ -273,12 +387,6 @@ class PhotoCaptureManager:
                 surface, pokemon, sprite_rect, zoom_scale, _FONT_CACHE
             )
 
-        # NÃO renderiza:
-        # - pokemon._render_wild_text()      ← nome + nível do selvagem
-        # - pokemon._render_hp_bar()          ← barra de vida
-        # - pokemon._render_miss_text()       ← texto de MISS
-        # - pokemon._render_debug()           ← informações de debug
-
     # ------------------------------------------------------------------
     # SALVAMENTO
     # ------------------------------------------------------------------
@@ -286,7 +394,8 @@ class PhotoCaptureManager:
         """Salva a superfície como PNG com timestamp."""
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-            filename = f"photo_{timestamp}.png"
+            fmt_suffix = f"_{self.photo_format}" if self.photo_format != PhotoFormat.RECTANGULAR else ""
+            filename = f"photo_{timestamp}{fmt_suffix}.png"
             filepath = self.output_dir / filename
 
             pygame.image.save(surface, str(filepath))

@@ -14,8 +14,14 @@ src/saves/*.json
 # IntelliJ IDEA
 .idea/
 
-
+# Build
 build
 dist
 saves
 *.spec
+
+# Screenshots do jogador (fotos tiradas in-game)
+res/PokemonSprites/screenshots/player_screenshots/
+
+# Configuracao de UI do jogador
+src/config/ui_config.json

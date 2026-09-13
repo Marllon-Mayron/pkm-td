@@ -10,8 +10,8 @@ class AchievementRarity(Enum):
     COMMON = "comum"
     UNCOMMON = "incomum"
     RARE = "raro"
-    EPIC = "epico"
-    LEGENDARY = "lendaria"
+    EPIC = "épico"
+    LEGENDARY = "lendária"
 
     @property
     def color(self) -> tuple:
@@ -19,8 +19,8 @@ class AchievementRarity(Enum):
             "comum": (150, 150, 150),
             "incomum": (100, 200, 100),
             "raro": (100, 150, 255),
-            "epico": (200, 100, 255),
-            "lendaria": (255, 215, 0)
+            "épico": (200, 100, 255),
+            "lendária": (255, 215, 0)
         }
         return colors.get(self.value, (150, 150, 150))
 
@@ -30,8 +30,8 @@ class AchievementRarity(Enum):
             "comum": "Comum",
             "incomum": "Incomum",
             "raro": "Raro",
-            "epico": "Epico",
-            "lendaria": "Lendaria"
+            "épico": "Épico",
+            "lendária": "Lendária"
         }
         return names.get(self.value, "Comum")
 

@@ -337,7 +337,7 @@ class PhaseSelectScene(BaseScene):
         self.pokedex_button_rect = None
         self.achievement_button_rect = None
         self.incubator_button_rect = None
-
+        self.profile_button_rect = None
         # Hover states
         self.back_button_hovered = False
         self.shop_button_hovered = False
@@ -345,7 +345,7 @@ class PhaseSelectScene(BaseScene):
         self.pokedex_button_hovered = False
         self.achievement_button_hovered = False
         self.incubator_button_hovered = False
-
+        self.profile_button_hovered = False
         # Scroll
         self.scroll_y = 0
         self.scroll_target = 0
@@ -448,13 +448,13 @@ class PhaseSelectScene(BaseScene):
         button_height = int(vh * 0.055)
         button_spacing = int(vw * 0.012)
 
-        # 5 botoes: Loja, Minigames, Pokedex, Conquistas, Incubadora
-        total_width = button_width * 5 + button_spacing * 4
+        # 6 botoes: Loja, Minigames, Pokedex, Conquistas, Incubadora, Perfil
+        total_width = button_width * 6 + button_spacing * 5
         start_x = vx + (vw - total_width) // 2
         bottom_y = vy + vh - button_height - int(vh * 0.06)
 
         self.shop_button_rect = pygame.Rect(start_x, bottom_y, button_width, button_height)
-        self.minigame_button_rect = pygame.Rect(start_x + button_width + button_spacing, bottom_y, button_width,
+        self.minigame_button_rect = pygame.Rect(start_x + (button_width + button_spacing), bottom_y, button_width,
                                                 button_height)
         self.pokedex_button_rect = pygame.Rect(start_x + (button_width + button_spacing) * 2, bottom_y, button_width,
                                                button_height)
@@ -462,6 +462,8 @@ class PhaseSelectScene(BaseScene):
                                                    button_width, button_height)
         self.incubator_button_rect = pygame.Rect(start_x + (button_width + button_spacing) * 4, bottom_y, button_width,
                                                  button_height)
+        self.profile_button_rect = pygame.Rect(start_x + (button_width + button_spacing) * 5, bottom_y, button_width,
+                                               button_height)
 
         # ===== ABAS =====
         if self.available_chapters:
@@ -588,6 +590,8 @@ class PhaseSelectScene(BaseScene):
                 self._open_achievements()
             elif event.key == pygame.K_i:
                 self._open_incubator()
+            elif event.key == pygame.K_v:
+                self._open_profile()
 
         # Redimensionamento
         elif event.type == pygame.VIDEORESIZE:
@@ -631,6 +635,7 @@ class PhaseSelectScene(BaseScene):
             pos) if self.achievement_button_rect else False
         self.incubator_button_hovered = self.incubator_button_rect.collidepoint(
             pos) if self.incubator_button_rect else False
+        self.profile_button_hovered = self.profile_button_rect.collidepoint(pos) if self.profile_button_rect else False
 
     def _handle_click(self, pos):
         """Processa cliques"""
@@ -664,6 +669,10 @@ class PhaseSelectScene(BaseScene):
             else:
                 sound_manager.play_effect(SoundEffect.CLICK)
                 print("Incubadora desbloqueada apos completar a fase 1-5!")
+            return
+
+        if self.profile_button_rect and self.profile_button_rect.collidepoint(pos):
+            self._open_profile()
             return
 
         # Abas
@@ -758,6 +767,13 @@ class PhaseSelectScene(BaseScene):
         sound_manager.play_effect(SoundEffect.CLICK)
         self.game.incubator_scene = IncubatorScene(self.game)
         self.game.current_scene = self.game.incubator_scene
+
+    def _open_profile(self):
+        """Abre a tela de perfil do jogador"""
+        sound_manager.play_effect(SoundEffect.CLICK)
+        from src.scenes.profile_scene.profile_scene import ProfileScene
+        sound_manager.stop_music(fade_ms=300)
+        self.game.current_scene = ProfileScene(self.game, return_scene="phase_select")
 
     def _on_shop_closed(self):
         self.layout_initialized = False
@@ -907,9 +923,8 @@ class PhaseSelectScene(BaseScene):
         self._render_bottom_button(screen, self.minigame_button_rect, "MINIGAMES", self.minigame_button_hovered)
         self._render_bottom_button(screen, self.pokedex_button_rect, "POKEDEX", self.pokedex_button_hovered)
         self._render_bottom_button(screen, self.achievement_button_rect, "CONQUISTAS", self.achievement_button_hovered)
-        self._render_bottom_button(screen, self.incubator_button_rect, "INCUBADORA", self.incubator_button_hovered,
-                                   not self._is_incubator_unlocked())
-
+        self._render_bottom_button(screen, self.incubator_button_rect, "INCUBADORA", self.incubator_button_hovered, not self._is_incubator_unlocked())
+        self._render_bottom_button(screen, self.profile_button_rect, "PERFIL", self.profile_button_hovered)
         # ===== ABAS =====
         for tab in self.chapter_tabs:
             tab.render(screen, self.tab_font)

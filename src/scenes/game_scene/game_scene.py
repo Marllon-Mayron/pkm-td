@@ -1727,6 +1727,25 @@ class GameScene(BaseScene):
                 self.show_debug = not self.show_debug
                 self._update_perf_monitor()
                 return None
+            elif event.key == pygame.K_c:
+                # Abre/fecha a câmera (toggle minimizar/maximizar)
+                if hasattr(self, 'camera_renderer') and self.camera_renderer:
+                    self.camera_renderer.minimized = not self.camera_renderer.minimized
+                    if not self.camera_renderer.minimized:
+                        self.camera_renderer._set_slider_from_area()
+                    # Toca som de clique
+                    try:
+                        from src.managers.sounds.sound_manager import sound_manager, SoundEffect
+                        sound_manager.play_effect(SoundEffect.CLICK)
+                    except Exception:
+                        pass
+                return None
+            elif event.key == pygame.K_SPACE:
+                # Tira foto (se a câmera estiver visível)
+                if hasattr(self, 'camera_renderer') and self.camera_renderer:
+                    if self.camera_renderer.visible:
+                        self.camera_renderer._do_capture()
+                return None
 
         # ===== MOUSE WHEEL =====
         if event.type == pygame.MOUSEWHEEL:
