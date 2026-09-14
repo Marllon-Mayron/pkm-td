@@ -4,7 +4,7 @@ Gerencia a captura de fotos do jogo.
 - Captura apenas o mundo (pokémons + cenário + clima + dia/noite)
 - SEM UI
 - Salva em res/PokemonSprites/screenshots/player_screenshots/
-- Suporta formatos: RETANGULAR, QUADRADO, CIRCULO
+- Suporta formatos: RETANGULAR, QUADRADO, CIRCULO, CELULAR
 """
 import pygame
 import os
@@ -20,8 +20,9 @@ class PhotoFormat:
     RECTANGULAR = "rectangular"
     QUADRADO = "quadrado"
     CIRCULO = "circulo"
+    CELULAR = "celular"  # NOVO
 
-    ALL = [RECTANGULAR, QUADRADO, CIRCULO]
+    ALL = [RECTANGULAR, QUADRADO, CIRCULO, CELULAR]  # Adicionado CELULAR
 
     @staticmethod
     def get_display_name(fmt: str) -> str:
@@ -29,6 +30,7 @@ class PhotoFormat:
             PhotoFormat.RECTANGULAR: "Retangular",
             PhotoFormat.QUADRADO: "Quadrado",
             PhotoFormat.CIRCULO: "Círculo",
+            PhotoFormat.CELULAR: "Celular",  # NOVO
         }.get(fmt, "Retangular")
 
     @staticmethod
@@ -37,11 +39,16 @@ class PhotoFormat:
             PhotoFormat.RECTANGULAR: "▭",
             PhotoFormat.QUADRADO: "◻",
             PhotoFormat.CIRCULO: "◯",
+            PhotoFormat.CELULAR: "▯",  # NOVO
         }.get(fmt, "▭")
 
 
 class PhotoCaptureManager:
     """Captura screenshots limpas (sem UI) da cena do jogo."""
+
+    # ===== ASPECT RATIO DO FORMATO CELULAR (9:16 retrato) =====
+    CELULAR_ASPECT_W = 9
+    CELULAR_ASPECT_H = 16
 
     def __init__(self, game_scene):
         self.game_scene = game_scene
@@ -121,9 +128,9 @@ class PhotoCaptureManager:
         """
         Retorna o rect da área de captura em coordenadas de tela.
 
-        IMPORTANTE: em formato QUADRADO/CIRCULO, força o rect a ter
-        width_px == height_px. Sem isso, como a viewport é retangular
-        (ex: 1280x720), uma área de 50% x 50% viraria 640x360 px.
+        - QUADRADO/CIRCULO: força width_px == height_px
+        - CELULAR: força aspect ratio 9:16 (retrato)
+        - RECTANGULAR: comportamento normal
         """
         sm = self.game_scene.screen_manager
         vx, vy = sm.viewport_x, sm.viewport_y
@@ -131,6 +138,7 @@ class PhotoCaptureManager:
 
         a = self.capture_area
 
+        # ===== QUADRADO / CÍRCULO =====
         if self.photo_format in (PhotoFormat.QUADRADO, PhotoFormat.CIRCULO):
             # ===== FORÇA QUADRADO EM PIXELS =====
             # Pega o menor lado em pixels para garantir que caiba
@@ -159,6 +167,56 @@ class PhotoCaptureManager:
                 rect.y = vy + vh - rect.height
 
             return rect
+
+        # ===== CELULAR (9:16 retrato) =====
+        elif self.photo_format == PhotoFormat.CELULAR:
+            # Pega a área desejada em pixels
+            w_px = int(a["width"] * vw)
+            h_px = int(a["height"] * vh)
+
+            # Força aspect ratio 9:16
+            target_ratio = self.CELULAR_ASPECT_W / self.CELULAR_ASPECT_H  # 9/16 = 0.5625
+
+            # Tenta caber baseado na altura
+            new_h = h_px
+            new_w = int(new_h * target_ratio)
+
+            # Se ficou mais largo que o desejado, ajusta pela largura
+            if new_w > w_px:
+                new_w = w_px
+                new_h = int(new_w / target_ratio)
+
+            # Garante que não ultrapasse a viewport
+            if new_h > vh:
+                new_h = vh
+                new_w = int(new_h * target_ratio)
+            if new_w > vw:
+                new_w = vw
+                new_h = int(new_w / target_ratio)
+
+            # Centraliza baseado no centro da área de captura
+            center_x_px = int(vx + (a["x"] + a["width"] / 2) * vw)
+            center_y_px = int(vy + (a["y"] + a["height"] / 2) * vh)
+
+            rect = pygame.Rect(
+                center_x_px - new_w // 2,
+                center_y_px - new_h // 2,
+                new_w, new_h,
+            )
+
+            # Clamp dentro da viewport
+            if rect.left < vx:
+                rect.x = vx
+            if rect.top < vy:
+                rect.y = vy
+            if rect.right > vx + vw:
+                rect.x = vx + vw - rect.width
+            if rect.bottom > vy + vh:
+                rect.y = vy + vh - rect.height
+
+            return rect
+
+        # ===== RETANGULAR =====
         else:
             # Retangular: comportamento normal
             return pygame.Rect(
@@ -256,13 +314,13 @@ class PhotoCaptureManager:
         - Pokémons colocados (SEM nome, SEM HP bar)
         - Projéteis
         - Target items (pokémon)
-        - Efeitos de status (visuais)
         - Filtros de clima e dia/noite
 
         NÃO renderiza:
         - Spots de torre
         - Nome do pokémon (wild text)
         - Barras de HP
+        - Textos de batalha (status effects, buffs, debuffs)
         - UI do jogo (painel de fase)
         - Team manager
         - Item bag
@@ -346,8 +404,11 @@ class PhotoCaptureManager:
 
     def _render_pokemon_sprite_only(self, surface, pokemon, camera, screen_manager):
         """
-        Renderiza APENAS o sprite do pokémon (sem nome, sem HP bar),
-        mas MANTÉM os efeitos de status visuais.
+        Renderiza APENAS o sprite do pokémon (sem nome, sem HP bar)
+        e SEM os textos de batalha (status effects, buffs, debuffs).
+
+        A câmera captura uma imagem "limpa" do Pokémon, sem poluição
+        visual de combate.
         """
         pokemon.camera = camera
 
@@ -371,21 +432,13 @@ class PhotoCaptureManager:
                 surface, screen_x, screen_y, zoom_scale
             )
 
-        # ===== EFEITOS DE STATUS (MANTIDOS NA FOTO) =====
-        if (hasattr(pokemon, 'battle_system') and pokemon.battle_system
-                and pokemon.battle_system.effect_manager
-                and sprite_rect):
-            from src.entities.pokemon.pokemon import _FONT_CACHE
-
-            pokemon.battle_system.effect_manager.render_status_texts(
-                surface, pokemon, sprite_rect, zoom_scale, _FONT_CACHE
-            )
-            pokemon.battle_system.effect_manager.render_stat_modifiers(
-                surface, pokemon, sprite_rect, zoom_scale, _FONT_CACHE
-            )
-            pokemon.battle_system.effect_manager.render_status_indicators(
-                surface, pokemon, sprite_rect, zoom_scale, _FONT_CACHE
-            )
+        # ===== TEXTOS DE BATALHA REMOVIDOS DA FOTO =====
+        # Antes, renderizávamos aqui:
+        #   - render_status_texts      (ex: "Super efetivo!", "-15 HP", "Envenenado!")
+        #   - render_stat_modifiers    (ex: "Ataque +2", "Defesa -1")
+        #   - render_status_indicators (ícones de status acima do Pokémon)
+        #
+        # Agora a câmera captura apenas o sprite, deixando a foto limpa.
 
     # ------------------------------------------------------------------
     # SALVAMENTO
@@ -399,11 +452,11 @@ class PhotoCaptureManager:
             filepath = self.output_dir / filename
 
             pygame.image.save(surface, str(filepath))
-            print(f"[PHOTO] ✅ Foto salva: {filepath}")
+            print(f"[PHOTO] Foto salva: {filepath}")
             return str(filepath)
 
         except Exception as e:
-            print(f"[PHOTO] ❌ Erro ao salvar: {e}")
+            print(f"[PHOTO] Erro ao salvar: {e}")
             return None
 
     def get_last_photo_path(self) -> str | None:

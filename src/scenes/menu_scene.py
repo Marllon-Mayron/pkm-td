@@ -373,7 +373,7 @@ class MenuScene(BaseScene):
     # MODO DEBUG — mude para True para liberar ferramentas internas
     # (Editor de Fases). Em builds públicas, mantenha False.
     # =====================================================================
-    DEBUG_MODE = False
+    DEBUG_MODE = True
 
     def __init__(self, game):
         super().__init__(game)

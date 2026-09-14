@@ -3,9 +3,9 @@
 UI da câmera fotográfica - acoplada à bolsa (sempre em cima dela).
 
 Recursos:
-- Preview da área de captura (moldura adaptativa: retangular/quadrada/circular)
+- Preview da área de captura (moldura adaptativa: retangular/quadrada/circular/celular)
 - Botão de tirar foto (grande, vermelho, estilo obturador)
-- Botão de formato na barra de título (alterna retangular/quadrado/círculo)
+- Botão de formato na barra de título (alterna retangular/quadrado/círculo/celular)
 - Alavanca analógica (estilo PlayStation) para mover a área
 - Slider horizontal de zoom na parte de baixo
 - Animação Polaroid após captura
@@ -46,6 +46,19 @@ def draw_circle_icon(surface, rect, color):
     pad = 4
     radius = min(rect.width, rect.height) // 2 - pad
     pygame.draw.circle(surface, color, rect.center, radius, 2)
+
+
+def draw_phone_icon(surface, rect, color):
+    """Desenha um ícone de celular (formato retrato 9:16)."""
+    pad = 4
+    # Formato retrato (mais alto que largo)
+    w = int((rect.width - pad * 2) * 0.55)
+    h = rect.height - pad * 2
+    x = rect.centerx - w // 2
+    y = rect.centery - h // 2
+
+    # Corpo do celular (apenas contorno retangular)
+    pygame.draw.rect(surface, color, (x, y, w, h), 2, border_radius=2)
 
 
 def draw_minus_icon(surface, rect, color):
@@ -731,7 +744,7 @@ class CameraPhotoRenderer:
             self._render_flash(screen)
 
     def _render_capture_frame(self, screen):
-        """Renderiza a moldura adaptativa: retangular, quadrada ou circular."""
+        """Renderiza a moldura adaptativa: retangular, quadrada, circular ou celular."""
         rect = self.photo_manager.get_capture_rect_screen()
         fmt = self.photo_manager.photo_format
 
@@ -901,6 +914,8 @@ class CameraPhotoRenderer:
             draw_square_icon(screen, rect, icon_color)
         elif fmt == PhotoFormat.CIRCULO:
             draw_circle_icon(screen, rect, icon_color)
+        elif fmt == PhotoFormat.CELULAR:
+            draw_phone_icon(screen, rect, icon_color)
 
     def _draw_analog_stick(self, screen):
         cx, cy = self.stick_center
