@@ -24,6 +24,17 @@ MSG_TYPES = {
     "RAID_START": "raid_start",
     "RAID_LEAVE": "raid_leave",
     "RAID_CANCEL": "raid_cancel",
+    # INRAID
+    "RAID_PLACEMENT": "raid_placement",
+    "RAID_BOSS_SPAWN": "raid_boss_spawn",
+    "RAID_BOSS_SYNC": "raid_boss_sync",
+    "RAID_BOSS_DEAD": "raid_boss_dead",
+    "RAID_POKEMON_STATE": "raid_pokemon_state",
+    "RAID_ATTACK_BOSS": "raid_attack_boss",
+    "RAID_POKEMON_DAMAGE": "raid_pokemon_damage",
+    "RAID_ALL_DEFEATED": "raid_all_defeated",
+    "RAID_WEATHER_CHANGE": "raid_weather_change",
+    "RAID_BOSS_ATTACK": "raid_boss_attack",
     # =================
     "ERROR": "error",
     "DISCONNECT": "disconnect",

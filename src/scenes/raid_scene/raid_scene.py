@@ -571,14 +571,95 @@ class RaidScene(BaseScene):
             ))
 
     def _on_raid_started(self):
-        # ===== PONTO DE INTEGRAÇÃO =====
-        # Aqui você pluga a cena de batalha da raid.
-        # Ex.: self.game.current_scene = RaidBattleScene(...)
-        toast_info("RAID INICIADA! (implementação de batalha pendente)")
-        print(f"[RAID] Iniciando raid com {len(self.raid_players)} jogadores. "
-              f"Time final: {len(self.final_team)} pokémons.")
-        for entry in self.final_team:
-            print(f"   - {entry['pokemon'].get('name')} (dono: {entry['owner_name']})")
+        from src.scenes.raid_scene.raid_battle_scene import RaidBattleScene
+
+        if getattr(self, '_raid_battle_launched', False):
+            return
+        self._raid_battle_launched = True
+
+        # Se o host ainda não finalizou o time, finaliza agora
+        if self.is_host and not self.final_team:
+            self._finalize_teams()
+
+        # ===== LÊ CONFIG DO BOSS DA FASE (pokemon_id + level + delay) =====
+        boss_cfg = self._get_raid_boss_config()
+        print(f"[RAID] Iniciando batalha | boss_id={boss_cfg['pokemon_id']} | "
+              f"level={boss_cfg['level']} | delay={boss_cfg['initial_delay']}s | "
+              f"final_team={len(self.final_team)} pokémon")
+
+        self.game.current_scene = RaidBattleScene(
+            self.game,
+            is_host=self.is_host,
+            network=self.network,
+            raid_players=self.raid_players,
+            final_team=self.final_team,
+            boss_id=boss_cfg["pokemon_id"],
+            boss_level=boss_cfg["level"],
+            initial_delay=boss_cfg["initial_delay"],
+        )
+
+    def _get_raid_boss_config(self):
+        """
+        Lê o boss da fase de raid (waves[0] + template).
+        Retorna dict com pokemon_id, level e initial_delay.
+        Prioriza os valores do TEMPLATE (se existir), senão usa os da WAVE.
+        """
+        default = {"pokemon_id": 146, "level": 50, "initial_delay": 10.0}
+        try:
+            from src.scenes.game_scene.components.phase_loader import phase_loader
+            from src.editor.wave_config import WaveTemplateManager
+
+            waves = phase_loader.get_waves_data()
+            if not waves:
+                print("[RAID] Nenhuma wave encontrada — usando defaults")
+                return default
+
+            wave = waves[0]
+
+            # ----- Template (opcional) -----
+            template = None
+            template_id = wave.get("template_id")
+            if template_id:
+                template = WaveTemplateManager.get_template(template_id)
+                if template:
+                    print(f"[RAID] Template do boss: {template.name} ({template_id})")
+
+            # ----- Pokemon ID -----
+            pokemon_id = None
+            if template and template.enemies:
+                pokemon_id = template.enemies[0].pokemon_id
+            else:
+                enemies = wave.get("enemies", [])
+                if enemies:
+                    pokemon_id = enemies[0].get("pokemon_id")
+
+            # ----- Level (usa min_level do template/wave) -----
+            if template:
+                level = getattr(template, "min_level", None) or wave.get("min_level", 50)
+            else:
+                level = wave.get("min_level", 50)
+
+            # ----- Initial delay -----
+            if template:
+                initial_delay = getattr(template, "initial_delay", None)
+                if initial_delay is None:
+                    initial_delay = wave.get("initial_delay", 10.0)
+            else:
+                initial_delay = wave.get("initial_delay", 10.0)
+
+            print(f"[RAID] Boss config lida: id={pokemon_id} level={level} "
+                  f"delay={initial_delay}")
+            return {
+                "pokemon_id": pokemon_id or 146,
+                "level": int(level),
+                "initial_delay": float(initial_delay),
+            }
+
+        except Exception as e:
+            print(f"[RAID] Erro ao ler config do boss: {e}")
+            import traceback
+            traceback.print_exc()
+            return default
 
     # =========================================================
     # Ações do jogador

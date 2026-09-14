@@ -29,6 +29,17 @@ _RELAY_TYPES = {
     "RAID_START",
     "RAID_LEAVE",
     "RAID_CANCEL",
+    # INRAID
+    "RAID_PLACEMENT",
+    "RAID_BOSS_SPAWN",
+    "RAID_BOSS_SYNC",
+    "RAID_BOSS_DEAD",
+    "RAID_POKEMON_STATE",
+    "RAID_ATTACK_BOSS",
+    "RAID_POKEMON_DAMAGE",
+    "RAID_ALL_DEFEATED",
+    "RAID_WEATHER_CHANGE",
+    "RAID_BOSS_ATTACK",
     # =================
 }
 

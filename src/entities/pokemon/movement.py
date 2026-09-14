@@ -21,8 +21,7 @@ class PokemonMovement:
             new_speed += self.pokemon.speed_bonus_not_wild
 
         self.pokemon.move_speed = new_speed
-        print(
-            f"[SPEED] {self.pokemon.name} velocidade atualizada: {self.pokemon.move_speed:.2f} (is_wild={self.pokemon.is_wild})")
+        #print( f"[SPEED] {self.pokemon.name} velocidade atualizada: {self.pokemon.move_speed:.2f} (is_wild={self.pokemon.is_wild})")
 
     def is_stunned(self) -> bool:
         """Verifica se o Pokémon está atordoado pela paralisia"""

@@ -344,6 +344,10 @@ class PokemonCombat:
         """
         Atualiza a lógica de combate - UNIFICADA.
         """
+        # ===== RAID: pokémons remotos (cópias visuais) NÃO simulam combate =====
+        if getattr(self.pokemon, '_is_remote', False):
+            return
+
         # ===== PRIORIDADE 1: RETORNANDO PARA O SPOT =====
         if self.pokemon.combat_state == "returning":
             self._handle_returning_state(dt)
@@ -808,6 +812,24 @@ class PokemonCombat:
 
     def _execute_attack(self, target: 'Pokemon', move):
         """Executa o ataque real"""
+
+        # ===== RAID BOSS: ataca todos os alvos no range =====
+        if getattr(self.pokemon, '_is_raid_boss', False) and \
+                getattr(self.pokemon, '_attack_all', False):
+            multi_targets = getattr(self.pokemon, '_current_multi_targets', None) or [target]
+            for t in multi_targets:
+                if t and t.is_alive() and not t.is_defeated:
+                    self.pokemon.battle_system.attempt_attack(self.pokemon, t)
+                    print(f"[RAID_BOSS] {self.pokemon.name} acertou {t.name}!")
+
+            # PP infinito
+            self.pokemon.restore_all_pp()
+            # Limpa marcadores
+            self.pokemon._current_multi_targets = None
+            # Cooldown
+            self.pokemon.charge_cooldown = self.pokemon.charge_cooldown_max
+            return
+
         # Verifica se o alvo já está morto ANTES do ataque
         if not target or not target.is_alive() or target.is_defeated:
             self.pokemon.target = None
@@ -931,6 +953,10 @@ class PokemonCombat:
             self.pokemon.combat_state = "attacking"
             if hasattr(self.pokemon, '_path_tracker'):
                 self.pokemon._path_tracker.set_ignore_path(self.pokemon, 0)
+
+        # Se for boss de raid, restaura PP depois de atacar
+        if getattr(self.pokemon, '_is_raid_boss', False):
+            self.pokemon.restore_all_pp()
 
     def _handle_returning_state(self, dt: float):
         """GERENCIA O RETORNO DO POKÉMON AO SPOT ORIGINAL"""
