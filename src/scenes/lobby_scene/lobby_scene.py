@@ -35,6 +35,7 @@ class LobbyScene(BaseScene):
         self.chat_input_rect = pygame.Rect(0, 0, 0, 0)
         self.accept_btn = pygame.Rect(0, 0, 100, 40)
         self.decline_btn = pygame.Rect(0, 0, 100, 40)
+        self.raid_btn = pygame.Rect(0, 0, 220, 35)
 
         self._update_button_positions()
 
@@ -92,6 +93,7 @@ class LobbyScene(BaseScene):
         self.trade_btn.topleft = (vx + 25, vy + 200)
         self.chat_input_rect = pygame.Rect(vx + 280, vy + vh - 45, vw - 410, 32)
         self.send_btn.topleft = (self.chat_input_rect.right + 10, self.chat_input_rect.y)
+        self.raid_btn.topleft = (vx + 25, vy + 245)
 
         center_x = vx + vw // 2
         center_y = vy + vh // 2 + 60
@@ -157,21 +159,21 @@ class LobbyScene(BaseScene):
             if len(self.players) > 1:
                 toast_info(f"Jogadores na sala: {len(self.players)}")
 
-        # ★ Chat recebido
+        # Chat recebido
         elif msg_type == "CHAT_MESSAGE":
             sender = payload.get("sender", "?")
             text = payload.get("text", "")
             if sender != self.my_name and text:
                 self.chat_messages.append(f"{sender}: {text}")
 
-        # ★ Pedido de troca recebido
+        # Pedido de troca recebido
         elif msg_type == "TRADE_REQUEST":
             from_name = payload.get("from", "Desconhecido")
             if from_name != self.my_name:
                 self.pending_trade_from = from_name
                 toast_info(f"{from_name} quer trocar com voce!")
 
-        # ★ Resposta ao pedido de troca
+        # Resposta ao pedido de troca
         elif msg_type == "TRADE_RESPONSE":
             accepted = payload.get("accepted", False)
             if accepted:
@@ -180,8 +182,12 @@ class LobbyScene(BaseScene):
             else:
                 toast_info("Oponente recusou a troca.")
                 self.pending_trade_from = None
-
-        # ★ Desconexão do outro jogador
+        # Entrar na Raid
+        elif msg_type == "RAID_JOIN":
+            name = payload.get("name", "?")
+            if name != self.my_name:
+                toast_info(f"{name} entrou na raid.")
+        # Desconexão do outro jogador
         elif msg_type == "DISCONNECT":
             who = payload.get("name", "O outro jogador")
             toast_warning(f"{who} desconectou.")
@@ -299,6 +305,13 @@ class LobbyScene(BaseScene):
                 if self.decline_btn.collidepoint(mouse_pos):
                     self._handle_trade_response(False)
                     return
+            if self.raid_btn.collidepoint(mouse_pos) and self.opponent_name:
+                sound_manager.play_effect(SoundEffect.CLICK)
+                from src.scenes.raid_scene.raid_scene import RaidScene
+                self.game.current_scene = RaidScene(
+                    self.game, is_host=self.is_host, network=self.network
+                )
+                return
 
             self.chat_active = False
 
@@ -422,6 +435,18 @@ class LobbyScene(BaseScene):
             "C = chat | T = solicitar troca | Ctrl+V = colar", True, (80, 80, 110)
         )
         screen.blit(instr, (vx + 25, vy + vh - 25))
+
+        # Botão RAID
+        if self.opponent_name:
+            raid_text = "Entrar em Raid"
+            rc = (120, 70, 160)
+            rh = (170, 100, 220)
+        else:
+            raid_text = "Raid (precisa 2+)"
+            rc = (50, 50, 60)
+            rh = (50, 50, 60)
+
+        self._draw_button(screen, self.raid_btn, raid_text, rc, rh)
 
     def _draw_button(self, screen, rect, text, color, hover_color):
         mouse = pygame.mouse.get_pos()

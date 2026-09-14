@@ -18,6 +18,18 @@ _RELAY_TYPES = {
     "TRADE_DECLINE",
     "TRADE_CONFIRM",
     "TRADE_COMPLETE",
+    # ===== RAID =====
+    "RAID_JOIN",
+    "RAID_PLAYER_LIST",
+    "RAID_START_SELECTION",
+    "RAID_TEAM_SUBMIT",
+    "RAID_TEAM_UPDATE",
+    "RAID_PLAYER_READY",
+    "RAID_COUNTDOWN",
+    "RAID_START",
+    "RAID_LEAVE",
+    "RAID_CANCEL",
+    # =================
 }
 
 _LOOPBACK_IPS = {"127.0.0.1", "localhost", "::1"}
@@ -46,7 +58,7 @@ class NetworkManager:
 
         # False (padrão): não permite duas conexões do mesmo IP.
         # True: útil apenas para TESTES locais na mesma máquina.
-        self.allow_same_ip_players = False
+        self.allow_same_ip_players = True
 
         self.local_ip = self._detect_local_ip()
         self.remote_ips = []

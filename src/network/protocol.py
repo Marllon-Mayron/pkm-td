@@ -13,6 +13,18 @@ MSG_TYPES = {
     "TRADE_DECLINE": "trade_decline",
     "TRADE_CONFIRM": "trade_confirm",
     "TRADE_COMPLETE": "trade_complete",
+    # ===== RAID =====
+    "RAID_JOIN": "raid_join",
+    "RAID_PLAYER_LIST": "raid_player_list",
+    "RAID_START_SELECTION": "raid_start_selection",
+    "RAID_TEAM_SUBMIT": "raid_team_submit",
+    "RAID_TEAM_UPDATE": "raid_team_update",
+    "RAID_PLAYER_READY": "raid_player_ready",
+    "RAID_COUNTDOWN": "raid_countdown",
+    "RAID_START": "raid_start",
+    "RAID_LEAVE": "raid_leave",
+    "RAID_CANCEL": "raid_cancel",
+    # =================
     "ERROR": "error",
     "DISCONNECT": "disconnect",
 }
