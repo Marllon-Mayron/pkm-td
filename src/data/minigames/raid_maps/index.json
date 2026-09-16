@@ -8,6 +8,22 @@
                 "chapter": 1,
                 "phase": 1
             }
+        },
+        {
+            "chapter": 1,
+            "level": 2,
+            "unlock_requirement": {
+                "chapter": 1,
+                "phase": 1
+            }
+        },
+        {
+            "chapter": 1,
+            "level": 3,
+            "unlock_requirement": {
+                "chapter": 1,
+                "phase": 2
+            }
         }
     ]
 }

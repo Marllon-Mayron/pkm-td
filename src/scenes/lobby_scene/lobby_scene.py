@@ -187,6 +187,10 @@ class LobbyScene(BaseScene):
             name = payload.get("name", "?")
             if name != self.my_name:
                 toast_info(f"{name} entrou na raid.")
+        elif msg_type == "RAID_RETURN_LOBBY":
+            # Alguém voltou da raid — se eu já estou no lobby, ignoro.
+            # (Se eu ainda estivesse na raid, o callback seria o do RaidBattleScene.)
+            pass
         # Desconexão do outro jogador
         elif msg_type == "DISCONNECT":
             who = payload.get("name", "O outro jogador")

@@ -822,9 +822,9 @@ class BattleSystem:
             target.miss_timer = 0.0
         target.miss_timer = 0.6
 
-    def _create_projectile(self, attacker: 'Pokemon', target: 'Pokemon', move, damage_result: dict, will_hit: bool):
-        """Cria um projétil para ataque especial"""
-        # Cores baseadas no tipo
+    def _create_projectile(self, attacker: 'Pokemon', target: 'Pokemon', move,
+                           damage_result: dict, will_hit: bool, visual_only: bool = False):
+        """Cria um projétil para ataque especial."""
         type_colors = {
             "normal": (168, 168, 120),
             "fire": (240, 128, 48),
@@ -847,7 +847,6 @@ class BattleSystem:
         }
         color = type_colors.get(move.type.lower(), (255, 255, 255))
 
-        # Usar a velocidade de movimento do atacante para o projétil
         projectile_speed = attacker.move_speed * 60
 
         projectile = Projectile(
@@ -858,14 +857,16 @@ class BattleSystem:
             effectiveness=damage_result["effectiveness"],
             color=color,
             speed=projectile_speed,
-            will_hit=will_hit
+            will_hit=will_hit,
+            visual_only=visual_only,  # ← NOVO
         )
         self.projectiles.append(projectile)
 
-        from src.managers.sounds.move_sound_manager import move_sound_manager
-
-        move_sound_manager.play_attack_sound(move.sound_name)
-        print(f"[SOM] {move.name} - som do atacante: {move.sound_name}")
+        # Só toca som se NÃO for visual-only
+        if not visual_only:
+            from src.managers.sounds.move_sound_manager import move_sound_manager
+            move_sound_manager.play_attack_sound(move.sound_name)
+            print(f"[SOM] {move.name} - som do atacante: {move.sound_name}")
 
     def _apply_damage(self, attacker: 'Pokemon', target: 'Pokemon', damage_result: dict, move):
         """Aplica dano a um alvo com rastreamento para Counter e Mirror Coat"""

@@ -1,9 +1,13 @@
 # src/scenes/raid_scene/raid_battle_scene.py
 """
 RaidBattleScene — sync em tempo real host↔cliente (pokémons, boss, clima, ataques).
+
 - Level e delay inicial do boss vêm da fase (template/wave).
-- Cada cliente é autoridade sobre SEUS pokémons.
-- Host é autoridade sobre o boss.
+- Cada cliente é autoridade sobre SEUS pokémons (movimento, animação, ataque).
+- Host é autoridade sobre o boss (HP, ataques).
+- Pokémon remotos NÃO simulam combate (só interpolam posição e tocam animação).
+- Ataques de qualquer pokémon são broadcastados (RAID_POKEMON_ATTACK).
+- Clima sincronizado via hook em WeatherManager.set_weather.
 - Nunca dispara Game Over local (raid continua). Só game over global via RAID_ALL_DEFEATED.
 """
 import math
@@ -13,6 +17,7 @@ from src.scenes.game_scene.game_scene import GameScene
 from src.scenes.raid_scene.raid_boss_manager import RaidBossManager
 from src.entities.pokemon import Pokemon
 from src.network.protocol import create_message
+from src.scenes.raid_scene.raid_catalog import get_raid_path
 
 
 class RaidBattleScene(GameScene):
@@ -25,7 +30,8 @@ class RaidBattleScene(GameScene):
     DEFAULT_INITIAL_DELAY = 10.0
 
     def __init__(self, game, is_host, network, raid_players, final_team,
-                 boss_id=None, boss_level=None, initial_delay=None):
+                 boss_id=None, boss_level=None, initial_delay=None,
+                 raid_chapter=None, raid_level=None):
         self._raid_is_host = is_host
         self._raid_network = network
         self._raid_players = raid_players
@@ -35,6 +41,10 @@ class RaidBattleScene(GameScene):
         self._raid_initial_delay = (
             float(initial_delay) if initial_delay is not None else self.DEFAULT_INITIAL_DELAY
         )
+        # ===== RAID ESPECÍFICA (pra carregar o JSON correto) =====
+        self._raid_chapter = int(raid_chapter) if raid_chapter else 1
+        self._raid_level = int(raid_level) if raid_level else 1
+
         self._raid_my_uuid = self._resolve_my_uuid(game)
         self._remote_pokemon = {}
 
@@ -44,6 +54,8 @@ class RaidBattleScene(GameScene):
         self._local_team_dead_shown = False
         self._applying_remote_weather = False
         self.raid_game_over_overlay = None
+        self.raid_victory_overlay = None
+        self._raid_returning_to_lobby = False
 
         super().__init__(game, chapter_id=1, phase_number=1)
 
@@ -74,16 +86,14 @@ class RaidBattleScene(GameScene):
 
         self._setup_raid_team()
 
-        # ===== INSTALA HOOKS =====
-        if is_host:
-            self._install_host_hooks()
-        else:
-            self._install_client_hooks()
-
-        # ===== HOOK DE CLIMA (host e client) =====
+        # ===== HOOKS UNIFICADOS (host + client) =====
+        self._install_raid_hooks()
+        # ===== HOOK DE CLIMA =====
         self._install_weather_sync_hook()
 
         print(f"[RAID_BATTLE] Iniciada (host={is_host}, uuid={self._raid_my_uuid[:8]})")
+        print(f"[RAID_BATTLE] Raid carregada: Cap {self._raid_chapter} "
+              f"Level {self._raid_level}")
         print(f"[RAID_BATTLE] Boss config: level={self._raid_boss_level}, "
               f"delay={self._raid_initial_delay}s")
         print(f"[RAID_BATTLE] Time local: {[p.name for p in self.player.team]}")
@@ -100,17 +110,21 @@ class RaidBattleScene(GameScene):
     # CARREGAMENTO DO MAPA
     # ------------------------------------------------------------------
     def _load_phase_data(self):
+        """Carrega o mapa da RAID ESPECÍFICA sorteada (chapter + level)."""
         import json, os
         from src.config.paths import PROJECT_ROOT
         from src.scenes.game_scene.components.phase_loader import phase_loader
 
-        raid_path = os.path.join(
-            PROJECT_ROOT, "src", "data", "minigames", "raid_maps", "level_01_01.json"
-        )
+        raid_path = get_raid_path(self._raid_chapter, self._raid_level)
+
         if not os.path.exists(raid_path):
             print(f"[RAID] AVISO: mapa de raid não encontrado: {raid_path}")
-            super()._load_phase_data()
-            return
+            fallback = get_raid_path(1, 1)
+            if os.path.exists(fallback):
+                raid_path = fallback
+            else:
+                super()._load_phase_data()
+                return
 
         print(f"[RAID] Carregando mapa de raid: {raid_path}")
         with open(raid_path, 'r', encoding='utf-8') as f:
@@ -176,73 +190,197 @@ class RaidBattleScene(GameScene):
             pass
 
     # ==================================================================
-    # HOOKS
+    # HOOKS UNIFICADOS (host + client)
     # ==================================================================
-    def _install_client_hooks(self):
-        """On CLIENT: nossos pokémons NÃO aplicam dano localmente no boss."""
-        scene = self
+    def _install_raid_hooks(self):
+        """
+        Hooks unificados (host + client).
+
+        _start_attack_animation: MEU pokemon atacando o boss → broadcast RAID_POKEMON_ATTACK
+        _execute_attack:
+            - MEU pokemon atacando o boss (HOST): attempt_attack normal
+            - MEU pokemon atacando o boss (CLIENT): envia RAID_ATTACK_BOSS + projétil visual
+            - Pokémon remoto: handler remoto anima
+            - SEMPRE: seta charge_cooldown + retorna ao spot
+        take_damage: pokémon remoto tomou dano → envia RAID_POKEMON_DAMAGE pro dono
+        """
         from src.entities.pokemon.combat import PokemonCombat
 
-        if getattr(PokemonCombat, '_raid_client_hook', False):
-            return
+        # ---------- HOOK: _start_attack_animation ----------
+        if not getattr(PokemonCombat, '_raid_attack_anim_hook', False):
+            original_start = PokemonCombat._start_attack_animation
 
-        original_execute = PokemonCombat._execute_attack
+            def hooked_start(self_c, target, move):
+                result = original_start(self_c, target, move)
 
-        def hooked_execute(self_c, target, move):
-            pokemon = self_c.pokemon
-            if (getattr(target, '_is_raid_boss', False) and
-                    getattr(pokemon, '_raid_owner_uuid', None) == scene._raid_my_uuid):
+                pokemon = self_c.pokemon
+                bs = getattr(pokemon, 'battle_system', None)
+                scene = getattr(bs, 'game_scene', None) if bs else None
+                if scene is None or not hasattr(scene, '_raid_my_uuid'):
+                    return result
+
+                if getattr(pokemon, '_is_raid_boss', False):
+                    return result
+                if getattr(pokemon, '_is_remote', False):
+                    return result
+                if getattr(pokemon, '_raid_owner_uuid', None) != scene._raid_my_uuid:
+                    return result
+                if not getattr(target, '_is_raid_boss', False):
+                    return result
+
                 try:
-                    scene._raid_network.send_to_all(create_message("RAID_ATTACK_BOSS", {
-                        "attacker_owner_uuid": scene._raid_my_uuid,
-                        "attacker_unique_id": pokemon.unique_id,
-                        "attacker_name": pokemon.name,
-                        "move_name": move.name,
-                    }))
-                except Exception as e:
-                    print(f"[RAID] Erro ao enviar ataque: {e}")
-                return
-            return original_execute(self_c, target, move)
-
-        PokemonCombat._execute_attack = hooked_execute
-        PokemonCombat._raid_client_hook = True
-        print("[RAID] Hooks de CLIENTE instalados")
-
-    def _install_host_hooks(self):
-        """On HOST: quando dano é aplicado a pokémon remoto, avisa o dono."""
-        scene = self
-        from src.entities.pokemon.combat import PokemonCombat
-
-        if getattr(PokemonCombat, '_raid_host_hook', False):
-            return
-
-        original_take = PokemonCombat.take_damage
-
-        def hooked_take(self_c, damage, attacker=None):
-            pokemon = self_c.pokemon
-            old_hp = pokemon.current_hp
-            result = original_take(self_c, damage, attacker)
-            new_hp = pokemon.current_hp
-            actual_damage = old_hp - new_hp
-
-            if (actual_damage > 0 and
-                    getattr(pokemon, '_is_remote', False)):
-                owner_uuid = getattr(pokemon, '_raid_owner_uuid', None)
-                if owner_uuid and owner_uuid != scene._raid_my_uuid:
-                    try:
-                        scene._raid_network.send_to_all(create_message("RAID_POKEMON_DAMAGE", {
-                            "owner_uuid": owner_uuid,
+                    scene._raid_network.send_to_all(create_message(
+                        "RAID_POKEMON_ATTACK",
+                        {
                             "unique_id": pokemon.unique_id,
-                            "damage": int(actual_damage),
-                            "attacker_name": attacker.name if attacker else "BOSS",
-                        }))
-                    except Exception as e:
-                        print(f"[RAID] Erro ao enviar dano: {e}")
-            return result
+                            "owner_uuid": scene._raid_my_uuid,
+                            "move_name": move.name,
+                        }
+                    ))
+                except Exception as e:
+                    print(f"[RAID] Erro ao broadcast ataque: {e}")
 
-        PokemonCombat.take_damage = hooked_take
-        PokemonCombat._raid_host_hook = True
-        print("[RAID] Hooks de HOST instalados")
+                return result
+
+            PokemonCombat._start_attack_animation = hooked_start
+            PokemonCombat._raid_attack_anim_hook = True
+
+        # ---------- HOOK: _execute_attack ----------
+        if not getattr(PokemonCombat, '_raid_execute_hook', False):
+            original_execute = PokemonCombat._execute_attack
+
+            def hooked_execute(self_c, target, move):
+                pokemon = self_c.pokemon
+                bs = getattr(pokemon, 'battle_system', None)
+                scene = getattr(bs, 'game_scene', None) if bs else None
+
+                if scene is None or not hasattr(scene, '_raid_my_uuid'):
+                    return original_execute(self_c, target, move)
+
+                if not getattr(target, '_is_raid_boss', False):
+                    return original_execute(self_c, target, move)
+
+                is_my_pokemon = (getattr(pokemon, '_raid_owner_uuid', None)
+                                 == scene._raid_my_uuid)
+
+                # Pokémon remoto: só seta cooldown local
+                if not is_my_pokemon:
+                    try:
+                        pokemon.charge_cooldown = pokemon.charge_cooldown_max
+                    except Exception:
+                        pass
+                    return
+
+                # ===== É MEU pokémon atacando o boss =====
+                if scene._raid_is_host:
+                    try:
+                        bs.attempt_attack(pokemon, target)
+                    except Exception as e:
+                        print(f"[RAID] Erro no attempt_attack (host): {e}")
+                else:
+                    try:
+                        scene._raid_network.send_to_all(create_message(
+                            "RAID_ATTACK_BOSS",
+                            {
+                                "attacker_owner_uuid": scene._raid_my_uuid,
+                                "attacker_unique_id": pokemon.unique_id,
+                                "attacker_name": pokemon.name,
+                                "move_name": move.name,
+                            }
+                        ))
+                    except Exception as e:
+                        print(f"[RAID] Erro ao enviar ataque: {e}")
+
+                    try:
+                        if move.name.lower() != "struggle" and move.current_pp > 0:
+                            move.current_pp -= 1
+                    except Exception:
+                        pass
+
+                    try:
+                        if move.category == "special" and move.power > 0:
+                            dmg = {
+                                "damage": 0, "effectiveness": 1.0, "hit": True,
+                                "message": "", "stab": False, "critical": False,
+                            }
+                            bs._create_projectile(
+                                pokemon, target, move, dmg,
+                                will_hit=True, visual_only=True,
+                            )
+                    except Exception as e:
+                        print(f"[RAID] Erro ao criar projétil local: {e}")
+
+                # ⚠️ COOLDOWN (o que evita metralhadora)
+                try:
+                    pokemon.charge_cooldown = pokemon.charge_cooldown_max
+                    pokemon.attack_cooldown = max(0.3, 1.0 - (pokemon.speed_stat / 500))
+                except Exception as e:
+                    print(f"[RAID] Erro ao setar cooldown: {e}")
+
+                # Pós-ataque: volta ao spot
+                if not pokemon.is_wild:
+                    pokemon.combat_state = "returning"
+                    if (pokemon.current_animation != "walk"
+                            and pokemon.has_animation("walk")):
+                        pokemon.set_animation("walk")
+                else:
+                    pokemon.combat_state = "attacking"
+                    if hasattr(pokemon, '_path_tracker'):
+                        pokemon._path_tracker.set_ignore_path(pokemon, 0)
+
+                if hasattr(pokemon, '_attack_animation_active'):
+                    pokemon._attack_animation_active = False
+
+                return
+
+            PokemonCombat._execute_attack = hooked_execute
+            PokemonCombat._raid_execute_hook = True
+
+        # ---------- HOOK: take_damage (avisa o dono de pokémons remotos) ----------
+        if not getattr(PokemonCombat, '_raid_take_damage_hook', False):
+            original_take = PokemonCombat.take_damage
+
+            def hooked_take(self_c, damage, attacker=None):
+                pokemon = self_c.pokemon
+                old_hp = pokemon.current_hp
+                result = original_take(self_c, damage, attacker)
+                new_hp = pokemon.current_hp
+                actual_damage = old_hp - new_hp
+
+                # ===== Só avisa se for pokémon REMOTO e tomou dano =====
+                if actual_damage > 0 and getattr(pokemon, '_is_remote', False):
+                    bs = getattr(pokemon, 'battle_system', None)
+                    scene = getattr(bs, 'game_scene', None) if bs else None
+                    if scene is not None and hasattr(scene, '_raid_my_uuid'):
+                        owner_uuid = getattr(pokemon, '_raid_owner_uuid', None)
+                        if owner_uuid and owner_uuid != scene._raid_my_uuid:
+                            try:
+                                scene._raid_network.send_to_all(create_message(
+                                    "RAID_POKEMON_DAMAGE",
+                                    {
+                                        "owner_uuid": owner_uuid,
+                                        "unique_id": pokemon.unique_id,
+                                        "damage": int(actual_damage),
+                                        "attacker_name": attacker.name if attacker else "BOSS",
+                                    }
+                                ))
+                                print(f"[RAID] Avisando dono: {pokemon.name} tomou "
+                                      f"{actual_damage} (owner={owner_uuid[:8]})")
+                            except Exception as e:
+                                print(f"[RAID] Erro ao enviar dano: {e}")
+                return result
+
+            PokemonCombat.take_damage = hooked_take
+            PokemonCombat._raid_take_damage_hook = True
+
+        print("[RAID] Hooks de raid instalados")
+
+    # Mantidos como no-op pra compatibilidade (caso chamados em outro lugar)
+    def _install_host_hooks(self):
+        pass
+
+    def _install_client_hooks(self):
+        pass
 
     def _install_weather_sync_hook(self):
         """Hook global em WeatherManager.set_weather."""
@@ -283,14 +421,25 @@ class RaidBattleScene(GameScene):
     # FIXED_UPDATE
     # ==================================================================
     def fixed_update(self, dt):
+        # Rede sempre
         self._process_network_queue()
 
-        # Atualiza overlay de derrota (se ativo)
+        # ===== OVERLAY DE VITÓRIA ATIVO =====
+        if self.raid_victory_overlay and self.raid_victory_overlay.active:
+            self.raid_victory_overlay.update(dt)
+            self._interpolate_remote_pokemon(dt)
+            return
+
+        # ===== OVERLAY DE DERROTA ATIVO =====
         if self.raid_game_over_overlay and self.raid_game_over_overlay.active:
             self.raid_game_over_overlay.update(dt)
-            return  # congela o jogo por baixo
+            self._interpolate_remote_pokemon(dt)
+            return
 
         super().fixed_update(dt)
+
+        # ===== INTERPOLAÇÃO DOS REMOTOS =====
+        self._interpolate_remote_pokemon(dt)
 
         # Sync periódico do meu time
         self._sync_timer += dt
@@ -322,6 +471,13 @@ class RaidBattleScene(GameScene):
                 else:
                     msg = item
                 self._on_raid_network_message(msg, None)
+
+                # Se a cena mudou durante o processamento (ex: RAID_RETURN_LOBBY),
+                # parar AGORA, o resto da fila é da nova cena (LobbyScene).
+                if self.game.current_scene is not self:
+                    print("[RAID] Cena mudou durante processamento — "
+                          "deixando o resto pra nova cena")
+                    break
         except Exception as e:
             print(f"[RAID] Erro na fila: {e}")
 
@@ -410,29 +566,45 @@ class RaidBattleScene(GameScene):
             self._apply_remote_weather(payload)
             return
 
-        # ===== ATAQUE DO BOSS (só client recebe) =====
         if msg_type == "RAID_BOSS_ATTACK":
             if not self._raid_is_host:
                 self.wave_manager.apply_remote_boss_attack(payload)
             return
 
+        if msg_type == "RAID_POKEMON_ATTACK":
+            self._apply_remote_pokemon_attack(payload)
+            return
+
+        if msg_type == "RAID_RETURN_LOBBY":
+            who = payload.get("name", "?")
+            print(f"[RAID] {who} voltou ao lobby — seguindo junto.")
+            self._return_to_lobby_from_raid(broadcast=False)
+            return
+
         if msg_type == "DISCONNECT":
             who = payload.get("name", "?")
             print(f"[RAID] {who} desconectou.")
+            # Não faz sentido continuar sozinho — volta pro lobby (sem reenviar).
+            self._return_to_lobby_from_raid(broadcast=False)
+            return
 
     # ==================================================================
     # APLICAR ESTADO REMOTO
     # ==================================================================
     def _apply_remote_pokemon_state(self, payload):
+        """Aplica estado de pokémons de outro jogador — só guarda a posição ALVO."""
         for state in payload.get("pokemon", []):
             uid = state.get("unique_id")
             pk = self._remote_pokemon.get(uid)
             if not pk:
                 continue
-            pk.x = state.get("x", pk.x)
-            pk.y = state.get("y", pk.y)
+
+            pk._target_x = float(state.get("x", pk.x))
+            pk._target_y = float(state.get("y", pk.y))
+
             pk.current_hp = state.get("current_hp", pk.current_hp)
             pk.max_hp = state.get("max_hp", pk.max_hp)
+
             if state.get("is_defeated"):
                 if not getattr(pk, 'is_defeated', False):
                     try:
@@ -442,15 +614,19 @@ class RaidBattleScene(GameScene):
             else:
                 pk.is_defeated = False
 
-            direction = state.get("current_direction")
-            if direction:
-                pk.current_direction = direction
-            anim = state.get("current_animation")
-            if anim and getattr(pk, 'current_animation', None) != anim:
-                try:
-                    pk.set_animation_direct(anim)
-                except Exception:
-                    pass
+            if not getattr(pk, '_attack_animation_active', False):
+                direction = state.get("current_direction")
+                if direction:
+                    pk.current_direction = direction
+
+                anim = state.get("current_animation")
+                if anim and getattr(pk, 'current_animation', None) != anim:
+                    if not getattr(pk, '_attack_animation_active', False):
+                        try:
+                            pk.set_animation_direct(anim)
+                        except Exception:
+                            pass
+
             cs = state.get("combat_state")
             if cs:
                 pk.combat_state = cs
@@ -610,6 +786,10 @@ class RaidBattleScene(GameScene):
             pk.placed_tile_x = cx // ts
             pk.placed_tile_y = cy // ts
 
+            # inicializa alvo de interpolação
+            pk._target_x = cx
+            pk._target_y = cy
+
             if hasattr(self, 'screen_manager'):
                 pk.screen_manager = self.screen_manager
             if hasattr(self, 'camera'):
@@ -628,6 +808,100 @@ class RaidBattleScene(GameScene):
                     break
 
             print(f"[RAID] Remote {pk.name} de {pk._raid_owner_name} em ({cx},{cy})")
+
+    def _apply_remote_pokemon_attack(self, payload):
+        """Pokémon remoto começou ataque → toca animação + cria projétil."""
+        uid = payload.get("unique_id")
+        owner_uuid = payload.get("owner_uuid")
+        move_name = payload.get("move_name")
+
+        if owner_uuid == self._raid_my_uuid:
+            return
+
+        pk = self._remote_pokemon.get(uid)
+        if not pk:
+            return
+
+        boss = self.wave_manager.boss
+        if not boss:
+            return
+
+        # Acha o move
+        move = None
+        for m in pk.moves:
+            if m.name == move_name:
+                move = m
+                break
+
+        if move is None:
+            try:
+                from src.entities.move import Move
+                move_info = {
+                    "type": "normal", "power": 40, "accuracy": 100,
+                    "pp": 35, "category": "physical",
+                    "description": "",
+                }
+                move = Move(move_name, move_info)
+            except Exception as e:
+                print(f"[RAID] Erro ao criar move fake: {e}")
+                return
+
+        # Aponta direção para o boss
+        try:
+            dx = boss.x - pk.x
+            dy = boss.y - pk.y
+            pk.combat._update_direction_to_target(dx, dy)
+        except Exception:
+            pass
+
+        # Toca animação
+        try:
+            pk.combat._start_attack_animation(boss, move)
+        except Exception as e:
+            print(f"[RAID] Erro ao animar ataque remoto: {e}")
+
+        # Cria projétil visual se for especial
+        try:
+            if move.category == "special" and move.power > 0 and self.battle_system:
+                dmg = {
+                    "damage": 0, "effectiveness": 1.0, "hit": True,
+                    "message": "", "stab": False, "critical": False,
+                }
+                self.battle_system._create_projectile(
+                    pk, boss, move, dmg,
+                    will_hit=True, visual_only=True,
+                )
+        except Exception as e:
+            print(f"[RAID] Erro ao criar projétil remoto: {e}")
+
+    def _interpolate_remote_pokemon(self, dt):
+        """Suaviza posição dos pokémons remotos rumo ao alvo."""
+        for pk in list(self._remote_pokemon.values()):
+            tx = getattr(pk, '_target_x', None)
+            ty = getattr(pk, '_target_y', None)
+            if tx is None or ty is None:
+                continue
+
+            dx = tx - pk.x
+            dy = ty - pk.y
+            dist_sq = dx * dx + dy * dy
+
+            if dist_sq > 200 * 200:
+                pk.x = tx
+                pk.y = ty
+                pk.rect.x, pk.rect.y = int(pk.x), int(pk.y)
+                continue
+
+            lerp_factor = min(1.0, dt * 12.0)
+            pk.x += dx * lerp_factor
+            pk.y += dy * lerp_factor
+            pk.rect.x, pk.rect.y = int(pk.x), int(pk.y)
+
+            if dist_sq > 4:
+                try:
+                    pk.combat._update_direction_to_target(dx, dy)
+                except Exception:
+                    pass
 
     def _broadcast_my_placement(self, pokemon, spot, action="place"):
         net = self._raid_network
@@ -749,7 +1023,6 @@ class RaidBattleScene(GameScene):
 
         self.game_state = "game_over"
 
-        # Para sons sem remover gold nem felicidade
         try:
             self._stop_all_sounds(fade_ms=1000)
         except Exception:
@@ -769,38 +1042,175 @@ class RaidBattleScene(GameScene):
         self._complete_phase()
 
     def _complete_phase(self):
-        from src.scenes.game_scene.components.managers.overlay_manager import OverlayType
+        """Chamado quando o boss morre. Dá recompensas E o lendário.
+        XP vai pro PLAYER (score), não pro time."""
         import random
 
-        self._stop_all_sounds(fade_ms=1000)
+        try:
+            self._stop_all_sounds(fade_ms=1000)
+        except Exception:
+            pass
+
+        if self.raid_game_over_overlay:
+            self.raid_game_over_overlay.active = False
+
         gold = self.BOSS_GOLD_REWARD
         xp = self.BOSS_XP_REWARD
 
+        # ===== ITENS =====
         earned_items = []
         try:
             from src.data.item_bag_catalog import item_bag_catalog
             for _ in range(random.randint(2, 4)):
-                iid = random.choice(["rare_candy", "ultraball", "masterball",
-                                     "revive", "full_heal"])
+                iid = random.choice([
+                    "rare_candy", "ultraball", "masterball",
+                    "revive", "full_heal"
+                ])
                 if item_bag_catalog.get_item(iid):
                     self.player.bag.add_item(iid, 1)
                     earned_items.append(iid)
+        except Exception as e:
+            print(f"[RAID_REWARD] Erro ao dar itens: {e}")
+
+        # ===== GOLD =====
+        try:
+            self.player.money += gold
+        except Exception as e:
+            print(f"[RAID_REWARD] Erro ao dar gold: {e}")
+
+        # ===== XP → SCORE DO PLAYER =====
+        try:
+            self.player.score += xp
+            print(f"[RAID_REWARD] +{xp} XP no score do jogador")
+        except Exception as e:
+            print(f"[RAID_REWARD] Erro ao dar XP: {e}")
+
+        # ===== LENDÁRIO =====
+        legendary_reward = self._grant_legendary_reward()
+
+        # ===== FELICIDADE =====
+        try:
+            for p in self.placement_manager.placed_pokemon:
+                if not getattr(p, '_is_remote', False) and p.is_alive():
+                    p.add_happiness(5, "Raid completada")
         except Exception:
             pass
 
-        self.player.auto_save()
+        # ===== CELEBRAÇÃO =====
+        try:
+            self.placement_manager.start_victory_celebration()
+        except Exception:
+            pass
+
+        try:
+            self.player.auto_save()
+        except Exception:
+            pass
+
         boss_name = self.wave_manager.boss.name if self.wave_manager.boss else "?"
 
         self.phase_complete_data = {
-            "base_reward": gold, "gold_from_defeats": 0, "bonus_amount": 0,
-            "gold_total": gold, "total_xp": xp, "perfect_run": True, "stars": 3,
-            "earned_items": earned_items, "is_raid": True, "raid_boss_name": boss_name,
+            "base_reward": gold,
+            "gold_from_defeats": 0,
+            "bonus_amount": 0,
+            "gold_total": gold,
+            "total_xp": xp,
+            "perfect_run": True,
+            "stars": 3,
+            "earned_items": earned_items,
+            "is_raid": True,
+            "raid_boss_name": boss_name,
+            "legendary": legendary_reward,
         }
-        self.game_state = "completed"
-        self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
 
-    def _return_to_lobby_from_raid(self):
-        """Volta para o LobbyScene (não para seleção de time)."""
+        self.game_state = "completed"
+
+        from src.scenes.raid_scene.raid_victory_overlay import RaidVictoryOverlay
+        self.raid_victory_overlay = RaidVictoryOverlay(self, {
+            "gold": gold,
+            "xp": xp,
+            "items": earned_items,
+            "legendary": legendary_reward,
+        })
+        print(f"[RAID] VITÓRIA! Recompensas exibidas.")
+
+    def _grant_legendary_reward(self):
+        """Cria o lendário derrotado (level 5, capture_method='event')."""
+        try:
+            from src.entities.pokemon import Pokemon
+            from datetime import datetime
+
+            legendary_id = self._raid_boss_id
+            if not legendary_id:
+                print(f"[RAID_REWARD] AVISO: _raid_boss_id inválido")
+                return None
+
+            legendary = Pokemon(
+                x=0, y=0,
+                pokemon_id=legendary_id,
+                level=5,
+                is_wild=False,
+                shiny=False,
+                is_boss=False,
+            )
+
+            legendary.capture_method = "event"
+            legendary.capture_date = datetime.now().isoformat()
+
+            destination = "box"
+            if self.player.has_team_space():
+                ok, msg = self.player.add_to_team(legendary)
+                if ok:
+                    destination = "team"
+                    print(f"[RAID_REWARD] Lendário {legendary.name} adicionado ao TIME")
+                else:
+                    self.player.add_to_box(legendary)
+                    print(f"[RAID_REWARD] Lendário {legendary.name} enviado à BOX ({msg})")
+            else:
+                self.player.add_to_box(legendary)
+                print(f"[RAID_REWARD] Time cheio — Lendário {legendary.name} enviado à BOX")
+
+            try:
+                self.player.caught_pokemon.add(legendary_id)
+                self.player.register_seen(legendary_id)
+            except Exception:
+                pass
+
+            return {
+                "id": legendary_id,
+                "name": legendary.name,
+                "level": 5,
+                "is_shiny": False,
+                "destination": destination,
+            }
+
+        except Exception as e:
+            print(f"[RAID_REWARD] Erro ao dar lendário: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def _return_to_lobby_from_raid(self, broadcast=True):
+        """
+        Volta para o LobbyScene.
+
+        broadcast=True  → envio RAID_RETURN_LOBBY antes de sair (sou quem clicou)
+        broadcast=False → fui avisado pelo parceiro, não reenvio (evita loop)
+        """
+        if self._raid_returning_to_lobby:
+            return
+        self._raid_returning_to_lobby = True
+
+        if broadcast and self._raid_network:
+            try:
+                self._raid_network.send_to_all(create_message(
+                    "RAID_RETURN_LOBBY",
+                    {"name": self._raid_network.my_name},
+                ))
+                print("[RAID] Avisando parceiro: voltando ao lobby")
+            except Exception as e:
+                print(f"[RAID] Erro ao avisar retorno: {e}")
+
         try:
             from src.scenes.lobby_scene.lobby_scene import LobbyScene
             self.game.current_scene = LobbyScene(
@@ -808,25 +1218,28 @@ class RaidBattleScene(GameScene):
                 is_host=self._raid_is_host,
                 network=self._raid_network,
             )
-            print("[RAID] Voltando ao lobby após derrota")
+            print("[RAID] Voltando ao lobby")
         except Exception as e:
             print(f"[RAID] Erro ao voltar ao lobby: {e}")
 
     def handle_event(self, event):
-        # Se o overlay de derrota da raid estiver ativo, prioriza ele
+        if self.raid_victory_overlay and self.raid_victory_overlay.active:
+            if self.raid_victory_overlay.handle_event(event):
+                return None
+            return None
+
         if self.raid_game_over_overlay and self.raid_game_over_overlay.active:
             if self.raid_game_over_overlay.handle_event(event):
                 return None
-            return None  # bloqueia outros eventos enquanto o overlay está aberto
+            return None
 
-        # Se o jogo já está em game_over, bloqueia tudo
         if self.game_state == "game_over":
             return None
 
         return super().handle_event(event)
 
     def handle_give_up(self):
-        """Desistir na raid = derrota local (mas NÃO remove gold nem felicidade)."""
+        """Desistir na raid = derrota local (sem penalidades)."""
         print("[RAID] Jogador desistiu da raid")
         try:
             self._stop_all_sounds(fade_ms=1000)
@@ -843,15 +1256,14 @@ class RaidBattleScene(GameScene):
     def render(self, screen):
         super().render(screen)
 
-        # Countdown do boss (antes do spawn)
         if not self.wave_manager.is_boss_spawned():
             self._render_boss_countdown(screen)
 
-        # Hint de espectador
         self._render_spectator_hint(screen)
 
-        # Overlay de derrota da raid (por cima de tudo)
-        if self.raid_game_over_overlay and self.raid_game_over_overlay.active:
+        if self.raid_victory_overlay and self.raid_victory_overlay.active:
+            self.raid_victory_overlay.render(screen)
+        elif self.raid_game_over_overlay and self.raid_game_over_overlay.active:
             self.raid_game_over_overlay.render(screen)
 
     def _render_spectator_hint(self, screen):

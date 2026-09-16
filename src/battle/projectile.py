@@ -10,7 +10,7 @@ import math
 class Projectile:
     """Projétil que viaja do atacante ao alvo"""
 
-    def __init__(self, attacker, target, move_name, damage, effectiveness, color, speed=300.0, will_hit=True):
+    def __init__(self, attacker, target, move_name, damage, effectiveness, color, speed=300.0, will_hit=True, visual_only=False):
         self.attacker = attacker
         self.target = target
         self.move_name = move_name
@@ -19,6 +19,7 @@ class Projectile:
         self.color = color
         self.speed = speed
         self.will_hit = will_hit  # Se o ataque vai acertar ou errar
+        self.visual_only = visual_only
 
         # Posição inicial (posição do atacante)
         self.x = attacker.x
@@ -119,11 +120,12 @@ class Projectile:
         if distance < self.target.map_sprite_size / 2 and not self.hit:
             self.hit = True
 
-            if self.will_hit:
-                # Acerrou - aplica dano
+            if self.visual_only:
+                # Projétil só pra visual — não aplica dano nem som de impacto
+                pass
+            elif self.will_hit:
                 self._apply_damage()
             else:
-                # Errou - mostra texto MISS e não aplica dano
                 self._apply_miss()
 
             self.is_finished = True
@@ -161,6 +163,9 @@ class Projectile:
     def _apply_damage(self):
         """Aplica dano ao alvo com efeitos de status"""
         # Aplica dano
+        if getattr(self, 'visual_only', False):
+            return
+
         self.target.take_damage(self.damage, attacker=self.attacker)
 
         # ===== APLICA EFEITOS DO MOVE APÓS O DANO =====

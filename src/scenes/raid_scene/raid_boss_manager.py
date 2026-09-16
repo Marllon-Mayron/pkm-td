@@ -186,16 +186,14 @@ class RaidBossManager:
         if self.paused:
             return []
 
-        # ===== DELAY DE SPAWN (roda no HOST e no CLIENT) =====
+        # ===== DELAY DE SPAWN (host e client) =====
         if not self._spawned:
             if self._spawn_delay > 0:
                 self._spawn_delay -= dt
 
-            # ---- CLIENT: só espera o host ----
             if self.passive:
                 return []
 
-            # ---- HOST: aviso aos 3s + spawn quando zera ----
             if not self._spawn_notified and self._spawn_delay <= 3.0:
                 self._spawn_notified = True
                 try:
@@ -214,12 +212,19 @@ class RaidBossManager:
             return []
 
         # ===== SIMULAÇÃO DO HOST =====
+        # checar morte ANTES de qualquer update, não pular boss morto.
         for boss in self.active_enemies[:]:
-            if boss.is_defeated:
+            # Se já morreu, chama o handler imediatamente
+            if boss.is_defeated or not boss.is_alive():
+                self._handle_boss_death(boss)
                 continue
+
+            # Update normal
             boss.update(dt)
             self._update_boss_combat(boss, dt)
-            if not boss.is_alive() or boss.is_defeated:
+
+            # Recheca (boss pode ter morrido durante o update/combate)
+            if boss.is_defeated or not boss.is_alive():
                 self._handle_boss_death(boss)
 
         # ===== BROADCAST PERIÓDICO DE HP =====
@@ -258,22 +263,64 @@ class RaidBossManager:
             boss.charge_cooldown = 1.0
             return
 
-        boss._current_multi_targets = list(targets_in_range)
-        boss._attack_all = True
-
+        # Direção para o centro dos alvos
         cx = sum(t.x for t in targets_in_range) / len(targets_in_range)
         cy = sum(t.y for t in targets_in_range) / len(targets_in_range)
         boss.combat._update_direction_to_target(cx - boss.x, cy - boss.y)
-        boss.combat._start_attack_animation(targets_in_range[0], move)
+
+        # ============================================================
+        # GOLPE FÍSICO: aplica dano DIRETO (boss não anda até o alvo)
+        # ============================================================
+        if move.category == "physical":
+            # Força este move específico a ser escolhido pelo attempt_attack:
+            # zera PP dos outros temporariamente
+            saved_pp = {}
+            for m in boss.moves:
+                saved_pp[m.name] = m.current_pp
+                m.current_pp = m.max_pp if m.name == move.name else 0
+
+            try:
+                for t in targets_in_range:
+                    if t and t.is_alive() and not t.is_defeated:
+                        try:
+                            self.game_scene.battle_system.attempt_attack(boss, t)
+                            print(f"[RAID_BOSS] {boss.name} acertou {t.name} "
+                                  f"(físico, sem mover)")
+                        except Exception as e:
+                            print(f"[RAID_BOSS] Erro ataque físico: {e}")
+            finally:
+                # Restaura PP de todos
+                for m in boss.moves:
+                    m.current_pp = saved_pp.get(m.name, m.max_pp)
+
+            # Toca animação visual (sem re-aplicar dano pela animação)
+            try:
+                boss.combat._start_attack_animation(targets_in_range[0], move)
+                # Marca como já aplicado para a animação NÃO chamar _execute_attack
+                boss._damage_applied = True
+                boss._current_multi_targets = None
+            except Exception as e:
+                print(f"[RAID_BOSS] Erro ao animar físico: {e}")
+
+        # ============================================================
+        # GOLPE ESPECIAL / STATUS: fluxo normal (multi-target via _execute_attack)
+        # ============================================================
+        else:
+            boss._current_multi_targets = list(targets_in_range)
+            boss._attack_all = True
+            try:
+                boss.combat._start_attack_animation(targets_in_range[0], move)
+            except Exception as e:
+                print(f"[RAID_BOSS] Erro ao animar especial: {e}")
+
         boss.charge_cooldown = self.BOSS_ATTACK_COOLDOWN
 
-        # ===== TOAST LOCAL (host vê) =====
+        # Toast local + broadcast
         self._show_boss_attack_toast(boss.name, move.name)
-
-        # ===== BROADCAST (clientes veem) =====
         self._broadcast_boss_attack(boss.name, move.name)
 
-        print(f"[RAID_BOSS] {boss.name} usou {move.name} em {len(targets_in_range)} alvos")
+        print(f"[RAID_BOSS] {boss.name} usou {move.name} em "
+              f"{len(targets_in_range)} alvos ({move.category})")
 
     # ------------------------------------------------------------------
     # TOAST DE ATAQUE DO BOSS

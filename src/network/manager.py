@@ -40,6 +40,8 @@ _RELAY_TYPES = {
     "RAID_ALL_DEFEATED",
     "RAID_WEATHER_CHANGE",
     "RAID_BOSS_ATTACK",
+    "RAID_POKEMON_ATTACK",
+    "RAID_RETURN_LOBBY",
     # =================
 }
 

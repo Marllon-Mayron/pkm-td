@@ -119,6 +119,11 @@ class RaidScene(BaseScene):
         # ===== ESTADO =====
         self.state = self.ST_WAITING
 
+        # ===== RAID SORTEADA (chapter + level) =====
+        # Host sorteia quando todos ficam prontos; cliente adota via rede.
+        self.raid_chapter = None
+        self.raid_level = None
+
         # Jogadores na raid: uuid -> dict(name, uuid, ready, submitted, team, assigned_count)
         self.raid_players = {}
 
@@ -153,12 +158,12 @@ class RaidScene(BaseScene):
 
         # ===== FONTES =====
         self.font_title = pygame.font.Font(None, 44)
-        self.font_h1    = pygame.font.Font(None, 28)
-        self.font_h2    = pygame.font.Font(None, 22)
-        self.font       = pygame.font.Font(None, 20)
+        self.font_h1 = pygame.font.Font(None, 28)
+        self.font_h2 = pygame.font.Font(None, 22)
+        self.font = pygame.font.Font(None, 20)
         self.font_small = pygame.font.Font(None, 18)
-        self.font_tiny  = pygame.font.Font(None, 16)
-        self.font_btn   = pygame.font.Font(None, 22)
+        self.font_tiny = pygame.font.Font(None, 16)
+        self.font_btn = pygame.font.Font(None, 22)
 
         # ===== SETUP =====
         self._refresh_my_entries()
@@ -166,9 +171,9 @@ class RaidScene(BaseScene):
 
         # ===== ANUNCIA ENTRADA =====
         my_uuid = (
-            getattr(self.game.player, "uuid", None)
-            or getattr(self.network, "my_uuid", None)
-            or "unknown"
+                getattr(self.game.player, "uuid", None)
+                or getattr(self.network, "my_uuid", None)
+                or "unknown"
         )
         self.network.set_uuid(my_uuid)
 
@@ -346,67 +351,38 @@ class RaidScene(BaseScene):
                 toast_info(f"{name} entrou na raid.")
                 self._broadcast_player_list()
 
-
         elif msg_type == "RAID_PLAYER_LIST":
-
             players = payload.get("players", [])
-
             print(f"[RAID][CLIENTE?{not self.is_host}] PLAYER_LIST recebida: "
-
                   f"{[p['name'] for p in players]}")
 
             new_map = {}
-
             for p in players:
                 u = p["uuid"]
-
                 old = self.raid_players.get(u, {})
-
                 new_map[u] = {
-
                     "name": p["name"],
-
                     "uuid": u,
-
                     "ready": p.get("ready", False),
-
                     "submitted": p.get("submitted", False),
-
                     "team": old.get("team", []),
-
                     "assigned_count": old.get("assigned_count", 0),
-
                 }
-
             self.raid_players = new_map
 
-            # Se eu NÃO estou na lista do host, significa que meu RAID_JOIN se perdeu
-
-            # (provavelmente chegou antes do host entrar na RaidScene). Re-envio.
-
+            # Se eu NÃO estou na lista do host, re-envio RAID_JOIN
             if not self.is_host:
-
                 my_uuid = self._my_uuid()
-
                 if my_uuid not in self.raid_players:
                     print(f"[RAID] Não estou na lista do host — reenviando RAID_JOIN "
-
                           f"(raid_id={self.raid_id})")
-
                     self.network.send_to_all(create_message(
-
                         "RAID_JOIN",
-
                         {
-
                             "raid_id": self.raid_id,
-
                             "name": self.network.my_name,
-
                             "uuid": my_uuid,
-
                         },
-
                     ))
 
         elif msg_type == "RAID_START_SELECTION":
@@ -455,9 +431,27 @@ class RaidScene(BaseScene):
             self.countdown_value = int(payload.get("seconds", 5))
             self.countdown_timer = 0.0
             self._countdown_started = True
+
+            # Cliente também adota a raid sorteada (vem no payload do countdown)
+            rc = payload.get("raid_chapter")
+            rl = payload.get("raid_level")
+            if rc is not None and rl is not None and not self.is_host:
+                self.raid_chapter = int(rc)
+                self.raid_level = int(rl)
+                print(f"[RAID] Cliente adotou raid: "
+                      f"Cap {self.raid_chapter} Level {self.raid_level}")
+
             toast_info(f"RAID COMEÇANDO EM {self.countdown_value}!")
 
         elif msg_type == "RAID_START":
+            # Cliente adota a raid sorteada pelo host
+            rc = payload.get("raid_chapter")
+            rl = payload.get("raid_level")
+            if rc is not None and rl is not None:
+                self.raid_chapter = int(rc)
+                self.raid_level = int(rl)
+                print(f"[RAID] Host anunciou raid: Cap {self.raid_chapter} "
+                      f"Level {self.raid_level}")
             self.state = self.ST_STARTED
             self._on_raid_started()
 
@@ -499,16 +493,47 @@ class RaidScene(BaseScene):
         if len(self.raid_players) < self.MIN_PLAYERS:
             return
         if all(p.get("ready") for p in self.raid_players.values()):
+            # ===== SORTEIA UMA RAID DA TEMPORADA =====
+            self._pick_random_raid()
+
             # Inicia countdown
             self.state = self.ST_COUNTDOWN
             self.countdown_value = 5
             self.countdown_timer = 0.0
             self._countdown_started = True
+
+            # Envia pro cliente (raid_chapter + raid_level vão no payload)
             self.network.send_to_all(create_message(
                 "RAID_COUNTDOWN",
-                {"raid_id": self.raid_id, "seconds": 5},
+                {
+                    "raid_id": self.raid_id,
+                    "seconds": 5,
+                    "raid_chapter": self.raid_chapter,
+                    "raid_level": self.raid_level,
+                },
             ))
             toast_info("Todos prontos! RAID COMEÇANDO!")
+
+    def _pick_random_raid(self):
+        from src.scenes.raid_scene.raid_catalog import pick_random_raid, get_raid_name
+        from src.config.raid_season import CURRENT_RAID_CHAPTER, get_season_name
+
+        resultado = pick_random_raid(CURRENT_RAID_CHAPTER)
+
+        if resultado is None:
+            print(f"[RAID] Sem raids no capítulo {CURRENT_RAID_CHAPTER} — usando 1-1")
+            self.raid_chapter, self.raid_level = 1, 1
+            return
+
+        self.raid_chapter, self.raid_level = resultado
+        season = get_season_name(self.raid_chapter)
+        nome = get_raid_name(self.raid_chapter, self.raid_level)
+        print(f"[RAID] Temporada {season} → {nome} (cap {self.raid_chapter} lvl {self.raid_level})")
+
+        try:
+            toast_info(f"Raid sorteada: {nome}", duration=3.0)
+        except Exception:
+            pass
 
     def _finalize_teams(self):
         """Calcula a divisão igualitária (6 / n) e envia para todos."""
@@ -581,10 +606,17 @@ class RaidScene(BaseScene):
         if self.is_host and not self.final_team:
             self._finalize_teams()
 
-        # ===== LÊ CONFIG DO BOSS DA FASE (pokemon_id + level + delay) =====
-        boss_cfg = self._get_raid_boss_config()
-        print(f"[RAID] Iniciando batalha | boss_id={boss_cfg['pokemon_id']} | "
-              f"level={boss_cfg['level']} | delay={boss_cfg['initial_delay']}s | "
+        # Se por algum motivo não há raid sorteada, garante fallback
+        if not self.raid_chapter or not self.raid_level:
+            self.raid_chapter = 1
+            self.raid_level = 1
+            print(f"[RAID] AVISO: raid não sorteada — usando fallback 1-1")
+
+        # ===== LÊ CONFIG DO BOSS DA FASE SORTEADA =====
+        boss_cfg = self._get_raid_boss_config(self.raid_chapter, self.raid_level)
+        print(f"[RAID] Iniciando batalha | cap={self.raid_chapter} "
+              f"level={self.raid_level} | boss_id={boss_cfg['pokemon_id']} | "
+              f"boss_level={boss_cfg['level']} | delay={boss_cfg['initial_delay']}s | "
               f"final_team={len(self.final_team)} pokémon")
 
         self.game.current_scene = RaidBattleScene(
@@ -596,59 +628,48 @@ class RaidScene(BaseScene):
             boss_id=boss_cfg["pokemon_id"],
             boss_level=boss_cfg["level"],
             initial_delay=boss_cfg["initial_delay"],
+            raid_chapter=self.raid_chapter,
+            raid_level=self.raid_level,
         )
 
-    def _get_raid_boss_config(self):
+    def _get_raid_boss_config(self, raid_chapter, raid_level):
         """
-        Lê o boss da fase de raid (waves[0] + template).
+        Lê o boss da fase de raid ESPECÍFICA (cap + level).
         Retorna dict com pokemon_id, level e initial_delay.
-        Prioriza os valores do TEMPLATE (se existir), senão usa os da WAVE.
         """
         default = {"pokemon_id": 146, "level": 50, "initial_delay": 10.0}
         try:
-            from src.scenes.game_scene.components.phase_loader import phase_loader
-            from src.editor.wave_config import WaveTemplateManager
+            import json, os
+            from src.scenes.raid_scene.raid_catalog import get_raid_path
 
-            waves = phase_loader.get_waves_data()
+            raid_path = get_raid_path(raid_chapter, raid_level)
+            if not os.path.exists(raid_path):
+                print(f"[RAID] AVISO: JSON da raid não encontrado: {raid_path}")
+                return default
+
+            with open(raid_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            waves = data.get("waves", {}).get("waves", [])
             if not waves:
-                print("[RAID] Nenhuma wave encontrada — usando defaults")
                 return default
 
             wave = waves[0]
 
-            # ----- Template (opcional) -----
-            template = None
-            template_id = wave.get("template_id")
-            if template_id:
-                template = WaveTemplateManager.get_template(template_id)
-                if template:
-                    print(f"[RAID] Template do boss: {template.name} ({template_id})")
-
             # ----- Pokemon ID -----
             pokemon_id = None
-            if template and template.enemies:
-                pokemon_id = template.enemies[0].pokemon_id
-            else:
-                enemies = wave.get("enemies", [])
-                if enemies:
-                    pokemon_id = enemies[0].get("pokemon_id")
+            enemies = wave.get("enemies", [])
+            if enemies:
+                pokemon_id = enemies[0].get("pokemon_id")
 
-            # ----- Level (usa min_level do template/wave) -----
-            if template:
-                level = getattr(template, "min_level", None) or wave.get("min_level", 50)
-            else:
-                level = wave.get("min_level", 50)
+            # ----- Level (usa min_level) -----
+            level = wave.get("min_level", 50)
 
             # ----- Initial delay -----
-            if template:
-                initial_delay = getattr(template, "initial_delay", None)
-                if initial_delay is None:
-                    initial_delay = wave.get("initial_delay", 10.0)
-            else:
-                initial_delay = wave.get("initial_delay", 10.0)
+            initial_delay = wave.get("initial_delay", 10.0)
 
-            print(f"[RAID] Boss config lida: id={pokemon_id} level={level} "
-                  f"delay={initial_delay}")
+            print(f"[RAID] Boss config lida ({raid_chapter}-{raid_level}): "
+                  f"id={pokemon_id} level={level} delay={initial_delay}")
             return {
                 "pokemon_id": pokemon_id or 146,
                 "level": int(level),
@@ -769,7 +790,11 @@ class RaidScene(BaseScene):
                     if self.is_host:
                         self.network.send_to_all(create_message(
                             "RAID_START",
-                            {"raid_id": self.raid_id},
+                            {
+                                "raid_id": self.raid_id,
+                                "raid_chapter": self.raid_chapter or 1,
+                                "raid_level": self.raid_level or 1,
+                            },
                         ))
                     self.state = self.ST_STARTED
                     self._on_raid_started()

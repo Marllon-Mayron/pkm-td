@@ -35,6 +35,8 @@ MSG_TYPES = {
     "RAID_ALL_DEFEATED": "raid_all_defeated",
     "RAID_WEATHER_CHANGE": "raid_weather_change",
     "RAID_BOSS_ATTACK": "raid_boss_attack",
+    "RAID_POKEMON_ATTACK": "raid_pokemon_attack",
+    "RAID_RETURN_LOBBY": "raid_return_lobby",
     # =================
     "ERROR": "error",
     "DISCONNECT": "disconnect",
