@@ -76,6 +76,21 @@ class _RaidEntry:
             return self._instance.to_dict()
         return dict(self._raw_data) if self._raw_data else {}
 
+    def get_instance(self, player):
+        """Retorna a instância Pokemon (cria e cacheia se for da box)."""
+        if self._instance is not None:
+            return self._instance
+
+        cached = player._pokemon_cache.get(self.unique_id)
+        if cached is not None:
+            return cached
+
+        from src.entities.pokemon import Pokemon
+        inst = Pokemon.from_dict(self._raw_data)
+        inst.is_in_team = False
+        player._pokemon_cache[self.unique_id] = inst
+        return inst
+
 
 # =========================================================
 # Cena principal de RAID
@@ -85,7 +100,7 @@ class RaidScene(BaseScene):
 
     # -------- Estados --------
     ST_WAITING   = "waiting"     # aguardando 2+ jogadores
-    ST_SELECTING = "selecting"   # cada um escolhe até 6
+    ST_SELECTING = "selecting"   # cada um escolhe até a quota dele
     ST_READY     = "ready"       # todos confirmam "Pronto"
     ST_COUNTDOWN = "countdown"   # 5..4..3..2..1
     ST_STARTED   = "started"     # raid começou (placeholder)
@@ -93,7 +108,7 @@ class RaidScene(BaseScene):
 
     MIN_PLAYERS = 2
     MAX_PLAYERS = 6
-    MAX_SELECTION = 6
+    MAX_SELECTION = 6            # teto absoluto (nunca pode passar disso)
     RAID_TEAM_SIZE = 6
 
     def __init__(self, game, is_host, network, raid_id=None):
@@ -120,7 +135,6 @@ class RaidScene(BaseScene):
         self.state = self.ST_WAITING
 
         # ===== RAID SORTEADA (chapter + level) =====
-        # Host sorteia quando todos ficam prontos; cliente adota via rede.
         self.raid_chapter = None
         self.raid_level = None
 
@@ -129,13 +143,22 @@ class RaidScene(BaseScene):
 
         # Minha seleção atual (lista de _RaidEntry)
         self._all_entries = []
-        self._my_selection = []  # lista de _RaidEntry
+        self._my_selection = []
 
         # Times recebidos de todos: uuid -> [pokemon_data, ...]
         self.all_teams = {}
 
-        # Resultado final da divisão: lista de {"pokemon": data, "owner_uuid":.., "owner_name":..}
+        # Resultado final: lista de {"pokemon": data, "owner_uuid":.., "owner_name":..}
         self.final_team = []
+
+        # ===== QUOTAS DE SELEÇÃO =====
+        # uuid -> quantos Pokémon pode escolher.
+        # Calculado pelo host ao iniciar a seleção e adotado pelo cliente.
+        self._quotas = {}
+
+        # ===== MODAL DE DETALHES =====
+        self.modal = None
+        self._detail_buttons = []
 
         # Countdown
         self.countdown_value = 0
@@ -192,7 +215,7 @@ class RaidScene(BaseScene):
         self.network.send_to_all(create_message(
             "RAID_JOIN",
             {
-                "raid_id": self.raid_id,  # cliente envia None inicialmente
+                "raid_id": self.raid_id,
                 "name": self.network.my_name,
                 "uuid": my_uuid,
             },
@@ -255,7 +278,6 @@ class RaidScene(BaseScene):
         content_y = vy + header_h
         content_h = vh - header_h - footer_h
 
-        # Painel esquerdo: jogadores (260px)  |  Painel direito: seleção/time
         left_w = 260
         gap = 14
 
@@ -265,7 +287,6 @@ class RaidScene(BaseScene):
             vw - left_w - margin * 2 - gap, content_h,
         )
 
-        # Lista fica dentro do painel direito
         self._list_rect = pygame.Rect(
             self._right_rect.x + 12,
             self._right_rect.y + 12,
@@ -279,7 +300,6 @@ class RaidScene(BaseScene):
         self.visible_items = max(2, avail_h // self._item_height)
         self._list_items_w = self._list_rect.width - 8
 
-        # Botões inferiores
         btn_h = 42
         center_x = vx + vw // 2
         self.leave_btn = pygame.Rect(vx + margin, vy + vh - btn_h - 16, 140, btn_h)
@@ -319,12 +339,12 @@ class RaidScene(BaseScene):
         msg_type = msg.get("type")
         payload = msg.get("payload", {})
 
-        # Ignora mensagens de OUTRAS raids (se houver)
+        # Ignora mensagens de OUTRAS raids
         incoming_raid_id = payload.get("raid_id")
         if incoming_raid_id and self.raid_id and incoming_raid_id != self.raid_id:
-            return  # é de outra raid mesmo, ignora
+            return
 
-        # Cliente adota o raid_id do host na primeira mensagem que chegar
+        # Cliente adota o raid_id do host na primeira mensagem
         if incoming_raid_id and not self.raid_id:
             self.raid_id = incoming_raid_id
             print(f"[RAID] Cliente adotou raid_id do host: {self.raid_id}")
@@ -335,8 +355,11 @@ class RaidScene(BaseScene):
             print(f"[RAID][HOST] RAID_JOIN recebido de {name} (uuid={uuid_str[:8]})")
 
             if self.is_host:
+                # Bloqueia entrada depois que a seleção começou
+                if self.state != self.ST_WAITING:
+                    print(f"[RAID][HOST] Recusando {name} — raid já em andamento.")
+                    return
                 if uuid_str in self.raid_players:
-                    # Já está — só re-broadcast para sincronizar quem pediu
                     print(f"[RAID][HOST] {name} já está na lista — re-broadcast.")
                     self._broadcast_player_list()
                     return
@@ -370,7 +393,6 @@ class RaidScene(BaseScene):
                 }
             self.raid_players = new_map
 
-            # Se eu NÃO estou na lista do host, re-envio RAID_JOIN
             if not self.is_host:
                 my_uuid = self._my_uuid()
                 if my_uuid not in self.raid_players:
@@ -390,7 +412,15 @@ class RaidScene(BaseScene):
                 self.state = self.ST_SELECTING
                 self._my_selection = []
                 self.scroll_offset = 0
-                toast_info("Selecione 6 Pokémon para a raid!")
+
+                # Adota quotas do host
+                quotas_raw = payload.get("quotas", {})
+                if quotas_raw:
+                    self._quotas = {str(k): int(v) for k, v in quotas_raw.items()}
+                else:
+                    self._quotas = self._compute_quotas()
+
+                toast_info(f"Selecione até {self._my_quota()} Pokémon para a raid!")
 
         elif msg_type == "RAID_TEAM_SUBMIT":
             sender_uuid = payload.get("uuid")
@@ -402,10 +432,14 @@ class RaidScene(BaseScene):
                 self._check_all_submitted()
 
         elif msg_type == "RAID_TEAM_UPDATE":
-            # Host envia a distribuição final
             self.all_teams = payload.get("all_teams", {})
             self.final_team = payload.get("final_team", [])
-            # Reconstrói contadores de cada jogador
+
+            # Adota quotas finais do host
+            quotas_raw = payload.get("quotas", {})
+            if quotas_raw:
+                self._quotas = {str(k): int(v) for k, v in quotas_raw.items()}
+
             for u, team in self.all_teams.items():
                 if u in self.raid_players:
                     self.raid_players[u]["assigned_count"] = len(team)
@@ -422,7 +456,6 @@ class RaidScene(BaseScene):
                 self._broadcast_player_list()
                 self._check_all_ready()
             else:
-                # Aplica localmente se não for host
                 if sender_uuid in self.raid_players:
                     self.raid_players[sender_uuid]["ready"] = ready
 
@@ -432,7 +465,6 @@ class RaidScene(BaseScene):
             self.countdown_timer = 0.0
             self._countdown_started = True
 
-            # Cliente também adota a raid sorteada (vem no payload do countdown)
             rc = payload.get("raid_chapter")
             rl = payload.get("raid_level")
             if rc is not None and rl is not None and not self.is_host:
@@ -444,7 +476,6 @@ class RaidScene(BaseScene):
             toast_info(f"RAID COMEÇANDO EM {self.countdown_value}!")
 
         elif msg_type == "RAID_START":
-            # Cliente adota a raid sorteada pelo host
             rc = payload.get("raid_chapter")
             rl = payload.get("raid_level")
             if rc is not None and rl is not None:
@@ -463,7 +494,6 @@ class RaidScene(BaseScene):
                 toast_warning(f"{name} saiu da raid.")
             if self.is_host:
                 self._broadcast_player_list()
-                # Se ficou sozinho, cancela
                 if len(self.raid_players) < self.MIN_PLAYERS and self.state != self.ST_WAITING:
                     self._cancel_raid("Jogadores insuficientes.")
 
@@ -493,16 +523,14 @@ class RaidScene(BaseScene):
         if len(self.raid_players) < self.MIN_PLAYERS:
             return
         if all(p.get("ready") for p in self.raid_players.values()):
-            # ===== SORTEIA UMA RAID DA TEMPORADA =====
+            # Sorteia a raid
             self._pick_random_raid()
 
-            # Inicia countdown
             self.state = self.ST_COUNTDOWN
             self.countdown_value = 5
             self.countdown_timer = 0.0
             self._countdown_started = True
 
-            # Envia pro cliente (raid_chapter + raid_level vão no payload)
             self.network.send_to_all(create_message(
                 "RAID_COUNTDOWN",
                 {
@@ -535,11 +563,12 @@ class RaidScene(BaseScene):
         except Exception:
             pass
 
-    def _finalize_teams(self):
-        """Calcula a divisão igualitária (6 / n) e envia para todos."""
+    # -------- Quotas --------
+    def _compute_quotas(self):
+        """Divide 6 Pokémon entre os jogadores. Sobra vai pra sorteio."""
         n = len(self.raid_players)
-        if n < self.MIN_PLAYERS:
-            return
+        if n <= 0:
+            return {}
 
         base = self.RAID_TEAM_SIZE // n
         remainder = self.RAID_TEAM_SIZE % n
@@ -547,15 +576,38 @@ class RaidScene(BaseScene):
         uuids = list(self.raid_players.keys())
         random.shuffle(uuids)
 
-        # Quantos cada um dá
         quotas = {}
         for i, u in enumerate(uuids):
             quotas[u] = base + (1 if i < remainder else 0)
+        return quotas
+
+    def _my_quota(self):
+        """Quantos Pokémon EU posso escolher nesta raid."""
+        my = self._my_uuid()
+        if self._quotas and my in self._quotas:
+            return int(self._quotas[my])
+        n = max(1, len(self.raid_players))
+        return max(1, self.RAID_TEAM_SIZE // n)
+
+    # -------- Finalização dos times --------
+    def _finalize_teams(self):
+        """Divide o time da raid usando as quotas pré-calculadas."""
+        n = len(self.raid_players)
+        if n < self.MIN_PLAYERS:
+            return
+
+        # Reutiliza quotas se válidas
+        if self._quotas and all(u in self._quotas for u in self.raid_players.keys()):
+            quotas = dict(self._quotas)
+        else:
+            quotas = self._compute_quotas()
 
         all_teams = {}
         final_team = []
 
         for u, quota in quotas.items():
+            if u not in self.raid_players:
+                continue
             player = self.raid_players[u]
             candidates = list(player.get("team", []))
             random.shuffle(candidates)
@@ -580,7 +632,7 @@ class RaidScene(BaseScene):
                 "raid_id": self.raid_id,
                 "all_teams": all_teams,
                 "final_team": final_team,
-                "quotas": quotas,
+                "quotas": {str(k): v for k, v in quotas.items()},
             },
         ))
 
@@ -602,17 +654,14 @@ class RaidScene(BaseScene):
             return
         self._raid_battle_launched = True
 
-        # Se o host ainda não finalizou o time, finaliza agora
         if self.is_host and not self.final_team:
             self._finalize_teams()
 
-        # Se por algum motivo não há raid sorteada, garante fallback
         if not self.raid_chapter or not self.raid_level:
             self.raid_chapter = 1
             self.raid_level = 1
             print(f"[RAID] AVISO: raid não sorteada — usando fallback 1-1")
 
-        # ===== LÊ CONFIG DO BOSS DA FASE SORTEADA =====
         boss_cfg = self._get_raid_boss_config(self.raid_chapter, self.raid_level)
         print(f"[RAID] Iniciando batalha | cap={self.raid_chapter} "
               f"level={self.raid_level} | boss_id={boss_cfg['pokemon_id']} | "
@@ -633,10 +682,7 @@ class RaidScene(BaseScene):
         )
 
     def _get_raid_boss_config(self, raid_chapter, raid_level):
-        """
-        Lê o boss da fase de raid ESPECÍFICA (cap + level).
-        Retorna dict com pokemon_id, level e initial_delay.
-        """
+        """Lê o boss da fase de raid ESPECÍFICA (cap + level)."""
         default = {"pokemon_id": 146, "level": 50, "initial_delay": 10.0}
         try:
             import json, os
@@ -656,16 +702,12 @@ class RaidScene(BaseScene):
 
             wave = waves[0]
 
-            # ----- Pokemon ID -----
             pokemon_id = None
             enemies = wave.get("enemies", [])
             if enemies:
                 pokemon_id = enemies[0].get("pokemon_id")
 
-            # ----- Level (usa min_level) -----
             level = wave.get("min_level", 50)
-
-            # ----- Initial delay -----
             initial_delay = wave.get("initial_delay", 10.0)
 
             print(f"[RAID] Boss config lida ({raid_chapter}-{raid_level}): "
@@ -691,20 +733,22 @@ class RaidScene(BaseScene):
             if e.unique_id == entry.unique_id:
                 self._my_selection.pop(i)
                 return
-        if len(self._my_selection) >= self.MAX_SELECTION:
-            toast_warning(f"Máximo de {self.MAX_SELECTION} Pokémon.")
+
+        quota = self._my_quota()
+        if len(self._my_selection) >= quota:
+            toast_warning(f"Máximo de {quota} Pokémon para esta raid.")
             return
         self._my_selection.append(entry)
 
     def _submit_team(self):
+        quota = self._my_quota()
         if len(self._my_selection) == 0:
             toast_warning("Selecione pelo menos 1 Pokémon.")
             return
-        if len(self._my_selection) > self.MAX_SELECTION:
-            toast_warning(f"Máximo {self.MAX_SELECTION}.")
+        if len(self._my_selection) > quota:
+            toast_warning(f"Máximo {quota}.")
             return
 
-        # Sincroniza held_item do cache (igual TradeScene)
         team_data = []
         for e in self._my_selection:
             data = e.to_dict()
@@ -719,7 +763,6 @@ class RaidScene(BaseScene):
             {"raid_id": self.raid_id, "uuid": my_uuid, "team": team_data},
         ))
 
-        # Se for host, já registra localmente
         if self.is_host:
             self.raid_players[my_uuid]["team"] = team_data
             self.raid_players[my_uuid]["submitted"] = True
@@ -727,8 +770,7 @@ class RaidScene(BaseScene):
             self._check_all_submitted()
 
         toast_info(f"Time enviado ({len(team_data)} Pokémon).")
-        # Bloqueia UI mostrando que já enviamos (aguardando outros)
-        self.state = self.ST_READY  # provisório até receber RAID_TEAM_UPDATE
+        self.state = self.ST_READY
 
     def _toggle_ready(self):
         my_uuid = self._my_uuid()
@@ -762,6 +804,36 @@ class RaidScene(BaseScene):
         self.game.current_scene = LobbyScene(
             self.game, is_host=self.is_host, network=self.network
         )
+
+    # =========================================================
+    # MODAL DE DETALHES
+    # =========================================================
+    def _open_pokemon_modal_by_uid(self, uid):
+        for e in self._all_entries:
+            if e.unique_id == uid:
+                self._open_pokemon_modal(e)
+                return
+
+    def _open_pokemon_modal(self, entry):
+        try:
+            uid = entry.unique_id
+            if uid not in self.game.player._pokemon_cache:
+                entry.get_instance(self.game.player)
+
+            from scenes.team_select_scene.components import PokemonModal
+            self.modal = PokemonModal(self.game, uid)
+
+            # Neutraliza botões de ação do modal
+            self.modal.action_button = pygame.Rect(0, 0, 0, 0)
+            self.modal.release_button = pygame.Rect(0, 0, 0, 0)
+        except Exception as e:
+            print(f"[RAID] Erro ao abrir modal: {e}")
+            import traceback
+            traceback.print_exc()
+            toast_warning("Erro ao abrir detalhes.")
+
+    def _close_modal(self):
+        self.modal = None
 
     # =========================================================
     # Update
@@ -803,6 +875,13 @@ class RaidScene(BaseScene):
     # Eventos
     # =========================================================
     def handle_event(self, event):
+        # ===== MODAL TEM PRIORIDADE =====
+        if self.modal and self.modal.visible:
+            result = self.modal.handle_event(event)
+            if result == "close":
+                self._close_modal()
+            return
+
         if event.type == pygame.VIDEORESIZE:
             self._layout()
             return
@@ -827,11 +906,18 @@ class RaidScene(BaseScene):
                 self._leave_raid()
                 return
 
-            # Botão de ação principal
             if self.action_btn.collidepoint(pos):
                 sound_manager.play_effect(SoundEffect.CLICK)
                 self._on_action_clicked()
                 return
+
+            # ===== Botões DETALHES (prioridade sobre toggle) =====
+            if self.state == self.ST_SELECTING:
+                for btn_rect, uid in self._detail_buttons:
+                    if btn_rect.collidepoint(pos):
+                        sound_manager.play_effect(SoundEffect.CLICK)
+                        self._open_pokemon_modal_by_uid(uid)
+                        return
 
             # Clique na lista (só na fase de seleção)
             if self.state == self.ST_SELECTING:
@@ -848,15 +934,19 @@ class RaidScene(BaseScene):
                         f"Precisa de pelo menos {self.MIN_PLAYERS} jogadores."
                     )
                     return
-                # Host inicia a seleção
+
+                # Calcula quotas ANTES de broadcastar
+                self._quotas = self._compute_quotas()
+                quotas_json = {str(k): int(v) for k, v in self._quotas.items()}
+
                 self.network.send_to_all(create_message(
                     "RAID_START_SELECTION",
-                    {"raid_id": self.raid_id},
+                    {"raid_id": self.raid_id, "quotas": quotas_json},
                 ))
                 self.state = self.ST_SELECTING
                 self._my_selection = []
                 self.scroll_offset = 0
-                toast_info("Seleção iniciada!")
+                toast_info(f"Seleção iniciada! Escolha até {self._my_quota()} Pokémon.")
             else:
                 toast_info("Aguardando o host iniciar a seleção...")
 
@@ -886,6 +976,10 @@ class RaidScene(BaseScene):
                 self._list_items_w, self._item_height - 4,
             )
             if rect.collidepoint(pos):
+                # Se o clique foi no botão DETALHES, não seleciona
+                for btn_rect, _uid in self._detail_buttons:
+                    if btn_rect.collidepoint(pos):
+                        return None
                 return idx
         return None
 
@@ -901,7 +995,6 @@ class RaidScene(BaseScene):
         vh = self.screen_manager.viewport_height
         cx = vx + vw // 2
 
-        # Header
         title = self.font_title.render("RAID", True, COL_ACCENT)
         screen.blit(title, title.get_rect(center=(cx, vy + 34)))
 
@@ -912,13 +1005,9 @@ class RaidScene(BaseScene):
         )
         screen.blit(subtitle, subtitle.get_rect(center=(cx, vy + 58)))
 
-        # Botão voltar
         self._draw_button(screen, self.back_btn, "Sair", kind="danger")
-
-        # Painel de jogadores
         self._render_players_panel(screen)
 
-        # Painel direito (muda por estado)
         if self.state == self.ST_WAITING:
             self._render_waiting(screen)
         elif self.state == self.ST_SELECTING:
@@ -932,15 +1021,17 @@ class RaidScene(BaseScene):
         elif self.state == self.ST_CANCELLED:
             self._render_cancelled(screen)
 
-        # Botão de ação
         self._render_action_button(screen)
 
-        # Rodapé
         instr = self.font_tiny.render(
             "ESC = sair  |  Clique nos Pokémon para selecionar/desselecionar",
             True, COL_TEXT_MUTED,
         )
         screen.blit(instr, instr.get_rect(center=(cx, vy + vh - 14)))
+
+        # Modal por cima de tudo
+        if self.modal and self.modal.visible:
+            self.modal.render(screen)
 
     # ---------- Painel esquerdo ----------
     def _render_players_panel(self, screen):
@@ -967,7 +1058,6 @@ class RaidScene(BaseScene):
             name_s = self.font_small.render(name, True, color)
             screen.blit(name_s, (self._players_rect.x + 14, y))
 
-            # Status
             status_y = y + 20
             if p.get("ready"):
                 status = "PRONTO"
@@ -982,16 +1072,20 @@ class RaidScene(BaseScene):
             status_s = self.font_tiny.render(status, True, scolor)
             screen.blit(status_s, (self._players_rect.x + 24, status_y))
 
-            # Contagem de pokémons atribuídos (se já final)
             if p.get("assigned_count", 0) > 0:
                 cnt = self.font_tiny.render(
                     f"{p['assigned_count']} pokémon(s)", True, COL_ACCENT
                 )
                 screen.blit(cnt, (self._players_rect.x + 140, status_y))
 
+            # Quota na fase de seleção
+            if self.state == self.ST_SELECTING and u in self._quotas:
+                q = self._quotas[u]
+                q_s = self.font_tiny.render(f"até {q}", True, COL_TEXT_DIM)
+                screen.blit(q_s, (self._players_rect.x + 200, status_y))
+
             y += 44
 
-        # Aviso "não pode começar sozinho"
         if len(self.raid_players) < self.MIN_PLAYERS:
             warn = self.font_tiny.render(
                 "Aguardando mais jogadores...", True, COL_WARN
@@ -1032,9 +1126,11 @@ class RaidScene(BaseScene):
         pygame.draw.rect(screen, COL_PANEL, self._right_rect, border_radius=10)
         pygame.draw.rect(screen, COL_BORDER, self._right_rect, 1, border_radius=10)
 
-        # Header
+        self._detail_buttons = []
+
+        quota = self._my_quota()
         header = self.font_h2.render(
-            f"Escolha até {self.MAX_SELECTION}  ({len(self._my_selection)}/{self.MAX_SELECTION})",
+            f"Escolha até {quota}  ({len(self._my_selection)}/{quota})",
             True, COL_ACCENT,
         )
         screen.blit(header, (self._list_rect.x + 4, self._list_rect.y + 10))
@@ -1060,7 +1156,6 @@ class RaidScene(BaseScene):
             )
             self._draw_entry(screen, rect, entry, entry.unique_id in selected_ids, mouse)
 
-        # Scrollbar simples
         total = len(self._all_entries)
         if total > self.visible_items:
             track_h = self.visible_items * self._item_height
@@ -1106,22 +1201,53 @@ class RaidScene(BaseScene):
             portrait = pygame.transform.smoothscale(portrait, (psize, psize))
             screen.blit(portrait, (px, py))
 
-        # Nome + nível + badge
+        # Botão DETALHES (à direita)
+        detail_btn_w = 66
+        detail_btn_h = 20
+        detail_btn = pygame.Rect(
+            rect.right - detail_btn_w - 6,
+            rect.y + (rect.height - detail_btn_h) // 2,
+            detail_btn_w, detail_btn_h,
+        )
+
+        # Área de info: da direita do portrait até a esquerda do DETALHES
+        info_x = px + psize + 12
+        info_right = detail_btn.left - 8
+        info_w = max(20, info_right - info_x)
+
+        # Nome
         name_color = COL_ACCENT if entry.is_shiny else COL_TEXT
         name_s = self.font_h2.render(entry.name, True, name_color)
-        screen.blit(name_s, (rect.x + 62, rect.y + 8))
+        if name_s.get_width() > info_w:
+            # trunca
+            trimmed = entry.name
+            while trimmed and self.font_h2.size(trimmed + "...")[0] > info_w:
+                trimmed = trimmed[:-1]
+            name_s = self.font_h2.render(trimmed + "...", True, name_color)
+        screen.blit(name_s, (info_x, rect.y + 8))
 
+        # Nível + badge
         lvl_s = self.font_small.render(f"Nível {entry.level}", True, COL_TEXT_DIM)
-        screen.blit(lvl_s, (rect.x + 62, rect.y + 30))
+        screen.blit(lvl_s, (info_x, rect.y + 30))
 
         badge = "TIME" if entry.is_in_team else "BOX"
         bcolor = COL_SUCCESS if entry.is_in_team else COL_TEXT_MUTED
         b_s = self.font_tiny.render(badge, True, bcolor)
-        screen.blit(b_s, (rect.x + 160, rect.y + 32))
+        badge_x = info_x + lvl_s.get_width() + 8
+        if badge_x + b_s.get_width() <= info_right:
+            screen.blit(b_s, (badge_x, rect.y + 32))
 
-        # Check de seleção
+        # Botão DETALHES
+        hover_d = detail_btn.collidepoint(mouse)
+        d_color = COL_BTN_INFO_H if hover_d else COL_BTN_INFO
+        pygame.draw.rect(screen, d_color, detail_btn, border_radius=4)
+        pygame.draw.rect(screen, COL_BORDER_HL, detail_btn, 1, border_radius=4)
+        d_txt = self.font_tiny.render("DETALHES", True, COL_TEXT)
+        screen.blit(d_txt, d_txt.get_rect(center=detail_btn.center))
+
+        # Check de seleção (à esquerda do DETALHES)
         if selected:
-            check_x = rect.right - 24
+            check_x = detail_btn.left - 16
             check_y = rect.centery
             pygame.draw.circle(screen, COL_SUCCESS, (check_x, check_y), 10)
             pygame.draw.lines(
@@ -1130,6 +1256,8 @@ class RaidScene(BaseScene):
                  (check_x + 4, check_y - 4)],
                 2,
             )
+
+        self._detail_buttons.append((detail_btn, entry.unique_id))
 
     def _render_ready(self, screen):
         pygame.draw.rect(screen, COL_PANEL, self._right_rect, border_radius=10)
@@ -1201,9 +1329,7 @@ class RaidScene(BaseScene):
         t = self.font_title.render("PREPARE-SE!", True, COL_ACCENT)
         screen.blit(t, t.get_rect(center=(cx, cy - 100)))
 
-        # Número grande
         num = self.countdown_value
-        # "pulso" no número
         scale = 1.0
         if self._countdown_started:
             frac = self.countdown_timer % 1.0
@@ -1253,7 +1379,8 @@ class RaidScene(BaseScene):
                 kind = "disabled"
                 enabled = False
         elif self.state == self.ST_SELECTING:
-            label = f"Enviar Time ({len(self._my_selection)}/{self.MAX_SELECTION})"
+            quota = self._my_quota()
+            label = f"Enviar Time ({len(self._my_selection)}/{quota})"
             kind = "success" if len(self._my_selection) > 0 else "disabled"
             enabled = len(self._my_selection) > 0
         elif self.state == self.ST_READY:
