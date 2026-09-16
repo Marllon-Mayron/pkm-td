@@ -24,6 +24,14 @@
                 "chapter": 1,
                 "phase": 2
             }
+        },
+        {
+            "chapter": 1,
+            "level": 4,
+            "unlock_requirement": {
+                "chapter": 1,
+                "phase": 3
+            }
         }
     ]
 }
