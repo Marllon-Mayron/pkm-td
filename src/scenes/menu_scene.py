@@ -33,7 +33,7 @@ class ImageSlideshow:
         self.timer = 0
         self.switch_interval = switch_interval
         self.image_surfaces = []
-        self.image_names = []          # <- NOVO: nome do arquivo de cada imagem
+        self.image_names = []
         self._loaded = False
         self.folder_path = None
 
@@ -350,7 +350,7 @@ class Button:
 class MenuScene(BaseScene):
     """Menu principal com painel lateral NEWS / PREVIEW + botões à esquerda."""
 
-    DEBUG_MODE = True
+    DEBUG_MODE = False
 
     def __init__(self, game):
         super().__init__(game)
