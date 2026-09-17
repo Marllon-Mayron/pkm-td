@@ -21,6 +21,10 @@ class DragDropManager:
         self.place_preview_alpha = 0
         self.tile_size = 24
 
+        # ===== ÍMÃ: raio (em pixels do mundo) que atrai o drop para o spot =====
+        # ~1.5 tiles de tolerância => perdoa erros de até ~36px no centro do spot
+        self.magnet_radius = int(self.tile_size * 1.5)
+
         self.drag_type = None  # "team" ou "placed"
         self.drag_source_spot = None
 
@@ -98,6 +102,32 @@ class DragDropManager:
 
         return placeholder
 
+    def _find_nearest_spot(self, world_pos, tower_spots):
+        """
+        ÍMÃ: encontra o spot mais próximo do mouse dentro do raio de tolerância.
+        Retorna None se nenhum spot estiver perto o suficiente.
+        """
+        if not tower_spots:
+            return None
+
+        best_spot = None
+        best_dist_sq = self.magnet_radius * self.magnet_radius
+
+        for spot in tower_spots:
+            # Centro do tile onde o spot está
+            spot_center_x = (spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
+            spot_center_y = (spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
+
+            dx = spot_center_x - world_pos[0]
+            dy = spot_center_y - world_pos[1]
+            dist_sq = dx * dx + dy * dy
+
+            if dist_sq <= best_dist_sq:
+                best_dist_sq = dist_sq
+                best_spot = spot
+
+        return best_spot
+
     def start_drag(self, slot_index, pokemon, screen_pos, world_pos):
         """Inicia o arrasto de um Pokémon do time"""
         if hasattr(pokemon, 'is_placed') and pokemon.is_placed:
@@ -163,77 +193,71 @@ class DragDropManager:
         self.preview_surface = final
 
     def update_drag(self, screen_pos, world_pos, tower_spots, placed_pokemon, camera, placement_manager=None):
-        """Atualiza a posição do arrasto"""
+        """Atualiza a posição do arrasto - COM ÍMÃ para facilitar o acerto no spot"""
         if not self.is_dragging:
             return
 
         self.drag_screen_pos = screen_pos
         self.drag_world_pos = world_pos
 
-        mouse_tile_x = world_pos[0] // self.tile_size
-        mouse_tile_y = world_pos[1] // self.tile_size
-
         self.hovered_spot = None
         self.hovered_pokemon = None
         self.valid_target = False
 
-        # ===== VERIFICA PRIMEIRO SE ESTÁ SOBRE UM POKÉMON COLOCADO =====
-        if placement_manager and self.drag_type == "placed":
+        # ===== 1. ÍMÃ: procura o spot mais próximo dentro do raio =====
+        magnet_spot = self._find_nearest_spot(world_pos, tower_spots)
+
+        if magnet_spot is None:
+            # Nenhum spot perto - preview segue o mouse normalmente
+            self.place_preview_alpha = min(255, self.place_preview_alpha + 15)
+            return
+
+        # ===== 2. Verifica se há um Pokémon colocado nesse spot (swap/evolução) =====
+        pokemon_at_magnet = None
+        if placement_manager:
+            spot_tile_x = magnet_spot.x // self.tile_size
+            spot_tile_y = magnet_spot.y // self.tile_size
+
             for pokemon in placed_pokemon:
                 if pokemon == self.drag_pokemon:
                     continue
                 if not pokemon.is_alive() or pokemon.is_defeated:
                     continue
 
-                pokemon_tile_x = pokemon.x // self.tile_size
-                pokemon_tile_y = pokemon.y // self.tile_size
-
-                if pokemon_tile_x == mouse_tile_x and pokemon_tile_y == mouse_tile_y:
-                    self.hovered_pokemon = pokemon
-                    self.valid_target = True
-                    self.hovered_spot = None
-
-                    for spot in tower_spots:
-                        spot_tile_x = spot.x // self.tile_size
-                        spot_tile_y = spot.y // self.tile_size
-                        if spot_tile_x == pokemon_tile_x and spot_tile_y == pokemon_tile_y:
-                            self.hovered_spot = spot
-                            break
-
-                    tile_center_x = (mouse_tile_x * self.tile_size) + self.tile_size // 2
-                    tile_center_y = (mouse_tile_y * self.tile_size) + self.tile_size // 2
-                    self.drag_world_pos = (tile_center_x, tile_center_y)
-
-                    screen_x, screen_y = self.game.screen_manager.world_to_screen(
-                        tile_center_x, tile_center_y, camera
-                    )
-                    self.drag_screen_pos = (screen_x, screen_y)
-
-                    print(f"[DRAG] Sobre Pokémon {pokemon.name} - pode evoluir ou trocar")
+                if (hasattr(pokemon, 'placed_tile_x') and
+                        pokemon.placed_tile_x == spot_tile_x and
+                        pokemon.placed_tile_y == spot_tile_y):
+                    pokemon_at_magnet = pokemon
                     break
 
-        # ===== SE NÃO ESTÁ SOBRE POKÉMON, VERIFICA SPOTS VAZIOS =====
-        if not self.valid_target:
-            for spot in tower_spots:
-                if spot.occupied:
-                    continue
+        # ===== 3. Define se o alvo do ímã é válido =====
+        target_is_valid = False
 
-                spot_tile_x = spot.x // self.tile_size
-                spot_tile_y = spot.y // self.tile_size
+        if pokemon_at_magnet and self.drag_type == "placed":
+            # Swap / evolução entre dois Pokémon colocados
+            self.hovered_pokemon = pokemon_at_magnet
+            target_is_valid = True
+        elif not magnet_spot.occupied:
+            # Spot vazio -> colocar (team) ou mover (placed)
+            target_is_valid = True
 
-                if spot_tile_x == mouse_tile_x and spot_tile_y == mouse_tile_y:
-                    self.hovered_spot = spot
-                    self.valid_target = True
+        if not target_is_valid:
+            # Spot ocupado e sem interação válida (ex: arrastando do time p/ cima de outro)
+            self.place_preview_alpha = min(255, self.place_preview_alpha + 15)
+            return
 
-                    tile_center_x = (spot_tile_x * self.tile_size) + self.tile_size // 2
-                    tile_center_y = (spot_tile_y * self.tile_size) + self.tile_size // 2
-                    self.drag_world_pos = (tile_center_x, tile_center_y)
+        # ===== 4. Ativa o alvo e APLICA O EFEITO ÍMÃ (snap para o centro) =====
+        self.hovered_spot = magnet_spot
+        self.valid_target = True
 
-                    screen_x, screen_y = self.game.screen_manager.world_to_screen(
-                        tile_center_x, tile_center_y, camera
-                    )
-                    self.drag_screen_pos = (screen_x, screen_y)
-                    break
+        tile_center_x = (magnet_spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
+        tile_center_y = (magnet_spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
+        self.drag_world_pos = (tile_center_x, tile_center_y)
+
+        screen_x, screen_y = self.game.screen_manager.world_to_screen(
+            tile_center_x, tile_center_y, camera
+        )
+        self.drag_screen_pos = (screen_x, screen_y)
 
         self.place_preview_alpha = min(255, self.place_preview_alpha + 15)
 
