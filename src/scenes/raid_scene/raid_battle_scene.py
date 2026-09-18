@@ -1135,7 +1135,9 @@ class RaidBattleScene(GameScene):
         print(f"[RAID] VITÓRIA! Recompensas exibidas.")
 
     def _grant_legendary_reward(self):
-        """Cria o lendário derrotado (level 5, capture_method='event')."""
+        """
+        Cria o lendário derrotado (level 5, capture_method='event').
+        """
         try:
             from src.entities.pokemon import Pokemon
             from datetime import datetime
@@ -1156,20 +1158,22 @@ class RaidBattleScene(GameScene):
 
             legendary.capture_method = "event"
             legendary.capture_date = datetime.now().isoformat()
+            # Garante que não entre no time por engano
+            legendary.is_in_team = False
+            legendary.is_placed = False
 
+            # ===== SEMPRE PARA A BOX =====
             destination = "box"
-            if self.player.has_team_space():
-                ok, msg = self.player.add_to_team(legendary)
-                if ok:
-                    destination = "team"
-                    print(f"[RAID_REWARD] Lendário {legendary.name} adicionado ao TIME")
-                else:
-                    self.player.add_to_box(legendary)
-                    print(f"[RAID_REWARD] Lendário {legendary.name} enviado à BOX ({msg})")
-            else:
+            try:
                 self.player.add_to_box(legendary)
-                print(f"[RAID_REWARD] Time cheio — Lendário {legendary.name} enviado à BOX")
+                print(f"[RAID_REWARD] Lendário {legendary.name} (Lv.5) enviado à BOX")
+            except Exception as e:
+                print(f"[RAID_REWARD] ERRO ao enviar lendário para box: {e}")
+                import traceback
+                traceback.print_exc()
+                return None
 
+            # ===== POKÉDEX =====
             try:
                 self.player.caught_pokemon.add(legendary_id)
                 self.player.register_seen(legendary_id)

@@ -147,8 +147,19 @@ class PokedexList:
         self.scroll_y = 0
         self.scroll_target = 0
         self.max_scroll = 0
-        self.dragging_scroll = False
+
+        # --- estados de drag ---
+        self.dragging_scroll = False  # arrastando a barra de scroll
+        self.dragging_list = False  # arrastando a lista (touch drag)
+        self.drag_moved = False  # se o dedo/mouse já se moveu o suficiente
+        self.drag_start_y = 0
         self.last_mouse_y = 0
+        self.pending_click_item = None  # item sob o toque, só seleciona se for tap
+
+        # --- tuning para mobile ---
+        self.drag_threshold = 8  # px para diferenciar tap de drag
+        self.scroll_bar_hit_width = 20  # área de toque da barra
+
         self.on_item_click = None
         print(f"[POKEDEX_LIST] Inicializada em: {x}, {y}, {width}x{height}")
 

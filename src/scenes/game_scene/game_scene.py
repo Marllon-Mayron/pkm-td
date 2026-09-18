@@ -55,6 +55,7 @@ class GameScene(BaseScene):
         self.debug_in_game = False
         self.move_select_overlay = None
         self.move_learn_overlay = None
+        self.pending_move_learn = None
         self.game_paused = False
 
         self.ui_hidden = False  # True = oculta todas as UIs
@@ -510,6 +511,14 @@ class GameScene(BaseScene):
         """Abre o overlay de aprendizado de novo move"""
         from src.scenes.game_scene.components.overlays.move_learn_overlay import MoveLearnOverlay
 
+        # ===== SE EVOLUÇÃO ESTIVER ATIVA, DEFERE =====
+        # O overlay de evolução tem PRIORIDADE. Guardamos o pedido e ele
+        # será aberto automaticamente quando a evolução for fechada.
+        if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
+            print(f"[MOVE_LEARN] Evolução ativa — adiando aprendizado de '{new_move_name}' em {pokemon.name}")
+            self.pending_move_learn = (pokemon, new_move_name)
+            return
+
         self.move_learn_overlay = MoveLearnOverlay(self, pokemon, new_move_name)
         self.move_learn_overlay.active = True
         self.game_paused = True
@@ -589,6 +598,18 @@ class GameScene(BaseScene):
         if hasattr(self, 'evolution_overlay'):
             self.evolution_overlay = None
 
+        # ===== ABRE MOVE LEARN PENDENTE (se houver) =====
+        # Ordem garantida: evolução -> move learn
+        if not cancel and hasattr(self, 'pending_move_learn') and self.pending_move_learn:
+            pokemon, move_name = self.pending_move_learn
+            self.pending_move_learn = None
+            print(f"[EVOLUTION] Evolução fechada. Abrindo move learn pendente: '{move_name}' em {pokemon.name}")
+            # open_move_learn_overlay agora passa pela checagem (evolution_overlay é None)
+            # e por si só já seta paused/game_paused/wave_manager.paused = True
+            self.open_move_learn_overlay(pokemon, move_name)
+            return
+
+        # Sem pendência: comportamento original
         if hasattr(self, 'wave_manager'):
             self.wave_manager.paused = False
 

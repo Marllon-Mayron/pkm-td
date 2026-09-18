@@ -348,9 +348,9 @@ class Button:
 # MENU SCENE
 # =========================================================================
 class MenuScene(BaseScene):
-    """Menu principal com painel lateral NEWS / PREVIEW + botões à esquerda."""
+    """Menu principal com painel lateral NEWS / PREVIEW"""
 
-    DEBUG_MODE = False
+    DEBUG_MODE = True
 
     def __init__(self, game):
         super().__init__(game)

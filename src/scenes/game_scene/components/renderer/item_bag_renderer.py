@@ -46,6 +46,17 @@ class ItemBagRenderer:
         self.scroll_offset = 0
         self._last_category = self.bag.selected_category
 
+        # ===== DRAG DA SCROLLBAR (mobile-friendly) =====
+        self.dragging_scrollbar = False
+        self.scrollbar_hit_width = 20   # área de toque (era 6px visual)
+
+        # ===== DRAG DA LISTA EM ÁREA VAZIA (touch scroll) =====
+        self.dragging_list = False
+        self.drag_moved = False
+        self.drag_start_pos = (0, 0)
+        self.drag_threshold = 8         # pixels para diferenciar tap de drag
+        self._scroll_accumulator = 0.0  # acumulador para scroll suave
+
         # MINIMIZAR
         self.minimized = False
 
@@ -69,6 +80,11 @@ class ItemBagRenderer:
         self.categories_per_page = 3
         self.current_page = 0
         self.total_pages = (len(self.all_categories) + self.categories_per_page - 1) // self.categories_per_page
+
+        # ===== CONTROLE DE SYNC DE PÁGINA =====
+        # Guarda a última categoria sincronizada para NÃO forçar a página de volta
+        # a cada render (o que anularia a navegação manual pelos botões < >).
+        self._last_synced_category = None
 
         # Caches de renderização
         self._cached_background = None
@@ -98,7 +114,16 @@ class ItemBagRenderer:
 
     # ---------- SINCRONIZAÇÃO DE CATEGORIA ----------
     def _sync_page_with_category(self):
+        """
+        Sincroniza a página atual com a categoria selecionada.
+        Só roda quando a categoria MUDA — assim a navegação manual
+        pelos botões < > não é desfeita a cada render.
+        """
         current_category = self.bag.selected_category
+        if self._last_synced_category == current_category:
+            return
+        self._last_synced_category = current_category
+
         for page in range(self.total_pages):
             start_idx = page * self.categories_per_page
             end_idx = min(start_idx + self.categories_per_page, len(self.all_categories))
@@ -128,6 +153,12 @@ class ItemBagRenderer:
         self.mouse_over_ui = self._is_mouse_in_area(mouse_x, mouse_y)
 
         if self.mouse_over_ui:
+            # ===== SOBRE A SCROLLBAR: NÃO DESTACA ITEM =====
+            bar_hit = self._get_scroll_bar_hit_rect()
+            if bar_hit and bar_hit.collidepoint(mouse_x, mouse_y):
+                self.hovered_index = -1
+                return
+
             index = self._get_item_index_at(mouse_x, mouse_y)
             if index >= 0:
                 self.hovered_index = index
@@ -151,6 +182,7 @@ class ItemBagRenderer:
             )
         else:
             print(f"[BAG_RENDERER] ERRO: game ou player não disponível")
+
     # ---------- EVENTOS ----------
     def handle_event(self, event):
         """Processa eventos da UI (sem lógica de arraste de item)"""
@@ -161,6 +193,13 @@ class ItemBagRenderer:
             if self._is_mouse_in_minimize_button(mouse_x, mouse_y):
                 self._toggle_minimize()
                 return True
+
+            # ===== SCROLLBAR (mobile-friendly, antes do resize para ganhar prioridade) =====
+            if not self.minimized:
+                bar_hit = self._get_scroll_bar_hit_rect()
+                if bar_hit and bar_hit.collidepoint(mouse_x, mouse_y):
+                    self._start_scrollbar_drag(mouse_y)
+                    return True
 
             # Handle de redimensionamento (canto inferior direito)
             if self._is_mouse_in_resize_handle(mouse_x, mouse_y):
@@ -183,7 +222,7 @@ class ItemBagRenderer:
             if self.minimized:
                 return False
 
-            # Navegação de categorias (setas)
+            # ===== NAVEGAÇÃO DE CATEGORIAS (botões < > nos cantos) =====
             if self._is_mouse_in_nav_arrows(mouse_x, mouse_y):
                 arrow = self._get_clicked_arrow(mouse_x, mouse_y)
                 if arrow == "left":
@@ -201,12 +240,25 @@ class ItemBagRenderer:
                 self.scroll_offset = 0
                 return True
 
-            # Clique em item: apenas seleciona e deixa o game_scene iniciar o arraste
+            # Clique na área da lista
             if self._is_mouse_in_area(mouse_x, mouse_y):
                 index = self._get_item_index_at(mouse_x, mouse_y)
+
                 if index >= 0:
+                    # ===== ITEM CLICADO: DEIXA O GAME_SCENE INICIAR O DRAG =====
+                    # (comportamento original mantido — drag de item para usar em Pokémon)
                     self.bag.selected_item_index = index
                     self.hovered_index = index
+                    # Retorna False para o game_scene processar o drag do item
+                    return False
+                else:
+                    # ===== ESPAÇO VAZIO: INICIA DRAG-TO-SCROLL =====
+                    self.dragging_list = True
+                    self.drag_moved = False
+                    self.drag_start_pos = (mouse_x, mouse_y)
+                    self._scroll_accumulator = 0.0
+                    # Consome o evento para o game_scene NÃO iniciar drag de item
+                    return True
 
         elif event.type == pygame.MOUSEMOTION:
             if self.dragging:
@@ -239,6 +291,36 @@ class ItemBagRenderer:
                 self._save_config_to_player()  # Salva enquanto redimensiona
                 return True
 
+            # ===== DRAG DA SCROLLBAR =====
+            if self.dragging_scrollbar:
+                self._scrollbar_jump_to(event.pos[1])
+                return True
+
+            # ===== DRAG DA LISTA (touch scroll na área vazia) =====
+            if self.dragging_list:
+                dx = event.pos[0] - self.drag_start_pos[0]
+                dy = event.pos[1] - self.drag_start_pos[1]
+
+                if not self.drag_moved:
+                    # Só considera drag se for majoritariamente vertical
+                    if abs(dy) > self.drag_threshold and abs(dy) > abs(dx):
+                        self.drag_moved = True
+
+                if self.drag_moved:
+                    # Arrastar para baixo (dy > 0) → ver itens acima → scroll diminui
+                    self._scroll_accumulator += -dy / 60.0
+                    whole = int(self._scroll_accumulator)
+                    if whole != 0:
+                        max_scroll = self._get_max_scroll()
+                        self.scroll_offset = max(0, min(max_scroll, self.scroll_offset + whole))
+                        self._scroll_accumulator -= whole
+                        # Zera acumulador ao bater no limite (evita "travar" e depois soltar)
+                        if self.scroll_offset == 0 or self.scroll_offset == max_scroll:
+                            self._scroll_accumulator = 0.0
+                    self.drag_start_pos = (event.pos[0], event.pos[1])
+                    self.hovered_index = -1
+                    return True
+
             self.update_hover(event.pos)
 
         elif event.type == pygame.MOUSEBUTTONUP:
@@ -252,6 +334,14 @@ class ItemBagRenderer:
                     self.resizing = False
                     pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
                     self._save_config_to_player()  # Salva ao soltar
+                    return True
+                if self.dragging_scrollbar:
+                    self.dragging_scrollbar = False
+                    return True
+                if self.dragging_list:
+                    self.dragging_list = False
+                    self.drag_moved = False
+                    self._scroll_accumulator = 0.0
                     return True
 
         # Roda do mouse: SCROLL vertical (apenas se não minimizado)
@@ -282,6 +372,77 @@ class ItemBagRenderer:
         max_scroll = self._get_max_scroll()
         self.scroll_offset = max(0, min(self.scroll_offset - direction, max_scroll))
 
+    # ---------- SCROLLBAR: HITBOX / TRACK / THUMB ----------
+    def _get_scroll_bar_track_rect(self):
+        """Rect visual da track da scrollbar (fina, 6px)."""
+        if self.minimized:
+            return None
+        items = self.bag.get_items_for_render()
+        max_visible = self._get_max_visible_items()
+        if max_visible <= 0 or len(items) <= max_visible:
+            return None
+        bar_x = self.x + self.width - 10
+        bar_y = self.y + 80
+        bar_height = self.height - 90
+        if bar_height <= 0:
+            return None
+        return pygame.Rect(bar_x, bar_y, 6, bar_height)
+
+    def _get_scroll_bar_hit_rect(self):
+        """Área clicável/tocável da scrollbar (bem mais larga que a visual)."""
+        track = self._get_scroll_bar_track_rect()
+        if track is None:
+            return None
+        return pygame.Rect(
+            self.x + self.width - self.scrollbar_hit_width,
+            track.y,
+            self.scrollbar_hit_width,
+            track.height,
+        )
+
+    def _get_scroll_thumb_rect(self):
+        """Rect visual do thumb (parte móvel) da scrollbar."""
+        track = self._get_scroll_bar_track_rect()
+        if track is None:
+            return None
+        items = self.bag.get_items_for_render()
+        max_visible = self._get_max_visible_items()
+        max_scroll = self._get_max_scroll()
+        if max_scroll == 0 or not items:
+            return None
+        thumb_height = max(20, track.height * max_visible / len(items))
+        scroll_ratio = self.scroll_offset / max_scroll
+        thumb_y = track.y + scroll_ratio * (track.height - thumb_height)
+        return pygame.Rect(track.x, thumb_y, track.width, thumb_height)
+
+    def _start_scrollbar_drag(self, mouse_y):
+        """Inicia o arraste da scrollbar. Se clicou fora do thumb, salta para a posição."""
+        thumb = self._get_scroll_thumb_rect()
+        self.dragging_scrollbar = True
+        # Se o clique foi no thumb, mantém; senão, centraliza o thumb na posição tocada
+        if not (thumb and thumb.collidepoint(self.x + self.width - 3, mouse_y)):
+            self._scrollbar_jump_to(mouse_y)
+
+    def _scrollbar_jump_to(self, mouse_y):
+        """Converte a posição Y do mouse em scroll_offset (centraliza o thumb na posição)."""
+        track = self._get_scroll_bar_track_rect()
+        if track is None:
+            return
+        items = self.bag.get_items_for_render()
+        max_visible = self._get_max_visible_items()
+        max_scroll = self._get_max_scroll()
+        if max_scroll == 0 or not items:
+            return
+        thumb_height = max(20, track.height * max_visible / len(items))
+        track_range = track.height - thumb_height
+        if track_range <= 0:
+            self.scroll_offset = 0
+            return
+        rel = mouse_y - track.y - thumb_height / 2
+        rel = max(0, min(track_range, rel))
+        self.scroll_offset = int(round((rel / track_range) * max_scroll))
+        self.scroll_offset = max(0, min(max_scroll, self.scroll_offset))
+
     # ---------- MINIMIZAR ----------
     def _toggle_minimize(self):
         self.minimized = not self.minimized
@@ -311,41 +472,64 @@ class ItemBagRenderer:
         return (handle_x <= mouse_x <= self.x + self.width and
                 handle_y <= mouse_y <= self.y + self.height)
 
-    # ---------- NAVEGAÇÃO DE CATEGORIAS ----------
+    # ---------- NAVEGAÇÃO DE CATEGORIAS (LOOP) ----------
     def _prev_category_page(self):
-        if self.current_page > 0:
-            self.current_page -= 1
+        """Volta uma página. Se estiver na primeira, vai para a última (loop)."""
+        if self.total_pages > 0:
+            self.current_page = (self.current_page - 1) % self.total_pages
 
     def _next_category_page(self):
-        if self.current_page < self.total_pages - 1:
-            self.current_page += 1
+        """Avança uma página. Se estiver na última, volta para a primeira (loop)."""
+        if self.total_pages > 0:
+            self.current_page = (self.current_page + 1) % self.total_pages
 
     def _get_current_page_categories(self):
         start_idx = self.current_page * self.categories_per_page
         end_idx = min(start_idx + self.categories_per_page, len(self.all_categories))
         return self.all_categories[start_idx:end_idx]
 
-    def _is_mouse_in_nav_arrows(self, mouse_x, mouse_y):
+    # ===== LAYOUT DOS BOTÕES < E > =====
+    _NAV_BTN_W = 24
+    _NAV_BTN_H = 25
+    _NAV_BTN_MARGIN = 8       # margem da borda da janela até o botão
+    _NAV_GAP = 5              # gap entre o botão e a primeira categoria
+
+    def _get_nav_button_rects(self):
+        """Retorna (left_rect, right_rect) dos botões < e > nos cantos."""
         if self.minimized:
+            return None, None
+        btn_y = self.y + 45
+        left_rect = pygame.Rect(
+            self.x + self._NAV_BTN_MARGIN,
+            btn_y,
+            self._NAV_BTN_W,
+            self._NAV_BTN_H,
+        )
+        right_rect = pygame.Rect(
+            self.x + self.width - self._NAV_BTN_MARGIN - self._NAV_BTN_W,
+            btn_y,
+            self._NAV_BTN_W,
+            self._NAV_BTN_H,
+        )
+        return left_rect, right_rect
+
+    def _get_categories_start_x(self):
+        """X onde começa a primeira categoria (depois do botão <)."""
+        return self.x + self._NAV_BTN_MARGIN + self._NAV_BTN_W + self._NAV_GAP
+
+    def _is_mouse_in_nav_arrows(self, mouse_x, mouse_y):
+        left_rect, right_rect = self._get_nav_button_rects()
+        if left_rect is None:
             return False
-        nav_y = self.y + 48
-        nav_height = 25
-        # O espaço das setas e página fica à direita das categorias
-        # Precisamos saber onde terminam as categorias
-        cat_width = self._get_available_category_width()
-        arrows_x = self.x + 15 + cat_width + 5
-        arrows_width = 40
-        return (arrows_x <= mouse_x <= arrows_x + arrows_width and
-                nav_y <= mouse_y <= nav_y + nav_height)
+        return left_rect.collidepoint(mouse_x, mouse_y) or right_rect.collidepoint(mouse_x, mouse_y)
 
     def _get_clicked_arrow(self, mouse_x, mouse_y):
-        if self.minimized:
+        left_rect, right_rect = self._get_nav_button_rects()
+        if left_rect is None:
             return None
-        cat_width = self._get_available_category_width()
-        arrows_x = self.x + 15 + cat_width + 5
-        if arrows_x <= mouse_x <= arrows_x + 15:
+        if left_rect.collidepoint(mouse_x, mouse_y):
             return "left"
-        elif arrows_x + 25 <= mouse_x <= arrows_x + 40:
+        if right_rect.collidepoint(mouse_x, mouse_y):
             return "right"
         return None
 
@@ -368,7 +552,7 @@ class ItemBagRenderer:
         gap = 5
         individual_width = (cat_width - (total_cats - 1) * gap) // total_cats
 
-        start_x = self.x + 15
+        start_x = self._get_categories_start_x()
         for cat_id, cat_name, color in current_categories:
             if start_x <= mouse_x <= start_x + individual_width:
                 return cat_id
@@ -376,13 +560,13 @@ class ItemBagRenderer:
         return None
 
     def _get_available_category_width(self):
-        """Largura total disponível para as categorias (descontando margens e setas)"""
-        # Margens: 15 da esquerda + 15 da direita + espaço para setas (40) + gap
-        # A largura total é self.width
-        # Espaço para setas e página: ~40px + um pequeno gap
-        arrows_space = 45  # 40 para setas + 5 de gap
-        available = self.width - 15 - 15 - arrows_space
-        return max(50, available)  # mínimo 50
+        """
+        Largura total disponível para as categorias (descontando margens,
+        botões < > e gaps).
+        Layout: [margem 8][< 24][gap 5] ...categorias... [gap 5][> 24][margem 8]
+        Total descontado: 8 + 24 + 5 + 5 + 24 + 8 = 74
+        """
+        return max(50, self.width - 74)
 
     # ---------- HIT TESTS ----------
     def _is_mouse_in_area(self, mouse_x, mouse_y):
@@ -418,6 +602,7 @@ class ItemBagRenderer:
 
         if not self.minimized:
             self._draw_categories(screen)
+            self._draw_category_navigation(screen)  # botões < > nos cantos
             self._draw_items(screen)
             self._draw_instructions(screen)
             self._draw_scrollbar(screen)
@@ -515,7 +700,7 @@ class ItemBagRenderer:
         if individual_width < 40:
             individual_width = 40  # mínimo
 
-        start_x = self.x + 15
+        start_x = self._get_categories_start_x()
         category_font = self._get_font(16)
 
         for cat_id, cat_name, color in current_categories:
@@ -543,34 +728,50 @@ class ItemBagRenderer:
 
             start_x += individual_width + gap
 
-        # Desenha navegação (setas) se houver mais de uma página
-        if self.total_pages > 1:
-            self._draw_category_navigation(screen, cat_width_total)
+    def _draw_category_navigation(self, screen):
+        """
+        Desenha os botões < (canto esquerdo) e > (canto direito) para
+        navegar entre páginas de categorias. A navegação é em LOOP:
+        a última página volta para a primeira e vice-versa.
+        """
+        left_rect, right_rect = self._get_nav_button_rects()
+        if left_rect is None or right_rect is None:
+            return
 
-    def _draw_category_navigation(self, screen, cat_width):
-        """Desenha setas e indicador de página ao lado das categorias"""
-        arrows_x = self.x + 15 + cat_width + 5
-        nav_y = self.y + 48
-        nav_height = 25
-        category_font = self._get_font(16)
+        mouse_pos = pygame.mouse.get_pos()
+        arrow_font = self._get_font(22, bold=True)
 
-        left_arrow_color = (150, 150, 150) if self.current_page > 0 else (80, 80, 80)
-        left_points = [(arrows_x + 5, nav_y + nav_height // 2),
-                       (arrows_x + 12, nav_y + nav_height - 5),
-                       (arrows_x + 12, nav_y + 5)]
-        pygame.draw.polygon(screen, left_arrow_color, left_points)
+        # ===== BOTÃO ESQUERDO < =====
+        hover_left = left_rect.collidepoint(mouse_pos) and self.mouse_over_ui
+        if hover_left:
+            bg_left = (100, 130, 190)
+            border_left = (150, 190, 255)
+        else:
+            bg_left = (45, 55, 75)
+            border_left = (100, 120, 160)
 
-        right_arrow_color = (150, 150, 150) if self.current_page < self.total_pages - 1 else (80, 80, 80)
-        right_points = [(arrows_x + 35, nav_y + nav_height // 2),
-                        (arrows_x + 28, nav_y + nav_height - 5),
-                        (arrows_x + 28, nav_y + 5)]
-        pygame.draw.polygon(screen, right_arrow_color, right_points)
+        pygame.draw.rect(screen, bg_left, left_rect, border_radius=5)
+        pygame.draw.rect(screen, border_left, left_rect, 1, border_radius=5)
 
-        page_text = category_font.render(f"{self.current_page + 1}/{self.total_pages}",
-                                         True, (180, 180, 200))
-        page_x = arrows_x + 15
-        page_y = nav_y + (nav_height - page_text.get_height()) // 2
-        screen.blit(page_text, (page_x, page_y))
+        left_text = arrow_font.render("<", True, (240, 240, 255))
+        left_text_rect = left_text.get_rect(center=left_rect.center)
+        screen.blit(left_text, left_text_rect)
+
+        # ===== BOTÃO DIREITO > =====
+        hover_right = right_rect.collidepoint(mouse_pos) and self.mouse_over_ui
+        if hover_right:
+            bg_right = (100, 130, 190)
+            border_right = (150, 190, 255)
+        else:
+            bg_right = (45, 55, 75)
+            border_right = (100, 120, 160)
+
+        pygame.draw.rect(screen, bg_right, right_rect, border_radius=5)
+        pygame.draw.rect(screen, border_right, right_rect, 1, border_radius=5)
+
+        right_text = arrow_font.render(">", True, (240, 240, 255))
+        right_text_rect = right_text.get_rect(center=right_rect.center)
+        screen.blit(right_text, right_text_rect)
 
     def _draw_items(self, screen):
         if self.minimized:
@@ -663,28 +864,27 @@ class ItemBagRenderer:
     def _draw_scrollbar(self, screen):
         if self.minimized:
             return
-        items = self.bag.get_items_for_render()
-        if not items:
-            return
-        max_visible = self._get_max_visible_items()
-        if max_visible <= 0 or len(items) <= max_visible:
+        track = self._get_scroll_bar_track_rect()
+        if track is None:
             return
 
-        bar_x = self.x + self.width - 10
-        bar_y = self.y + 80
-        bar_height = self.height - 90
-        if bar_height <= 0:
-            return
+        # Track (fundo)
+        pygame.draw.rect(screen, (40, 45, 60), track, border_radius=3)
 
-        thumb_height = max(20, bar_height * max_visible / len(items))
-        max_scroll = self._get_max_scroll()
-        if max_scroll == 0:
-            return
-        scroll_ratio = self.scroll_offset / max_scroll
-        thumb_y = bar_y + scroll_ratio * (bar_height - thumb_height)
-
-        pygame.draw.rect(screen, (40, 45, 60), (bar_x, bar_y, 6, bar_height), border_radius=3)
-        pygame.draw.rect(screen, (150, 160, 200), (bar_x, thumb_y, 6, thumb_height), border_radius=3)
+        # Thumb (parte móvel)
+        thumb = self._get_scroll_thumb_rect()
+        if thumb:
+            # Cor: destaque se estiver arrastando ou com o mouse em cima
+            if self.dragging_scrollbar:
+                thumb_color = (100, 200, 255)
+            else:
+                bar_hit = self._get_scroll_bar_hit_rect()
+                mouse_pos = pygame.mouse.get_pos()
+                if bar_hit and bar_hit.collidepoint(mouse_pos):
+                    thumb_color = (190, 200, 230)
+                else:
+                    thumb_color = (150, 160, 200)
+            pygame.draw.rect(screen, thumb_color, thumb, border_radius=3)
 
     def _draw_pulse_effect(self, screen, rect):
         pulse = 0.5 + 0.5 * math.sin(self.animation_time * 3)

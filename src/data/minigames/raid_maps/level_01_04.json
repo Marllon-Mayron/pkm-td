@@ -1978,8 +1978,8 @@
                 "enabled": true,
                 "enemies": [
                     {
-                        "pokemon_id": 145,
-                        "percentage": 100.0
+                        "pokemon_id": 150,
+                        "percentage": 0.0
                     }
                 ],
                 "min_level": 47,
@@ -2003,7 +2003,7 @@
                     "enemies": [
                         {
                             "pokemon_id": 150,
-                            "percentage": 100.0
+                            "percentage": 0.0
                         }
                     ],
                     "min_level": 47,
