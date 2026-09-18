@@ -26,6 +26,9 @@ NEWS_DEVLOGS = {
 # O número é extraído do nome do arquivo (news_1.png -> 1, news_2.png -> 2)
 # =====================================================================
 NEWS_IMAGE_TITLES = {
+    "0.1.19": {
+        1: "Novas fases de fim de campanha, e muitas correções pro modo mobile",
+    },
     "0.1.18": {
         1: "Raids Multijogador Coopreativo disponivel!",
         2: "Adicionado nova tela de perfil do jogador.",
@@ -36,6 +39,7 @@ NEWS_IMAGE_TITLES = {
         1: "Novo sistema de camera, permitindo registrar sua jornada!",
         2: "Novo painel para visualizacao dos seus pokemons",
     },
+
 }
 
 
