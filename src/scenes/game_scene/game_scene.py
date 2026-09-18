@@ -57,6 +57,8 @@ class GameScene(BaseScene):
         self.move_learn_overlay = None
         self.pending_move_learn = None
         self.game_paused = False
+        self.final_victory_overlay = None
+        self._pending_final_victory_delay = None
 
         self.ui_hidden = False  # True = oculta todas as UIs
 
@@ -1666,6 +1668,10 @@ class GameScene(BaseScene):
         screen_mgr = self.screen_manager
 
         # ===== OVERLAYS PRIORITÁRIOS =====
+        if self.final_victory_overlay is not None:
+            self.final_victory_overlay.handle_event(event)
+            return None
+
         if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
             self.evolution_overlay.handle_event(event)
             return None
@@ -1981,8 +1987,29 @@ class GameScene(BaseScene):
         # ===== GUARDA O DT PARA USO NO RENDER (partículas de clima) =====
         self._last_dt = dt
 
+        # ===== DELAY DA VITORIA FINAL =====
+        # Criado durante _complete_phase; so vira overlay depois de alguns
+        # segundos, para a celebracao de vitoria rolar primeiro.
+        if self._pending_final_victory_delay is not None:
+            if self._pending_final_victory_delay > 0:
+                self._pending_final_victory_delay -= dt
+            else:
+                self._pending_final_victory_delay = None
+                from src.scenes.game_scene.components.overlays.final_victory_overlay import (
+                    FinalVictoryOverlay,
+                )
+                self.final_victory_overlay = FinalVictoryOverlay(self)
+                print("[FINAL_VICTORY] Overlay Hall of Fame ativado!")
+
         # ===== OVERLAYS PRIORITÁRIOS =====
         perf_monitor.start_section("OVERLAYS")
+
+        # ===== VITORIA FINAL (prioridade máxima — cobre tudo) =====
+        if self.final_victory_overlay is not None:
+            self.final_victory_overlay.update(dt)
+            perf_monitor.end_section()
+            perf_monitor.end_frame()
+            return
 
         if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
             self.evolution_overlay.update(dt)
@@ -2347,7 +2374,13 @@ class GameScene(BaseScene):
         self.player.auto_save()
 
         # ===== MOSTRA OVERLAY DE FASE COMPLETA =====
-        self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
+        # Fase final (capitulo 8, fase 1) -> overlay especial estilo Hall of Fame
+        if self.chapter_id == 8 and self.phase_number == 1:
+            # Delay para dar tempo da celebracao de vitoria rolar primeiro
+            self._pending_final_victory_delay = 3.5
+            print("[FINAL_VICTORY] Fase final detectada! Hall of Fame em 3.5s.")
+        else:
+            self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
 
     # ===== MÉTODOS DE RENDER =====
 
@@ -2569,6 +2602,12 @@ class GameScene(BaseScene):
             screen.blit(bg_surface, bg_rect)
 
             screen.blit(hint_text, (hint_x, hint_y))
+
+        # ===== VITORIA FINAL (por cima de tudo - cobre a tela toda) =====
+        if self.final_victory_overlay is not None:
+            perf_monitor.start_section("RENDER_FINAL_VICTORY")
+            self.final_victory_overlay.render(screen)
+            perf_monitor.end_section()
 
         perf_monitor.end_section()
 
