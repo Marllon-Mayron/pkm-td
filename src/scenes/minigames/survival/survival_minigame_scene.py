@@ -117,6 +117,17 @@ class SurvivalMinigameScene(BaseMinigameScene):
         self.font_large = pygame.font.Font(None, 48)
         self.font_medium = pygame.font.Font(None, 32)
         self.font_small = pygame.font.Font(None, 24)
+        # ===== CACHE DE FONTES PARA LABELS DE POKEMON =====
+        self._label_font_cache = {}
+
+    def _get_cached_font(self, size):
+        """Retorna fonte do cache (evita criar fontes a cada frame)."""
+        size = max(8, int(size))
+        font = self._label_font_cache.get(size)
+        if font is None:
+            font = pygame.font.Font(None, size)
+            self._label_font_cache[size] = font
+        return font
 
     def _load_survival_data(self):
         """Carrega os dados específicos do minigame survival"""
@@ -150,12 +161,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 pokemon["type"] = pokemon["types"][0] if pokemon["types"] else "normal"
 
             print(f"[Survival] {len(self.available_pokemon_cards)} Pokémon disponíveis")
-            for p in self.available_pokemon_cards:
-                print(f"  - {p['name']} (ID:{p['id']}) - Custo: {p['cost']}")
-
             print(f"[Survival] {len(self.available_item_cards)} Itens disponíveis")
-            for i in self.available_item_cards:
-                print(f"  - {i['id']} - Custo: {i['cost']}")
 
         except Exception as e:
             print(f"[Survival] Erro ao carregar dados: {e}")
@@ -210,18 +216,15 @@ class SurvivalMinigameScene(BaseMinigameScene):
         self.card_deck.set_card_pools(pokemon_cards, item_cards)
 
         print(f"[Survival] Deck inicializado com {len(self.card_deck.card_pool)} cartas no pool")
-        print(f"[Survival] Cartas atuais no deck: {len(self.card_deck.cards)}")
 
     def _init_survival_wave_manager(self):
         """Inicializa o wave manager com os dados carregados"""
         self.wave_manager = SurvivalWaveManager(self, self.chapter_id, self.phase_number, self.survival_data)
         self.wave_manager.set_paths(self.path_renderer.paths)
 
-        # ===== CARREGA PATHS NO ASSIGNMENT MANAGER =====
         if self.path_renderer and self.path_renderer.paths:
             self.path_assignment.load_paths(self.path_renderer.paths)
 
-            # ===== REGISTRA TODOS OS SPOTS =====
             if hasattr(self, 'spot_renderer') and self.spot_renderer:
                 for spot in self.spot_renderer.get_spots():
                     self.path_assignment.register_spot(
@@ -277,24 +280,20 @@ class SurvivalMinigameScene(BaseMinigameScene):
         if pokemon and hasattr(pokemon, 'effect_manager') and pokemon.effect_manager:
             status = pokemon.effect_manager.get_status(pokemon)
             if status:
-                # Verifica se status tem o atributo 'type'
                 if hasattr(status, 'type'):
                     return status.type
-                # Se status já é o enum diretamente
                 elif isinstance(status, StatusType):
                     return status
         return None
 
     def _get_pokemon_status_name(self, pokemon) -> str:
-        """Retorna o nome do status atual do Pokémon como string - USANDO BATTLE_SYSTEM"""
-        # ===== USA O EFFECT_MANAGER DO BATTLE_SYSTEM PRIMEIRO =====
+        """Retorna o nome do status atual do Pokémon como string"""
         if self.battle_system and self.battle_system.effect_manager:
             status = self.battle_system.effect_manager.get_status(pokemon)
             if status and status.type != StatusType.NONE:
-                # Mapeamento para string
                 status_map = {
                     StatusType.POISON: "poison",
-                    StatusType.TOXIC_POISON: "poison",  # Toxic também é poison para cura
+                    StatusType.TOXIC_POISON: "poison",
                     StatusType.PARALYSIS: "paralysis",
                     StatusType.SLEEP: "sleep",
                     StatusType.BURN: "burn",
@@ -302,7 +301,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 }
                 return status_map.get(status.type, "none")
 
-        # Fallback: tenta via effect_manager do Pokémon
         if hasattr(pokemon, 'effect_manager') and pokemon.effect_manager:
             status = pokemon.effect_manager.get_status(pokemon)
             if status and status.type != StatusType.NONE:
@@ -366,118 +364,61 @@ class SurvivalMinigameScene(BaseMinigameScene):
                           duration=2.0, pokemon=target_pokemon, portrait="happy")
             success = True
 
-
         elif effect == 'cure_status':
-
-            status_to_cure = effect_value  # "poison", "paralysis", etc.
-
-            # Mapeamento dos status (igual ao modo normal)
+            status_to_cure = effect_value
 
             from src.battle.effects.status_effect import StatusType
-
             status_map = {
-
                 "paralysis": StatusType.PARALYSIS,
-
                 "sleep": StatusType.SLEEP,
-
                 "poison": StatusType.POISON,
-
                 "burn": StatusType.BURN,
-
                 "freeze": StatusType.FREEZE,
-
             }
-
             status_names = {
-
                 StatusType.PARALYSIS: "paralisado",
-
                 StatusType.SLEEP: "dormindo",
-
                 StatusType.POISON: "envenenado",
-
                 StatusType.BURN: "queimado",
-
                 StatusType.FREEZE: "congelado"
-
             }
 
             status_type = status_map.get(status_to_cure.lower())
 
             if not status_type:
                 toast_warning(f"Não foi possível usar {item_name} em {target_pokemon.name}!",
-
                               duration=1.5, pokemon=target_pokemon, portrait="sad")
-
                 return False
 
-            # ===== USA O EFFECT_MANAGER DO BATTLE_SYSTEM (IGUAL MODO NORMAL) =====
-
             if self.battle_system and self.battle_system.effect_manager:
-
                 current_status = self.battle_system.effect_manager.get_status(target_pokemon)
-
                 if current_status and current_status.type == status_type:
-
-                    # Remove o status usando o effect_manager do battle_system
-
                     self.battle_system.effect_manager.remove_status(target_pokemon)
-
                     toast_success(f"{item_name} usado! {target_pokemon.name} foi curado!",
-
                                   duration=2.0, pokemon=target_pokemon, portrait="happy")
-
                     success = True
-
                 else:
-
-                    # Verifica se o Pokémon tem algum status
-
                     if not current_status or current_status.type.value == "none":
-
                         needed_status_display = status_names.get(status_type, status_to_cure)
-
                         toast_warning(
-
                             f"{target_pokemon.name} não está {needed_status_display}! {item_name} não pode ser usado.",
-
                             duration=2.0, pokemon=target_pokemon, portrait="normal")
-
                     else:
-
                         current_name = status_names.get(current_status.type, current_status.type.value)
-
                         needed_name = status_names.get(status_type, status_to_cure)
-
                         toast_warning(
-
                             f"{target_pokemon.name} está {current_name}! {item_name} cura {needed_name} apenas.",
-
                             duration=2.0, pokemon=target_pokemon, portrait="sad")
-
                     return False
-
             else:
-
-                # Fallback: tenta usar o effect_manager do próprio Pokémon
-
                 if target_pokemon.effect_manager:
-
                     target_pokemon.effect_manager.remove_status(target_pokemon)
-
                     toast_success(f"{item_name} usado! {target_pokemon.name} foi curado!",
-
                                   duration=2.0, pokemon=target_pokemon, portrait="happy")
-
                     success = True
-
                 else:
-
                     toast_warning(f"Não foi possível curar {target_pokemon.name}!",
-
                                   duration=1.5, pokemon=target_pokemon, portrait="sad")
-
                     return False
 
         elif effect == 'revive':
@@ -554,10 +495,8 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
         from src.entities.pokemon import Pokemon
 
-        tile_center_x = (
-                                    spot.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
-        tile_center_y = (
-                                    spot.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+        tile_center_x = (spot.x // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
+        tile_center_y = (spot.y // self.placement_manager.tile_size) * self.placement_manager.tile_size + self.placement_manager.tile_size // 2
 
         pokemon = Pokemon(
             tile_center_x, tile_center_y,
@@ -579,7 +518,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
         pokemon.set_battle_system(self.battle_system)
 
-        # ===== MINIGAME SPECIFIC: Define range inicial baseado no move =====
         self._update_pokemon_range_from_move(pokemon)
 
         self.placement_manager.add_pokemon(pokemon, spot)
@@ -612,7 +550,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
     def lose_life(self, amount: int = 1):
         """Perde uma vida"""
-        # Impede múltiplas chamadas de game over
         if self.game_state == "game_over":
             return
 
@@ -624,24 +561,28 @@ class SurvivalMinigameScene(BaseMinigameScene):
             self.game_over()
 
     def game_over(self):
-        # Impede game over duplicado
+        # ===== TRAVA: nao entra em game over duas vezes =====
         if self.game_state == "game_over":
             return
 
         self.game_state = "game_over"
         if self.wave_manager:
             self.wave_manager.paused = True
+            self.wave_manager._finished = True
+            self.wave_manager.active_enemies.clear()
         toast_error("GAME OVER!", duration=3.0)
         print(f"[Survival] GAME OVER! Score final: {self.score}")
 
-        # Impede que mais inimigos causem dano
-        if self.wave_manager:
-            self.wave_manager.active_enemies.clear()
-
     def complete_game(self):
+        # ===== TRAVA: nao completa duas vezes =====
+        if self.game_state == "completed":
+            return
+
         self.game_state = "completed"
         if self.wave_manager:
             self.wave_manager.paused = True
+            self.wave_manager._finished = True
+            self.wave_manager.active_enemies.clear()
         toast_success("FASE COMPLETA! PARABÉNS!", duration=3.0, portrait="happy")
         print(f"[Survival] FASE COMPLETA! Score final: {self.score}")
 
@@ -659,19 +600,16 @@ class SurvivalMinigameScene(BaseMinigameScene):
         from src.managers.sounds.sound_manager import sound_manager
         sound_manager.stop_effect("evolution")
 
-        # ===== CORREÇÃO: FECHA O OVERLAY IGUAL AO GAME_SCENE =====
         if hasattr(self, 'evolution_overlay'):
             self.evolution_overlay.active = False
             self.evolution_overlay = None
 
-        # ===== DESPAUSA O JOGO =====
         self.paused = False
         if hasattr(self, 'wave_manager') and self.wave_manager:
             self.wave_manager.paused = False
 
-        # ===== SE CANCELOU, NÃO APLICA A EVOLUÇÃO =====
         if cancel:
-            print(f"[EVOLUTION] Evolução cancelada para {self.pokemon.name if hasattr(self, 'pokemon') else '?'}")
+            print(f"[EVOLUTION] Evolução cancelada")
 
     def open_move_learn_overlay(self, pokemon, new_move_name):
         from src.scenes.game_scene.components.overlays.move_learn_overlay import MoveLearnOverlay
@@ -714,7 +652,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
             self.move_select_overlay.active = False
             self.move_select_overlay = None
 
-            # ===== MINIGAME SPECIFIC: Atualiza o range baseado no move =====
             if pokemon and pokemon.is_placed and not pokemon.is_defeated:
                 self._update_pokemon_range_from_move(pokemon)
 
@@ -725,9 +662,8 @@ class SurvivalMinigameScene(BaseMinigameScene):
     def _update_pokemon_range_from_move(self, pokemon):
         """
         Atualiza o attack_range do Pokémon baseado no tipo do move atual.
-        Apenas para o minigame Survival.
-        Physical: 120
-        Special: 300
+        Physical: 150
+        Special: 500
         """
         if not pokemon or pokemon.is_defeated or not pokemon.is_alive():
             return
@@ -811,7 +747,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 self.show_debug = not self.show_debug
                 return
             elif event.key == pygame.K_r:
-                # Recicla o deck (se disponível)
                 if self.card_deck and self.card_deck.recycle_cooldown_remaining <= 0:
                     if self.card_deck.cards:
                         self.card_deck.recycle_deck()
@@ -835,7 +770,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
                     self.selected_card_index = card_result.get('index', -1)
                     self.selected_card_type = card_result.get('card_type', 'pokemon')
 
-                    # Carrega o sprite do item para preview
                     if self.selected_card_type == 'item':
                         item_id = self.selected_card.get('item_data', {}).get('id', '')
                         self.selected_card_sprite = self.item_catalog.get_sprite(item_id, scaled=True)
@@ -913,7 +847,16 @@ class SurvivalMinigameScene(BaseMinigameScene):
         if self.paused:
             return
 
+        # ===== TRAVA DURA: nao atualiza mais nada apos fim =====
         if self.game_state in ["game_over", "completed"]:
+            if hasattr(self, 'survival_ui'):
+                self.survival_ui.update(dt)
+            return
+
+        # ===== TRAVA EXTRA: se wave_manager tambem esta pausado =====
+        if self.wave_manager and self.wave_manager.paused:
+            if hasattr(self, 'survival_ui'):
+                self.survival_ui.update(dt)
             return
 
         if hasattr(self, 'survival_ui'):
@@ -935,7 +878,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
         if self.wave_manager:
             enemies_at_end = self.wave_manager.update(dt)
 
-            # Processa inimigos que chegaram ao fim
             for enemy in enemies_at_end:
                 if enemy.is_alive() and not enemy.is_defeated:
                     if not hasattr(enemy, '_escaped_counted') or not enemy._escaped_counted:
@@ -945,7 +887,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
         # ===== LIMPA ALVOS INVÁLIDOS DOS ALIADOS =====
         for ally in self.player_pokemon:
             if ally.target and (not ally.target.is_alive() or ally.target.is_defeated):
-                print(f"[FIX] {ally.name} alvo inválido {ally.target.name} (morto), limpando")
                 ally.target = None
                 ally.combat_state = "returning"
                 if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
@@ -956,7 +897,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
         if self.wave_manager:
             active_enemies = [e for e in self.wave_manager.active_enemies if e.is_alive() and not e.is_defeated]
 
-        # ===== ATUALIZA TODOS OS ALIADOS (POKÉMON DO JOGADOR) =====
+        # ===== ATUALIZA TODOS OS ALIADOS =====
         old_levels = {id(pokemon): pokemon.level for pokemon in self.player_pokemon}
 
         for pokemon in self.player_pokemon[:]:
@@ -964,17 +905,13 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 self._remove_pokemon(pokemon)
                 continue
 
-            # Sempre atualiza o Pokémon (animação, etc)
             pokemon.update(dt)
 
-            # ===== ATUALIZA COMBATE COM RESTRIÇÃO DE PATH =====
             if active_enemies:
-                # Passa o path_assignment para o Pokémon (modo minigame)
                 pokemon._temp_path_assignment = self.path_assignment
                 pokemon.update_combat(dt, active_enemies)
                 pokemon._temp_path_assignment = None
             else:
-                # ===== SEM INIMIGOS: FORÇA O POKÉMON A VOLTAR AO SPOT =====
                 if pokemon.combat_state != "returning":
                     if pokemon.target:
                         pokemon.target = None
@@ -999,33 +936,28 @@ class SurvivalMinigameScene(BaseMinigameScene):
                             if pokemon.has_animation("idle"):
                                 pokemon.set_animation("idle")
                 else:
-                    # Já está em returning, passa lista vazia e path_assignment
                     pokemon._temp_path_assignment = self.path_assignment
                     pokemon.update_combat(dt, [])
                     pokemon._temp_path_assignment = None
 
-            # Atualiza animação do aliado
             pokemon.animation.update(dt)
 
-        # ===== ATUALIZA COMBATE DOS INIMIGOS COM RESTRIÇÃO DE PATH =====
+        # ===== ATUALIZA COMBATE DOS INIMIGOS =====
         if self.wave_manager and self.wave_manager.active_enemies:
             for enemy in self.wave_manager.active_enemies[:]:
                 if not enemy.is_alive() or enemy.is_defeated:
                     continue
 
-                # Passa o path_assignment para o inimigo (modo minigame)
                 enemy._temp_path_assignment = self.path_assignment
                 enemy.update_combat(dt, self.player_pokemon)
                 enemy._temp_path_assignment = None
 
-                # Atualiza animação do inimigo
                 enemy.animation.update(dt)
 
-        # ===== ATUALIZA SISTEMA DE COMBATE (PROJÉTEIS, ETC) =====
+        # ===== ATUALIZA SISTEMA DE COMBATE =====
         if hasattr(self, 'battle_system'):
             self.battle_system.update(dt)
 
-        # ===== ATUALIZA EFFECT MANAGER =====
         if hasattr(self, 'battle_system') and self.battle_system:
             effect_mgr = self.battle_system.effect_manager
             if effect_mgr:
@@ -1051,14 +983,13 @@ class SurvivalMinigameScene(BaseMinigameScene):
             self.notification_manager.update(dt)
 
     def force_allies_return_to_spots(self):
-        """Força todos os aliados a voltarem para seus spots (útil após wave terminar)"""
+        """Força todos os aliados a voltarem para seus spots"""
         for ally in self.player_pokemon:
             if not ally.is_alive() or ally.is_defeated:
                 continue
 
             ally.target = None
 
-            # Verifica se já está no spot
             if hasattr(ally, 'original_spot_x') and hasattr(ally, 'original_spot_y'):
                 dx = ally.original_spot_x - ally.x
                 dy = ally.original_spot_y - ally.y
@@ -1068,7 +999,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
                     ally.combat_state = "returning"
                     if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
                         ally.set_animation("walk")
-                    print(f"[FORCE] {ally.name} voltando ao spot (distância: {distance:.1f})")
                 else:
                     ally.combat_state = "idle"
                     if hasattr(ally, 'has_animation') and ally.has_animation("idle"):
@@ -1099,7 +1029,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
         for pokemon in self.player_pokemon:
             pokemon.render(screen, self.camera, show_hp=True)
-            self._render_ally_name_and_level(screen, pokemon)
+            self._render_ally_pp_and_xp(screen, pokemon)
 
         if hasattr(self, 'battle_system'):
             self.battle_system.render_projectiles(screen, self.camera, self.screen_manager)
@@ -1140,7 +1070,11 @@ class SurvivalMinigameScene(BaseMinigameScene):
                 return self.spot_renderer.get_spot_at_world_pos(world_pos[0], world_pos[1])
         return None
 
-    def _render_ally_name_and_level(self, screen, pokemon):
+    def _render_ally_pp_and_xp(self, screen, pokemon):
+        """
+        Renderiza level + PP e barra de XP acima do Pokémon.
+        Formato: 'lvl: 8 - PP: 10/20'
+        """
         if not pokemon or pokemon.is_defeated or not pokemon.is_alive():
             return
 
@@ -1156,23 +1090,19 @@ class SurvivalMinigameScene(BaseMinigameScene):
         sprite_to_render = None
         if hasattr(pokemon, 'sprite') and pokemon.sprite:
             if pokemon.is_boss:
-                orig_width, orig_height = pokemon.sprite.get_width(), pokemon.sprite.get_height()
-                new_width = int(orig_width * 2)
-                new_height = int(orig_height * 2)
-                sprite_to_render = pygame.transform.scale(pokemon.sprite, (new_width, new_height))
+                ow, oh = pokemon.sprite.get_width(), pokemon.sprite.get_height()
+                sprite_to_render = pygame.transform.scale(pokemon.sprite, (ow * 2, oh * 2))
             else:
                 sprite_to_render = pokemon.sprite
 
         if sprite_to_render:
-            current_width, current_height = sprite_to_render.get_width(), sprite_to_render.get_height()
-            final_width = max(1, int(current_width * zoom_scale))
-            final_height = max(1, int(current_height * zoom_scale))
-
-            if final_width != current_width or final_height != current_height:
-                scaled_sprite = pygame.transform.scale(sprite_to_render, (final_width, final_height))
+            cw, ch = sprite_to_render.get_width(), sprite_to_render.get_height()
+            fw = max(1, int(cw * zoom_scale))
+            fh = max(1, int(ch * zoom_scale))
+            if fw != cw or fh != ch:
+                scaled_sprite = pygame.transform.scale(sprite_to_render, (fw, fh))
             else:
                 scaled_sprite = sprite_to_render
-
             sprite_rect = scaled_sprite.get_rect()
             sprite_rect.center = (int(screen_x), int(screen_y))
         else:
@@ -1180,35 +1110,27 @@ class SurvivalMinigameScene(BaseMinigameScene):
             sprite_rect = pygame.Rect(0, 0, size, size)
             sprite_rect.center = (int(screen_x), int(screen_y))
 
-        # ===== OBTÉM O MOVE ATUAL E SEU PP =====
-        current_move = pokemon.get_current_move()
-        pp_text = ""
-        pp_color = (100, 255, 100)  # Verde claro padrão
+        # ===== MONTA TEXTO: 'lvl: 8 - PP: 10/20' =====
+        level_text = f"lvl: {pokemon.level}"
 
+        current_move = pokemon.get_current_move()
         if current_move:
             pp_current = current_move.current_pp
             pp_max = current_move.max_pp
             pp_text = f"PP: {pp_current:02d}/{pp_max:02d}"
 
-            # Cor baseada na porcentagem de PP
             pp_percent = pp_current / pp_max if pp_max > 0 else 0
             if pp_percent <= 0.25:
-                pp_color = (255, 100, 100)  # Vermelho - baixo
+                pp_color = (255, 100, 100)
             elif pp_percent <= 0.5:
-                pp_color = (255, 200, 100)  # Laranja - médio
+                pp_color = (255, 200, 100)
             else:
-                pp_color = (100, 255, 100)  # Verde - bom
+                pp_color = (100, 255, 100)
         else:
             pp_text = "PP: --"
             pp_color = (150, 150, 150)
 
-        # Nome e Level
-        name_text = f"{pokemon.name} - "
-        level_text = f"lv. {pokemon.level:02d}"
-
-        text_color = (150, 200, 255)
-        outline_color = (0, 0, 0)
-
+        # Cor do level (shiny = dourado, level alto = vermelho, normal = verde)
         if pokemon.is_shiny:
             level_color = (255, 215, 0)
         elif pokemon.level >= 30:
@@ -1216,57 +1138,42 @@ class SurvivalMinigameScene(BaseMinigameScene):
         else:
             level_color = (100, 255, 100)
 
-        # Tamanhos de fonte
-        name_font_size = max(10, int(12 * zoom_scale))
-        level_font_size = max(9, int(11 * zoom_scale))
-        pp_font_size = max(8, int(10 * zoom_scale))
+        separator = " - "
+        separator_color = (200, 200, 200)
 
-        name_font = pygame.font.Font(None, name_font_size)
-        level_font = pygame.font.Font(None, level_font_size)
-        pp_font = pygame.font.Font(None, pp_font_size)
+        font_size = max(8, int(11 * zoom_scale))
+        font = self._get_cached_font(font_size)
 
-        # Renderiza textos
-        name_surface = name_font.render(name_text, True, text_color)
-        level_surface = level_font.render(level_text, True, level_color)
-        pp_surface = pp_font.render(pp_text, True, pp_color)
+        # Renderiza cada parte
+        level_surf = font.render(level_text, True, level_color)
+        sep_surf = font.render(separator, True, separator_color)
+        pp_surf = font.render(pp_text, True, pp_color)
 
-        name_outline = name_font.render(name_text, True, outline_color)
-        level_outline = level_font.render(level_text, True, outline_color)
-        pp_outline = pp_font.render(pp_text, True, outline_color)
+        level_outline = font.render(level_text, True, (0, 0, 0))
+        sep_outline = font.render(separator, True, (0, 0, 0))
+        pp_outline = font.render(pp_text, True, (0, 0, 0))
 
-        name_width = name_surface.get_width()
-        level_width = level_surface.get_width()
-        pp_width = pp_surface.get_width()
+        # Largura total
+        total_w = level_surf.get_width() + sep_surf.get_width() + pp_surf.get_width()
 
-        # Espaçamento entre elementos
-        spacing = 4
-        total_width = name_width + 2 + level_width + spacing + pp_width
-
+        # Posicao (acima do sprite)
         sprite_height = sprite_rect.height
         relative_offset = -sprite_height * 0.85
 
-        start_x = sprite_rect.centerx - total_width // 2
-        text_y = int(sprite_rect.top + relative_offset)
+        base_x = sprite_rect.centerx - total_w // 2
+        base_y = int(sprite_rect.top + relative_offset)
 
-        # Posições
-        name_x, name_y = start_x, text_y
-        level_x = start_x + name_width + 2
-        level_y = text_y + (name_font_size - level_font_size)
-        pp_x = level_x + level_width + spacing
-        pp_y = text_y + (name_font_size - pp_font_size) - 2
+        # Desenha cada parte com contorno
+        cur_x = base_x
+        for surf, outline in [(level_surf, level_outline),
+                              (sep_surf, sep_outline),
+                              (pp_surf, pp_outline)]:
+            for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+                screen.blit(outline, (cur_x + dx, base_y + dy))
+            screen.blit(surf, (cur_x, base_y))
+            cur_x += surf.get_width()
 
-        # Desenha contornos
-        for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
-            screen.blit(name_outline, (name_x + dx, name_y + dy))
-            screen.blit(level_outline, (level_x + dx, level_y + dy))
-            screen.blit(pp_outline, (pp_x + dx, pp_y + dy))
-
-        # Desenha textos principais
-        screen.blit(name_surface, (name_x, name_y))
-        screen.blit(level_surface, (level_x, level_y))
-        screen.blit(pp_surface, (pp_x, pp_y))
-
-        # Renderiza barra de XP
+        # Barra de XP
         self._render_ally_xp_bar(screen, sprite_rect, pokemon, zoom_scale)
 
     def _render_ally_xp_bar(self, screen, sprite_rect, pokemon, zoom_scale):
@@ -1305,7 +1212,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
             cost = pokemon_data.get('cost', 50)
             can_afford = self.energy >= cost
 
-            # Tenta pegar o sprite do Pokémon
             sprite_to_draw = None
             try:
                 pokedex = self.game.player.pokedex if self.game.player else None
@@ -1335,7 +1241,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
         pygame.draw.rect(preview_bg, border_color, (0, 0, preview_size, preview_size), 3, border_radius=8)
 
-        # Desenha o sprite
         if sprite_to_draw:
             sprite_x = (preview_size - sprite_to_draw.get_width()) // 2
             sprite_y = (preview_size - sprite_to_draw.get_height()) // 2
@@ -1347,7 +1252,6 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
         screen.blit(preview_bg, (mouse_pos[0] - half, mouse_pos[1] - half))
 
-        # Círculo de energia
         pygame.draw.circle(screen, (255, 200, 50), (mouse_pos[0] + half - 15, mouse_pos[1] - half + 15), 14)
         screen.blit(cost_bg, (mouse_pos[0] + half - 15 - cost_text.get_width() // 2 - 3, mouse_pos[1] - half + 10))
         screen.blit(cost_text, (mouse_pos[0] + half - 15 - cost_text.get_width() // 2, mouse_pos[1] - half + 11))
@@ -1417,6 +1321,5 @@ class SurvivalMinigameScene(BaseMinigameScene):
 
     def on_resize(self):
         """Chamado quando a tela é redimensionada"""
-        # Recalcula posições do deck de cartas
         if self.card_deck:
             self.card_deck.on_resize()

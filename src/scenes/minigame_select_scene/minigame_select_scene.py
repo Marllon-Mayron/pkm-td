@@ -43,7 +43,8 @@ class MinigameCard:
             return was_hovered != self.is_hovered
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.is_hovered and self.unlocked:
-                return self.level_number
+                # Retorna o par (chapter, level) do minigame
+                return (self.level_chapter, self.level_number)
         return None
 
     def render(self, screen, font_title, font_name, font_small):
@@ -85,7 +86,7 @@ class MinigameCard:
                                   self.rect.centerx, self.rect.centery - 15, self.rect.width - 20)
 
         # Nível
-        level_text = font_small.render(f"Nível {self.level_number}", True, self.text_color)
+        level_text = font_small.render(f"Cap. {self.level_chapter} - Nível {self.level_number}", True, self.text_color )
         level_rect = level_text.get_rect(center=(self.rect.centerx, self.rect.centery + 25))
         screen.blit(level_text, level_rect)
 
@@ -358,34 +359,38 @@ class MinigameSelectScene(BaseScene):
             if event.button == 1:
                 self.dragging_scroll = False
 
-    def _start_minigame_level(self, level_number):
-        """Inicia um nível de minigame"""
-        print(f"Iniciando minigame {self.selected_minigame_folder} - Nível {level_number}")
+    def _start_minigame_level(self, chapter_and_level):
+        """Inicia um nível de minigame.
 
-        # Mapeamento de minigames para suas cenas
+        Args:
+            chapter_and_level: tupla (chapter, level) vinda do card.
+        """
+        chapter_val, level_val = chapter_and_level
+
+        print(f"Iniciando minigame {self.selected_minigame_folder} - "
+              f"Capítulo {chapter_val}, Nível {level_val}")
+
         if self.selected_minigame_folder == "survival":
             from src.scenes.minigames.survival import SurvivalMinigameScene
 
-            # O level_number é o número do nível (ex: 1)
-            # O chapter_id deve ser o level_number
-            # O phase_number é sempre 1
+            # chapter_val vira chapter_id (nomes dos arquivos: level_{chapter}_{phase}.json)
+            # level_val vira phase_number
             self.game.current_scene = SurvivalMinigameScene(
                 self.game,
-                chapter_id=level_number,
-                phase_number=1
+                chapter_id=chapter_val,
+                phase_number=level_val
             )
         else:
-            # Para outros minigames...
             phase_data = self.exporter.load_phase(
-                level_number,
-                1,
+                chapter_val,
+                level_val,
                 localization_type="custom",
                 custom_folder=self.selected_minigame_folder
             )
             if phase_data:
                 print(f"Minigame carregado: {phase_data.get('name', 'Sem nome')}")
             else:
-                print(f"Erro ao carregar nível {level_number}")
+                print(f"Erro ao carregar nível {chapter_val}-{level_val}")
 
     def _get_scroll_bar_rect(self):
         """Retorna retângulo da barra de scroll"""

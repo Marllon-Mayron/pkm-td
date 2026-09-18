@@ -30,6 +30,9 @@ class SurvivalWaveManager:
         self.active_enemies: List[Pokemon] = []
         self.paused = False
 
+        # ===== TRAVA DURA: impede qualquer spawn apos o jogo terminar =====
+        self._finished = False
+
         # Configuração das waves
         self.current_wave = 1
         self.total_waves = 0
@@ -60,10 +63,22 @@ class SurvivalWaveManager:
         if self.survival_data and "waves" in self.survival_data:
             self.waves_config = self.survival_data["waves"]
             self.total_waves = len(self.waves_config)
+
+            # ===== VALIDACAO: se 0 waves, usa fallback =====
+            if self.total_waves == 0:
+                print("[SurvivalWave] ERRO: 0 waves configuradas! Usando fallback.")
+                self.waves_config = [
+                    {"wave": 1, "enemies": [10, 13], "count": 3,
+                     "min_level": 3, "max_level": 5, "spawn_interval": 3.0}
+                ]
+                self.total_waves = 1
+
             print(f"[SurvivalWave] Carregadas {self.total_waves} waves")
         else:
             self.waves_config = [
-                {"wave": 1, "enemies": [10, 13], "count": 3, "min_level": 3, "max_level": 5, "spawn_interval": 3.0}]
+                {"wave": 1, "enemies": [10, 13], "count": 3,
+                 "min_level": 3, "max_level": 5, "spawn_interval": 3.0}
+            ]
             self.total_waves = 1
             print(f"[SurvivalWave] Usando wave fallback")
 
@@ -98,12 +113,15 @@ class SurvivalWaveManager:
             print(f"[SurvivalWave] Paths disponíveis: {self.available_paths}")
 
     def start_waves(self):
+        # ===== RESET DA TRAVA =====
+        self._finished = False
         self.current_wave = 1
         self.enemies_killed = 0
         self.enemies_escaped = 0
         self.wave_active = False
         self.between_waves_timer = 0
         self._wave_completed_announced = False
+        self.active_enemies.clear()
         self._prepare_next_wave()
         self.wave_active = True
         print(f"[SurvivalWave] Iniciando waves... Total: {self.total_waves}")
@@ -113,27 +131,29 @@ class SurvivalWaveManager:
         if not attacker or not enemy:
             return
 
-        # Pula se for selvagem (inimigo atacando aliado não ganha XP)
         if attacker.is_wild:
             return
 
-        # Pula se o inimigo já está morto
         if enemy.is_defeated or not enemy.is_alive():
             return
 
-        # Inicializa o set de atacantes para este inimigo se não existir
         if not hasattr(enemy, '_attackers'):
             enemy._attackers = set()
 
-        # Adiciona o ID do atacante
         enemy._attackers.add(id(attacker))
-        print(f"[XP_TRACK] {attacker.name} atacou {enemy.name} - registrado")
 
     def _prepare_next_wave(self):
         """Prepara a próxima wave baseada na configuração"""
+        # ===== TRAVA DURA: nunca mais prepara wave se já terminou =====
+        if self._finished:
+            return
+
         if self.current_wave > self.total_waves:
             print(f"[SurvivalWave] Todas as waves completas! Fim do jogo.")
+            self._finished = True
             self.wave_active = False
+            # ===== LIMPA INIMIGOS RESTANTES =====
+            self.active_enemies.clear()
             if hasattr(self.game_scene, 'complete_game'):
                 self.game_scene.complete_game()
             return
@@ -226,17 +246,16 @@ class SurvivalWaveManager:
 
     def _create_enemy(self) -> Optional[Pokemon]:
         """Cria um inimigo baseado na configuração da wave"""
+        # ===== TRAVA: nao cria inimigos apos fim =====
+        if self._finished:
+            return None
+
         if not self.current_wave_config:
             return None
 
         path_idx = self._get_random_path()
         if path_idx is None:
             return None
-
-        if hasattr(self.game_scene, 'path_assignment'):
-            path_y = self.game_scene.path_assignment.path_y_coords[path_idx] if path_idx < len(
-                self.game_scene.path_assignment.path_y_coords) else None
-            print(f"[SurvivalWave] Criando inimigo para path {path_idx} (Y={path_y})")
 
         start_point = self._get_path_start_point(path_idx)
         if not start_point:
@@ -276,7 +295,6 @@ class SurvivalWaveManager:
         pokemon.combat_state = "attacking"
 
         pokemon._assigned_path_index = path_idx
-        print(f"[SurvivalWave] {pokemon.name} associado ao path {path_idx}")
 
         if self.game_scene and hasattr(self.game_scene, 'screen_manager'):
             pokemon.screen_manager = self.game_scene.screen_manager
@@ -344,6 +362,10 @@ class SurvivalWaveManager:
 
     def update(self, dt: float) -> List[Pokemon]:
         """Atualiza waves - APENAS MOVIMENTO"""
+        # ===== TRAVA DURA: nao atualiza nada apos terminar =====
+        if self._finished:
+            return []
+
         if self.paused:
             return []
 
@@ -375,7 +397,6 @@ class SurvivalWaveManager:
                 if enemy:
                     if hasattr(self.game_scene, 'battle_system'):
                         enemy.set_battle_system(self.game_scene.battle_system)
-                        # Conecta o wave_manager ao battle_system para registro de ataques
                         if hasattr(self.game_scene.battle_system, 'set_wave_manager'):
                             self.game_scene.battle_system.set_wave_manager(self)
 
@@ -539,7 +560,6 @@ class SurvivalWaveManager:
         """Distribui XP APENAS para os Pokémon que atacaram este inimigo específico"""
 
         if not hasattr(defeated_enemy, '_attackers'):
-            print(f"[XP] Nenhum atacante registrado para {defeated_enemy.name}")
             return
 
         attackers = []
@@ -550,7 +570,6 @@ class SurvivalWaveManager:
                     break
 
         if not attackers:
-            print(f"[XP] Nenhum atacante encontrado vivo para {defeated_enemy.name}")
             return
 
         # ===== CALCULA XP BASE (exponencial pelo nível do inimigo) =====
@@ -559,15 +578,11 @@ class SurvivalWaveManager:
 
         if defeated_enemy.is_boss:
             base_xp = int(base_xp * 3)
-            print(f"[XP] BOSS derrotado! XP base: {base_xp}")
 
         if defeated_enemy.is_shiny:
             base_xp = int(base_xp * 1.5)
 
         xp_per_attacker = max(1, base_xp // len(attackers))
-
-        print(f"[XP] {defeated_enemy.name} (nível {level}) foi atacado por {len(attackers)} Pokémon")
-        print(f"[XP] Distribuindo {xp_per_attacker} XP para cada atacante")
 
         pokedex = self.game_scene.game.player.pokedex if self.game_scene.game.player else None
         ev_yield = {}
@@ -592,11 +607,6 @@ class SurvivalWaveManager:
 
                 if ally.stats.can_gain_evs(evs_gained):
                     ally.stats.gain_evs(evs_gained)
-                    print(f"[XP] {ally.name} ganhou {xp_per_attacker} XP e EVs: {evs_gained}")
-                else:
-                    print(f"[XP] {ally.name} ganhou {xp_per_attacker} XP (EVs bloqueados)")
-            else:
-                print(f"[XP] {ally.name} ganhou {xp_per_attacker} XP")
 
     def _cleanup_enemy_attackers(self, enemy: Pokemon):
         """Limpa a lista de atacantes do inimigo"""
@@ -605,6 +615,10 @@ class SurvivalWaveManager:
 
     def _complete_wave(self):
         """Completa a wave atual e prepara a próxima"""
+        # ===== TRAVA: nao completa wave apos fim =====
+        if self._finished:
+            return
+
         print(f"[SurvivalWave] WAVE {self.current_wave} COMPLETA!")
 
         wave_complete_text = f"ONDA {self.current_wave} COMPLETA!"
@@ -661,7 +675,7 @@ class SurvivalWaveManager:
         }
 
     def has_more_waves(self) -> bool:
-        return self.current_wave <= self.total_waves
+        return not self._finished and self.current_wave <= self.total_waves
 
     def has_active_waves(self) -> bool:
         return self.wave_active or self.enemies_spawned_in_wave > 0

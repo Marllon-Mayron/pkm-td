@@ -66,6 +66,10 @@ class PokemonStats:
         - Nível 50 → 5,000 XP
         - Nível 100 → 20,000 XP
         """
+
+        if self.pokemon.level >= 100:
+                return 999999999
+
         return (self.pokemon.level ** 2) * 2
 
     def calculate_attack_damage(self) -> float:

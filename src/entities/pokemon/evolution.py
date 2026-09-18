@@ -330,17 +330,34 @@ class PokemonEvolution:
                 print(f"[COMBINATION] TeamSelectScene marcado para recriar layout!")
 
     def gain_xp(self, amount):
-        """Ganha XP e verifica level up/evolução"""
+        """Ganha XP e verifica level up/evolução. Não passa do nível 100."""
+        MAX_LEVEL = 100
+
+        # ===== SE JÁ ESTÁ NO NÍVEL MÁXIMO, IGNORA XP =====
+        if self.pokemon.level >= MAX_LEVEL:
+            self.pokemon.xp = 0
+            self.pokemon.xp_to_next = self.pokemon._calculate_xp_needed()
+            return False
+
         old_level = self.pokemon.level
         self.pokemon.xp += amount
 
         leveled_up = False
-        while self.pokemon.xp >= self.pokemon.xp_to_next:
+
+        # ===== SOBE DE NÍVEL, MAS NUNCA PASSA DE 100 =====
+        while (self.pokemon.xp >= self.pokemon.xp_to_next
+               and self.pokemon.level < MAX_LEVEL):
             self.level_up()
             leveled_up = True
 
-        if self.pokemon.level >= 100:
-            if hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
+        # ===== SE BATEU NO TETO, ZERA O XP E TRAVA =====
+        if self.pokemon.level >= MAX_LEVEL:
+            self.pokemon.level = MAX_LEVEL
+            self.pokemon.xp = 0
+            self.pokemon.xp_to_next = self.pokemon._calculate_xp_needed()
+
+            # ===== CONQUISTA: NÍVEL MÁXIMO =====
+            if leveled_up and hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
                 game_scene = self.pokemon.game_scene
                 phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
                 if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
@@ -350,25 +367,42 @@ class PokemonEvolution:
             self.pokemon.attack_damage = self.pokemon._calculate_attack_damage()
             self.pokemon.defense_value = self.pokemon._calculate_defense()
 
-            # Verifica evolução por nível primeiro
-            evolution = evolution_manager.check_evolution(self.pokemon.id, current_level=self.pokemon.level)
-            if evolution and self.pokemon.game_scene:
-                self.pokemon.game_scene.open_evolution_overlay(self.pokemon, evolution)
-                return True
+            # Verifica evolução por nível primeiro (nunca no nível 100)
+            if self.pokemon.level < MAX_LEVEL:
+                evolution = evolution_manager.check_evolution(
+                    self.pokemon.id, current_level=self.pokemon.level
+                )
+                if evolution and self.pokemon.game_scene:
+                    self.pokemon.game_scene.open_evolution_overlay(self.pokemon, evolution)
+                    return True
 
-            # Se não evoluiu por nível, verifica evolução por felicidade
-            happiness_evo = evolution_manager.check_happiness_evolution(self.pokemon)
-            if happiness_evo and self.pokemon.game_scene:
-                self.pokemon.game_scene.open_evolution_overlay(self.pokemon, happiness_evo)
-                return True
+                # Se não evoluiu por nível, verifica evolução por felicidade
+                happiness_evo = evolution_manager.check_happiness_evolution(self.pokemon)
+                if happiness_evo and self.pokemon.game_scene:
+                    self.pokemon.game_scene.open_evolution_overlay(self.pokemon, happiness_evo)
+                    return True
 
         return leveled_up
 
     def level_up(self):
-        """Sobe de nível com curva de XP suavizada"""
+        """Sobe de nível com curva de XP suavizada. Bloqueado no nível 100."""
+        MAX_LEVEL = 100
+
+        # ===== TRAVA DE SEGURANÇA =====
+        if self.pokemon.level >= MAX_LEVEL:
+            self.pokemon.level = MAX_LEVEL
+            self.pokemon.xp = 0
+            return []
+
         old_level = self.pokemon.level
         self.pokemon.xp -= self.pokemon.xp_to_next
         self.pokemon.level += 1
+
+        # ===== GARANTE QUE NUNCA PASSA DE 100 =====
+        if self.pokemon.level > MAX_LEVEL:
+            self.pokemon.level = MAX_LEVEL
+            self.pokemon.xp = 0
+
         self.pokemon._calculate_stats()
         self.pokemon.current_hp = self.pokemon.max_hp
         self.pokemon.xp_to_next = self.pokemon._calculate_xp_needed()

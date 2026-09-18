@@ -1,0 +1,81 @@
+{
+  "name": "Caverna Sombria",
+  "description": "Sobreviva aos pokémon da caverna e às ondas noturnas",
+  "total_waves": 20,
+  "starting_lives": 5,
+  "starting_energy": 150,
+  "max_energy": 300,
+  "energy_regen_rate": 1.0,
+
+  "available_pokemon": [
+    {"id": 167, "cost": 25,  "level": 6, "weight": 1.0},
+    {"id": 163, "cost": 30,  "level": 6, "weight": 0.9},
+    {"id": 194, "cost": 40,  "level": 6, "weight": 0.8},
+    {"id": 179, "cost": 55,  "level": 6, "weight": 0.7},
+    {"id": 161, "cost": 65,  "level": 6, "weight": 0.6},
+    {"id": 187, "cost": 80,  "level": 7, "weight": 0.5},
+    {"id": 191, "cost": 95,  "level": 7, "weight": 0.4},
+    {"id": 183, "cost": 115, "level": 7, "weight": 0.3}
+  ],
+
+  "available_items": [
+    {
+      "id": "potion",
+      "cost": 30,
+      "effect": "heal",
+      "effect_value": 20,
+      "weight": 1.0
+    },
+    {
+      "id": "awakening",
+      "cost": 25,
+      "effect": "cure_status",
+      "effect_value": "sleep",
+      "weight": 0.9
+    },
+    {
+      "id": "antidote",
+      "cost": 20,
+      "effect": "cure_status",
+      "effect_value": "poison",
+      "weight": 0.8
+    },
+    {
+      "id": "pp_up",
+      "cost": 25,
+      "effect": "pp_restore",
+      "effect_value": 0.2,
+      "weight": 0.5
+    }
+  ],
+
+  "waves": [
+    {"wave": 1,  "enemies": [41],              "count": 3,  "min_level": 4,  "max_level": 6,  "spawn_interval": 3.5},
+    {"wave": 2,  "enemies": [41, 163],         "count": 4,  "min_level": 4,  "max_level": 6,  "spawn_interval": 3.0},
+    {"wave": 3,  "enemies": [41, 167],         "count": 5,  "min_level": 5,  "max_level": 6,  "spawn_interval": 2.8},
+    {"wave": 4,  "enemies": [41, 163, 167],    "count": 5,  "min_level": 5,  "max_level": 7,  "spawn_interval": 2.5},
+    {"wave": 5,  "enemies": [42],              "count": 2,  "min_level": 8,  "max_level": 8,  "spawn_interval": 0.1, "is_boss": true},
+    {"wave": 6,  "enemies": [41, 161],         "count": 5,  "min_level": 6,  "max_level": 7,  "spawn_interval": 2.5},
+    {"wave": 7,  "enemies": [41, 167, 179],    "count": 6,  "min_level": 6,  "max_level": 7,  "spawn_interval": 2.5},
+    {"wave": 8,  "enemies": [23, 41],          "count": 6,  "min_level": 6,  "max_level": 8,  "spawn_interval": 2.3},
+    {"wave": 9,  "enemies": [41, 163, 167],    "count": 7,  "min_level": 7,  "max_level": 8,  "spawn_interval": 2.3},
+    {"wave": 10, "enemies": [24],              "count": 3,  "min_level": 11, "max_level": 11, "spawn_interval": 0.1, "is_boss": true},
+    {"wave": 11, "enemies": [41, 42, 167],     "count": 7,  "min_level": 7,  "max_level": 9,  "spawn_interval": 2.2},
+    {"wave": 12, "enemies": [41, 42, 163],     "count": 8,  "min_level": 7,  "max_level": 9,  "spawn_interval": 2.2},
+    {"wave": 13, "enemies": [41, 42, 161],     "count": 8,  "min_level": 7,  "max_level": 10, "spawn_interval": 2.0},
+    {"wave": 14, "enemies": [41, 42, 179],     "count": 9,  "min_level": 8,  "max_level": 10, "spawn_interval": 2.0},
+    {"wave": 15, "enemies": [39],              "count": 3,  "min_level": 11, "max_level": 11, "spawn_interval": 0.1, "is_boss": true},
+    {"wave": 16, "enemies": [41, 42, 167, 163], "count": 9,  "min_level": 8,  "max_level": 11, "spawn_interval": 1.8},
+    {"wave": 17, "enemies": [41, 42, 161, 179], "count": 10, "min_level": 9,  "max_level": 11, "spawn_interval": 1.8},
+    {"wave": 18, "enemies": [41, 42, 167, 163], "count": 12, "min_level": 9,  "max_level": 12, "spawn_interval": 1.5},
+    {"wave": 19, "enemies": [41, 42, 161, 179], "count": 12, "min_level": 9,  "max_level": 13, "spawn_interval": 1.5},
+    {"wave": 20, "enemies": [42, 39],          "count": 5,  "min_level": 14, "max_level": 14, "spawn_interval": 0.1, "is_boss": true}
+  ],
+
+  "rewards": {
+    "base_score": 500,
+    "score_per_wave": 25,
+    "score_per_boss": 100,
+    "energy_per_completed_wave": 30
+  }
+}

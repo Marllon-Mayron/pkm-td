@@ -1,7 +1,7 @@
 {
     "chapter": 1,
-    "phase": 1,
-    "name": "sruvival",
+    "phase": 2,
+    "name": "sruvival 2",
     "map": {
         "width": 29,
         "height": 17,
@@ -543,10 +543,10 @@
                 "height": 17,
                 "tile_size": 24,
                 "tileset_paths": [
-                    "res/AllTiles/TileDtef/AppleWoods/tileset_0.png",
-                    "res/AllTiles/TileDtef/AppleWoods/tileset_1.png",
-                    "res/AllTiles/TileDtef/AppleWoods/tileset_2.png",
-                    "res/AllTiles/TileDtef/FarAmpPlains/tileset_0.png"
+                    "res/AllTiles/TileDtef/FarAmpPlains/tileset_0.png",
+                    "res/AllTiles/TileDtef/FarAmpPlains/tileset_1.png",
+                    "res/AllTiles/TileDtef/FarAmpPlains/tileset_2.png",
+                    "res/AllTiles/TileDtef/GreatCanyon/tileset_0.png"
                 ]
             },
             {
@@ -2109,7 +2109,16 @@
         ]
     },
     "events": {
-        "triggers": [],
+        "triggers": [
+            {
+                "trigger_type": "time",
+                "time_value": 0.0,
+                "wave_index": 0,
+                "wave_state": "wave_start",
+                "custom_condition": "",
+                "events": []
+            }
+        ],
         "selected_trigger": 0
     },
     "rewards": {
@@ -2117,15 +2126,15 @@
         "experience": 0,
         "item_rewards": [],
         "drop_chance": 0.0,
-        "max_items": 3,
+        "max_items": 0,
         "template_name": null
     },
     "localization_type": "custom",
     "custom_folder": "survival",
-    "day_night_mode": "random",
-    "base_weather": "random",
+    "day_night_mode": "cave",
+    "base_weather": "none",
     "unlock_requirement": {
-        "chapter": 1,
-        "phase": 2
+        "chapter": 2,
+        "phase": 3
     }
 }
