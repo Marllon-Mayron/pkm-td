@@ -193,6 +193,7 @@ class PokemonFilters:
             {'label': 'Todos', 'value': 'all'},
             {'label': 'Shiny', 'value': 'shiny'},
             {'label': 'Normal', 'value': 'normal'},
+            {'label': 'Com item', 'value': 'has_item'},
         ]
         sort_options = [
             {'label': 'Captura', 'value': 'capture'},
@@ -200,6 +201,8 @@ class PokemonFilters:
             {'label': 'Z-A', 'value': 'name_desc'},
             {'label': 'ID crescente', 'value': 'id_asc'},
             {'label': 'ID decrescente', 'value': 'id_desc'},
+            {'label': 'Nível crescente', 'value': 'level_asc'},
+            {'label': 'Nível decrescente', 'value': 'level_desc'},
         ]
 
         self.filter_dropdown = Dropdown(

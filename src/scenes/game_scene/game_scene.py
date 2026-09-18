@@ -2239,15 +2239,28 @@ class GameScene(BaseScene):
         self.placement_manager.start_victory_celebration()
 
         # ===== VERIFICA SE É GINÁSIO =====
+        # ===== VERIFICA SE É GINÁSIO =====
         if (self.chapter_id, self.phase_number) in GYM_PHASES:
             gym_number = GYM_PHASES[(self.chapter_id, self.phase_number)]
             print(f"[GYM] Ginásio {gym_number} completado!")
-            # Incrementa contador de insígnias
-            self.player.achievement_manager.increment_counter("badge_count")
-            # Verifica conquista de primeira insígnia
-            self.player.achievement_manager.check_and_unlock("first_badge", self.phase_id)
-            # Verifica conquista de todas as insígnias
-            self.player.achievement_manager.check_and_unlock("all_badges", self.phase_id)
+
+            ach_mgr = self.player.achievement_manager
+
+            # ===== SÓ CONTA A INSÍGNIA UMA VEZ POR GINÁSIO =====
+            gym_key = f"gym_{gym_number}_completed"
+            already_done = ach_mgr.get_counter(gym_key) > 0
+
+            if not already_done:
+                ach_mgr.set_counter(gym_key, 1)
+                ach_mgr.increment_counter("badge_count")
+
+                # Verifica conquista de primeira insígnia
+                ach_mgr.check_and_unlock("first_badge", self.phase_id)
+                # Verifica conquista de todas as insígnias (agora com badge_count correto)
+                ach_mgr.check_and_unlock("all_badges", self.phase_id)
+                print(f"[GYM] Insígnia {gym_number} contabilizada (total: {ach_mgr.get_counter('badge_count')}/8)")
+            else:
+                print(f"[GYM] Ginásio {gym_number} já havia sido concluído — badge_count NÃO incrementado")
 
         # ===== RECOMPENSAS BASE =====
         base_reward = self.phase_rewards.get('money', 100)

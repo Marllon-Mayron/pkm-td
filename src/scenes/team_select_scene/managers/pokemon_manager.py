@@ -11,11 +11,14 @@ class PokemonManager:
         """Aplica busca, filtro e ordenação a uma lista de dicionários."""
         filtered_list = pokemon_list
 
-        # Filtro de shiny
+        # Filtro de shiny / normal
         if self.current_filter == "shiny":
             filtered_list = [p for p in filtered_list if p.get("is_shiny", False)]
         elif self.current_filter == "normal":
             filtered_list = [p for p in filtered_list if not p.get("is_shiny", False)]
+        # NOVO: filtro de Pokemon que estão segurando item
+        elif self.current_filter == "has_item":
+            filtered_list = [p for p in filtered_list if p.get("held_item")]
 
         # Busca por nome ou apelido
         if self.current_search:
@@ -35,6 +38,11 @@ class PokemonManager:
             filtered_list.sort(key=lambda p: p.get("id", 0))
         elif self.current_sort == "id_desc":
             filtered_list.sort(key=lambda p: p.get("id", 0), reverse=True)
+        # NOVO: ordenação por nível
+        elif self.current_sort == "level_asc":
+            filtered_list.sort(key=lambda p: p.get("level", 0))
+        elif self.current_sort == "level_desc":
+            filtered_list.sort(key=lambda p: p.get("level", 0), reverse=True)
         # "capture" - ORDENA POR DATA DE CAPTURA (mais antigo primeiro)
         elif self.current_sort == "capture":
             filtered_list.sort(key=lambda p: p.get("capture_date", ""))
@@ -151,6 +159,7 @@ class PokemonManager:
                     }
                     for move in cached_pokemon.moves
                 ]
+                data["held_item"] = cached_pokemon.held_item
 
         # ===== 4. ATUALIZA OS POKEMON QUE ESTÃO NO TIME MAS NÃO NO CACHE =====
         for pokemon in self.player.team:
@@ -282,6 +291,7 @@ class PokemonManager:
                     }
                     for move in pokemon.moves
                 ]
+                data["held_item"] = pokemon.held_item
                 # Mantém o unique_id, is_shiny, etc
                 print(f"[SYNC] Box atualizada para {pokemon.name} (ID: {pokemon.id})")
                 return True

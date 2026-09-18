@@ -69,8 +69,10 @@ class Game:
             success = self.player.load_game(1)
             if success:
                 print("[GAME] Save carregado com sucesso!")
-                # Carrega as configurações do save
-                progress_manager._load_settings_from_save()
+                # ===== RECARREGA PROGRESSO + SETTINGS DO SAVE =====
+                # load_game() já rodou _sync_unlocked_phases_with_catalog()
+                # dentro do SaveManager. reload_progress() lê esse estado atualizado.
+                progress_manager.reload_progress()
                 return
             else:
                 print("[GAME] Erro ao carregar save - criando novo...")
@@ -112,8 +114,8 @@ class Game:
 
         if success:
             print("[GAME] Save inicial criado com sucesso!")
-            # Carrega as configurações do save
-            progress_manager._load_settings_from_save()
+            # ===== RECARREGA PROGRESSO + SETTINGS =====
+            progress_manager.reload_progress()
         else:
             print("[GAME] ERRO: Não foi possível criar o save inicial!")
 

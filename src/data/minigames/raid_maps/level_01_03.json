@@ -1310,8 +1310,8 @@
                         "percentage": 100.0
                     }
                 ],
-                "min_level": 47,
-                "max_level": 47,
+                "min_level": 62,
+                "max_level": 62,
                 "wave_size": 1,
                 "spawn_interval": 3.0,
                 "initial_delay": 10.0,
@@ -1334,8 +1334,8 @@
                             "percentage": 100.0
                         }
                     ],
-                    "min_level": 47,
-                    "max_level": 47,
+                    "min_level": 62,
+                    "max_level": 62,
                     "wave_size": 1,
                     "spawn_interval": 3.0,
                     "initial_delay": 10.0,

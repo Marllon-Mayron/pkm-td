@@ -489,6 +489,8 @@ class SaveManager:
             self.save_data = raw_data
             self.current_save_file = slot
 
+            self._sync_unlocked_phases_with_catalog()
+
             player_data = self.save_data["player"]
 
             # Dados básicos
@@ -648,6 +650,96 @@ class SaveManager:
 
         print(f"[SAVE] Configurações carregadas: Música={settings_obj.music_volume}, SFX={settings_obj.sfx_volume}, Ambiente={settings_obj.ambient_volume}")
         return True
+
+    def _sync_unlocked_phases_with_catalog(self) -> bool:
+        """
+        Sincroniza `unlocked_phases` com o catálogo REAL de fases do jogo.
+
+        Roda em TODO load — não só em migração de versão. Isso resolve o caso
+        onde o jogador completou tudo e depois uma fase NOVA foi adicionada
+        ao jogo (ex: `7-5`). A fase nova é desbloqueada automaticamente se
+        a anterior (mesmo capítulo) ou a última do capítulo anterior já foi
+        completada.
+
+        Retorna True se modificou o save (e portanto precisa salvar de novo).
+        """
+        try:
+            from src.config.phase_catalog import phase_catalog
+            # Força recarregar do disco (a pasta pode ter mudado desde o último run)
+            phase_catalog.refresh()
+            all_phases = phase_catalog.get_all_phases()
+        except Exception as e:
+            print(f"[SAVE] Erro ao ler catálogo de fases: {e}")
+            return False
+
+        if not all_phases:
+            return False
+
+        game_state = self.save_data.setdefault("game_state", {})
+        unlocked = set(str(p) for p in game_state.get("unlocked_phases", []))
+        completed = set(str(p) for p in game_state.get("completed_phases", []))
+
+        # 1-1 sempre desbloqueada (fallback de segurança)
+        unlocked.add("1-1")
+
+        changes = False
+        sorted_chapters = sorted(all_phases.keys())
+
+        for ch_idx, chapter_num in enumerate(sorted_chapters):
+            phases_list = all_phases[chapter_num]
+            if not phases_list:
+                continue
+            phase_nums = sorted(p["number"] for p in phases_list)
+
+            for idx, phase_num in enumerate(phase_nums):
+                phase_id = f"{chapter_num}-{phase_num}"
+                if phase_id in unlocked:
+                    continue
+
+                should_unlock = False
+
+                if idx == 0:
+                    # Primeira fase do capítulo
+                    if chapter_num == 1:
+                        should_unlock = True
+                    else:
+                        # Precisa ter completado a ÚLTIMA fase do capítulo anterior
+                        prev_ch = sorted_chapters[ch_idx - 1]
+                        prev_phases = all_phases[prev_ch]
+                        if prev_phases:
+                            last_prev_num = max(p["number"] for p in prev_phases)
+                            last_prev_id = f"{prev_ch}-{last_prev_num}"
+                            should_unlock = last_prev_id in completed
+                else:
+                    # Fase N depende de N-1 no MESMO capítulo
+                    prev_num = phase_nums[idx - 1]
+                    prev_id = f"{chapter_num}-{prev_num}"
+                    should_unlock = prev_id in completed
+
+                if should_unlock:
+                    unlocked.add(phase_id)
+                    changes = True
+                    print(f"[SAVE]  Fase nova detectada e desbloqueada: {phase_id}")
+
+        # Também garante que fases recém-desbloqueadas por progressão apareçam
+        # na lista canônica em ordem
+        if changes:
+            game_state["unlocked_phases"] = sorted(unlocked)
+            # Salva o arquivo imediatamente para persistir
+            if self.current_save_file:
+                filename = f"save_{self.current_save_file}.json"
+                filepath = os.path.join(self.save_dir, filename)
+                try:
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        json.dump(self.save_data, f, indent=2, ensure_ascii=False)
+                    print(f"[SAVE] unlocked_phases atualizado no arquivo ({len(unlocked)} fases)")
+                except Exception as e:
+                    print(f"[SAVE] Erro ao gravar unlocked_phases: {e}")
+            # também atualiza o player_data em memória
+            self.save_data["game_state"] = game_state
+            return True
+
+        return False
 
     def migrate_save_data(self, save_data: Dict, version: str) -> Dict:
         """Migra dados de save de versões antigas para o formato atual (0.1.9)"""

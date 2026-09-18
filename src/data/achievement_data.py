@@ -371,7 +371,7 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         title="Amigo Amigo",
         description="Capture 5 Pokémon usando a Friend Ball",
         rarity=AchievementRarity.UNCOMMON,
-        rewards={"gold": 500, "xp": 250, "items": {"friendball": 5}}
+        rewards={"gold": 500, "xp": 250, "items": {"friendball": 2}}
     ),
 
     # ============================================================
@@ -525,7 +525,7 @@ ACHIEVEMENTS: Dict[str, Achievement] = {
         title="Primeira Mordida",
         description="Faca um Pokemon consumir uma berry equipada em batalha",
         rarity=AchievementRarity.COMMON,
-        rewards={"gold": 100, "xp": 50, "items": {"oran_berry": 3}}
+        rewards={"gold": 100, "xp": 50, "items": {"oranberry": 2}}
     ),
     "capture_with_item": Achievement(
         id="capture_with_item",

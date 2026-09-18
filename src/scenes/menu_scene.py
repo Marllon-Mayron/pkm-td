@@ -647,7 +647,8 @@ class MenuScene(BaseScene):
         has_chosen_starter = getattr(self.game.player, 'has_chosen_starter', False)
         if has_chosen_starter:
             from src.config.progress import progress_manager
-            progress_manager._load_settings_from_save()
+            # Pega qualquer fase nova que tenha sido adicionada ao catálogo enquanto o jogo estava aberto e sincroniza com o save.
+            progress_manager.reload_progress()
             self.game.current_scene = PhaseSelectScene(self.game)
         else:
             from src.scenes.starter_select_scene.starter_select_scene import StarterSelectScene
