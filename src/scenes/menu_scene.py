@@ -14,6 +14,7 @@ from pathlib import Path
 
 from config.paths import SPRITES_PATH, RES_PATH
 from config.news_config import get_devlog_url, get_news_title, natural_sort_key
+from config.global_settings import DEBUG_MODE
 from src.scenes.base_scene import BaseScene
 from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 from src.scenes.settings_scene.settings_scene import SettingsScene
@@ -350,8 +351,6 @@ class Button:
 class MenuScene(BaseScene):
     """Menu principal com painel lateral NEWS / PREVIEW"""
 
-    DEBUG_MODE = False
-
     def __init__(self, game):
         super().__init__(game)
 
@@ -555,7 +554,7 @@ class MenuScene(BaseScene):
             (40, 40, 60), (80, 80, 120), self.open_editor, None,
             volume=BTN_VOLUME
         )
-        if not MenuScene.DEBUG_MODE:
+        if not DEBUG_MODE:
             editor_btn.disabled = True
             editor_btn.disabled_tooltip = "Disponível apenas em modo debug"
 
@@ -580,6 +579,15 @@ class MenuScene(BaseScene):
                    (60, 20, 20), (120, 30, 30), self.quit_game, None,
                    volume=BTN_VOLUME),
         ]
+
+        # ===== BOTÃO DEBUG (apenas se DEBUG_MODE) =====
+        if DEBUG_MODE:
+            debug_btn = Button(
+                left_margin, main_btn_y + 0.55, button_width, 0.055, "DEBUG",
+                (25, 55, 45), (45, 100, 80), self.open_debug_scene, None,
+                volume=BTN_VOLUME,
+            )
+            self.buttons.append(debug_btn)
 
     def _create_particles(self):
         for _ in range(30):
@@ -623,7 +631,7 @@ class MenuScene(BaseScene):
         self.game.current_scene = SettingsScene(self.game)
 
     def open_editor(self):
-        if not MenuScene.DEBUG_MODE:
+        if not DEBUG_MODE:
             toast_warning(
                 "Editor de Fases indisponível (modo debug desativado).",
                 duration=3.5,
@@ -633,6 +641,13 @@ class MenuScene(BaseScene):
 
         from src.scenes.editor.editor_scene import EditorScene
         self.game.current_scene = EditorScene(self.game)
+
+    def open_debug_scene(self):
+        if not DEBUG_MODE:
+            toast_warning("Debug desabilitado nesta build.", duration=3.0)
+            return
+        from src.scenes.debug_scene.debug_scene import DebugScene
+        self.game.current_scene = DebugScene(self.game)
 
     def open_mystery_gift(self):
         from src.scenes.mystery_gift_scene.mystery_gift_scene import MysteryGiftScene

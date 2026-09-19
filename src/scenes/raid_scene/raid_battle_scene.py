@@ -11,6 +11,7 @@ RaidBattleScene — sync em tempo real host↔cliente (pokémons, boss, clima, a
 - Nunca dispara Game Over local (raid continua). Só game over global via RAID_ALL_DEFEATED.
 """
 import math
+import uuid
 import pygame
 
 from src.scenes.game_scene.game_scene import GameScene
@@ -56,6 +57,12 @@ class RaidBattleScene(GameScene):
         self.raid_game_over_overlay = None
         self.raid_victory_overlay = None
         self._raid_returning_to_lobby = False
+
+        # ===== BACKUP DO TIME ORIGINAL (seguranca anti-perda de dados) =====
+        # Guarda referencias dos objetos originais do player.team antes de
+        # serem movidos para a box e substituidos por copias temporarias.
+        self._saved_player_team = None
+        self._saved_team_ids = None
 
         super().__init__(game, chapter_id=1, phase_number=1)
 
@@ -149,8 +156,49 @@ class RaidBattleScene(GameScene):
         }
 
     # ------------------------------------------------------------------
+    # SETUP DO TIME (SEGURANCA CONTRA PERDA DE DADOS)
+    # ------------------------------------------------------------------
     def _setup_raid_team(self):
+        """
+        Prepara o time para a raid com SEGURANCA MAXIMA contra perda de dados.
+
+        Estrategia:
+          1) Guarda referencia dos objetos originais em memoria (self._saved_player_team)
+          2) Move os originais para a PC Box, mantendo is_in_team=True
+             (para que o save_game saiba quem era do time real em caso de crash)
+          3) Cria COPIAS temporarias com o MESMO unique_id para uso na raid
+          4) Marca cada copia com _is_raid_copy=True
+
+        Assim:
+          - Se o jogo NAO crashar: ao sair da raid restauramos o time original
+            em memoria (rapido e limpo).
+          - Se o jogo CRASHAR: o save_manager detecta o estado de raid e salva
+            apenas os originais (na box). No proximo load, os originais voltam
+            ao time e qualquer copia orfa e limpa automaticamente.
+        """
+        # 1) Guarda time original em memoria (idempotente — so na primeira vez)
+        if self._saved_player_team is None:
+            self._saved_player_team = list(self.player.team)
+            self._saved_team_ids = {p.unique_id for p in self._saved_player_team}
+            print(f"[RAID] Backup do time original: "
+                  f"{len(self._saved_player_team)} pokemon "
+                  f"({[p.name for p in self._saved_player_team]})")
+
+        # 2) Move originais para a box (com is_in_team=True preservado)
+        for p in self._saved_player_team:
+            p.is_in_team = False  # na instancia em memoria
+            p_dict = p.to_dict()
+            p_dict["is_in_team"] = True  # mas MARCA na box que era do time
+            # Remove possivel duplicata antes de adicionar
+            self.player.pc_box = [
+                d for d in self.player.pc_box
+                if d.get("unique_id") != p.unique_id
+            ]
+            self.player.pc_box.append(p_dict)
+
+        # 3) Limpa o time — sera repovoado com copias temporarias
         self.player.team.clear()
+
         if not self._raid_final_team:
             return
 
@@ -159,9 +207,10 @@ class RaidBattleScene(GameScene):
             if e.get("owner_uuid") == self._raid_my_uuid
         ]
         if not my_pokemons:
-            print(f"[RAID_BATTLE] AVISO: nenhum pokémon meu. Usando todos.")
+            print(f"[RAID_BATTLE] AVISO: nenhum pokemon meu. Usando todos.")
             my_pokemons = list(self._raid_final_team)
 
+        # 4) Cria copias temporarias (MESMO unique_id do original)
         for entry in my_pokemons:
             pdata = entry.get("pokemon")
             if not pdata:
@@ -171,6 +220,12 @@ class RaidBattleScene(GameScene):
             except Exception as e:
                 print(f"[RAID_BATTLE] Falha em {pdata.get('name')}: {e}")
                 continue
+
+            # MESMO unique_id do original (intencional).
+            # O save_manager usa isso para identificar e limpar copias.
+            pk._is_raid_copy = True
+            pk._raid_original_uid = pk.unique_id
+
             pk.is_wild = False
             pk.is_in_team = True
             pk._raid_owner_name = entry.get("owner_name", "?")
@@ -180,7 +235,60 @@ class RaidBattleScene(GameScene):
             pk.attack_range = RaidBossManager.ALLY_ATTACK_RANGE
             self.player.team.append(pk)
 
-        print(f"[RAID_BATTLE] {len(self.player.team)} pokémon(s) local(is)")
+        print(f"[RAID_BATTLE] {len(self.player.team)} copia(s) temporaria(s) "
+              f"da raid criadas (unique_id preservado)")
+
+    # ------------------------------------------------------------------
+    def _restore_player_team(self):
+        """
+        Restaura o time ORIGINAL do jogador (idempotente).
+
+        Chamar ANTES de qualquer auto_save e em TODOS os caminhos de saida
+        da raid (vitoria, derrota, disconnect, ESC, RAID_RETURN_LOBBY).
+
+        - Remove os originais da box (eles voltam pro time)
+        - Remove qualquer copia de raid orfa (do time ou da box)
+        - Devolve os objetos originais ao player.team
+        """
+        saved = self._saved_player_team
+        if saved is None:
+            return
+
+        saved_ids = self._saved_team_ids or set()
+
+        # 1) Remove os originais da box (eles voltam para o time)
+        self.player.pc_box = [
+            d for d in self.player.pc_box
+            if d.get("unique_id") not in saved_ids
+        ]
+
+        # 2) Remove qualquer copia de raid orfa que tenha sobrado na box
+        self.player.pc_box = [
+            d for d in self.player.pc_box
+            if not d.get("_is_raid_copy")
+        ]
+
+        # 3) Marca as copias remanescentes no time como fora do time
+        for p in list(self.player.team):
+            if getattr(p, '_is_raid_copy', False):
+                p.is_in_team = False
+
+        # 4) Devolve os objetos originais ao time
+        self.player.team = list(saved)
+        for p in self.player.team:
+            p.is_in_team = True
+            p.is_placed = False
+            # Remove marcador (por seguranca)
+            if hasattr(p, '_is_raid_copy'):
+                delattr(p, '_is_raid_copy')
+
+        # 5) Limpa o backup (idempotencia)
+        self._saved_player_team = None
+        self._saved_team_ids = None
+
+        print(f"[RAID] Time original restaurado: "
+              f"{len(self.player.team)} pokemon "
+              f"({[p.name for p in self.player.team]})")
 
     def _start_game(self):
         try:
@@ -1102,6 +1210,13 @@ class RaidBattleScene(GameScene):
         except Exception:
             pass
 
+        # ============================================================
+        # RESTAURA O TIME ORIGINAL ANTES DE SALVAR
+        # Sem isso o auto_save gravaria o time "temporario" da raid
+        # e os pokemon originais seriam perdidos.
+        # ============================================================
+        self._restore_player_team()
+
         try:
             self.player.auto_save()
         except Exception:
@@ -1205,6 +1320,13 @@ class RaidBattleScene(GameScene):
             return
         self._raid_returning_to_lobby = True
 
+        # ============================================================
+        # RESTAURA O TIME ORIGINAL ANTES DE QUALQUER COISA
+        # Cobre todos os caminhos de saida (vitoria, derrota,
+        # RAID_RETURN_LOBBY do parceiro, DISCONNECT).
+        # ============================================================
+        self._restore_player_team()
+
         if broadcast and self._raid_network:
             try:
                 self._raid_network.send_to_all(create_message(
@@ -1245,6 +1367,12 @@ class RaidBattleScene(GameScene):
     def handle_give_up(self):
         """Desistir na raid = derrota local (sem penalidades)."""
         print("[RAID] Jogador desistiu da raid")
+
+        # ============================================================
+        # RESTAURA O TIME ORIGINAL ANTES DE SAIR (ESC / desistir)
+        # ============================================================
+        self._restore_player_team()
+
         try:
             self._stop_all_sounds(fade_ms=1000)
         except Exception:

@@ -179,6 +179,14 @@ class SaveManager:
                 "held_item": getattr(pokemon, 'held_item', None),
             }
 
+            # ===== MARCADOR DE COPIA TEMPORARIA DE RAID =====
+            # Copias criadas em RaidBattleScene._setup_raid_team recebem
+            # o atributo _is_raid_copy=True. O save_game detecta o estado
+            # de raid e nao salva essas copias; o load_game tambem limpa
+            # qualquer copia orfa que tenha vazado para o disco.
+            if getattr(pokemon, '_is_raid_copy', False):
+                pokemon_dict["_is_raid_copy"] = True
+
             return pokemon_dict
 
         # ===== POKÉMON NORMAL (não transformado) =====
@@ -221,6 +229,11 @@ class SaveManager:
             "happiness": pokemon.happiness,
             "held_item": getattr(pokemon, 'held_item', None),
         }
+
+        # ===== MARCADOR DE COPIA TEMPORARIA DE RAID =====
+        # (mesmo motivo do branch do Ditto transformado acima)
+        if getattr(pokemon, '_is_raid_copy', False):
+            pokemon_dict["_is_raid_copy"] = True
 
         return pokemon_dict
 
@@ -282,6 +295,82 @@ class SaveManager:
             pokemon.restore_moves(moves_data)
 
         return pokemon
+
+    def _clean_raid_copies(self, pokemon_list, label="list"):
+        """
+        Remove duplicatas e copias temporarias de raid de uma lista de dicts.
+
+        Duas camadas de defesa:
+          1) Filtra entradas marcadas explicitamente com _is_raid_copy=True
+          2) Deduplica por (unique_id, id, capture_date) — se dois pokemon
+             tem exatamente essas tres chaves iguais, sao a mesma criatura
+             (original + copia de raid, ou duplicata por outro bug).
+
+        Quando dois registros batem a chave, a preferencia e:
+          - Manter o que NAO esta marcado com _is_raid_copy
+          - Se ambos tem o mesmo status, mantem o primeiro encontrado
+
+        Muta a lista in-place. Retorna o numero de entradas removidas.
+        """
+        if not pokemon_list:
+            return 0
+
+        removed = 0
+
+        # -------- Camada 1: filtro explicito por _is_raid_copy --------
+        filtered = []
+        for d in pokemon_list:
+            if d.get("_is_raid_copy"):
+                removed += 1
+                continue
+            filtered.append(d)
+
+        # -------- Camada 2: deduplicacao por chave composta --------
+        # A chave (unique_id, id, capture_date) e o "DNA" do pokemon.
+        # Se dois registros batem isso, sao o mesmo individuo.
+        seen = {}  # chave -> indice em unique_list
+        unique_list = []
+
+        for d in filtered:
+            key = (
+                d.get("unique_id"),
+                d.get("id"),
+                d.get("capture_date"),
+            )
+
+            if key in seen:
+                # Ja temos um registro com essa chave. Decide qual manter.
+                existing_idx = seen[key]
+                existing = unique_list[existing_idx]
+
+                existing_is_copy = existing.get("_is_raid_copy", False)
+                current_is_copy = d.get("_is_raid_copy", False)
+
+                if not existing_is_copy and current_is_copy:
+                    # Mantem existing, descarta current
+                    removed += 1
+                    continue
+                if existing_is_copy and not current_is_copy:
+                    # Substitui existing pelo current (nao-copia)
+                    unique_list[existing_idx] = d
+                    removed += 1
+                    continue
+                # Ambos sao original OU ambos sao copia: mantem o primeiro
+                removed += 1
+                continue
+
+            seen[key] = len(unique_list)
+            unique_list.append(d)
+
+        # Substitui o conteudo in-place (mantem a identidade da lista)
+        pokemon_list.clear()
+        pokemon_list.extend(unique_list)
+
+        if removed > 0:
+            print(f"[SAVE] Limpeza de raid em '{label}': "
+                  f"{removed} duplicata(s)/copia(s) removida(s)")
+
+        return removed
 
     def save_game(self, player, game_state=None, save_name="save", slot=1) -> bool:
         """
@@ -349,7 +438,7 @@ class SaveManager:
         else:
             player_data["achievements"] = {"unlocked": [], "counters": {}, "unlocked_data": {}}
 
-        # ===== PC BOX - já é uma lista de dicionários =====
+        # ===== PC BOX - normaliza dicionarios (idempotente) =====
         from datetime import datetime
         for data in player.pc_box:
             if "unique_id" not in data:
@@ -359,46 +448,87 @@ class SaveManager:
             if "capture_method" not in data:
                 data["capture_method"] = "unknown"
 
-        # ===== TIME - converte objetos para dicionários =====
-        team_dicts = []
-        for pokemon in player.team:
-            p_dict = self._pokemon_to_dict(pokemon)
-            if "unique_id" not in p_dict:
-                p_dict["unique_id"] = str(uuid.uuid4())
-            if "capture_date" not in p_dict:
-                p_dict["capture_date"] = datetime.now().isoformat()
-            if "capture_method" not in p_dict:
-                p_dict["capture_method"] = "unknown"
-            team_dicts.append(p_dict)
+        # ============================================================
+        # DETECCAO DE ESTADO DE RAID
+        # ============================================================
+        # Se o time contem copias temporarias de raid (marcadas com
+        # _is_raid_copy=True), NAO salvamos essas copias. O time REAL
+        # esta na pc_box marcado com is_in_team=True.
+        #
+        # Isso garante que, mesmo se o jogo fechar durante a raid,
+        # o save em disco contenha apenas os pokemon originais.
+        # No proximo load, os originais voltam ao time e qualquer
+        # copia orfa e limpa automaticamente pelo load_game.
+        # ============================================================
+        has_raid_copies = any(
+            getattr(p, '_is_raid_copy', False) for p in player.team
+        )
 
-        # ===== CONSOLIDA: time + pc_box sem duplicatas =====
-        all_pokemon_dicts = {}
-        for data in player.pc_box:
-            uid = data.get("unique_id")
-            if uid:
-                all_pokemon_dicts[uid] = data
-        for p_dict in team_dicts:
-            uid = p_dict.get("unique_id")
-            if uid:
-                all_pokemon_dicts[uid] = p_dict
+        if has_raid_copies:
+            print("[SAVE] Estado de RAID detectado - copias temporarias ignoradas")
 
-        team_ids = {p.unique_id for p in player.team}
-        for uid, data in all_pokemon_dicts.items():
-            data["is_in_team"] = uid in team_ids
+            # Filtra qualquer copia que tenha vazado para a box (defesa)
+            player.pc_box = [
+                d for d in player.pc_box
+                if not d.get("_is_raid_copy")
+            ]
 
-        box_list = list(all_pokemon_dicts.values())
+            # Deduplica por seguranca (defesa em profundidade)
+            self._clean_raid_copies(player.pc_box, label="pc_box (raid)")
 
-        # ===== SALVA =====
-        player_data["pc_box"] = box_list
-        team_order = []
-        for pokemon in player.team:
-            uid = pokemon.unique_id
-            if uid in all_pokemon_dicts:
-                team_order.append(all_pokemon_dicts[uid])
-            else:
-                team_order.append(self._pokemon_to_dict(pokemon))
+            # Time real = entradas da pc_box marcadas com is_in_team=True
+            # (foram os originais movidos para a box ao entrar na raid)
+            team_order = [d for d in player.pc_box if d.get("is_in_team")]
 
-        player_data["team"] = team_order
+            # pc_box sem consolidacao (ja esta limpa)
+            box_list = list(player.pc_box)
+
+            player_data["pc_box"] = box_list
+            player_data["team"] = team_order
+
+            print(f"[SAVE] RAID - box: {len(box_list)} | team: {len(team_order)}")
+
+        else:
+            # ===== TIME - converte objetos para dicionarios =====
+            team_dicts = []
+            for pokemon in player.team:
+                p_dict = self._pokemon_to_dict(pokemon)
+                if "unique_id" not in p_dict:
+                    p_dict["unique_id"] = str(uuid.uuid4())
+                if "capture_date" not in p_dict:
+                    p_dict["capture_date"] = datetime.now().isoformat()
+                if "capture_method" not in p_dict:
+                    p_dict["capture_method"] = "unknown"
+                team_dicts.append(p_dict)
+
+            # ===== CONSOLIDA: time + pc_box sem duplicatas =====
+            all_pokemon_dicts = {}
+            for data in player.pc_box:
+                uid = data.get("unique_id")
+                if uid:
+                    all_pokemon_dicts[uid] = data
+            for p_dict in team_dicts:
+                uid = p_dict.get("unique_id")
+                if uid:
+                    all_pokemon_dicts[uid] = p_dict
+
+            team_ids = {p.unique_id for p in player.team}
+            for uid, data in all_pokemon_dicts.items():
+                data["is_in_team"] = uid in team_ids
+
+            box_list = list(all_pokemon_dicts.values())
+
+            # ===== SALVA =====
+            player_data["pc_box"] = box_list
+            team_order = []
+            for pokemon in player.team:
+                uid = pokemon.unique_id
+                if uid in all_pokemon_dicts:
+                    team_order.append(all_pokemon_dicts[uid])
+                else:
+                    team_order.append(self._pokemon_to_dict(pokemon))
+
+            player_data["team"] = team_order
 
         # ===== ESTADO DO JOGO =====
         if game_state:
@@ -425,7 +555,8 @@ class SaveManager:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(self.save_data, f, indent=2, ensure_ascii=False)
             print(f"[SAVE] Jogo salvo em {filepath}")
-            print(f"[SAVE] Box: {len(box_list)} Pokemon | Time: {len(player.team)} Pokemon")
+            print(f"[SAVE] Box: {len(player_data['pc_box'])} Pokemon | "
+                  f"Time: {len(player_data['team'])} Pokemon")
             return True
         except Exception as e:
             print(f"[ERRO] Falha ao salvar: {e}")
@@ -466,7 +597,7 @@ class SaveManager:
     def load_game(self, player, slot=1) -> bool:
         """
         Carrega um save e aplica ao jogador.
-        Agora: pc_box será preenchida com dicionários, team com objetos Pokemon.
+        pc_box é preenchida com dicionários, team com objetos Pokemon.
         """
         filename = f"save_{slot}.json"
         filepath = os.path.join(self.save_dir, filename)
@@ -508,12 +639,46 @@ class SaveManager:
             if hasattr(player.bag, '_update_filtered_items'):
                 player.bag._update_filtered_items()
 
-            # ===== CARREGA PC BOX COMO DICIONÁRIOS =====
+            # ============================================================
+            # CARREGA PC BOX COMO DICIONARIOS
+            # Defesas contra duplicatas de raid:
+            #   1) Filtra entradas com _is_raid_copy=True
+            #   2) Deduplica por (unique_id, id, capture_date)
+            # ============================================================
             box_data = player_data.get("pc_box", [])
+
+            # Filtra copias explicitas de raid
+            box_data = [d for d in box_data if not d.get("_is_raid_copy")]
+
+            # Deduplica (defesa em profundidade contra qualquer duplicata)
+            self._clean_raid_copies(box_data, label="pc_box")
+
             player.pc_box = box_data
 
-            # ===== CARREGA TIME COMO OBJETOS POKEMON =====
+            # ============================================================
+            # CARREGA TIME COMO OBJETOS POKEMON
+            # Mesmo tratamento: filtra copias e deduplica.
+            # ============================================================
             team_data = player_data.get("team", [])
+
+            # Filtra copias explicitas de raid tambem do team
+            team_data = [d for d in team_data if not d.get("_is_raid_copy")]
+
+            # Deduplica
+            self._clean_raid_copies(team_data, label="team")
+
+            # ------------------------------------------------------------
+            # SAFETY NET: reconstroi time a partir da box se necessario.
+            # Se o save foi feito DURANTE uma raid (auto_save acidental) e
+            # por algum motivo o time ficou vazio, os originais estao na
+            # box marcados com is_in_team=True. Recupera eles.
+            # ------------------------------------------------------------
+            if not team_data:
+                team_data = [d for d in player.pc_box if d.get("is_in_team")]
+                if team_data:
+                    print(f"[SAVE] Time vazio no save - reconstruindo a partir "
+                          f"da box ({len(team_data)} pokemon)")
+
             player.team = []
             for p_dict in team_data:
                 pokemon = self._dict_to_pokemon(p_dict)

@@ -3,6 +3,7 @@
 import queue
 import socket
 
+from src.config.global_settings import DEBUG_MODE
 from src.network.server import TradeServer
 from src.network.client import TradeClient
 from src.network.protocol import create_message
@@ -71,7 +72,7 @@ class NetworkManager:
 
         # False (padrão): não permite duas conexões do mesmo IP.
         # True: útil apenas para TESTES locais na mesma máquina.
-        self.allow_same_ip_players = False
+        self.allow_same_ip_players = DEBUG_MODE
 
         self.local_ip = self._detect_local_ip()
         self.remote_ips = []
