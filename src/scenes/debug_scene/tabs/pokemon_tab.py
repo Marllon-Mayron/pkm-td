@@ -44,7 +44,6 @@ _NATURES_DATA = [
 ]
 _NATURE_NAMES = [n["name"] for n in _NATURES_DATA]
 
-# Tamanhos grandes
 ROW_H = 64
 PORTRAIT_SIZE = 48
 SUB_TAB_H = 40
@@ -91,6 +90,18 @@ class PokemonTab:
             self.held_items = [None] + sorted(set(ids))
         except Exception:
             self.held_items = [None]
+
+        # ===== Estado da scrollbar (drag) =====
+        self._scroll_dragging = False
+        self._scroll_geom = None  # (bar_x, list_y, list_h, total, visible, target)
+        self._scrollbar_rect = None
+        self._scrollbar_thumb_rect = None
+        self._scrollbar_thumb_h = 0
+        self._scroll_thumb_offset = 0
+
+        # Visibilidade (definida no render)
+        self._visible_create_n = 8
+        self._visible_edit_n = 8
 
     # ==================================================================
     # HELPERS
@@ -152,18 +163,68 @@ class PokemonTab:
         self.focused_input = None
 
     # ==================================================================
+    # DRAG DA SCROLLBAR
+    # ==================================================================
+    def _begin_scroll_drag(self, mouse_pos):
+        if not self._scroll_geom:
+            return
+        _, list_y, list_h, total, visible, _ = self._scroll_geom
+        if total <= visible:
+            return
+        thumb_h = max(24, int(list_h * visible / total))
+        if self._scrollbar_thumb_rect and self._scrollbar_thumb_rect.collidepoint(mouse_pos):
+            self._scroll_thumb_offset = mouse_pos[1] - self._scrollbar_thumb_rect.y
+        else:
+            self._scroll_thumb_offset = thumb_h // 2
+            self._update_scroll_from_mouse(mouse_pos[1])
+        self._scroll_dragging = True
+
+    def _update_scroll_from_mouse(self, mouse_y):
+        if not self._scroll_geom:
+            return
+        _, list_y, list_h, total, visible, target = self._scroll_geom
+        if total <= visible:
+            return
+        thumb_h = max(24, int(list_h * visible / total))
+        desired_y = mouse_y - self._scroll_thumb_offset
+        desired_y = max(list_y, min(list_y + list_h - thumb_h, desired_y))
+        track_h = max(1, list_h - thumb_h)
+        ratio = (desired_y - list_y) / track_h
+        max_s = total - visible
+        new_scroll = max(0, min(max_s, int(round(ratio * max_s))))
+        if target == "create":
+            self.list_scroll = new_scroll
+        elif target == "edit":
+            self.edit_scroll = new_scroll
+
+    # ==================================================================
     # EVENTOS
     # ==================================================================
     def handle_event(self, event):
+        # ===== Scrollbar drag (prioridade máxima) =====
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._scrollbar_rect and self._scrollbar_rect.collidepoint(event.pos):
+                self._begin_scroll_drag(event.pos)
+                return
+        if event.type == pygame.MOUSEMOTION and self._scroll_dragging:
+            self._update_scroll_from_mouse(event.pos[1])
+            return
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self._scroll_dragging:
+                self._scroll_dragging = False
+                return
+
+        # ===== Wheel =====
         if event.type == pygame.MOUSEWHEEL:
             if self.mode == self.MODE_CREATE:
-                max_s = max(0, len(self.filtered_ids) - self._visible_create())
+                max_s = max(0, len(self.filtered_ids) - self._visible_create_n)
                 self.list_scroll = max(0, min(max_s, self.list_scroll - event.y))
             else:
-                max_s = max(0, len(self.edit_targets) - self._visible_edit())
+                max_s = max(0, len(self.edit_targets) - self._visible_edit_n)
                 self.edit_scroll = max(0, min(max_s, self.edit_scroll - event.y))
             return
 
+        # ===== Mouse down (clicks) =====
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             clicked = self.parent.find_click_at(event.pos)
             if clicked not in self.INPUT_NAMES:
@@ -172,6 +233,7 @@ class PokemonTab:
                 self.on_click(clicked)
             return
 
+        # ===== Teclado =====
         if event.type == pygame.KEYDOWN and self.focused_input:
             fi = self.focused_input
             is_name = fi in ("name", "edit_name")
@@ -180,7 +242,6 @@ class PokemonTab:
                 else self.edit_form if fi == "edit_name"
                 else None
             )
-
             if event.key == pygame.K_BACKSPACE:
                 if is_name and target is not None:
                     target["custom_name"] = target["custom_name"][:-1]
@@ -197,13 +258,6 @@ class PokemonTab:
                     if len(self.search_text) < 20:
                         self.search_text += event.unicode
                         self._apply_search()
-
-    def _visible_create(self):
-        # descontos: subtab + search + margens
-        return 8
-
-    def _visible_edit(self):
-        return 8
 
     def on_click(self, name):
         if name == "poke_mode_create":
@@ -542,9 +596,14 @@ class PokemonTab:
     # RENDER
     # ==================================================================
     def render(self, screen, left_rect, right_rect):
+        # Limpa rects da scrollbar antes de qualquer render
+        self._scrollbar_rect = None
+        self._scrollbar_thumb_rect = None
+        self._scroll_geom = None
+
         p = self.parent
 
-        # ---- Sub-abas grandes ----
+        # ---- Sub-abas ----
         sub_y = left_rect.y + 10
         sub_h = SUB_TAB_H
         sub_w = (left_rect.width - 30) // 2
@@ -598,12 +657,11 @@ class PokemonTab:
         row_h = ROW_H
         list_h = left_rect.bottom - list_y - 10
         visible = max(1, list_h // row_h)
-        self._visible_create = lambda: visible
+        self._visible_create_n = visible
 
         start = self.list_scroll
         end = min(len(self.filtered_ids), start + visible)
 
-        # Label resumo
         summary_f = p.get_font(13)
         summary = summary_f.render(f"{len(self.filtered_ids)} Pokémon",
                                    True, (150, 160, 190))
@@ -613,19 +671,23 @@ class PokemonTab:
             idx = i - start
             row = pygame.Rect(left_rect.x + 10, list_y + idx * row_h,
                               left_rect.width - 20, row_h - 4)
-            self._render_list_row(screen, row, self.filtered_ids[i],
-                                  selected=(i == self.list_selected),
-                                  badge=None)
+            self._render_list_row(
+                screen, row,
+                click_name=f"list_item_{i}",
+                pid=self.filtered_ids[i],
+                selected=(i == self.list_selected),
+            )
 
         self._render_scrollbar(screen, left_rect, list_y, list_h,
-                               visible, len(self.filtered_ids), self.list_scroll)
+                               visible, len(self.filtered_ids),
+                               self.list_scroll, target="create")
 
     def _render_edit_list(self, screen, left_rect, list_y):
         p = self.parent
         row_h = ROW_H
         list_h = left_rect.bottom - list_y - 10
         visible = max(1, list_h // row_h)
-        self._visible_edit = lambda: visible
+        self._visible_edit_n = visible
 
         total = len(self.edit_targets)
         team_count = sum(1 for t in self.edit_targets if t["source"] == "team")
@@ -671,15 +733,20 @@ class PokemonTab:
                 pid, name, level, shiny = 1, "?", 1, False
                 badge = ("?", (80, 80, 80))
 
-            self._render_list_row(screen, row, pid, name=name, level=level,
-                                  shiny=shiny,
-                                  selected=(i == self.edit_selected),
-                                  badge=badge)
+            self._render_list_row(
+                screen, row,
+                click_name=f"edit_item_{i}",
+                pid=pid, name=name, level=level, shiny=shiny,
+                selected=(i == self.edit_selected),
+                badge=badge,
+            )
 
         self._render_scrollbar(screen, left_rect, list_y, list_h,
-                               visible, len(self.edit_targets), self.edit_scroll)
+                               visible, len(self.edit_targets),
+                               self.edit_scroll, target="edit")
 
-    def _render_list_row(self, screen, row, pid, name=None, level=None, shiny=False,
+    def _render_list_row(self, screen, row, click_name, pid,
+                         name=None, level=None, shiny=False,
                          selected=False, badge=None):
         p = self.parent
         hovered = row.collidepoint(pygame.mouse.get_pos())
@@ -693,7 +760,7 @@ class PokemonTab:
 
         pygame.draw.rect(screen, bg, row, border_radius=6)
         pygame.draw.rect(screen, border, row, 2 if selected else 1, border_radius=6)
-        p.register_click(f"list_item_{pid}" if name is None else f"edit_item_{pid}", row)
+        p.register_click(click_name, row)
 
         # Portrait
         portrait = self._get_portrait(pid, shiny)
@@ -703,18 +770,15 @@ class PokemonTab:
                 sc = pygame.transform.smoothscale(portrait, (ps, ps))
             except Exception:
                 sc = pygame.transform.scale(portrait, (ps, ps))
-
             box = pygame.Rect(row.x + 6, row.y + (row.height - ps) // 2, ps, ps)
             pygame.draw.rect(screen, (18, 20, 32), box, border_radius=6)
             pygame.draw.rect(screen, (70, 75, 100), box, 1, border_radius=6)
             screen.blit(sc, (box.x + (ps - sc.get_width()) // 2,
                              box.y + (ps - sc.get_height()) // 2))
 
-        # Texto
         tx = row.x + PORTRAIT_SIZE + 20
 
         if name is None:
-            # modo create: mostra #ID + Nome
             name_f = p.get_font(18)
             clr = (255, 255, 255) if selected else (215, 220, 235)
             text = f"#{pid:04d}   {self.pokedex.get_name(pid)}"
@@ -722,8 +786,6 @@ class PokemonTab:
             ty = row.y + (row.height - text_s.get_height()) // 2
             screen.blit(text_s, (tx, ty))
         else:
-            # modo edit: badge + nome + level
-            # Badge
             if badge:
                 label, color = badge
                 bf = p.get_font(12)
@@ -741,21 +803,33 @@ class PokemonTab:
             ty = row.y + (row.height - name_s.get_height()) // 2
             screen.blit(name_s, (tx, ty))
 
-            # Level
             lv_f = p.get_font(15)
             lv_s = lv_f.render(f"Lv.{level}", True, (255, 220, 120))
             screen.blit(lv_s, (row.right - lv_s.get_width() - 16, ty))
 
-    def _render_scrollbar(self, screen, left_rect, list_y, list_h, visible, total, scroll):
+    def _render_scrollbar(self, screen, left_rect, list_y, list_h,
+                          visible, total, scroll, target):
+        bar_x = left_rect.right - 8
+        # Guarda geometria sempre (mesmo quando não há scroll)
+        self._scroll_geom = (bar_x, list_y, list_h, total, visible, target)
+
         if total <= visible:
             return
-        p = self.parent
-        bar_x = left_rect.right - 8
+
         thumb_h = max(24, int(list_h * visible / total))
         max_s = max(1, total - visible)
         thumb_y = list_y + int((list_h - thumb_h) * scroll / max_s)
-        pygame.draw.rect(screen, (40, 40, 60), (bar_x, list_y, 5, list_h), border_radius=3)
-        pygame.draw.rect(screen, (140, 110, 180), (bar_x, thumb_y, 5, thumb_h), border_radius=3)
+
+        # Visual
+        pygame.draw.rect(screen, (40, 40, 60),
+                         (bar_x, list_y, 5, list_h), border_radius=3)
+        pygame.draw.rect(screen, (140, 110, 180),
+                         (bar_x, thumb_y, 5, thumb_h), border_radius=3)
+
+        # Área clicável (um pouco mais larga para facilitar)
+        self._scrollbar_rect = pygame.Rect(bar_x - 3, list_y, 11, list_h)
+        self._scrollbar_thumb_rect = pygame.Rect(bar_x, thumb_y, 5, thumb_h)
+        self._scrollbar_thumb_h = thumb_h
 
     # ---------- FORMULÁRIO ----------
     def _render_form(self, screen, panel, form, prefix):
@@ -775,7 +849,6 @@ class PokemonTab:
         pygame.draw.rect(screen, (26, 30, 48), header_rect, border_radius=10)
         pygame.draw.rect(screen, (90, 80, 130), header_rect, 2, border_radius=10)
 
-        # Portrait
         portrait = self._get_portrait(pid, form["shiny"])
         ps = FORM_HEADER_SIZE
         if portrait:
@@ -783,7 +856,6 @@ class PokemonTab:
                 sc = pygame.transform.smoothscale(portrait, (ps, ps))
             except Exception:
                 sc = pygame.transform.scale(portrait, (ps, ps))
-
             pb = pygame.Rect(header_rect.x + 12,
                              header_rect.y + (header_h - ps) // 2, ps, ps)
             pygame.draw.rect(screen, (18, 20, 32), pb, border_radius=8)
@@ -791,7 +863,6 @@ class PokemonTab:
             screen.blit(sc, (pb.x + (ps - sc.get_width()) // 2,
                              pb.y + (ps - sc.get_height()) // 2))
 
-        # Nome + ID
         name_f = p.get_font(28)
         name_s = name_f.render(name, True, (255, 255, 255))
         id_f = p.get_font(15)
@@ -802,7 +873,6 @@ class PokemonTab:
         screen.blit(name_s, (tx, ty))
         screen.blit(id_s, (tx, ty + name_s.get_height() + 2))
 
-        # Tipos
         types = self.pokedex.get_types(pid)
         type_y = ty + name_s.get_height() + id_s.get_height() + 12
         ttx = tx
@@ -816,7 +886,6 @@ class PokemonTab:
             screen.blit(tt, (badge.x + 8, badge.y + 4))
             ttx += badge.width + 8
 
-        # Botão aleatório (só no create)
         if not is_edit:
             rand_rect = pygame.Rect(header_rect.right - 130,
                                     header_rect.bottom - 34, 118, 26)
@@ -869,7 +938,6 @@ class PokemonTab:
         p.draw_section_title(screen, panel.x + pad, y, inner_w, "IVs (0-31)")
         y += SECTION_TITLE_H
 
-        # Presets
         preset_h = 26
         preset_w = 90
         px = panel.x + pad
@@ -885,7 +953,6 @@ class PokemonTab:
 
         y += preset_h + 10
 
-        # Sliders de IV em 2 colunas
         col_gap = 14
         col_w = (inner_w - col_gap) // 2
         col1_x = panel.x + pad
@@ -908,7 +975,6 @@ class PokemonTab:
             p.draw_section_title(screen, panel.x + pad, y, inner_w, "STATS PREVISTOS")
             y += SECTION_TITLE_H
 
-            # Caixa de stats
             stats_box = pygame.Rect(panel.x + pad, y, inner_w, 74)
             pygame.draw.rect(screen, (26, 30, 48), stats_box, border_radius=8)
             pygame.draw.rect(screen, (90, 80, 130), stats_box, 1, border_radius=8)
@@ -941,11 +1007,9 @@ class PokemonTab:
             cell_w = inner_w // 6
             for i, (lbl, val, color) in enumerate(items):
                 cx = stats_box.x + i * cell_w + cell_w // 2
-                # Label
                 lf = p.get_font(13)
                 ls = lf.render(lbl, True, (150, 160, 190))
                 screen.blit(ls, ls.get_rect(center=(cx, stats_box.y + 22)))
-                # Valor
                 vf = p.get_font(22)
                 vs = vf.render(str(val), True, color)
                 screen.blit(vs, vs.get_rect(center=(cx, stats_box.y + 50)))
@@ -969,7 +1033,7 @@ class PokemonTab:
                           success=True, font_size=17)
 
             hint = hint_f.render(
-                "ESC: voltar   ·   Scroll: navegar lista   ·   Arraste o slider para ajustar",
+                "ESC: voltar   ·   Scroll: navegar   ·   Arraste a barra lateral",
                 True, (140, 140, 160))
         else:
             save_rect = pygame.Rect(footer_rect.x + 24, btn_y, 260, btn_h)
@@ -981,7 +1045,7 @@ class PokemonTab:
             p.register_click("action_delete", del_rect)
             p.draw_button(screen, del_rect, "REMOVER", danger=True, font_size=17)
 
-            hint = hint_f.render("ESC: voltar   ·   Scroll: navegar lista",
+            hint = hint_f.render("ESC: voltar   ·   Scroll: navegar   ·   Arraste a barra lateral",
                                  True, (140, 140, 160))
 
         screen.blit(hint, (footer_rect.right - hint.get_width() - 24,
