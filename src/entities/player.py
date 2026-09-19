@@ -418,7 +418,7 @@ class Player(Entity):
             self.team.append(pokemon)
             pokemon.is_in_team = True
         else:
-            self.pc_box.append(pokemon)
+            self.add_to_box(pokemon)
 
         # ===== REGISTRA NA POKÉDEX =====
         self.caught_pokemon.add(pokemon_id)

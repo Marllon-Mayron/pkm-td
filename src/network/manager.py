@@ -139,7 +139,7 @@ class NetworkManager:
             on_message=self._on_server_message,
             on_connect=self._on_server_connect,
             on_disconnect=self._on_server_disconnect,
-            max_clients=2,
+            max_clients=5,
         )
         self.server.start()
         self.players_list = [self.my_name]

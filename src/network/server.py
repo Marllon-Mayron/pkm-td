@@ -13,7 +13,7 @@ class TradeServer(threading.Thread):
 
     def __init__(self, host='0.0.0.0', port=12345,
                  on_message=None, on_connect=None, on_disconnect=None,
-                 max_clients=2):
+                 max_clients=5):
         super().__init__(daemon=True)
         self.host = host
         self.port = port
