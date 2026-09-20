@@ -5,6 +5,7 @@ Cena principal do jogo - COM NOVA ARQUITETURA DE WAVES
 import pygame
 from datetime import datetime
 
+from src.scenes.game_scene.components.managers.move_quick_switch_manager import MoveQuickSwitchManager
 from src.scenes.game_scene.components.managers.event_processor import EventProcessor
 from src.scenes.game_scene.components.managers.photo_capture_manager import PhotoCaptureManager
 from src.scenes.game_scene.components.renderer.camera_photo_renderer import CameraPhotoRenderer
@@ -78,6 +79,7 @@ class GameScene(BaseScene):
         # Cria os gerenciadores
         self.placement_manager = PlacementManager(self)
         self.team_manager = GameTeamManager(game, self)
+        self.move_quick_switch_manager = MoveQuickSwitchManager(self)
         self.notification_manager = notification_manager
         self.target_item_manager = TargetItemManager(game)
         self.target_item_renderer = TargetItemRenderer()
@@ -1707,6 +1709,10 @@ class GameScene(BaseScene):
                 return None
             return None
 
+        # ===== QUICK SWITCH DE MOVES (prioridade sobre drag/mapa) =====
+        if self.move_quick_switch_manager.handle_event(event, self.camera, self.screen_manager):
+            return None
+
         # ===== DRAG DE ITENS =====
         if drag_manager.is_dragging:
             if event.type == pygame.MOUSEMOTION:
@@ -1986,6 +1992,10 @@ class GameScene(BaseScene):
 
         # ===== GUARDA O DT PARA USO NO RENDER (partículas de clima) =====
         self._last_dt = dt
+
+        # ===== QUICK SWITCH UPDATE (limpa widgets órfãos) =====
+        if hasattr(self, 'move_quick_switch_manager'):
+            self.move_quick_switch_manager.update(dt)
 
         # ===== DELAY DA VITORIA FINAL =====
         # Criado durante _complete_phase; so vira overlay depois de alguns
@@ -2540,6 +2550,12 @@ class GameScene(BaseScene):
                              (screen_mgr.viewport_x, screen_mgr.viewport_y,
                               screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
             perf_monitor.end_section()
+
+        # ===== QUICK SWITCH DE MOVES (SEMPRE VISÍVEL) =====
+        perf_monitor.start_section("RENDER_QUICK_SWITCH")
+        if hasattr(self, 'move_quick_switch_manager'):
+            self.move_quick_switch_manager.render( screen, self.camera, self.screen_manager  )
+        perf_monitor.end_section()
 
         # ===== NOTIFICATIONS (sempre renderizadas) =====
         viewport_rect = pygame.Rect(
