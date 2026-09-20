@@ -8,6 +8,7 @@ import math
 from src.scenes.base_scene import BaseScene
 from src.config.progress import progress_manager
 from src.config.phase_catalog import phase_catalog
+from src.config.global_settings import DEBUG_MODE
 from src.scenes.incubator_scene.incubator_scene import IncubatorScene
 from src.scenes.shop_scene.shop_scene import ShopScene
 from src.scenes.pokedex_scene import PokedexScene
@@ -338,6 +339,7 @@ class PhaseSelectScene(BaseScene):
         self.achievement_button_rect = None
         self.incubator_button_rect = None
         self.profile_button_rect = None
+        self.npc_hall_button_rect = None
         # Hover states
         self.back_button_hovered = False
         self.shop_button_hovered = False
@@ -346,6 +348,7 @@ class PhaseSelectScene(BaseScene):
         self.achievement_button_hovered = False
         self.incubator_button_hovered = False
         self.profile_button_hovered = False
+        self.npc_hall_button_hovered = False
         # Scroll
         self.scroll_y = 0
         self.scroll_target = 0
@@ -356,7 +359,7 @@ class PhaseSelectScene(BaseScene):
         # Estado
         self.layout_initialized = False
         self.last_window_size = (self.screen_manager.window_width, self.screen_manager.window_height)
-        self.dev_mode = True
+        self.dev_mode = DEBUG_MODE
         self._animation_timer = 0
         self._music_started = False
 
@@ -444,26 +447,35 @@ class PhaseSelectScene(BaseScene):
         self.back_button_rect = pygame.Rect(vx + 20, vy + 20, back_size, back_size)
 
         # ===== BOTOES INFERIORES =====
-        button_width = int(vw * 0.10)
+        button_width = int(vw * 0.09)
         button_height = int(vh * 0.055)
-        button_spacing = int(vw * 0.012)
+        button_spacing = int(vw * 0.010)
 
-        # 6 botoes: Loja, Minigames, Pokedex, Conquistas, Incubadora, Perfil
-        total_width = button_width * 6 + button_spacing * 5
+        # 7 botoes: Loja, NPC Hall, Minigames, Pokedex, Conquistas, Incubadora, Perfil
+        total_width = button_width * 7 + button_spacing * 6
         start_x = vx + (vw - total_width) // 2
         bottom_y = vy + vh - button_height - int(vh * 0.06)
 
-        self.shop_button_rect = pygame.Rect(start_x, bottom_y, button_width, button_height)
-        self.minigame_button_rect = pygame.Rect(start_x + (button_width + button_spacing), bottom_y, button_width,
-                                                button_height)
-        self.pokedex_button_rect = pygame.Rect(start_x + (button_width + button_spacing) * 2, bottom_y, button_width,
-                                               button_height)
-        self.achievement_button_rect = pygame.Rect(start_x + (button_width + button_spacing) * 3, bottom_y,
-                                                   button_width, button_height)
-        self.incubator_button_rect = pygame.Rect(start_x + (button_width + button_spacing) * 4, bottom_y, button_width,
-                                                 button_height)
-        self.profile_button_rect = pygame.Rect(start_x + (button_width + button_spacing) * 5, bottom_y, button_width,
-                                               button_height)
+        self.shop_button_rect = pygame.Rect(
+            start_x, bottom_y, button_width, button_height)
+        self.npc_hall_button_rect = pygame.Rect(
+            start_x + (button_width + button_spacing), bottom_y,
+            button_width, button_height)
+        self.minigame_button_rect = pygame.Rect(
+            start_x + (button_width + button_spacing) * 2, bottom_y,
+            button_width, button_height)
+        self.pokedex_button_rect = pygame.Rect(
+            start_x + (button_width + button_spacing) * 3, bottom_y,
+            button_width, button_height)
+        self.achievement_button_rect = pygame.Rect(
+            start_x + (button_width + button_spacing) * 4, bottom_y,
+            button_width, button_height)
+        self.incubator_button_rect = pygame.Rect(
+            start_x + (button_width + button_spacing) * 5, bottom_y,
+            button_width, button_height)
+        self.profile_button_rect = pygame.Rect(
+            start_x + (button_width + button_spacing) * 6, bottom_y,
+            button_width, button_height)
 
         # ===== ABAS =====
         if self.available_chapters:
@@ -575,11 +587,17 @@ class PhaseSelectScene(BaseScene):
             elif event.key == pygame.K_RIGHT:
                 self._next_chapter()
             elif event.key == pygame.K_r and pygame.key.get_mods() & pygame.KMOD_CTRL:
-                self._reset_progress()
-            elif event.key == pygame.K_u and self.dev_mode:
-                self._debug_unlock_next()
-            elif event.key == pygame.K_a and self.dev_mode:
-                self._debug_unlock_all()
+                # ===== DEBUG: resetar progresso =====
+                if DEBUG_MODE:
+                    self._reset_progress()
+            elif event.key == pygame.K_u:
+                # ===== DEBUG: desbloquear proxima fase =====
+                if DEBUG_MODE:
+                    self._debug_unlock_next()
+            elif event.key == pygame.K_a:
+                # ===== DEBUG: desbloquear todas as fases =====
+                if DEBUG_MODE:
+                    self._debug_unlock_all()
             elif event.key == pygame.K_s:
                 self._open_shop()
             elif event.key == pygame.K_m:
@@ -628,14 +646,12 @@ class PhaseSelectScene(BaseScene):
         """Atualiza estados de hover dos botoes"""
         self.back_button_hovered = self.back_button_rect.collidepoint(pos) if self.back_button_rect else False
         self.shop_button_hovered = self.shop_button_rect.collidepoint(pos) if self.shop_button_rect else False
-        self.minigame_button_hovered = self.minigame_button_rect.collidepoint(
-            pos) if self.minigame_button_rect else False
+        self.minigame_button_hovered = self.minigame_button_rect.collidepoint( pos) if self.minigame_button_rect else False
         self.pokedex_button_hovered = self.pokedex_button_rect.collidepoint(pos) if self.pokedex_button_rect else False
-        self.achievement_button_hovered = self.achievement_button_rect.collidepoint(
-            pos) if self.achievement_button_rect else False
-        self.incubator_button_hovered = self.incubator_button_rect.collidepoint(
-            pos) if self.incubator_button_rect else False
+        self.achievement_button_hovered = self.achievement_button_rect.collidepoint( pos) if self.achievement_button_rect else False
+        self.incubator_button_hovered = self.incubator_button_rect.collidepoint( pos) if self.incubator_button_rect else False
         self.profile_button_hovered = self.profile_button_rect.collidepoint(pos) if self.profile_button_rect else False
+        self.npc_hall_button_hovered = ( self.npc_hall_button_rect.collidepoint(pos) if self.npc_hall_button_rect else False)
 
     def _handle_click(self, pos):
         """Processa cliques"""
@@ -673,6 +689,10 @@ class PhaseSelectScene(BaseScene):
 
         if self.profile_button_rect and self.profile_button_rect.collidepoint(pos):
             self._open_profile()
+            return
+
+        if self.npc_hall_button_rect and self.npc_hall_button_rect.collidepoint(pos):
+            self._open_npc_hall()
             return
 
         # Abas
@@ -731,7 +751,10 @@ class PhaseSelectScene(BaseScene):
                     tab.active = (tab.chapter_id == self.current_chapter_id)
 
     def _reset_progress(self):
-        """Reseta o progresso (CTRL+R)"""
+        """Reseta o progresso (CTRL+R) - APENAS EM DEBUG MODE"""
+        if not DEBUG_MODE:
+            print("[PHASE_SELECT] Reset bloqueado: DEBUG_MODE=False")
+            return
         self.progress.reset_progress()
         self.catalog.refresh()
         self.available_chapters = sorted(self.catalog.get_all_phases().keys())
@@ -747,6 +770,11 @@ class PhaseSelectScene(BaseScene):
         self.game.shop_scene = ShopScene(self.game)
         self.game.shop_scene.on_close_callback = self._on_shop_closed
         self.game.current_scene = self.game.shop_scene
+
+    def _open_npc_hall(self):
+        sound_manager.play_effect(SoundEffect.CLICK)
+        from src.scenes.npc_hall_scene.npc_hall_scene import NpcHallScene
+        self.game.current_scene = NpcHallScene(self.game)
 
     def _open_minigames(self):
         sound_manager.play_effect(SoundEffect.CLICK)
@@ -798,7 +826,10 @@ class PhaseSelectScene(BaseScene):
     # ======================================================================
 
     def _debug_unlock_next(self):
-        """Desbloqueia a proxima fase (modo debug)"""
+        """Desbloqueia a proxima fase (APENAS EM DEBUG MODE)"""
+        if not DEBUG_MODE:
+            print("[PHASE_SELECT] Unlock next bloqueado: DEBUG_MODE=False")
+            return
         if self.phase_cards:
             for card in self.phase_cards:
                 if not card.unlocked:
@@ -816,7 +847,10 @@ class PhaseSelectScene(BaseScene):
                         self._create_phase_cards()
 
     def _debug_unlock_all(self):
-        """Desbloqueia todas as fases (modo debug)"""
+        """Desbloqueia todas as fases (APENAS EM DEBUG MODE)"""
+        if not DEBUG_MODE:
+            print("[PHASE_SELECT] Unlock all bloqueado: DEBUG_MODE=False")
+            return
         all_phases = self.catalog.get_all_phases()
         for chapter_id, phases in all_phases.items():
             for phase in phases:
@@ -925,6 +959,7 @@ class PhaseSelectScene(BaseScene):
         self._render_bottom_button(screen, self.achievement_button_rect, "CONQUISTAS", self.achievement_button_hovered)
         self._render_bottom_button(screen, self.incubator_button_rect, "INCUBADORA", self.incubator_button_hovered, not self._is_incubator_unlocked())
         self._render_bottom_button(screen, self.profile_button_rect, "PERFIL", self.profile_button_hovered)
+        self._render_bottom_button(screen, self.npc_hall_button_rect, "NPC HALL", self.npc_hall_button_hovered)
         # ===== ABAS =====
         for tab in self.chapter_tabs:
             tab.render(screen, self.tab_font)
@@ -972,18 +1007,19 @@ class PhaseSelectScene(BaseScene):
         # ===== INSTRUCOES =====
         font_small = pygame.font.Font(None, 16)
         inst_text = "SETAS NAVEGAR | CLIQUE NA FASE | ESC VOLTAR"
-        if self.dev_mode:
+        if DEBUG_MODE:
             inst_text += " | [U] proxima | [A] todas"
         inst = font_small.render(inst_text, True, (100, 100, 120))
         inst_x = vx + (vw - inst.get_width()) // 2
         inst_y = vy + vh - 18
         screen.blit(inst, (inst_x, inst_y))
 
-        # Debug info
-        debug_text = font_small.render("CTRL+R resetar progresso", True, (60, 60, 70))
-        debug_x = vx + 15
-        debug_y = vy + vh - 40
-        screen.blit(debug_text, (debug_x, debug_y))
+        # Debug info (apenas em modo debug)
+        if DEBUG_MODE:
+            debug_text = font_small.render("CTRL+R resetar progresso", True, (60, 60, 70))
+            debug_x = vx + 15
+            debug_y = vy + vh - 40
+            screen.blit(debug_text, (debug_x, debug_y))
 
         # ===== PAUSA =====
         if self.paused:
