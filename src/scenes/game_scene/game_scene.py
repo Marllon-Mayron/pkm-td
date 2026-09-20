@@ -511,51 +511,6 @@ class GameScene(BaseScene):
         if hasattr(self, 'wave_manager'):
             self.wave_manager.paused = False
 
-    def open_move_learn_overlay(self, pokemon, new_move_name):
-        """Abre o overlay de aprendizado de novo move"""
-        from src.scenes.game_scene.components.overlays.move_learn_overlay import MoveLearnOverlay
-
-        # ===== SE EVOLUÇÃO ESTIVER ATIVA, DEFERE =====
-        # O overlay de evolução tem PRIORIDADE. Guardamos o pedido e ele
-        # será aberto automaticamente quando a evolução for fechada.
-        if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
-            print(f"[MOVE_LEARN] Evolução ativa — adiando aprendizado de '{new_move_name}' em {pokemon.name}")
-            self.pending_move_learn = (pokemon, new_move_name)
-            return
-
-        self.move_learn_overlay = MoveLearnOverlay(self, pokemon, new_move_name)
-        self.move_learn_overlay.active = True
-        self.game_paused = True
-        self.paused = True
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = True
-
-    def close_move_learn_overlay(self, cancel=False):
-        """Fecha o overlay de aprendizado de moves (MODIFICADO para TMs)"""
-        if self.move_learn_overlay:
-            self.move_learn_overlay.active = False
-            self.move_learn_overlay = None
-
-        # Se NÃO foi cancelado e temos dados pendentes de TM, aplica o aprendizado
-        if not cancel and hasattr(self, 'pending_tm_data') and self.pending_tm_data:
-            # O Pokémon já aprendeu o move via replace_move no overlay
-            print(f"[TM] {self.pending_tm_data['move_name']} aprendido com sucesso!")
-
-            # ===== CONQUISTAS: Ensino de Moves =====
-            phase_id = f"{self.chapter_id}-{self.phase_number}"
-            if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
-                ach_mgr = self.player.achievement_manager
-                ach_mgr.increment_counter("move_taught_count")
-                ach_mgr.check_and_unlock("first_move_taught", phase_id)
-                ach_mgr.check_and_unlock("move_taught_10", phase_id)
-
-            self.pending_tm_data = None
-
-        self.game_paused = False
-        self.paused = False
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = False
-
     def show_capture_overlay(self, pokemon, is_to_team=True):
         """Mostra o overlay de captura de Pokémon"""
         self.game_paused = True
@@ -574,46 +529,189 @@ class GameScene(BaseScene):
             self.wave_manager.paused = False
         self.overlay_manager.hide()
 
+    # ==================================================================
+    # OVERLAY: MOVE LEARN
+    # ==================================================================
+    def open_move_learn_overlay(self, pokemon, new_move_name):
+        """Abre o overlay de aprendizado de novo move."""
+        from src.scenes.game_scene.components.overlays.move_learn_overlay import MoveLearnOverlay
+
+        # ===== GUARDA 1: evolução ativa? DEFERE =====
+        if (hasattr(self, 'evolution_overlay')
+                and self.evolution_overlay
+                and self.evolution_overlay.active):
+            print(f"[MOVE_LEARN] Evolução ativa — adiando '{new_move_name}' em {pokemon.name}")
+            self.pending_move_learn = (pokemon, new_move_name)
+            return
+
+        # ===== GUARDA 2: já existe um move_learn_overlay ativo? DEFERE =====
+        if self.move_learn_overlay and self.move_learn_overlay.active:
+            print(f"[MOVE_LEARN] Overlay já ativo — adiando '{new_move_name}' em {pokemon.name}")
+            # Salva na fila do pokémon se existir, senão usa pending_move_learn
+            if not hasattr(pokemon, '_pending_moves_to_learn'):
+                pokemon._pending_moves_to_learn = []
+            pokemon._pending_moves_to_learn.insert(0, new_move_name)
+            return
+
+        self.move_learn_overlay = MoveLearnOverlay(self, pokemon, new_move_name)
+        self.move_learn_overlay.active = True
+        self.game_paused = True
+        self.paused = True
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = True
+
+    def close_move_learn_overlay(self, cancel=False):
+        """Fecha o overlay de aprendizado de moves."""
+        if self.move_learn_overlay:
+            self.move_learn_overlay.active = False
+            pokemon_ref = self.move_learn_overlay.pokemon
+            self.move_learn_overlay = None
+        else:
+            pokemon_ref = None
+
+        # ===== TM: aplica conquistas =====
+        if not cancel and hasattr(self, 'pending_tm_data') and self.pending_tm_data:
+            print(f"[TM] {self.pending_tm_data['move_name']} aprendido com sucesso!")
+            phase_id = f"{self.chapter_id}-{self.phase_number}"
+            if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
+                ach_mgr = self.player.achievement_manager
+                ach_mgr.increment_counter("move_taught_count")
+                ach_mgr.check_and_unlock("first_move_taught", phase_id)
+                ach_mgr.check_and_unlock("move_taught_10", phase_id)
+            self.pending_tm_data = None
+
+        # ===== Retoma a fila de moves pendentes (do pokémon) =====
+        if not cancel and pokemon_ref is not None:
+            if getattr(pokemon_ref, '_pending_moves_to_learn', None):
+                # Ainda há moves na fila — abre o próximo
+                print(f"[MOVE_LEARN] Fila tem "
+                      f"{len(pokemon_ref._pending_moves_to_learn)} move(s) pendente(s), "
+                      f"abrindo próximo...")
+                # NÃO desliga o paused ainda, porque vamos reabrir
+                self.game_paused = True
+                self.paused = True
+                if hasattr(self, 'wave_manager'):
+                    self.wave_manager.paused = True
+
+                # Processa o próximo (pode abrir novo overlay)
+                if hasattr(pokemon_ref, 'evolution'):
+                    pokemon_ref.evolution._process_pending_moves()
+                    return
+
+        # ===== Sem mais pendências: retoma o jogo =====
+        self.game_paused = False
+        self.paused = False
+        if hasattr(self, 'wave_manager'):
+            self.wave_manager.paused = False
+
+    # ==================================================================
+    # OVERLAY: EVOLUÇÃO
+    # ==================================================================
     def open_evolution_overlay(self, pokemon, evolution_data):
-        """Abre o overlay de evolução para um Pokémon"""
-        # Guarda o método de evolução para contagem depois
+        """Abre o overlay de evolução. Sempre tem PRIORIDADE máxima."""
+        # ===== GUARDA: se já tem um overlay de evolução ativo, ignora =====
+        if (hasattr(self, 'evolution_overlay')
+                and self.evolution_overlay
+                and self.evolution_overlay.active):
+            print(f"[EVOLUTION] Overlay já ativo — ignorando chamada para {pokemon.name}")
+            return
+
+        # ===== Se houver move_learn_overlay ativo, guarda pra reabrir depois =====
+        if self.move_learn_overlay and self.move_learn_overlay.active:
+            try:
+                pending_pokemon = self.move_learn_overlay.pokemon
+                pending_move = self.move_learn_overlay.new_move_name
+                # Coloca na frente da fila do pokémon
+                if not hasattr(pending_pokemon, '_pending_moves_to_learn'):
+                    pending_pokemon._pending_moves_to_learn = []
+                pending_pokemon._pending_moves_to_learn.insert(0, pending_move)
+                # Fecha o overlay atual (sem processar fila)
+                self.move_learn_overlay.active = False
+                self.move_learn_overlay = None
+                print(f"[EVOLUTION] Move learn overlay fechado para dar prioridade à evolução")
+            except Exception as e:
+                print(f"[EVOLUTION] Erro ao guardar move pendente: {e}")
+                self.move_learn_overlay = None
+
+        # ===== Guarda o método e dados para estatísticas =====
         if hasattr(pokemon, 'evolution'):
             method = evolution_data.get("method", "unknown")
             pokemon.evolution._pending_evolution_method = method
 
-            # Se for evolução por felicidade com horário (Espeon/Umbreon)
             if method == "happiness" and "time_of_day" in evolution_data:
                 pokemon._last_evolution_time_of_day = evolution_data.get("time_of_day")
 
-            # Guarda os dados para referência
             pokemon._last_evolution_data = evolution_data
 
         sound_manager.play_effect(SoundEffect.EVOLUTION)
         self.evolution_overlay = EvolutionOverlay(self, pokemon, evolution_data)
         self.evolution_overlay.active = True
 
+        # Estado de pausa
+        self.game_paused = True
+        self.paused = True
         if hasattr(self, 'wave_manager'):
             self.wave_manager.paused = True
 
     def close_evolution_overlay(self, cancel=False):
-        """Fecha o overlay de evolução"""
+        """Fecha o overlay de evolução e processa a fila de moves."""
         sound_manager.stop_effect(SoundEffect.EVOLUTION)
 
         if hasattr(self, 'evolution_overlay'):
             self.evolution_overlay = None
 
-        # ===== ABRE MOVE LEARN PENDENTE (se houver) =====
-        # Ordem garantida: evolução -> move learn
-        if not cancel and hasattr(self, 'pending_move_learn') and self.pending_move_learn:
+        # ==================================================================
+        # CANCELADO: descarta os moves pendentes e retoma o jogo
+        # ==================================================================
+        if cancel:
+            print(f"[EVOLUTION] Cancelado — descartando moves pendentes")
+            # Move pendente (TM)
+            if hasattr(self, 'pending_move_learn') and self.pending_move_learn:
+                self.pending_move_learn = None
+            # Fila de moves do level up
+            if hasattr(self, 'player') and self.player and self.player.team:
+                for p in self.player.team:
+                    if hasattr(p, '_pending_moves_to_learn'):
+                        p._pending_moves_to_learn = []
+
+            self.paused = False
+            self.game_paused = False
+            if hasattr(self, 'wave_manager'):
+                self.wave_manager.paused = False
+            return
+
+        # ==================================================================
+        # NÃO CANCELADO: verifica se há moves a aprender
+        # ==================================================================
+
+        # ----- Prioridade A: pending_move_learn (TM adiada durante evolução) -----
+        if hasattr(self, 'pending_move_learn') and self.pending_move_learn:
             pokemon, move_name = self.pending_move_learn
             self.pending_move_learn = None
-            print(f"[EVOLUTION] Evolução fechada. Abrindo move learn pendente: '{move_name}' em {pokemon.name}")
-            # open_move_learn_overlay agora passa pela checagem (evolution_overlay é None)
-            # e por si só já seta paused/game_paused/wave_manager.paused = True
+            print(f"[EVOLUTION] Abrindo move learn pendente (TM): '{move_name}' em {pokemon.name}")
+            # Vai setar paused internamente
             self.open_move_learn_overlay(pokemon, move_name)
             return
 
-        # Sem pendência: comportamento original
+        # ----- Prioridade B: fila de moves do level up -----
+        # Busca no time quem tem fila de moves pendentes
+        pokemon_with_pending = None
+        for p in (self.player.team if hasattr(self, 'player') and self.player else []):
+            if getattr(p, '_pending_moves_to_learn', None):
+                pokemon_with_pending = p
+                break
+
+        if pokemon_with_pending:
+            print(f"[EVOLUTION] Evolução fechada. Processando fila de "
+                  f"{len(pokemon_with_pending._pending_moves_to_learn)} move(s) "
+                  f"pendente(s) de {pokemon_with_pending.name}")
+            # Não desliga o paused: vamos reabrir outro overlay
+            pokemon_with_pending.evolution._process_pending_moves()
+            return
+
+        # ----- Sem pendências: retoma o jogo -----
+        self.paused = False
+        self.game_paused = False
         if hasattr(self, 'wave_manager'):
             self.wave_manager.paused = False
 

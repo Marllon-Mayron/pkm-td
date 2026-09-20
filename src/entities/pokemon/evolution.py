@@ -329,63 +329,104 @@ class PokemonEvolution:
                 game_scene.game.current_scene.layout_initialized = False
                 print(f"[COMBINATION] TeamSelectScene marcado para recriar layout!")
 
-    def gain_xp(self, amount):
-        """Ganha XP e verifica level up/evolução. Não passa do nível 100."""
-        MAX_LEVEL = 100
+    # ==================================================================
+    # FILA DE MOVES PENDENTES (aprendidos ao subir de nível)
+    # ==================================================================
+    # IMPORTANTE:
+    # Quando o Pokémon sobe de nível, coletamos os moves que ele
+    # aprenderia neste nível em `pokemon._pending_moves_to_learn`.
+    # NÃO abrimos overlay imediatamente — damos prioridade à evolução.
+    # O processamento da fila acontece depois, quando o overlay de
+    # evolução fechar (ou imediatamente, se não houver evolução).
+    # ==================================================================
+    def _queue_new_moves_for_level(self, new_level: int):
+        """
+        Coleta os moves que o Pokémon aprenderia neste nível e os coloca
+        em uma fila. NÃO abre overlays — o processamento é feito depois,
+        respeitando a prioridade de evolução.
+        """
+        if not hasattr(self.pokemon, '_pending_moves_to_learn'):
+            self.pokemon._pending_moves_to_learn = []
 
-        # ===== SE JÁ ESTÁ NO NÍVEL MÁXIMO, IGNORA XP =====
-        if self.pokemon.level >= MAX_LEVEL:
-            self.pokemon.xp = 0
-            self.pokemon.xp_to_next = self.pokemon._calculate_xp_needed()
+        learnset = self.pokemon.move_data.get_pokemon_learnset(self.pokemon.id)
+        current_moves = {m.name.lower() for m in self.pokemon.moves}
+
+        for move_info in learnset:
+            if move_info.get("level", 0) == new_level:
+                move_name = move_info.get("move", "")
+                if (move_name
+                        and move_name.lower() not in current_moves
+                        and move_name not in self.pokemon._pending_moves_to_learn):
+                    self.pokemon._pending_moves_to_learn.append(move_name)
+                    print(f"[LEVEL_UP] {self.pokemon.name}: '{move_name}' "
+                          f"adicionado à fila (nível {new_level})")
+
+    def _process_pending_moves(self):
+        """
+        Processa a fila de moves pendentes.
+        Chamado quando NÃO há evolução a resolver, ou após o overlay de
+        evolução fechar.
+        Retorna True se algum move foi aprendido (ou pediu overlay).
+        """
+        if not hasattr(self.pokemon, '_pending_moves_to_learn'):
             return False
 
-        old_level = self.pokemon.level
-        self.pokemon.xp += amount
+        pending = list(self.pokemon._pending_moves_to_learn)
+        if not pending:
+            return False
 
-        leveled_up = False
+        # Pega apenas o PRIMEIRO move para processar.
+        # Se abrir overlay, os demais ficam na fila e serão processados
+        # quando a fila for retomada.
+        next_move = pending[0]
+        self.pokemon._pending_moves_to_learn = pending[1:]
 
-        # ===== SOBE DE NÍVEL, MAS NUNCA PASSA DE 100 =====
-        while (self.pokemon.xp >= self.pokemon.xp_to_next
-               and self.pokemon.level < MAX_LEVEL):
-            self.level_up()
-            leveled_up = True
+        # Verifica se o Pokémon já tem esse move
+        current = {m.name.lower() for m in self.pokemon.moves}
+        if next_move.lower() in current:
+            # Já tem, pula para o próximo
+            return self._process_pending_moves()
 
-        # ===== SE BATEU NO TETO, ZERA O XP E TRAVA =====
-        if self.pokemon.level >= MAX_LEVEL:
-            self.pokemon.level = MAX_LEVEL
-            self.pokemon.xp = 0
-            self.pokemon.xp_to_next = self.pokemon._calculate_xp_needed()
+        # Se tem menos de 4 moves, aprende direto
+        if len(self.pokemon.moves) < 4:
+            from src.entities.move import Move
+            move_info = self.pokemon.move_data.get_move_info(next_move)
+            if move_info:
+                new_move = Move(next_move, move_info)
+                self.pokemon.moves.append(new_move)
+                print(f"[LEVEL_UP] {self.pokemon.name} aprendeu {next_move}!")
 
-            # ===== CONQUISTA: NÍVEL MÁXIMO =====
-            if leveled_up and hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
-                game_scene = self.pokemon.game_scene
-                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
-                if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
-                    game_scene.player.achievement_manager.check_and_unlock("max_level_reached", phase_id)
+                # Toast informativo
+                try:
+                    toast_battle(
+                        f"{self.pokemon.name} aprendeu: {next_move}!",
+                        duration=4.0,
+                        pokemon=self.pokemon,
+                        portrait="inspired"
+                    )
+                except Exception:
+                    pass
 
-        if leveled_up:
-            self.pokemon.attack_damage = self.pokemon._calculate_attack_damage()
-            self.pokemon.defense_value = self.pokemon._calculate_defense()
+                # Continua processando o próximo
+                return self._process_pending_moves() or True
+            return self._process_pending_moves()
 
-            # Verifica evolução por nível primeiro (nunca no nível 100)
-            if self.pokemon.level < MAX_LEVEL:
-                evolution = evolution_manager.check_evolution(
-                    self.pokemon.id, current_level=self.pokemon.level
-                )
-                if evolution and self.pokemon.game_scene:
-                    self.pokemon.game_scene.open_evolution_overlay(self.pokemon, evolution)
-                    return True
+        # Tem 4 moves: precisa do overlay
+        if self.pokemon.game_scene:
+            self.pokemon.game_scene.open_move_learn_overlay(self.pokemon, next_move)
+            return True
 
-                # Se não evoluiu por nível, verifica evolução por felicidade
-                happiness_evo = evolution_manager.check_happiness_evolution(self.pokemon)
-                if happiness_evo and self.pokemon.game_scene:
-                    self.pokemon.game_scene.open_evolution_overlay(self.pokemon, happiness_evo)
-                    return True
+        return False
 
-        return leveled_up
+    def has_pending_moves(self) -> bool:
+        """Retorna True se há moves na fila."""
+        return bool(getattr(self.pokemon, '_pending_moves_to_learn', []))
 
+    # ==================================================================
+    # LEVEL UP (modificado — NÃO abre mais overlay de moves)
+    # ==================================================================
     def level_up(self):
-        """Sobe de nível com curva de XP suavizada. Bloqueado no nível 100."""
+        """Sobe de nível. Bloqueado no nível 100. NÃO abre overlays de move."""
         MAX_LEVEL = 100
 
         # ===== TRAVA DE SEGURANÇA =====
@@ -415,14 +456,8 @@ class PokemonEvolution:
             portrait="joyous"
         )
 
-        new_moves, pending_moves = self.pokemon.check_new_moves_on_level_up(old_level)
-        if new_moves:
-            toast_battle(
-                f"{self.pokemon.name} aprendeu: {', '.join(new_moves)} ",
-                duration=5.0,
-                pokemon=self.pokemon,
-                portrait="inspired"
-            )
+        # ===== NOVO: apenas ENFILEIRA os moves, NÃO abre overlay =====
+        self._queue_new_moves_for_level(self.pokemon.level)
 
         cache_key = (self.pokemon.id, self.pokemon.level, self.pokemon.speed_stat,
                      self.pokemon.is_shiny, self.pokemon.is_boss)
@@ -432,4 +467,81 @@ class PokemonEvolution:
         from src.managers.sounds.sound_manager import SoundEffect
 
         sound_manager.play_effect(SoundEffect.LEVELUP)
-        return pending_moves
+        return []
+
+    # ==================================================================
+    # GAIN XP (modificado — evolução tem PRIORIDADE sobre moves)
+    # ==================================================================
+    def gain_xp(self, amount):
+        """Ganha XP. Evolução SEMPRE tem prioridade sobre aprendizado de moves."""
+        MAX_LEVEL = 100
+
+        # ===== SE JÁ ESTÁ NO NÍVEL MÁXIMO, IGNORA XP =====
+        if self.pokemon.level >= MAX_LEVEL:
+            self.pokemon.xp = 0
+            self.pokemon.xp_to_next = self.pokemon._calculate_xp_needed()
+            return False
+
+        old_level = self.pokemon.level
+        self.pokemon.xp += amount
+
+        leveled_up = False
+
+        # Garante que a fila existe
+        if not hasattr(self.pokemon, '_pending_moves_to_learn'):
+            self.pokemon._pending_moves_to_learn = []
+
+        # ===== SOBE DE NÍVEL, MAS NUNCA PASSA DE 100 =====
+        while (self.pokemon.xp >= self.pokemon.xp_to_next
+               and self.pokemon.level < MAX_LEVEL):
+            self.level_up()
+            leveled_up = True
+
+        # ===== SE BATEU NO TETO, ZERA O XP E TRAVA =====
+        if self.pokemon.level >= MAX_LEVEL:
+            self.pokemon.level = MAX_LEVEL
+            self.pokemon.xp = 0
+            self.pokemon.xp_to_next = self.pokemon._calculate_xp_needed()
+
+            # ===== CONQUISTA: NÍVEL MÁXIMO =====
+            if leveled_up and hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
+                game_scene = self.pokemon.game_scene
+                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+                    game_scene.player.achievement_manager.check_and_unlock("max_level_reached", phase_id)
+
+        if not leveled_up:
+            return False
+
+        self.pokemon.attack_damage = self.pokemon._calculate_attack_damage()
+        self.pokemon.defense_value = self.pokemon._calculate_defense()
+
+        # ==================================================================
+        # PRIORIDADE 1: EVOLUÇÃO
+        # ==================================================================
+        # Se o Pokémon pode evoluir (por nível ou felicidade), abre o
+        # overlay de evolução. Os moves aprendidos ficam na fila e só
+        # serão processados quando o overlay de evolução fechar.
+        # ==================================================================
+        evolution = None
+        if self.pokemon.level < MAX_LEVEL:
+            evolution = evolution_manager.check_evolution(
+                self.pokemon.id, current_level=self.pokemon.level
+            )
+            if not evolution:
+                evolution = evolution_manager.check_happiness_evolution(self.pokemon)
+
+        if evolution and self.pokemon.game_scene:
+            print(f"[LEVEL_UP] {self.pokemon.name}: evolução pendente — "
+                  f"adiando {len(self.pokemon._pending_moves_to_learn)} move(s) "
+                  f"para depois do overlay de evolução")
+            self.pokemon.game_scene.open_evolution_overlay(self.pokemon, evolution)
+            return True
+
+        # ==================================================================
+        # PRIORIDADE 2: APRENDIZADO DE MOVES (só se não houver evolução)
+        # ==================================================================
+        if self.has_pending_moves():
+            self._process_pending_moves()
+
+        return True

@@ -6,6 +6,9 @@ from src.scenes.game_scene.components.overlays.base_overlay import BaseOverlay
 
 _FONT_CACHE = {}
 
+# Duração total da animação de evolução (em segundos)
+EVOLUTION_DURATION = 3.0
+
 
 class EvolutionOverlay(BaseOverlay):
     """Overlay exibido quando um Pokémon está apto para evoluir"""
@@ -18,6 +21,13 @@ class EvolutionOverlay(BaseOverlay):
         self.evolve_to_id = evolution_data["evolve_to"]
         self.animation_state = "waiting"  # waiting, evolving, complete
         self.animation_timer = 0
+
+        # ===== TIMER REAL (fallback se update(dt) não for chamado) =====
+        # Marca o instante (em ticks do pygame) em que o estado "evolving"
+        # começou. É usado tanto para detectar conclusão quanto para
+        # calcular o progresso da barra, garantindo que a animação avance
+        # mesmo se por algum motivo update() não for chamado no frame.
+        self._evolving_started_at_ticks = None
 
         # Guarda os nomes ANTES da evolução
         self.original_name = pokemon.name.upper()
@@ -83,6 +93,36 @@ class EvolutionOverlay(BaseOverlay):
         if not self.evolved_sprite:
             self.evolved_sprite = self.current_sprite
 
+    # ==================================================================
+    # TIMER / PROGRESSO (fonte única de verdade)
+    # ==================================================================
+    def _get_evolving_elapsed(self) -> float:
+        """Retorna quantos segundos se passaram desde que a evolução começou."""
+        if self._evolving_started_at_ticks is None:
+            return 0.0
+        return (pygame.time.get_ticks() - self._evolving_started_at_ticks) / 1000.0
+
+    def _get_evolution_progress(self) -> float:
+        """Retorna progresso normalizado 0.0–1.0 da animação de evolução."""
+        elapsed = self._get_evolving_elapsed()
+        if EVOLUTION_DURATION <= 0:
+            return 1.0
+        return max(0.0, min(1.0, elapsed / EVOLUTION_DURATION))
+
+    def _check_evolution_complete(self):
+        """
+        Verifica (via tempo real) se a animação de evolução terminou.
+        Chamado tanto no update() quanto no render() — assim, mesmo se
+        o update não for chamado por algum motivo, a evolução ainda conclui.
+        """
+        if self.animation_state != "evolving":
+            return
+        if self._get_evolving_elapsed() >= EVOLUTION_DURATION:
+            self.complete_evolution()
+
+    # ==================================================================
+    # EVENTOS
+    # ==================================================================
     def handle_event(self, event):
         """Processa eventos"""
         if not self.active:
@@ -125,35 +165,58 @@ class EvolutionOverlay(BaseOverlay):
 
         return False
 
+    # ==================================================================
+    # UPDATE
+    # ==================================================================
     def update(self, dt):
         """Atualiza animação"""
         self.animation_timer += dt
 
-        if self.animation_state == "evolving":
-            # Animação de 3 segundos
-            if self.animation_timer >= 3.0:
-                self.complete_evolution()
+        # Se ainda está no estado "evolving", checa por tempo real
+        self._check_evolution_complete()
 
+    # ==================================================================
+    # AÇÕES DE ESTADO
+    # ==================================================================
     def start_evolution(self):
         """Inicia a animação de evolução"""
+        if self.animation_state == "evolving":
+            return
         self.animation_state = "evolving"
         self.animation_timer = 0
+        self._evolving_started_at_ticks = pygame.time.get_ticks()
         self._play_evolution_sound()
+        print(f"[EVOLUTION] Animação de evolução iniciada "
+              f"({EVOLUTION_DURATION:.1f}s)")
 
     def complete_evolution(self):
         """Completa a evolução"""
+        if self.animation_state == "complete":
+            return
+
+        print(f"[EVOLUTION] Animação concluída — aplicando evolução")
+
         # Aplica a evolução
-        self.pokemon._perform_evolution(self.evolve_to_id, self.is_normal_game)
+        try:
+            self.pokemon._perform_evolution(self.evolve_to_id, self.is_normal_game)
+        except Exception as e:
+            print(f"[EVOLUTION] ERRO ao aplicar evolução: {e}")
+            import traceback
+            traceback.print_exc()
 
         # Atualiza dados do jogador
         if self.is_normal_game:
-            if hasattr(self.game_scene, 'player'):
-                self.game_scene.player.caught_pokemon.add(self.evolve_to_id)
-                self.game_scene.player.register_seen(self.evolve_to_id)
-                self.game_scene.player.auto_save()
+            if hasattr(self.game_scene, 'player') and self.game_scene.player:
+                try:
+                    self.game_scene.player.caught_pokemon.add(self.evolve_to_id)
+                    self.game_scene.player.register_seen(self.evolve_to_id)
+                    self.game_scene.player.auto_save()
+                except Exception as e:
+                    print(f"[EVOLUTION] Erro ao salvar após evolução: {e}")
 
         self.animation_state = "complete"
         self.animation_timer = 0
+        self._evolving_started_at_ticks = None
 
     def cancel_evolution(self):
         """Cancela a evolução"""
@@ -193,12 +256,20 @@ class EvolutionOverlay(BaseOverlay):
         try:
             from src.managers.sounds.sound_manager import sound_manager
             sound_manager.play_evolution_sound()
-        except:
-            pass
+        except Exception as e:
+            print(f"[EVOLUTION] Aviso: som de evolução não tocou ({e})")
 
+    # ==================================================================
+    # RENDER
+    # ==================================================================
     def render(self, screen):
         if not self.active:
             return
+
+        # ===== FALLBACK: completa a evolução se já passou o tempo =====
+        # Isso garante que a animação avance mesmo se o update(dt) não for
+        # chamado por algum motivo (pausa do jogo, bug de loop, etc).
+        self._check_evolution_complete()
 
         viewport = self.get_viewport_rect()
 
@@ -290,31 +361,32 @@ class EvolutionOverlay(BaseOverlay):
         sprite_y = content_rect.y + 100
         sprite_size = 150
 
-        # 3 segundos de animação, 12 ciclos de piscada (alterna a cada 0.25s)
-        total_time = 3.0
-        cycles = 12  # Número de trocas de sprite
+        total_time = EVOLUTION_DURATION
+        cycles = 12
         cycle_duration = total_time / cycles
 
-        # Calcula em qual ciclo estamos (0 a cycles-1)
-        current_cycle = int(self.animation_timer / cycle_duration)
+        # Usa o tempo REAL (ticks) como fonte de verdade
+        elapsed = self._get_evolving_elapsed()
+        progress = self._get_evolution_progress()
 
-        # Garante que não ultrapasse o número de ciclos
+        # Ciclo atual (para piscar entre sprites)
+        current_cycle = int(elapsed / cycle_duration) if cycle_duration > 0 else 0
         if current_cycle >= cycles:
             current_cycle = cycles - 1
 
-        # Alterna entre sprite original e evoluído a cada ciclo
-        # Ciclos pares = sprite original, ímpares = sprite evoluído
+        # Alterna entre sprite original e evoluído
         if current_cycle % 2 == 0:
             sprite_to_show = self.current_sprite
         else:
             sprite_to_show = self.evolved_sprite
 
-        # Efeito de brilho pulsante (quanto mais perto do fim, mais forte)
-        glow_intensity = min(1.0, self.animation_timer / total_time)
-        pulse = abs(math.sin(self.animation_timer * 15)) * (8 + glow_intensity * 8)
+        # Efeito de brilho pulsante (mais forte no fim)
+        glow_intensity = progress
 
-        self._render_centered_sprite(screen, sprite_to_show, center_x, sprite_y, sprite_size,
-                                     glowing=True, glow_intensity=glow_intensity)
+        self._render_centered_sprite(
+            screen, sprite_to_show, center_x, sprite_y, sprite_size,
+            glowing=True, glow_intensity=glow_intensity
+        )
 
         # Texto "???" durante a transformação
         font_question = self._get_font(24, True)
@@ -332,14 +404,19 @@ class EvolutionOverlay(BaseOverlay):
         pygame.draw.rect(screen, (60, 60, 70), (bar_x, bar_y, bar_width, bar_height), border_radius=4)
 
         # Progresso
-        progress = min(1.0, self.animation_timer / total_time)
         progress_width = int(bar_width * progress)
         if progress_width > 0:
-            pygame.draw.rect(screen, self.colors['accent'], (bar_x, bar_y, progress_width, bar_height), border_radius=4)
+            pygame.draw.rect(
+                screen, self.colors['accent'],
+                (bar_x, bar_y, progress_width, bar_height),
+                border_radius=4
+            )
 
         # Texto do progresso
         font_progress = self._get_font(12)
-        progress_text = font_progress.render(f"{int(progress * 100)}%", True, self.colors['text_muted'])
+        progress_text = font_progress.render(
+            f"{int(progress * 100)}%", True, self.colors['text_muted']
+        )
         progress_text_x = center_x - progress_text.get_width() // 2
         screen.blit(progress_text, (progress_text_x, bar_y + bar_height + 4))
 
@@ -415,12 +492,16 @@ class EvolutionOverlay(BaseOverlay):
 
         # Efeito de brilho durante evolução
         if glowing:
-            pulse = abs(math.sin(self.animation_timer * 12)) * (8 + glow_intensity * 8)
+            # Usa tempo real para o pulse
+            t_sec = self._get_evolving_elapsed()
+            pulse = abs(math.sin(t_sec * 12)) * (8 + glow_intensity * 8)
             glow_radius = max(new_w, new_h) // 2 + int(pulse) + 12
             glow_surface = pygame.Surface((glow_radius * 2, glow_radius * 2), pygame.SRCALPHA)
             glow_alpha = int(100 + pulse * 8)
-            pygame.draw.circle(glow_surface, (*self.colors['accent'], glow_alpha),
-                               (glow_radius, glow_radius), glow_radius)
+            pygame.draw.circle(
+                glow_surface, (*self.colors['accent'], glow_alpha),
+                (glow_radius, glow_radius), glow_radius
+            )
             screen.blit(glow_surface, (center_x - glow_radius, center_y - glow_radius))
 
         # Fundo
