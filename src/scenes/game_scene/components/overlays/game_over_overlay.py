@@ -171,7 +171,7 @@ class GameOverOverlay(BaseOverlay):
 
     def _return_to_team_select(self):
         """Volta para a tela de seleção de time"""
-        from src.scenes.team_select_scene import TeamSelectScene
+        from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
 
         self._stop_music()
         self.game_scene.cleanup()

@@ -5,6 +5,8 @@ Tela de selecao de fases - Layout reformulado com estilo consistente
 """
 import pygame
 import math
+
+from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
 from src.scenes.base_scene import BaseScene
 from src.config.progress import progress_manager
 from src.config.phase_catalog import phase_catalog
@@ -817,7 +819,6 @@ class PhaseSelectScene(BaseScene):
         if phase_info:
             print(f"Iniciando fase: {phase_id} - {phase_info['name']}")
 
-        from src.scenes.team_select_scene import TeamSelectScene
         self.game.team_select_scene = TeamSelectScene(self.game, self.current_chapter_id, phase_number)
         self.game.current_scene = self.game.team_select_scene
 

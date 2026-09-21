@@ -37,7 +37,16 @@ MSG_TYPES = {
     "RAID_BOSS_ATTACK": "raid_boss_attack",
     "RAID_POKEMON_ATTACK": "raid_pokemon_attack",
     "RAID_RETURN_LOBBY": "raid_return_lobby",
-    # =================
+    # ========ARENA PVP=========
+    "ARENA_JOIN": "arena_join",
+    "ARENA_PLAYER_LIST": "arena_player_list",
+    "ARENA_START": "arena_start",
+    "ARENA_LEAVE": "arena_leave",
+    "ARENA_PLACEMENT": "arena_placement",
+    "ARENA_POKEMON_STATE": "arena_pokemon_state",
+    "ARENA_POKEMON_ATTACK": "arena_pokemon_attack",
+    "ARENA_POKEMON_DAMAGE": "arena_pokemon_damage",
+    "ARENA_END": "arena_end",
     "ERROR": "error",
     "DISCONNECT": "disconnect",
 }

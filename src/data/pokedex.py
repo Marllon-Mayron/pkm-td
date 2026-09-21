@@ -7,6 +7,20 @@ from typing import Dict, List, Optional, Any
 from src.data.sprite_loader import PokemonSpriteManager
 
 
+def _safe_convert_alpha(surf: pygame.Surface) -> pygame.Surface:
+    """
+    Só chama convert_alpha() se o display existir.
+    Sem display (ex: Pokedex criada antes do set_mode), retorna a
+    superfície original — funciona igual, só não é otimizada.
+    """
+    if pygame.display.get_surface() is not None:
+        try:
+            return surf.convert_alpha()
+        except Exception:
+            pass
+    return surf
+
+
 class Pokedex:
     _instance = None
 
@@ -64,7 +78,9 @@ class Pokedex:
         self.max_base_speed = 1
 
         self.load_pokemon_data()
-        self.load_sprites()
+        # NOTA: load_sprites() é lazy agora — não carrega no __init__.
+        # Os sprites são carregados sob demanda em _get_front_sprite /
+        # _get_back_sprite / get_portrait, quando o display já existe.
 
     # =========================================================
     # LOAD — dados do JSON unificado
@@ -169,66 +185,55 @@ class Pokedex:
             traceback.print_exc()
             self._load_fallback_data()
 
-    def load_sprites(self):
-        """Carrega os sprites front e back (mantém o sistema original)"""
+    # =========================================================
+    # SPRITES FRONT/BACK — CARREGAMENTO LAZY
+    # =========================================================
+    def _get_front_sprite(self, pokemon_id: int, shiny: bool = False) -> Optional[pygame.Surface]:
+        """Carrega (lazy) e cacheia um front sprite."""
+        cache = self.front_shiny_sprites if shiny else self.front_sprites
+        if pokemon_id in cache:
+            return cache[pokemon_id]
+
         base_path = Path(__file__).parent.parent.parent / "res" / "PokemonSprites"
-
-        if not base_path.exists():
-            print(f"Diretório de sprites não encontrado: {base_path}")
-            return
-
-        for pokemon_id in range(1, self.max_id + 1):
-            self._load_front_sprite(pokemon_id, base_path)
-            self._load_back_sprite(pokemon_id, base_path)
-
-        print(f"Sprites carregados: Front({len(self.front_sprites)}), Back({len(self.back_sprites)})")
-
-    def _load_front_sprite(self, pokemon_id, base_path):
-        """Carrega sprite frontal (96x96) - MANTIDO ORIGINAL"""
-        filename = self._format_filename_front_back(pokemon_id, shiny=False)
+        filename = self._format_filename_front_back(pokemon_id, shiny=shiny)
         path = base_path / "front" / f"{filename}.png"
 
-        if path.exists():
-            try:
-                sprite = pygame.image.load(str(path)).convert_alpha()
-                self.front_sprites[pokemon_id] = sprite
-            except Exception as e:
-                print(f"Erro ao carregar front {pokemon_id}: {e}")
+        if not path.exists():
+            return None
 
-        filename_shiny = self._format_filename_front_back(pokemon_id, shiny=True)
-        path_shiny = base_path / "front" / f"{filename_shiny}.png"
+        try:
+            sprite = pygame.image.load(str(path))
+            sprite = _safe_convert_alpha(sprite)
+            cache[pokemon_id] = sprite
+            return sprite
+        except Exception as e:
+            print(f"[POKEDEX] Erro front {pokemon_id} shiny={shiny}: {e}")
+            return None
 
-        if path_shiny.exists():
-            try:
-                sprite = pygame.image.load(str(path_shiny)).convert_alpha()
-                self.front_shiny_sprites[pokemon_id] = sprite
-            except Exception as e:
-                print(f"Erro ao carregar front shiny {pokemon_id}: {e}")
+    def _get_back_sprite(self, pokemon_id: int, shiny: bool = False) -> Optional[pygame.Surface]:
+        """Carrega (lazy) e cacheia um back sprite."""
+        cache = self.back_shiny_sprites if shiny else self.back_sprites
+        if pokemon_id in cache:
+            return cache[pokemon_id]
 
-    def _load_back_sprite(self, pokemon_id, base_path):
-        """Carrega sprite traseiro (96x96) - MANTIDO ORIGINAL"""
-        filename = self._format_filename_front_back(pokemon_id, shiny=False)
+        base_path = Path(__file__).parent.parent.parent / "res" / "PokemonSprites"
+        filename = self._format_filename_front_back(pokemon_id, shiny=shiny)
         path = base_path / "back" / f"{filename}.png"
 
-        if path.exists():
-            try:
-                sprite = pygame.image.load(str(path)).convert_alpha()
-                self.back_sprites[pokemon_id] = sprite
-            except Exception as e:
-                print(f"Erro ao carregar back {pokemon_id}: {e}")
+        if not path.exists():
+            return None
 
-        filename_shiny = self._format_filename_front_back(pokemon_id, shiny=True)
-        path_shiny = base_path / "back" / f"{filename_shiny}.png"
-
-        if path_shiny.exists():
-            try:
-                sprite = pygame.image.load(str(path_shiny)).convert_alpha()
-                self.back_shiny_sprites[pokemon_id] = sprite
-            except Exception as e:
-                print(f"Erro ao carregar back shiny {pokemon_id}: {e}")
+        try:
+            sprite = pygame.image.load(str(path))
+            sprite = _safe_convert_alpha(sprite)
+            cache[pokemon_id] = sprite
+            return sprite
+        except Exception as e:
+            print(f"[POKEDEX] Erro back {pokemon_id} shiny={shiny}: {e}")
+            return None
 
     def _format_filename_front_back(self, pokemon_id, shiny=False):
-        """Formata nome do arquivo para front/back (mantém original)"""
+        """Formata nome do arquivo para front/back"""
         filename = str(pokemon_id)
         if shiny:
             filename += "s"
@@ -286,10 +291,6 @@ class Pokedex:
     def normalize_item_id(item_id: str) -> Optional[str]:
         """
         Normaliza IDs de itens removendo `-` e `_` e baixando para lowercase.
-        Garante compatibilidade entre:
-          - PokeAPI:  'metal-coat', 'kings-rock', 'dragon-scale', 'up-grade'
-          - Catálogo: 'metalcoat',  'kings_rock', 'dragon_scale', 'upgrade'
-        Resultado: 'metalcoat', 'kingsrock', 'dragonscale', 'upgrade'
         """
         if not item_id:
             return None
@@ -300,15 +301,7 @@ class Pokedex:
         return self.normalize_item_id(pokeapi_name)
 
     def build_normalized_catalog(self) -> Dict[str, Dict]:
-        """
-        Retorna o catálogo de itens da loja indexado pelo id NORMALIZADO.
-        Útil para comparar diretamente com os nomes da PokeAPI.
-
-        Uso:
-            catalog = self.pokedex.build_normalized_catalog()
-            item_data = catalog.get(self.pokedex.normalize_item_id("metal-coat"))
-            # → item_data do "metalcoat" no catálogo
-        """
+        """Retorna o catálogo de itens indexado pelo id NORMALIZADO."""
         try:
             from src.data.item_bag_catalog import item_bag_catalog
         except Exception as e:
@@ -330,11 +323,7 @@ class Pokedex:
         return poke.get("evolution", {}).get("methods", [])
 
     def find_evolution_by_item(self, pokemon_id: int, item_id: str) -> Optional[Dict]:
-        """
-        Busca método de evolução que casa com o item informado.
-        Compara por id NORMALIZADO (ignora - e _).
-        Cobre tanto `use_item` quanto `trade` com held_item.
-        """
+        """Busca método de evolução que casa com o item informado."""
         target = self.normalize_item_id(item_id)
         if not target:
             return None
@@ -348,10 +337,7 @@ class Pokedex:
         return None
 
     def find_evolution_by_method(self, pokemon_id: int, method: str, **criteria) -> List[Dict]:
-        """
-        Busca métodos que casam com o method + critérios extras.
-        Ex: find_evolution_by_method(133, 'level_up', min_happiness=160)
-        """
+        """Busca métodos que casam com o method + critérios extras."""
         results = []
         for m in self.get_evolution_methods(pokemon_id):
             if m.get("method") != method:
@@ -369,10 +355,7 @@ class Pokedex:
     # MÉTODOS PARA INMAP
     # =========================================================
     def get_inmap_animation(self, pokemon_id: int, shiny: bool = False) -> Dict:
-        """
-        Retorna animações COMPLETAS com 8 direções.
-        Usa os dados já carregados pelo SpriteLoader.
-        """
+        """Retorna animações COMPLETAS com 8 direções."""
         cache_key = f"{pokemon_id}_{shiny}"
         if cache_key in self.inmap_animations_cache:
             return self.inmap_animations_cache[cache_key]
@@ -500,12 +483,12 @@ class Pokedex:
 
     def get_sprite(self, pokemon_id, sprite_type="front", shiny=False, direction="down", frame=0):
         if sprite_type == "front":
-            cache = self.front_shiny_sprites if shiny else self.front_sprites
-            return cache.get(pokemon_id, self._create_placeholder(pokemon_id, "front", 96))
+            sprite = self._get_front_sprite(pokemon_id, shiny)
+            return sprite if sprite else self._create_placeholder(pokemon_id, "front", 96)
 
         elif sprite_type == "back":
-            cache = self.back_shiny_sprites if shiny else self.back_sprites
-            return cache.get(pokemon_id, self._create_placeholder(pokemon_id, "back", 96))
+            sprite = self._get_back_sprite(pokemon_id, shiny)
+            return sprite if sprite else self._create_placeholder(pokemon_id, "back", 96)
 
         elif sprite_type == "inmap":
             anim = self.get_inmap_animation(pokemon_id, shiny)
@@ -641,8 +624,8 @@ class Pokedex:
         if not search_dir.exists():
             return None
 
-        target = f"{pokemon_id:04d}-{expression}".lower()  # ex: "0005-normal"
-        target_alt = expression.lower()  # ex: "normal"
+        target = f"{pokemon_id:04d}-{expression}".lower()
+        target_alt = expression.lower()
 
         try:
             candidates = list(search_dir.iterdir())
@@ -666,8 +649,8 @@ class Pokedex:
 
         return None
 
-    def get_portrait(self, pokemon_id: int, expression: str = "normal", shiny: bool = False) -> Optional[
-        pygame.Surface]:
+    def get_portrait(self, pokemon_id: int, expression: str = "normal",
+                     shiny: bool = False) -> Optional[pygame.Surface]:
         if not hasattr(self, '_portrait_cache'):
             self._portrait_cache = {}
 
@@ -692,7 +675,8 @@ class Pokedex:
         portrait = None
         if portrait_path is not None:
             try:
-                portrait = pygame.image.load(str(portrait_path)).convert_alpha()
+                portrait = pygame.image.load(str(portrait_path))
+                portrait = _safe_convert_alpha(portrait)
                 if portrait.get_width() != 40 or portrait.get_height() != 40:
                     portrait = pygame.transform.scale(portrait, (40, 40))
             except Exception as e:
