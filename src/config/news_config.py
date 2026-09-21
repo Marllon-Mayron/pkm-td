@@ -26,6 +26,13 @@ NEWS_DEVLOGS = {
 # O número é extraído do nome do arquivo (news_1.png -> 1, news_2.png -> 2)
 # =====================================================================
 NEWS_IMAGE_TITLES = {
+    "0.1.20": {
+        1: "Capa da versão: 0.1.20.",
+        2: "Nova tela de hall de npcs.",
+        3: "Novo npc para renomear seus pokemons",
+        4: "Novo npc para reaprender moves de pokemons",
+        5: "Nova forma de jogo, batalhando contra treinadores inteligentes"
+    },
     "0.1.19": {
         1: "Novas fases de fim de campanha, e muitas correções pro modo mobile",
     },

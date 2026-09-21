@@ -439,7 +439,7 @@ class EnemySpawner:
             enemy_config.get("pokemon_id", 1),
             level=level,
             is_wild=True,
-            shiny=random.random() < 0.001,
+            shiny=random.random() < 0.0005,
             is_boss=is_boss
         )
 

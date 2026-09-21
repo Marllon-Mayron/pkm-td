@@ -381,6 +381,13 @@ class SurvivalWaveManager:
                 self.wave_active = True
                 return []
             else:
+                if not self._finished:
+                    print(f"[SurvivalWave] Todas as {self.total_waves} waves completas! Finalizando jogo...")
+                    self._finished = True
+                    self.wave_active = False
+                    self.active_enemies.clear()
+                    if hasattr(self.game_scene, 'complete_game'):
+                        self.game_scene.complete_game()
                 return []
 
         if self.wave_timer > 0:

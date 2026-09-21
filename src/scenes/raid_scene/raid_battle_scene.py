@@ -11,6 +11,7 @@ RaidBattleScene — sync em tempo real host↔cliente (pokémons, boss, clima, a
 - Nunca dispara Game Over local (raid continua). Só game over global via RAID_ALL_DEFEATED.
 """
 import math
+import random
 import uuid
 import pygame
 
@@ -1252,22 +1253,27 @@ class RaidBattleScene(GameScene):
     def _grant_legendary_reward(self):
         """
         Cria o lendário derrotado (level 5, capture_method='event').
+        1% de chance de vir shiny (1/1000).
         """
         try:
             from src.entities.pokemon import Pokemon
             from datetime import datetime
+            import random
 
             legendary_id = self._raid_boss_id
             if not legendary_id:
                 print(f"[RAID_REWARD] AVISO: _raid_boss_id inválido")
                 return None
 
+            # ===== CHANCE DE SHINY: 1/1000 =====
+            is_shiny = random.random() < 0.001
+
             legendary = Pokemon(
                 x=0, y=0,
                 pokemon_id=legendary_id,
                 level=5,
                 is_wild=False,
-                shiny=False,
+                shiny=is_shiny,
                 is_boss=False,
             )
 
@@ -1281,7 +1287,10 @@ class RaidBattleScene(GameScene):
             destination = "box"
             try:
                 self.player.add_to_box(legendary)
-                print(f"[RAID_REWARD] Lendário {legendary.name} (Lv.5) enviado à BOX")
+                if is_shiny:
+                    print(f"[RAID_REWARD] SHINY! Lendário {legendary.name} (Lv.5) enviado à BOX")
+                else:
+                    print(f"[RAID_REWARD] Lendário {legendary.name} (Lv.5) enviado à BOX")
             except Exception as e:
                 print(f"[RAID_REWARD] ERRO ao enviar lendário para box: {e}")
                 import traceback
@@ -1299,7 +1308,7 @@ class RaidBattleScene(GameScene):
                 "id": legendary_id,
                 "name": legendary.name,
                 "level": 5,
-                "is_shiny": False,
+                "is_shiny": is_shiny,
                 "destination": destination,
             }
 

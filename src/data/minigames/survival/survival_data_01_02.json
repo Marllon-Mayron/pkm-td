@@ -9,13 +9,13 @@
 
   "available_pokemon": [
     {"id": 167, "cost": 25,  "level": 6, "weight": 1.0},
-    {"id": 163, "cost": 30,  "level": 6, "weight": 0.9},
-    {"id": 194, "cost": 40,  "level": 6, "weight": 0.8},
-    {"id": 179, "cost": 55,  "level": 6, "weight": 0.7},
-    {"id": 161, "cost": 65,  "level": 6, "weight": 0.6},
-    {"id": 187, "cost": 80,  "level": 7, "weight": 0.5},
-    {"id": 191, "cost": 95,  "level": 7, "weight": 0.4},
-    {"id": 183, "cost": 115, "level": 7, "weight": 0.3}
+    {"id": 163, "cost": 35,  "level": 6, "weight": 0.9},
+    {"id": 194, "cost": 35,  "level": 6, "weight": 0.8},
+    {"id": 179, "cost": 50,  "level": 6, "weight": 0.7},
+    {"id": 161, "cost": 60,  "level": 6, "weight": 0.6},
+    {"id": 187, "cost": 20,  "level": 7, "weight": 0.5},
+    {"id": 191, "cost": 80,  "level": 7, "weight": 0.4},
+    {"id": 183, "cost": 110, "level": 7, "weight": 0.3}
   ],
 
   "available_items": [

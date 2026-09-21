@@ -940,13 +940,17 @@ class ArenaBattleScene(BaseScene):
         self.arena_state = "finished"
         self.arena_result = result
 
+        # Recompensas SEMPRE calculadas (usadas tanto pra ganhar quanto pra perder).
         rewards = {}
-        if result == "win" and self._trainer_data:
+        if self._trainer_data:
             rewards = {
                 "money": self._trainer_data.get("reward_money", 0),
                 "xp": self._trainer_data.get("reward_xp", 0),
                 "trainer_name": self._trainer_data.get("name", "oponente"),
             }
+
+        if result == "win" and rewards:
+            # ---- Ganha o que o treinador oferece ----
             try:
                 self.player.money += rewards["money"]
                 self.player.score += rewards["xp"]
@@ -963,7 +967,27 @@ class ArenaBattleScene(BaseScene):
             except Exception:
                 pass
 
-        print(f"[ARENA] Fim da batalha: {result}")
+        elif result == "lose" and rewards:
+            # ---- Perde EXATAMENTE o que ganharia ----
+            loss_money = rewards.get("money", 0)
+            loss_xp = rewards.get("xp", 0)
+
+            # Clamp em 0 pra não ficar negativo
+            try:
+                self.player.money = max(0, self.player.money - loss_money)
+            except Exception:
+                pass
+            try:
+                self.player.score = max(0, self.player.score - loss_xp)
+            except Exception:
+                pass
+
+            try:
+                self.player.auto_save()
+            except Exception:
+                pass
+
+        print(f"[ARENA] Fim da batalha: {result} | rewards={rewards}")
 
         from src.scenes.arena_scene.arena_result_overlay import ArenaResultOverlay
         self._arena_overlay = ArenaResultOverlay(self, result, rewards)
@@ -1029,105 +1053,94 @@ class ArenaBattleScene(BaseScene):
     # RENDER
     # ==================================================================
     def render(self, screen):
-        screen.fill((0, 0, 0))
+        if not self.active:
+            return
 
-        # ---- MUNDO ----
-        self.map_renderer.render(screen, self.camera, self.screen_manager)
+        sm = self.scene.screen_manager
+        vx, vy = sm.viewport_x, sm.viewport_y
+        vw, vh = sm.viewport_width, sm.viewport_height
 
-        if self.spot_renderer:
-            self.spot_renderer.render(
-                screen, self.camera, self.screen_manager,
-                show_editing=False, highlight_spot=None,
-            )
+        overlay = pygame.Surface((vw, vh), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, min(210, self.alpha)))
+        screen.blit(overlay, (vx, vy))
 
-        # Inimigos posicionados
-        for enemy in self.wave_manager.active_enemies:
-            if enemy.is_alive() and not enemy.is_defeated:
-                enemy.render(screen, self.camera, show_hp=False)
+        win = (self.result == "win")
+        accent = (255, 215, 0) if win else (230, 90, 90)
+        accent_dim = (128, 90, 20) if win else (128, 48, 54)
 
-        # Pokémons do jogador
-        if self.placement_manager:
-            self.placement_manager.render(screen, self.camera, self.screen_manager)
+        panel_w, panel_h = 640, 360
+        panel = pygame.Rect(0, 0, panel_w, panel_h)
+        panel.center = (vx + vw // 2, vy + vh // 2 - 20)
 
-        # Projéteis
-        if hasattr(self, 'battle_system'):
-            self.battle_system.render_projectiles(screen, self.camera, self.screen_manager)
+        pygame.draw.rect(screen, (26, 29, 48), panel, border_radius=20)
+        glow = 0.5 + 0.5 * math.sin(self.elapsed * 3)
+        border_alpha = int(180 + 75 * glow)
+        border_surf = pygame.Surface((panel_w + 8, panel_h + 8), pygame.SRCALPHA)
+        pygame.draw.rect(border_surf, (*accent, border_alpha),
+                         border_surf.get_rect(), 3, border_radius=22)
+        screen.blit(border_surf, (panel.x - 4, panel.y - 4))
+        pygame.draw.rect(screen, accent_dim, panel, 2, border_radius=20)
 
-        # HP bars — inimigos
-        for enemy in self.wave_manager.active_enemies:
-            if enemy.is_alive() and not enemy.is_defeated:
-                enemy.render_hp_enemy(screen, self.camera)
+        cx = panel.centerx
+        title = "VITÓRIA!" if win else "DERROTA"
+        t = self.font_title.render(title, True, accent)
+        t_sh = self.font_title.render(title, True, (0, 0, 0))
+        tr = t.get_rect(center=(cx, panel.y + 80))
+        screen.blit(t_sh, (tr.x + 3, tr.y + 3))
+        screen.blit(t, tr)
 
-        # HP bars — aliados
-        if self.placement_manager:
-            self.placement_manager.render_hp(screen, self.camera)
+        pygame.draw.line(screen, accent_dim,
+                         (panel.x + 50, panel.y + 130),
+                         (panel.right - 50, panel.y + 130), 2)
 
-        # Filtros de clima / dia-noite
-        viewport_rect = pygame.Rect(
-            self.screen_manager.viewport_x,
-            self.screen_manager.viewport_y,
-            self.screen_manager.viewport_width,
-            self.screen_manager.viewport_height,
-        )
+        if win:
+            sub_txt = f"Você derrotou {self.rewards.get('trainer_name', 'o oponente')}!"
+            sub_color = (235, 235, 245)
+        else:
+            sub_txt = "Sua equipe foi derrotada..."
+            sub_color = (200, 200, 210)
 
-        if hasattr(self, 'battle_system') and self.battle_system:
-            weather = self.battle_system.weather_manager.current_weather
-            if weather and weather.active:
-                self.weather_filter.render(screen, weather, viewport_rect,
-                                            dt=self._last_dt)
+        sub = self.font_sub.render(sub_txt, True, sub_color)
+        screen.blit(sub, sub.get_rect(center=(cx, panel.y + 165)))
+
+        # Recompensas (vitória) / Penalidade (derrota)
+        y = panel.y + 210
+        gold = self.rewards.get("money", 0)
+        xp = self.rewards.get("xp", 0)
+
+        if win:
+            info = self.font_info.render(
+                f"+{gold} Ouro    ·    +{xp} XP", True, (255, 215, 0))
+            screen.blit(info, info.get_rect(center=(cx, y)))
+        else:
+            if gold > 0 or xp > 0:
+                info = self.font_info.render(
+                    f"-{gold} Ouro    ·    -{xp} XP", True, (230, 90, 90))
+                screen.blit(info, info.get_rect(center=(cx, y)))
+
+                warn = self.font_info.render(
+                    "Você perdeu o equivalente ao que ganharia.",
+                    True, (160, 165, 190))
+                screen.blit(warn, warn.get_rect(center=(cx, y + 26)))
             else:
-                self.weather_filter.render(screen, None, viewport_rect,
-                                            dt=self._last_dt)
+                info = self.font_info.render(
+                    "Nenhuma penalidade — apenas tente novamente!",
+                    True, (170, 175, 200))
+                screen.blit(info, info.get_rect(center=(cx, y)))
 
-        if hasattr(self, 'day_night_weather'):
-            day_night = self.day_night_weather.day_night_state
-            if day_night and day_night.active:
-                self.day_night_filter.render(screen, day_night, viewport_rect)
+        # Botão
+        mouse = pygame.mouse.get_pos()
+        hover = self.btn.collidepoint(mouse)
+        btn_color = (80, 180, 100) if win else (180, 80, 90)
+        if hover:
+            btn_color = (110, 220, 130) if win else (220, 110, 120)
 
-        # ---- UI ----
-        if not self.ui_hidden:
-            # Team manager (HUD inferior)
-            if self.team_manager:
-                self.team_manager.render(
-                    screen, self.camera, self.spot_renderer.get_spots())
+        pygame.draw.rect(screen, btn_color, self.btn, border_radius=14)
+        pygame.draw.rect(screen, accent, self.btn, 3, border_radius=14)
 
-            # Drag manager (pokémon sendo arrastado)
-            if self.team_manager and self.team_manager.drag_manager:
-                if self.team_manager.drag_manager.is_dragging:
-                    self.team_manager.drag_manager.render(screen, self.camera)
-
-            # Drag de item
-            if self.item_drag_manager and self.item_drag_manager.is_dragging:
-                self.item_drag_manager.render(screen, self.camera)
-
-            # Bolsa
-            if self.item_bag_renderer:
-                self.item_bag_renderer.render(screen)
-
-            # Quick switch (dropdowns de move acima dos slots)
-            if self.move_quick_switch_manager:
-                self.move_quick_switch_manager.render(
-                    screen, self.camera, self.screen_manager)
-
-        # ---- Hints de estado ----
-        if self.arena_state == "placing":
-            self._render_placing_hint(screen)
-        elif self.arena_state == "countdown":
-            self._render_countdown(screen)
-
-        # Toast de "oponente posicionou"
-        if self.arena_state in ("placing", "countdown"):
-            self._render_enemy_place_toast(screen)
-
-        # ---- Overlays ----
-        if self.overlay_manager.is_active:
-            self.overlay_manager.render(screen)
-
-        if self.move_select_overlay and self.move_select_overlay.active:
-            self.move_select_overlay.render(screen)
-
-        if self._arena_overlay and self._arena_overlay.active:
-            self._arena_overlay.render(screen)
+        label = "Voltar ao NPC Hall"
+        bt = self.font_btn.render(label, True, (255, 255, 255))
+        screen.blit(bt, bt.get_rect(center=self.btn.center))
 
     def _render_placing_hint(self, screen):
         sm = self.screen_manager

@@ -403,17 +403,30 @@ class Player(Entity):
                     desfossilizador["time_elapsed"] = desfossilizador["duration_minutes"]
 
     def collect_pokemon_from_desfossilizador(self, desfossilizador_index):
-        """Coleta o Pokémon do desfossilizador pronto."""
+        """Coleta o Pokémon do desfossilizador pronto.
+        Chance de shiny: 1/1000.
+        """
         from datetime import datetime
+        import random
+
         desfossilizador = self.desfossilizadores[desfossilizador_index]
         if desfossilizador["status"] != "ready":
             return None
         pokemon_id = desfossilizador["pokemon_id"]
         from src.entities.pokemon import Pokemon
-        pokemon = Pokemon(0, 0, pokemon_id, level=5, is_wild=False)
+
+        # ===== CHANCE DE SHINY: 1/1000 =====
+        is_shiny = random.random() < 0.001
+
+        pokemon = Pokemon(0, 0, pokemon_id, level=5, is_wild=False, shiny=is_shiny)
+
         # ===== DEFINE DATA E MÉTODO =====
         pokemon.capture_date = datetime.now().isoformat()
         pokemon.capture_method = "fossil"
+
+        if is_shiny:
+            print(f"[FOSSIL] SHINY! {pokemon.name} revivido do fóssil!")
+
         if len(self.team) < 6:
             self.team.append(pokemon)
             pokemon.is_in_team = True
