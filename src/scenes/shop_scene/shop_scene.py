@@ -623,6 +623,10 @@ class QuantitySelector:
 
 
 class ShopScene(BaseScene):
+    # Largura visual da scrollbar (mobile-friendly)
+    _SCROLLBAR_WIDTH = 14
+    _SCROLLBAR_HIT_PAD = 8   # padding extra pra clicar com o dedo
+
     def __init__(self, game):
         super().__init__(game)
 
@@ -652,6 +656,20 @@ class ShopScene(BaseScene):
         self.inventory_scroll_target = 0
         self.max_shop_scroll = 0
         self.max_inventory_scroll = 0
+
+        # ===== DRAG DA SCROLLBAR =====
+        self._dragging_scroll = None          # None | "shop" | "inventory"
+        self._scroll_thumb_offset = 0         # offset do clique dentro do thumb
+        self._scroll_hover = None             # None | "shop" | "inventory"
+
+        # Rects de hit-testing (recalculados a cada frame em _render_scroll_bar)
+        self._shop_scrollbar_rect = None
+        self._shop_scrollbar_track_rect = None
+        self._shop_scrollbar_thumb_rect = None
+
+        self._inventory_scrollbar_rect = None
+        self._inventory_scrollbar_track_rect = None
+        self._inventory_scrollbar_thumb_rect = None
 
         # Elementos UI
         self.shop_cards = []
@@ -769,6 +787,68 @@ class ShopScene(BaseScene):
             card.is_locked = not self._is_item_available(item_data)
             card.update_owned(self.player.bag.items)
             self.shop_cards.append(card)
+
+    # ==================================================================
+    # DRAG DA SCROLLBAR
+    # ==================================================================
+    def _begin_scroll_drag(self, which, mouse_pos):
+        """Inicia o drag de uma scrollbar. `which` é 'shop' ou 'inventory'."""
+        if which == "shop":
+            thumb = self._shop_scrollbar_thumb_rect
+            track = self._shop_scrollbar_track_rect
+        else:
+            thumb = self._inventory_scrollbar_thumb_rect
+            track = self._inventory_scrollbar_track_rect
+
+        if not track:
+            return
+
+        # Clique no thumb → guarda offset. Clique na track → pula e começa a arrastar.
+        if thumb and thumb.collidepoint(mouse_pos):
+            self._scroll_thumb_offset = mouse_pos[1] - thumb.y
+        else:
+            thumb_h = thumb.height if thumb else 20
+            self._scroll_thumb_offset = thumb_h // 2
+            self._update_scroll_from_mouse(mouse_pos[1])
+
+        self._dragging_scroll = which
+
+    def _update_scroll_from_mouse(self, mouse_y):
+        """Converte a posição Y do mouse em scroll (durante o drag)."""
+        which = self._dragging_scroll
+        if not which:
+            return
+
+        if which == "shop":
+            track = self._shop_scrollbar_track_rect
+            thumb = self._shop_scrollbar_thumb_rect
+            max_scroll = self.max_shop_scroll
+        else:
+            track = self._inventory_scrollbar_track_rect
+            thumb = self._inventory_scrollbar_thumb_rect
+            max_scroll = self.max_inventory_scroll
+
+        if not track or not thumb or max_scroll <= 0:
+            return
+
+        thumb_h = thumb.height
+        track_y = track.y
+        track_h = track.height
+        track_range = max(1, track_h - thumb_h)
+
+        desired_y = mouse_y - self._scroll_thumb_offset
+        desired_y = max(track_y, min(track_y + track_range, desired_y))
+
+        ratio = (desired_y - track_y) / track_range
+        new_scroll = ratio * max_scroll
+
+        # Aplica imediatamente (sem lerp) para dar resposta tátil durante o drag
+        if which == "shop":
+            self.shop_scroll_target = new_scroll
+            self.shop_scroll_y = new_scroll
+        else:
+            self.inventory_scroll_target = new_scroll
+            self.inventory_scroll_y = new_scroll
 
     def _recalculate_scrolls(self):
         """Recalcula os valores máximos de scroll"""
@@ -949,12 +1029,31 @@ class ShopScene(BaseScene):
             )
 
     def handle_event(self, event):
-        # Se o seletor de quantidade estiver visível, ele recebe todos os eventos primeiro
+        # ===== Seletor de quantidade (prioridade máxima) =====
         if self.quantity_selector and self.quantity_selector.visible:
             result = self.quantity_selector.handle_event(event)
             if result == "confirm":
                 self._execute_transaction()
             return
+
+        # ===== DRAG DA SCROLLBAR (prioridade sobre cards/categorias) =====
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Checa shop primeiro, depois inventory
+            if self._shop_scrollbar_rect and self._shop_scrollbar_rect.collidepoint(event.pos):
+                self._begin_scroll_drag("shop", event.pos)
+                return
+            if self._inventory_scrollbar_rect and self._inventory_scrollbar_rect.collidepoint(event.pos):
+                self._begin_scroll_drag("inventory", event.pos)
+                return
+
+        if event.type == pygame.MOUSEMOTION and self._dragging_scroll:
+            self._update_scroll_from_mouse(event.pos[1])
+            return
+
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self._dragging_scroll:
+                self._dragging_scroll = None
+                return
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_p:
@@ -1110,14 +1209,16 @@ class ShopScene(BaseScene):
             if hasattr(card, 'update_animation'):
                 card.update_animation(dt)
 
-        # Scroll suave
-        if abs(self.shop_scroll_y - self.shop_scroll_target) > 0.1:
-            self.shop_scroll_y += (self.shop_scroll_target - self.shop_scroll_y) * min(1, dt * 10)
-            self._create_shop_cards_visual()
+        # Scroll suave (apenas quando NÃO está arrastando — drag aplica direto)
+        if self._dragging_scroll != "shop":
+            if abs(self.shop_scroll_y - self.shop_scroll_target) > 0.1:
+                self.shop_scroll_y += (self.shop_scroll_target - self.shop_scroll_y) * min(1, dt * 10)
+                self._create_shop_cards_visual()
 
-        if abs(self.inventory_scroll_y - self.inventory_scroll_target) > 0.1:
-            self.inventory_scroll_y += (self.inventory_scroll_target - self.inventory_scroll_y) * min(1, dt * 10)
-            self._create_inventory_cards_visual()
+        if self._dragging_scroll != "inventory":
+            if abs(self.inventory_scroll_y - self.inventory_scroll_target) > 0.1:
+                self.inventory_scroll_y += (self.inventory_scroll_target - self.inventory_scroll_y) * min(1, dt * 10)
+                self._create_inventory_cards_visual()
 
         # Feedback
         if self.feedback_timer > 0:
@@ -1127,6 +1228,14 @@ class ShopScene(BaseScene):
             self.feedback_alpha = 0
 
     def render(self, screen):
+        # ===== Reset dos rects de hit-testing (recalculados neste frame) =====
+        self._shop_scrollbar_rect = None
+        self._shop_scrollbar_track_rect = None
+        self._shop_scrollbar_thumb_rect = None
+        self._inventory_scrollbar_rect = None
+        self._inventory_scrollbar_track_rect = None
+        self._inventory_scrollbar_thumb_rect = None
+
         self._draw_gradient_background(screen)
 
         if not self.layout_initialized:
@@ -1253,29 +1362,81 @@ class ShopScene(BaseScene):
         max_scroll = self.max_shop_scroll if title == "COMPRAR" else self.max_inventory_scroll
         scroll_y = self.shop_scroll_y if title == "COMPRAR" else self.inventory_scroll_y
 
-        if max_scroll > 0:
-            self._render_scroll_bar(screen, rect, scroll_y, max_scroll, color)
+        self._render_scroll_bar(
+            screen, rect, scroll_y, max_scroll, color,
+            "shop" if title == "COMPRAR" else "inventory",
+        )
 
-    def _render_scroll_bar(self, screen, panel_rect, scroll_y, max_scroll, color):
+    def _render_scroll_bar(self, screen, panel_rect, scroll_y, max_scroll,
+                           color, which):
+        """
+        Renderiza a scrollbar e armazena seus rects para hit-testing.
+        which: 'shop' ou 'inventory'
+        """
         if not panel_rect:
             return
 
-        bar_x = panel_rect.right - 8
+        bar_w = self._SCROLLBAR_WIDTH
+        bar_x = panel_rect.right - bar_w - 4
         bar_y = panel_rect.y + 45 + self.category_offset
         bar_height = panel_rect.height - 50 - self.category_offset
 
-        if max_scroll <= 0:
+        if bar_height <= 20:
             return
 
-        scroll_height = max(30, bar_height * (bar_height / (bar_height + max_scroll)))
-        scroll_pos = bar_y + (scroll_y / max_scroll) * (bar_height - scroll_height)
+        track_rect = pygame.Rect(bar_x, bar_y, bar_w, bar_height)
 
-        # Fundo
-        pygame.draw.rect(screen, (40, 40, 45), (bar_x, bar_y, 3, bar_height))
+        # Track (fundo)
+        pygame.draw.rect(screen, (38, 38, 48), track_rect, border_radius=7)
+        pygame.draw.rect(screen, (55, 55, 70), track_rect, 1, border_radius=7)
 
-        # Barra
-        scroll_rect = pygame.Rect(bar_x, scroll_pos, 3, scroll_height)
-        pygame.draw.rect(screen, color, scroll_rect)
+        if max_scroll <= 0:
+            # Sem necessidade de scroll: registra apenas a track
+            if which == "shop":
+                self._shop_scrollbar_track_rect = track_rect
+            else:
+                self._inventory_scrollbar_track_rect = track_rect
+            return
+
+        # Calcula geometria do thumb
+        thumb_ratio = bar_height / (bar_height + max_scroll)
+        thumb_h = max(48, int(bar_height * thumb_ratio))   # mínimo 48px: fácil de agarrar
+        max_s = max(1, max_scroll)
+        thumb_y = bar_y + int((scroll_y / max_s) * (bar_height - thumb_h))
+
+        thumb_rect = pygame.Rect(bar_x, thumb_y, bar_w, thumb_h)
+
+        # Cor da thumb conforme estado
+        mouse_pos = pygame.mouse.get_pos()
+        if self._dragging_scroll == which:
+            thumb_color = (220, 220, 250)
+            thumb_border = (255, 255, 255)
+        elif thumb_rect.collidepoint(mouse_pos):
+            thumb_color = (200, 200, 235)
+            thumb_border = (230, 230, 250)
+        else:
+            thumb_color = color
+            thumb_border = (230, 230, 245)
+
+        pygame.draw.rect(screen, thumb_color, thumb_rect, border_radius=7)
+        pygame.draw.rect(screen, thumb_border, thumb_rect, 1, border_radius=7)
+
+        # Registra os rects para hit-testing
+        # Área clicável mais larga que a visual (padding à esquerda e direita)
+        pad = self._SCROLLBAR_HIT_PAD
+        hit_rect = pygame.Rect(
+            bar_x - pad, bar_y,
+            bar_w + pad * 2, bar_height
+        )
+
+        if which == "shop":
+            self._shop_scrollbar_rect = hit_rect
+            self._shop_scrollbar_track_rect = track_rect
+            self._shop_scrollbar_thumb_rect = thumb_rect
+        else:
+            self._inventory_scrollbar_rect = hit_rect
+            self._inventory_scrollbar_track_rect = track_rect
+            self._inventory_scrollbar_thumb_rect = thumb_rect
 
     def _render_feedback(self, screen):
         if self.feedback_alpha <= 0:

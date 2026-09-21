@@ -24,7 +24,8 @@ from src.config.global_settings import DEBUG_MODE
 class DebugScene(BaseScene):
     TAB_POKEMON = "pokemon"
     TAB_ITEMS = "items"
-    _PARENT_CLICKS = ("close", "tab_pokemon", "tab_items")
+    TAB_PROFILE = "profile"
+    _PARENT_CLICKS = ("close", "tab_pokemon", "tab_items", "tab_profile")
 
     # ------------------------------------------------------------------
     def __init__(self, game):
@@ -52,11 +53,16 @@ class DebugScene(BaseScene):
         # Abas filhas
         from .tabs.pokemon_tab import PokemonTab
         from .tabs.items_tab import ItemsTab
+        from .tabs.profile_tab import ProfileTab
+
         self.pokemon_tab = PokemonTab(self)
         self.items_tab = ItemsTab(self)
+        self.profile_tab = ProfileTab(self)
+
         self._tabs = {
             self.TAB_POKEMON: self.pokemon_tab,
             self.TAB_ITEMS: self.items_tab,
+            self.TAB_PROFILE: self.profile_tab,
         }
 
     @property
@@ -358,8 +364,12 @@ class DebugScene(BaseScene):
                     self.tab = self.TAB_ITEMS
                     self.active_tab.clear_focus()
                     return
+                if clicked == "tab_profile" and self.tab != self.TAB_PROFILE:
+                    self.tab = self.TAB_PROFILE
+                    self.active_tab.clear_focus()
+                    return
                 # se já estava na aba, apenas ignora
-                if clicked in ("tab_pokemon", "tab_items"):
+                if clicked in ("tab_pokemon", "tab_items", "tab_profile"):
                     return
 
             if clicked and clicked.endswith("_slider"):
@@ -441,11 +451,16 @@ class DebugScene(BaseScene):
         tab_w = int(vw * 0.16)
 
         poke_tab = pygame.Rect(vx + 20, tab_y, tab_w, tab_h)
-        item_tab = pygame.Rect(vx + 20 + tab_w + 8, tab_y, tab_w, tab_h)
+        item_tab = pygame.Rect(vx + 20 + (tab_w + 8), tab_y, tab_w, tab_h)
+        prof_tab = pygame.Rect(vx + 20 + (tab_w + 8) * 2, tab_y, tab_w, tab_h)
+
         self.register_click("tab_pokemon", poke_tab)
         self.register_click("tab_items", item_tab)
+        self.register_click("tab_profile", prof_tab)
+
         self.draw_tab(screen, poke_tab, "POKÉMON", self.tab == self.TAB_POKEMON)
         self.draw_tab(screen, item_tab, "ITENS", self.tab == self.TAB_ITEMS)
+        self.draw_tab(screen, prof_tab, "PERFIL", self.tab == self.TAB_PROFILE)
 
         # Área de conteúdo
         content_top = tab_y + tab_h + 10

@@ -455,6 +455,18 @@ class PokemonTab:
             player.add_to_box(pkmn)
             self.parent.show_message(f"{pkmn.get_display_name()} adicionado à BOX!")
 
+        # ===== REGISTRA NA POKÉDEX (visto + capturado) =====
+        # add_to_box já faz caught_pokemon.add, mas o branch do TEAM não.
+        # register_seen NUNCA é feito por nenhum dos dois.
+        # Set é idempotente, então chamar sempre é seguro.
+        try:
+            player.register_seen(pkmn.id)
+            player.caught_pokemon.add(pkmn.id)
+            print(f"[DEBUG] {pkmn.name} (ID: {pkmn.id}) registrado na Pokédex "
+                  f"(visto + capturado)")
+        except Exception as e:
+            print(f"[DEBUG] Erro ao registrar na Pokédex: {e}")
+
         self.parent.save_game()
         self._refresh_edit_targets()
         sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
@@ -559,6 +571,16 @@ class PokemonTab:
         except Exception as e:
             self.parent.show_message(f"Erro: {e}")
             return
+
+        # ===== REGISTRA NA POKÉDEX (por segurança) =====
+        # Se o Pokémon foi editado mas ainda não estava registrado como
+        # visto/capturado (ex: bug anterior), garante que agora esteja.
+        try:
+            pid = form["pokemon_id"]
+            player.register_seen(pid)
+            player.caught_pokemon.add(pid)
+        except Exception as e:
+            print(f"[DEBUG] Erro ao registrar na Pokédex (edit): {e}")
 
         self.parent.save_game()
         self.parent.show_message("Pokémon atualizado!")
