@@ -109,19 +109,30 @@ class ArenaResultOverlay:
         sub = self.font_sub.render(sub_txt, True, sub_color)
         screen.blit(sub, sub.get_rect(center=(cx, panel.y + 165)))
 
-        # Recompensas
+        # Recompensas (vitória) / Penalidade (derrota)
         y = panel.y + 210
+        gold = self.rewards.get("money", 0)
+        xp = self.rewards.get("xp", 0)
+
         if win:
-            gold = self.rewards.get("money", 0)
-            xp = self.rewards.get("xp", 0)
             info = self.font_info.render(
                 f"+{gold} Ouro    ·    +{xp} XP", True, (255, 215, 0))
             screen.blit(info, info.get_rect(center=(cx, y)))
         else:
-            info = self.font_info.render(
-                "Nenhuma penalidade — apenas tente novamente!",
-                True, (170, 175, 200))
-            screen.blit(info, info.get_rect(center=(cx, y)))
+            if gold > 0 or xp > 0:
+                info = self.font_info.render(
+                    f"-{gold} Ouro    ·    -{xp} XP", True, (230, 90, 90))
+                screen.blit(info, info.get_rect(center=(cx, y)))
+
+                warn = self.font_info.render(
+                    "Você perdeu o equivalente ao que ganharia.",
+                    True, (160, 165, 190))
+                screen.blit(warn, warn.get_rect(center=(cx, y + 26)))
+            else:
+                info = self.font_info.render(
+                    "Nenhuma penalidade — apenas tente novamente!",
+                    True, (170, 175, 200))
+                screen.blit(info, info.get_rect(center=(cx, y)))
 
         # Botão
         mouse = pygame.mouse.get_pos()
