@@ -73,7 +73,12 @@ class SaveManager:
                 },
                 "desfossilizadores": [],
                 "total_playtime": 0,
-                "has_chosen_starter": False
+                "has_chosen_starter": False,
+                "profile_customization": {
+                    "featured_achievements": [],  # lista de keys de ACHIEVEMENTS (máx 3)
+                    "background_color": "default",  # key de BACKGROUND_OPTIONS
+                    "favorite_pokemon_id": None,  # unique_id de um pokemon do TIME
+                },
             },
             "game_state": {
                 "current_chapter": 1,
@@ -438,6 +443,16 @@ class SaveManager:
         else:
             player_data["achievements"] = {"unlocked": [], "counters": {}, "unlocked_data": {}}
 
+        # ===== PROFILE CUSTOMIZATION =====
+        player_data["profile_customization"] = dict(getattr(
+            player, 'profile_customization',
+            {
+                "featured_achievements": [],
+                "background_color": "default",
+                "favorite_pokemon_id": None,
+            }
+        ))
+
         # ===== PC BOX - normaliza dicionarios (idempotente) =====
         from datetime import datetime
         for data in player.pc_box:
@@ -781,6 +796,16 @@ class SaveManager:
 
             if hasattr(player, 'achievement_manager'):
                 player.achievement_manager.load_from_player()
+
+            # ===== PROFILE CUSTOMIZATION =====
+            player.profile_customization = dict(player_data.get(
+                "profile_customization",
+                {
+                    "featured_achievements": [],
+                    "background_color": "default",
+                    "favorite_pokemon_id": None,
+                }
+            ))
 
             print(f"[SAVE] Jogo carregado de {filepath}")
             print(f"[SAVE] Box: {len(player.pc_box)} Pokemon | Time: {len(player.team)} Pokemon")

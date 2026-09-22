@@ -5,7 +5,7 @@ Galeria de Fotos do Jogador - Vibe "mesa de fotos polaroid"
 - Fotos na mesa: crop centralizado em quadrado (sem distorcer)
 - Preview expandido: proporção REAL da imagem (sem crop, sem esticar)
 - Molduras Polaroid, rotações em leque, hover lift, animação de expansão
-- Fundo consistente com a tela de perfil (azul escuro)
+- Fundo usa o tema escolhido na tela de perfil (BACKGROUND_OPTIONS)
 """
 import pygame
 import os
@@ -13,10 +13,13 @@ import math
 import random
 from pathlib import Path
 
-from config.paths import SPRITES_PATH
+from src.config.paths import SPRITES_PATH
 from src.scenes.base_scene import BaseScene
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 from src.ui.toast_renderer import toast_info, toast_warning
+
+# Tema compartilhado com a tela de perfil
+from src.scenes.profile_scene.profile_scene import BACKGROUND_OPTIONS
 
 
 # =====================================================================
@@ -231,7 +234,7 @@ class ExpandedPhoto:
     STATE_DONE = "done"
 
     def __init__(self, photo_item: PhotoItem, screen_rect: pygame.Rect,
-                 viewport_rect: pygame.Rect):
+                 viewport_rect: pygame.Rect, theme_accent=(80, 100, 160)):
         self.photo_item = photo_item
         self.state = self.STATE_OPENING
         self.timer = 0.0
@@ -243,6 +246,7 @@ class ExpandedPhoto:
 
         self.start_rect = screen_rect.copy()
         self.viewport_rect = viewport_rect
+        self.theme_accent = theme_accent
 
         self.target_rect = self._compute_target_rect(viewport_rect)
         self._current_rect = screen_rect.copy()
@@ -326,7 +330,7 @@ class ExpandedPhoto:
     def render(self, screen):
         rect = self._current_rect
 
-        # Fundo escurecido
+        # Fundo escurecido (sempre escuro — garante contraste da foto)
         overlay = pygame.Surface(
             (screen.get_width(), screen.get_height()),
             pygame.SRCALPHA
@@ -408,7 +412,7 @@ class ExpandedPhoto:
 
         self._render_rect = pygame.Rect(final_x, final_y, total_w, total_h)
 
-        # Hint
+        # Hint (usa o accent do tema na borda)
         if self.state == self.STATE_OPEN:
             hint_font = pygame.font.Font(None, 24)
             hint = hint_font.render(
@@ -423,6 +427,12 @@ class ExpandedPhoto:
             hint_x = self.viewport_rect.centerx - hint.get_width() // 2
             hint_y = final_y + total_h + 20
             screen.blit(hint_bg, (hint_x - 12, hint_y - 6))
+            pygame.draw.rect(
+                screen, self.theme_accent,
+                (hint_x - 12, hint_y - 6,
+                 hint.get_width() + 24, hint.get_height() + 12),
+                1, border_radius=4
+            )
             screen.blit(hint, (hint_x, hint_y))
 
 
@@ -431,7 +441,7 @@ class ExpandedPhoto:
 # =====================================================================
 
 class PhotoGalleryScene(BaseScene):
-    """Galeria de fotos com visual de mesa + Polaroid"""
+    """Galeria de fotos com visual de mesa + Polaroid + tema do perfil"""
 
     def __init__(self, game, return_scene=None):
         super().__init__(game)
@@ -450,7 +460,7 @@ class PhotoGalleryScene(BaseScene):
         self.PHOTOS_PER_PAGE = 8
 
         # Expansão
-        self.expanded_photo: ExpandedPhoto | None = None
+        self.expanded_photo = None
 
         # Confirmação de exclusão
         self.delete_confirmation_active = False
@@ -487,10 +497,32 @@ class PhotoGalleryScene(BaseScene):
 
         # Estado
         self._animation_timer = 0
-        self._hovered_item: PhotoItem | None = None
-        self._selected_item: PhotoItem | None = None
+        self._hovered_item = None
+        self._selected_item = None
 
         self._load_photos()
+
+    # ==================================================================
+    # TEMA (integração com a tela de perfil)
+    # ==================================================================
+
+    def _get_current_theme(self):
+        """
+        Retorna o dict do tema escolhido na tela de perfil.
+        Le de player.profile_customization["background_color"].
+        Fallback para "default" se nao existir.
+        """
+        try:
+            player = getattr(self.game, 'player', None)
+            if player is None:
+                return BACKGROUND_OPTIONS["default"]
+            customization = getattr(player, 'profile_customization', None)
+            if not isinstance(customization, dict):
+                return BACKGROUND_OPTIONS["default"]
+            bg_key = customization.get("background_color", "default")
+            return BACKGROUND_OPTIONS.get(bg_key, BACKGROUND_OPTIONS["default"])
+        except Exception:
+            return BACKGROUND_OPTIONS["default"]
 
     # ==================================================================
     # CARREGAMENTO
@@ -517,7 +549,6 @@ class PhotoGalleryScene(BaseScene):
         seed_str = f"page_{self.current_page}_" + "_".join(p.name for p in page_paths)
         rng = random.Random(seed_str)
 
-        # Grid 4x2
         cols = 4
         rows = 2
 
@@ -526,7 +557,6 @@ class PhotoGalleryScene(BaseScene):
         vw = self.screen_manager.viewport_width
         vh = self.screen_manager.viewport_height
 
-        # Área útil
         area_x = vx + int(vw * 0.06)
         area_y = vy + int(vh * 0.16)
         area_w = int(vw * 0.88)
@@ -544,20 +574,15 @@ class PhotoGalleryScene(BaseScene):
             cell_cx = area_x + col * cell_w + cell_w / 2
             cell_cy = area_y + row * cell_h + cell_h / 2
 
-            # Jitter (posição "espalhada")
             jitter_x = rng.uniform(-cell_w * 0.14, cell_w * 0.14)
             jitter_y = rng.uniform(-cell_h * 0.16, cell_h * 0.16)
 
-            # ===== ROTAÇÃO EM LEQUE =====
-            # Fotos à esquerda inclinam pra esquerda, à direita pra direita.
             center_col = (cols - 1) / 2.0
-            col_offset = (col - center_col) / max(1.0, center_col)  # -1..1
+            col_offset = (col - center_col) / max(1.0, center_col)
 
             base_rotation = col_offset * rng.uniform(5.0, 9.0)
             random_offset = rng.uniform(-6.0, 6.0)
             rotation = base_rotation + random_offset
-
-            # Clamp para nunca passar de ±16° (sem virar de cabeça pra baixo)
             rotation = max(-16.0, min(16.0, rotation))
 
             item = PhotoItem(
@@ -578,11 +603,13 @@ class PhotoGalleryScene(BaseScene):
     def total_pages(self):
         if not self.photo_paths:
             return 1
-        return max(1, (len(self.photo_paths) + self.PHOTOS_PER_PAGE - 1) // self.PHOTOS_PER_PAGE)
+        return max(1, (len(self.photo_paths) + self.PHOTOS_PER_PAGE - 1)
+                   // self.PHOTOS_PER_PAGE)
 
     def go_back(self):
         from src.scenes.profile_scene.profile_scene import ProfileScene
-        self.game.current_scene = ProfileScene(self.game, return_scene=self.return_scene)
+        self.game.current_scene = ProfileScene(self.game,
+                                                return_scene=self.return_scene)
 
     def prev_page(self):
         if self.current_page > 0:
@@ -602,8 +629,7 @@ class PhotoGalleryScene(BaseScene):
     # EXPANSÃO
     # ==================================================================
 
-    def _expand_item(self, item: PhotoItem):
-        """Expande uma foto clicada"""
+    def _expand_item(self, item):
         self._selected_item = item
         item.selected = True
 
@@ -614,7 +640,11 @@ class PhotoGalleryScene(BaseScene):
             self.screen_manager.viewport_height
         )
 
-        self.expanded_photo = ExpandedPhoto(item, item.screen_rect, viewport_rect)
+        theme = self._get_current_theme()
+        self.expanded_photo = ExpandedPhoto(
+            item, item.screen_rect, viewport_rect,
+            theme_accent=theme.get("accent", (80, 100, 160))
+        )
         sound_manager.play_effect(SoundEffect.CLICK, volume=0.4)
 
     def _close_expanded(self):
@@ -626,7 +656,6 @@ class PhotoGalleryScene(BaseScene):
     # ==================================================================
 
     def show_delete_confirmation(self):
-        # Só permite se houver uma foto selecionada
         if self._selected_item is not None:
             self.delete_confirmation_active = True
             self.delete_confirmation_timer = 0
@@ -660,17 +689,14 @@ class PhotoGalleryScene(BaseScene):
     # ==================================================================
 
     def handle_event(self, event):
-        # ===== 1. MODAL DE CONFIRMAÇÃO (prioridade máxima) =====
+        # 1. MODAL DE CONFIRMAÇÃO (prioridade máxima)
         if self.delete_confirmation_active:
             self._handle_delete_confirmation(event)
             return
 
-        # ===== 2. BOTÕES (ficam na frente do preview) =====
-        # Só interceptam clique se o mouse estiver em cima deles.
-        # O botão "Excluir Foto" só é clicável se houver foto selecionada.
+        # 2. BOTÕES
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for idx, button in enumerate(self.buttons):
-                # Pula o botão "Excluir Foto" (índice 3) se não houver seleção
                 if idx == 3 and self._selected_item is None:
                     continue
                 if button.rect.collidepoint(event.pos):
@@ -682,12 +708,12 @@ class PhotoGalleryScene(BaseScene):
                     continue
                 button.handle_event(event)
 
-        # ===== 3. PREVIEW EXPANDIDO (prioridade sobre a mesa) =====
+        # 3. PREVIEW EXPANDIDO
         if self.expanded_photo is not None:
             self._handle_expanded_event(event)
             return
 
-        # ===== 4. TECLADO DA MESA =====
+        # 4. TECLADO
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.go_back()
@@ -698,7 +724,7 @@ class PhotoGalleryScene(BaseScene):
             elif event.key == pygame.K_DELETE and self._selected_item:
                 self.show_delete_confirmation()
 
-        # ===== 5. MOUSE NA MESA =====
+        # 5. MOUSE NA MESA
         if event.type == pygame.MOUSEMOTION:
             self._update_hover(event.pos)
 
@@ -712,24 +738,20 @@ class PhotoGalleryScene(BaseScene):
             self._handle_click(event.pos)
 
     def _handle_click(self, pos):
-        # (botões já foram tratados em handle_event)
         item = self._get_item_at(pos)
         if item is not None:
             self._expand_item(item)
             return
 
-        # Clique fora: desmarca (mas NÃO fecha preview aberto — isso é feito no _handle_expanded_event)
         if self._selected_item:
             self._selected_item.selected = False
             self._selected_item = None
 
     def _handle_expanded_event(self, event):
-        """Eventos enquanto uma foto está expandida"""
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_ESCAPE, pygame.K_RETURN, pygame.K_SPACE):
                 self._close_expanded()
             elif event.key == pygame.K_DELETE:
-                # Abre o modal — ele será renderizado NA FRENTE do preview
                 self.delete_confirmation_active = True
                 self.delete_confirmation_timer = 0
 
@@ -810,7 +832,7 @@ class PhotoGalleryScene(BaseScene):
         vw = self.screen_manager.viewport_width
         vh = self.screen_manager.viewport_height
 
-        # Fundo estilo perfil (azul escuro)
+        # Fundo com o tema escolhido no perfil
         self._render_background(screen, vx, vy, vw, vh)
 
         # Botões
@@ -831,18 +853,17 @@ class PhotoGalleryScene(BaseScene):
         # Paginação
         self._render_pagination(screen, vx, vy, vw, vh)
 
-        # ===== FOTO EXPANDIDA (ANTES dos botões) =====
+        # Foto expandida (antes dos botões)
         if self.expanded_photo:
             self.expanded_photo.render(screen)
 
-        # ===== BOTÕES (na frente do preview) =====
-        # O botão "Excluir Foto" só aparece se houver uma foto selecionada
+        # Botões na frente do preview
         for idx, button in enumerate(self.buttons):
             if idx == 3 and self._selected_item is None:
-                continue  # pula o botão "Excluir Foto"
+                continue
             button.render(screen)
 
-        # ===== MODAL DE CONFIRMAÇÃO (por cima de TUDO) =====
+        # Modal de confirmação por cima de tudo
         if self.delete_confirmation_active:
             self._render_delete_confirmation(screen, vx, vy, vw, vh)
 
@@ -852,30 +873,39 @@ class PhotoGalleryScene(BaseScene):
             "Clique em uma foto para expandir | DEL para excluir | ESC para voltar",
             True, (140, 150, 190)
         )
-        bg = pygame.Surface((hint.get_width() + 16, hint.get_height() + 8), pygame.SRCALPHA)
+        bg = pygame.Surface((hint.get_width() + 16, hint.get_height() + 8),
+                            pygame.SRCALPHA)
         bg.fill((0, 0, 0, 120))
         screen.blit(bg, (vx + vw - hint.get_width() - 25, vy + vh - 26))
         screen.blit(hint, (vx + vw - hint.get_width() - 17, vy + vh - 22))
 
     # ------------------------------------------------------------------
-    # FUNDO
+    # FUNDO (usa o tema escolhido no perfil)
     # ------------------------------------------------------------------
     def _render_background(self, screen, vx, vy, vw, vh):
         """
-        Fundo com aparência de mesa
+        Fundo com aparência de mesa, usando o gradiente + accent
+        do tema escolhido na tela de perfil.
         """
-        # ===== GRADIENTE BASE (AZUL ESCURO) =====
+        theme = self._get_current_theme()
+        top = theme["top"]
+        bottom = theme["bottom"]
+        accent = theme["accent"]
+
+        # ===== GRADIENTE BASE =====
         for i in range(vh):
             t = i / vh
-            # Topo mais claro, base mais escura — mesma "curva" do marrom, mas em azul
-            r = int(22 + t * 10)
-            g = int(28 + t * 14)
-            b = int(48 + t * 22)
+            r = int(top[0] + (bottom[0] - top[0]) * t)
+            g = int(top[1] + (bottom[1] - top[1]) * t)
+            b = int(top[2] + (bottom[2] - top[2]) * t)
             pygame.draw.line(screen, (r, g, b), (vx, vy + i), (vx + vw, vy + i))
 
-        # ===== FIBRAS HORIZONTAIS =====
-        # Antes eram (48, 36, 28) marrom → agora azul-acinzentado sutil
-        fiber_color = (35, 45, 70)
+        # ===== FIBRAS HORIZONTAIS (derivadas do accent) =====
+        fiber_color = (
+            max(0, int(accent[0] * 0.45)),
+            max(0, int(accent[1] * 0.45)),
+            max(0, int(accent[2] * 0.45)),
+        )
         for i in range(0, vh, 4):
             y = vy + i
             offset = int(math.sin(i * 0.05) * 2)
@@ -884,7 +914,7 @@ class PhotoGalleryScene(BaseScene):
                 (vx + offset, y), (vx + vw + offset, y), 1
             )
 
-        # ===== VINHETA (CANTOS MAIS ESCUROS) =====
+        # ===== VINHETA (cantos mais escuros) =====
         vignette = pygame.Surface((vw, vh), pygame.SRCALPHA)
         for i in range(0, 60, 2):
             alpha = int((i / 60) ** 2 * 80)
@@ -896,9 +926,12 @@ class PhotoGalleryScene(BaseScene):
         screen.blit(vignette, (vx, vy))
 
     # ------------------------------------------------------------------
-    # CABEÇALHO
+    # CABEÇALHO (usa accent do tema na linha)
     # ------------------------------------------------------------------
     def _render_header(self, screen, vx, vy, vw, vh):
+        theme = self._get_current_theme()
+        accent = theme["accent"]
+
         title_font = pygame.font.Font(None, int(vh * 0.05))
         title = title_font.render("GALERIA DE FOTOS", True, (255, 215, 0))
         title_shadow = title_font.render("GALERIA DE FOTOS", True, (30, 20, 10))
@@ -916,25 +949,30 @@ class PhotoGalleryScene(BaseScene):
 
         line_y = vy + int(vh * 0.105)
         pygame.draw.line(
-            screen, (80, 100, 160),
+            screen, accent,
             (vx + 20, line_y), (vx + vw - 20, line_y), 2
         )
 
     # ------------------------------------------------------------------
-    # ESTADO VAZIO
+    # ESTADO VAZIO (usa accent do tema)
     # ------------------------------------------------------------------
     def _render_empty_state(self, screen, vx, vy, vw, vh):
+        theme = self._get_current_theme()
+        accent = theme["accent"]
+        accent_soft = tuple(min(255, c + 60) for c in accent)
+
         center_x = vx + vw // 2
         center_y = vy + vh // 2
 
         empty_font = pygame.font.Font(None, int(vh * 0.04))
-        empty_text = empty_font.render("Nenhuma foto ainda...", True, (140, 160, 200))
+        empty_text = empty_font.render("Nenhuma foto ainda...",
+                                        True, (200, 215, 240))
         screen.blit(empty_text, empty_text.get_rect(center=(center_x, center_y - 20)))
 
         hint_font = pygame.font.Font(None, int(vh * 0.025))
         hint = hint_font.render(
             "Use a Câmera durante o jogo para tirar fotos!",
-            True, (100, 120, 160)
+            True, accent_soft
         )
         screen.blit(hint, hint.get_rect(center=(center_x, center_y + 25)))
 
@@ -942,25 +980,30 @@ class PhotoGalleryScene(BaseScene):
         cam_w, cam_h = int(vw * 0.10), int(vh * 0.08)
         cam_x = center_x - cam_w // 2
         cam_y = center_y - int(vh * 0.20)
-        pygame.draw.rect(screen, (40, 50, 80),
+
+        cam_body = (30, 38, 60)
+        pygame.draw.rect(screen, cam_body,
                          (cam_x, cam_y, cam_w, cam_h), border_radius=8)
-        pygame.draw.rect(screen, (80, 100, 160),
+        pygame.draw.rect(screen, accent,
                          (cam_x, cam_y, cam_w, cam_h), 2, border_radius=8)
         pygame.draw.circle(screen, (20, 25, 40),
                            (cam_x + cam_w // 2, cam_y + cam_h // 2),
                            int(min(cam_w, cam_h) * 0.30))
-        pygame.draw.circle(screen, (100, 130, 200),
+        pygame.draw.circle(screen, accent_soft,
                            (cam_x + cam_w // 2, cam_y + cam_h // 2),
                            int(min(cam_w, cam_h) * 0.30), 2)
         pygame.draw.circle(screen, (200, 220, 255),
                            (cam_x + cam_w - 15, cam_y + 12), 4)
 
     # ------------------------------------------------------------------
-    # PAGINAÇÃO
+    # PAGINAÇÃO (usa accent do tema no fundo)
     # ------------------------------------------------------------------
     def _render_pagination(self, screen, vx, vy, vw, vh):
         if self.total_pages <= 1:
             return
+
+        theme = self._get_current_theme()
+        accent = theme["accent"]
 
         page_y = vy + int(vh * 0.855)
 
@@ -969,9 +1012,16 @@ class PhotoGalleryScene(BaseScene):
             f"Página {self.current_page + 1} / {self.total_pages}",
             True, (200, 215, 255)
         )
-        bg = pygame.Surface((page_text.get_width() + 20, page_text.get_height() + 8), pygame.SRCALPHA)
+        bg_rect = pygame.Rect(
+            vx + vw // 2 - page_text.get_width() // 2 - 10,
+            page_y - 4,
+            page_text.get_width() + 20,
+            page_text.get_height() + 8
+        )
+        bg = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
         bg.fill((0, 0, 0, 140))
-        screen.blit(bg, (vx + vw // 2 - page_text.get_width() // 2 - 10, page_y - 4))
+        screen.blit(bg, bg_rect)
+        pygame.draw.rect(screen, accent, bg_rect, 1, border_radius=4)
         screen.blit(page_text, page_text.get_rect(center=(vx + vw // 2, page_y)))
 
     # ------------------------------------------------------------------
@@ -997,8 +1047,10 @@ class PhotoGalleryScene(BaseScene):
         screen.blit(title, title.get_rect(center=(cx + cw // 2, cy + 30)))
 
         msg_font = pygame.font.Font(None, int(vh * 0.025))
-        msg1 = msg_font.render("Tem certeza que deseja excluir esta foto?", True, (200, 200, 210))
-        msg2 = msg_font.render("Esta ação não pode ser desfeita!", True, (255, 150, 150))
+        msg1 = msg_font.render("Tem certeza que deseja excluir esta foto?",
+                                True, (200, 200, 210))
+        msg2 = msg_font.render("Esta ação não pode ser desfeita!",
+                                True, (255, 150, 150))
         screen.blit(msg1, msg1.get_rect(center=(cx + cw // 2, cy + ch // 2 - 10)))
         screen.blit(msg2, msg2.get_rect(center=(cx + cw // 2, cy + ch // 2 + 20)))
 
@@ -1010,7 +1062,8 @@ class PhotoGalleryScene(BaseScene):
         yes_rect = pygame.Rect(cx + cw // 2 - btn_w - spacing // 2,
                                cy + ch - btn_h - 15, btn_w, btn_h)
         yes_hover = yes_rect.collidepoint(mouse_pos)
-        pygame.draw.rect(screen, (180, 40, 40) if yes_hover else (140, 30, 30), yes_rect, border_radius=8)
+        pygame.draw.rect(screen, (180, 40, 40) if yes_hover else (140, 30, 30),
+                         yes_rect, border_radius=8)
         pygame.draw.rect(screen, (255, 80, 80), yes_rect, 2, border_radius=8)
 
         yes_font = pygame.font.Font(None, int(vh * 0.028))
@@ -1020,7 +1073,8 @@ class PhotoGalleryScene(BaseScene):
         no_rect = pygame.Rect(cx + cw // 2 + spacing // 2,
                               cy + ch - btn_h - 15, btn_w, btn_h)
         no_hover = no_rect.collidepoint(mouse_pos)
-        pygame.draw.rect(screen, (70, 70, 80) if no_hover else (50, 50, 60), no_rect, border_radius=8)
+        pygame.draw.rect(screen, (70, 70, 80) if no_hover else (50, 50, 60),
+                         no_rect, border_radius=8)
         pygame.draw.rect(screen, (120, 120, 130), no_rect, 2, border_radius=8)
 
         no_text = yes_font.render("NÃO", True, (255, 255, 255))

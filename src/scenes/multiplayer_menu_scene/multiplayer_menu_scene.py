@@ -6,6 +6,7 @@ import tkinter as tk
 
 from src.scenes.base_scene import BaseScene
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
+from src.managers.save_manager import save_manager
 from src.network.manager import NetworkManager
 from src.network.firewall_utils import request_firewall_permission
 from src.ui.toast_renderer import toast_info, toast_warning
@@ -44,7 +45,7 @@ COL_BTN_DISABLED    = (40, 43, 58)
 
 
 # =========================================================
-# TextInput
+# TextInput (usado apenas para o IP do host)
 # =========================================================
 class TextInput:
     """Campo de texto com cursor, placeholder, foco e hover."""
@@ -75,14 +76,6 @@ class TextInput:
 
     # -------- Eventos --------
     def handle_event(self, event):
-        """
-        Retorna:
-          None      -> nada relevante
-          True      -> conteúdo/estado mudou (precisa redesenhar)
-          'submit'  -> ENTER pressionado
-          'escape'  -> ESC pressionado
-          'paste'   -> Ctrl+V pressionado (quem chama decide o que colar)
-        """
         if not self.enabled:
             return None
 
@@ -143,7 +136,6 @@ class TextInput:
         pygame.draw.rect(screen, bg, self.rect, border_radius=8)
         pygame.draw.rect(screen, border, self.rect, 2, border_radius=8)
 
-        # Texto
         if self.text:
             surf = self.font.render(self.text, True, COL_TEXT)
         else:
@@ -153,7 +145,6 @@ class TextInput:
         ty = self.rect.centery - surf.get_height() // 2
         screen.blit(surf, (tx, ty))
 
-        # Cursor
         if self.active and self._cursor_on:
             if self.text:
                 w = self.font.size(self.text)[0]
@@ -172,7 +163,7 @@ class TextInput:
 # Scene
 # =========================================================
 class MultiplayerMenuScene(BaseScene):
-    """Menu de multiplayer: configurar nome, criar sala ou entrar em uma."""
+    """Menu de multiplayer: criar sala ou entrar em uma."""
 
     MODE_IDLE = "idle"
     MODE_JOIN = "join"
@@ -181,8 +172,10 @@ class MultiplayerMenuScene(BaseScene):
         super().__init__(game)
         self.network = NetworkManager()
 
+        # ------ Nome do treinador (vem do save / perfil) ------
+        self.player_name = self._load_trainer_name()
+
         # ------ Estado ------
-        self.player_name = "Jogador"
         self.host_ip = self._get_local_ip()
         self.port = 12345
         self.mode = self.MODE_IDLE
@@ -202,13 +195,9 @@ class MultiplayerMenuScene(BaseScene):
         self.font_btn_small = pygame.font.Font(None, 22)
         self.font_mono      = pygame.font.Font(None, 24)
         self.font_hint      = pygame.font.Font(None, 18)
+        self.font_trainer   = pygame.font.Font(None, 32)
 
-        # ------ Widgets ------
-        self.name_input = TextInput(
-            self.font_input, placeholder="Digite seu nome...", max_length=20
-        )
-        self.name_input.set_value(self.player_name)
-
+        # ------ Widgets (apenas o IP) ------
         self.ip_input = TextInput(
             self.font_input, placeholder="Ex.: 192.168.0.10", max_length=24
         )
@@ -224,16 +213,31 @@ class MultiplayerMenuScene(BaseScene):
         # ------ Clipboard ------
         self._init_clipboard()
 
-        # ------ Aplica nome inicial ------
+        # ------ Aplica nome no network ------
         self.network.set_name(self.player_name)
+        player_uuid = getattr(self.game.player, 'uuid', None) or "unknown"
+        self.network.set_uuid(player_uuid)
 
         # ------ Layout inicial ------
         self._layout()
 
-        # ------ Foco inicial ------
-        self.name_input.active = True
+        self._set_status(
+            f"Conectado como {self.player_name}.", COL_SUCCESS
+        )
 
-        self._set_status("Defina seu nome para comecar.", COL_WARN)
+    # =====================================================
+    # Nome do treinador
+    # =====================================================
+    def _load_trainer_name(self):
+        """Le o nome do save; fallback para 'Treinador'."""
+        try:
+            name = save_manager.save_data.get("meta", {}).get("save_name", "")
+            name = (name or "").strip()
+            if not name:
+                return "Treinador"
+            return name[:20]
+        except Exception:
+            return "Treinador"
 
     # =====================================================
     # Inicialização
@@ -293,26 +297,21 @@ class MultiplayerMenuScene(BaseScene):
         vy = self.screen_manager.viewport_y
         cx = vx + vw // 2
 
-        # Botão voltar
         self.back_btn.topleft = (vx + 20, vy + 20)
 
-        # ----- Dimensões do card -----
         card_w = min(560, vw - 60)
         pad = 32
         left_x = cx - card_w // 2 + pad
         inner_w = card_w - pad * 2
 
-        # Começo do card (abaixo do título)
         card_top = vy + 150
-
-        # Cursor vertical dentro do card
         y = card_top + pad
 
-        # ---- Seção: Identificação ----
+        # ---- Seção: Identificação (só mostra quem você é) ----
         y += 22                                        # label da seção
-        y += 20                                        # "Seu nome"
-        self.name_input.rect = pygame.Rect(left_x, y, inner_w, 46)
-        y += 46
+        y += 20                                        # "Treinador"
+        self._trainer_row_y = y
+        y += 44                                        # altura da "linha" do treinador
         y += 30                                        # espaço
 
         # ---- Seção: Sala ----
@@ -338,7 +337,6 @@ class MultiplayerMenuScene(BaseScene):
             y += 46
             y += 26
         else:
-            # Modo idle: pula essa seção
             y += 6
 
         # ---- Divisor + endereço local ----
@@ -353,31 +351,13 @@ class MultiplayerMenuScene(BaseScene):
         y += ip_row_h
         y += 8
 
-        # ---- Altura final do card ----
         card_h = (y - card_top) + pad
         self.card_rect = pygame.Rect(cx - card_w // 2, card_top, card_w, card_h)
 
     # =====================================================
     # Ações
     # =====================================================
-    def _apply_name(self):
-        name = self.name_input.value.strip()
-        if not name:
-            name = "Jogador"
-        self.player_name = name[:20]
-        self.network.set_name(self.player_name)
-
-        # ===== UUID DO JOGADOR (persistente) =====
-        player_uuid = getattr(self.game.player, 'uuid', None) or "unknown"
-        self.network.set_uuid(player_uuid)
-
     def _create_room(self):
-        if not self.name_input.value.strip():
-            self._set_status("Digite um nome antes de criar a sala.", COL_WARN)
-            self.name_input.active = True
-            return
-
-        self._apply_name()
         self._set_status("Criando sala...", COL_ACCENT)
         self.connecting = True
 
@@ -397,17 +377,10 @@ class MultiplayerMenuScene(BaseScene):
             self.connecting = False
 
     def _try_join(self):
-        if not self.name_input.value.strip():
-            self._set_status("Digite um nome antes de conectar.", COL_WARN)
-            self.name_input.active = True
-            return
-
         if not self.ip_input.value.strip():
             self._set_status("Digite o endereco IP do host.", COL_WARN)
             self.ip_input.active = True
             return
-
-        self._apply_name()
 
         clean_ip = self.ip_input.value.strip()
         if ":" in clean_ip:
@@ -426,7 +399,6 @@ class MultiplayerMenuScene(BaseScene):
                 self.game, is_host=False, network=self.network
             )
         else:
-            # ★ Mostra o motivo real da recusa (mesmo IP, duplicado, etc.)
             reason = self.network.get_last_rejection_reason()
             if reason:
                 self._set_status(reason, COL_DANGER, duration=6.0)
@@ -456,45 +428,28 @@ class MultiplayerMenuScene(BaseScene):
             self._layout()
             return
 
-        # ---- TextInputs primeiro ----
-        for inp in (self.name_input, self.ip_input):
-            if not inp.enabled:
-                continue
-            result = inp.handle_event(event)
-            if result is None:
-                continue
-
-            # Input tratou o evento
-            if inp is self.name_input:
-                self._apply_name()
-            if result == "paste":
-                pasted = self._paste_from_clipboard().strip()
-                if pasted:
-                    inp.set_value(inp.value + pasted)
-                    if inp is self.name_input:
-                        self._apply_name()
-                    if inp is self.ip_input and ":" in pasted:
-                        inp.set_value(pasted.split(":")[0])
-                    toast_info("Texto colado.")
-            if result == "submit":
-                if inp is self.name_input:
-                    self._apply_name()
-                    self.name_input.active = False
-                    self._set_status(
-                        f"Ola, {self.player_name}. Escolha uma opcao.", COL_SUCCESS
-                    )
-                elif inp is self.ip_input:
+        # ---- TextInput do IP (apenas no modo JOIN) ----
+        if self.mode == self.MODE_JOIN and self.ip_input.enabled:
+            result = self.ip_input.handle_event(event)
+            if result is not None:
+                if result == "paste":
+                    pasted = self._paste_from_clipboard().strip()
+                    if pasted:
+                        if ":" in pasted:
+                            pasted = pasted.split(":")[0]
+                        self.ip_input.set_value(
+                            self.ip_input.value + pasted
+                        )
+                        toast_info("Texto colado.")
+                if result == "submit":
                     self._try_join()
-            if result == "escape":
-                self._return_to_menu()
-                return
-            if result is True:
-                # Conteúdo mudou: não deixa o clique "vazar" para botões
-                if event.type == pygame.MOUSEBUTTONDOWN:
+                if result == "escape":
+                    self._return_to_menu()
                     return
-            break
-        else:
-            pass  # nenhum input tratou
+                if result is True:
+                    # Não deixa o clique "vazar" para botões
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        return
 
         # ---- Atalhos de teclado ----
         if event.type == pygame.KEYDOWN:
@@ -524,7 +479,9 @@ class MultiplayerMenuScene(BaseScene):
                 if self.mode != self.MODE_JOIN:
                     self.mode = self.MODE_JOIN
                     self._layout()
-                    self._set_status("Digite o IP do host e clique em Conectar.", COL_ACCENT)
+                    self._set_status(
+                        "Digite o IP do host e clique em Conectar.", COL_ACCENT
+                    )
                     self.ip_input.active = True
                 else:
                     self._try_join()
@@ -546,7 +503,6 @@ class MultiplayerMenuScene(BaseScene):
         if self.status_timer > 0:
             self.status_timer -= dt
 
-        self.name_input.update(dt)
         self.ip_input.update(dt)
 
     # =====================================================
@@ -574,7 +530,6 @@ class MultiplayerMenuScene(BaseScene):
         )
         screen.blit(subtitle, subtitle.get_rect(center=(cx, vy + 95)))
 
-        # Linha decorativa
         line_w = min(420, vw - 80)
         line_y = vy + 120
         pygame.draw.line(
@@ -594,28 +549,63 @@ class MultiplayerMenuScene(BaseScene):
         inner_w = card.width - pad * 2
 
         # ============================
-        # Seção: Identificação
+        # Seção: Identificação (só leitura)
         # ============================
         y = card.y + pad
         self._draw_section_label(screen, "IDENTIFICACAO", left_x, y)
         y += 22
 
-        label = self.font_label.render("Seu nome", True, COL_TEXT_DIM)
+        label = self.font_label.render("Treinador", True, COL_TEXT_DIM)
         screen.blit(label, (left_x, y))
         y += 20
-        # (o rect do name_input já está posicionado pelo _layout)
 
-        self.name_input.render(screen)
+        # "Linha" com o nome do treinador + avatar letter
+        trainer_row = pygame.Rect(left_x, y, inner_w, 44)
+        pygame.draw.rect(screen, COL_CARD_DARK, trainer_row, border_radius=8)
+        pygame.draw.rect(screen, COL_BORDER, trainer_row, 2, border_radius=8)
 
-        # Hint abaixo do nome
+        # Avatar letter
+        avatar_size = 32
+        avatar_rect = pygame.Rect(
+            trainer_row.x + 6,
+            trainer_row.y + (trainer_row.height - avatar_size) // 2,
+            avatar_size, avatar_size,
+        )
+        pygame.draw.rect(screen, (30, 40, 70), avatar_rect, border_radius=6)
+        pygame.draw.rect(screen, COL_ACCENT, avatar_rect, 1, border_radius=6)
+        letter = (self.player_name[:1] or "T").upper()
+        letter_font = pygame.font.Font(None, 26)
+        letter_surf = letter_font.render(letter, True, COL_ACCENT)
+        screen.blit(letter_surf, letter_surf.get_rect(center=avatar_rect.center))
+
+        # Nome
+        name_surf = self.font_trainer.render(
+            self.player_name, True, COL_TEXT
+        )
+        screen.blit(
+            name_surf,
+            name_surf.get_rect(
+                midleft=(avatar_rect.right + 10, trainer_row.centery)
+            ),
+        )
+
+        # Hint à direita (não editável aqui)
         hint = self.font_hint.render(
-            "ENTER para confirmar. Voce sera identificado por este nome.",
-            True, COL_TEXT_MUTED,
+            "vindo do perfil", True, COL_TEXT_MUTED
         )
         screen.blit(
             hint,
-            (left_x, self.name_input.rect.bottom + 6),
+            hint.get_rect(
+                midright=(trainer_row.right - 12, trainer_row.centery)
+            ),
         )
+
+        # Dica abaixo da linha
+        hint2 = self.font_hint.render(
+            "Para trocar o nome, edite-o na tela de Perfil.",
+            True, COL_TEXT_MUTED,
+        )
+        screen.blit(hint2, (left_x, trainer_row.bottom + 6))
 
         # ============================
         # Seção: Sala
@@ -700,7 +690,6 @@ class MultiplayerMenuScene(BaseScene):
     def _draw_section_label(self, screen, text, x, y):
         surf = self.font_section.render(text, True, COL_TEXT_MUTED)
         screen.blit(surf, (x, y))
-        # pequeno traço à esquerda
         pygame.draw.line(
             screen, COL_ACCENT_DIM,
             (x - 12, y + surf.get_height() // 2),
