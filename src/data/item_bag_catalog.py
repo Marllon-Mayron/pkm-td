@@ -643,7 +643,7 @@ class ItemBagCatalog:
         # (id, nome, sprite_file, move_name, unlock_phase, price)
         tms = [
             ("tm_bide", "TM34 - Bide", "machine_NORMAL.png", "bide", "1-6", 2000),
-            ("tm_dream_eater", "TM42 - Dream Eater", "machine_PYSCHIC.png", "dream-eater", "2-1", 1000),
+            ("tm_dream_eater", "TM42 - Dream Eater", "machine_PSYCHIC.png", "dream-eater", "2-1", 1000),
             ("tm_thunder_wave", "TM45 - Thunder Wave", "machine_ELECTRIC.png", "thunder-wave", "2-2", 1600),
             ("tm_whirlwind", "TM04 - Whirlwind", "machine_NORMAL.png", "whirlwind", "2-3", 2500),
             ("tm_water_gun", "TM12 - Water Gun", "machine_WATER.png", "water-gun", "2-4", 2000),

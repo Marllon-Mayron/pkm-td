@@ -628,7 +628,7 @@ class EffectFactory:
             "description": "Causa dano a todos os inimigos próximos."
         },
         "surf": {
-            "effect_type": "stat_mod",
+            "effect_type": "",
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "is_area": True,
