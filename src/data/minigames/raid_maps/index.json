@@ -32,6 +32,46 @@
                 "chapter": 1,
                 "phase": 3
             }
+        },
+        {
+            "chapter": 2,
+            "level": 1,
+            "unlock_requirement": {
+                "chapter": 1,
+                "phase": 1
+            }
+        },
+        {
+            "chapter": 2,
+            "level": 2,
+            "unlock_requirement": {
+                "chapter": 1,
+                "phase": 1
+            }
+        },
+        {
+            "chapter": 2,
+            "level": 3,
+            "unlock_requirement": {
+                "chapter": 1,
+                "phase": 1
+            }
+        },
+        {
+            "chapter": 2,
+            "level": 4,
+            "unlock_requirement": {
+                "chapter": 1,
+                "phase": 1
+            }
+        },
+        {
+            "chapter": 2,
+            "level": 5,
+            "unlock_requirement": {
+                "chapter": 1,
+                "phase": 1
+            }
         }
     ]
 }
