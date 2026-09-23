@@ -93,13 +93,10 @@ class SurvivalUI:
         # ===== MENSAGEM CENTRAL (flutuante) =====
         self._render_center_message(screen, viewport_x, viewport_y, vp_width, vp_height)
 
-        # ===== GAME OVER / COMPLETED (overlay central) =====
-        if self.game_scene.game_state == "game_over":
-            self._render_game_overlay(screen, viewport_x, viewport_y, vp_width, vp_height, "GAME OVER",
-                                      self.COLORS['danger'])
-        elif self.game_scene.game_state == "completed":
-            self._render_game_overlay(screen, viewport_x, viewport_y, vp_width, vp_height, "VITÓRIA!",
-                                      self.COLORS['success'])
+        # ===== GAME OVER / COMPLETED =====
+        # NAO renderizado aqui! A SurvivalMinigameScene cuida disso agora
+        # em _render_game_over() e _render_completed(), para evitar
+        # duas telas sobrepostas.
 
     def _render_top_bar(self, screen, x: int, y: int, width: int, height: int):
         """Renderiza a barra superior com gradiente"""
@@ -413,43 +410,3 @@ class SurvivalUI:
 
                 screen.blit(scaled_shadow, (center_x - scaled_w // 2 + 4, center_y - scaled_h // 2 + 4))
                 screen.blit(scaled_text, (center_x - scaled_w // 2, center_y - scaled_h // 2))
-
-    def _render_game_overlay(self, screen, vp_x, vp_y, vp_w, vp_h, title, color):
-        """Renderiza overlay de game over ou vitoria"""
-        # Fundo escurecido
-        overlay = pygame.Surface((vp_w, vp_h), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 220))
-        screen.blit(overlay, (vp_x, vp_y))
-
-        # Título
-        title_font = self._get_font(60)
-        title_surf = title_font.render(title, True, color)
-        title_x = vp_x + (vp_w - title_surf.get_width()) // 2
-        title_y = vp_y + vp_h // 2 - 120
-        screen.blit(title_surf, (title_x, title_y))
-
-        # Score final
-        score_font = self._get_font(38)
-        formatted_score = f"{self.game_scene.score:,}".replace(",", ".")
-        score_text = f"PONTUAÇÃO: {formatted_score}"
-        score_surf = score_font.render(score_text, True, self.COLORS['accent'])
-        score_x = vp_x + (vp_w - score_surf.get_width()) // 2
-        score_y = title_y + 85
-        screen.blit(score_surf, (score_x, score_y))
-
-        # Waves completadas
-        wave_font = self._get_font(24)
-        current_wave = self.game_scene.wave_manager.current_wave if self.game_scene.wave_manager else self.game_scene.wave_number
-        wave_text = f"Waves completadas: {current_wave - 1}/{self.game_scene.total_waves}"
-        wave_surf = wave_font.render(wave_text, True, self.COLORS['text_dim'])
-        wave_x = vp_x + (vp_w - wave_surf.get_width()) // 2
-        wave_y = score_y + 60
-        screen.blit(wave_surf, (wave_x, wave_y))
-
-        # Instrução
-        inst_font = self._get_font(18)
-        inst_text = "Pressione ESC para voltar ao menu"
-        inst_surf = inst_font.render(inst_text, True, self.COLORS['text_dim'])
-        inst_x = vp_x + (vp_w - inst_surf.get_width()) // 2
-        inst_y = wave_y + 55
-        screen.blit(inst_surf, (inst_x, inst_y))

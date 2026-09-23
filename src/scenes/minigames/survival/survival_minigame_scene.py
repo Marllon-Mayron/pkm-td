@@ -554,10 +554,11 @@ class SurvivalMinigameScene(BaseMinigameScene):
             return
 
         self.lives -= amount
-        toast_warning(f"Perdeu uma vida! Restam: {self.lives}",
-                      duration=2.0, portrait="sad")
 
-        if self.lives <= 0 and self.game_state != "game_over":
+        if self.lives > 0:
+            toast_warning(f"Perdeu uma vida! Restam: {self.lives}",
+                          duration=2.0, portrait="sad")
+        else:
             self.game_over()
 
     def game_over(self):
@@ -566,11 +567,29 @@ class SurvivalMinigameScene(BaseMinigameScene):
             return
 
         self.game_state = "game_over"
+
+        # ===== GARANTE QUE NAO ESTA PAUSADO (evita _render_pause_overlay em cima) =====
+        self.paused = False
+
         if self.wave_manager:
             self.wave_manager.paused = True
             self.wave_manager._finished = True
             self.wave_manager.active_enemies.clear()
-        toast_error("GAME OVER!", duration=3.0)
+
+        # ===== LIMPA TOASTS PENDENTES (evita "Perdeu uma vida" residindo 2s) =====
+        if hasattr(self, 'notification_manager') and self.notification_manager:
+            try:
+                # Se o notification_manager tiver um método de limpar, usa.
+                # Caso não tenha, ignora silenciosamente.
+                if hasattr(self.notification_manager, 'clear_all'):
+                    self.notification_manager.clear_all()
+                elif hasattr(self.notification_manager, 'toasts'):
+                    self.notification_manager.toasts.clear()
+                elif hasattr(self.notification_manager, 'notifications'):
+                    self.notification_manager.notifications.clear()
+            except Exception as e:
+                print(f"[Survival] Aviso ao limpar notificacoes: {e}")
+
         print(f"[Survival] GAME OVER! Score final: {self.score}")
 
     def complete_game(self):
@@ -583,7 +602,9 @@ class SurvivalMinigameScene(BaseMinigameScene):
             self.wave_manager.paused = True
             self.wave_manager._finished = True
             self.wave_manager.active_enemies.clear()
-        toast_success("FASE COMPLETA! PARABÉNS!", duration=3.0, portrait="happy")
+
+        # ===== NOTA: toast de "FASE COMPLETA!" foi removido.
+        # ===== O overlay central já comunica isso ao jogador.
         print(f"[Survival] FASE COMPLETA! Score final: {self.score}")
 
     # ===== MÉTODOS DE OVERLAY =====
@@ -676,6 +697,72 @@ class SurvivalMinigameScene(BaseMinigameScene):
             elif move_category == "special":
                 pokemon.attack_range = 500
 
+    # ===== MÉTODOS DE BOTÃO VOLTAR =====
+
+    def _get_back_button_rect(self) -> pygame.Rect:
+        """Retorna o rect do botão VOLTAR (usado em game_over/completed)."""
+        btn_w, btn_h = 260, 55
+        btn_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - btn_w) // 2
+        btn_y = self.screen_manager.viewport_y + self.screen_manager.viewport_height // 2 + 100
+        return pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+
+    def _render_back_button(self, screen) -> None:
+        """Renderiza o botão VOLTAR nas telas de fim de jogo."""
+        btn_rect = self._get_back_button_rect()
+        mouse_pos = pygame.mouse.get_pos()
+        hovered = btn_rect.collidepoint(mouse_pos)
+
+        if hovered:
+            bg_color = (60, 130, 200)
+            border_color = (150, 200, 255)
+        else:
+            bg_color = (40, 90, 150)
+            border_color = (100, 150, 200)
+
+        # Sombra
+        shadow = btn_rect.copy()
+        shadow.x += 3
+        shadow.y += 3
+        pygame.draw.rect(screen, (0, 0, 0, 120), shadow, border_radius=10)
+
+        pygame.draw.rect(screen, bg_color, btn_rect, border_radius=10)
+        pygame.draw.rect(screen, border_color, btn_rect, 3, border_radius=10)
+
+        font = pygame.font.Font(None, 32)
+        text = font.render("VOLTAR", True, (255, 255, 255))
+        text_rect = text.get_rect(center=btn_rect.center)
+        screen.blit(text, text_rect)
+
+    def _return_to_survival_select(self):
+        """
+        Volta para a tela de seleção de fases do minigame Survival.
+        Tenta vários nomes possíveis; se não achar, cai no menu principal.
+        """
+        print("[Survival] Voltando para a seleção de fases do minigame...")
+
+        # AJUSTE: adicione/remova candidatos conforme o nome real da sua cena de seleção
+        candidates = [
+            ("src.scenes.minigames.survival.survival_select_scene", "SurvivalSelectScene"),
+            ("src.scenes.minigames.survival.survival_phase_select_scene", "SurvivalPhaseSelectScene"),
+            ("src.scenes.minigames.survival_select_scene", "SurvivalSelectScene"),
+            ("src.scenes.minigames.minigame_select_scene", "MinigameSelectScene"),
+            ("src.scenes.minigames_scene", "MinigamesScene"),
+        ]
+
+        for module_path, class_name in candidates:
+            try:
+                module = __import__(module_path, fromlist=[class_name])
+                scene_class = getattr(module, class_name)
+                self.game.current_scene = scene_class(self.game)
+                print(f"[Survival] Cena de seleção carregada: {class_name}")
+                return
+            except (ImportError, AttributeError, TypeError):
+                continue
+
+        # Fallback: menu principal
+        print("[Survival] Cena de seleção não encontrada. Voltando ao menu principal.")
+        self.game.current_scene = self.game.menu_scene
+
     # ===== MÉTODOS DE EVENTOS =====
 
     def handle_event(self, event):
@@ -690,6 +777,16 @@ class SurvivalMinigameScene(BaseMinigameScene):
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.handle_event(event)
             return
+
+        # ===== BOTÃO VOLTAR NAS TELAS DE FIM DE JOGO =====
+        if self.game_state in ["game_over", "completed"]:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self._get_back_button_rect().collidepoint(event.pos):
+                    self._return_to_survival_select()
+                    return
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                self._return_to_survival_select()
+                return
 
         if self.survival_ui.handle_event(event):
             return
@@ -825,7 +922,8 @@ class SurvivalMinigameScene(BaseMinigameScene):
             elif hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
                 self.close_evolution_overlay(cancel=True)
             else:
-                self.game.current_scene = self.game.menu_scene
+                # ESC durante o jogo normal: volta para a seleção de fases do minigame
+                self._return_to_survival_select()
 
         super().handle_event(event)
 
@@ -1277,10 +1375,13 @@ class SurvivalMinigameScene(BaseMinigameScene):
         wave_y = score_y + 35
         screen.blit(wave_text, (wave_x, wave_y))
 
-        inst_text = self.font_small.render("Pressione ESC para voltar ao menu", True, (150, 150, 150))
+        inst_text = self.font_small.render("Pressione ESC para voltar a selecao", True, (150, 150, 150))
         inst_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - inst_text.get_width()) // 2
-        inst_y = wave_y + 50
+        inst_y = wave_y + 30
         screen.blit(inst_text, (inst_x, inst_y))
+
+        # ===== BOTAO VOLTAR =====
+        self._render_back_button(screen)
 
     def _render_completed(self, screen):
         overlay = pygame.Surface((self.screen_manager.viewport_width, self.screen_manager.viewport_height))
@@ -1303,10 +1404,13 @@ class SurvivalMinigameScene(BaseMinigameScene):
         lives_y = score_y + 35
         screen.blit(lives_text, (lives_x, lives_y))
 
-        inst_text = self.font_small.render("Pressione ESC para voltar ao menu", True, (150, 150, 150))
+        inst_text = self.font_small.render("Pressione ESC para voltar a selecao", True, (150, 150, 150))
         inst_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - inst_text.get_width()) // 2
-        inst_y = lives_y + 50
+        inst_y = lives_y + 30
         screen.blit(inst_text, (inst_x, inst_y))
+
+        # ===== BOTAO VOLTAR =====
+        self._render_back_button(screen)
 
     def _render_pause_overlay(self, screen):
         overlay = pygame.Surface((self.screen_manager.viewport_width, self.screen_manager.viewport_height))
