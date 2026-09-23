@@ -39,6 +39,13 @@ class RenameDialog:
         self.cancel_btn = None
         self.input_rect = None
 
+        # ===== SCROLLBAR DRAG (lista de pokemon) =====
+        self._scrollbar_rect = None
+        self._scrollbar_track_rect = None
+        self._scrollbar_thumb_rect = None
+        self._scroll_dragging = False
+        self._scroll_thumb_offset = 0
+
         self._fonts = {}
         self._last_size = (0, 0)
         self._recalc_layout()
@@ -144,6 +151,35 @@ class RenameDialog:
             return 8
         return max(1, (self.list_rect.height - 40) // self.ROW_H)
 
+    # ==================================================================
+    # SCROLLBAR DRAG
+    # ==================================================================
+    def _begin_scroll_drag(self, mouse_pos):
+        thumb = self._scrollbar_thumb_rect
+        if thumb and thumb.collidepoint(mouse_pos):
+            self._scroll_thumb_offset = mouse_pos[1] - thumb.y
+        else:
+            self._scroll_thumb_offset = max(1, thumb.height // 2 if thumb else 10)
+            self._update_scroll_from_mouse(mouse_pos[1])
+        self._scroll_dragging = True
+
+    def _update_scroll_from_mouse(self, mouse_y):
+        track = self._scrollbar_track_rect
+        thumb = self._scrollbar_thumb_rect
+        if not track or not thumb:
+            return
+        thumb_h = thumb.height
+        track_y = track.y
+        track_h = track.height
+        track_max = max(1, track_h - thumb_h)
+
+        desired_y = mouse_y - self._scroll_thumb_offset
+        desired_y = max(track_y, min(track_y + track_max, desired_y))
+
+        ratio = (desired_y - track_y) / track_max
+        max_scroll = max(0, len(self.entries) - self._visible_rows())
+        self.list_scroll = max(0, min(max_scroll, int(round(ratio * max_scroll))))
+
     def _get_selected(self):
         if 0 <= self.selected_index < len(self.entries):
             return self.entries[self.selected_index]
@@ -163,7 +199,18 @@ class RenameDialog:
     def handle_event(self, event):
         self._check_resize()
 
-        # Teclado
+        # ===== DRAG ATIVO (prioridade maxima) =====
+        if self._scroll_dragging:
+            if event.type == pygame.MOUSEMOTION:
+                self._update_scroll_from_mouse(event.pos[1])
+                return None
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                self._scroll_dragging = False
+                return None
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                return None
+
+        # ===== TECLADO =====
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 return "close"
@@ -177,7 +224,7 @@ class RenameDialog:
                     self.name_input += event.unicode
             return None
 
-        # Scroll
+        # ===== SCROLL WHEEL =====
         if event.type == pygame.MOUSEWHEEL:
             mx, my = pygame.mouse.get_pos()
             if self.list_rect and self.list_rect.collidepoint(mx, my):
@@ -185,17 +232,22 @@ class RenameDialog:
                 self.list_scroll = max(0, min(max_s, self.list_scroll - event.y))
             return None
 
-        # Click
+        # ===== CLICK =====
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # Cancel
+            # Cancelar
             if self.cancel_btn and self.cancel_btn.collidepoint(event.pos):
                 return "close"
 
-            # Confirm
+            # Confirmar
             if self.confirm_btn and self.confirm_btn.collidepoint(event.pos):
                 return self._try_confirm()
 
-            # List click
+            # ===== SCROLLBAR DRAG (checa ANTES da lista) =====
+            if self._scrollbar_rect and self._scrollbar_rect.collidepoint(event.pos):
+                self._begin_scroll_drag(event.pos)
+                return None
+
+            # Lista de Pokémon
             if self.list_rect and self.list_rect.collidepoint(event.pos):
                 rel_y = event.pos[1] - self.list_rect.y - 40
                 if rel_y >= 0:
@@ -309,12 +361,24 @@ class RenameDialog:
         hdr_s = self._fonts['small'].render("SEUS POKÉMON", True, (180, 190, 215))
         screen.blit(hdr_s, (hdr.x + 12, hdr.y + 8))
 
+        # ===== Scrollbar geometry (calculada ANTES do loop) =====
+        visible = self._visible_rows()
+        has_scrollbar = len(self.entries) > visible
+
+        bar_w = 12
+        bar_gap_right = 6
+        bar_x = self.list_rect.right - bar_w - bar_gap_right
+        bar_top = self.list_rect.y + 40
+        bar_h = self.list_rect.height - 44
+
+        # Margem reservada à direita (Lv.XX e #ID ficam ANTES da barra)
+        right_reserve = (bar_w + bar_gap_right + 8) if has_scrollbar else 12
+
         old_clip = screen.get_clip()
         clip = pygame.Rect(self.list_rect.x + 4, self.list_rect.y + 36,
                            self.list_rect.width - 8, self.list_rect.height - 40)
         screen.set_clip(clip)
 
-        visible = self._visible_rows()
         start = self.list_scroll
         end = min(len(self.entries), start + visible)
         mouse = pygame.mouse.get_pos()
@@ -330,11 +394,14 @@ class RenameDialog:
             hovered = row.collidepoint(mouse)
 
             if selected:
-                bg = (62, 52, 100); border = (200, 180, 255)
+                bg = (62, 52, 100);
+                border = (200, 180, 255)
             elif hovered:
-                bg = (40, 44, 62); border = (100, 110, 140)
+                bg = (40, 44, 62);
+                border = (100, 110, 140)
             else:
-                bg = (26, 30, 42); border = (48, 53, 68)
+                bg = (26, 30, 42);
+                border = (48, 53, 68)
 
             pygame.draw.rect(screen, bg, row, border_radius=6)
             pygame.draw.rect(screen, border, row, 1, border_radius=6)
@@ -359,28 +426,39 @@ class RenameDialog:
                 f"Espécie: {entry['species']}", True, (160, 170, 195))
             screen.blit(sp_js, (row.x + 58, row.y + 28))
 
+            # Lv e ID deslocados para NÃO invadir a scrollbar
             lv_s = self._fonts['small'].render(f"Lv.{entry['level']}", True,
-                                                (255, 220, 120))
-            screen.blit(lv_s, (row.right - lv_s.get_width() - 12, row.y + 8))
+                                               (255, 220, 120))
+            screen.blit(lv_s, (row.right - right_reserve - lv_s.get_width(),
+                               row.y + 8))
 
             id_s = self._fonts['tiny'].render(f"#{entry['id']:04d}", True,
-                                               (130, 140, 170))
-            screen.blit(id_s, (row.right - id_s.get_width() - 12, row.y + 30))
+                                              (130, 140, 170))
+            screen.blit(id_s, (row.right - right_reserve - id_s.get_width(),
+                               row.y + 30))
 
         screen.set_clip(old_clip)
 
-        # Scrollbar
-        if len(self.entries) > visible:
-            bar_x = self.list_rect.right - 6
-            bar_top = self.list_rect.y + 40
-            bar_h = self.list_rect.height - 44
-            thumb_h = max(24, int(bar_h * visible / len(self.entries)))
+        # ===== Scrollbar =====
+        if has_scrollbar:
+            thumb_h = max(40, int(bar_h * visible / len(self.entries)))
             max_s = max(1, len(self.entries) - visible)
             thumb_y = bar_top + int((bar_h - thumb_h) * self.list_scroll / max_s)
-            pygame.draw.rect(screen, (35, 38, 55), (bar_x, bar_top, 4, bar_h),
-                             border_radius=2)
-            pygame.draw.rect(screen, (120, 130, 170),
-                             (bar_x, thumb_y, 4, thumb_h), border_radius=2)
+
+            pygame.draw.rect(screen, (35, 38, 55),
+                             (bar_x, bar_top, bar_w, bar_h), border_radius=6)
+            thumb_color = (180, 190, 230) if self._scroll_dragging else (120, 130, 170)
+            pygame.draw.rect(screen, thumb_color,
+                             (bar_x, thumb_y, bar_w, thumb_h), border_radius=6)
+
+            self._scrollbar_track_rect = pygame.Rect(bar_x, bar_top, bar_w, bar_h)
+            self._scrollbar_thumb_rect = pygame.Rect(bar_x, thumb_y, bar_w, thumb_h)
+            self._scrollbar_rect = pygame.Rect(
+                bar_x - 10, bar_top, bar_w + 16, bar_h)
+        else:
+            self._scrollbar_rect = None
+            self._scrollbar_track_rect = None
+            self._scrollbar_thumb_rect = None
 
     def _render_form(self, screen):
         if not self.form_rect:
