@@ -649,7 +649,7 @@ class ItemBagCatalog:
             ("tm_water_gun", "TM12 - Water Gun", "machine_WATER.png", "water-gun", "2-4", 2000),
             ("tm_mega_punch", "TM01 - Mega Punch", "machine_NORMAL.png", "mega-punch", "2-5", 3000),
             ("tm_seismic_toss", "TM19 - Seismic Toss", "machine_FIGHTING.png", "seismic-toss", "2-6", 2000),
-            ("tm_selfdestruct", "TM36 - Selfdestruct", "machine_NORMAL.png", "selfdestruct", "2-6", 1000),
+            ("tm_self_destruct", "TM36 - Self Destruct", "machine_NORMAL.png", "self-destruct", "2-6", 1000),
             ("tm_dig", "TM28 - Dig", "machine_WATER.png", "dig", "2-7", 2000),
             ("tm_bubble_beam", "TM11 - Bubble Beam", "machine_WATER.png", "bubble-beam", "2-8", 2500),
             ("hm_body_slam", "TM08 - Body Slam", "machine_NORMAL.png", "body-slam", "3-1", 2000),

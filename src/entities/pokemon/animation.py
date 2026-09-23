@@ -854,9 +854,7 @@ class PokemonAnimation:
             self.pokemon._pose_cooldown = 0.0
 
         # ===== FORÇA RESTAURAÇÃO DA ANIMAÇÃO ANTERIOR =====
-        # Não use set_animation aqui, porque ele tem uma guarda que só troca
-        # se a animação for diferente. Como pode ser a mesma (idle→idle),
-        # forçamos direto:
+        # Não usa set_animation aqui, porque ele tem uma guarda que só troca se a animação for diferente. Como pode ser a mesma (idle→idle), forçamos direto:
         self.pokemon.current_animation = saved
         self.pokemon.current_frame = 0
         self.pokemon.animation_timer = 0

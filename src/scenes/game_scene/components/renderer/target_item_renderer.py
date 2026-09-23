@@ -12,6 +12,11 @@ from src.core.render_context import render_context
 class TargetItemRenderer:
     """Renderiza os itens alvo com variações visuais"""
 
+    # ===== TAMANHO BASE DO SPRITE =====
+    # 16 (era pequeno demais para o jogador ver no mapa) Aumentado em 50% -> 24
+    BASE_SPRITE_SIZE = 24
+    MIN_SPRITE_SIZE = 12  # era 8; subiu proporcionalmente
+
     def __init__(self):
         self.show_debug = False
 
@@ -34,7 +39,8 @@ class TargetItemRenderer:
 
         # Escala do sprite baseada no zoom
         scale = camera.zoom * screen_manager.render_scale if camera else screen_manager.render_scale
-        sprite_size = max(8, int(16 * scale))
+
+        sprite_size = max(self.MIN_SPRITE_SIZE, int(self.BASE_SPRITE_SIZE * scale))
         half_size = sprite_size // 2
 
         # Renderiza o item (com rotação)

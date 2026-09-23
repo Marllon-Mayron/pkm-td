@@ -47,6 +47,28 @@ MSG_TYPES = {
     "ARENA_POKEMON_ATTACK": "arena_pokemon_attack",
     "ARENA_POKEMON_DAMAGE": "arena_pokemon_damage",
     "ARENA_END": "arena_end",
+
+    # ===== PVP =====
+    "PVP_JOIN": "pvp_join",
+    "PVP_PLAYER_LIST": "pvp_player_list",
+    "PVP_SELECT_FORMAT": "pvp_select_format",
+    "PVP_TEAM_SUBMIT": "pvp_team_submit",
+    "PVP_READY": "pvp_ready",
+    "PVP_START_SELECTION": "pvp_start_selection",
+    "PVP_COUNTDOWN": "pvp_countdown",
+    "PVP_START": "pvp_start",
+    "PVP_LEAVE": "pvp_leave",
+    "PVP_CANCEL": "pvp_cancel",
+    # IN-BATTLE
+    "PVP_PLACEMENT": "pvp_placement",
+    "PVP_POKEMON_STATE": "pvp_pokemon_state",
+    "PVP_POKEMON_ATTACK": "pvp_pokemon_attack",
+    "PVP_POKEMON_DAMAGE": "pvp_pokemon_damage",
+    "PVP_END": "pvp_end",
+    "PVP_TEAM_ASSIGN": "pvp_team_assign",
+    "PVP_WEATHER_CHANGE": "pvp_weather_change",
+    "PVP_POKEMON_REMOVE": "pvp_pokemon_remove",
+
     "ERROR": "error",
     "DISCONNECT": "disconnect",
 }

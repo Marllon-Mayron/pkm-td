@@ -255,6 +255,13 @@ class ProfileScene(BaseScene):
         self._ach_save_rect = None
         self._ach_cancel_rect = None
 
+        self._ach_dragging = False
+        self._ach_drag_offset = 0
+        self._ach_bar_rect = None
+        self._ach_track_rect = None
+        self._ach_bar_h = 0
+        self._ach_max_scroll = 0.0
+
         # BG
         self._bg_draft = "default"
         self._bg_cell_rects = []
@@ -755,21 +762,53 @@ class ProfileScene(BaseScene):
                 self._close_modal(); return
 
     def _handle_ach_picker_event(self, event):
+        # Drag em andamento tem prioridade sobre qualquer outra coisa
+        if self._ach_dragging:
+            if event.type == pygame.MOUSEMOTION:
+                self._drag_ach_scroll(event.pos[1])
+                return
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                self._ach_dragging = False
+                return
+
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                self._close_modal(); return
+                self._close_modal();
+                return
             if event.key == pygame.K_DOWN:
-                self._ach_scroll += 40
+                self._ach_scroll = min(self._ach_scroll + 40,
+                                       self._ach_max_scroll)
             elif event.key == pygame.K_UP:
                 self._ach_scroll = max(0, self._ach_scroll - 40)
             return
         if event.type == pygame.MOUSEWHEEL:
-            self._ach_scroll = max(0, self._ach_scroll - event.y * 40); return
+            self._ach_scroll = max(0, min(self._ach_scroll - event.y * 40,
+                                          self._ach_max_scroll))
+            return
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # 1) Clique na barra -> inicia drag
+            if self._ach_bar_rect and self._ach_bar_rect.collidepoint(event.pos):
+                self._ach_dragging = True
+                self._ach_drag_offset = event.pos[1] - self._ach_bar_rect.y
+                try:
+                    sound_manager.play_effect(SoundEffect.CLICK, volume=0.2)
+                except Exception:
+                    pass
+                return
+            # 2) Clique na track (fora da barra) -> salta + inicia drag
+            if self._ach_track_rect and self._ach_track_rect.collidepoint(event.pos):
+                self._ach_drag_offset = self._ach_bar_h // 2
+                self._drag_ach_scroll(event.pos[1])
+                self._ach_dragging = True
+                return
+            # 3) Botoes
             if self._ach_save_rect and self._ach_save_rect.collidepoint(event.pos):
-                self._apply_ach_picker(); return
+                self._apply_ach_picker();
+                return
             if self._ach_cancel_rect and self._ach_cancel_rect.collidepoint(event.pos):
-                self._close_modal(); return
+                self._close_modal();
+                return
+            # 4) Linhas
             for key, rect in self._ach_row_rects:
                 if rect.collidepoint(event.pos):
                     if key in self._ach_draft:
@@ -784,6 +823,17 @@ class ProfileScene(BaseScene):
                         pass
                     return
             return
+
+    def _drag_ach_scroll(self, mouse_y):
+        """Atualiza _ach_scroll baseado na posicao Y do mouse durante o drag."""
+        if not self._ach_track_rect or self._ach_max_scroll <= 0:
+            return
+        track = self._ach_track_rect
+        span = max(1, track.height - self._ach_bar_h)
+        new_y = mouse_y - self._ach_drag_offset
+        new_y = max(track.y, min(new_y, track.y + span))
+        ratio = (new_y - track.y) / span
+        self._ach_scroll = ratio * self._ach_max_scroll
 
     def _handle_bg_picker_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -1593,6 +1643,19 @@ class ProfileScene(BaseScene):
         pygame.draw.rect(screen, (15, 20, 35), list_rect, border_radius=10)
         pygame.draw.rect(screen, (60, 80, 130), list_rect, 2, border_radius=10)
         self._ach_row_rects = []
+        self._ach_bar_rect = None
+        self._ach_track_rect = None
+        self._ach_bar_h = 0
+        self._ach_max_scroll = 0.0
+
+        row_h = int(panel.height * 0.075)
+        total_h = len(unlocked_keys) * row_h + 10
+        max_scroll = max(0, total_h - list_rect.height)
+        self._ach_max_scroll = max_scroll
+        self._ach_scroll = max(0, min(self._ach_scroll, max_scroll))
+
+        # Reserva espaco nas linhas se a scrollbar existir
+        scrollbar_reserve = 22 if max_scroll > 0 else 0
 
         if not unlocked_keys:
             f = pygame.font.Font(None, int(panel.height * 0.032))
@@ -1602,18 +1665,15 @@ class ProfileScene(BaseScene):
         else:
             old_clip = screen.get_clip()
             screen.set_clip(list_rect.inflate(-4, -4))
-            row_h = int(panel.height * 0.075)
-            total_h = len(unlocked_keys) * row_h + 10
-            max_scroll = max(0, total_h - list_rect.height)
-            self._ach_scroll = max(0, min(self._ach_scroll, max_scroll))
 
             for i, key in enumerate(unlocked_keys):
                 ach = ACHIEVEMENTS[key]
                 ry = list_rect.y + 8 + i * row_h - self._ach_scroll
                 if ry + row_h < list_rect.y or ry > list_rect.bottom:
                     continue
-                row_rect = pygame.Rect(list_rect.x + 8, ry,
-                                       list_rect.width - 16, row_h - 4)
+                row_rect = pygame.Rect(
+                    list_rect.x + 8, ry,
+                    list_rect.width - 16 - scrollbar_reserve, row_h - 4)
                 selected = key in self._ach_draft
                 try:
                     rcol = ach.rarity.color
@@ -1640,7 +1700,6 @@ class ProfileScene(BaseScene):
                                       cb_rect.width - 8, cb_rect.height - 8),
                                      border_radius=2)
 
-                # Badge de raridade (canto direito) — calculada antes do titulo
                 try:
                     rt = ach.rarity.display_name.upper()
                 except Exception:
@@ -1655,14 +1714,12 @@ class ProfileScene(BaseScene):
                 pygame.draw.rect(screen, (0, 0, 0), rb_rect, 1, border_radius=5)
                 screen.blit(rb_s, (rb_rect.x + 8, rb_rect.y + 4))
 
-                # Titulo truncado (nao invade badge)
                 t_f = pygame.font.Font(None, int(row_h * 0.42))
                 avail_w = rb_rect.x - (cb_rect.right + 12) - 8
                 title_txt = truncate_text(ach.title, t_f, avail_w)
                 t_s = t_f.render(title_txt, True, (240, 245, 255))
                 screen.blit(t_s, (cb_rect.right + 12, row_rect.y + 8))
 
-                # Descricao
                 d_f = pygame.font.Font(None, int(row_h * 0.32))
                 desc = ach.description or ""
                 avail_desc_w = rb_rect.x - (cb_rect.right + 12) - 8
@@ -1675,6 +1732,7 @@ class ProfileScene(BaseScene):
 
             screen.set_clip(old_clip)
 
+        # Botoes
         btn_h = int(panel.height * 0.075)
         btn_w = int(panel.width * 0.22)
         gap = int(panel.width * 0.04)
@@ -1688,14 +1746,45 @@ class ProfileScene(BaseScene):
         self._draw_modal_button(screen, cancel_rect, "CANCELAR",
                                 base_color=(80, 60, 60), hover_color=(140, 80, 80))
 
-        if unlocked_keys and max_scroll > 0:
-            bar_x = list_rect.right - 8
-            bar_h = max(30, int(list_rect.height *
+        # ====== SCROLLBAR (larga e arrastavel) ======
+        if max_scroll > 0:
+            bar_w = 14  # <-- mais larga
+            bar_x = list_rect.right - bar_w - 6
+            bar_h = max(44, int(list_rect.height *
                                 (list_rect.height / max(1, total_h))))
+            bar_h = min(bar_h, list_rect.height - 8)
+
+            track_rect = pygame.Rect(bar_x - 3, list_rect.y + 4,
+                                     bar_w + 6, list_rect.height - 8)
+            self._ach_track_rect = track_rect
+            self._ach_bar_h = bar_h
+
+            # Track de fundo
+            pygame.draw.rect(screen, (22, 27, 44), track_rect, border_radius=9)
+            pygame.draw.rect(screen, (55, 70, 105), track_rect, 1, border_radius=9)
+
+            # Posicao da barra
             ratio = self._ach_scroll / max_scroll if max_scroll > 0 else 0
-            bar_y = list_rect.y + int((list_rect.height - bar_h) * ratio)
-            pygame.draw.rect(screen, (100, 130, 200),
-                             (bar_x, bar_y, 5, bar_h), border_radius=3)
+            bar_y = track_rect.y + int((track_rect.height - bar_h) * ratio)
+            bar_rect = pygame.Rect(track_rect.x + 2, bar_y,
+                                   track_rect.width - 4, bar_h)
+            self._ach_bar_rect = bar_rect
+
+            mouse_pos = pygame.mouse.get_pos()
+            hovered = bar_rect.collidepoint(mouse_pos) or self._ach_dragging
+            bar_color = (150, 180, 240) if hovered else (100, 130, 200)
+            bar_border = (210, 225, 255) if hovered else (140, 160, 200)
+            pygame.draw.rect(screen, bar_color, bar_rect, border_radius=7)
+            pygame.draw.rect(screen, bar_border, bar_rect, 2, border_radius=7)
+
+            # Grip (3 linhas no centro) — ajuda o usuario a ver que e arrastavel
+            if bar_h >= 32:
+                gc_x = bar_rect.centerx
+                gc_y = bar_rect.centery
+                for off in (-6, 0, 6):
+                    pygame.draw.line(screen, (35, 45, 70),
+                                     (gc_x - 4, gc_y + off),
+                                     (gc_x + 4, gc_y + off), 2)
 
     # ----- BG -----
     def _render_bg_picker(self, screen, vx, vy, vw, vh):
