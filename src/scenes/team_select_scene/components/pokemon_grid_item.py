@@ -6,19 +6,30 @@ from src.scenes.team_select_scene.utils.constants import COLORS
 
 
 class PokemonGridItem:
+    """
+    Card individual da grid de Pokemon disponiveis (BOX).
+
+    IMPORTANTE: a grid representa APENAS a BOX. O time e exibido
+    separadamente nos slots superiores. Por isso, este componente
+    NAO renderiza mais nenhuma indicacao visual de "No time"
+    (overlay verde + texto), nem colore o card de verde quando o
+    Pokemon esta no time - isso era redundante e confuso.
+    """
+
     def __init__(self, pokemon_data, x, y, width, height):
         self.pokemon_data = pokemon_data  # dict
         self.rect = pygame.Rect(x, y, width, height)
         self.is_hovered = False
         self._portrait_cache = None
-        self._is_in_team_cache = None
         self._held_icon_cache = None
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
             self.is_hovered = self.rect.collidepoint(event.pos)
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.is_hovered and not self.pokemon_data.get("is_in_team", False):
+            # A grid representa a BOX. Todo Pokemon exibido aqui e clicavel,
+            # independente de estar no time ou nao.
+            if self.is_hovered:
                 return self.pokemon_data
         return None
 
@@ -55,8 +66,10 @@ class PokemonGridItem:
         if self.pokemon_data.get("held_item"):
             self._draw_held_item_icon(screen)
 
-        if self.pokemon_data.get("is_in_team", False):
-            self._draw_team_overlay(screen, font)
+        # ===== NOTA =====
+        # Nao desenhamos mais overlay de "No time" aqui. A grid representa
+        # apenas a Box, entao qualquer indicacao de "esta no time" era
+        # redundante (o time ja e exibido nos slots superiores).
 
     def _draw_held_item_icon(self, screen):
         """Desenha o ícone de item segurável no canto inferior direito"""
@@ -75,10 +88,9 @@ class PokemonGridItem:
             screen.blit(icon_scaled, (icon_x, icon_y))
 
     def _draw_card_background(self, screen):
-        if self.pokemon_data.get("is_in_team", False):
-            color = COLORS['GRID']['IN_TEAM']
-            border_color = COLORS['GRID']['BORDER_IN_TEAM']
-        elif self.is_hovered:
+        # A grid so mostra Pokemon da Box, entao nunca usamos o estado
+        # "in_team" para colorir o card. Apenas hover/default.
+        if self.is_hovered:
             color = COLORS['GRID']['HOVER']
             border_color = COLORS['GRID']['BORDER_HOVER']
         else:
@@ -149,11 +161,3 @@ class PokemonGridItem:
             color = type_colors.get(type_name.lower(), (128, 128, 128))
             type_text = type_font.render(type_name.upper(), True, color)
             screen.blit(type_text, (name_x + (i * 45), self.rect.y + 50))
-
-    def _draw_team_overlay(self, screen, font):
-        overlay = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
-        overlay.fill((0, 50, 0, 100))
-        screen.blit(overlay, self.rect)
-        team_text = font.render("No time", True, COLORS['TEXT']['GREEN'])
-        text_rect = team_text.get_rect(center=(self.rect.centerx, self.rect.centery + 35))
-        screen.blit(team_text, text_rect)

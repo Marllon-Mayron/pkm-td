@@ -51,22 +51,22 @@ class PokemonManager:
 
     def get_available_pokemon(self, page=0, items_per_page=30):
         """Retorna a lista de Pokémon disponíveis (sempre do cache atualizado)"""
-        # Garante que os dados estão atualizados antes de retornar
-        all_pokemon = list(self.player.pc_box)
-
-        # Atualiza is_in_team para todos os Pokémon na box
+        # ===== DEFENSIVO: a BOX so deve conter Pokemon que NAO estao no time =====
         team_ids = {p.unique_id for p in self.player.team}
+        all_pokemon = [
+            p for p in self.player.pc_box
+            if p.get("unique_id") not in team_ids
+        ]
+
+        # ===== Atualiza dados do cache =====
         for data in all_pokemon:
             unique_id = data.get("unique_id")
-            if unique_id:
-                data["is_in_team"] = unique_id in team_ids
-                # Se tiver no cache, usa os dados mais recentes
-                if unique_id in self.player._pokemon_cache:
-                    cached = self.player._pokemon_cache[unique_id]
-                    data["name"] = cached.name
-                    data["id"] = cached.id
-                    data["level"] = cached.level
-                    data["types"] = cached.types.copy()
+            if unique_id and unique_id in self.player._pokemon_cache:
+                cached = self.player._pokemon_cache[unique_id]
+                data["name"] = cached.name
+                data["id"] = cached.id
+                data["level"] = cached.level
+                data["types"] = cached.types.copy()
 
         filtered_list = self._apply_filters_and_sort(all_pokemon)
         start_idx = page * items_per_page
