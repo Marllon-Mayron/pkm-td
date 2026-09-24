@@ -498,6 +498,7 @@ class WaveManager:
                         other._path_tracker.set_ignore_path(other, 0)
 
             # ===== LIMPA REFERÊNCIAS DE POKÉMON ALIADOS =====
+            # ===== LIMPA REFERÊNCIAS DE POKÉMON ALIADOS =====
             if hasattr(self.game_scene, 'placement_manager'):
                 for ally in self.game_scene.placement_manager.placed_pokemon:
                     if hasattr(ally, 'target') and ally.target == enemy:
@@ -505,10 +506,18 @@ class WaveManager:
                         ally.target = None
                         if hasattr(ally, '_attack_attempts'):
                             ally._attack_attempts = 0
-                        # Força aliado a voltar para o spot
-                        ally.combat_state = "returning"
-                        if hasattr(ally, 'has_animation') and ally.has_animation("walk"):
-                            ally.set_animation("walk")
+
+                        # ===== TELEPORTA PARA O SPOT (não anda de volta) =====
+                        arena_no_return = getattr(ally, '_arena_no_return', False)
+                        if not arena_no_return and hasattr(ally, 'combat'):
+                            # Se está atacando, agenda; senão teleporta imediatamente
+                            ally.combat._schedule_teleport_to_spot()
+                        else:
+                            # Arena ou sem combat: só fica idle
+                            ally.combat_state = "idle"
+                            if hasattr(ally, 'has_animation') and ally.has_animation("idle"):
+                                ally.set_animation("idle")
+
                         # Reseta qualquer animação de ataque pendente
                         if hasattr(ally, '_attack_animation_active'):
                             ally._attack_animation_active = False

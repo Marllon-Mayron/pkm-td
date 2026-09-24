@@ -1649,6 +1649,10 @@ class Pokemon(Entity):
                     print(f"[TWO_TURN] Carga de {self.name} foi cancelada devido à derrota!")
                     self.battle_system.active_charge_move = None
 
+            # ===== LIMPA TELEPORT PENDENTE =====
+            if hasattr(self, '_pending_teleport_to_spot'):
+                delattr(self, '_pending_teleport_to_spot')
+
             # ===== REMOVE EFEITOS RESIDUAIS DO BATTLE_SYSTEM (apenas se existir) =====
             if hasattr(self, 'battle_system') and self.battle_system:
                 if hasattr(self.battle_system, 'residual_effects'):
@@ -1763,6 +1767,10 @@ class Pokemon(Entity):
         self.spot_id = None
         self.is_moving = False
         self.is_placed = False
+
+        # ===== LIMPA FLAG DE TELEPORT PENDENTE =====
+        if hasattr(self, '_pending_teleport_to_spot'):
+            delattr(self, '_pending_teleport_to_spot')
 
         # ===== LIMPA FLAG DO STRUGGLE =====
         if hasattr(self, '_struggle_message_shown'):

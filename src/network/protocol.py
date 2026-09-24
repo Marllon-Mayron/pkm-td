@@ -68,6 +68,7 @@ MSG_TYPES = {
     "PVP_TEAM_ASSIGN": "pvp_team_assign",
     "PVP_WEATHER_CHANGE": "pvp_weather_change",
     "PVP_POKEMON_REMOVE": "pvp_pokemon_remove",
+    "PVP_DAY_NIGHT": "pvp_day_night",
 
     "ERROR": "error",
     "DISCONNECT": "disconnect",

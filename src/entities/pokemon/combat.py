@@ -314,36 +314,105 @@ class PokemonCombat:
 
         arena_no_return = getattr(self.pokemon, '_arena_no_return', False)
 
-        # ===== CORREÇÃO: PARA ALIADOS DO TOWER DEFENSE, FORÇA RETORNO AO SPOT =====
+        # ===== ALIADOS DO TOWER DEFENSE: TELEPORTA PARA O SPOT =====
         if not self.pokemon.is_wild and not arena_no_return:
-            print(f"[TARGET_LOST] {self.pokemon.name}: voltando para o spot (motivo: {reason})")
-            self.pokemon.combat_state = "returning"
-
-            # ===== FORÇA RESET DAS FLAGS DE MOVIMENTO =====
-            self.pokemon.is_moving = False
-            self.pokemon.last_x = self.pokemon.x
-            self.pokemon.last_y = self.pokemon.y
-
-            # ===== FORÇA ANIMAÇÃO DE WALK =====
-            if hasattr(self.pokemon, 'has_animation') and self.pokemon.has_animation("walk"):
-                self.pokemon.set_animation("walk")
-
-            # ===== CANCELA QUALQUER ANIMAÇÃO DE ATAQUE PENDENTE =====
-            if hasattr(self.pokemon, '_attack_animation_active'):
-                self.pokemon._attack_animation_active = False
-                # Limpa flags relacionadas
-                if hasattr(self.pokemon, '_pending_attack_move'):
-                    delattr(self.pokemon, '_pending_attack_move')
-                if hasattr(self.pokemon, '_pending_attack_target'):
-                    delattr(self.pokemon, '_pending_attack_target')
+            print(f"[TARGET_LOST] {self.pokemon.name}: teleportando para o spot (motivo: {reason})")
+            self._schedule_teleport_to_spot()
         else:
-            # ===== ARENA (aliado) OU SELVAGEM: fica idle no lugar, sem voltar pro spot =====
+            # ===== ARENA (aliado) OU SELVAGEM: fica idle no lugar =====
             if arena_no_return:
                 print(f"[TARGET_LOST] {self.pokemon.name}: arena — permanece no local "
                       f"(motivo: {reason})")
 
             if hasattr(self.pokemon, 'has_animation') and self.pokemon.has_animation("idle"):
                 self.pokemon.set_animation("idle")
+
+    # ===== TELEPORTE PARA O SPOT (substitui o "returning" andando) =====
+
+    def _teleport_to_spot(self):
+        """
+        Teleporta INSTANTANEAMENTE o Pokémon para seu spot original.
+        Substitui o 'returning' (andar de volta) para aliados do Tower Defense,
+        reduzindo drasticamente a punição de Pokémon de ataque físico corpo a corpo.
+
+        Ghost visual só é criado se o Pokémon REALMENTE saiu do spot
+        (evita o efeito estranho em golpes de status/especiais, que não movem o Pokémon).
+        """
+        # ===== SEM SPOT DEFINIDO: apenas fica idle =====
+        if not hasattr(self.pokemon, 'original_spot_x') or not hasattr(self.pokemon, 'original_spot_y'):
+            self.pokemon.combat_state = "idle"
+            self.pokemon.target = None
+            if self.pokemon.has_animation("idle"):
+                self.pokemon.set_animation("idle")
+            return
+
+        # ===== VERIFICA SE O POKÉMON REALMENTE SAIU DO SPOT =====
+        dx = self.pokemon.x - self.pokemon.original_spot_x
+        dy = self.pokemon.y - self.pokemon.original_spot_y
+        dist_sq = dx * dx + dy * dy
+        is_away_from_spot = dist_sq > 25  # ~5px de tolerância
+
+        # ===== SÓ CRIA GHOST SE ELE SAIU DO SPOT =====
+        # (golpes de status/especiais não movem o Pokémon, então não tem ghost)
+        if is_away_from_spot:
+            if hasattr(self.pokemon, 'game_scene') and self.pokemon.game_scene:
+                gs = self.pokemon.game_scene
+                if hasattr(gs, 'placement_manager') and gs.placement_manager:
+                    gs.placement_manager.spawn_teleport_ghost(self.pokemon)
+
+        # ===== TELEPORTA (no-op se já estava no spot) =====
+        self.pokemon.x = self.pokemon.original_spot_x
+        self.pokemon.y = self.pokemon.original_spot_y
+        if hasattr(self.pokemon, 'rect'):
+            self.pokemon.rect.x = int(self.pokemon.x)
+            self.pokemon.rect.y = int(self.pokemon.y)
+
+        # ===== RESETA FLAGS DE MOVIMENTO =====
+        self.pokemon.is_moving = False
+        self.pokemon.last_x = self.pokemon.x
+        self.pokemon.last_y = self.pokemon.y
+
+        # ===== RESETA ESTADO DE COMBATE =====
+        self.pokemon.combat_state = "idle"
+        self.pokemon.target = None
+        # (NÃO reseta charge_cooldown — deve respeitar o cooldown aplicado no ataque!)
+
+        # ===== CANCELA ANIMAÇÃO DE ATAQUE RESIDUAL =====
+        if hasattr(self.pokemon, '_attack_animation_active'):
+            self.pokemon._attack_animation_active = False
+        if hasattr(self.pokemon, '_pending_attack_move'):
+            delattr(self.pokemon, '_pending_attack_move')
+        if hasattr(self.pokemon, '_pending_attack_target'):
+            delattr(self.pokemon, '_pending_attack_target')
+
+        # ===== LIMPA FLAG DE TELEPORT PENDENTE =====
+        if hasattr(self.pokemon, '_pending_teleport_to_spot'):
+            delattr(self.pokemon, '_pending_teleport_to_spot')
+
+        # ===== VOLTA PARA IDLE =====
+        if self.pokemon.has_animation("idle"):
+            self.pokemon.set_animation("idle")
+
+        if is_away_from_spot:
+            print(f"[TELEPORT] {self.pokemon.name} teleportou para o spot "
+                  f"({self.pokemon.x:.0f}, {self.pokemon.y:.0f})")
+        else:
+            print(f"[TELEPORT] {self.pokemon.name} já estava no spot (no-op)")
+
+    def _schedule_teleport_to_spot(self):
+        """
+        Agenda o teleporte para o spot:
+        - Se o Pokémon NÃO está atacando: teleporta imediatamente.
+        - Se ESTÁ atacando: espera a animação terminar (flag consumida em update_combat).
+        """
+        is_attacking = (hasattr(self.pokemon, '_attack_animation_active')
+                        and self.pokemon._attack_animation_active)
+
+        if is_attacking:
+            self.pokemon._pending_teleport_to_spot = True
+            print(f"[TELEPORT] {self.pokemon.name} vai teleportar após a animação de ataque.")
+        else:
+            self._teleport_to_spot()
 
     # ===== MÉTODO PRINCIPAL DE COMBATE =====
     def update_combat(self, dt: float, all_entities: List):
@@ -391,6 +460,12 @@ class PokemonCombat:
         if is_attacking:
             return
 
+        # ===== NOVO: TELEPORT AGENDADO (após ataque) =====
+        if getattr(self.pokemon, '_pending_teleport_to_spot', False):
+            self.pokemon._pending_teleport_to_spot = False
+            self._teleport_to_spot()
+            return
+
         # Atualiza cooldown
         if self.pokemon.charge_cooldown > 0:
             self.pokemon.charge_cooldown -= dt
@@ -404,23 +479,11 @@ class PokemonCombat:
 
                 arena_no_return = getattr(self.pokemon, '_arena_no_return', False)
 
-                # ===== ALIADOS DO TOWER DEFENSE: VOLTAM PARA O SPOT =====
+                # ===== ALIADOS DO TOWER DEFENSE: TELEPORTA PARA O SPOT =====
                 if not self.pokemon.is_wild and not arena_no_return:
-                    print(f"[COMBAT] {self.pokemon.name}: voltando para o spot (alvo morto)")
-                    self.pokemon.combat_state = "returning"
-                    # Reseta qualquer estado de ataque pendente
-                    if hasattr(self.pokemon, '_attack_animation_active'):
-                        self.pokemon._attack_animation_active = False
-                    # ===== FORÇA RESET DAS FLAGS DE MOVIMENTO =====
-                    self.pokemon.is_moving = False
-                    self.pokemon.last_x = self.pokemon.x
-                    self.pokemon.last_y = self.pokemon.y
-                    # Garante animação de walk
-                    if self.pokemon.has_animation("walk"):
-                        self.pokemon.set_animation("walk")
-                    # Reseta cooldown
-                    self.pokemon.charge_cooldown = 0
-                    # Não retorna - continua para processar o movimento de retorno
+                    print(f"[COMBAT] {self.pokemon.name}: alvo morto, teleportando para o spot")
+                    self._schedule_teleport_to_spot()
+                    return
                 else:
                     # ===== ARENA (aliado) OU INIMIGO: fica idle no lugar =====
                     # Vai buscar outro alvo naturalmente no próximo tick.
@@ -462,7 +525,7 @@ class PokemonCombat:
                 arena_no_return = getattr(self.pokemon, '_arena_no_return', False)
 
                 if self.pokemon.combat_state != "idle":
-                    # ===== ALIADOS DO TOWER DEFENSE: VOLTAM PARA O SPOT QUANDO NÃO HÁ INIMIGOS =====
+                    # ===== ALIADOS DO TOWER DEFENSE: TELEPORTA PARA O SPOT QUANDO NÃO HÁ INIMIGOS =====
                     if not self.pokemon.is_wild and not arena_no_return:
                         if hasattr(self.pokemon, 'original_spot_x') and hasattr(self.pokemon, 'original_spot_y'):
                             dx = self.pokemon.original_spot_x - self.pokemon.x
@@ -470,10 +533,8 @@ class PokemonCombat:
                             distance_to_spot = math.sqrt(dx * dx + dy * dy)
 
                             if distance_to_spot > 5:
-                                print(f"[COMBAT] {self.pokemon.name}: sem inimigos, voltando para o spot")
-                                self.pokemon.combat_state = "returning"
-                                if self.pokemon.has_animation("walk"):
-                                    self.pokemon.set_animation("walk")
+                                print(f"[COMBAT] {self.pokemon.name}: sem inimigos, teleportando para o spot")
+                                self._schedule_teleport_to_spot()
                                 return
                             else:
                                 # Já está no spot
@@ -514,10 +575,17 @@ class PokemonCombat:
         if not target.is_alive() or target.is_defeated:
             print(f"[COMBAT] {self.pokemon.name}: alvo {target.name} morreu antes do ataque!")
             self.pokemon.target = None
-            self.pokemon.combat_state = "idle"
 
-            if not self.pokemon.is_wild and self.pokemon.has_animation("idle"):
-                self.pokemon.set_animation("idle")
+            arena_no_return = getattr(self.pokemon, '_arena_no_return', False)
+
+            if not self.pokemon.is_wild and not arena_no_return:
+                # ALIADO TOWER DEFENSE: teleporta para o spot
+                self._schedule_teleport_to_spot()
+            else:
+                # ARENA ou selvagem: fica idle no lugar
+                self.pokemon.combat_state = "idle"
+                if self.pokemon.has_animation("idle"):
+                    self.pokemon.set_animation("idle")
             return
 
         # ===== VERIFICA SE ESTÁ PRESO NA TEIA (SPIDER WEB) =====
@@ -558,9 +626,7 @@ class PokemonCombat:
                 print(f"[COMBAT] {self.pokemon.name}: alvo {target.name} saiu do range durante perseguição! "
                       f"Distância: {distance_check:.0f} > {self.pokemon.attack_range:.0f}")
                 self.pokemon.target = None
-                self.pokemon.combat_state = "returning"
-                if self.pokemon.has_animation("walk"):
-                    self.pokemon.set_animation("walk")
+                self._schedule_teleport_to_spot()
                 return
 
         # ===== ANTI-SPAM: Evita ficar tentando atacar sem PP a cada frame =====
@@ -670,10 +736,8 @@ class PokemonCombat:
             self.pokemon.target = None
 
             if not self.pokemon.is_wild:
-                print(f"[MOVE] {self.pokemon.name}: voltando para o spot (alvo morto durante movimento)")
-                self.pokemon.combat_state = "returning"
-                if self.pokemon.has_animation("walk"):
-                    self.pokemon.set_animation("walk")
+                print(f"[MOVE] {self.pokemon.name}: teleportando para o spot (alvo morto durante movimento)")
+                self._schedule_teleport_to_spot()
             else:
                 self.pokemon.combat_state = "idle"
                 if self.pokemon.has_animation("idle"):
@@ -693,9 +757,7 @@ class PokemonCombat:
                 print(f"[MOVE] {self.pokemon.name}: alvo {target.name} muito longe durante movimento! "
                       f"Distância: {distance_check:.0f} > {self.pokemon.attack_range * 1.5:.0f}")
                 self.pokemon.target = None
-                self.pokemon.combat_state = "returning"
-                if self.pokemon.has_animation("walk"):
-                    self.pokemon.set_animation("walk")
+                self._schedule_teleport_to_spot()
                 return
 
         # Garante animação de walk
@@ -854,12 +916,10 @@ class PokemonCombat:
         if not target or not target.is_alive() or target.is_defeated:
             self.pokemon.target = None
 
-            # ===== ALIADOS: VOLTAM PARA O SPOT =====
+            # ===== ALIADOS: TELEPORTA PARA O SPOT =====
             if not self.pokemon.is_wild:
-                print(f"[ATTACK] {self.pokemon.name}: alvo já estava morto, voltando para o spot")
-                self.pokemon.combat_state = "returning"
-                if self.pokemon.has_animation("walk"):
-                    self.pokemon.set_animation("walk")
+                print(f"[ATTACK] {self.pokemon.name}: alvo já estava morto, teleportando para o spot")
+                self._schedule_teleport_to_spot()
             else:
                 self.pokemon.combat_state = "idle"
                 if self.pokemon.has_animation("idle"):
@@ -890,9 +950,7 @@ class PokemonCombat:
                     self.pokemon.has_no_pp = True
 
                     if not self.pokemon.is_wild:
-                        self.pokemon.combat_state = "returning"
-                        if self.pokemon.has_animation("walk"):
-                            self.pokemon.set_animation("walk")
+                        self._schedule_teleport_to_spot()
                     else:
                         self.pokemon.combat_state = "idle"
                         if self.pokemon.has_animation("idle"):
@@ -970,18 +1028,16 @@ class PokemonCombat:
                     print(f"[ATTACK] {self.pokemon.name}: atacou {target.name} "
                           f"(arena — permanece no local)")
             else:
-                # ===== TOWER DEFENSE: SEMPRE volta para o spot após atacar =====
+                # ===== TOWER DEFENSE: TELEPORTA para o spot após atacar =====
+                # (não anda mais de volta — reduz a punição de Pokémon corpo a corpo)
                 if target_is_dead_now:
-                    print(f"[ATTACK] {self.pokemon.name}: matou {target.name}! Voltando para o spot.")
+                    print(f"[ATTACK] {self.pokemon.name}: matou {target.name}! Teleportando para o spot.")
                     self.pokemon.target = None
                 else:
-                    print(f"[ATTACK] {self.pokemon.name}: atacou {target.name}, voltando para o spot.")
+                    print(f"[ATTACK] {self.pokemon.name}: atacou {target.name}, teleportando para o spot.")
 
-                # SEMPRE volta para o spot após atacar
-                self.pokemon.combat_state = "returning"
-                # Força animação walk APENAS se não estiver já em walk
-                if self.pokemon.current_animation != "walk" and self.pokemon.has_animation("walk"):
-                    self.pokemon.set_animation("walk")
+                # Agenda teleporte (aguarda animação terminar se estiver atacando)
+                self._schedule_teleport_to_spot()
         else:
             # ===== INIMIGOS =====
             self.pokemon.combat_state = "attacking"
@@ -993,8 +1049,22 @@ class PokemonCombat:
             self.pokemon.restore_all_pp()
 
     def _handle_returning_state(self, dt: float):
-        """GERENCIA O RETORNO DO POKÉMON AO SPOT ORIGINAL"""
-        # Verifica se tem spot original definido
+        """
+        Fallback de segurança: se algum código externo setar combat_state='returning'
+        em um aliado do Tower Defense, teleporta imediatamente em vez de andar.
+
+        Só usa 'andar de volta' para selvagens (que não têm teleporte conceitual).
+        """
+        arena_no_return = getattr(self.pokemon, '_arena_no_return', False)
+
+        # ===== ALIADOS DO TOWER DEFENSE: teleporta direto =====
+        if not self.pokemon.is_wild and not arena_no_return:
+            print(f"[RETURN] {self.pokemon.name}: 'returning' detectado — "
+                  f"teleportando ao invés de andar")
+            self._teleport_to_spot()
+            return
+
+        # ===== SELVAGEM ou ARENA: comportamento original (andar / idle) =====
         if not hasattr(self.pokemon, 'original_spot_x') or not hasattr(self.pokemon, 'original_spot_y'):
             print(f"[RETURN] {self.pokemon.name} não tem spot original! Voltando para idle.")
             self.pokemon.combat_state = "idle"
@@ -1017,45 +1087,30 @@ class PokemonCombat:
             if hasattr(self.pokemon, 'rect'):
                 self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
 
-            # Reseta estado
             self.pokemon.combat_state = "idle"
             self.pokemon.target = None
-
-            # ===== FORÇA RESET DAS FLAGS DE MOVIMENTO =====
             self.pokemon.is_moving = False
             self.pokemon.last_x = self.pokemon.x
             self.pokemon.last_y = self.pokemon.y
 
-            # ===== FORÇA ANIMAÇÃO IDLE =====
             if hasattr(self.pokemon, 'has_animation') and self.pokemon.has_animation("idle"):
                 self.pokemon.set_animation("idle")
-                print(f"[RETURN] {self.pokemon.name} retornou ao spot! Posição: ({self.pokemon.x:.0f}, {self.pokemon.y:.0f})")
-            else:
-                print(f"[RETURN] {self.pokemon.name} retornou ao spot, mas não tem animação idle!")
             return
 
-        # ===== AINDA VOLTANDO =====
-        # Verifica se não está em animação de ataque
+        # Ainda voltando (apenas selvagens/arena caem aqui)
         is_attacking = hasattr(self.pokemon, '_attack_animation_active') and self.pokemon._attack_animation_active
-
         if not is_attacking:
-            # Força animação walk APENAS se não estiver já em walk
             if hasattr(self.pokemon, 'current_animation') and self.pokemon.current_animation != "walk":
                 if hasattr(self.pokemon, 'has_animation') and self.pokemon.has_animation("walk"):
                     self.pokemon.set_animation("walk")
-                    print(f"[RETURN] {self.pokemon.name} voltando ao spot (walk)")
 
-        # Move em direção ao spot
         move_distance = self.pokemon.move_speed * dt * 60
-
-        # Evita divisão por zero
         if distance <= 0:
             return
 
         move_x = (dx / distance) * move_distance
         move_y = (dy / distance) * move_distance
 
-        # Não ultrapassar o spot
         if abs(move_x) > abs(dx):
             move_x = dx
         if abs(move_y) > abs(dy):
@@ -1066,7 +1121,6 @@ class PokemonCombat:
         if hasattr(self.pokemon, 'rect'):
             self.pokemon.rect.x, self.pokemon.rect.y = self.pokemon.x, self.pokemon.y
 
-        # Atualiza direção baseada no movimento
         self._update_direction_to_target(dx, dy)
 
     def show_miss_on_self(self):
@@ -1125,12 +1179,9 @@ class PokemonCombat:
         print(f"[NO_MOVES] {self.pokemon.name} sem moves disponíveis!")
 
         if not self.pokemon.is_wild:
-            # Para aliados: volta para o spot
-            if self.pokemon.combat_state != "returning":
-                self.pokemon.combat_state = "returning"
-                # Só define walk se não estiver já em walk
-                if self.pokemon.current_animation != "walk" and self.pokemon.has_animation("walk"):
-                    self.pokemon.set_animation("walk")
+            # Para aliados: teleporta para o spot
+            if self.pokemon.combat_state != "idle":
+                self._schedule_teleport_to_spot()
         else:
             # Para selvagens: fica idle
             if self.pokemon.combat_state != "idle":

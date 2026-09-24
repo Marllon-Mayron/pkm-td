@@ -38,6 +38,9 @@ class ItemBagCatalog:
         self._sprites_loaded = False  # Flag para controle
         self.placeholders = {}  # Placeholders criados
 
+        self.open_sprites = {}  # Sprite aberto original
+        self.open_sprites_scaled = {}  # Sprite aberto escalado
+
         # Usa o PROJECT_ROOT e ITEMS_PATH do paths.py
         self.root_dir = PROJECT_ROOT
         self.base_path = ITEMS_PATH
@@ -845,6 +848,54 @@ class ItemBagCatalog:
         if item_id in self.sprites:
             return self.sprites[item_id]
         return self.sprites.get("pokeball")
+
+    def get_open_sprite_path(self, item_id):
+        """
+        Retorna o Path da versão ABERTA do sprite de uma pokébola.
+
+        Convenção de nome: mesmo nome do sprite normal + "_OPEN" antes da extensão.
+        Ex.: POKEBALL.png -> POKEBALL_OPEN.png
+
+        Retorna None se o item não for pokébola ou se o arquivo não existir.
+        """
+        item_data = self.items.get(item_id)
+        if not item_data:
+            return None
+        if item_data.get("category") != "pokeball":
+            return None
+
+        sprite_path = item_data["sprite_path"]
+        candidates = [
+            sprite_path.parent / f"{sprite_path.stem}_OPEN{sprite_path.suffix}",
+            sprite_path.parent / f"{sprite_path.stem}_open{sprite_path.suffix}",
+        ]
+        for path in candidates:
+            if path.exists():
+                return path
+        return None
+
+    def get_open_sprite(self, item_id, size=(32, 64)):
+        """
+        Retorna o sprite ABERTO de uma pokébola, escalado para `size`.
+        Retorna None se o arquivo não existir.
+        """
+        cache_key = (item_id, size)
+        if cache_key in self.open_sprites_scaled:
+            return self.open_sprites_scaled[cache_key]
+
+        open_path = self.get_open_sprite_path(item_id)
+        if not open_path:
+            return None
+
+        self._ensure_pygame_ready()
+        try:
+            sprite = pygame.image.load(str(open_path)).convert_alpha()
+            scaled = pygame.transform.scale(sprite, size)
+            self.open_sprites_scaled[cache_key] = scaled
+            return scaled
+        except Exception as e:
+            print(f"[ItemBagCatalog] Erro ao carregar sprite aberto {open_path}: {e}")
+            return None
 
     def get_item(self, item_id):
         """Retorna dados do item"""

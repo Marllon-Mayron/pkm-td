@@ -3,9 +3,15 @@
 PvPBattleScene — batalha PvP entre jogadores com sync de rede.
 
 Regras de substituição:
-  - Quando um pokémon morre, o corpo fica no campo por 2s.
-  - Após 2s, o corpo é removido e o spot é liberado.
-  - O JOGADOR escolhe o próximo arrastando do HUD (sem auto-substituição).
+  - Quando um pokémon morre, o corpo fica no campo por 3s.
+  - Após 3s, o corpo é removido e o spot é liberado.
+  - O PERDEDOR (dono do pokémon morto) escolhe o próximo arrastando do
+    HUD (sem auto-substituição).
+  - O VENCEDOR (quem derrotou o pokémon inimigo) recebe um overlay com
+    cards para trocar um dos seus pokémon posicionados por um do HUD.
+    Esse overlay tem 10s de tempo (mesmo do placement inicial).
+  - Se o jogador não posicionar nada em 10s na fase de placement, o
+    jogo posiciona automaticamente os primeiros pokémon do time.
 """
 import json
 import math
@@ -22,7 +28,10 @@ from src.data.pvp_catalog import (
 
 
 # Tempo que o corpo fica no campo antes de ser removido
-CORPSE_LIFETIME = 2.0
+CORPSE_LIFETIME = 3.0
+
+# Tempo máximo para posicionar/trocar pokémon
+PLACEMENT_TIME = 10.0
 
 
 # =====================================================================
@@ -208,6 +217,10 @@ class PvPBattleScene(BaseScene):
             or "unknown"
         )
 
+        # Pokedex para os retratos do overlay de troca
+        from src.data.pokedex import Pokedex
+        self.pokedex = Pokedex()
+
         self.pvp_state = "placing"
         self.pvp_result = None
         self.pvp_countdown = self.COUNTDOWN_TIME
@@ -215,6 +228,7 @@ class PvPBattleScene(BaseScene):
         self.game_paused = False
         self.ui_hidden = False
         self._pvp_overlay = None
+        self._swap_overlay = None
         self._battle_elapsed = 0.0
         self._last_dt = 0.0
         self.move_select_overlay = None
@@ -223,6 +237,8 @@ class PvPBattleScene(BaseScene):
 
         self._local_placement_ready = False
         self._remote_placement_done = set()
+        # Timer para auto-placement (10s)
+        self._placement_timer = PLACEMENT_TIME
 
         self._sync_timer = 0.0
         self._remote_pokemon = {}
@@ -232,9 +248,14 @@ class PvPBattleScene(BaseScene):
         self._local_team_dead = False
         self._original_team = None
         self._applying_remote_weather = False
+        self._applying_remote_day_night = False
 
-        # Timers de remoção de corpos (id(pokemon) -> segundos restantes)
+        # Timers de remoção de corpos MEUS (id(pokemon) -> segundos restantes)
         self._death_timers = {}
+
+        # Dados do mapa (dia/noite/clima-base) — preenchidos em _load_map
+        self._map_day_night = "day"
+        self._map_base_weather = "none"
 
         self._uuid_to_side = {}
         for u, info in self._all_teams.items():
@@ -248,8 +269,6 @@ class PvPBattleScene(BaseScene):
         from src.scenes.game_scene.components.managers.overlay_manager import OverlayManager
         from src.scenes.game_scene.components.managers.team_manager import GameTeamManager
         from src.scenes.game_scene.components.managers.move_quick_switch_manager import MoveQuickSwitchManager
-        from src.scenes.game_scene.components.managers.item_drag_manager import ItemDragManager
-        from src.scenes.game_scene.components.renderer.item_bag_renderer import ItemBagRenderer
         from src.battle.effects.specific.weather.weather_filter import WeatherFilter
         from src.battle.effects.specific.day_night.day_night_filter import DayNightFilter
         from src.scenes.game_scene.components.day_night_weather_system import DayNightWeatherSystem
@@ -278,6 +297,9 @@ class PvPBattleScene(BaseScene):
         self.day_night_weather = DayNightWeatherSystem(self)
         self.day_night_weather.initialize()
 
+        # ★ Aplica day/night vindo do mapa
+        self._apply_map_day_night()
+
         self.overlay_manager = OverlayManager(self)
         self.placement_manager = PlacementManager(self)
 
@@ -297,12 +319,8 @@ class PvPBattleScene(BaseScene):
 
         self.team_manager = GameTeamManager(self.game, self)
         self.move_quick_switch_manager = MoveQuickSwitchManager(self)
-        self.item_bag_renderer = ItemBagRenderer(self.game, self.player.bag)
-        self.item_drag_manager = ItemDragManager(self.game, self.player.bag)
-        try:
-            self.player.apply_bag_ui_config(self.item_bag_renderer)
-        except Exception:
-            pass
+
+        # ★ Bag removida no PvP — não é possível usar itens.
 
         all_p = (self._local_team_objs + self._ally_team_objs
                  + self._enemy_team_objs)
@@ -315,13 +333,19 @@ class PvPBattleScene(BaseScene):
             p._arena_no_return = True
             p._pvp_no_return = True
 
+        # ★ Host broadcast inicial do day/night
+        if self._network and self._network.is_host:
+            self._broadcast_day_night()
+
         print(f"[PVP] Iniciado {self.format_name} | "
               f"lado={self._my_team_side} | "
               f"time={len(self._local_team_objs)} | "
               f"spots_meus={len(self._my_spots)} | "
               f"aliados={len(self._ally_team_objs)} | "
               f"inimigos={len(self._enemy_team_objs)} | "
-              f"total_players={self._total_players}")
+              f"total_players={self._total_players} | "
+              f"dia={self._map_day_night} | "
+              f"clima_base={self._map_base_weather}")
 
     # ==================================================================
     def _load_map(self):
@@ -341,6 +365,63 @@ class PvPBattleScene(BaseScene):
         self.path_renderer.load_from_data(data.get("paths", {}))
         self.spot_renderer.load_from_data(data.get("tower_spots", {}))
         self._phase_data = data
+
+        # ★ Puxa as infos ambientais do mapa (dia/noite + clima base)
+        self._map_day_night = str(data.get("day_night_mode", "day") or "day")
+        self._map_base_weather = str(data.get("base_weather", "none") or "none")
+
+    # ==================================================================
+    # DAY/NIGHT (sincronização vinda do mapa)
+    # ==================================================================
+    def _apply_map_day_night(self):
+        """Aplica o modo dia/noite do mapa ao sistema local.
+
+        Como cada jogador carrega o mesmo mapa, isso garante consistência.
+        O host também faz broadcast explícito via PVP_DAY_NIGHT para evitar
+        qualquer divergência caso o sistema use aleatoriedade/tempo real.
+        """
+        mode = self._map_day_night
+        if not mode:
+            return
+        try:
+            state = getattr(self.day_night_weather, 'day_night_state', None)
+            if state is not None and hasattr(state, 'mode'):
+                state.mode = mode
+            elif hasattr(self.day_night_weather, 'set_mode'):
+                self.day_night_weather.set_mode(mode)
+            elif hasattr(self.day_night_weather, 'set_day_night_mode'):
+                self.day_night_weather.set_day_night_mode(mode)
+            print(f"[PVP] Day/night aplicado: {mode}")
+        except Exception as e:
+            print(f"[PVP] erro aplicar day/night: {e}")
+
+    def _broadcast_day_night(self):
+        if not self._network:
+            return
+        mode = self._map_day_night
+        if not mode:
+            return
+        try:
+            self._network.send_to_all(create_message("PVP_DAY_NIGHT", {
+                "mode": mode,
+                "base_weather": self._map_base_weather,
+            }))
+            print(f"[PVP] Day/night broadcast: {mode}")
+        except Exception as e:
+            print(f"[PVP] erro broadcast day/night: {e}")
+
+    def _apply_remote_day_night(self, payload):
+        mode = payload.get("mode")
+        if not mode:
+            return
+        if self._applying_remote_day_night:
+            return
+        self._applying_remote_day_night = True
+        try:
+            self._map_day_night = mode
+            self._apply_map_day_night()
+        finally:
+            self._applying_remote_day_night = False
 
     # ==================================================================
     def _setup_teams(self):
@@ -554,6 +635,12 @@ class PvPBattleScene(BaseScene):
             spot = placement_data['spot']
 
             if spot.occupied:
+                # ★ Durante batalha, permite substituir um pokémon (vivo ou
+                #   morto) do PRÓPRIO jogador no spot — este é o mecanismo
+                #   do PERDEDOR arrastar do HUD durante a janela de morte.
+                if (self.pvp_state == "battle"
+                        and self._try_replace_own_on_spot(pokemon, spot)):
+                    return
                 return
 
             # Durante placing: limite de spots_per_player
@@ -579,6 +666,10 @@ class PvPBattleScene(BaseScene):
                 if getattr(pokemon, '_pvp_owner_uuid', None) is None:
                     pokemon._pvp_owner_uuid = self._my_uuid
 
+                # Durante batalha, o novo pokémon já deve entrar atacando
+                if self.pvp_state == "battle":
+                    pokemon.combat_state = "attacking"
+
                 self._broadcast_placement(pokemon, spot, is_reserve=False)
 
                 if self.pvp_state == "placing":
@@ -601,6 +692,84 @@ class PvPBattleScene(BaseScene):
             pokemon.original_spot_y = cy
             to_spot.occupied = True
             self._broadcast_placement(pokemon, to_spot, is_reserve=False)
+
+    # ------------------------------------------------------------------
+    # SUBSTITUIÇÃO POR DRAG (PERDEDOR)
+    # ------------------------------------------------------------------
+    def _try_replace_own_on_spot(self, new_pk, spot):
+        """Tenta substituir um pokémon PRÓPRIO (vivo ou morto) posicionado
+        no spot pelo `new_pk` (vindo do HUD).
+
+        Esse é o mecanismo do PERDEDOR: durante a janela de morte (3s),
+        ele pode arrastar um pokémon novo para o spot do pokémon morto.
+
+        Retorna True se conseguiu.
+        """
+        ts = self.placement_manager.tile_size
+        stx = spot.x // ts
+        sty = spot.y // ts
+
+        existing = None
+        for p in self.placement_manager.placed_pokemon:
+            if getattr(p, '_pvp_owner_uuid', None) != self._my_uuid:
+                continue
+            if (getattr(p, 'placed_tile_x', None) == stx
+                    and getattr(p, 'placed_tile_y', None) == sty):
+                existing = p
+                break
+
+        if existing is None:
+            return False
+        if existing is new_pk:
+            return False
+
+        is_dead = (not existing.is_alive()
+                   or getattr(existing, 'is_defeated', False))
+
+        # Pokémon vivo: só permite se houver janela de morte ativa
+        # (troca defensiva). Pokémon morto: sempre permite durante a janela.
+        if not is_dead and not self._death_timers:
+            return False
+
+        self._replace_own_pokemon(existing, new_pk, spot)
+        return True
+
+    def _replace_own_pokemon(self, old_pk, new_pk, spot):
+        """Remove old_pk do campo (volta pro HUD) e posiciona new_pk no
+        mesmo spot. Faz broadcast do remove do antigo e do place do novo.
+        """
+        # Cancela timer de morte do antigo (se houver)
+        self._death_timers.pop(id(old_pk), None)
+
+        # Remove o antigo
+        if old_pk in self.placement_manager.placed_pokemon:
+            self.placement_manager.placed_pokemon.remove(old_pk)
+        old_pk.is_placed = False
+        old_pk.combat_state = "idle"
+        old_pk.placed_tile_x = None
+        old_pk.placed_tile_y = None
+
+        # Libera o spot para o add_pokemon
+        spot.occupied = False
+
+        # Avisa a rede que o antigo saiu
+        if self._network:
+            try:
+                self._network.send_to_all(create_message(
+                    "PVP_POKEMON_REMOVE", {
+                        "uuid": self._my_uuid,
+                        "unique_id": old_pk.unique_id,
+                    }))
+            except Exception as e:
+                print(f"[PVP] erro replace remove: {e}")
+
+        # Posiciona o novo
+        self._on_pokemon_placed({
+            'action': 'place',
+            'pokemon': new_pk,
+            'spot': spot,
+        })
+        print(f"[PVP] Substituição (drag): {old_pk.name} → {new_pk.name}")
 
     def _check_placing_complete(self):
         if self.pvp_state != "placing" or self._local_placement_ready:
@@ -649,6 +818,151 @@ class PvPBattleScene(BaseScene):
             print("[PVP] → countdown")
 
     # ==================================================================
+    # AUTO-PLACEMENT (timeout de 10s)
+    # ==================================================================
+    def _auto_place_pokemon(self):
+        """Posiciona automaticamente os primeiros pokémon disponíveis do
+        time quando o jogador não posiciona nada em PLACEMENT_TIME segundos.
+
+        Evita que um jogador fique de fora da batalha.
+        """
+        if self._local_placement_ready:
+            return
+
+        print(f"[PVP] Auto-placement: {self._placement_timer:.1f}s "
+              f"esgotado, posicionando automaticamente...")
+
+        placed_ids = {
+            p.unique_id for p in self.placement_manager.placed_pokemon
+            if getattr(p, '_pvp_owner_uuid', None) == self._my_uuid
+        }
+        available = [
+            p for p in self._local_team_objs if p.unique_id not in placed_ids
+        ]
+
+        for spot in self._my_spots:
+            if self._local_placement_ready:
+                break
+            if spot.occupied or not available:
+                continue
+            pk = available.pop(0)
+            self._on_pokemon_placed({
+                'action': 'place',
+                'pokemon': pk,
+                'spot': spot,
+            })
+
+        # Se ainda não marcou como pronto (ex: time vazio ou sem spots),
+        # força o "done" para não travar a partida.
+        if not self._local_placement_ready:
+            self._local_placement_ready = True
+            if self._network:
+                try:
+                    self._network.send_to_all(create_message("PVP_PLACEMENT", {
+                        "uuid": self._my_uuid,
+                        "action": "done",
+                    }))
+                except Exception as e:
+                    print(f"[PVP] erro auto-done: {e}")
+            if self._network and self._network.is_host:
+                self._check_all_ready()
+
+    # ==================================================================
+    # SWAP OVERLAY DO VENCEDOR
+    # ==================================================================
+    def _on_enemy_killed(self, enemy_pk):
+        """Chamado quando um pokémon INIMIGO morre na minha tela.
+
+        Sou o VENCEDOR dessa troca. Abro o overlay para eu poder trocar
+        um dos meus pokémon posicionados por um do HUD.
+        """
+        # Só uma vez por inimigo
+        if getattr(enemy_pk, '_winner_swap_offered', False):
+            return
+        enemy_pk._winner_swap_offered = True
+
+        # Sem empilhar overlays
+        if self._swap_overlay and self._swap_overlay.active:
+            return
+        if self.pvp_state != "battle":
+            return
+
+        # Preciso ter pokémon vivo posicionado
+        my_placed = [
+            p for p in self.placement_manager.placed_pokemon
+            if getattr(p, '_pvp_owner_uuid', None) == self._my_uuid
+            and p.is_alive()
+            and not getattr(p, 'is_defeated', False)
+        ]
+        if not my_placed:
+            return
+
+        # Preciso ter pokémon vivo no banco (fora do campo)
+        my_benched = [
+            p for p in self._local_team_objs
+            if not getattr(p, 'is_placed', False)
+            and p.is_alive()
+            and not getattr(p, 'is_defeated', False)
+        ]
+        if not my_benched:
+            return
+
+        # Escolhe o pokémon posicionado mais próximo do inimigo morto
+        # (provavelmente foi quem lutou)
+        my_placed.sort(
+            key=lambda p: (p.x - enemy_pk.x) ** 2 + (p.y - enemy_pk.y) ** 2
+        )
+        placed_to_swap = my_placed[0]
+
+        from src.scenes.pvp_scene.pvp_swap_overlay import SwapSelectionOverlay
+        self._swap_overlay = SwapSelectionOverlay(
+            self, placed_to_swap, my_benched,
+            on_choice=lambda chosen: self._on_winner_swap_choice(
+                placed_to_swap, chosen),
+            subtitle=(f"Você derrotou {enemy_pk.name}! "
+                      f"Trocar {placed_to_swap.name}?"),
+        )
+        print(f"[PVP] Overlay do vencedor: pode trocar "
+              f"{placed_to_swap.name} ({len(my_benched)} no banco)")
+
+    def _on_winner_swap_choice(self, placed_pk, chosen):
+        """Callback do overlay do vencedor."""
+        self._swap_overlay = None
+
+        if chosen is None:
+            print(f"[PVP] Vencedor optou por não trocar {placed_pk.name}")
+            return
+
+        # Localiza o spot do pokémon posicionado
+        ts = self.placement_manager.tile_size
+        ptx = getattr(placed_pk, 'placed_tile_x', None)
+        pty = getattr(placed_pk, 'placed_tile_y', None)
+
+        target_spot = None
+        for spot in self._my_spots:
+            stx = spot.x // ts
+            sty = spot.y // ts
+            if stx == ptx and sty == pty:
+                target_spot = spot
+                break
+
+        if target_spot is None:
+            for spot in self._my_spots:
+                cx = (spot.x // ts) * ts + ts // 2
+                cy = (spot.y // ts) * ts + ts // 2
+                if abs(placed_pk.x - cx) < 5 and abs(placed_pk.y - cy) < 5:
+                    target_spot = spot
+                    break
+
+        if target_spot is None:
+            print(f"[PVP] Spot não encontrado para {placed_pk.name}")
+            return
+
+        self._replace_own_pokemon(placed_pk, chosen, target_spot)
+        chosen.combat_state = "attacking"
+        print(f"[PVP] Vencedor trocou: {placed_pk.name} → {chosen.name}")
+
+    # ==================================================================
     # UPDATE
     # ==================================================================
     def fixed_update(self, dt):
@@ -660,6 +974,8 @@ class PvPBattleScene(BaseScene):
             return
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.update(dt)
+        if self._swap_overlay and self._swap_overlay.active:
+            self._swap_overlay.update(dt)
 
         if self.overlay_manager.is_active:
             self.overlay_manager.update(dt)
@@ -672,8 +988,6 @@ class PvPBattleScene(BaseScene):
         if hasattr(self, 'day_night_weather'):
             self.day_night_weather.update(dt)
 
-        if self.item_bag_renderer:
-            self.item_bag_renderer.update(dt)
         if self.team_manager:
             self.team_manager.update(dt)
         if self.move_quick_switch_manager:
@@ -702,6 +1016,15 @@ class PvPBattleScene(BaseScene):
         for e in self.wave_manager.active_enemies:
             e.update(dt)
 
+        if self._local_placement_ready:
+            return
+
+        # ★ Contador regressivo de placement (10s)
+        self._placement_timer -= dt
+        if self._placement_timer <= 0:
+            self._placement_timer = 0.0
+            self._auto_place_pokemon()
+
     def _update_countdown(self, dt):
         for p in self.placement_manager.placed_pokemon:
             p.update(dt)
@@ -720,12 +1043,16 @@ class PvPBattleScene(BaseScene):
                 p.combat_state = "attacking"
         print("[PVP] Batalha iniciada!")
 
+        # ★ Garante que todos os clientes estejam com o mesmo dia/noite
+        if self._network and self._network.is_host:
+            self._broadcast_day_night()
+
     def _update_battle(self, dt):
         self._battle_elapsed += dt
         self.wave_manager.update(dt)
         self.placement_manager.update(dt, self.wave_manager.active_enemies)
 
-        # Gerencia corpos (dead bodies → 2s → remove)
+        # Gerencia corpos MEUS (dead bodies → 3s → remove)
         self._check_dead_pokemon()
         self._update_death_timers(dt)
 
@@ -733,10 +1060,15 @@ class PvPBattleScene(BaseScene):
             self._check_battle_end()
 
     # ==================================================================
-    # CORPOS (DEAD BODIES)
+    # CORPOS (DEAD BODIES) — apenas do PERDEDOR local
     # ==================================================================
     def _check_dead_pokemon(self):
-        """Detecta pokémon MEUS que morreram e inicia timer de remoção."""
+        """Detecta pokémon MEUS que morreram e inicia timer de remoção.
+
+        O PERDEDOR (eu) continua com o mecanismo de arrastar do HUD
+        durante os 3s do corpo no campo. NENHUM overlay é aberto aqui —
+        o overlay é do VENCEDOR e é disparado quando um INIMIGO morre.
+        """
         for p in self.placement_manager.placed_pokemon:
             if getattr(p, '_pvp_owner_uuid', None) != self._my_uuid:
                 continue
@@ -769,7 +1101,6 @@ class PvPBattleScene(BaseScene):
         for pid in to_remove:
             del self._death_timers[pid]
 
-            # Encontra o corpo
             pk = None
             for p in self.placement_manager.placed_pokemon:
                 if id(p) == pid:
@@ -828,7 +1159,8 @@ class PvPBattleScene(BaseScene):
         print(f"[PVP] {pokemon.name} removido do campo{spot_info}")
 
     def _apply_remote_remove(self, payload):
-        """Remove um pokémon remoto do campo (corpo expirado no lado do dono)."""
+        """Remove um pokémon remoto do campo (corpo expirado no lado do dono
+        ou pokémon trocado durante a janela de morte)."""
         if payload.get("uuid") == self._my_uuid:
             return
 
@@ -969,10 +1301,17 @@ class PvPBattleScene(BaseScene):
             if not pk:
                 continue
 
+            # ★ Detecta morte de pokémon INIMIGO (sou o VENCEDOR)
+            old_hp = pk.current_hp
+            was_alive = old_hp > 0 and not getattr(pk, 'is_defeated', False)
+
             pk._target_x = float(state.get("x", pk.x))
             pk._target_y = float(state.get("y", pk.y))
             pk.current_hp = state.get("current_hp", pk.current_hp)
             pk.max_hp = state.get("max_hp", pk.max_hp)
+
+            now_dead = (pk.current_hp <= 0
+                        or state.get("is_defeated", False))
 
             if state.get("is_defeated"):
                 if not getattr(pk, 'is_defeated', False):
@@ -982,6 +1321,12 @@ class PvPBattleScene(BaseScene):
                         pk.is_defeated = True
             else:
                 pk.is_defeated = False
+
+            # ★ Dispara overlay do VENCEDOR quando um inimigo morre
+            if (was_alive and now_dead
+                    and not getattr(pk, '_is_ally_remote', False)
+                    and getattr(pk, 'is_placed', False)):
+                self._on_enemy_killed(pk)
 
             if not getattr(pk, '_attack_animation_active', False):
                 anim = state.get("current_animation")
@@ -1067,6 +1412,9 @@ class PvPBattleScene(BaseScene):
 
         elif t == "PVP_WEATHER_CHANGE":
             self._apply_remote_weather(p)
+
+        elif t == "PVP_DAY_NIGHT":
+            self._apply_remote_day_night(p)
 
         elif t == "PVP_POKEMON_STATE":
             self._apply_remote_pokemon_state(p)
@@ -1184,6 +1532,12 @@ class PvPBattleScene(BaseScene):
                 return None
             return None
 
+        # ★ Overlay do vencedor (troca) tem prioridade sobre o resto
+        if self._swap_overlay and self._swap_overlay.active:
+            if self._swap_overlay.handle_event(event):
+                return None
+            return None
+
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.handle_event(event)
             return None
@@ -1201,34 +1555,9 @@ class PvPBattleScene(BaseScene):
             if event.key in (pygame.K_ESCAPE, pygame.K_p):
                 self.toggle_pause()
                 return None
-            if event.key == pygame.K_TAB:
-                if hasattr(self.player, 'bag'):
-                    self.player.bag.cycle_category()
-                return None
 
         if self.move_quick_switch_manager.handle_event(
                 event, self.camera, self.screen_manager):
-            return None
-
-        if self.item_drag_manager.is_dragging:
-            if event.type == pygame.MOUSEMOTION:
-                wp = self.screen_manager.get_mouse_world_position(
-                    event.pos, self.camera)
-                if wp:
-                    self.item_drag_manager.update_drag(
-                        event.pos, wp,
-                        self.placement_manager.placed_pokemon,
-                        self.wave_manager.active_enemies,
-                        self.camera)
-                return None
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                self.item_drag_manager.stop_drag(self._on_item_use)
-                return None
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                self.item_drag_manager.cancel_drag()
-                return None
-
-        if self.item_bag_renderer and self.item_bag_renderer.handle_event(event):
             return None
 
         if self.team_manager:
@@ -1245,8 +1574,7 @@ class PvPBattleScene(BaseScene):
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mp = pygame.mouse.get_pos()
-            if (not self.item_drag_manager.is_dragging
-                    and not self.team_manager.is_dragging()):
+            if not self.team_manager.is_dragging():
                 if self.screen_manager.is_mouse_in_viewport(mp):
                     wp = self.screen_manager.get_mouse_world_position(
                         mp, self.camera)
@@ -1263,9 +1591,6 @@ class PvPBattleScene(BaseScene):
         if event.type == pygame.MOUSEWHEEL:
             mp = pygame.mouse.get_pos()
             if self.screen_manager.is_mouse_in_viewport(mp):
-                if (self.item_bag_renderer
-                        and getattr(self.item_bag_renderer, 'mouse_over_ui', False)):
-                    return None
                 self.camera.handle_zoom(event.y > 0)
                 return None
 
@@ -1308,9 +1633,6 @@ class PvPBattleScene(BaseScene):
                 self.camera._clamp_position()
                 self.last_mouse_pos = event.pos
                 return None
-        return None
-
-    def _on_item_use(self, *args, **kwargs):
         return None
 
     def toggle_pause(self):
@@ -1440,10 +1762,6 @@ class PvPBattleScene(BaseScene):
             if self.team_manager:
                 self.team_manager.render(
                     screen, self.camera, self.spot_renderer.get_spots())
-            if self.item_drag_manager and self.item_drag_manager.is_dragging:
-                self.item_drag_manager.render(screen, self.camera)
-            if self.item_bag_renderer:
-                self.item_bag_renderer.render(screen)
             if self.move_quick_switch_manager:
                 self.move_quick_switch_manager.render(
                     screen, self.camera, self.screen_manager)
@@ -1453,13 +1771,18 @@ class PvPBattleScene(BaseScene):
         elif self.pvp_state == "countdown":
             self._render_countdown(screen)
 
+        # ★ Death hint (perdedor) só aparece sem overlay do vencedor ativo
         if self.pvp_state == "battle":
-            self._render_death_hint(screen)
+            if not (self._swap_overlay and self._swap_overlay.active):
+                self._render_death_hint(screen)
 
         if self.overlay_manager.is_active:
             self.overlay_manager.render(screen)
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.render(screen)
+        # ★ Overlay do vencedor acima de tudo, antes do resultado
+        if self._swap_overlay and self._swap_overlay.active:
+            self._swap_overlay.render(screen)
         if self._pvp_overlay and self._pvp_overlay.active:
             self._pvp_overlay.render(screen)
 
@@ -1474,15 +1797,26 @@ class PvPBattleScene(BaseScene):
         required = self.spots_per_player
 
         font = pygame.font.Font(None, 28)
-        text = f"Posicione seus Pokémon: {placed}/{required}"
-        hint = font.render(text, True, (255, 215, 0))
+        timer_left = max(0, int(math.ceil(self._placement_timer)))
+        if not self._local_placement_ready:
+            text = (f"Posicione seus Pokémon: {placed}/{required}  ·  "
+                    f"{timer_left}s")
+        else:
+            text = f"Posicione seus Pokémon: {placed}/{required}"
+
+        if not self._local_placement_ready and timer_left <= 3:
+            text_color = (255, 90, 90)
+        else:
+            text_color = (255, 215, 0)
+
+        hint = font.render(text, True, text_color)
         shadow = font.render(text, True, (0, 0, 0))
         panel_w = max(hint.get_width() + 40, 520)
         panel = pygame.Rect(vx + (vw - panel_w) // 2, vy + 20, panel_w, 70)
         bg = pygame.Surface((panel_w, 70), pygame.SRCALPHA)
         bg.fill((0, 0, 0, 190))
         screen.blit(bg, panel)
-        pygame.draw.rect(screen, (255, 215, 0), panel, 2, border_radius=10)
+        pygame.draw.rect(screen, text_color, panel, 2, border_radius=10)
         screen.blit(shadow, (panel.centerx - hint.get_width() // 2 + 2,
                              panel.y + 12))
         screen.blit(hint, (panel.centerx - hint.get_width() // 2, panel.y + 10))
@@ -1496,11 +1830,11 @@ class PvPBattleScene(BaseScene):
                              panel.y + 42))
 
     def _render_death_hint(self, screen):
-        """Avisa o jogador quando tem um corpo no campo."""
+        """Avisa o PERDEDOR (eu) que posso arrastar um pokémon novo do HUD
+        para o spot do pokémon morto durante a janela de 3s."""
         if not self._death_timers:
             return
 
-        # Mostra o menor timer restante
         min_timer = min(self._death_timers.values())
 
         sm = self.screen_manager
@@ -1508,11 +1842,12 @@ class PvPBattleScene(BaseScene):
         vw = sm.viewport_width
 
         font = pygame.font.Font(None, 26)
-        text = f"Seu pokémon caiu! Próximo em {min_timer:.1f}s..."
+        text = (f"Seu pokémon caiu! Arraste um novo do HUD "
+                f"({min_timer:.1f}s)")
         hint = font.render(text, True, (255, 100, 100))
         shadow = font.render(text, True, (0, 0, 0))
 
-        panel_w = max(hint.get_width() + 40, 520)
+        panel_w = max(hint.get_width() + 40, 640)
         panel = pygame.Rect(vx + (vw - panel_w) // 2, vy + 20, panel_w, 42)
         bg = pygame.Surface((panel_w, 42), pygame.SRCALPHA)
         bg.fill((40, 0, 0, 200))

@@ -27,6 +27,8 @@ class ItemDragManager:
         self.trail_positions = []
         self.trail_max_length = 8
 
+        self._preview_is_open = False
+
         # Alvo sob o mouse
         self.hovered_target = None
         self.target_type = None
@@ -76,6 +78,30 @@ class ItemDragManager:
     def _create_preview(self, item_id):
         """Cria a superfície de preview do item"""
         sprite = self.catalog.get_sprite(item_id, scaled=True)
+        if sprite:
+            self.preview_surface = pygame.transform.scale(sprite, (48, 48))
+            self._add_glow_effect()
+        # Sempre começa fechada
+        self._preview_is_open = False
+
+    def _set_pokeball_open_preview(self, is_open):
+        """
+        Troca o preview da pokébola entre FECHADA  e ABERTA e Só tem efeito se o item arrastado for uma pokébola.
+        """
+        if not self.drag_item_data or self.drag_item_data["category"] != "pokeball":
+            return
+
+        if is_open:
+            open_sprite = self.catalog.get_open_sprite(
+                self.drag_item_id, size=(48, 96)
+            )
+            if open_sprite:
+                self.preview_surface = open_sprite.copy()
+                self._add_glow_effect()
+                return
+
+        # Fallback / fechado: sprite normal
+        sprite = self.catalog.get_sprite(self.drag_item_id, scaled=True)
         if sprite:
             self.preview_surface = pygame.transform.scale(sprite, (48, 48))
             self._add_glow_effect()
@@ -144,6 +170,12 @@ class ItemDragManager:
         # ===== VERIFICA ALVOS =====
         if self.drag_item_data["category"] == "pokeball":
             self._check_pokeball_target(enemy_pokemon, screen_pos, camera)
+
+            # ===== Sprite aberto quando o alvo é uma pokébola válida =====
+            should_be_open = (self.valid_target and self.target_type == "enemy")
+            if should_be_open != self._preview_is_open:
+                self._preview_is_open = should_be_open
+                self._set_pokeball_open_preview(should_be_open)
 
         elif self.drag_item_data["category"] == "medicine":
             self._check_medicine_target(allied_pokemon, screen_pos, camera)
@@ -390,6 +422,8 @@ class ItemDragManager:
         self.error_message_timer = 0
         self.error_message_target = None
 
+        self._preview_is_open = False
+
         # Restaura cursor
         pygame.mouse.set_cursor(self.normal_cursor)
         self.game.player.auto_save()
@@ -409,6 +443,7 @@ class ItemDragManager:
         self.error_message = None
         self.error_message_timer = 0
         self.error_message_target = None
+        self._preview_is_open = False
         pygame.mouse.set_cursor(self.normal_cursor)
 
     def render(self, screen, camera):

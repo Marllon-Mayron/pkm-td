@@ -1,5 +1,5 @@
 # src/scenes/game_scene/components/managers/placement_manager.py
-import pygame, random
+import pygame, random, math
 
 from src.ui.toast_renderer import toast_warning
 
@@ -13,6 +13,9 @@ class PlacementManager:
         self.tile_size = 24
         # ===== NOVO: flag de celebração de vitória =====
         self._victory_celebration_active = False
+
+        # ===== NOVO: Ghosts de teleporte (efeito visual) =====
+        self.teleport_ghosts = []  # Lista de dicts com os ghosts ativos
 
     def _check_combination_evolution_on_placement(self, pokemon, spot):
         """
@@ -60,6 +63,155 @@ class PlacementManager:
                     return False
 
         return False
+
+    # =========================================================
+    # NOVO: EFEITO VISUAL DE TELEPORTE (GHOSTS)
+    # =========================================================
+    def spawn_teleport_ghost(self, pokemon):
+        """
+        Cria DOIS ghosts visuais quando o Pokémon teleporta:
+        - Um na ORIGEM (onde ele estava) → fade out simulando "saída"
+        - Um no DESTINO (spot original) → fade in simulando "materialização"
+
+        O efeito dura ~0.5s. Não interfere em nada no gameplay.
+        """
+        # Pega o sprite atual do Pokémon (na direção/animação em que está)
+        sprite = None
+        if hasattr(pokemon, 'sprite') and pokemon.sprite:
+            sprite = pokemon.sprite
+        elif hasattr(pokemon, 'inmap_frames') and pokemon.inmap_frames:
+            # Fallback: pega a primeira frame da direção atual
+            direction = getattr(pokemon, 'current_direction', 'down')
+            frames = pokemon.inmap_frames.get(direction)
+            if frames:
+                sprite = frames[0]
+
+        if not sprite:
+            return  # Sem sprite disponível, não cria ghost
+
+        # ===== GHOST DA ORIGEM (onde ele estava) =====
+        origin_ghost = {
+            'x': pokemon.x,
+            'y': pokemon.y,
+            'sprite': sprite.copy(),
+            'alpha': 200,
+            'life': 0.45,
+            'max_life': 0.45,
+            'scale_start': 1.0,
+            'scale_end': 1.25,   # cresce um pouco enquanto desaparece
+            'current_scale': 1.0,
+            'is_destination': False,
+        }
+        self.teleport_ghosts.append(origin_ghost)
+
+        # ===== GHOST DO DESTINO (spot) =====
+        dest_x = getattr(pokemon, 'original_spot_x', pokemon.x)
+        dest_y = getattr(pokemon, 'original_spot_y', pokemon.y)
+
+        dest_ghost = {
+            'x': dest_x,
+            'y': dest_y,
+            'sprite': sprite.copy(),
+            'alpha': 0,
+            'life': 0.5,
+            'max_life': 0.5,
+            'scale_start': 0.7,  # começa pequeno
+            'scale_end': 1.0,    # cresce até o tamanho normal
+            'current_scale': 0.7,
+            'is_destination': True,
+        }
+        self.teleport_ghosts.append(dest_ghost)
+
+        print(f"[TELEPORT_GHOST] Ghosts criados para {pokemon.name}")
+
+    def update_ghosts(self, dt):
+        """Atualiza os ghosts de teleporte (fade in/out + escala)."""
+        for ghost in self.teleport_ghosts[:]:
+            ghost['life'] -= dt
+
+            if ghost['life'] <= 0:
+                self.teleport_ghosts.remove(ghost)
+                continue
+
+            # progress: 1.0 (recém-criado) → 0.0 (expirando)
+            progress = ghost['life'] / ghost['max_life']
+
+            # Escala interpolada
+            scale_range = ghost['scale_end'] - ghost['scale_start']
+            ghost['current_scale'] = ghost['scale_end'] - scale_range * progress
+
+            # ===== ALPHA =====
+            if ghost['is_destination']:
+                # Destino: FADE IN (0 → 220) e depois FADE OUT
+                # Nos primeiros 30% da vida: fade in
+                # Depois: fade out
+                if progress > 0.7:
+                    # Ainda subindo (fase de materialização)
+                    t = (1.0 - progress) / 0.3  # 0 -> 1
+                    ghost['alpha'] = int(220 * t)
+                else:
+                    # Fade out
+                    t = progress / 0.7  # 1 -> 0
+                    ghost['alpha'] = int(220 * t)
+            else:
+                # Origem: só fade out
+                ghost['alpha'] = int(200 * progress)
+
+    def render_ghosts(self, screen, camera):
+        """Renderiza os ghosts de teleporte (chamado ANTES dos Pokémons)."""
+        if not self.teleport_ghosts:
+            return
+
+        # Obtém screen_manager para conversão de coordenadas
+        sm = getattr(self.game, 'screen_manager', None)
+
+        for ghost in self.teleport_ghosts:
+            sprite = ghost['sprite']
+            if not sprite:
+                continue
+
+            # ===== CONVERTE PARA COORDENADAS DE TELA =====
+            if camera and sm:
+                screen_x, screen_y = sm.world_to_screen(ghost['x'], ghost['y'], camera)
+                zoom_scale = camera.zoom * sm.render_scale
+            else:
+                screen_x, screen_y = ghost['x'], ghost['y']
+                zoom_scale = 1.0
+
+            # ===== APLICA ESCALA =====
+            scale = ghost.get('current_scale', 1.0)
+            w = max(1, int(sprite.get_width() * zoom_scale * scale))
+            h = max(1, int(sprite.get_height() * zoom_scale * scale))
+
+            if w <= 0 or h <= 0:
+                continue
+
+            scaled = pygame.transform.scale(sprite, (w, h))
+
+            # ===== TINT AZUL (fica "fantasmagórico") =====
+            # Cria uma cópia colorida por cima com blend aditivo suave
+            tinted = scaled.copy()
+            tint_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+            # Cor azul-clara (ciano) com alpha baixo
+            if ghost['is_destination']:
+                tint_color = (120, 200, 255, 70)  # ciano claro
+            else:
+                tint_color = (180, 140, 255, 60)  # lilás (saída)
+            tint_surface.fill(tint_color)
+            tinted.blit(tint_surface, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+
+            # ===== APLICA ALPHA =====
+            alpha = max(0, min(255, ghost['alpha']))
+            tinted.set_alpha(alpha)
+
+            # ===== DESENHA =====
+            rect = tinted.get_rect()
+            rect.center = (int(screen_x), int(screen_y))
+            screen.blit(tinted, rect)
+
+    # =========================================================
+    # FIM NOVO
+    # =========================================================
 
     def add_pokemon(self, spot, pokemon):
         """Adiciona um Pokémon no spot"""
@@ -283,6 +435,9 @@ class PlacementManager:
 
     def update(self, dt, enemies):
         """Atualiza todos os Pokémon colocados"""
+        # ===== NOVO: Atualiza ghosts de teleporte (sempre, em qualquer modo) =====
+        self.update_ghosts(dt)
+
         # ===== MODO CELEBRAÇÃO: Pokémon terminam ações pendentes mas não engajam novas =====
         if self._victory_celebration_active:
             for pokemon in self.placed_pokemon:
@@ -372,6 +527,9 @@ class PlacementManager:
 
         self.placed_pokemon.clear()
 
+        # ===== NOVO: Limpa ghosts de teleporte pendentes =====
+        self.teleport_ghosts.clear()
+
     def render_hp(self, screen, camera):
         """Renderiza as barras de HP de todos os Pokémon colocados"""
         for pokemon in self.placed_pokemon:
@@ -399,7 +557,94 @@ class PlacementManager:
                     # Renderiza a barra de HP
                     pokemon._render_hp_bar(screen, sprite_rect, zoom_scale)
 
+    def render_astral_bodies(self, screen, camera):
+        """
+        Desenha um 'corpo astral' (ghost fixo) no spot de cada Pokémon
+        que saiu para atacar/andar.
+
+        Simboliza que o corpo físico ficou no spot enquanto a 'alma' viaja.
+        Some automaticamente quando o Pokémon retorna ao spot (teleporte).
+        """
+        if not self.placed_pokemon:
+            return
+
+        sm = getattr(self.game, 'screen_manager', None)
+        if sm is None:
+            return
+
+        # ===== PULSAÇÃO GLOBAL (respiração etérea) =====
+        # Frequência baixa (~0.3 Hz) para parecer "respirando" lentamente
+        t = pygame.time.get_ticks() / 1000.0
+        pulse = 0.5 + 0.5 * math.sin(t * 2.0)  # 0..1
+
+        for pokemon in self.placed_pokemon:
+            # Pula mortos / derrotados
+            if not pokemon.is_alive() or pokemon.is_defeated:
+                continue
+
+            # Pula se não tem spot original
+            spot_x = getattr(pokemon, 'original_spot_x', None)
+            spot_y = getattr(pokemon, 'original_spot_y', None)
+            if spot_x is None or spot_y is None:
+                continue
+
+            # ===== SÓ DESENHA SE ESTIVER FORA DO SPOT =====
+            dx = pokemon.x - spot_x
+            dy = pokemon.y - spot_y
+            dist_sq = dx * dx + dy * dy
+            if dist_sq < 25:  # ~5px de tolerância — está no spot, não desenha
+                continue
+
+            # ===== PEGA O SPRITE ATUAL =====
+            sprite = None
+            if hasattr(pokemon, 'sprite') and pokemon.sprite:
+                sprite = pokemon.sprite
+            elif hasattr(pokemon, 'inmap_frames') and pokemon.inmap_frames:
+                direction = getattr(pokemon, 'current_direction', 'down')
+                frames = pokemon.inmap_frames.get(direction)
+                if frames:
+                    sprite = frames[0]
+
+            if not sprite:
+                continue
+
+            # ===== CONVERSÃO PARA COORDENADAS DE TELA =====
+            screen_x, screen_y = sm.world_to_screen(spot_x, spot_y, camera)
+            zoom_scale = camera.zoom * sm.render_scale
+
+            w = max(1, int(sprite.get_width() * zoom_scale))
+            h = max(1, int(sprite.get_height() * zoom_scale))
+
+            if w <= 0 or h <= 0:
+                continue
+
+            scaled = pygame.transform.scale(sprite, (w, h))
+
+            # ===== TINT AZUL-ETÉREO =====
+            # Blend aditivo suave com azul claro (dá ar de "alma/corpo astral")
+            tinted = scaled.copy()
+            tint_surface = pygame.Surface((w, h), pygame.SRCALPHA)
+            tint_surface.fill((90, 150, 230, 100))
+            tinted.blit(tint_surface, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
+
+            # ===== ALPHA PULSANTE =====
+            # Base 70 + oscilação até 130 → fica "respirando" sem piscar demais
+            alpha = int(70 + 60 * pulse)
+            tinted.set_alpha(alpha)
+
+            # ===== DESENHA =====
+            rect = tinted.get_rect()
+            rect.center = (int(screen_x), int(screen_y))
+            screen.blit(tinted, rect)
+
     def render(self, screen, camera, screen_manager):
         """Renderiza todos os Pokémon colocados"""
+        # 1. Ghosts de teleporte (efeito pontual de fade — 0.5s)
+        self.render_ghosts(screen, camera)
+
+        # 2. Corpos astrais (ghost fixo no spot enquanto o Pokémon está fora)
+        self.render_astral_bodies(screen, camera)
+
+        # 3. Pokémons reais (por cima de tudo)
         for pokemon in self.placed_pokemon:
             pokemon.render(screen, camera, show_hp=False)
