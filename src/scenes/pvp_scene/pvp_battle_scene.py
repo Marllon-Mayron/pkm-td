@@ -263,6 +263,9 @@ class PvPBattleScene(BaseScene):
         self._map_day_night = "day"
         self._map_base_weather = "none"
 
+        self.day_night_mode = "day"
+        self.base_weather = "none"
+
         self._uuid_to_side = {}
         for u, info in self._all_teams.items():
             self._uuid_to_side[u] = info.get("team_side", "a")
@@ -300,11 +303,10 @@ class PvPBattleScene(BaseScene):
         self.battle_system = BattleSystem(self)
         self.effect_manager = self.battle_system.effect_manager
 
+        # ★ O DayNightWeatherSystem já vai ler self.day_night_mode e
+        #   self.base_weather (setados em _load_map) no initialize().
         self.day_night_weather = DayNightWeatherSystem(self)
         self.day_night_weather.initialize()
-
-        # ★ Aplica day/night vindo do mapa
-        self._apply_map_day_night()
 
         self.overlay_manager = OverlayManager(self)
         self.placement_manager = PlacementManager(self)
@@ -372,32 +374,44 @@ class PvPBattleScene(BaseScene):
         self.spot_renderer.load_from_data(data.get("tower_spots", {}))
         self._phase_data = data
 
-        # ★ Puxa as infos ambientais do mapa (dia/noite + clima base)
+        # ★ Guarda com os nomes internos (usado pelo broadcast)
         self._map_day_night = str(data.get("day_night_mode", "day") or "day")
         self._map_base_weather = str(data.get("base_weather", "none") or "none")
+
+        self.day_night_mode = self._map_day_night
+        self.base_weather = self._map_base_weather
+        print(f"[PVP] Mapa define dia/noite='{self.day_night_mode}' "
+              f"clima='{self.base_weather}'")
 
     # ==================================================================
     # DAY/NIGHT (sincronização vinda do mapa)
     # ==================================================================
     def _apply_map_day_night(self):
-        """Aplica o modo dia/noite do mapa ao sistema local.
-
-        Como cada jogador carrega o mesmo mapa, isso garante consistência.
-        O host também faz broadcast explícito via PVP_DAY_NIGHT para evitar
-        qualquer divergência caso o sistema use aleatoriedade/tempo real.
+        """Aplica o modo dia/noite + clima-base do mapa ao sistema local.
         """
         mode = self._map_day_night
         if not mode:
             return
+
+        new_weather = self._map_base_weather or "none"
+
+        # Já está no estado certo? Nada a fazer.
+        already_correct = (
+            getattr(self, 'day_night_mode', None) == mode
+            and getattr(self, 'base_weather', None) == new_weather
+            and getattr(self.day_night_weather, '_initialized', False)
+        )
+        if already_correct:
+            return
+
+        self.day_night_mode = mode
+        self.base_weather = new_weather
+
         try:
-            state = getattr(self.day_night_weather, 'day_night_state', None)
-            if state is not None and hasattr(state, 'mode'):
-                state.mode = mode
-            elif hasattr(self.day_night_weather, 'set_mode'):
-                self.day_night_weather.set_mode(mode)
-            elif hasattr(self.day_night_weather, 'set_day_night_mode'):
-                self.day_night_weather.set_day_night_mode(mode)
-            print(f"[PVP] Day/night aplicado: {mode}")
+            self.day_night_weather._initialized = False
+            self.day_night_weather.initialize()
+            print(f"[PVP] Day/night aplicado: {mode} | "
+                  f"clima base: {new_weather}")
         except Exception as e:
             print(f"[PVP] erro aplicar day/night: {e}")
 
@@ -412,7 +426,8 @@ class PvPBattleScene(BaseScene):
                 "mode": mode,
                 "base_weather": self._map_base_weather,
             }))
-            print(f"[PVP] Day/night broadcast: {mode}")
+            print(f"[PVP] Day/night broadcast: {mode} | "
+                  f"clima={self._map_base_weather}")
         except Exception as e:
             print(f"[PVP] erro broadcast day/night: {e}")
 
@@ -425,6 +440,8 @@ class PvPBattleScene(BaseScene):
         self._applying_remote_day_night = True
         try:
             self._map_day_night = mode
+            self._map_base_weather = payload.get(
+                "base_weather", self._map_base_weather)
             self._apply_map_day_night()
         finally:
             self._applying_remote_day_night = False

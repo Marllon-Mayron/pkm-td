@@ -5,7 +5,7 @@ import math
 import random
 import unicodedata
 
-from data.item_bag_catalog import item_bag_catalog
+from src.data.item_bag_catalog import item_bag_catalog
 from src.scenes.team_select_scene.components.held_item_dropdown import HeldItemDropdown
 from src.data.pokedex import Pokedex
 from src.battle.effects.effect_factory import EffectFactory
@@ -200,6 +200,12 @@ class PokemonModal:
         self._mouse_virtual = None
         self._active_help = None
         self._help_zones = []
+
+        # ===== SCROLLBAR DRAG =====
+        self._scrollbar_dragging = False
+        self._scrollbar_drag_offset = 0.0
+        self._scrollbar_thumb_rect = None
+        self._scrollbar_track_rect = None
 
         self._summary_cache = None
         self._summary_signature = None
@@ -403,14 +409,18 @@ class PokemonModal:
         self.prev_page_button = pygame.Rect(0, 0, 1, 1)
         self.next_page_button = pygame.Rect(0, 0, 1, 1)
 
+        # ===== SCROLLBAR: 16px de largura + 12px de respiro =====
+        SCROLLBAR_W = 16
+        SCROLLBAR_GAP = 12
         content_top = tabs_rect.bottom + int(self.height * 0.012)
         content_bottom = footer_y - int(self.height * 0.012)
         content = pygame.Rect(
             self.rect.x + pad, content_top,
-            self.rect.width - pad * 2 - 14,
+            self.rect.width - pad * 2 - SCROLLBAR_W - SCROLLBAR_GAP,
             content_bottom - content_top)
         self.layout['content'] = content
-        self.layout['scrollbar_x'] = content.right + 6
+        self.layout['scrollbar_x'] = content.right + SCROLLBAR_GAP
+        self.layout['scrollbar_w'] = SCROLLBAR_W
 
         cw = max(110, int(self.width * 0.11))
         ch = max(36, int(self.height * 0.052))
@@ -1112,6 +1122,55 @@ class PokemonModal:
     # =================================================================
     # EVENTOS
     # =================================================================
+    # =================================================================
+    # SCROLLBAR DRAG
+    # =================================================================
+    def _handle_scrollbar_mousedown(self, event):
+        """Inicia o drag do scrollbar. Retorna True se consumiu o evento."""
+        if self.max_scroll <= 0:
+            return False
+
+        # ----- 1) Clique no THUMB → arrasta direto -----
+        if self._scrollbar_thumb_rect:
+            thumb_hit = self._scrollbar_thumb_rect.inflate(20, 8)
+            if thumb_hit.collidepoint(event.pos):
+                self._scrollbar_dragging = True
+                self._scrollbar_drag_offset = (
+                    event.pos[1] - self._scrollbar_thumb_rect.y)
+                return True
+
+        # ----- 2) Clique na TRILHA → pula para a posição e inicia drag -----
+        if self._scrollbar_track_rect:
+            track_hit = self._scrollbar_track_rect.inflate(20, 4)
+            if track_hit.collidepoint(event.pos):
+                cr = self.layout['content']
+                thumb_h = (self._scrollbar_thumb_rect.height
+                           if self._scrollbar_thumb_rect else 56)
+                thumb_h = max(36, min(cr.height, thumb_h))
+
+                # Centraliza o thumb no ponto clicado
+                self._scrollbar_drag_offset = thumb_h / 2.0
+                self._update_scrollbar_drag(event.pos[1])
+
+                self._scrollbar_dragging = True
+                return True
+
+        return False
+
+    def _update_scrollbar_drag(self, mouse_y):
+        """Atualiza scroll_y com base na posição vertical do mouse."""
+        if self.max_scroll <= 0:
+            return
+        cr = self.layout['content']
+        thumb_h = (self._scrollbar_thumb_rect.height
+                   if self._scrollbar_thumb_rect else 56)
+        thumb_h = max(36, min(cr.height, thumb_h))
+
+        rel_y = mouse_y - cr.y - self._scrollbar_drag_offset
+        travel = max(1, cr.height - thumb_h)
+        pct = max(0.0, min(1.0, rel_y / travel))
+        self.scroll_y = pct * self.max_scroll
+
     def handle_event(self, event):
         if not self.visible:
             return None
@@ -1124,9 +1183,11 @@ class PokemonModal:
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
-                self._switch_tab(-1); return None
+                self._switch_tab(-1);
+                return None
             if event.key == pygame.K_RIGHT:
-                self._switch_tab(1); return None
+                self._switch_tab(1);
+                return None
             if event.key == pygame.K_ESCAPE:
                 self.visible = False
                 self.confirmation_active = False
@@ -1136,13 +1197,22 @@ class PokemonModal:
             if self.max_scroll > 0:
                 mx, my = pygame.mouse.get_pos()
                 cr = self.layout['content']
-                if cr.collidepoint(mx, my):
+                # Área de scroll inclui a scrollbar (para o wheel funcionar
+                # mesmo com o mouse em cima dela)
+                scroll_hit = pygame.Rect(
+                    cr.x, cr.y, cr.width + 30, cr.height)
+                if scroll_hit.collidepoint(mx, my):
                     self.scroll_y -= event.y * 60
                     self.scroll_y = max(0.0, min(float(self.max_scroll),
-                                                  float(self.scroll_y)))
+                                                 float(self.scroll_y)))
             return None
 
         if event.type == pygame.MOUSEMOTION:
+            # ===== DRAG DO SCROLLBAR =====
+            if self._scrollbar_dragging:
+                self._update_scrollbar_drag(event.pos[1])
+                return None
+
             self._hover_tab = -1
             for i, r in enumerate(self.layout.get('tabs', [])):
                 if r.collidepoint(event.pos):
@@ -1152,6 +1222,10 @@ class PokemonModal:
             return None
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # ===== SCROLLBAR (prioridade sobre qualquer outra coisa) =====
+            if self._handle_scrollbar_mousedown(event):
+                return None
+
             if self.close_button.collidepoint(event.pos):
                 self.visible = False
                 self.confirmation_active = False
@@ -1198,6 +1272,11 @@ class PokemonModal:
                 return "close"
 
             if self._handle_held_item_click(event):
+                return None
+
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self._scrollbar_dragging:
+                self._scrollbar_dragging = False
                 return None
 
         return None
@@ -1712,16 +1791,69 @@ class PokemonModal:
 
         if self.max_scroll > 0:
             self._render_scrollbar(screen, cr)
+        else:
+            self._scrollbar_thumb_rect = None
+            self._scrollbar_track_rect = None
 
     def _render_scrollbar(self, screen, cr):
         x = self.layout['scrollbar_x']
-        w = 6
+        w = self.layout.get('scrollbar_w', 16)
         h = cr.height
-        self._rounded(screen, (25, 28, 38), (x, cr.y, w, h), radius=3)
+
+        # Trilha (mais clara e com borda, dando dica visual de "área rolável")
+        track_rect = pygame.Rect(x, cr.y, w, h)
+        pygame.draw.rect(screen, (25, 28, 38), track_rect, border_radius=8)
+        pygame.draw.rect(screen, (40, 46, 60), track_rect, 1, border_radius=8)
+
+        if self.max_scroll <= 0:
+            self._scrollbar_thumb_rect = None
+            self._scrollbar_track_rect = None
+            return
+
         ratio = cr.height / (cr.height + self.max_scroll)
-        thumb_h = max(36, int(h * ratio))
+        thumb_h = max(56, int(h * ratio))  # mínimo generoso p/ toque
         thumb_y = cr.y + int((self.scroll_y / self.max_scroll) * (h - thumb_h))
-        self._rounded(screen, (95, 110, 145), (x, thumb_y, w, thumb_h), radius=3)
+        thumb_rect = pygame.Rect(x, thumb_y, w, thumb_h)
+
+        # Hit test com folga p/ mobile
+        mx, my = pygame.mouse.get_pos()
+        is_hover = thumb_rect.inflate(20, 8).collidepoint(mx, my)
+
+        # Cores dinâmicas
+        if self._scrollbar_dragging:
+            thumb_color = (218, 175, 90)
+            border_color = (255, 215, 0)
+            grip_color = (55, 40, 10)
+        elif is_hover:
+            thumb_color = (140, 160, 205)
+            border_color = (205, 220, 245)
+            grip_color = (40, 50, 75)
+        else:
+            thumb_color = (95, 110, 145)
+            border_color = (130, 145, 180)
+            grip_color = (35, 42, 58)
+
+        # Thumb
+        pygame.draw.rect(screen, thumb_color, thumb_rect, border_radius=8)
+        pygame.draw.rect(screen, border_color, thumb_rect, 2, border_radius=8)
+
+        # Brilho no topo
+        highlight = tuple(min(255, c + 60) for c in thumb_color)
+        pygame.draw.rect(screen, highlight,
+                         (thumb_rect.x + 3, thumb_rect.y + 2,
+                          thumb_rect.width - 6, 2),
+                         border_radius=1)
+
+        # Grip (3 linhas) — sinaliza "arraste-me"
+        grip_cx = thumb_rect.centerx
+        grip_cy = thumb_rect.centery
+        for dy in (-6, 0, 6):
+            pygame.draw.line(screen, grip_color,
+                             (grip_cx - 4, grip_cy + dy),
+                             (grip_cx + 4, grip_cy + dy), 2)
+
+        self._scrollbar_thumb_rect = thumb_rect
+        self._scrollbar_track_rect = track_rect
 
     def _draw_page(self, surf, rect):
         key = self._tab_key()
