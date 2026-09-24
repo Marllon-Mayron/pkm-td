@@ -3,7 +3,7 @@
 Overlay mostrado para o VENCEDOR de uma troca (quem ainda tem pokémon vivo).
 
 Mostra:
-  - Barra de tempo (10s)
+  - Barra de tempo (5s)
   - "Deseja trocar?"
   - Cards dos pokémon disponíveis no HUD (para trocar)
   - Card do pokémon atualmente posicionado com legenda "Não trocar"
@@ -16,8 +16,8 @@ import pygame
 
 
 class SwapSelectionOverlay:
-    # Tempo total para decidir a troca (mesmo do placement inicial)
-    SWAP_TIME = 10.0
+    # Tempo total para decidir a troca
+    SWAP_TIME = 5.0
 
     def __init__(self, scene, current_pokemon, available_pokemon,
                  on_choice, subtitle=None):
