@@ -469,7 +469,7 @@ class CategorySelector:
 
 
 class QuantitySelector:
-    """Seletor de quantidade clean"""
+    """Seletor de quantidade — layout sequencial (nada se sobrepõe)."""
 
     def __init__(self, x, y, width, height):
         self.rect = pygame.Rect(x, y, width, height)
@@ -480,26 +480,159 @@ class QuantitySelector:
         self.mode = "buy"
         self.item = None
         self.total_price = 0
-
-        # Botões
-        btn_size = 40
-        self.btn_decrease = pygame.Rect(x + 30, y + 70, btn_size, btn_size)
-        self.btn_increase = pygame.Rect(x + width - 70, y + 70, btn_size, btn_size)
-        self.btn_confirm = pygame.Rect(x + 30, y + 140, width - 60, 40)
-        self.btn_cancel = pygame.Rect(x + 30, y + 190, width - 60, 35)
-
+        self.unit_price = 0
         self.hovered_btn = None
 
+        # Rects dos botões (definidos em _layout)
+        self.btn_decrease    = pygame.Rect(0, 0, 0, 0)
+        self.btn_increase    = pygame.Rect(0, 0, 0, 0)
+        self.btn_decrease_10 = pygame.Rect(0, 0, 0, 0)
+        self.btn_increase_10 = pygame.Rect(0, 0, 0, 0)
+        self.btn_max         = pygame.Rect(0, 0, 0, 0)
+        self.btn_confirm     = pygame.Rect(0, 0, 0, 0)
+        self.btn_cancel      = pygame.Rect(0, 0, 0, 0)
+
+        # Posições auxiliares
+        self.pad = 0
+        self.header_rect = pygame.Rect(0, 0, 0, 0)
+        self.header_sprite_size = 0
+        self.sep_y = 0
+        self.qty_label_y = 0
+        self.qty_box_rect = pygame.Rect(0, 0, 0, 0)
+        self.total_rect = pygame.Rect(0, 0, 0, 0)
+
+        self._layout()
+
+    # ------------------------------------------------------------------
+    # LAYOUT — cursor sequencial do topo pra baixo
+    # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # LAYOUT — cursor sequencial do topo pra baixo
+    # ------------------------------------------------------------------
+    def _layout(self):
+        x, y = self.rect.x, self.rect.y
+        W, H = self.rect.width, self.rect.height
+
+        # ---- Padding externo ----
+        pad = max(14, min(int(H * 0.045), 30))
+        self.pad = pad
+
+        # ---- Alturas base de cada bloco ----
+        header_h = max(54, int(H * 0.13))
+        label_h = 20
+        box_h = max(70, int(H * 0.16))
+        quick_h = max(44, int(H * 0.10))
+        total_h = max(44, int(H * 0.09))
+        footer_h = max(50, int(H * 0.11))
+
+        # ---- Margem entre blocos (aumentada) ----
+        gap = max(18, int(H * 0.042))
+        label_gap = max(10, gap // 2)
+
+        def needed(g, hd, lb, bx, qk, tt, ft, lg):
+            # pad*2 + 5 gaps (header/sep/caixa/rápida/total) + 1px do separador + label_gap
+            return (pad * 2 + hd + lb + bx + qk + tt + ft
+                    + g * 5 + 1 + lg)
+
+        # ---- Comprime o gap se não couber ----
+        while (gap > 8 and
+               needed(gap, header_h, label_h, box_h, quick_h, total_h,
+                      footer_h, label_gap) > H):
+            gap -= 1
+            label_gap = max(6, gap // 2)
+
+        # ---- Ainda não coube: escala os blocos ----
+        if (needed(gap, header_h, label_h, box_h, quick_h, total_h,
+                   footer_h, label_gap) > H):
+            fixed = pad * 2 + gap * 5 + 1 + label_gap
+            avail = max(1, H - fixed)
+            base = header_h + label_h + box_h + quick_h + total_h + footer_h
+            s = avail / base
+            header_h = int(header_h * s)
+            label_h = int(label_h * s)
+            box_h = int(box_h * s)
+            quick_h = int(quick_h * s)
+            total_h = int(total_h * s)
+            footer_h = int(footer_h * s)
+
+        # ---- Cursor sequencial ----
+        cursor = y + pad
+
+        # ========== HEADER ==========
+        self.header_rect = pygame.Rect(x + pad, cursor, W - pad * 2, header_h)
+        self.header_sprite_size = min(header_h, int(W * 0.20))
+        cursor += header_h + gap
+
+        # ========== SEPARADOR ==========
+        self.sep_y = cursor
+        cursor += 1 + gap
+
+        # ========== LABEL "QUANTIDADE" ==========
+        self.qty_label_y = cursor
+        cursor += label_h + label_gap
+
+        # ========== CAIXA DA QUANTIDADE ==========
+        box_x = x + pad
+        box_w = W - pad * 2
+        self.qty_box_rect = pygame.Rect(box_x, cursor, box_w, box_h)
+
+        inner_pad = 8
+        btn_size = max(1, box_h - inner_pad * 2)
+        btn_y = cursor + inner_pad
+        self.btn_decrease = pygame.Rect(box_x + inner_pad, btn_y,
+                                        btn_size, btn_size)
+        self.btn_increase = pygame.Rect(box_x + box_w - btn_size - inner_pad,
+                                        btn_y, btn_size, btn_size)
+        cursor += box_h + gap
+
+        # ========== LINHA RÁPIDA (-10 MAX +10) ==========
+        quick_gap = max(10, int(W * 0.025))
+        quick_w = (box_w - quick_gap * 2) // 3
+        self.btn_decrease_10 = pygame.Rect(box_x, cursor, quick_w, quick_h)
+        self.btn_max = pygame.Rect(box_x + quick_w + quick_gap,
+                                   cursor, quick_w, quick_h)
+        self.btn_increase_10 = pygame.Rect(box_x + (quick_w + quick_gap) * 2,
+                                           cursor, quick_w, quick_h)
+        cursor += quick_h + gap
+
+        # ========== FAIXA DE TOTAL ==========
+        self.total_rect = pygame.Rect(box_x, cursor, box_w, total_h)
+        cursor += total_h + gap
+
+        # ========== FOOTER (Cancelar | Confirmar) ==========
+        btn_gap = max(10, int(W * 0.025))
+        cancel_w = int((box_w - btn_gap) * 0.42)
+        confirm_w = box_w - btn_gap - cancel_w
+        self.btn_cancel = pygame.Rect(box_x, cursor, cancel_w, footer_h)
+        self.btn_confirm = pygame.Rect(box_x + cancel_w + btn_gap,
+                                       cursor, confirm_w, footer_h)
+
+        # ---- Rede de segurança: rodapé nunca sai do painel ----
+        overflow = self.btn_confirm.bottom - (self.rect.bottom - pad)
+        if overflow > 0:
+            self.btn_cancel.y -= overflow
+            self.btn_confirm.y -= overflow
+
+    # ------------------------------------------------------------------
+    # ESTADO
+    # ------------------------------------------------------------------
     def show(self, mode, item, player_money, max_from_inventory=None):
         self.mode = mode
         self.item = item
         self.visible = True
         self.quantity = 1
+        self.hovered_btn = None
+        self._layout()
 
         if mode == "buy":
-            item_price = item.get("price", 100)
-            self.max_quantity = min(99, player_money // item_price) if player_money >= item_price else 0
+            price = item.get("price", 100)
+            self.unit_price = price
+            self.max_quantity = (
+                min(99, player_money // price)
+                if player_money >= price else 0
+            )
         else:
+            self.unit_price = item.sell_price
             self.max_quantity = item.quantity
             self.quantity = min(1, self.max_quantity)
 
@@ -508,119 +641,241 @@ class QuantitySelector:
     def hide(self):
         self.visible = False
         self.item = None
+        self.hovered_btn = None
 
     def update_total(self):
         if not self.item:
             return
+        self.total_price = self.quantity * self.unit_price
 
-        if self.mode == "buy":
-            price = self.item.get("price", 100)
-            self.total_price = self.quantity * price
-        else:
-            self.total_price = self.quantity * self.item.sell_price
+    def _is_enabled(self, name):
+        if name == "decrease":
+            return self.quantity > self.min_quantity
+        if name == "increase":
+            return self.quantity < self.max_quantity
+        if name == "decrease_10":
+            return self.quantity > self.min_quantity
+        if name == "increase_10":
+            return self.quantity < self.max_quantity
+        if name == "max":
+            return self.max_quantity > 0 and self.quantity < self.max_quantity
+        return True
 
+    # ------------------------------------------------------------------
+    # EVENTOS
+    # ------------------------------------------------------------------
     def handle_event(self, event):
         if not self.visible:
             return None
 
         if event.type == pygame.MOUSEMOTION:
             self.hovered_btn = None
-            if self.btn_decrease.collidepoint(event.pos):
-                self.hovered_btn = "decrease"
-            elif self.btn_increase.collidepoint(event.pos):
-                self.hovered_btn = "increase"
-            elif self.btn_confirm.collidepoint(event.pos):
-                self.hovered_btn = "confirm"
-            elif self.btn_cancel.collidepoint(event.pos):
-                self.hovered_btn = "cancel"
+            for key, rect in (
+                ("decrease",    self.btn_decrease),
+                ("increase",    self.btn_increase),
+                ("decrease_10", self.btn_decrease_10),
+                ("increase_10", self.btn_increase_10),
+                ("max",         self.btn_max),
+                ("confirm",     self.btn_confirm),
+                ("cancel",      self.btn_cancel),
+            ):
+                if rect.collidepoint(event.pos):
+                    self.hovered_btn = key
+                    break
             return None
 
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.btn_decrease.collidepoint(event.pos):
                 self.quantity = max(self.min_quantity, self.quantity - 1)
-                self.update_total()
-                return "update"
-
-            elif self.btn_increase.collidepoint(event.pos):
+                self.update_total(); return "update"
+            if self.btn_increase.collidepoint(event.pos):
                 self.quantity = min(self.max_quantity, self.quantity + 1)
-                self.update_total()
-                return "update"
-
-            elif self.btn_confirm.collidepoint(event.pos):
+                self.update_total(); return "update"
+            if self.btn_decrease_10.collidepoint(event.pos):
+                self.quantity = max(self.min_quantity, self.quantity - 10)
+                self.update_total(); return "update"
+            if self.btn_increase_10.collidepoint(event.pos):
+                self.quantity = min(self.max_quantity, self.quantity + 10)
+                self.update_total(); return "update"
+            if self.btn_max.collidepoint(event.pos):
+                if self.max_quantity > 0:
+                    self.quantity = max(self.min_quantity, self.max_quantity)
+                    self.update_total(); return "update"
+            if self.btn_confirm.collidepoint(event.pos):
                 return "confirm"
-
-            elif self.btn_cancel.collidepoint(event.pos):
-                self.hide()
-                return "cancel"
+            if self.btn_cancel.collidepoint(event.pos):
+                self.hide(); return "cancel"
 
         return None
 
+    # ------------------------------------------------------------------
+    # RENDER
+    # ------------------------------------------------------------------
     def render(self, screen, fonts):
         if not self.visible:
             return
 
-        # Overlay escuro que BLOQUEIA cliques no fundo
-        overlay = pygame.Surface((screen.get_width(), screen.get_height()))
-        overlay.set_alpha(200)
-        overlay.fill((0, 0, 0))
-        screen.blit(overlay, (0, 0))
+        # Overlay
+        ov = pygame.Surface((screen.get_width(), screen.get_height()))
+        ov.set_alpha(210); ov.fill((0, 0, 0))
+        screen.blit(ov, (0, 0))
 
-        # Janela principal
-        pygame.draw.rect(screen, (35, 40, 50), self.rect, border_radius=10)
-        pygame.draw.rect(screen, (80, 120, 180), self.rect, 2, border_radius=10)
+        # ---- Painel ----
+        pygame.draw.rect(screen, (32, 36, 48), self.rect, border_radius=16)
+        pygame.draw.rect(screen, (75, 95, 135), self.rect, 2, border_radius=16)
+        pygame.draw.rect(screen, (48, 55, 72),
+                         self.rect.inflate(-10, -10), 1, border_radius=14)
 
-        # Título
-        mode_text = "COMPRAR" if self.mode == "buy" else "VENDER"
-        item_name = self.item['name'] if isinstance(self.item, dict) else self.item.name
-        title = fonts['medium'].render(f"{mode_text} {item_name}", True, (255, 215, 0))
-        title_rect = title.get_rect(center=(self.rect.centerx, self.rect.y + 25))
-        screen.blit(title, title_rect)
+        # ========== HEADER ==========
+        hr = self.header_rect
+        sp_size = self.header_sprite_size
+        sp_rect = pygame.Rect(hr.x, hr.y + (hr.height - sp_size) // 2,
+                              sp_size, sp_size)
 
-        # Quantidade
-        qty_text = fonts['large'].render(str(self.quantity), True, (255, 255, 255))
-        qty_rect = qty_text.get_rect(center=(self.rect.centerx, self.rect.y + 90))
-        screen.blit(qty_text, qty_rect)
+        pygame.draw.rect(screen, (22, 26, 34), sp_rect, border_radius=10)
+        pygame.draw.rect(screen, (60, 72, 95), sp_rect, 2, border_radius=10)
 
-        # Botões +/-
-        for btn, symbol in [(self.btn_decrease, "-"), (self.btn_increase, "+")]:
-            hovered = (self.hovered_btn == ("decrease" if symbol == "-" else "increase"))
-            can_use = (symbol == "-" and self.quantity > 1) or (symbol == "+" and self.quantity < self.max_quantity)
+        item_name = (self.item['name']
+                     if isinstance(self.item, dict) else self.item.name)
+        item_id   = (self.item['id']
+                     if isinstance(self.item, dict) else self.item.item_id)
 
-            if hovered and can_use:
-                btn_color = (70, 90, 120)
-            elif can_use:
-                btn_color = (50, 70, 100)
-            else:
-                btn_color = (40, 45, 60)
+        sprite = item_bag_catalog.get_sprite(item_id, scaled=True)
+        if sprite:
+            ss = sp_size - 12
+            sprite = pygame.transform.smoothscale(sprite, (ss, ss))
+            screen.blit(sprite, (sp_rect.x + 6, sp_rect.y + 6))
 
-            pygame.draw.rect(screen, btn_color, btn, border_radius=20)
-            pygame.draw.rect(screen, (150, 150, 150), btn, 1, border_radius=20)
+        # Texto: ação + nome, ancorado à direita do sprite
+        tx = sp_rect.right + 16
+        action_txt = "COMPRAR" if self.mode == "buy" else "VENDER"
+        action_col = (100, 200, 255) if self.mode == "buy" else (255, 180, 90)
+        at = fonts['small'].render(action_txt, True, action_col)
+        nt = fonts['title'].render(item_name, True, (240, 245, 255))
 
-            btn_text = fonts['large'].render(symbol, True, (255, 255, 255))
-            btn_rect = btn_text.get_rect(center=btn.center)
-            screen.blit(btn_text, btn_rect)
+        # Empilha verticalmente os dois textos, centralizados no header
+        total_h_txt = at.get_height() + 4 + nt.get_height()
+        ty = hr.y + (hr.height - total_h_txt) // 2
+        screen.blit(at, (tx, ty))
+        screen.blit(nt, (tx, ty + at.get_height() + 4))
 
-        # Total
-        total_text = fonts['small'].render(f"Total: ${self.total_price}", True, (150, 255, 150))
-        total_rect = total_text.get_rect(center=(self.rect.centerx, self.rect.y + 120))
-        screen.blit(total_text, total_rect)
+        # ========== SEPARADOR ==========
+        pygame.draw.line(screen, (55, 65, 88),
+                         (hr.x, self.sep_y),
+                         (hr.right, self.sep_y), 1)
 
-        # Botão confirmar
-        hovered = (self.hovered_btn == "confirm")
-        confirm_color = (70, 140, 70) if hovered and self.quantity > 0 else (50, 100, 50)
-        pygame.draw.rect(screen, confirm_color, self.btn_confirm, border_radius=5)
-        confirm_text = fonts['small'].render("CONFIRMAR", True, (255, 255, 255))
-        confirm_rect = confirm_text.get_rect(center=self.btn_confirm.center)
-        screen.blit(confirm_text, confirm_rect)
+        # ========== LABEL "QUANTIDADE" ==========
+        ql = fonts['small'].render("QUANTIDADE", True, (140, 152, 180))
+        screen.blit(ql, (self.rect.centerx - ql.get_width() // 2,
+                         self.qty_label_y))
 
-        # Botão cancelar
-        hovered = (self.hovered_btn == "cancel")
-        cancel_color = (120, 70, 70) if hovered else (90, 60, 60)
-        pygame.draw.rect(screen, cancel_color, self.btn_cancel, border_radius=5)
-        cancel_text = fonts['small'].render("Cancelar", True, (255, 200, 200))
-        cancel_rect = cancel_text.get_rect(center=self.btn_cancel.center)
-        screen.blit(cancel_text, cancel_rect)
+        # ========== CAIXA DA QUANTIDADE ==========
+        box = self.qty_box_rect
+        pygame.draw.rect(screen, (20, 24, 32), box, border_radius=12)
+        pygame.draw.rect(screen, (60, 75, 100), box, 2, border_radius=12)
 
+        # Número grande central
+        qtxt = fonts['title'].render(str(self.quantity), True, (255, 255, 255))
+        screen.blit(qtxt, qtxt.get_rect(center=box.center))
+
+        # Botões − / + (dentro da caixa)
+        self._render_round_button(
+            screen, fonts, self.btn_decrease, "−",
+            self.hovered_btn == "decrease",
+            self._is_enabled("decrease"))
+        self._render_round_button(
+            screen, fonts, self.btn_increase, "+",
+            self.hovered_btn == "increase",
+            self._is_enabled("increase"))
+
+        # ========== LINHA RÁPIDA ==========
+        self._render_quick_button(
+            screen, fonts, self.btn_decrease_10, "−10",
+            self.hovered_btn == "decrease_10",
+            self._is_enabled("decrease_10"))
+        self._render_quick_button(
+            screen, fonts, self.btn_max, "MAX",
+            self.hovered_btn == "max",
+            self._is_enabled("max"))
+        self._render_quick_button(
+            screen, fonts, self.btn_increase_10, "+10",
+            self.hovered_btn == "increase_10",
+            self._is_enabled("increase_10"))
+
+        # ========== FAIXA DE TOTAL ==========
+        tb = self.total_rect
+        pygame.draw.rect(screen, (24, 34, 28), tb, border_radius=10)
+        pygame.draw.rect(screen, (55, 100, 65), tb, 2, border_radius=10)
+
+        left_txt = fonts['small'].render(
+            f"{self.quantity}  ×  ${self.unit_price}",
+            True, (170, 195, 175))
+        screen.blit(left_txt,
+                    (tb.x + 16, tb.centery - left_txt.get_height() // 2))
+
+        right_txt = fonts['medium'].render(
+            f"${self.total_price}", True, (135, 255, 150))
+        screen.blit(right_txt,
+                    (tb.right - right_txt.get_width() - 16,
+                     tb.centery - right_txt.get_height() // 2))
+
+        # ========== FOOTER ==========
+        self._render_footer_button(
+            screen, fonts, self.btn_cancel, "CANCELAR", "danger",
+            self.hovered_btn == "cancel")
+        self._render_footer_button(
+            screen, fonts, self.btn_confirm, "CONFIRMAR", "success",
+            self.hovered_btn == "confirm")
+
+    # ------------------------------------------------------------------
+    # HELPERS DE RENDER
+    # ------------------------------------------------------------------
+    def _render_round_button(self, screen, fonts, btn, symbol,
+                             hovered, enabled):
+        if hovered and enabled:
+            bg, bd = (90, 130, 180), (150, 200, 255)
+        elif enabled:
+            bg, bd = (58, 84, 125), (95, 135, 185)
+        else:
+            bg, bd = (40, 45, 58), (65, 72, 88)
+
+        radius = btn.width // 2
+        pygame.draw.rect(screen, bg, btn, border_radius=radius)
+        pygame.draw.rect(screen, bd, btn, 2, border_radius=radius)
+
+        color = (255, 255, 255) if enabled else (130, 135, 150)
+        t = fonts['title'].render(symbol, True, color)
+        screen.blit(t, t.get_rect(center=btn.center))
+
+    def _render_quick_button(self, screen, fonts, btn, label,
+                             hovered, enabled):
+        if hovered and enabled:
+            bg, bd = (65, 92, 140), (150, 195, 245)
+        elif enabled:
+            bg, bd = (42, 55, 80), (90, 115, 160)
+        else:
+            bg, bd = (34, 38, 50), (62, 68, 85)
+
+        pygame.draw.rect(screen, bg, btn, border_radius=10)
+        pygame.draw.rect(screen, bd, btn, 2, border_radius=10)
+
+        color = (240, 245, 255) if enabled else (120, 125, 140)
+        t = fonts['medium'].render(label, True, color)
+        screen.blit(t, t.get_rect(center=btn.center))
+
+    def _render_footer_button(self, screen, fonts, btn, label, kind, hovered):
+        if kind == "success":
+            bg = (55, 140, 70) if hovered else (42, 105, 55)
+            bd = (140, 235, 155) if hovered else (100, 175, 115)
+        else:
+            bg = (150, 65, 65) if hovered else (110, 55, 55)
+            bd = (230, 140, 140) if hovered else (170, 100, 100)
+
+        pygame.draw.rect(screen, bg, btn, border_radius=10)
+        pygame.draw.rect(screen, bd, btn, 2, border_radius=10)
+
+        t = fonts['medium'].render(label, True, (255, 255, 255))
+        screen.blit(t, t.get_rect(center=btn.center))
 
 class ShopScene(BaseScene):
     # Largura visual da scrollbar (mobile-friendly)

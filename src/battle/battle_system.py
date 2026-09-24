@@ -1271,18 +1271,21 @@ class BattleSystem:
         # ===== CONQUISTAS: Ataque buffado pelo clima =====
         if weather_boosted and hasattr(self, 'game_scene') and self.game_scene:
             game_scene = self.game_scene
-            if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+            if (getattr(game_scene, 'achievements_enabled', True)
+                    and hasattr(game_scene, 'chapter_id')
+                    and hasattr(game_scene, 'phase_number')
+                    and hasattr(game_scene, 'player')
+                    and hasattr(game_scene.player, 'achievement_manager')):
                 player = game_scene.player
                 phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
 
-                # Incrementa contador de ataques buffados pelo clima
                 player.achievement_manager.increment_counter("weather_boosted_attack_count")
-
-                # Verifica conquista
-                player.achievement_manager.check_and_unlock("first_weather_boosted_attack", phase_id)
+                player.achievement_manager.check_and_unlock(
+                    "first_weather_boosted_attack", phase_id)
 
                 print(
-                    f"[ACHIEVEMENT] Ataque buffado pelo clima #{player.achievement_manager.get_counter('weather_boosted_attack_count')}")
+                    f"[ACHIEVEMENT] Ataque buffado pelo clima "
+                    f"#{player.achievement_manager.get_counter('weather_boosted_attack_count')}")
 
         return effects
 

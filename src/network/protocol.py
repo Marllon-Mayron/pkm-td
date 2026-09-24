@@ -69,6 +69,9 @@ MSG_TYPES = {
     "PVP_WEATHER_CHANGE": "pvp_weather_change",
     "PVP_POKEMON_REMOVE": "pvp_pokemon_remove",
     "PVP_DAY_NIGHT": "pvp_day_night",
+    "PVP_STATUS_APPLY": "pvp_status_apply",
+    "PVP_STATUS_REMOVE": "pvp_status_remove",
+    "PVP_STAT_MOD": "pvp_stat_mod",
 
     "ERROR": "error",
     "DISCONNECT": "disconnect",

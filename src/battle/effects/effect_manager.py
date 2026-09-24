@@ -37,7 +37,7 @@ class EffectManager:
         self.STATUS_TICK_INTERVAL = 2.0
         self.font_cache = {}
 
-    def apply_status(self, pokemon, status: StatusEffect, source=None):
+    def apply_status(self, pokemon, status: StatusEffect, source=None, silent=False):
         """Aplica um efeito de status a um Pokémon (com verificação de imunidade)"""
         from .status_effect import TypeImmunity
 
@@ -106,8 +106,9 @@ class EffectManager:
             StatusType.CONFUSION: f"{pokemon.name} está confuso!"
         }
 
-        if not pokemon.is_wild and status.type in status_messages:
-            toast_battle(f"{status_messages[status.type]}", duration=5.0, pokemon=pokemon, portrait="pain")
+        if not silent and not pokemon.is_wild and status.type in status_messages:
+            toast_battle(f"{status_messages[status.type]}", duration=5.0,
+                         pokemon=pokemon, portrait="pain")
 
         # ===== FORÇA ATUALIZAÇÃO DA ANIMAÇÃO =====
         if hasattr(pokemon, 'update_status_animation'):
@@ -275,6 +276,16 @@ class EffectManager:
             return self.stat_stages[pokemon_id].get_stage(stat_type)
 
         return 0
+
+    def apply_stat_stage_from_remote(self, pokemon, stat_type, stages):
+        """Aplica um stage SEM criar StatModifier com duração.
+        A expiração é gerenciada pelo dono via sync periódico."""
+        pid = id(pokemon)
+        if pid not in self.stat_stages:
+            self.stat_stages[pid] = StatStage()
+        self.stat_stages[pid].modify(stat_type, stages)
+        if stat_type == StatType.SPEED and hasattr(pokemon, 'update_move_speed_from_effects'):
+            pokemon.update_move_speed_from_effects()
 
     def get_all_modifiers(self, pokemon) -> Dict[str, int]:
         """Retorna todos os modificadores ativos para um Pokémon"""

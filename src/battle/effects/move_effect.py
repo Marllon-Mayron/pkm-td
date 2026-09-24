@@ -3989,20 +3989,22 @@ class MoveEffect:
         # ===== CONQUISTAS: Incrementa contador de mudanças de clima =====
         if hasattr(battle_system, 'game_scene') and battle_system.game_scene:
             game_scene = battle_system.game_scene
-            if hasattr(game_scene, 'player') and hasattr(game_scene.player, 'achievement_manager'):
+            if (getattr(game_scene, 'achievements_enabled', True)
+                    and hasattr(game_scene, 'chapter_id')
+                    and hasattr(game_scene, 'phase_number')
+                    and hasattr(game_scene, 'player')
+                    and hasattr(game_scene.player, 'achievement_manager')):
                 player = game_scene.player
                 phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
 
-                # Incrementa contador de mudanças de clima
                 player.achievement_manager.increment_counter("weather_change_count")
-
-                # Verifica conquistas relacionadas
                 player.achievement_manager.check_and_unlock("first_weather_change", phase_id)
                 player.achievement_manager.check_and_unlock("weather_change_50", phase_id)
                 player.achievement_manager.check_and_unlock("weather_change_100", phase_id)
 
                 print(
-                    f"[ACHIEVEMENT] Mudança de clima #{player.achievement_manager.get_counter('weather_change_count')}")
+                    f"[ACHIEVEMENT] Mudança de clima "
+                    f"#{player.achievement_manager.get_counter('weather_change_count')}")
 
         # Mensagem específica
         messages = {

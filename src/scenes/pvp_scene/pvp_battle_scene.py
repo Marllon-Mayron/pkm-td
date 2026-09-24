@@ -76,6 +76,87 @@ def _install_pvp_damage_hook():
     PokemonCombat._pvp_damage_hook = True
     print("[PVP] Hook de dano instalado")
 
+def _install_pvp_status_hook():
+    from src.battle.effects.effect_manager import EffectManager
+    if getattr(EffectManager, '_pvp_status_hook', False):
+        return
+
+    original_apply = EffectManager.apply_status
+    original_remove = EffectManager.remove_status
+
+    def hooked_apply(self_em, pokemon, status, *args, **kwargs):
+        # ★ Não re-broadcasta quando é aplicação vinda da rede
+        if getattr(self_em, '_pvp_applying_remote', False):
+            return original_apply(self_em, pokemon, status, *args, **kwargs)
+
+        result = original_apply(self_em, pokemon, status, *args, **kwargs)
+        if not result:
+            return result
+        if not getattr(pokemon, '_is_remote', False):
+            return result
+        # ... (resto igual: monta payload e envia PVP_STATUS_APPLY) ...
+        return result
+
+    def hooked_remove(self_em, pokemon):
+        # ★ Não re-broadcasta quando é remoção vinda da rede
+        if getattr(self_em, '_pvp_applying_remote', False):
+            return original_remove(self_em, pokemon)
+
+        old = self_em.status_effects.get(id(pokemon))
+        old_type = old.type.value if old else None
+        result = original_remove(self_em, pokemon)
+        # ... (resto igual) ...
+        return result
+
+    EffectManager.apply_status = hooked_apply
+    EffectManager.remove_status = hooked_remove
+    EffectManager._pvp_status_hook = True
+    print("[PVP] Hook de status instalado")
+
+def _install_pvp_stat_hook():
+    from src.battle.effects.effect_manager import EffectManager
+    if getattr(EffectManager, '_pvp_stat_hook', False):
+        return
+
+    original_add = EffectManager.add_stat_modifier
+
+    def hooked_add(self_em, pokemon, stat_type, stages, duration=None, is_battle_item=False):
+        # Não re-broadcasta quando estamos aplicando algo vindo da rede
+        if getattr(self_em, '_pvp_applying_remote', False):
+            return original_add(self_em, pokemon, stat_type, stages, duration, is_battle_item)
+
+        result = original_add(self_em, pokemon, stat_type, stages, duration, is_battle_item)
+        if not result:
+            return result
+        if not getattr(pokemon, '_is_remote', False):
+            return result
+
+        bs = getattr(pokemon, 'battle_system', None)
+        scene = getattr(bs, 'game_scene', None) if bs else None
+        if scene is None or not hasattr(scene, '_my_uuid'):
+            return result
+        owner_uuid = getattr(pokemon, '_pvp_owner_uuid', None)
+        if not owner_uuid or owner_uuid == scene._my_uuid:
+            return result
+
+        try:
+            scene._network.send_to_all(create_message(
+                "PVP_STAT_MOD", {
+                    "owner_uuid": owner_uuid,
+                    "unique_id": pokemon.unique_id,
+                    "stat": stat_type.value,
+                    "stages": int(stages),
+                    "duration": float(duration) if duration else 0.0,
+                }))
+            print(f"[PVP] Stat broadcast: {pokemon.name} "
+                  f"{stat_type.value} {stages:+d}")
+        except Exception as e:
+            print(f"[PVP] erro enviar stat_mod: {e}")
+        return result
+
+    EffectManager.add_stat_modifier = hooked_add
+    EffectManager._pvp_stat_hook = True
+    print("[PVP] Hook de stat_mod instalado")
 
 # =====================================================================
 # HOOK GLOBAL: clima → broadcast
@@ -191,6 +272,8 @@ class PvPBattleScene(BaseScene):
 
         _install_pvp_damage_hook()
         _install_pvp_weather_hook()
+        _install_pvp_status_hook()
+        _install_pvp_stat_hook()
 
         try:
             from src.battle.effects.specific.weather.weather_manager import WeatherManager
@@ -204,6 +287,8 @@ class PvPBattleScene(BaseScene):
         self._arena_chapter = int(arena_chapter)
         self._arena_level = int(arena_level)
         self._my_team_side = my_team_side
+        #   Qualquer código de achievement deve checar esta flag antes de rodar.
+        self.achievements_enabled = False
         self._on_exit_callback = on_exit
 
         (self.players_per_team,
@@ -1411,8 +1496,22 @@ class PvPBattleScene(BaseScene):
     def _broadcast_my_pokemon_state(self):
         if not self._network:
             return
+        from src.battle.effects import StatType
+        em = self.battle_system.effect_manager
+
         states = []
         for p in self._local_team_objs:
+            status = em.get_status(p)
+            status_name = status.type.value if status else None
+
+            stages_payload = {}
+            pid = id(p)
+            if pid in em.stat_stages:
+                for st in StatType:
+                    s = em.stat_stages[pid].get_stage(st)
+                    if s != 0:
+                        stages_payload[st.value] = s
+
             states.append({
                 "unique_id": p.unique_id,
                 "current_hp": int(p.current_hp),
@@ -1424,6 +1523,8 @@ class PvPBattleScene(BaseScene):
                 "current_direction": getattr(p, 'current_direction', 'down'),
                 "combat_state": getattr(p, 'combat_state', 'idle'),
                 "is_defeated": bool(getattr(p, 'is_defeated', False)),
+                "status": status_name,  # ← novo
+                "stat_stages": stages_payload,  # ← novo
             })
         try:
             self._network.send_to_all(create_message("PVP_POKEMON_STATE", {
@@ -1463,6 +1564,9 @@ class PvPBattleScene(BaseScene):
             else:
                 pk.is_defeated = False
 
+            self._sync_remote_status(pk, state.get("status"))
+            self._sync_remote_stat_stages(pk, state.get("stat_stages", {}))
+
             # ★ Dispara overlay do VENCEDOR quando um inimigo morre
             if (was_alive and now_dead
                     and not getattr(pk, '_is_ally_remote', False)
@@ -1487,6 +1591,59 @@ class PvPBattleScene(BaseScene):
             cs = state.get("combat_state")
             if cs:
                 pk.combat_state = cs
+
+    def _sync_remote_status(self, pk, status_name):
+        """Espelha o status do dono no nosso lado. Cobre expiração (sono,
+        congelamento) e auto-correção caso um PVP_STATUS_* tenha sido perdido."""
+        from src.battle.effects import StatusType, StatusEffect
+        em = self.battle_system.effect_manager
+
+        current = em.get_status(pk)
+        current_type = current.type.value if current else None
+
+        if status_name == current_type:
+            return  # já está consistente
+
+        em._pvp_applying_remote = True
+        try:
+            if current:
+                em.remove_status(pk)
+            if status_name:
+                try:
+                    st = StatusType(status_name)
+                except ValueError:
+                    return
+                new_status = StatusEffect(st, duration=None)
+                em.apply_status(pk, new_status, source=None, silent=True)
+        finally:
+            em._pvp_applying_remote = False
+
+    def _sync_remote_stat_stages(self, pk, stages_dict):
+        """Espelha os stages do dono no nosso lado. Cobre expiração e
+        auto-correção caso um PVP_STAT_MOD tenha sido perdido."""
+        from src.battle.effects import StatType
+        from src.battle.effects.stat_modifier import StatStage
+        em = self.battle_system.effect_manager
+        pid = id(pk)
+
+        has_any = bool(stages_dict) or pid in em.stat_stages
+        if not has_any:
+            return
+
+        if pid not in em.stat_stages:
+            em.stat_stages[pid] = StatStage()
+
+        changed = False
+        for st in StatType:
+            target = int(stages_dict.get(st.value, 0))
+            current = em.stat_stages[pid].get_stage(st)
+            diff = target - current
+            if diff != 0:
+                em.stat_stages[pid].modify(st, diff)
+                changed = True
+
+        if changed and hasattr(pk, 'update_move_speed_from_effects'):
+            pk.update_move_speed_from_effects()
 
     def _interpolate_remote_pokemon(self, dt):
         for pk in self._remote_pokemon.values():
@@ -1565,6 +1722,15 @@ class PvPBattleScene(BaseScene):
 
         elif t == "PVP_POKEMON_DAMAGE":
             self._apply_damage_to_my_pokemon(p)
+
+        elif t == "PVP_STATUS_APPLY":
+            self._apply_status_to_my_pokemon(p)
+
+        elif t == "PVP_STATUS_REMOVE":
+            self._remove_status_from_my_pokemon(p)
+
+        elif t == "PVP_STAT_MOD":
+            self._apply_stat_mod_to_my_pokemon(p)
 
         elif t == "PVP_END":
             winner_side = p.get("winner_side")
@@ -1662,6 +1828,91 @@ class PvPBattleScene(BaseScene):
                         p.is_defeated = True
                 print(f"[PVP] {p.name} tomou {damage} → "
                       f"{p.current_hp}/{p.max_hp}")
+                break
+
+    def _apply_status_to_my_pokemon(self, payload):
+        """O oponente aplicou um status no MEU pokémon — aplica localmente
+        para que os ticks (veneno/queimadura) e a paralisia funcionem."""
+        if payload.get("owner_uuid") != self._my_uuid:
+            return
+        uid = payload.get("unique_id")
+        status_type_str = payload.get("status_type")
+        if not uid or not status_type_str:
+            return
+
+        from src.battle.effects import StatusType, StatusEffect
+
+        for p in self._local_team_objs:
+            if p.unique_id != uid:
+                continue
+            try:
+                status_type = StatusType(status_type_str)
+            except ValueError:
+                print(f"[PVP] Status desconhecido: {status_type_str}")
+                return
+
+            em = self.battle_system.effect_manager
+
+            # Remove status atual (se houver) — um novo sobrescreve
+            if em.get_status(p):
+                em.remove_status(p)
+
+            status = StatusEffect(status_type, duration=None)
+            em.apply_status(p, status, source=None)
+            print(f"[PVP] Status remoto aplicado: {p.name} = {status_type_str}")
+            break
+
+    def _apply_stat_mod_to_my_pokemon(self, payload):
+        """O oponente reduziu/aumentou um stat do MEU pokémon.
+        Aplicamos localmente com DURAÇÃO para que o modificador
+        expire no lado do dono e o próximo sync propague o valor 0."""
+        if payload.get("owner_uuid") != self._my_uuid:
+            return
+        uid = payload.get("unique_id")
+        stat_name = payload.get("stat")
+        stages = int(payload.get("stages", 0))
+        duration = float(payload.get("duration", 0.0)) or None
+        if not uid or not stat_name or stages == 0:
+            return
+
+        from src.battle.effects import StatType
+        stat_map = {
+            "attack": StatType.ATTACK,
+            "defense": StatType.DEFENSE,
+            "sp_attack": StatType.SP_ATTACK,
+            "sp_defense": StatType.SP_DEFENSE,
+            "speed": StatType.SPEED,
+            "accuracy": StatType.ACCURACY,
+            "evasion": StatType.EVASION,
+        }
+        st = stat_map.get(stat_name)
+        if st is None:
+            return
+
+        for p in self._local_team_objs:
+            if p.unique_id != uid:
+                continue
+            em = self.battle_system.effect_manager
+            em._pvp_applying_remote = True
+            try:
+                # ★ Usa add_stat_modifier COM duração → expira sozinho no dono
+                em.add_stat_modifier(p, st, stages, duration)
+            finally:
+                em._pvp_applying_remote = False
+            print(f"[PVP] Stat remoto: {p.name} {stat_name} {stages:+d} "
+                  f"(dur={duration})")
+            break
+
+    def _remove_status_from_my_pokemon(self, payload):
+        if payload.get("owner_uuid") != self._my_uuid:
+            return
+        uid = payload.get("unique_id")
+        for p in self._local_team_objs:
+            if p.unique_id == uid:
+                em = self.battle_system.effect_manager
+                if em.get_status(p):
+                    em.remove_status(p)
+                    print(f"[PVP] Status remoto removido: {p.name}")
                 break
 
     # ==================================================================
