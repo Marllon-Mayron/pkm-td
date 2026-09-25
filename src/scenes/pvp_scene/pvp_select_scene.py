@@ -3,7 +3,8 @@
 Seleção do formato PvP + escolha do time.
 
 Formatos:
-  1v1 → 1 jogador/time · time de 6 · 1 em campo
+  1v1 → 1 jogador/time · time de até 6 · 1 em campo
+        (mínimo 1 pokémon — o jogador que se prejudique se levar menos)
   2v2 → 2 jogadores/time · time de 3 · 1 em campo por jogador
   3v3 → 3 jogadores/time · time de 2 · 2 em campo por jogador
 """
@@ -39,7 +40,7 @@ COL_ITEM_SEL_HV = (70, 145, 95)
 
 PVP_MODES = [
     {"chapter": 1, "label": "1v1", "subtitle": "Duelo Individual",
-     "desc": "1 jogador/time · 6 pokémon · 1 vs 1 em campo"},
+     "desc": "1 jogador/time · até 6 pokémon · 1 vs 1 em campo"},
     {"chapter": 2, "label": "2v2", "subtitle": "Batalha em Dupla",
      "desc": "2 jogadores/time · 3 pokémon cada · 2 vs 2 em campo"},
     {"chapter": 3, "label": "3v3", "subtitle": "Confronto Completo",
@@ -106,9 +107,30 @@ class PvPSelectScene(BaseScene):
     def _selected_chapter(self):
         return self.modes[self.selected_mode_idx]["chapter"]
 
+    # ------------------------------------------------------------------
+    # Regras de seleção
+    # ------------------------------------------------------------------
     def _required_pokemon(self):
-        # team_size = quantos pokémon o jogador leva no time
+        """Quantidade 'nominal' de pokémon do formato (team_size).
+        Usado no display e na validação de modos rígidos."""
         return get_pvp_team_size(self._selected_chapter())
+
+    def _min_pokemon(self):
+        """Mínimo que o jogador PRECISA escolher.
+        - 1v1: 1 (o jogador pode ir com menos que o máximo e se virar)
+        - 2v2 / 3v3: exatamente o team_size (rígido)"""
+        chapter = self._selected_chapter()
+        if chapter == 1:
+            return 1
+        return get_pvp_team_size(chapter)
+
+    def _max_pokemon(self):
+        """Máximo que o jogador PODE escolher (também é o teto físico)."""
+        return get_pvp_team_size(self._selected_chapter())
+
+    def _is_selection_valid(self):
+        chosen = len(self.selected_ids)
+        return self._min_pokemon() <= chosen <= self._max_pokemon()
 
     def _required_players(self):
         return get_pvp_total_players(self._selected_chapter())
@@ -200,7 +222,11 @@ class PvPSelectScene(BaseScene):
                 if r.collidepoint(pos):
                     if i != self.selected_mode_idx:
                         self.selected_mode_idx = i
-                        self.selected_ids.clear()
+                        # ★ Ao trocar de formato, o time selecionado pode
+                        # ficar inválido. Não limpamos agressivamente para
+                        # não irritar o jogador — só garantimos que a
+                        # seleção não ultrapasse o novo máximo.
+                        self._clamp_selection_to_max()
                         self.poke_scroll = 0
                         sound_manager.play_effect(SoundEffect.CLICK, volume=0.2)
                     return
@@ -213,14 +239,22 @@ class PvPSelectScene(BaseScene):
                         self._toggle_poke(self.player_entries[idx])
                 return
 
+    def _clamp_selection_to_max(self):
+        """Remove seleção excedente ao trocar de formato."""
+        max_p = self._max_pokemon()
+        while len(self.selected_ids) > max_p:
+            self.selected_ids.pop()
+
     def _toggle_poke(self, entry):
         uid = entry["unique_id"]
-        required = self._required_pokemon()
+        max_p = self._max_pokemon()
 
         if uid in self.selected_ids:
             self.selected_ids.discard(uid)
         else:
-            if len(self.selected_ids) >= required:
+            # ★ Só bloqueia se ultrapassar o MÁXIMO (não o "required").
+            # No 1v1 isso permite selecionar de 1 a 6 livremente.
+            if len(self.selected_ids) >= max_p:
                 self.selected_ids.pop()
             self.selected_ids.add(uid)
         sound_manager.play_effect(SoundEffect.CLICK, volume=0.2)
@@ -235,8 +269,8 @@ class PvPSelectScene(BaseScene):
         )
 
     def _start_matchmaking(self):
-        required = self._required_pokemon()
-        if len(self.selected_ids) != required:
+        # ★ Validação: usa min/max em vez de exigir exatamente o team_size
+        if not self._is_selection_valid():
             return
 
         team_data = []
@@ -386,7 +420,7 @@ class PvPSelectScene(BaseScene):
         y += 40
 
         info = self._font(18).render(
-            f"{players} jogador(es)/time  ·  time de {team_size}  ·  "
+            f"{players} jogador(es)/time  ·  time de até {team_size}  ·  "
             f"{spots_pp} em campo/jogador",
             True, COL_TEXT_DIM)
         screen.blit(info, (rect.x + 22, y))
@@ -408,18 +442,28 @@ class PvPSelectScene(BaseScene):
                          (rect.x + 22, y), (rect.right - 22, y), 1)
         y += 14
 
-        required = team_size
+        # ★ Usa min/max em vez de exigir exatamente team_size
+        min_p = self._min_pokemon()
+        max_p = self._max_pokemon()
         chosen = len(self.selected_ids)
-        color = COL_SUCCESS if chosen == required else COL_TEXT
+        is_valid = self._is_selection_valid()
+
+        if min_p == max_p:
+            label_range = f"{max_p}"
+        else:
+            label_range = f"{min_p}-{max_p}"
+
+        color = COL_SUCCESS if is_valid else COL_TEXT
         title_s = self._font(22).render(
-            f"SEU TIME  ({chosen}/{required})", True, color)
+            f"SEU TIME  ({chosen}/{label_range})", True, color)
         screen.blit(title_s, (rect.x + 22, y))
 
-        if chosen == required:
+        if is_valid:
             hint_txt = "Pronto!"
             hint_col = COL_SUCCESS
-        elif chosen < required:
-            hint_txt = f"Faltam {required - chosen}"
+        elif chosen < min_p:
+            faltam = min_p - chosen
+            hint_txt = f"Faltam {faltam}"
             hint_col = COL_ACCENT
         else:
             hint_txt = "Muitos"
@@ -514,11 +558,13 @@ class PvPSelectScene(BaseScene):
         screen.set_clip(old_clip)
 
     def _render_ready_btn(self, screen):
-        required = self._required_pokemon()
+        # ★ Validação por min/max — em 1v1, qualquer valor entre 1 e 6 vale
+        is_valid = self._is_selection_valid()
         chosen = len(self.selected_ids)
-        can = (chosen == required)
+        min_p = self._min_pokemon()
+        max_p = self._max_pokemon()
 
-        if can:
+        if is_valid:
             bg = (55, 130, 70)
             bg_hover = (90, 190, 110)
             border = COL_ACCENT
@@ -527,10 +573,10 @@ class PvPSelectScene(BaseScene):
             border = (100, 105, 115)
 
         mouse = pygame.mouse.get_pos()
-        hover = can and self.ready_btn.collidepoint(mouse)
+        hover = is_valid and self.ready_btn.collidepoint(mouse)
         color = bg_hover if hover else bg
 
-        if can:
+        if is_valid:
             pulse = 0.5 + 0.5 * math.sin(self._anim_time * 3.0)
             ga = int(50 + 60 * pulse)
             glow = pygame.Surface(
@@ -543,11 +589,14 @@ class PvPSelectScene(BaseScene):
         pygame.draw.rect(screen, color, self.ready_btn, border_radius=18)
         pygame.draw.rect(screen, border, self.ready_btn, 3, border_radius=18)
 
-        if not can:
-            if chosen < required:
-                label = f"Escolha {required - chosen} pokémon"
+        if not is_valid:
+            if chosen < min_p:
+                faltam = min_p - chosen
+                label = f"Escolha {faltam} pokémon" if faltam > 1 else "Escolha 1 pokémon"
             else:
-                label = f"Remova {chosen - required} pokémon"
+                # Ultrapassou o máximo (não deveria acontecer, mas defensivo)
+                remova = chosen - max_p
+                label = f"Remova {remova} pokémon"
         else:
             label = "BUSCAR PARTIDA!"
 

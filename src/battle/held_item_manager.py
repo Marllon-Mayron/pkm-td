@@ -32,6 +32,28 @@ class HeldItemManager:
         return None
 
     @staticmethod
+    def get_money_multiplier(team_pokemon) -> float:
+        """
+        Retorna o multiplicador de dinheiro ganho em batalhas contra treinadores,
+        baseado em Amulet Coin no time.
+
+        Regra (estilo Pokémon original):
+          - Se QUALQUER Pokémon do time que participou da batalha estiver
+            segurando Amulet Coin, o multiplicador é 2.0.
+          - Caso contrário, 1.0.
+          - Múltiplos Amulet Coins NÃO acumulam (continua 2.0).
+
+        Parâmetro:
+            team_pokemon: lista/iterável de Pokémon do time do jogador
+                          (ex: placement_manager.placed_pokemon, ou
+                           player.team em batalhas de arena).
+        """
+        for p in team_pokemon or []:
+            if getattr(p, "held_item", None) == "amulet_coin":
+                return 2.0
+        return 1.0
+
+    @staticmethod
     def apply_type_boost(attacker: Pokemon, move_type: str, damage: int) -> int:
         """
         Aplica bônus de tipo se o atacante estiver segurando um item que aumenta

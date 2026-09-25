@@ -256,6 +256,21 @@ class ItemBagCatalog:
             "unlock_chapter": None,
         }
 
+        items["moomoo_milk"] = {
+            "id": "moomoo_milk",
+            "name": "MOOMOO MILK",
+            "sprite_path": medicine_path / "MOOMOOMILK.png",
+            "description": "Leite nutritivo de Miltank. Recupera 100 HP de um Pokémon.",
+            "category": "medicine",
+            "usable_in_battle": True,
+            "usable_on_map": True,
+            "effect": "heal",
+            "effect_value": 100,
+            "price": 500,
+            "not_for_sale": True,
+            "unlock_phase": None,
+            "unlock_chapter": None,
+        }
         # ============================================================
         # ITENS DE CURA DE STATUS
         # ============================================================
@@ -534,6 +549,7 @@ class ItemBagCatalog:
         # ============================================================
         # HELD ITEMS (ITENS SEGURÁVEIS)
         # ============================================================
+
         held_items = [
             # Inseto
             ("silverpowder", "SILVERPOWDER", "Aumenta o poder de golpes do tipo Inseto em 10%.", "held_item", 8000),
@@ -570,11 +586,18 @@ class ItemBagCatalog:
             # Fantasma
             ("spelltag", "SPELLTAG", "Aumenta o poder de golpes do tipo Fantasma em 10%.", "held_item", 8000),
             # Demais itens seguráveis
-            ("kings_rock", "KINGSROCK",
-             "Dá 10% de chance de fazer o oponente hesitar ao usar um ataque que causa dano.", "held_item", 9000),
-            ("dragon_scale", "DRAGONSCALE", "Escama especial que faz o Seadra evoluir para Kingdra.", "held_item",
-             9000),
+            ("kings_rock", "KINGSROCK", "Dá 10% de chance de fazer o oponente hesitar ao usar um ataque que causa dano.", "held_item", 9000),
+            ("dragon_scale", "DRAGONSCALE", "Escama especial que faz o Seadra evoluir para Kingdra.", "held_item", 9000),
             ("upgrade", "UPGRADE", "Dispositivo avançado que faz o Porygon evoluir para Porygon2.", "held_item", 9000),
+
+            ("amulet_coin", "AMULETCOIN", "Dobra o dinheiro recebido ao vencer batalhas contra treinadores. O Pokémon precisa participar da batalha.", "held_item", 10000),
+            ("big_pearl", "BIGPEARL", "Uma pérola grande e bonita. Pode ser vendida por um preço bem alto.", "held_item", 10000),
+            ("stick", "STICK", "Alho-poró. Aumenta a taxa de acerto crítico do Farfetch'd em 2 níveis.", "held_item", 1000),
+            ("thick_club", "THICKCLUB", "Osso grosso. Dobra o Ataque do Cubone e Maroak.",  "held_item", 1000),
+            ("light_ball", "LIGHTBALL", "Bola elétrica. Dobra o Ataque e Ataque Especial do Pikachu.", "held_item", 1000),
+            ("lucky_punch", "LUCKYPUNCH", "Luva da sorte. Aumenta muito a taxa de acerto crítico da Chansey.", "held_item", 1000),
+            ("big_mushroom", "BIGMUSHROOM", "Cogumelo grande e raro. Pode ser vendido por um preço alto.", "held_item", 2400),
+            ("tiny_mushroom", "TINYMUSHROOM", "Cogumelo pequeno e comum. Pode ser vendido por um preço razoável.", "held_item", 600),
         ]
 
         for item_id, name, description, category, price in held_items:
@@ -594,6 +617,7 @@ class ItemBagCatalog:
                 "unlock_phase": "4-5",
                 "unlock_chapter": None,
             }
+
 
         # ============================================================
         # ITENS ESPECIAIS (não vendidos na loja, mas revendíveis pelo jogador)

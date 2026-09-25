@@ -4,7 +4,6 @@ from typing import List, Dict, Optional
 from dataclasses import dataclass
 
 from src.data.item_bag_catalog import item_bag_catalog
-from src.data.wild_held_items import roll_wild_held_item
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 from src.ui.toast_renderer import toast_battle
 
@@ -498,13 +497,17 @@ class EnemySpawner:
         """
         Duas rolagens:
           - Rolagem A: 5% de chance de segurar algo.
-          - Rolagem B: escolhe o item por peso.
-        Bosses ficam de fora por padrão (remova o `if is_boss` se quiser que também segurem).
+          - Rolagem B: regras exclusivas da espécie OU sorteio ponderado.
+        Bosses ficam de fora por padrão.
         """
         if is_boss:
             return
 
-        item_id = roll_wild_held_item()
+        item_id = roll_wild_held_item(
+            pokemon_id=pokemon.id,
+            is_shiny=pokemon.is_shiny,
+            level=pokemon.level,
+        )
         if not item_id:
             return
 

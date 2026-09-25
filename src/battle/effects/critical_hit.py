@@ -64,6 +64,16 @@ class CriticalHitSystem:
             if pokemon_id in cls._crit_stage_modifiers:
                 base_stage += cls._crit_stage_modifiers[pokemon_id]
 
+            # ===== STICK — exclusivo do Farfetch'd (+2 estágios) =====
+            if (getattr(attacker, "held_item", None) == "stick"
+                    and getattr(attacker, "id", None) == 83):
+                base_stage += 2
+
+            # ===== LUCKY PUNCH — exclusivo da Chansey (+2 estágios) =====
+            if (getattr(attacker, "held_item", None) == "lucky_punch"
+                    and getattr(attacker, "id", None) == 113):
+                base_stage += 2
+
         # Limita a +4 (50% de chance)
         return min(4, base_stage)
 

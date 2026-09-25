@@ -940,7 +940,7 @@ class ArenaBattleScene(BaseScene):
         self.arena_state = "finished"
         self.arena_result = result
 
-        # Recompensas SEMPRE calculadas (usadas tanto pra ganhar quanto pra perder).
+        # ===== RECOMPENSAS BASE =====
         rewards = {}
         if self._trainer_data:
             rewards = {
@@ -949,30 +949,49 @@ class ArenaBattleScene(BaseScene):
                 "trainer_name": self._trainer_data.get("name", "oponente"),
             }
 
+        # ===== APLICA AMULET COIN (só na vitória, dobra o ouro) =====
+        display_rewards = dict(rewards)
         if result == "win" and rewards:
-            # ---- Ganha o que o treinador oferece ----
+            try:
+                from src.battle.held_item_manager import HeldItemManager
+                amulet_mult = HeldItemManager.get_money_multiplier(
+                    self._local_team_objs)
+                if amulet_mult > 1.0:
+                    old_money = rewards["money"]
+                    rewards["money"] = int(rewards["money"] * amulet_mult)
+                    print(f"[AMULET_COIN] Arena: ouro {old_money} -> "
+                          f"{rewards['money']} (x{amulet_mult})")
+                    display_rewards["money"] = rewards["money"]
+            except Exception as e:
+                print(f"[AMULET_COIN] Erro ao aplicar multiplicador na arena: {e}")
+
+        # ===== VITÓRIA =====
+        if result == "win" and rewards:
+            # ---- Ganha o que o treinador oferece (já com Amulet aplicado) ----
             try:
                 self.player.money += rewards["money"]
                 self.player.score += rewards["xp"]
             except Exception:
                 pass
+
             for p in self._local_team_objs:
                 if p.is_alive():
                     try:
                         p.gain_xp(rewards["xp"] // 3)
                     except Exception:
                         pass
+
             try:
                 self.player.auto_save()
             except Exception:
                 pass
 
+        # ===== DERROTA =====
         elif result == "lose" and rewards:
-            # ---- Perde EXATAMENTE o que ganharia ----
+            # ---- Perde EXATAMENTE o que ganharia (sem Amulet, pois não venceu) ----
             loss_money = rewards.get("money", 0)
             loss_xp = rewards.get("xp", 0)
 
-            # Clamp em 0 pra não ficar negativo
             try:
                 self.player.money = max(0, self.player.money - loss_money)
             except Exception:
@@ -989,8 +1008,9 @@ class ArenaBattleScene(BaseScene):
 
         print(f"[ARENA] Fim da batalha: {result} | rewards={rewards}")
 
+        # ===== OVERLAY (usa display_rewards que reflete o valor real) =====
         from src.scenes.arena_scene.arena_result_overlay import ArenaResultOverlay
-        self._arena_overlay = ArenaResultOverlay(self, result, rewards)
+        self._arena_overlay = ArenaResultOverlay(self, result, display_rewards)
 
     # ==================================================================
     # SAÍDA

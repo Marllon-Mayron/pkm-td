@@ -403,26 +403,41 @@ class WaveManager:
         """
         print(f"[WaveManager] {enemy.name} (BOSS={enemy.is_boss}) MORREU em batalha!")
 
-        # ===== VERIFICA MULTIPLICADOR DE PAY DAY PARA GOLD =====
+        # ===== GOLD BASE =====
         gold_reward = self.gold_per_defeat
-        # Incrementa o contador de inimigos derrotados
         self.total_enemies_defeated += 1
         print(f"[DEBUG] total_enemies_defeated agora = {self.total_enemies_defeated}")
-        pay_day_gold_mult = 1.0
 
+        # ===== PAY DAY (multiplicador de gold) =====
         if hasattr(enemy, '_pay_day_hit') and enemy._pay_day_hit:
             pay_day_gold_mult = getattr(enemy, '_pay_day_gold_multiplier', 2.0)
+            old_gold = gold_reward
             gold_reward = int(gold_reward * pay_day_gold_mult)
-            print(f"[PAY_DAY] Bonus de gold! {self.gold_per_defeat} -> {gold_reward} (x{pay_day_gold_mult})")
+            print(f"[PAY_DAY] Bonus de gold! {old_gold} -> {gold_reward} (x{pay_day_gold_mult})")
 
-        # ===== NOVO SISTEMA DE XP: SO QUEM ATACOU ESTE INIMIGO =====
+        # ===== AMULET COIN (dobra o gold se algum aliado em campo segura) =====
+        try:
+            from src.battle.held_item_manager import HeldItemManager
+            team = []
+            if self.game_scene and hasattr(self.game_scene, 'placement_manager'):
+                team = self.game_scene.placement_manager.placed_pokemon
+            amulet_mult = HeldItemManager.get_money_multiplier(team)
+            if amulet_mult > 1.0:
+                old_gold = gold_reward
+                gold_reward = int(gold_reward * amulet_mult)
+                print(f"[AMULET_COIN] Gold dobrado! {old_gold} -> {gold_reward}")
+        except Exception as e:
+            print(f"[AMULET_COIN] Erro ao aplicar multiplicador: {e}")
+
+        # ===== XP: SÓ QUEM ATACOU ESTE INIMIGO =====
         if self.game_scene and hasattr(self.game_scene, 'battle_system'):
             self.game_scene.battle_system.distribute_xp_for_defeated_enemy(enemy)
 
-        # Adiciona gold (com multiplicador)
+        # ===== ADICIONA GOLD =====
         self.total_gold_earned += gold_reward
+        print(f"[GOLD] +{gold_reward} (total acumulado: {self.total_gold_earned})")
 
-        # Se estava carregando item, o item volta para o chão
+        # ===== SE ESTAVA CARREGANDO ITEM, DROPA DE VOLTA =====
         if enemy.is_carrying is not None:
             try:
                 item_name = enemy.is_carrying.item_name
@@ -447,11 +462,20 @@ class WaveManager:
                     player.achievement_manager.check_and_unlock("boss_defeated", phase_id)
                     print(f"[ACHIEVEMENT] Boss {enemy.name} derrotado! Verificando conquistas...")
 
-        # Remove o inimigo da lista ativa
+        # ===== CONQUISTAS: Amulet Coin ativo na morte =====
+        if hasattr(enemy, 'held_item') and enemy.held_item == "amulet_coin":
+            # (não deveria acontecer — Amulet Coin é só do jogador — mas
+            #  deixamos o gancho caso queira contar selvagens com o item)
+            pass
+
+        # ===== REMOVE O INIMIGO DA LISTA ATIVA =====
         self._remove_enemy(enemy)
 
-        # Auto-save após morte de inimigo
-        self.game_scene.player.auto_save()
+        # ===== AUTO-SAVE =====
+        try:
+            self.game_scene.player.auto_save()
+        except Exception:
+            pass
 
     def _steal_item(self, enemy: 'Pokemon'):
         """

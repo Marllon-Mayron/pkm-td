@@ -1951,10 +1951,14 @@
         "item_rewards": [
             {
                 "item_id": "x_speed",
-                "weight": 100
+                "weight": 30
+            },
+            {
+                "item_id": "moomoo_milk",
+                "weight": 70
             }
         ],
-        "drop_chance": 0.01,
+        "drop_chance": 0.05,
         "max_items": 5,
         "template_name": null
     },

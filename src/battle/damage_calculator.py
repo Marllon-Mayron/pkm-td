@@ -275,8 +275,21 @@ class DamageCalculator:
             attack_stat = attacker.attack
             defense_stat = defender.defense
 
+            # ===== THICK CLUB — exclusivo do Cubone/Maroak (dobra o Attack) =====
+            if (getattr(attacker, "held_item", None) == "thick_club"
+                    and getattr(attacker, "id", None) in (104, 105)):
+                attack_stat = attack_stat * 2
+                print(f"[THICK_CLUB] {attacker.name}: Ataque físico dobrado! "
+                      f"({attacker.attack} -> {int(attack_stat)})")
+
+            # ===== LIGHT BALL — exclusivo do Pikachu (dobra Attack físico) =====
+            if (getattr(attacker, "held_item", None) == "light_ball"
+                    and getattr(attacker, "id", None) == 25):
+                attack_stat = attack_stat * 2
+                print(f"[LIGHT_BALL] {attacker.name}: Ataque físico dobrado! "
+                      f"({attacker.attack} -> {int(attack_stat)})")
+
             # ===== APLICA EFEITO DA QUEIMADURA NO ATACANTE =====
-            # Se o atacante está queimado, reduz o dano físico pela metade
             if hasattr(attacker, 'effect_manager') and attacker.effect_manager:
                 status = attacker.effect_manager.get_status(attacker)
                 if status and status.type == StatusType.BURN:
@@ -285,6 +298,13 @@ class DamageCalculator:
         else:  # special
             attack_stat = attacker.sp_attack
             defense_stat = defender.sp_defense
+
+            # ===== LIGHT BALL — exclusivo do Pikachu (dobra Sp. Attack) =====
+            if (getattr(attacker, "held_item", None) == "light_ball"
+                    and getattr(attacker, "id", None) == 25):
+                attack_stat = attack_stat * 2
+                print(f"[LIGHT_BALL] {attacker.name}: Ataque Especial dobrado! "
+                      f"({attacker.sp_attack} -> {int(attack_stat)})")
 
         # ===== VERIFICA MINIMIZE PARA STOMP =====
         if move.name.lower() == "stomp":
