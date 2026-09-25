@@ -3,6 +3,7 @@ import random
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 
+from src.data.wild_held_items import roll_wild_held_item
 from src.data.item_bag_catalog import item_bag_catalog
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 from src.ui.toast_renderer import toast_battle

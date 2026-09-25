@@ -572,7 +572,6 @@ class BattleSystem:
         elif move.category == "physical" and move.power > 0:
             print(f"[BATTLE] {attacker.name} usou {move.name}! (Ataque físico)")
 
-            # ===== REGISTRA ATACANTE PARA O ALVO =====
             if target:
                 self.register_attacker_for_enemy(attacker, target)
 
@@ -580,6 +579,18 @@ class BattleSystem:
             move_sound_manager.play_attack_sound(move.sound_name)
 
             move.current_pp -= 1
+
+            # ===== APLICA EFEITOS BEFORE_DAMAGE (ex: Quick Attack buff) =====
+            # Só aplica se ainda NÃO foi aplicado no _try_attack (antes de mover).
+            # Se a flag existir, é porque o combat.py já aplicou o buff quando
+            # o Pokémon decidiu atacar — não precisa aplicar de novo.
+            flag = f"_before_dmg_{move.name}_{id(target)}"
+            if not getattr(attacker, flag, False):
+                self._apply_move_effect_by_timing(
+                    attacker, target, move, EffectTiming.BEFORE_DAMAGE, damage=0
+                )
+            else:
+                print(f"[BEFORE_DAMAGE] {move.name} já aplicado no _try_attack — pulando")
 
             if will_hit:
                 damage_result = self._calculate_move_damage(attacker, target, move)
@@ -615,6 +626,14 @@ class BattleSystem:
                 print(f"[TRACK] {attacker.name} usou {move.name}")
 
             return True
+
+    def _apply_move_effect_by_timing(self, attacker, target, move, timing, damage=0):
+        """Aplica efeito do move apenas se o timing bater."""
+        from src.battle.effects import EffectFactory
+
+        effect = EffectFactory.create_effect(move.name)
+        if effect and effect.timing == timing:
+            effect.execute(attacker, target, self, self.effect_manager, damage)
 
     def _handle_special_damage_move(self, attacker: 'Pokemon', target: 'Pokemon', move) -> bool:
         """

@@ -113,11 +113,9 @@ def _roll_species_rule(pokemon_id, is_shiny=False, level=1, rng=random):
     if not rules:
         return None
 
-    # Ordena por prioridade (menor primeiro; default 0)
     ordered = sorted(rules, key=lambda r: r.get("priority", 0))
 
     for rule in ordered:
-        # Filtros opcionais
         if rule.get("shiny_only") and not is_shiny:
             continue
         if level < rule.get("level_min", 0):
@@ -138,12 +136,6 @@ def roll_wild_held_item(pokemon_id=None, is_shiny=False, level=1, rng=None):
     Rola as DUAS etapas:
       - Rolagem A: 5% de chance de segurar algo.
       - Rolagem B: item exclusivo da espécie (se houver) OU sorteio ponderado.
-
-    Parâmetros:
-        pokemon_id: ID numérico da espécie (para regras exclusivas).
-        is_shiny:   se o Pokémon é shiny (filtro opcional das regras).
-        level:      nível do Pokémon (filtro opcional das regras).
-        rng:        fonte de random (para testes determinísticos).
 
     Retorna o item_id (str) ou None.
     """

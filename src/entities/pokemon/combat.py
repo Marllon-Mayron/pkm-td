@@ -681,6 +681,10 @@ class PokemonCombat:
         # Atualiza direção para olhar para o alvo
         self._update_direction_to_target(dx, dy)
 
+        # APLICA EFEITOS BEFORE_DAMAGE ANTES DE MOVER OU ATACAR
+
+        self._apply_before_damage_effect(target, current_move)
+
         # ===== ALIADOS (NOT WILD) =====
         if not self.pokemon.is_wild:
             attack_distance = 12
@@ -727,6 +731,46 @@ class PokemonCombat:
                 self.pokemon.target = None
                 self.pokemon.combat_state = "idle"
                 self.pokemon._attack_attempts = 0
+
+    def _apply_before_damage_effect(self, target, move):
+        """
+        Aplica efeitos com timing=BEFORE_DAMAGE (ex: Quick Attack) ANTES
+        do Pokémon começar a se mover em direção ao alvo.
+
+        Assim o buff de Speed já está ativo durante o deslocamento, e o
+        Pokémon anda mais rápido até o alvo.
+
+        Só aplica UMA VEZ por ciclo de ataque (flag por move + id do alvo).
+        A flag é limpa no _execute_attack.
+        """
+        if not hasattr(self.pokemon, 'battle_system') or not self.pokemon.battle_system:
+            return
+
+        try:
+            from src.battle.effects import EffectFactory, EffectTiming
+            effect = EffectFactory.create_effect(move.name)
+            if not effect or effect.timing != EffectTiming.BEFORE_DAMAGE:
+                return
+
+            # ===== FLAG: só aplica UMA VEZ por (move, alvo) =====
+            flag = f"_before_dmg_{move.name}_{id(target)}"
+            if getattr(self.pokemon, flag, False):
+                return
+
+            print(f"[BEFORE_DAMAGE] {self.pokemon.name}: aplicando {move.name} "
+                  f"ANTES de mover até {target.name}!")
+
+            effect.execute(
+                self.pokemon, target,
+                self.pokemon.battle_system,
+                self.pokemon.battle_system.effect_manager,
+            )
+            setattr(self.pokemon, flag, True)
+
+        except Exception as e:
+            print(f"[BEFORE_DAMAGE] erro ao aplicar {move.name}: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _move_towards_target(self, target: 'Pokemon', dx: float, dy: float, distance: float, dt: float):
         """Move em direção ao alvo (para aliados E inimigos)"""
@@ -1044,9 +1088,15 @@ class PokemonCombat:
             if hasattr(self.pokemon, '_path_tracker'):
                 self.pokemon._path_tracker.set_ignore_path(self.pokemon, 0)
 
-        # Se for boss de raid, restaura PP depois de atacar
-        if getattr(self.pokemon, '_is_raid_boss', False):
-            self.pokemon.restore_all_pp()
+            # ===== LIMPA FLAG DE BEFORE_DAMAGE APLICADO =====
+            # Permite aplicar de novo no próximo ciclo / próximo alvo
+            for key in list(vars(self.pokemon).keys()):
+                if key.startswith(f"_before_dmg_{move.name}_"):
+                    setattr(self.pokemon, key, False)
+
+            # Se for boss de raid, restaura PP depois de atacar
+            if getattr(self.pokemon, '_is_raid_boss', False):
+                self.pokemon.restore_all_pp()
 
     def _handle_returning_state(self, dt: float):
         """

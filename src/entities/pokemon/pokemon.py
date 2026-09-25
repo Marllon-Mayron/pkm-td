@@ -909,6 +909,7 @@ class Pokemon(Entity):
         """Define o sistema de combate para este Pokémon"""
         self.battle_system = battle_system
         if battle_system and battle_system.effect_manager:
+            self.effect_manager = battle_system.effect_manager
             battle_system.effect_manager.register_pokemon(self)
 
     def heal(self, amount=None):
@@ -1228,8 +1229,8 @@ class Pokemon(Entity):
             return
 
         # ===== 4. POKÉMON VIVO - ATUALIZA RESTO =====
-        # Atualiza velocidade baseada nos efeitos
-        if hasattr(self, 'effect_manager') and self.effect_manager and self.is_wild:
+        # Atualiza velocidade baseada nos efeitos (TANTO selvagens QUANTO aliados)
+        if hasattr(self, 'effect_manager') and self.effect_manager:
             self.update_move_speed_from_effects()
 
         # Atualiza item sendo carregado

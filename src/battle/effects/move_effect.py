@@ -241,6 +241,8 @@ class MoveEffect:
             return self._apply_mimic(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "transform":
             return self._apply_transform(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "quick_attack_buff":
+            return self._apply_quick_attack_buff(attacker, target, battle_system, effect_manager)
         #GEN2
         elif self.effect_type == "triple_kick":
             return self._apply_triple_kick(attacker, target, battle_system, effect_manager)
@@ -2448,6 +2450,32 @@ class MoveEffect:
 
         # Atualiza o tamanho do sprite
         attacker.map_sprite_size = pokedex.get_map_sprite_size(target.id, attacker.is_shiny)
+
+    def _apply_quick_attack_buff(self, attacker, target, battle_system, effect_manager):
+        """
+        Quick Attack: aplica +N Speed por X segundos. Simples e temporário.
+        O buff expira sozinho pelo EffectManager.
+        """
+        from src.battle.effects.stat_modifier import StatType
+
+        speed_stages = self.params.get("speed_stages", 6)
+        duration = self.params.get("duration", 2.5)
+
+        # Aplica o modificador de Speed com duração
+        effect_manager.add_stat_modifier(
+            attacker,
+            StatType.SPEED,
+            speed_stages,
+            duration=duration,
+        )
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} acelerou! Velocidade +{speed_stages}!",
+            duration=1.5
+        )
+        print(f"[QUICK_ATTACK] {attacker.name} ganhou +{speed_stages} Speed por {duration}s")
+        return True
 
     # ===== MÉTODOS DE MIST =====
     def _apply_mist(self, attacker, target, battle_system, effect_manager, damage):

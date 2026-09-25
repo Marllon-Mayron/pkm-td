@@ -112,24 +112,34 @@ class PokemonStats:
         combined_norm = base_norm * (0.8 + 0.2 * stat_norm)
         level_factor = 1.0 + (self.pokemon.level / 100) * 0.3
 
+        # ===== 1. Calcula o move_speed BASE =====
         move_speed = MIN_MOVE_SPEED + (MAX_MOVE_SPEED - MIN_MOVE_SPEED) * combined_norm
         move_speed *= level_factor
-
-        speed_mult = 1.0
-        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
-            try:
-                from src.battle.effects import StatType
-                speed_mult = self.pokemon.effect_manager.get_stat_multiplier(self.pokemon, StatType.SPEED)
-                move_speed *= speed_mult
-            except Exception:
-                pass
 
         if self.pokemon.is_shiny:
             move_speed *= 1.25
         if self.pokemon.is_boss:
             move_speed *= 0.7
 
-        return max(MIN_MOVE_SPEED, min(MAX_MOVE_SPEED, move_speed))
+        # ===== 2. Clamp base ANTES do buff =====
+        move_speed = max(MIN_MOVE_SPEED, min(MAX_MOVE_SPEED, move_speed))
+
+        # ===== 3. Aplica o multiplicador de Speed =====
+        speed_mult = 1.0
+        if hasattr(self.pokemon, 'effect_manager') and self.pokemon.effect_manager:
+            try:
+                from src.battle.effects import StatType
+                speed_mult = self.pokemon.effect_manager.get_stat_multiplier(self.pokemon, StatType.SPEED)
+            except Exception as e:
+                print(f"[SPEED_MULT] erro: {e}")
+
+        move_speed *= speed_mult
+
+        # ===== 4. Clamp final mais permissivo (permite buff até 4x) =====
+        MAX_WITH_BUFF = MAX_MOVE_SPEED * 4.0  # 16.0
+        move_speed = max(MIN_MOVE_SPEED, min(MAX_WITH_BUFF, move_speed))
+
+        return move_speed
 
     def get_cached_move_speed(self):
         cache_key = (self.pokemon.id, self.pokemon.level, self.pokemon.speed_stat,

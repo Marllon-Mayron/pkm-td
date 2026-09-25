@@ -26,6 +26,12 @@ NEWS_DEVLOGS = {
 # O número é extraído do nome do arquivo (news_1.png -> 1, news_2.png -> 2)
 # =====================================================================
 NEWS_IMAGE_TITLES = {
+    "0.1.21": {
+        1: "Capa da versão: 0.1.21.",
+        2: "Tela de seleçaõ de time para o pvp.",
+        3: "Modo arena PVP",
+        4: "Muitos itens seguraveis novos"
+    },
     "0.1.20": {
         1: "Capa da versão: 0.1.20.",
         2: "Nova tela de hall de npcs.",

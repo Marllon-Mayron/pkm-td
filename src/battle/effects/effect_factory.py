@@ -1473,7 +1473,29 @@ class EffectFactory:
                 "pp_on_copy": 5
             },
             "description": "Copies a move used by the foe."
-        }
+        },
+
+        "quick-attack": {
+            "effect_type": "quick_attack_buff",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.BEFORE_DAMAGE,
+            "params": {
+                "speed_stages": 1,
+                "duration": 2.5,
+            },
+            "description": "Ataca primeiro. Aumenta a Velocidade do usuário por alguns segundos."
+        },
+
+        "mach-punch": {
+            "effect_type": "quick_attack_buff",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.BEFORE_DAMAGE,
+            "params": {
+                "speed_stages": 1,
+                "duration": 2.5,
+            },
+            "description": "Soco rápido. Aumenta a Velocidade do usuário por alguns segundos."
+        },
     }
 
     MOVE_EFFECTS_GEN2 = {
@@ -2267,6 +2289,17 @@ class EffectFactory:
                 "prevents_confusion": True,
             },
             "description": "Protege o time de problemas de status pelos próximos 5 ataques."
+        },
+
+        "extreme-speed": {
+            "effect_type": "quick_attack_buff",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.BEFORE_DAMAGE,
+            "params": {
+                "speed_stages": 1,
+                "duration": 2.5,
+            },
+            "description": "Prioridade alta. Aumenta a Velocidade do usuário por alguns segundos."
         },
 
     }
