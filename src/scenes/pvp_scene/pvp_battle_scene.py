@@ -3,20 +3,21 @@
 PvPBattleScene — batalha PvP entre jogadores com sync de rede.
 
 Regras de substituição:
-  - Quando um pokémon morre, o corpo fica no campo por 5s.
+  - Quando um pokémon morre, o corpo fica no campo por 10s.
   - O spot é LIBERADO imediatamente para que o PERDEDOR possa arrastar
     um novo pokémon do HUD em cima do corpo.
-  - Após 5s, se o PERDEDOR não substituiu, o jogo posiciona
+  - Após 10s, se o PERDEDOR não substituiu, o jogo posiciona
     automaticamente o primeiro pokémon disponível do time.
   - VENCEDOR (quem derrotou um pokémon inimigo): recebe SEMPRE um overlay
-    com cards (5s) para escolher trocar um dos seus pokémon posicionados
+    com cards (10s) para escolher trocar um dos seus pokémon posicionados
     por outro do HUD, ou "Não trocar".
   - Uma vez colocado, um pokémon NÃO pode ser removido nem trocado por
-    drag — apenas substituindo um MORTO (janela de 5s) ou via overlay do
+    drag — apenas substituindo um MORTO (janela de 10s) ou via overlay do
     VENCEDOR.
   - O contador de 10s do placement inicial fica SEMPRE visível durante a
     fase de placement.
   - Bag de itens desabilitada no PvP.
+  - Conquistas desabilitadas no PvP (achievements_enabled = False).
 """
 import json
 import math
@@ -33,7 +34,7 @@ from src.data.pvp_catalog import (
 
 
 # Tempo que o corpo fica no campo antes de ser removido
-CORPSE_LIFETIME = 5.0
+CORPSE_LIFETIME = 10.0
 
 # Tempo máximo para posicionar pokémon no início da partida
 PLACEMENT_TIME = 10.0
@@ -76,7 +77,17 @@ def _install_pvp_damage_hook():
     PokemonCombat._pvp_damage_hook = True
     print("[PVP] Hook de dano instalado")
 
+
+# =====================================================================
+# HOOK GLOBAL: status → broadcast
+# =====================================================================
 def _install_pvp_status_hook():
+    """Hook em EffectManager.apply_status/remove_status para propagar
+    status aplicados em pokémons remotos de volta ao dono.
+
+    Também protege contra loop: se a aplicação veio da rede
+    (_pvp_applying_remote=True), apenas delega sem re-broadcastar.
+    """
     from src.battle.effects.effect_manager import EffectManager
     if getattr(EffectManager, '_pvp_status_hook', False):
         return
@@ -85,7 +96,7 @@ def _install_pvp_status_hook():
     original_remove = EffectManager.remove_status
 
     def hooked_apply(self_em, pokemon, status, *args, **kwargs):
-        # ★ Não re-broadcasta quando é aplicação vinda da rede
+        # ★ Guard: aplicação vinda da rede → não re-broadcasta
         if getattr(self_em, '_pvp_applying_remote', False):
             return original_apply(self_em, pokemon, status, *args, **kwargs)
 
@@ -94,18 +105,53 @@ def _install_pvp_status_hook():
             return result
         if not getattr(pokemon, '_is_remote', False):
             return result
-        # ... (resto igual: monta payload e envia PVP_STATUS_APPLY) ...
+
+        bs = getattr(pokemon, 'battle_system', None)
+        scene = getattr(bs, 'game_scene', None) if bs else None
+        if scene is None or not hasattr(scene, '_my_uuid'):
+            return result
+        owner_uuid = getattr(pokemon, '_pvp_owner_uuid', None)
+        if not owner_uuid or owner_uuid == scene._my_uuid:
+            return result
+        try:
+            scene._network.send_to_all(create_message(
+                "PVP_STATUS_APPLY", {
+                    "owner_uuid": owner_uuid,
+                    "unique_id": pokemon.unique_id,
+                    "status_type": status.type.value,
+                }))
+            print(f"[PVP] Status broadcast: {pokemon.name} "
+                  f"({status.type.value}) → {owner_uuid[:8]}")
+        except Exception as e:
+            print(f"[PVP] erro enviar status apply: {e}")
         return result
 
     def hooked_remove(self_em, pokemon):
-        # ★ Não re-broadcasta quando é remoção vinda da rede
+        # ★ Guard: remoção vinda da rede → não re-broadcasta
         if getattr(self_em, '_pvp_applying_remote', False):
             return original_remove(self_em, pokemon)
 
         old = self_em.status_effects.get(id(pokemon))
         old_type = old.type.value if old else None
+
         result = original_remove(self_em, pokemon)
-        # ... (resto igual) ...
+
+        if result and old_type and getattr(pokemon, '_is_remote', False):
+            bs = getattr(pokemon, 'battle_system', None)
+            scene = getattr(bs, 'game_scene', None) if bs else None
+            if scene is None or not hasattr(scene, '_my_uuid'):
+                return result
+            owner_uuid = getattr(pokemon, '_pvp_owner_uuid', None)
+            if not owner_uuid or owner_uuid == scene._my_uuid:
+                return result
+            try:
+                scene._network.send_to_all(create_message(
+                    "PVP_STATUS_REMOVE", {
+                        "owner_uuid": owner_uuid,
+                        "unique_id": pokemon.unique_id,
+                    }))
+            except Exception as e:
+                print(f"[PVP] erro enviar status remove: {e}")
         return result
 
     EffectManager.apply_status = hooked_apply
@@ -113,6 +159,10 @@ def _install_pvp_status_hook():
     EffectManager._pvp_status_hook = True
     print("[PVP] Hook de status instalado")
 
+
+# =====================================================================
+# HOOK GLOBAL: stat mod → broadcast
+# =====================================================================
 def _install_pvp_stat_hook():
     from src.battle.effects.effect_manager import EffectManager
     if getattr(EffectManager, '_pvp_stat_hook', False):
@@ -120,12 +170,15 @@ def _install_pvp_stat_hook():
 
     original_add = EffectManager.add_stat_modifier
 
-    def hooked_add(self_em, pokemon, stat_type, stages, duration=None, is_battle_item=False):
-        # Não re-broadcasta quando estamos aplicando algo vindo da rede
+    def hooked_add(self_em, pokemon, stat_type, stages,
+                   duration=None, is_battle_item=False):
+        # ★ Guard: aplicação vinda da rede → não re-broadcasta
         if getattr(self_em, '_pvp_applying_remote', False):
-            return original_add(self_em, pokemon, stat_type, stages, duration, is_battle_item)
+            return original_add(self_em, pokemon, stat_type, stages,
+                                duration, is_battle_item)
 
-        result = original_add(self_em, pokemon, stat_type, stages, duration, is_battle_item)
+        result = original_add(self_em, pokemon, stat_type, stages,
+                              duration, is_battle_item)
         if not result:
             return result
         if not getattr(pokemon, '_is_remote', False):
@@ -157,6 +210,7 @@ def _install_pvp_stat_hook():
     EffectManager.add_stat_modifier = hooked_add
     EffectManager._pvp_stat_hook = True
     print("[PVP] Hook de stat_mod instalado")
+
 
 # =====================================================================
 # HOOK GLOBAL: clima → broadcast
@@ -271,9 +325,9 @@ class PvPBattleScene(BaseScene):
         super().__init__(game)
 
         _install_pvp_damage_hook()
-        _install_pvp_weather_hook()
         _install_pvp_status_hook()
         _install_pvp_stat_hook()
+        _install_pvp_weather_hook()
 
         try:
             from src.battle.effects.specific.weather.weather_manager import WeatherManager
@@ -287,9 +341,11 @@ class PvPBattleScene(BaseScene):
         self._arena_chapter = int(arena_chapter)
         self._arena_level = int(arena_level)
         self._my_team_side = my_team_side
-        #   Qualquer código de achievement deve checar esta flag antes de rodar.
-        self.achievements_enabled = False
         self._on_exit_callback = on_exit
+
+        # ★ Conquistas são exclusivas do modo campanha.
+        #   Código de achievement checa esta flag antes de rodar.
+        self.achievements_enabled = False
 
         (self.players_per_team,
          self.pokemon_per_player,
@@ -388,8 +444,6 @@ class PvPBattleScene(BaseScene):
         self.battle_system = BattleSystem(self)
         self.effect_manager = self.battle_system.effect_manager
 
-        # ★ O DayNightWeatherSystem já vai ler self.day_night_mode e
-        #   self.base_weather (setados em _load_map) no initialize().
         self.day_night_weather = DayNightWeatherSystem(self)
         self.day_night_weather.initialize()
 
@@ -413,8 +467,6 @@ class PvPBattleScene(BaseScene):
         self.team_manager = GameTeamManager(self.game, self)
         self.move_quick_switch_manager = MoveQuickSwitchManager(self)
 
-        # ★ Bag removida no PvP — não é possível usar itens.
-
         all_p = (self._local_team_objs + self._ally_team_objs
                  + self._enemy_team_objs)
         for p in all_p:
@@ -426,7 +478,6 @@ class PvPBattleScene(BaseScene):
             p._arena_no_return = True
             p._pvp_no_return = True
 
-        # ★ Host broadcast inicial do day/night
         if self._network and self._network.is_host:
             self._broadcast_day_night()
 
@@ -459,7 +510,6 @@ class PvPBattleScene(BaseScene):
         self.spot_renderer.load_from_data(data.get("tower_spots", {}))
         self._phase_data = data
 
-        # ★ Guarda com os nomes internos (usado pelo broadcast)
         self._map_day_night = str(data.get("day_night_mode", "day") or "day")
         self._map_base_weather = str(data.get("base_weather", "none") or "none")
 
@@ -469,18 +519,15 @@ class PvPBattleScene(BaseScene):
               f"clima='{self.base_weather}'")
 
     # ==================================================================
-    # DAY/NIGHT (sincronização vinda do mapa)
+    # DAY/NIGHT
     # ==================================================================
     def _apply_map_day_night(self):
-        """Aplica o modo dia/noite + clima-base do mapa ao sistema local.
-        """
         mode = self._map_day_night
         if not mode:
             return
 
         new_weather = self._map_base_weather or "none"
 
-        # Já está no estado certo? Nada a fazer.
         already_correct = (
             getattr(self, 'day_night_mode', None) == mode
             and getattr(self, 'base_weather', None) == new_weather
@@ -743,10 +790,6 @@ class PvPBattleScene(BaseScene):
             pokemon = placement_data['pokemon']
             spot = placement_data['spot']
 
-            # ★ Durante batalha: drops do HUD só são válidos em cima de
-            #   um corpo morto do próprio jogador (janela de 5s). A
-            #   substituição interna (vencedor via overlay) passa com
-            #   `is_replacement=True`.
             if self.pvp_state == "battle" and not is_replacement:
                 dead_body = self._find_own_dead_at_spot(spot)
                 if dead_body is not None:
@@ -756,15 +799,11 @@ class PvPBattleScene(BaseScene):
                 return
 
             if spot.occupied:
-                # Defesa em profundidade: se por algum motivo o spot
-                # ainda estiver marcado como ocupado (ex: timing), tenta
-                # substituir um corpo morto do próprio jogador.
                 if (self.pvp_state == "battle"
                         and self._try_replace_own_on_spot(pokemon, spot)):
                     return
                 return
 
-            # Durante placing: limite de spots_per_player
             if self.pvp_state == "placing":
                 my_placed = [
                     p for p in self.placement_manager.placed_pokemon
@@ -787,7 +826,6 @@ class PvPBattleScene(BaseScene):
                 if getattr(pokemon, '_pvp_owner_uuid', None) is None:
                     pokemon._pvp_owner_uuid = self._my_uuid
 
-                # Durante batalha, o novo pokémon já deve entrar atacando
                 if self.pvp_state == "battle":
                     pokemon.combat_state = "attacking"
 
@@ -818,9 +856,6 @@ class PvPBattleScene(BaseScene):
     # SUBSTITUIÇÃO POR DRAG (PERDEDOR) E POR OVERLAY (VENCEDOR)
     # ------------------------------------------------------------------
     def _find_own_dead_at_spot(self, spot):
-        """Retorna o corpo morto (pokémon próprio) que está posicionado
-        nesse spot, ou None. Usado para aceitar drag do HUD em cima de
-        um corpo durante a janela de 5s."""
         ts = self.placement_manager.tile_size
         stx = spot.x // ts
         sty = spot.y // ts
@@ -834,7 +869,6 @@ class PvPBattleScene(BaseScene):
                     and getattr(p, 'placed_tile_y', None) == sty):
                 return p
 
-        # Fallback: por pixel
         for p in self.placement_manager.placed_pokemon:
             if getattr(p, '_pvp_owner_uuid', None) != self._my_uuid:
                 continue
@@ -847,10 +881,6 @@ class PvPBattleScene(BaseScene):
         return None
 
     def _try_replace_own_on_spot(self, new_pk, spot):
-        """Fallback: tenta substituir um pokémon PRÓPRIO MORTO no spot
-        pelo `new_pk`. Pokémon vivo NUNCA pode ser substituído por drag —
-        a única forma de trocar pokémon vivo é via overlay do VENCEDOR.
-        """
         existing = self._find_own_dead_at_spot(spot)
         if existing is None or existing is new_pk:
             return False
@@ -858,16 +888,8 @@ class PvPBattleScene(BaseScene):
         return True
 
     def _replace_own_pokemon(self, old_pk, new_pk, spot):
-        """Remove old_pk do campo (volta pro HUD) e posiciona new_pk no
-        mesmo spot. Faz broadcast do remove do antigo e do place do novo.
-
-        Usado tanto pelo PERDEDOR (arrastando do HUD em cima do corpo)
-        quanto pelo VENCEDOR (via overlay de troca).
-        """
-        # Cancela timer de morte do antigo (se houver)
         self._death_timers.pop(id(old_pk), None)
 
-        # Remove o antigo
         if old_pk in self.placement_manager.placed_pokemon:
             self.placement_manager.placed_pokemon.remove(old_pk)
         old_pk.is_placed = False
@@ -875,10 +897,8 @@ class PvPBattleScene(BaseScene):
         old_pk.placed_tile_x = None
         old_pk.placed_tile_y = None
 
-        # Libera o spot para o add_pokemon
         spot.occupied = False
 
-        # Avisa a rede que o antigo saiu
         if self._network:
             try:
                 self._network.send_to_all(create_message(
@@ -889,8 +909,6 @@ class PvPBattleScene(BaseScene):
             except Exception as e:
                 print(f"[PVP] erro replace remove: {e}")
 
-        # Posiciona o novo — marca como substituição interna para
-        # não cair no filtro de "drop em spot sem corpo" da batalha.
         self._on_pokemon_placed({
             'action': 'place',
             'pokemon': new_pk,
@@ -949,11 +967,6 @@ class PvPBattleScene(BaseScene):
     # AUTO-PLACEMENT (timeout de 10s no início)
     # ==================================================================
     def _auto_place_pokemon(self):
-        """Posiciona automaticamente os primeiros pokémon disponíveis do
-        time quando o jogador não posiciona nada em PLACEMENT_TIME segundos.
-
-        Evita que um jogador fique de fora da batalha.
-        """
         if self._local_placement_ready:
             return
 
@@ -980,8 +993,6 @@ class PvPBattleScene(BaseScene):
                 'spot': spot,
             })
 
-        # Se ainda não marcou como pronto (ex: time vazio ou sem spots),
-        # força o "done" para não travar a partida.
         if not self._local_placement_ready:
             self._local_placement_ready = True
             if self._network:
@@ -996,15 +1007,9 @@ class PvPBattleScene(BaseScene):
                 self._check_all_ready()
 
     # ==================================================================
-    # AUTO-PLACEMENT DO PERDEDOR (após expirar a janela de 5s)
+    # AUTO-PLACEMENT DO PERDEDOR (após expirar a janela de 10s)
     # ==================================================================
     def _auto_place_for_loser(self, corpse_pk):
-        """Chamado quando o timer de morte (5s) expira sem o PERDEDOR ter
-        colocado um novo pokémon. Posiciona automaticamente o primeiro
-        pokémon disponível do time no spot liberado — se houver.
-        Caso contrário, apenas remove o corpo e libera o spot.
-        """
-        # Encontra o spot ocupado pelo corpo (via tile)
         ts = self.placement_manager.tile_size
         ptx = getattr(corpse_pk, 'placed_tile_x', None)
         pty = getattr(corpse_pk, 'placed_tile_y', None)
@@ -1018,7 +1023,6 @@ class PvPBattleScene(BaseScene):
                 break
 
         if target_spot is None:
-            # Fallback: tenta pelas coordenadas em pixel
             for spot in self._my_spots:
                 cx = (spot.x // ts) * ts + ts // 2
                 cy = (spot.y // ts) * ts + ts // 2
@@ -1026,7 +1030,6 @@ class PvPBattleScene(BaseScene):
                     target_spot = spot
                     break
 
-        # Primeiro pokémon disponível do time (mesma lógica do placement)
         placed_ids = {
             p.unique_id for p in self.placement_manager.placed_pokemon
             if getattr(p, '_pvp_owner_uuid', None) == self._my_uuid
@@ -1045,7 +1048,6 @@ class PvPBattleScene(BaseScene):
             print(f"[PVP] Auto-place do perdedor: {corpse_pk.name} → "
                   f"{new_pk.name}")
         else:
-            # Sem substituto — apenas remove o corpo e libera o spot
             self._remove_pokemon_from_field(corpse_pk)
             print(f"[PVP] Auto-place do perdedor sem substituto "
                   f"({corpse_pk.name} removido)")
@@ -1053,16 +1055,38 @@ class PvPBattleScene(BaseScene):
     # ==================================================================
     # OVERLAY DO VENCEDOR
     # ==================================================================
+    def _check_enemy_kills(self):
+        """Varre inimigos remotos e dispara overlay do vencedor para
+        qualquer um que morreu e ainda não foi oferecido.
+
+        Cobre casos onde a transição was_alive→now_dead não é vista
+        no sync (ex: simulação local já matou o remoto antes do pacote
+        de state chegar). Idempotente via `_winner_swap_offered`.
+        """
+        if self.pvp_state != "battle":
+            return
+
+        for enemy in self._enemy_team_objs:
+            if getattr(enemy, '_is_ally_remote', False):
+                continue
+            if not getattr(enemy, 'is_defeated', False):
+                continue
+            if getattr(enemy, '_winner_swap_offered', False):
+                continue
+            # _on_enemy_killed revalida pré-condições e só marca
+            # `_winner_swap_offered` quando de fato oferece o overlay.
+            self._on_enemy_killed(enemy)
+
     def _on_enemy_killed(self, enemy_pk):
         """Chamado quando um pokémon INIMIGO morre na minha tela.
 
         Sou o VENCEDOR dessa troca. Abro SEMPRE o overlay para eu poder
-        trocar um dos meus pokémon posicionados por um do HUD (5s).
+        trocar um dos meus pokémon posicionados por um do HUD.
 
         Se já houver um overlay ativo, ele é substituído pelo novo — o
         vencedor sempre tem a chance de escolher para a morte mais recente.
         """
-        # Só uma vez por inimigo
+        # Idempotência: um overlay por inimigo
         if getattr(enemy_pk, '_winner_swap_offered', False):
             return
         if self.pvp_state != "battle":
@@ -1088,15 +1112,12 @@ class PvPBattleScene(BaseScene):
         if not my_benched:
             return
 
-        # Marca que já foi oferecido para este inimigo
         enemy_pk._winner_swap_offered = True
 
-        # Se já houver um overlay ativo, substitui silenciosamente
-        # (sem chamar o callback do antigo) para sempre mostrar o novo.
+        # Substitui overlay ativo silenciosamente (sem chamar callback do antigo)
         if self._swap_overlay and self._swap_overlay.active:
             self._swap_overlay.active = False
 
-        # Escolhe o pokémon posicionado mais próximo do inimigo morto
         my_placed.sort(
             key=lambda p: (p.x - enemy_pk.x) ** 2 + (p.y - enemy_pk.y) ** 2
         )
@@ -1111,7 +1132,7 @@ class PvPBattleScene(BaseScene):
                       f"Trocar {placed_to_swap.name}?"),
         )
         print(f"[PVP] Overlay do vencedor: pode trocar "
-              f"{placed_to_swap.name} ({len(my_benched)} no banco) — 5s")
+              f"{placed_to_swap.name} ({len(my_benched)} no banco) — 10s")
 
     def _on_winner_swap_choice(self, placed_pk, chosen):
         """Callback do overlay do vencedor."""
@@ -1121,7 +1142,6 @@ class PvPBattleScene(BaseScene):
             print(f"[PVP] Vencedor optou por não trocar {placed_pk.name}")
             return
 
-        # Localiza o spot do pokémon posicionado
         ts = self.placement_manager.tile_size
         ptx = getattr(placed_pk, 'placed_tile_x', None)
         pty = getattr(placed_pk, 'placed_tile_y', None)
@@ -1204,16 +1224,10 @@ class PvPBattleScene(BaseScene):
         for e in self.wave_manager.active_enemies:
             e.update(dt)
 
-        # ★ O contador SEMPRE decrementa durante a fase de placement —
-        #   mesmo depois que o jogador local já está pronto. Isso mantém
-        #   a pressão visual e o timer aparece para todo mundo até a
-        #   transição para o countdown.
         if self._placement_timer > 0:
             self._placement_timer -= dt
             if self._placement_timer <= 0:
                 self._placement_timer = 0.0
-                # Auto-place só age se o jogador ainda não tiver
-                # completado o time (senão o método retorna cedo).
                 self._auto_place_pokemon()
 
     def _update_countdown(self, dt):
@@ -1234,7 +1248,6 @@ class PvPBattleScene(BaseScene):
                 p.combat_state = "attacking"
         print("[PVP] Batalha iniciada!")
 
-        # ★ Garante que todos os clientes estejam com o mesmo dia/noite
         if self._network and self._network.is_host:
             self._broadcast_day_night()
 
@@ -1243,26 +1256,20 @@ class PvPBattleScene(BaseScene):
         self.wave_manager.update(dt)
         self.placement_manager.update(dt, self.wave_manager.active_enemies)
 
-        # Gerencia corpos MEUS (dead bodies → 5s → remove/auto-place)
+        # Gerencia corpos MEUS (dead bodies → 10s → remove/auto-place)
         self._check_dead_pokemon()
         self._update_death_timers(dt)
+
+        # ★ Varre inimigos mortos e dispara overlay do vencedor
+        self._check_enemy_kills()
 
         if self._battle_elapsed > 1.0:
             self._check_battle_end()
 
     # ==================================================================
-    # CORPOS (DEAD BODIES) — janela de 5s do PERDEDOR
+    # CORPOS (DEAD BODIES) — janela de 10s do PERDEDOR
     # ==================================================================
     def _check_dead_pokemon(self):
-        """Detecta pokémon MEUS que morreram e inicia o timer de remoção.
-
-        Sou o PERDEDOR dessa troca. Durante os 5s, posso arrastar um novo
-        pokémon do HUD para o spot. Para isso, o spot é LIBERADO
-        imediatamente (spot.occupied = False), mantendo o corpo visível
-        em `placed_pokemon`. Assim o GameTeamManager aceita o drop no
-        spot e nosso `_on_pokemon_placed` detecta o corpo morto e
-        substitui.
-        """
         ts = self.placement_manager.tile_size
         for p in self.placement_manager.placed_pokemon:
             if getattr(p, '_pvp_owner_uuid', None) != self._my_uuid:
@@ -1272,14 +1279,10 @@ class PvPBattleScene(BaseScene):
             if id(p) in self._death_timers:
                 continue
 
-            # Nova morte detectada — inicia o timer
             self._death_timers[id(p)] = CORPSE_LIFETIME
             print(f"[PVP] {p.name} morreu — janela de {CORPSE_LIFETIME}s "
                   f"para substituir")
 
-            # ★ Libera o spot IMEDIATAMENTE para que o drag do HUD
-            #   consiga pousar em cima do corpo. O corpo continua sendo
-            #   renderizado (está em placed_pokemon).
             ptx = getattr(p, 'placed_tile_x', None)
             pty = getattr(p, 'placed_tile_y', None)
             freed = False
@@ -1291,7 +1294,6 @@ class PvPBattleScene(BaseScene):
                     freed = True
                     break
             if not freed:
-                # Fallback por pixel
                 for spot in self._my_spots:
                     cx = (spot.x // ts) * ts + ts // 2
                     cy = (spot.y // ts) * ts + ts // 2
@@ -1299,7 +1301,6 @@ class PvPBattleScene(BaseScene):
                         spot.occupied = False
                         break
 
-            # Animação de faint
             try:
                 if p.has_animation("faint"):
                     p.set_animation_direct("faint")
@@ -1307,15 +1308,6 @@ class PvPBattleScene(BaseScene):
                 pass
 
     def _update_death_timers(self, dt):
-        """Decrementa timers e trata a expiração.
-
-        Quando o timer de um corpo expira:
-          - Se o PERDEDOR colocou um novo pokémon no spot durante a janela,
-            o corpo já foi substituído (o timer foi cancelado em
-            `_replace_own_pokemon`), então nada acontece.
-          - Caso contrário, auto-posiciona o primeiro disponível (se houver)
-            ou apenas remove o corpo e libera o spot.
-        """
         to_expire = []
         for pid, timer in list(self._death_timers.items()):
             new_timer = timer - dt
@@ -1337,10 +1329,8 @@ class PvPBattleScene(BaseScene):
                 self._auto_place_for_loser(pk)
 
     def _remove_pokemon_from_field(self, pokemon):
-        """Remove o pokemon do campo, libera o spot e broadcasta."""
         ts = self.placement_manager.tile_size
 
-        # Libera o spot (por coordenadas de tile)
         ptx = getattr(pokemon, 'placed_tile_x', None)
         pty = getattr(pokemon, 'placed_tile_y', None)
         freed_spot = None
@@ -1353,7 +1343,6 @@ class PvPBattleScene(BaseScene):
                 freed_spot = spot
                 break
 
-        # Fallback: tenta pelas coordenadas em pixel
         if freed_spot is None:
             for spot in self._my_spots:
                 cx = (spot.x // ts) * ts + ts // 2
@@ -1363,13 +1352,11 @@ class PvPBattleScene(BaseScene):
                     freed_spot = spot
                     break
 
-        # Remove das listas
         if pokemon in self.placement_manager.placed_pokemon:
             self.placement_manager.placed_pokemon.remove(pokemon)
 
         pokemon.is_placed = False
 
-        # Broadcast
         if self._network:
             try:
                 self._network.send_to_all(create_message("PVP_POKEMON_REMOVE", {
@@ -1385,8 +1372,6 @@ class PvPBattleScene(BaseScene):
         print(f"[PVP] {pokemon.name} removido do campo{spot_info}")
 
     def _apply_remote_remove(self, payload):
-        """Remove um pokémon remoto do campo (corpo expirado no lado do dono
-        ou pokémon trocado durante a janela de morte)."""
         if payload.get("uuid") == self._my_uuid:
             return
 
@@ -1399,7 +1384,6 @@ class PvPBattleScene(BaseScene):
         ptx = getattr(pk, 'placed_tile_x', None)
         pty = getattr(pk, 'placed_tile_y', None)
 
-        # Libera o spot no lado inimigo
         for spot in self._enemy_spots:
             stx = spot.x // ts
             sty = spot.y // ts
@@ -1523,8 +1507,8 @@ class PvPBattleScene(BaseScene):
                 "current_direction": getattr(p, 'current_direction', 'down'),
                 "combat_state": getattr(p, 'combat_state', 'idle'),
                 "is_defeated": bool(getattr(p, 'is_defeated', False)),
-                "status": status_name,  # ← novo
-                "stat_stages": stages_payload,  # ← novo
+                "status": status_name,
+                "stat_stages": stages_payload,
             })
         try:
             self._network.send_to_all(create_message("PVP_POKEMON_STATE", {
@@ -1543,7 +1527,6 @@ class PvPBattleScene(BaseScene):
             if not pk:
                 continue
 
-            # ★ Detecta morte de pokémon INIMIGO (sou o VENCEDOR)
             old_hp = pk.current_hp
             was_alive = old_hp > 0 and not getattr(pk, 'is_defeated', False)
 
@@ -1564,13 +1547,18 @@ class PvPBattleScene(BaseScene):
             else:
                 pk.is_defeated = False
 
+            # ★ Sync periódico de status e stat stages.
+            # O guard `_pvp_applying_remote` evita re-broadcast.
             self._sync_remote_status(pk, state.get("status"))
             self._sync_remote_stat_stages(pk, state.get("stat_stages", {}))
 
-            # ★ Dispara overlay do VENCEDOR quando um inimigo morre
-            if (was_alive and now_dead
+            # ★ Overlay do VENCEDOR quando um inimigo morre.
+            # Não depende mais de `was_alive` — se a simulação local
+            # já tiver matado o remoto, esta chamada ainda dispara
+            # (idempotente via `_winner_swap_offered`).
+            if (now_dead
                     and not getattr(pk, '_is_ally_remote', False)
-                    and getattr(pk, 'is_placed', False)):
+                    and not getattr(pk, '_winner_swap_offered', False)):
                 self._on_enemy_killed(pk)
 
             if not getattr(pk, '_attack_animation_active', False):
@@ -1593,8 +1581,9 @@ class PvPBattleScene(BaseScene):
                 pk.combat_state = cs
 
     def _sync_remote_status(self, pk, status_name):
-        """Espelha o status do dono no nosso lado. Cobre expiração (sono,
-        congelamento) e auto-correção caso um PVP_STATUS_* tenha sido perdido."""
+        """Espelha o status do dono no nosso lado. Cobre expiração
+        (sono, congelamento) e auto-correção caso um PVP_STATUS_* tenha
+        sido perdido."""
         from src.battle.effects import StatusType, StatusEffect
         em = self.battle_system.effect_manager
 
@@ -1602,7 +1591,7 @@ class PvPBattleScene(BaseScene):
         current_type = current.type.value if current else None
 
         if status_name == current_type:
-            return  # já está consistente
+            return  # já consistente
 
         em._pvp_applying_remote = True
         try:
@@ -1853,7 +1842,6 @@ class PvPBattleScene(BaseScene):
 
             em = self.battle_system.effect_manager
 
-            # Remove status atual (se houver) — um novo sobrescreve
             if em.get_status(p):
                 em.remove_status(p)
 
@@ -1864,7 +1852,7 @@ class PvPBattleScene(BaseScene):
 
     def _apply_stat_mod_to_my_pokemon(self, payload):
         """O oponente reduziu/aumentou um stat do MEU pokémon.
-        Aplicamos localmente com DURAÇÃO para que o modificador
+        Aplicamos localmente COM duração para que o modificador
         expire no lado do dono e o próximo sync propague o valor 0."""
         if payload.get("owner_uuid") != self._my_uuid:
             return
@@ -1895,7 +1883,7 @@ class PvPBattleScene(BaseScene):
             em = self.battle_system.effect_manager
             em._pvp_applying_remote = True
             try:
-                # ★ Usa add_stat_modifier COM duração → expira sozinho no dono
+                # ★ Usa add_stat_modifier COM duração → expira sozinho
                 em.add_stat_modifier(p, st, stages, duration)
             finally:
                 em._pvp_applying_remote = False
@@ -1924,7 +1912,6 @@ class PvPBattleScene(BaseScene):
                 return None
             return None
 
-        # ★ Overlay do vencedor (troca) tem prioridade sobre o resto
         if self._swap_overlay and self._swap_overlay.active:
             if self._swap_overlay.handle_event(event):
                 return None
@@ -1985,10 +1972,6 @@ class PvPBattleScene(BaseScene):
             if self.screen_manager.is_mouse_in_viewport(mp):
                 self.camera.handle_zoom(event.y > 0)
                 return None
-
-        # ★ Clique-direito REMOVIDO — uma vez colocado, o pokémon não
-        #   pode mais ser removido pelo jogador. A única troca possível é
-        #   via overlay do VENCEDOR (ou substituindo um MORTO por drag).
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 2:
             mp = pygame.mouse.get_pos()
@@ -2152,7 +2135,6 @@ class PvPBattleScene(BaseScene):
         elif self.pvp_state == "countdown":
             self._render_countdown(screen)
 
-        # ★ Death hint (perdedor) só aparece sem overlay do vencedor ativo
         if self.pvp_state == "battle":
             if not (self._swap_overlay and self._swap_overlay.active):
                 self._render_death_hint(screen)
@@ -2161,7 +2143,6 @@ class PvPBattleScene(BaseScene):
             self.overlay_manager.render(screen)
         if self.move_select_overlay and self.move_select_overlay.active:
             self.move_select_overlay.render(screen)
-        # ★ Overlay do vencedor acima de tudo, antes do resultado
         if self._swap_overlay and self._swap_overlay.active:
             self._swap_overlay.render(screen)
         if self._pvp_overlay and self._pvp_overlay.active:
@@ -2180,9 +2161,6 @@ class PvPBattleScene(BaseScene):
         font = pygame.font.Font(None, 28)
         timer_left = max(0, int(math.ceil(self._placement_timer)))
 
-        # ★ O contador SEMPRE aparece durante a fase de placement.
-        #   Isso pressiona quem ainda não colocou e evita o outro esperar
-        #   indefinidamente.
         if self._local_placement_ready:
             text = f"Você está pronto!  ·  {timer_left}s"
             text_color = (105, 220, 130)
@@ -2217,7 +2195,7 @@ class PvPBattleScene(BaseScene):
 
     def _render_death_hint(self, screen):
         """Avisa o PERDEDOR (eu) que posso arrastar um pokémon novo do HUD
-        para o spot do pokémon morto durante a janela de 5s."""
+        para o spot do pokémon morto durante a janela de 10s."""
         if not self._death_timers:
             return
 

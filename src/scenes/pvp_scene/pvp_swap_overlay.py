@@ -17,7 +17,7 @@ import pygame
 
 class SwapSelectionOverlay:
     # Tempo total para decidir a troca
-    SWAP_TIME = 5.0
+    SWAP_TIME = 10.0
 
     def __init__(self, scene, current_pokemon, available_pokemon,
                  on_choice, subtitle=None):
