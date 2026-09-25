@@ -329,17 +329,51 @@ class Player(Entity):
             if uid and uid in self._pokemon_cache:
                 self._pokemon_cache[uid].capture_method = new_method
 
-    def save_game(self, slot=1):
-        """Salva o jogo atual"""
+    def _get_current_save_name(self, slot=1):
+        """
+        Obtém o nome atual do save (do save_manager em memória ou do arquivo).
+        Usado para que auto_saves NÃO sobrescrevam um nome customizado.
+        """
         from src.managers.save_manager import save_manager
 
-        # Você pode passar o estado atual do jogo
+        # 1. Tenta pegar do save_manager em memória
+        try:
+            if getattr(save_manager, 'save_data', None):
+                name = save_manager.save_data.get("meta", {}).get("save_name")
+                if name:
+                    return name
+        except Exception:
+            pass
+
+        # 2. Fallback: lê direto do arquivo do slot
+        try:
+            import os, json
+            filepath = os.path.join(save_manager.save_dir, f"save_{slot}.json")
+            if os.path.exists(filepath):
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    file_data = json.load(f)
+                name = file_data.get("meta", {}).get("save_name")
+                if name:
+                    return name
+        except Exception as e:
+            print(f"[PLAYER] Erro ao ler nome do save: {e}")
+
+        # 3. Fallback final
+        return f"Save {slot}"
+
+    def save_game(self, slot=1):
+        """Salva o jogo atual preservando o nome customizado do save."""
+        from src.managers.save_manager import save_manager
+
+        # Preserva o nome atual (não força "Save N")
+        save_name = self._get_current_save_name(slot)
+
         game_state = {
             "current_chapter": getattr(self, 'current_chapter', 1),
             "current_phase": getattr(self, 'current_phase', 1)
         }
 
-        return save_manager.save_game(self, game_state, save_name=f"Save {slot}", slot=slot)
+        return save_manager.save_game(self, game_state, save_name=save_name, slot=slot)
 
     def load_game(self, slot=1):
         """Carrega um jogo"""

@@ -28,9 +28,13 @@ class PhaseCompleteOverlay(BaseOverlay):
         # Agrupa itens iguais com contagem
         self.item_counts = Counter(self.earned_items)
 
-        # Botão
-        self.button_rect = None
+        # Botões
+        self.button_rect = None              # CONTINUAR (phase select)
+        self.retry_button_rect = None        # REJOGAR FASE
+        self.next_phase_button_rect = None   # PRÓXIMA FASE
         self.button_hovered = False
+        self.retry_button_hovered = False
+        self.next_phase_button_hovered = False
 
         # Animações
         self.animation_timer = 0.0
@@ -47,8 +51,18 @@ class PhaseCompleteOverlay(BaseOverlay):
         # --- Cache para o sprite de desconhecido ---
         self._unknown_portrait_cache = None
 
+        # --- Verifica se existe próxima fase ---
+        self.next_phase = progress_manager.get_next_phase(self.phase_id)
+        self.has_next_phase = self.next_phase is not None
+
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.retry_button_rect and self.retry_button_rect.collidepoint(event.pos):
+                self._retry_phase()
+                return True
+            if self.next_phase_button_rect and self.next_phase_button_rect.collidepoint(event.pos):
+                self._go_to_next_phase()
+                return True
             if self.button_rect and self.button_rect.collidepoint(event.pos):
                 self._return_to_phase_select()
                 return True
@@ -56,6 +70,10 @@ class PhaseCompleteOverlay(BaseOverlay):
             self._return_to_phase_select()
             return True
         elif event.type == pygame.MOUSEMOTION:
+            if self.retry_button_rect:
+                self.retry_button_hovered = self.retry_button_rect.collidepoint(event.pos)
+            if self.next_phase_button_rect:
+                self.next_phase_button_hovered = self.next_phase_button_rect.collidepoint(event.pos)
             if self.button_rect:
                 self.button_hovered = self.button_rect.collidepoint(event.pos)
         return False
@@ -170,15 +188,14 @@ class PhaseCompleteOverlay(BaseOverlay):
             stars_height = star_size + 20
 
         # Próxima fase
-        next_phase = progress_manager.get_next_phase(self.phase_id)
         next_height = 0
-        if next_phase:
-            chapter, phase = map(int, next_phase.split("-"))
+        if self.next_phase:
+            chapter, phase = map(int, self.next_phase.split("-"))
             next_info = phase_catalog.get_phase_info(chapter, phase)
             if next_info:
                 next_height = font_tiny.get_height() + 20
 
-        # Botão
+        # Botões (agora 3 botões em linha)
         button_height = min(50, int(viewport.height * 0.08))
         button_section_height = button_height + 20
 
@@ -358,43 +375,114 @@ class PhaseCompleteOverlay(BaseOverlay):
                 self._draw_star(screen, star_x + i * (star_size + 6), y_offset, star_size, (255, 215, 0))
             y_offset += star_size + 15
 
-        # ----- Próxima fase -----
-        if next_phase:
-            chapter, phase = map(int, next_phase.split("-"))
+        # ----- Próxima fase (texto informativo) -----
+        if self.next_phase:
+            chapter, phase = map(int, self.next_phase.split("-"))
             next_info = phase_catalog.get_phase_info(chapter, phase)
             if next_info:
                 next_text = font_tiny.render(f"Próxima fase: {next_info['name']}", True, (180, 180, 255))
                 screen.blit(next_text, (center_x - next_text.get_width() // 2, y_offset))
                 y_offset += next_text.get_height() + 15
 
-        # ----- Botão CONTINUAR -----
-        button_width = min(220, int(viewport.width * 0.25))
+        # ============================================================
+        # BOTÕES (agora 3 botões)
+        # ============================================================
+        button_width = min(180, int(viewport.width * 0.20))
         button_height = min(50, int(viewport.height * 0.08))
-        button_x = center_x - button_width // 2
-        self.button_rect = pygame.Rect(button_x, y_offset, button_width, button_height)
+        spacing = int(viewport.width * 0.015)
 
-        if self.button_hovered:
-            color = (80, 120, 220)
-            border_color = (120, 160, 255)
-            shadow_offset = 2
+        # Calcula se cabe 3 botões ou se precisa de 2 linhas
+        total_buttons_width = button_width * 3 + spacing * 2
+
+        if total_buttons_width <= viewport.width * 0.9:
+            # 3 botões em linha
+            start_x_buttons = center_x - total_buttons_width // 2
+
+            # Botão REJOGAR
+            self.retry_button_rect = pygame.Rect(
+                start_x_buttons, y_offset, button_width, button_height
+            )
+            self._render_action_button(
+                screen, self.retry_button_rect, "REJOGAR", font_small,
+                self.retry_button_hovered,
+                base_color=(120, 60, 40), hover_color=(180, 90, 60),
+                border_color=(160, 80, 60), hover_border=(220, 120, 80)
+            )
+
+            # Botão PRÓXIMA FASE (só se existir)
+            if self.has_next_phase:
+                self.next_phase_button_rect = pygame.Rect(
+                    start_x_buttons + button_width + spacing, y_offset,
+                    button_width, button_height
+                )
+                self._render_action_button(
+                    screen, self.next_phase_button_rect, "PRÓXIMA FASE", font_small,
+                    self.next_phase_button_hovered,
+                    base_color=(40, 100, 50), hover_color=(60, 150, 70),
+                    border_color=(60, 140, 70), hover_border=(80, 200, 100)
+                )
+            else:
+                self.next_phase_button_rect = None
+
+            # Botão CONTINUAR (menu)
+            continue_x = start_x_buttons + (button_width + spacing) * (2 if self.has_next_phase else 1)
+            self.button_rect = pygame.Rect(
+                continue_x, y_offset, button_width, button_height
+            )
+            self._render_action_button(
+                screen, self.button_rect, "CONTINUAR", font_small,
+                self.button_hovered,
+                base_color=(50, 70, 150), hover_color=(80, 120, 220),
+                border_color=(70, 100, 200), hover_border=(120, 160, 255)
+            )
         else:
-            color = (50, 70, 150)
-            border_color = (70, 100, 200)
-            shadow_offset = 4
+            # 2 linhas de botões
+            # Primeira linha: REJOGAR + PRÓXIMA FASE
+            first_row_width = button_width * 2 + spacing
+            first_row_x = center_x - first_row_width // 2
 
-        shadow_rect = self.button_rect.copy()
-        shadow_rect.x += shadow_offset
-        shadow_rect.y += shadow_offset
-        pygame.draw.rect(screen, (0, 0, 0, 80), shadow_rect, border_radius=12)
+            self.retry_button_rect = pygame.Rect(
+                first_row_x, y_offset, button_width, button_height
+            )
+            self._render_action_button(
+                screen, self.retry_button_rect, "REJOGAR", font_small,
+                self.retry_button_hovered,
+                base_color=(120, 60, 40), hover_color=(180, 90, 60),
+                border_color=(160, 80, 60), hover_border=(220, 120, 80)
+            )
 
-        pygame.draw.rect(screen, color, self.button_rect, border_radius=12)
-        pygame.draw.rect(screen, border_color, self.button_rect, 2, border_radius=12)
+            if self.has_next_phase:
+                self.next_phase_button_rect = pygame.Rect(
+                    first_row_x + button_width + spacing, y_offset,
+                    button_width, button_height
+                )
+                self._render_action_button(
+                    screen, self.next_phase_button_rect, "PRÓXIMA FASE", font_small,
+                    self.next_phase_button_hovered,
+                    base_color=(40, 100, 50), hover_color=(60, 150, 70),
+                    border_color=(60, 140, 70), hover_border=(80, 200, 100)
+                )
+            else:
+                self.next_phase_button_rect = None
 
-        button_text = font_medium.render("CONTINUAR", True, (255, 255, 255))
-        text_rect = button_text.get_rect(center=self.button_rect.center)
-        screen.blit(button_text, text_rect)
+            y_offset += button_height + spacing
 
-        y_offset = self.button_rect.bottom + 15
+            # Segunda linha: CONTINUAR centralizado
+            self.button_rect = pygame.Rect(
+                center_x - button_width // 2, y_offset, button_width, button_height
+            )
+            self._render_action_button(
+                screen, self.button_rect, "CONTINUAR", font_small,
+                self.button_hovered,
+                base_color=(50, 70, 150), hover_color=(80, 120, 220),
+                border_color=(70, 100, 200), hover_border=(120, 160, 255)
+            )
+
+        y_offset = max(
+            self.button_rect.bottom,
+            self.next_phase_button_rect.bottom if self.next_phase_button_rect else 0,
+            self.retry_button_rect.bottom if self.retry_button_rect else 0
+        ) + 15
 
         # ----- Grade de Pokémon da fase -----
         y_offset = self._render_pokemon_grid(screen, center_x, y_offset, viewport)
@@ -402,6 +490,29 @@ class PhaseCompleteOverlay(BaseOverlay):
         # ----- Instrução ESC -----
         esc_text = font_tiny.render("Pressione ESC para continuar", True, (120, 120, 120))
         screen.blit(esc_text, (center_x - esc_text.get_width() // 2, y_offset))
+
+    def _render_action_button(self, screen, rect, text, font, hovered,
+                              base_color, hover_color, border_color, hover_border):
+        """Renderiza um botão de ação com sombra e hover"""
+        if hovered:
+            shadow_offset = 2
+        else:
+            shadow_offset = 4
+
+        shadow_rect = rect.copy()
+        shadow_rect.x += shadow_offset
+        shadow_rect.y += shadow_offset
+        pygame.draw.rect(screen, (0, 0, 0, 80), shadow_rect, border_radius=12)
+
+        color = hover_color if hovered else base_color
+        border = hover_border if hovered else border_color
+
+        pygame.draw.rect(screen, color, rect, border_radius=12)
+        pygame.draw.rect(screen, border, rect, 2, border_radius=12)
+
+        text_surf = font.render(text, True, (255, 255, 255))
+        text_rect = text_surf.get_rect(center=rect.center)
+        screen.blit(text_surf, text_rect)
 
     def _render_pokemon_grid(self, screen, center_x, y_offset, viewport):
         """Renderiza a grade de Pokémon da fase, com portrait ou ?"""
@@ -509,9 +620,54 @@ class PhaseCompleteOverlay(BaseOverlay):
         pygame.draw.polygon(screen, color, points)
         pygame.draw.polygon(screen, (200, 170, 0), points, 1)
 
+    def _retry_phase(self):
+        """Reinicia a fase atual"""
+        from src.scenes.game_scene.game_scene import GameScene
+
+        print(f"[PHASE_COMPLETE] Reiniciando fase {self.phase_id}...")
+
+        self._stop_music()
+
+        # Limpa a cena do jogo
+        if hasattr(self.game_scene, 'cleanup'):
+            self.game_scene.cleanup()
+
+        # Cria uma nova GameScene com a mesma fase
+        new_game_scene = GameScene(
+            self.game,
+            self.chapter_id,
+            self.phase_number
+        )
+        self.game.current_scene = new_game_scene
+
+        print(f"[PHASE_COMPLETE] Fase {self.phase_id} reiniciada!")
+
+    def _go_to_next_phase(self):
+        """Avança diretamente para a próxima fase"""
+        from src.scenes.game_scene.game_scene import GameScene
+
+        if not self.next_phase:
+            print("[PHASE_COMPLETE] Não há próxima fase!")
+            return
+
+        chapter, phase = map(int, self.next_phase.split("-"))
+        print(f"[PHASE_COMPLETE] Indo para próxima fase: {self.next_phase}")
+
+        self._stop_music()
+
+        # Limpa a cena do jogo
+        if hasattr(self.game_scene, 'cleanup'):
+            self.game_scene.cleanup()
+
+        # Cria uma nova GameScene para a próxima fase
+        new_game_scene = GameScene(self.game, chapter, phase)
+        self.game.current_scene = new_game_scene
+
+        print(f"[PHASE_COMPLETE] Próxima fase {self.next_phase} iniciada!")
+
     def _return_to_phase_select(self):
         """
-        Retorna para a tela de seleção de time com refresh forçado.
+        Retorna para a tela de seleção de fase com refresh forçado.
         """
         from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 
@@ -521,7 +677,7 @@ class PhaseCompleteOverlay(BaseOverlay):
         if hasattr(self.game_scene, 'cleanup'):
             self.game_scene.cleanup()
 
-        # Cria a cena de seleção de time com refresh forçado
+        # Cria a cena de seleção de fase com refresh forçado
         phase_select_scene = PhaseSelectScene(
             self.game,
         )
@@ -530,4 +686,4 @@ class PhaseCompleteOverlay(BaseOverlay):
         # Define como cena atual
         self.game.current_scene = phase_select_scene
 
-        print(f"[PHASE_COMPLETE] Retornando ao TeamSelectScene com refresh forçado")
+        print(f"[PHASE_COMPLETE] Retornando ao PhaseSelectScene com refresh forçado")

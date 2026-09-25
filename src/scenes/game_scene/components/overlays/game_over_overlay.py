@@ -17,8 +17,10 @@ class GameOverOverlay(BaseOverlay):
         self._apply_gold_penalty()
 
         # Botões
-        self.button_rect = None          # VOLTAR (team select)
-        self.menu_button_rect = None     # SELECIONAR FASE (phase select)
+        self.retry_button_rect = None       # REJOGAR FASE
+        self.button_rect = None             # VOLTAR (team select)
+        self.menu_button_rect = None        # SELECIONAR FASE (phase select)
+        self.retry_button_hovered = False
         self.button_hovered = False
         self.menu_button_hovered = False
 
@@ -40,6 +42,9 @@ class GameOverOverlay(BaseOverlay):
             return True
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.retry_button_rect and self.retry_button_rect.collidepoint(event.pos):
+                self._retry_phase()
+                return True
             if self.button_rect and self.button_rect.collidepoint(event.pos):
                 self._return_to_team_select()
                 return True
@@ -48,6 +53,8 @@ class GameOverOverlay(BaseOverlay):
                 return True
 
         elif event.type == pygame.MOUSEMOTION:
+            if self.retry_button_rect:
+                self.retry_button_hovered = self.retry_button_rect.collidepoint(event.pos)
             if self.button_rect:
                 self.button_hovered = self.button_rect.collidepoint(event.pos)
             if self.menu_button_rect:
@@ -119,30 +126,40 @@ class GameOverOverlay(BaseOverlay):
         screen.blit(gold_text, (gold_x, y_offset))
         y_offset += gold_text.get_height() + 30
 
-        # ===== BOTÕES (lado a lado) =====
-        button_width = 220
+        # ===== BOTÕES (3 botões) =====
+        button_width = 180
         button_height = 50
-        spacing = 30
+        spacing = 20
 
-        total_width = button_width * 2 + spacing
+        total_width = button_width * 3 + spacing * 2
         left_x = center_x - total_width // 2
 
-        self.button_rect = self._draw_button(
+        # Botão REJOGAR FASE (novo - destaque verde)
+        self.retry_button_rect = self._draw_button(
             screen, left_x, y_offset, button_width, button_height,
+            "REJOGAR FASE", font_small, self.retry_button_hovered,
+            base_color=(40, 100, 50), hover_color=(60, 150, 70),
+            border_color=(60, 140, 70), hover_border=(80, 200, 100)
+        )
+
+        # Botão TIME (existente)
+        self.button_rect = self._draw_button(
+            screen, left_x + button_width + spacing, y_offset, button_width, button_height,
             "TIME", font_medium, self.button_hovered,
             base_color=(120, 40, 40), hover_color=(180, 60, 60),
             border_color=(160, 60, 60), hover_border=(220, 80, 80)
         )
 
+        # Botão SELECIONAR FASE (existente)
         self.menu_button_rect = self._draw_button(
-            screen, left_x + button_width + spacing, y_offset,
+            screen, left_x + (button_width + spacing) * 2, y_offset,
             button_width, button_height,
             "SELECIONAR FASE", font_small, self.menu_button_hovered,
             base_color=(40, 60, 120), hover_color=(60, 90, 180),
             border_color=(60, 90, 160), hover_border=(80, 120, 220)
         )
 
-        y_offset = self.button_rect.bottom + 20
+        y_offset = self.retry_button_rect.bottom + 20
 
         esc_text = font_small.render(
             "Pressione ESC para voltar à seleção de time",
@@ -169,6 +186,26 @@ class GameOverOverlay(BaseOverlay):
         )
         return rect
 
+    def _retry_phase(self):
+        """Reinicia a fase atual sem sair da tela de jogo"""
+        from src.scenes.game_scene.game_scene import GameScene
+        from src.managers.sounds.sound_manager import sound_manager
+
+        print(f"[GAME_OVER] Reiniciando fase {self.game_scene.phase_id}...")
+
+        self._stop_music()
+        self.game_scene.cleanup()
+
+        # Cria uma nova GameScene com a mesma fase
+        new_game_scene = GameScene(
+            self.game,
+            self.game_scene.chapter_id,
+            self.game_scene.phase_number
+        )
+        self.game.current_scene = new_game_scene
+
+        print(f"[GAME_OVER] Fase {self.game_scene.phase_id} reiniciada!")
+
     def _return_to_team_select(self):
         """Volta para a tela de seleção de time"""
         from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
@@ -181,6 +218,7 @@ class GameOverOverlay(BaseOverlay):
             self.game_scene.phase_info.get("chapter", 1),
             self.game_scene.phase_number
         )
+        team_select._needs_refresh = True
         self.game.current_scene = team_select
 
     def _return_to_phase_select(self):

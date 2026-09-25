@@ -121,8 +121,19 @@ class RelearnDialog:
         return self._fonts[size]
 
     def _refresh_entries(self):
+        """
+        Popula a lista de Pokémon do time + box, SEM duplicatas.
+
+        O save manager salva o time dentro da pc_box também (mesmos
+        unique_ids). Filtramos os que já estão no time para não duplicar
+        a exibição.
+        """
         self.entries = []
+
+        # ===== TIME =====
+        team_ids = set()
         for p in self.player.team:
+            team_ids.add(p.unique_id)
             self.entries.append({
                 "source": "team",
                 "unique_id": p.unique_id,
@@ -131,16 +142,27 @@ class RelearnDialog:
                 "level": p.level,
                 "id": p.id,
                 "shiny": p.is_shiny,
+                # RenameDialog também usa:
+                "custom_name": getattr(p, "custom_name", None),
             })
+
+        # ===== BOX (filtra quem já está no time) =====
         for d in self.player.pc_box:
+            uid = d.get("unique_id")
+            if not uid:
+                continue
+            if uid in team_ids:
+                continue
             self.entries.append({
                 "source": "box",
-                "unique_id": d.get("unique_id"),
+                "unique_id": uid,
                 "display": d.get("custom_name") or d.get("name", "?"),
                 "species": d.get("name", "?"),
                 "level": d.get("level", 1),
                 "id": d.get("id", 1),
                 "shiny": d.get("is_shiny", False),
+                # RenameDialog também usa:
+                "custom_name": d.get("custom_name"),
             })
 
     def _recalc_layout(self):
@@ -283,6 +305,7 @@ class RelearnDialog:
         return None
 
     def _refresh_learnable_moves(self):
+        """Popula a lista de golpes reaprendíveis considerando pré-evoluções."""
         self.learnable_moves = []
         self.selected_move_idx = -1
         self.move_scroll = 0
@@ -292,7 +315,9 @@ class RelearnDialog:
         if not pokemon:
             return
 
-        all_moves = self.move_data.get_moves_at_level(pokemon.id, pokemon.level)
+        # ===== NOVO: pega golpes de TODA a família (pré-evoluções + atual) =====
+        all_moves = self._get_family_moves_at_level(pokemon.id, pokemon.level)
+
         current_lower = {m.name.lower() for m in pokemon.moves}
 
         for name in all_moves:
@@ -301,6 +326,98 @@ class RelearnDialog:
             info = self.move_data.get_move_info(name)
             if info:
                 self.learnable_moves.append({"name": name, "info": info})
+
+    # ==================================================================
+    # FAMÍLIA EVOLUTIVA
+    # ==================================================================
+    def _get_family_moves_at_level(self, pokemon_id, level):
+        """
+        Retorna todos os golpes que o Pokémon pode ter aprendido por level-up
+        considerando sua cadeia de pré-evoluções.
+
+        Funciona como o Move Reminder real: um Pokémon evoluído ainda pode
+        reaprender qualquer golpe que suas pré-evoluções aprendiam até o
+        nível atual.
+
+        Ex.: Butterfree Lv.20 pode reaprender Tackle e String Shot do
+        Caterpie, mesmo sendo uma espécie diferente.
+        """
+        chain = self._get_species_pre_evolution_chain(pokemon_id)
+        seen = set()
+        result = []
+
+        for species_id in chain:
+            try:
+                moves = self.move_data.get_moves_at_level(species_id, level)
+            except Exception as e:
+                print(f"[RELEARN] Erro ao pegar moves de #{species_id}: {e}")
+                moves = []
+
+            for move_name in moves:
+                key = move_name.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                result.append(move_name)
+
+        return result
+
+    def _get_species_pre_evolution_chain(self, pokemon_id):
+        """
+        Retorna a lista de IDs da cadeia evolutiva até (e incluindo) o
+        Pokémon alvo, ordenada da forma mais básica até a mais evoluída.
+
+        Prioridade:
+          1) Usa `family_members` do pokedex (dados exatos do JSON)
+          2) Fallback: caminha pelo `evolves_from` (subindo a corrente)
+          3) Fallback final: retorna apenas o próprio pokemon_id
+        """
+        try:
+            data = self.pokedex.get_pokemon(pokemon_id)
+        except Exception:
+            data = None
+
+        if not data:
+            return [pokemon_id]
+
+        evo = data.get("evolution") or {}
+
+        # ----- Tentativa 1: family_members (ordenado do mais básico ao final) -----
+        fam = evo.get("family_members") or []
+        family_ids = [
+            m.get("id") for m in fam
+            if isinstance(m, dict) and m.get("id")
+        ]
+        if family_ids and pokemon_id in family_ids:
+            idx = family_ids.index(pokemon_id)
+            return family_ids[:idx + 1]
+
+        # ----- Tentativa 2: sobe pelo evolves_from -----
+        chain = [pokemon_id]
+        current_id = pokemon_id
+        visited = {pokemon_id}
+
+        for _ in range(10):  # sanity limit (cadeias gen 1-5 nunca passam de 3)
+            try:
+                cur_data = self.pokedex.get_pokemon(current_id)
+            except Exception:
+                break
+            if not cur_data:
+                break
+
+            prev = (cur_data.get("evolution") or {}).get("evolves_from")
+            if not prev or not isinstance(prev, dict) or not prev.get("id"):
+                break
+
+            prev_id = prev["id"]
+            if prev_id in visited:
+                break
+
+            visited.add(prev_id)
+            chain.insert(0, prev_id)
+            current_id = prev_id
+
+        return chain
 
     def _get_move_description(self, move_name, move_info=None):
         if move_name in self._desc_cache:

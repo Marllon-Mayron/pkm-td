@@ -63,8 +63,19 @@ class RenameDialog:
         return self._fonts[size]
 
     def _refresh_entries(self):
+        """
+        Popula a lista de Pokémon do time + box, SEM duplicatas.
+
+        O save manager salva o time dentro da pc_box também (mesmos
+        unique_ids). Filtramos os que já estão no time para não duplicar
+        a exibição.
+        """
         self.entries = []
+
+        # ===== TIME =====
+        team_ids = set()
         for p in self.player.team:
+            team_ids.add(p.unique_id)
             self.entries.append({
                 "source": "team",
                 "unique_id": p.unique_id,
@@ -73,17 +84,26 @@ class RenameDialog:
                 "level": p.level,
                 "id": p.id,
                 "shiny": p.is_shiny,
-                "custom_name": p.custom_name,
+                # RenameDialog também usa:
+                "custom_name": getattr(p, "custom_name", None),
             })
+
+        # ===== BOX (filtra quem já está no time) =====
         for d in self.player.pc_box:
+            uid = d.get("unique_id")
+            if not uid:
+                continue
+            if uid in team_ids:
+                continue
             self.entries.append({
                 "source": "box",
-                "unique_id": d.get("unique_id"),
+                "unique_id": uid,
                 "display": d.get("custom_name") or d.get("name", "?"),
                 "species": d.get("name", "?"),
                 "level": d.get("level", 1),
                 "id": d.get("id", 1),
                 "shiny": d.get("is_shiny", False),
+                # RenameDialog também usa:
                 "custom_name": d.get("custom_name"),
             })
 

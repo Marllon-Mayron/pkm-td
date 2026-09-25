@@ -161,12 +161,12 @@ class Pokedex:
                     },
                     "catch_rate": pokemon.get("rate", pokemon.get("capture_rate", 120)),
                     "evolution": {
-                        # Campos legados (compat com código existente)
                         "EvolveTo": next_evolution_id,
                         "lvlMin": evolution_level if evolution_level is not None else "none",
                         "method": evolution_method,
-                        # NOVO: lista completa
                         "methods": all_methods,
+                        "evolves_from": evo_data.get("evolves_from"),
+                        "family_members": list(family_members),
                     },
                     "weight_kg": pokemon.get("weight_kg", 10.0),
                     "height_m": pokemon.get("height_m", 1.0),
