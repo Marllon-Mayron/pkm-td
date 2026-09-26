@@ -795,8 +795,11 @@ class PvPBattleScene(BaseScene):
               f"{getattr(pk, '_pvp_owner_name', '?')} em ({cx},{cy})")
 
     def _on_pokemon_placed(self, placement_data):
-        """Permite drop durante 'placing' E 'battle'."""
-        if self.pvp_state not in ("placing", "battle"):
+        """Permite drop durante 'placing', 'battle' E 'substitution'."""
+        # ★ FIX: aceitar 'substitution' — sem isso, NENHUMA substituição
+        # (drag do perdedor, overlay do vencedor, auto-place) funciona,
+        # porque todas passam por aqui.
+        if self.pvp_state not in ("placing", "battle", "substitution"):
             return
         action = placement_data.get('action', 'place')
         is_replacement = placement_data.get('is_replacement', False)
@@ -805,7 +808,10 @@ class PvPBattleScene(BaseScene):
             pokemon = placement_data['pokemon']
             spot = placement_data['spot']
 
-            if self.pvp_state == "battle" and not is_replacement:
+            # ★ FIX: aceitar 'substitution' também nesta checagem de
+            # corpo morto. Antes só "battle" era aceito, então durante a
+            # janela sincronizada o drop caía no print de "ignorado".
+            if self.pvp_state in ("battle", "substitution") and not is_replacement:
                 dead_body = self._find_own_dead_at_spot(spot)
                 if dead_body is not None:
                     self._replace_own_pokemon(dead_body, pokemon, spot)
@@ -814,7 +820,8 @@ class PvPBattleScene(BaseScene):
                 return
 
             if spot.occupied:
-                if (self.pvp_state == "battle"
+                # ★ FIX: aceitar 'substitution' também aqui.
+                if (self.pvp_state in ("battle", "substitution")
                         and self._try_replace_own_on_spot(pokemon, spot)):
                     return
                 return
@@ -841,7 +848,10 @@ class PvPBattleScene(BaseScene):
                 if getattr(pokemon, '_pvp_owner_uuid', None) is None:
                     pokemon._pvp_owner_uuid = self._my_uuid
 
-                if self.pvp_state == "battle":
+                # ★ FIX: aceitar 'substitution' — pokémon já entra em
+                # modo "attacking" (a batalha está pausada, mas quando
+                # retomar ele já está pronto).
+                if self.pvp_state in ("battle", "substitution"):
                     pokemon.combat_state = "attacking"
 
                 self._broadcast_placement(pokemon, spot, is_reserve=False)
@@ -850,7 +860,7 @@ class PvPBattleScene(BaseScene):
                     self._check_placing_complete()
                 else:
                     print(f"[PVP] {pokemon.name} entrou em campo "
-                          f"(durante batalha)")
+                          f"(durante batalha/substituição)")
 
         elif action == 'move':
             pokemon = placement_data['pokemon']
@@ -2083,7 +2093,9 @@ class PvPBattleScene(BaseScene):
                 if em.get_status(p):
                     em.remove_status(p)
                     print(f"[PVP] Status remoto removido: {p.name}")
-                break    # ==================================================================
+                break
+
+    # ==================================================================
     # EVENTOS
     # ==================================================================
     def handle_event(self, event):
