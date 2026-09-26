@@ -366,9 +366,9 @@ class PvPBattleScene(BaseScene):
         self.player = game.player
         self.screen_manager = game.screen_manager
         self._my_uuid = (
-            getattr(game.player, "uuid", None)
-            or getattr(network, "my_uuid", None)
-            or "unknown"
+                getattr(network, "my_uuid", None)
+                or getattr(game.player, "uuid", None)
+                or "unknown"
         )
 
         # Pokedex para os retratos do overlay de troca

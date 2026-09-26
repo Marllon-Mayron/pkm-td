@@ -2,6 +2,7 @@
 
 import queue
 import socket
+import uuid as _uuid_module
 
 from src.config.global_settings import DEBUG_MODE
 from src.network.server import TradeServer
@@ -66,9 +67,6 @@ _PVP_TYPES = {
     "PVP_STATUS_APPLY",
     "PVP_STATUS_REMOVE",
     "PVP_STAT_MOD",
-    "PVP_SUBSTITUTION_READY",
-    "PVP_SUBSTITUTION_START",
-    "PVP_SUBSTITUTION_END",
 }
 _RELAY_TYPES = _RELAY_TYPES | _PVP_TYPES
 
@@ -104,12 +102,34 @@ class NetworkManager:
         self.remote_ips = []
         self._last_rejection_reason = ""
 
+        # ★ UUID único por sessão de rede.
+        # Separado do UUID do save (game.player.uuid), que pode ser
+        # igual entre jogadores que compartilham o mesmo save.
+        self._session_uuid = None
+
+    # ★ Gera (uma vez) o UUID de sessão e o usa como my_uuid.
+    def _ensure_session_uuid(self):
+        if not self._session_uuid or self._session_uuid == "unknown":
+            self._session_uuid = str(_uuid_module.uuid4())
+            self.my_uuid = self._session_uuid
+            print(f"[NET] UUID de sessão gerado: {self._session_uuid}")
+        return self._session_uuid
+
     def set_name(self, name):
         self.my_name = name
 
     def set_uuid(self, uuid_str):
-        """Define o UUID do jogador local (chamado pelo menu/lobby)."""
+        """Define o UUID do jogador local (chamado pelo menu/lobby).
+
+        ★ NUNCA sobrescreve o UUID de sessão se ele já existir.
+        """
+        if self._session_uuid:
+            # UUID de sessão já existe — ele é a fonte da verdade
+            self.my_uuid = self._session_uuid
+            return
+        # Sem sessão ainda: aceita o UUID do save como placeholder
         self.my_uuid = uuid_str or "unknown"
+
     # ------------------------------------------------------------------
     # Detecção de IP / validação
     # ------------------------------------------------------------------
@@ -160,6 +180,8 @@ class NetworkManager:
     def start_host(self, port=12345):
         self.is_host = True
         self.remote_ips = []
+        # ★ Gera UUID de sessão ANTES de aceitar conexões
+        self._ensure_session_uuid()
         self.server = TradeServer(
             host='0.0.0.0',
             port=port,
@@ -176,6 +198,8 @@ class NetworkManager:
         self.is_host = False
         self.remote_ips = [host]
         self._last_rejection_reason = ""
+        # ★ Gera UUID de sessão ANTES de conectar
+        self._ensure_session_uuid()
         self.client = TradeClient(
             host=host,
             port=port,
@@ -317,11 +341,11 @@ class NetworkManager:
 
             self.players_list = normalized
 
-            # Descobre o oponente (primeiro da lista cujo name != my_name)
+            # Descobre o oponente (primeiro da lista cujo uuid != meu uuid)
             self.opponent_name = None
             self.opponent_uuid = None
             for entry in normalized:
-                if entry["name"] != self.my_name:
+                if entry["uuid"] != self.my_uuid:
                     self.opponent_name = entry["name"]
                     self.opponent_uuid = entry["uuid"]
                     break

@@ -75,11 +75,16 @@ class PvPMatchmakingScene(BaseScene):
         self._rebroadcast_timer = 0.0
         self._retry_join_timer = 0.0
 
+        if hasattr(network, '_ensure_session_uuid'):
+            network._ensure_session_uuid()
+
         self.my_uuid = (
-            getattr(game.player, "uuid", None)
-            or getattr(network, "my_uuid", None)
-            or "unknown"
+                getattr(network, "my_uuid", None)
+                or getattr(game.player, "uuid", None)
+                or "unknown"
         )
+        network.set_uuid(self.my_uuid)
+        print(f"[PVP_MM] UUID local: {self.my_uuid[:8]}")
         network.set_uuid(self.my_uuid)
 
         self.players[self.my_uuid] = {
