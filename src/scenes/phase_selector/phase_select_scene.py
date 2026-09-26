@@ -21,7 +21,7 @@ from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 class PhaseCard:
     """Card de fase estilizado com animacoes"""
 
-    def __init__(self, phase_data, unlocked=False, completed=False):
+    def __init__(self, phase_data, unlocked=False, completed=False, mythical_id=None):
         self.phase_data = phase_data
         self.phase_number = phase_data["number"]
         self.phase_name = phase_data["name"]
@@ -33,6 +33,8 @@ class PhaseCard:
         self.rect = pygame.Rect(0, 0, 0, 0)
         self.is_hovered = False
         self._was_hovered = False
+
+        self.mythical_id = mythical_id
 
         # Animacoes
         self.scale = 1.0
@@ -159,11 +161,47 @@ class PhaseCard:
         status_rect = status.get_rect(center=(scaled_rect.centerx, scaled_rect.centery + 28))
         screen.blit(status, status_rect)
 
+        if self.mythical_id is not None and self.unlocked:
+            self._render_mythical_icon(screen, scaled_rect)
+
         # Overlay para fases bloqueadas
         if not self.unlocked:
             overlay = pygame.Surface((scaled_rect.width, scaled_rect.height), pygame.SRCALPHA)
             overlay.fill((0, 0, 0, 160))
             screen.blit(overlay, scaled_rect)
+
+    def _render_mythical_icon(self, screen, scaled_rect):
+        """Renderiza o portrait happy do mítico centralizado no topo do card."""
+        try:
+            from src.data.pokedex import Pokedex
+
+            pokedex = Pokedex()
+            portrait = pokedex.get_portrait(self.mythical_id, "happy", False)
+
+            if portrait is None:
+                return
+
+            icon_size = 34
+            portrait_scaled = pygame.transform.scale(portrait, (icon_size, icon_size))
+
+            # ===== CENTRALIZADO NO TOPO =====
+            icon_x = scaled_rect.centerx - icon_size // 2
+            icon_y = scaled_rect.top + 6
+
+            # Fundo dourado pulsante (chama atenção)
+            pulse = int(80 + 40 * (0.5 + 0.5 * math.sin(pygame.time.get_ticks() * 0.005)))
+            bg_rect = pygame.Rect(icon_x - 4, icon_y - 4, icon_size + 8, icon_size + 8)
+
+            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+            bg_surface.fill((255, 215, 0, pulse))
+            screen.blit(bg_surface, bg_rect)
+
+            # Borda dourada
+            pygame.draw.rect(screen, (255, 215, 0), bg_rect, 2, border_radius=6)
+
+            screen.blit(portrait_scaled, (icon_x, icon_y))
+        except Exception as e:
+            print(f"[MYTHICAL_ICON] Erro ao renderizar mítico {self.mythical_id}: {e}")
 
     def _render_wrapped_text(self, screen, text, font, color, center_x, center_y):
         """Renderiza texto com quebra de linha automatica"""
@@ -545,6 +583,15 @@ class PhaseSelectScene(BaseScene):
         visible_height = vh - (grid_start_y - vy) - int(vh * 0.15)
         self.max_scroll = max(0, grid_height - visible_height)
 
+        # ===== MÍTICO PENDENTE (se houver) =====
+        from src.data.mythical_catalog import MythicalCatalog
+
+        pending_mythical_entry = None
+        if hasattr(self.game, 'player') and self.game.player:
+            pending_mythical_id = getattr(self.game.player, 'pending_mythical_id', None)
+            if pending_mythical_id is not None:
+                pending_mythical_entry = MythicalCatalog.get_mythical(pending_mythical_id)
+
         # Cria cards
         self.phase_cards = []
         for i, phase_data in enumerate(phases):
@@ -558,7 +605,17 @@ class PhaseSelectScene(BaseScene):
             unlocked = self.progress.is_phase_unlocked(phase_id)
             completed = self.progress.is_phase_completed(phase_id)
 
-            card = PhaseCard(phase_data, unlocked, completed)
+            # ===== O mítico aparece em TODAS as fases onde ele PODE estar =====
+            mythical_id_for_card = None
+            if pending_mythical_entry and phase_id in pending_mythical_entry.phases:
+                mythical_id_for_card = pending_mythical_entry.pokemon_id
+
+            card = PhaseCard(
+                phase_data,
+                unlocked,
+                completed,
+                mythical_id=mythical_id_for_card,
+            )
             card.update_position(card_x, card_y, card_width, card_height)
             self.phase_cards.append(card)
 
@@ -1198,6 +1255,8 @@ class PhaseSelectScene(BaseScene):
         """Chamado quando a cena e ativada"""
         if not self._music_started or not pygame.mixer.music.get_busy():
             self._start_phase_select_music()
+        # Força re-layout pra pegar mudanças de estado do player (ex: mítico pendente)
+        self.layout_initialized = False
 
     def on_exit(self):
         """Chamado quando a cena e desativada"""

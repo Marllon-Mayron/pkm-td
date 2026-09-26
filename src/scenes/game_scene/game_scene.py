@@ -48,6 +48,8 @@ GYM_PHASES = {
     (7, 4): 8,   # 8º Ginásio
 }
 
+MYTHICAL_SPAWN_CHANCE = 0.10
+
 class GameScene(BaseScene):
     def __init__(self, game, chapter_id=1, phase_number=1):
         super().__init__(game)
@@ -286,6 +288,9 @@ class GameScene(BaseScene):
         self.wave_manager.reset_gold()
         self.game_state = "waiting"
 
+        # ===== VERIFICA MÍTICO PENDENTE PARA ESTA FASE =====
+        self._check_mythical_spawn()
+
         if not self.event_manager.triggers:
             self.game_state = "in_wave"
             self.wave_manager.start_all_waves()
@@ -387,6 +392,86 @@ class GameScene(BaseScene):
         else:
             self.world_width = 2000
             self.world_height = 2000
+
+    # ==================================================================
+    # SISTEMA DE MÍTICOS
+    # ==================================================================
+
+    def _check_mythical_spawn(self):
+        """
+        Se houver um mítico agendado para ESTA fase, arma o spawner
+        e limpa o estado pendente do player.
+        """
+        from src.data.mythical_catalog import MythicalCatalog
+
+        pending_id = getattr(self.player, 'pending_mythical_id', None)
+        pending_phase = getattr(self.player, 'pending_mythical_phase_id', None)
+
+        if not pending_id or not pending_phase:
+            return
+
+        # Não é esta fase? Só ignora.
+        if pending_phase != self.phase_id:
+            return
+
+        # Mítico inválido (catálogo mudou)? Limpa e sai.
+        if not MythicalCatalog.is_mythical(pending_id):
+            print(f"[Mythical] ID {pending_id} não está mais no catálogo — limpando.")
+            self.player.pending_mythical_id = None
+            self.player.pending_mythical_phase_id = None
+            self.player.auto_save()
+            return
+
+        # Arma o spawner
+        if hasattr(self, 'wave_manager') and getattr(self.wave_manager, 'spawner', None):
+            self.wave_manager.spawner.set_mythical_to_spawn(pending_id)
+            entry = MythicalCatalog.get_mythical(pending_id)
+            print(f"[Mythical]  {entry.name} vai aparecer na fase {self.phase_id}! ")
+
+        # Consome o estado pendente
+        self.player.pending_mythical_id = None
+        self.player.pending_mythical_phase_id = None
+        self.player.auto_save()
+
+    def _roll_mythical_chance(self):
+        """
+        Rola 10% de chance de agendar um mítico para uma fase futura.
+        Só rola se:
+          - jogador tem todas as insígnias (conquista all_badges)
+          - não há mítico pendente no momento
+        """
+        import random
+        from src.data.mythical_catalog import MythicalCatalog
+
+        # ===== PRÉ-REQUISITO: TODAS AS INSÍGNIAS =====
+        if not hasattr(self, 'player') or not hasattr(self.player, 'achievement_manager'):
+            return
+        if not self.player.achievement_manager.is_unlocked("all_badges"):
+            return
+
+        # ===== JÁ TEM UM PENDENTE? NÃO SORTEIA OUTRO =====
+        if getattr(self.player, 'pending_mythical_id', None):
+            return
+
+        # ===== 10% DE CHANCE =====
+        if random.random() >= MYTHICAL_SPAWN_CHANCE:
+            return
+
+        mythicals = MythicalCatalog.get_all()
+        if not mythicals:
+            return
+
+        # Sorteia mítico + fase
+        chosen = random.choice(mythicals)
+        if not chosen.phases:
+            return
+        chosen_phase = random.choice(list(chosen.phases))
+
+        self.player.pending_mythical_id = chosen.pokemon_id
+        self.player.pending_mythical_phase_id = chosen_phase
+        self.player.auto_save()
+
+        print(f"[Mythical]  {chosen.name} agendado para a fase {chosen_phase} (10% roll)")
 
     def _update_perf_monitor(self):
         """Atualiza o estado do monitor de performance baseado no debug"""
@@ -2456,6 +2541,8 @@ class GameScene(BaseScene):
         self.player.score += self.phase_rewards.get('experience', 50)
 
         print(f"[DEBUG] phase_rewards = {self.phase_rewards}")
+
+        self._roll_mythical_chance()
 
         # ===== ESTRELAS =====
         if total_items > 0:

@@ -1,0 +1,13 @@
+{
+    "name": "Dojo",
+    "levels": [
+        {
+            "chapter": 1,
+            "level": 1,
+            "unlock_requirement": {
+                "chapter": 5,
+                "phase": 5
+            }
+        }
+    ]
+}

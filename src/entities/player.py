@@ -80,6 +80,10 @@ class Player(Entity):
         self.total_playtime = 0.0  # segundos totais de jogo
         self._playtime_accumulator = 0.0  # para acumular dt
 
+        # ===== SISTEMA DE MÍTICOS =====
+        self.pending_mythical_id: Optional[int] = None  # pokemon_id do mítico agendado
+        self.pending_mythical_phase_id: Optional[str] = None  # fase onde ele vai aparecer
+
         # ===== CUSTOMIZACAO DO PERFIL =====
         self.profile_customization = {
             "featured_achievements": [],  # keys de ACHIEVEMENTS (máx 3)

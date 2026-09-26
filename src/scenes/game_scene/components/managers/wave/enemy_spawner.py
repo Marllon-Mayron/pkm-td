@@ -54,6 +54,11 @@ class EnemySpawner:
         self.spawned_count: Dict[int, int] = {}
         self.waves_ended = []
 
+        # ===== SISTEMA DE MÍTICOS =====
+        self._mythical_to_spawn: Optional[int] = None
+        self._mythical_path: Optional[int] = None
+        self._mythical_spawn_index: Optional[int] = None
+
     def set_paused(self, paused: bool):
         """Define o estado de pausa do spawner"""
         self.paused = paused
@@ -61,6 +66,25 @@ class EnemySpawner:
     def set_condition(self, condition: str):
         """Define a condição atual (day, night, etc) para usar os variants"""
         self.current_condition = condition
+
+    def set_mythical_to_spawn(self, pokemon_id: Optional[int]):
+        """
+        Agenda um Pokémon mítico para ser spawnado.
+        Sorteia um path e (mais tarde) um índice dentro da wave.
+        """
+        self._mythical_to_spawn = pokemon_id
+        self._mythical_path = None
+        self._mythical_spawn_index = None
+
+        if pokemon_id:
+            from src.data.mythical_catalog import MythicalCatalog
+            entry = MythicalCatalog.get_mythical(pokemon_id)
+            name = entry.name if entry else f"ID {pokemon_id}"
+
+            # Sorteia o path que vai receber o mítico
+            available_paths = list(self.waves.keys())
+            if available_paths:
+                self._mythical_path = random.choice(available_paths)
 
     def initialize_waves(self, raw_data):
         """Inicializa as waves a partir dos dados brutos"""
@@ -155,7 +179,29 @@ class EnemySpawner:
         self.spawn_timer[path_idx] = 0
         self.spawned_count[path_idx] = 0
 
-        print(f"[WaveSpawner] Path {path_idx}: Iniciando wave {wave_idx + 1} com {wave_data.wave_size} inimigos")
+        # ===== MÍTICO: sorteia o índice DENTRO da wave (só uma vez) =====
+        if (self._mythical_to_spawn is not None
+                and path_idx == self._mythical_path
+                and self._mythical_spawn_index is None):
+
+            wave_size = wave_data.wave_size
+
+            # Índices válidos: 1 até wave_size - 2
+            # (exclui o primeiro spawn=0 e o último que é o boss)
+            if wave_size >= 3:
+                self._mythical_spawn_index = random.randint(1, wave_size - 2)
+                print(f"[Spawner] Mítico vai spawnar no índice "
+                      f"{self._mythical_spawn_index} (de 0 a {wave_size - 1}) "
+                      f"no path {path_idx}")
+            else:
+                # Wave muito pequena pra esconder o mítico no meio
+                print(f"[Spawner] Wave {wave_idx} tem só {wave_size} inimigo(s) — "
+                      f"mítico cancelado (precisa de >= 3)")
+                self._mythical_to_spawn = None
+                self._mythical_path = None
+
+        print(f"[WaveSpawner] Path {path_idx}: Iniciando wave {wave_idx + 1} "
+              f"com {wave_data.wave_size} inimigos")
         return True
 
     def has_more_waves(self) -> bool:
@@ -404,7 +450,23 @@ class EnemySpawner:
 
     def _create_enemy(self, wave: WaveConfig, path, path_idx: int, is_boss: bool) -> Optional['Pokemon']:
         """Cria um novo inimigo com suporte a porcentagens decimais, templates e variants"""
+
         from src.entities.pokemon import Pokemon
+
+        # ===== MÍTICO: dispara só no índice sorteado =====
+        if (self._mythical_to_spawn is not None
+                and not is_boss
+                and path_idx == self._mythical_path
+                and self._mythical_spawn_index is not None
+                and self.spawned_count.get(path_idx, 0) == self._mythical_spawn_index):
+            mythical_id = self._mythical_to_spawn
+
+            # Limpa TODOS os campos do mítico (consome a chance)
+            self._mythical_to_spawn = None
+            self._mythical_path = None
+            self._mythical_spawn_index = None
+
+            return self._create_mythical(mythical_id, path, path_idx)
 
         # ===== OBTÉM A LISTA DE INIMIGOS (COM VARIANTS SE HOUVER) =====
         enemies_list = self._get_enemies_for_wave(wave)
@@ -491,6 +553,77 @@ class EnemySpawner:
         print(f"[Spawner]   - Pattern: {attack_pattern.value}")
         print(f"[Spawner]   - HP: {pokemon.current_hp}/{pokemon.max_hp}")
         print(f"[Spawner]   - Moves: {[m.name for m in pokemon.moves]}")
+
+        return pokemon
+
+    def _create_mythical(self, mythical_id: int, path, path_idx: int) -> Optional['Pokemon']:
+        """
+        Cria um Pokémon mítico:
+          - Sempre Lv.20
+          - Nunca boss, nunca shiny
+          - Padrão de ataque PASSIVE (não ataca)
+        """
+        from src.entities.pokemon import Pokemon
+        from src.battle.attack_pattern import AttackPattern
+        from src.data.mythical_catalog import MythicalCatalog
+
+        if not path or not path.start_point:
+            print(f"[Spawner] ERRO: Path inválido para spawn de mítico")
+            return None
+
+        start_x, start_y = path.start_point
+
+        pokemon = Pokemon(
+            start_x, start_y,
+            mythical_id,
+            level=20,
+            is_wild=True,
+            shiny=random.random() < 0.001,
+            is_boss=False,
+        )
+
+        # ===== CONFIGURA SCREEN_MANAGER / CAMERA =====
+        if self.wave_manager.game_scene and hasattr(self.wave_manager.game_scene, 'screen_manager'):
+            pokemon.screen_manager = self.wave_manager.game_scene.screen_manager
+            pokemon.camera = self.wave_manager.game_scene.camera
+
+        # ===== ASSINA PATH =====
+        if not self.wave_manager.path_tracker.assign_path(pokemon, path_idx, start_at_begin=True):
+            print(f"[Spawner] ERRO: falha ao atribuir path ao mítico {pokemon.name}")
+            return None
+
+        # ===== FLAGS DE SPAWN =====
+        pokemon._just_spawned = True
+        pokemon._spawn_timer = 0.5
+        pokemon._distance_traveled = 0.0
+        pokemon._last_pos = (pokemon.x, pokemon.y)
+        pokemon.current_hp = pokemon.max_hp
+
+        # ===== MARCA COMO MÍTICO =====
+        pokemon.is_mythical = True
+
+        # ===== FORÇA PADRÃO PASSIVO (nunca agressivo) =====
+        pokemon.attack_pattern = AttackPattern.PASSIVE
+        pokemon.vicious_move_name = None
+        pokemon.selected_category = None
+
+        # ===== REGISTRA NA POKÉDEX =====
+        self._register_enemy_as_seen(pokemon)
+
+        # ===== NOTIFICAÇÃO ESPECIAL (som do shiny + toast) =====
+        sound_manager.play_effect(SoundEffect.SHINY)
+        entry = MythicalCatalog.get_mythical(mythical_id)
+        display = entry.name.upper() if entry else pokemon.name.upper()
+        toast_battle(
+            f" {display} MÍTICO APARECEU! ",
+            duration=6.0,
+            pokemon=pokemon,
+            portrait="happy",
+        )
+
+        print(f"[Spawner]   MÍTICO {pokemon.name} Lv.{pokemon.level} spawnado no path {path_idx}")
+        print(f"[Spawner]   - Pattern: {pokemon.attack_pattern.value} (PASSIVE)")
+        print(f"[Spawner]   - HP: {pokemon.current_hp}/{pokemon.max_hp}")
 
         return pokemon
 
