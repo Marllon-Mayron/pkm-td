@@ -72,6 +72,9 @@ MSG_TYPES = {
     "PVP_STATUS_APPLY": "pvp_status_apply",
     "PVP_STATUS_REMOVE": "pvp_status_remove",
     "PVP_STAT_MOD": "pvp_stat_mod",
+    "PVP_SUBSTITUTION_READY": "pvp_substitution_ready",
+    "PVP_SUBSTITUTION_START": "pvp_substitution_start",
+    "PVP_SUBSTITUTION_END": "pvp_substitution_end",
 
     "ERROR": "error",
     "DISCONNECT": "disconnect",

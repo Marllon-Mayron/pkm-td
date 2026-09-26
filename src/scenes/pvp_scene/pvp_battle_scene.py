@@ -16,6 +16,10 @@ Regras de substituição:
     VENCEDOR.
   - O contador de 10s do placement inicial fica SEMPRE visível durante a
     fase de placement.
+  - ★ JANELA DE SUBSTITUIÇÃO SINCRONIZADA: quando alguém morre, AMBOS os
+    jogadores entram no estado "substitution" e a batalha fica pausada
+    até que ambos terminem suas decisões (perdedor substitui/auto-place,
+    vencedor decide trocar ou não). Só então a batalha retoma.
   - Bag de itens desabilitada no PvP.
   - Conquistas desabilitadas no PvP (achievements_enabled = False).
 """
@@ -38,6 +42,10 @@ CORPSE_LIFETIME = 10.0
 
 # Tempo máximo para posicionar pokémon no início da partida
 PLACEMENT_TIME = 10.0
+
+# ★ Timeout global de segurança da janela de substituição
+# (caso algo trave na rede, força a saída)
+SUBSTITUTION_TIMEOUT = 15.0
 
 
 # =====================================================================
@@ -399,6 +407,13 @@ class PvPBattleScene(BaseScene):
 
         # Timers de remoção de corpos MEUS (id(pokemon) -> segundos restantes)
         self._death_timers = {}
+
+        # ★ Estado da janela de substituição sincronizada
+        self._substitution_active = False
+        self._substitution_local_ready = False
+        self._substitution_remote_ready = set()
+        self._pre_substitution_state = "battle"
+        self._substitution_timeout = 0.0
 
         # Dados do mapa (dia/noite/clima-base) — preenchidos em _load_map
         self._map_day_night = "day"
@@ -917,6 +932,12 @@ class PvPBattleScene(BaseScene):
         })
         print(f"[PVP] Substituição: {old_pk.name} → {new_pk.name}")
 
+        # ★ Se estamos numa janela de substituição sincronizada e o
+        # PERDEDOR (eu) acabou de substituir manualmente, sinaliza ready.
+        if self._substitution_active and not self._substitution_local_ready:
+            if getattr(old_pk, '_pvp_owner_uuid', None) == self._my_uuid:
+                self._mark_substitution_ready()
+
     def _check_placing_complete(self):
         if self.pvp_state != "placing" or self._local_placement_ready:
             return
@@ -1053,6 +1074,143 @@ class PvPBattleScene(BaseScene):
                   f"({corpse_pk.name} removido)")
 
     # ==================================================================
+    # JANELA DE SUBSTITUIÇÃO SINCRONIZADA
+    # ==================================================================
+    def _start_substitution_window(self):
+        """Inicia uma janela de substituição sincronizada.
+
+        Ambos os jogadores entram em 'substitution' até que:
+          - O PERDEDOR substitua (ou auto-place após 10s)
+          - O VENCEDOR decida trocar ou não (overlay 10s)
+
+        Durante a janela, a batalha fica pausada — ninguém ataca,
+        projéteis não avançam, etc.
+        """
+        if self._substitution_active:
+            return  # já ativa
+
+        self._substitution_active = True
+        self._substitution_local_ready = False
+        self._substitution_remote_ready.clear()
+        self._substitution_timeout = 0.0
+
+        # Salva o estado anterior para restaurar depois
+        if self.pvp_state == "battle":
+            self._pre_substitution_state = "battle"
+
+        self.pvp_state = "substitution"
+
+        print(f"[PVP] ★ Janela de substituição INICIADA "
+              f"(estado anterior={self._pre_substitution_state})")
+
+    def _mark_substitution_ready(self):
+        """Marca que o jogador local terminou sua parte na substituição.
+
+        - O PERDEDOR chama isso após substituir manualmente OU após
+          o auto-place (timeout de 10s).
+        - O VENCEDOR chama isso após fechar o overlay de troca
+          (escolher ou 'Não trocar' ou timeout).
+        """
+        if not self._substitution_active:
+            return
+        if self._substitution_local_ready:
+            return
+
+        self._substitution_local_ready = True
+        print(f"[PVP] ★ Substituição LOCAL pronta — enviando ready")
+
+        if self._network:
+            try:
+                self._network.send_to_all(create_message(
+                    "PVP_SUBSTITUTION_READY", {
+                        "uuid": self._my_uuid,
+                    }))
+            except Exception as e:
+                print(f"[PVP] erro enviar substitution ready: {e}")
+
+        self._check_substitution_complete()
+
+    def _check_substitution_complete(self):
+        """Verifica se ambos os jogadores terminaram a substituição."""
+        if not self._substitution_active:
+            return
+        if not self._substitution_local_ready:
+            return
+        if len(self._substitution_remote_ready) < self._total_players - 1:
+            return
+
+        # ★ Todos prontos — encerra a janela
+        print(f"[PVP] ★ TODOS prontos para retomar batalha")
+        self._end_substitution_window()
+
+    def _end_substitution_window(self):
+        """Encerra a janela de substituição e retoma a batalha."""
+        if not self._substitution_active:
+            return
+
+        self._substitution_active = False
+        self._substitution_local_ready = False
+        self._substitution_remote_ready.clear()
+        self._substitution_timeout = 0.0
+
+        # Restaura o estado anterior (battle)
+        self.pvp_state = self._pre_substitution_state or "battle"
+
+        # Garante que pokémons em campo estão atacando
+        for p in self.placement_manager.placed_pokemon:
+            if p.is_alive() and not getattr(p, 'is_defeated', False):
+                if p.combat_state != "attacking":
+                    p.combat_state = "attacking"
+
+        print(f"[PVP] ★ Janela de substituição ENCERRADA "
+              f"— retomando {self.pvp_state}")
+
+        # Host notifica remotos que a janela fechou (redundância)
+        if self._network and self._network.is_host:
+            try:
+                self._network.send_to_all(create_message(
+                    "PVP_SUBSTITUTION_END", {}))
+            except Exception:
+                pass
+
+    def _on_remote_substitution_ready(self, payload):
+        """Recebe ready de outro jogador."""
+        uid = payload.get("uuid")
+        if not uid or uid == self._my_uuid:
+            return
+
+        if uid not in self._substitution_remote_ready:
+            self._substitution_remote_ready.add(uid)
+            print(f"[PVP] ★ Substituição REMOTA pronta: {uid[:8]} "
+                  f"({len(self._substitution_remote_ready)}/"
+                  f"{self._total_players - 1})")
+            self._check_substitution_complete()
+
+    def _update_substitution(self, dt):
+        """Durante a janela de substituição, apenas atualiza animações
+        e verifica timeout global (fallback)."""
+        # Atualiza animações dos pokémons
+        for p in self.placement_manager.placed_pokemon:
+            p.update(dt)
+        for e in self.wave_manager.active_enemies:
+            e.update(dt)
+
+        # Atualiza timers de morte (perdedor)
+        self._update_death_timers(dt)
+
+        # Timeout global de segurança (fallback): se algo travar,
+        # após SUBSTITUTION_TIMEOUT segundos força a saída da janela
+        self._substitution_timeout += dt
+        if self._substitution_timeout >= SUBSTITUTION_TIMEOUT:
+            print(f"[PVP] ★ TIMEOUT da janela de substituição "
+                  f"— forçando saída")
+            # Se ainda não sinalizou, sinaliza agora
+            if not self._substitution_local_ready:
+                self._mark_substitution_ready()
+            # Força saída local
+            self._end_substitution_window()
+
+    # ==================================================================
     # OVERLAY DO VENCEDOR
     # ==================================================================
     def _check_enemy_kills(self):
@@ -1063,7 +1221,7 @@ class PvPBattleScene(BaseScene):
         no sync (ex: simulação local já matou o remoto antes do pacote
         de state chegar). Idempotente via `_winner_swap_offered`.
         """
-        if self.pvp_state != "battle":
+        if self.pvp_state not in ("battle", "substitution"):
             return
 
         for enemy in self._enemy_team_objs:
@@ -1089,7 +1247,7 @@ class PvPBattleScene(BaseScene):
         # Idempotência: um overlay por inimigo
         if getattr(enemy_pk, '_winner_swap_offered', False):
             return
-        if self.pvp_state != "battle":
+        if self.pvp_state not in ("battle", "substitution"):
             return
 
         # Preciso ter pokémon vivo posicionado
@@ -1113,6 +1271,10 @@ class PvPBattleScene(BaseScene):
             return
 
         enemy_pk._winner_swap_offered = True
+
+        # ★ Inicia a janela de substituição se não estiver ativa
+        if not self._substitution_active:
+            self._start_substitution_window()
 
         # Substitui overlay ativo silenciosamente (sem chamar callback do antigo)
         if self._swap_overlay and self._swap_overlay.active:
@@ -1140,35 +1302,36 @@ class PvPBattleScene(BaseScene):
 
         if chosen is None:
             print(f"[PVP] Vencedor optou por não trocar {placed_pk.name}")
-            return
+        else:
+            ts = self.placement_manager.tile_size
+            ptx = getattr(placed_pk, 'placed_tile_x', None)
+            pty = getattr(placed_pk, 'placed_tile_y', None)
 
-        ts = self.placement_manager.tile_size
-        ptx = getattr(placed_pk, 'placed_tile_x', None)
-        pty = getattr(placed_pk, 'placed_tile_y', None)
-
-        target_spot = None
-        for spot in self._my_spots:
-            stx = spot.x // ts
-            sty = spot.y // ts
-            if stx == ptx and sty == pty:
-                target_spot = spot
-                break
-
-        if target_spot is None:
+            target_spot = None
             for spot in self._my_spots:
-                cx = (spot.x // ts) * ts + ts // 2
-                cy = (spot.y // ts) * ts + ts // 2
-                if abs(placed_pk.x - cx) < 5 and abs(placed_pk.y - cy) < 5:
+                stx = spot.x // ts
+                sty = spot.y // ts
+                if stx == ptx and sty == pty:
                     target_spot = spot
                     break
 
-        if target_spot is None:
-            print(f"[PVP] Spot não encontrado para {placed_pk.name}")
-            return
+            if target_spot is None:
+                for spot in self._my_spots:
+                    cx = (spot.x // ts) * ts + ts // 2
+                    cy = (spot.y // ts) * ts + ts // 2
+                    if abs(placed_pk.x - cx) < 5 and abs(placed_pk.y - cy) < 5:
+                        target_spot = spot
+                        break
 
-        self._replace_own_pokemon(placed_pk, chosen, target_spot)
-        chosen.combat_state = "attacking"
-        print(f"[PVP] Vencedor trocou: {placed_pk.name} → {chosen.name}")
+            if target_spot is None:
+                print(f"[PVP] Spot não encontrado para {placed_pk.name}")
+            else:
+                self._replace_own_pokemon(placed_pk, chosen, target_spot)
+                chosen.combat_state = "attacking"
+                print(f"[PVP] Vencedor trocou: {placed_pk.name} → {chosen.name}")
+
+        # ★ Vencedor terminou — sinaliza ready
+        self._mark_substitution_ready()
 
     # ==================================================================
     # UPDATE
@@ -1207,6 +1370,8 @@ class PvPBattleScene(BaseScene):
             self._update_countdown(dt)
         elif self.pvp_state == "battle":
             self._update_battle(dt)
+        elif self.pvp_state == "substitution":
+            self._update_substitution(dt)
 
         if hasattr(self, 'battle_system') and self.battle_system:
             self.battle_system.effect_manager.update(dt)
@@ -1283,6 +1448,9 @@ class PvPBattleScene(BaseScene):
             print(f"[PVP] {p.name} morreu — janela de {CORPSE_LIFETIME}s "
                   f"para substituir")
 
+            # ★ Inicia a janela de substituição sincronizada
+            self._start_substitution_window()
+
             ptx = getattr(p, 'placed_tile_x', None)
             pty = getattr(p, 'placed_tile_y', None)
             freed = False
@@ -1327,6 +1495,8 @@ class PvPBattleScene(BaseScene):
 
             if pk is not None:
                 self._auto_place_for_loser(pk)
+                # ★ Perdedor terminou (auto-place) — sinaliza ready
+                self._mark_substitution_ready()
 
     def _remove_pokemon_from_field(self, pokemon):
         ts = self.placement_manager.tile_size
@@ -1721,6 +1891,18 @@ class PvPBattleScene(BaseScene):
         elif t == "PVP_STAT_MOD":
             self._apply_stat_mod_to_my_pokemon(p)
 
+        # ★ Janela de substituição sincronizada
+        elif t == "PVP_SUBSTITUTION_READY":
+            self._on_remote_substitution_ready(p)
+
+        elif t == "PVP_SUBSTITUTION_START":
+            if not self._substitution_active:
+                self._start_substitution_window()
+
+        elif t == "PVP_SUBSTITUTION_END":
+            if self._substitution_active:
+                self._end_substitution_window()
+
         elif t == "PVP_END":
             winner_side = p.get("winner_side")
             my_side = self._my_team_side
@@ -1901,9 +2083,7 @@ class PvPBattleScene(BaseScene):
                 if em.get_status(p):
                     em.remove_status(p)
                     print(f"[PVP] Status remoto removido: {p.name}")
-                break
-
-    # ==================================================================
+                break    # ==================================================================
     # EVENTOS
     # ==================================================================
     def handle_event(self, event):
@@ -2139,6 +2319,10 @@ class PvPBattleScene(BaseScene):
             if not (self._swap_overlay and self._swap_overlay.active):
                 self._render_death_hint(screen)
 
+        # ★ Aviso visual durante a janela de substituição sincronizada
+        if self.pvp_state == "substitution":
+            self._render_substitution_hint(screen)
+
         if self.overlay_manager.is_active:
             self.overlay_manager.render(screen)
         if self.move_select_overlay and self.move_select_overlay.active:
@@ -2220,6 +2404,44 @@ class PvPBattleScene(BaseScene):
         screen.blit(shadow, (panel.centerx - hint.get_width() // 2 + 2,
                              panel.y + 10 + 2))
         screen.blit(hint, (panel.centerx - hint.get_width() // 2, panel.y + 10))
+
+    def _render_substitution_hint(self, screen):
+        """Aviso durante a janela de substituição sincronizada:
+        mostra que a batalha está pausada esperando ambos os jogadores."""
+        sm = self.screen_manager
+        vx, vy = sm.viewport_x, sm.viewport_y
+        vw = sm.viewport_width
+
+        font = pygame.font.Font(None, 26)
+
+        if self._substitution_local_ready:
+            text = "Aguardando o oponente decidir..."
+            color = (110, 170, 255)
+        else:
+            text = "Batalha pausada — escolha sua substituição!"
+            color = (255, 185, 100)
+
+        hint = font.render(text, True, color)
+        shadow = font.render(text, True, (0, 0, 0))
+
+        panel_w = max(hint.get_width() + 60, 640)
+        panel = pygame.Rect(vx + (vw - panel_w) // 2, vy + 72, panel_w, 46)
+        bg = pygame.Surface((panel_w, 46), pygame.SRCALPHA)
+        bg.fill((20, 30, 60, 210))
+        screen.blit(bg, panel)
+        pygame.draw.rect(screen, color, panel, 2, border_radius=10)
+        screen.blit(shadow, (panel.centerx - hint.get_width() // 2 + 2,
+                             panel.y + 12 + 2))
+        screen.blit(hint, (panel.centerx - hint.get_width() // 2, panel.y + 12))
+
+        # Contador de prontos
+        ready_count = len(self._substitution_remote_ready) + (
+            1 if self._substitution_local_ready else 0)
+        sub = pygame.font.Font(None, 18).render(
+            f"Prontos: {ready_count}/{self._total_players}",
+            True, (190, 200, 220))
+        screen.blit(sub, (panel.centerx - sub.get_width() // 2,
+                          panel.y + 26))
 
     def _render_countdown(self, screen):
         sm = self.screen_manager
