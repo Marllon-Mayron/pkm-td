@@ -585,19 +585,32 @@ class ItemBagCatalog:
             ("blackglasses", "BLACKGLASSES", "Aumenta o poder de golpes do tipo Sombrio em 10%.", "held_item", 8000),
             # Fantasma
             ("spelltag", "SPELLTAG", "Aumenta o poder de golpes do tipo Fantasma em 10%.", "held_item", 8000),
-            # Demais itens seguráveis
-            ("kings_rock", "KINGSROCK", "Dá 10% de chance de fazer o oponente hesitar ao usar um ataque que causa dano.", "held_item", 9000),
-            ("dragon_scale", "DRAGONSCALE", "Escama especial que faz o Seadra evoluir para Kingdra.", "held_item", 9000),
+            # Demais itens seguráveis (venda na loja)
+            ("kings_rock", "KINGSROCK",
+             "Dá 10% de chance de fazer o oponente hesitar ao usar um ataque que causa dano.", "held_item", 9000),
+            ("dragon_scale", "DRAGONSCALE", "Escama especial que faz o Seadra evoluir para Kingdra.", "held_item",
+             9000),
             ("upgrade", "UPGRADE", "Dispositivo avançado que faz o Porygon evoluir para Porygon2.", "held_item", 9000),
+        ]
 
-            ("amulet_coin", "AMULETCOIN", "Dobra o dinheiro recebido ao vencer batalhas contra treinadores. O Pokémon precisa participar da batalha.", "held_item", 10000),
-            ("big_pearl", "BIGPEARL", "Uma pérola grande e bonita. Pode ser vendida por um preço bem alto.", "held_item", 10000),
-            ("stick", "STICK", "Alho-poró. Aumenta a taxa de acerto crítico do Farfetch'd em 2 níveis.", "held_item", 1000),
-            ("thick_club", "THICKCLUB", "Osso grosso. Dobra o Ataque do Cubone e Maroak.",  "held_item", 1000),
-            ("light_ball", "LIGHTBALL", "Bola elétrica. Dobra o Ataque e Ataque Especial do Pikachu.", "held_item", 1000),
-            ("lucky_punch", "LUCKYPUNCH", "Luva da sorte. Aumenta muito a taxa de acerto crítico da Chansey.", "held_item", 1000),
-            ("big_mushroom", "BIGMUSHROOM", "Cogumelo grande e raro. Pode ser vendido por um preço alto.", "held_item", 2400),
-            ("tiny_mushroom", "TINYMUSHROOM", "Cogumelo pequeno e comum. Pode ser vendido por um preço razoável.", "held_item", 600),
+        # Itens seguráveis que NÃO são vendidos na loja (mas podem ser revendidos)
+        held_items_not_for_sale = [
+            ("amulet_coin", "AMULETCOIN",
+             "Dobra o dinheiro recebido ao vencer batalhas contra treinadores. O Pokémon precisa participar da batalha.",
+             "held_item", 10000),
+            ("big_pearl", "BIGPEARL", "Uma pérola grande e bonita. Pode ser vendida por um preço bem alto.",
+             "held_item", 10000),
+            ("stick", "STICK", "Alho-poró. Aumenta a taxa de acerto crítico do Farfetch'd em 2 níveis.", "held_item",
+             1000),
+            ("thick_club", "THICKCLUB", "Osso grosso. Dobra o Ataque do Cubone e Maroak.", "held_item", 1000),
+            ("light_ball", "LIGHTBALL", "Bola elétrica. Dobra o Ataque e Ataque Especial do Pikachu.", "held_item",
+             1000),
+            ("lucky_punch", "LUCKYPUNCH", "Luva da sorte. Aumenta muito a taxa de acerto crítico da Chansey.",
+             "held_item", 1000),
+            ("big_mushroom", "BIGMUSHROOM", "Cogumelo grande e raro. Pode ser vendido por um preço alto.", "held_item",
+             2400),
+            ("tiny_mushroom", "TINYMUSHROOM", "Cogumelo pequeno e comum. Pode ser vendido por um preço razoável.",
+             "held_item", 600),
         ]
 
         for item_id, name, description, category, price in held_items:
@@ -606,14 +619,33 @@ class ItemBagCatalog:
                 "name": name,
                 "sprite_path": held_items_path / f"{name}.png",
                 "description": description,
-                "category": category,  # "held_item"
+                "category": category,
                 "usable_in_battle": False,
                 "usable_on_map": False,
                 "effect": "held_item_boost",
                 "effect_value": {
-                    "type_boost": 1.1,  # 10% de aumento
+                    "type_boost": 1.1,
                 },
                 "price": price,
+                "unlock_phase": "4-5",
+                "unlock_chapter": None,
+            }
+
+        for item_id, name, description, category, price in held_items_not_for_sale:
+            items[item_id] = {
+                "id": item_id,
+                "name": name,
+                "sprite_path": held_items_path / f"{name}.png",
+                "description": description,
+                "category": category,
+                "usable_in_battle": False,
+                "usable_on_map": False,
+                "effect": "held_item_boost",
+                "effect_value": {
+                    "type_boost": 1.1,
+                },
+                "price": price,
+                "not_for_sale": True,  # ← não aparece na loja, mas pode ser vendido
                 "unlock_phase": "4-5",
                 "unlock_chapter": None,
             }

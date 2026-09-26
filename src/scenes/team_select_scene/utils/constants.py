@@ -81,40 +81,47 @@ FILTER_BUTTONS = {
 }
 # Configurações de layout
 LAYOUT = {
-    'MARGIN': 30,
-    'TOP_MARGIN': 80,
+    'MARGIN': 20,
+    'TOP_MARGIN': 60,
+
     'SLOT': {
-        'WIDTH': 160,
-        'HEIGHT': 110,
-        'SPACING': 10
+        'MIN_W': 140,
+        'MAX_W': 200,
+        'MIN_H': 110,
+        'MAX_H': 160,
+        'SPACING': 8,
     },
     'GRID': {
-        'COLS': 6,
-        'CARD_WIDTH': 140,
-        'CARD_HEIGHT': 90,
-        'SPACING': 10
+        # Limites absolutos (nunca menor/maior que isto)
+        'CARD_MIN_W': 150,
+        'CARD_MAX_W': 260,
+        'CARD_MIN_H': 130,
+        'CARD_MAX_H': 230,
+        'SPACING': 10,
+        'ASPECT': 1.10,          # w/h alvo
     },
     'BUTTON': {
         'WIDTH': 100,
         'HEIGHT': 40,
-        'PAGE_WIDTH': 80
+        'PAGE_WIDTH': 80,
     },
     'FILTERS': {
-        'HEIGHT': 56,
+        'HEIGHT': 52,
         'PADDING': 12,
         'SEARCH_WIDTH': 240,
         'DROPDOWN_WIDTH': 150,
         'SPACING': 10,
         'MAX_WIDTH': 780,
-    }
+    },
 }
 
-# Configurações de fonte
 FONT_SIZES = {
-    'TITLE': 48,
-    'SLOT': 20,
+    'TITLE': 44,
+    'SLOT': 24,
+    'SLOT_NAME': 22,
     'GRID': 18,
-    'PAGE': 24,
+    'GRID_NAME': 20,
+    'PAGE': 22,
     'MODAL_TITLE': 28,
     'MODAL_TEXT': 22,
     'SMALL': 18,

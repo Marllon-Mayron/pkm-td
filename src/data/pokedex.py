@@ -730,3 +730,21 @@ class Pokedex:
     def is_single_direction_animation(self, pokemon_id: int, animation_name: str, shiny: bool = False) -> bool:
         directions = self.get_animation_directions(pokemon_id, animation_name, shiny)
         return len(directions) == 1
+
+    def get_icon_frames(self, pokemon_id: int) -> list:
+        """Retorna os frames do ícone (2 frames de 64x64)."""
+        from src.data.icon_loader import pokemon_icon_loader
+        return pokemon_icon_loader.get_icon_frames(pokemon_id)
+
+    def get_animated_icon(self, pokemon_id: int, size: int = 40,
+                          time_ms: int = 0, frame_duration_ms: int = 400) -> pygame.Surface:
+        """Retorna o ícone animado escalado para `size`."""
+        from src.data.icon_loader import pokemon_icon_loader
+        return pokemon_icon_loader.get_animated_icon(
+            pokemon_id, size, time_ms, frame_duration_ms
+        )
+
+    def get_static_icon(self, pokemon_id: int, size: int = 40) -> pygame.Surface:
+        """Retorna o primeiro frame do ícone, escalado."""
+        from src.data.icon_loader import pokemon_icon_loader
+        return pokemon_icon_loader.get_static_icon(pokemon_id, size)

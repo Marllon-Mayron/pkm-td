@@ -1,163 +1,255 @@
 # src/scenes/team_select_scene/components/pokemon_grid_item.py
 
 import pygame
+import math
+import random
 from src.ui.utils.icon_loader import get_held_icon
+from src.ui.utils.font_cache import get_font
+from src.data.icon_loader import pokemon_icon_loader
 from src.scenes.team_select_scene.utils.constants import COLORS
 
 
+TYPE_COLORS = {
+    "normal": (168, 168, 120), "fire": (240, 128, 48),
+    "water": (104, 144, 240), "electric": (248, 208, 48),
+    "grass": (120, 200, 80), "ice": (152, 216, 216),
+    "fighting": (192, 48, 40), "poison": (160, 64, 160),
+    "ground": (224, 192, 104), "flying": (168, 144, 240),
+    "psychic": (248, 88, 136), "bug": (168, 184, 32),
+    "rock": (184, 160, 56), "ghost": (112, 88, 152),
+    "dragon": (112, 56, 248), "dark": (112, 88, 72),
+    "steel": (184, 184, 208), "fairy": (238, 153, 172),
+}
+
+
+class _Sparkles:
+    """Mesmo sistema do TeamSlot (reutilizado)."""
+    _sprite_cache = {}
+
+    def __init__(self, seed=0):
+        self.particles = []
+        self._rng = random.Random(seed)
+        self._timer = 0
+        self._interval = 8
+        self._rect = None
+
+    @classmethod
+    def _get_sprite(cls, size, color):
+        key = (size, color)
+        s = cls._sprite_cache.get(key)
+        if s is None:
+            d = size * 2
+            s = pygame.Surface((d, d), pygame.SRCALPHA)
+            cx = cy = d // 2
+            pygame.draw.line(s, color, (cx - size, cy), (cx + size, cy), 1)
+            pygame.draw.line(s, color, (cx, cy - size), (cx, cy + size), 1)
+            pygame.draw.circle(s, color, (cx, cy), max(1, size // 2))
+            cls._sprite_cache[key] = s
+        return s
+
+    def update_and_draw(self, screen, rect):
+        self._rect = rect
+        self._timer += 1
+        if self._timer >= self._interval:
+            self._timer = 0
+            self._spawn()
+        alive = []
+        for p in self.particles:
+            p['life'] -= p['decay']
+            if p['life'] <= 0:
+                continue
+            p['x'] += p['vx']; p['y'] += p['vy']; p['vy'] += 0.02
+            if p['y'] > rect.bottom + 4: p['y'] = rect.top - 4
+            if p['x'] < rect.left - 4: p['x'] = rect.right + 4
+            if p['x'] > rect.right + 4: p['x'] = rect.left - 4
+            alpha = int(200 * p['life'])
+            spr = self._get_sprite(p['size'], p['color'])
+            spr.set_alpha(alpha)
+            screen.blit(spr, (p['x'] - p['size'], p['y'] - p['size']))
+            alive.append(p)
+        self.particles = alive
+
+    def _spawn(self):
+        if not self._rect: return
+        r = self._rect
+        side = self._rng.randint(0, 3)
+        if side == 0: x = self._rng.uniform(r.left, r.right); y = r.top
+        elif side == 1: x = r.right; y = self._rng.uniform(r.top, r.bottom)
+        elif side == 2: x = self._rng.uniform(r.left, r.right); y = r.bottom
+        else: x = r.left; y = self._rng.uniform(r.top, r.bottom)
+        self.particles.append({
+            'x': x, 'y': y,
+            'vx': self._rng.uniform(-0.3, 0.3),
+            'vy': self._rng.uniform(-0.4, -0.1),
+            'size': self._rng.choice([2, 2, 3]),
+            'life': 1.0,
+            'decay': self._rng.uniform(0.015, 0.03),
+            'color': self._rng.choice([(255, 235, 140), (255, 215, 0), (255, 245, 200)]),
+        })
+
+
 class PokemonGridItem:
-    """
-    Card individual da grid de Pokemon disponiveis (BOX).
-
-    IMPORTANTE: a grid representa APENAS a BOX. O time e exibido
-    separadamente nos slots superiores. Por isso, este componente
-    NAO renderiza mais nenhuma indicacao visual de "No time"
-    (overlay verde + texto), nem colore o card de verde quando o
-    Pokemon esta no time - isso era redundante e confuso.
-    """
-
     def __init__(self, pokemon_data, x, y, width, height):
-        self.pokemon_data = pokemon_data  # dict
+        self.pokemon_data = pokemon_data
         self.rect = pygame.Rect(x, y, width, height)
         self.is_hovered = False
-        self._portrait_cache = None
+        self.is_drag_hover = False
+        self.is_being_dragged = False
         self._held_icon_cache = None
+        seed = hash((pokemon_data.get("unique_id", 0), x, y)) & 0xFFFF
+        self._sparkles = _Sparkles(seed=seed)
+
+    @property
+    def unique_id(self):
+        return self.pokemon_data.get("unique_id")
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
             self.is_hovered = self.rect.collidepoint(event.pos)
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # A grid representa a BOX. Todo Pokemon exibido aqui e clicavel,
-            # independente de estar no time ou nao.
-            if self.is_hovered:
-                return self.pokemon_data
         return None
 
-    def _get_portrait(self, pokedex):
-        """Obtém o retrato do Pokémon com cache"""
-        if self._portrait_cache is None:
-            pokemon_id = self.pokemon_data["id"]
-            is_shiny = self.pokemon_data.get("is_shiny", False)
-            portrait = pokedex.get_portrait(pokemon_id, "normal", is_shiny)
-
-            if is_shiny and portrait:
-                shiny_portrait = portrait.copy()
-                overlay = pygame.Surface((40, 40), pygame.SRCALPHA)
-                overlay.fill((255, 215, 0, 80))
-                shiny_portrait.blit(overlay, (0, 0))
-                self._portrait_cache = shiny_portrait
-            else:
-                self._portrait_cache = portrait
-        return self._portrait_cache
-
     def _get_held_icon(self):
-        """Retorna o ícone de item segurável em cache"""
         if self._held_icon_cache is None:
             self._held_icon_cache = get_held_icon()
         return self._held_icon_cache
 
     def render(self, screen, font, pokedex):
         self._draw_shadow(screen)
-        self._draw_card_background(screen)
-        self._draw_portrait_and_id(screen, pokedex, font)
-        self._draw_info(screen, font)
+        self._draw_background(screen)
+        self._draw_content(screen)
 
-        # ===== ÍCONE DE ITEM SEGURÁVEL (canto inferior direito) =====
         if self.pokemon_data.get("held_item"):
-            self._draw_held_item_icon(screen)
+            self._draw_item_icon(screen)
 
-        # ===== NOTA =====
-        # Nao desenhamos mais overlay de "No time" aqui. A grid representa
-        # apenas a Box, entao qualquer indicacao de "esta no time" era
-        # redundante (o time ja e exibido nos slots superiores).
-
-    def _draw_held_item_icon(self, screen):
-        """Desenha o ícone de item segurável no canto inferior direito"""
-        icon = self._get_held_icon()
-        if icon:
-            # 15x15
-            icon_scaled = pygame.transform.scale(icon, (15, 15))
-            icon_x = self.rect.right - 20
-            icon_y = self.rect.bottom - 20
-
-            # Fundo
-            bg_rect = pygame.Rect(icon_x - 2, icon_y - 2, 19, 19)
-            pygame.draw.rect(screen, (0, 0, 0, 200), bg_rect, border_radius=4)
-            pygame.draw.rect(screen, (255, 215, 0, 180), bg_rect, 1, border_radius=4)
-
-            screen.blit(icon_scaled, (icon_x, icon_y))
-
-    def _draw_card_background(self, screen):
-        # A grid so mostra Pokemon da Box, entao nunca usamos o estado
-        # "in_team" para colorir o card. Apenas hover/default.
-        if self.is_hovered:
-            color = COLORS['GRID']['HOVER']
-            border_color = COLORS['GRID']['BORDER_HOVER']
-        else:
-            color = COLORS['GRID']['DEFAULT']
-            border_color = COLORS['GRID']['BORDER']
-
-        pygame.draw.rect(screen, color, self.rect, border_radius=6)
-        pygame.draw.rect(screen, border_color, self.rect, 1, border_radius=6)
+        if self.pokemon_data.get("is_shiny", False):
+            self._sparkles.update_and_draw(screen, self.rect)
 
     def _draw_shadow(self, screen):
-        shadow_rect = self.rect.copy()
-        shadow_rect.x += 2
-        shadow_rect.y += 2
-        pygame.draw.rect(screen, COLORS['GRID']['SHADOW'], shadow_rect, border_radius=6)
+        r = self.rect.copy(); r.x += 2; r.y += 2
+        pygame.draw.rect(screen, COLORS['GRID']['SHADOW'], r, border_radius=8)
 
-    def _draw_portrait_and_id(self, screen, pokedex, font):
-        portrait = self._get_portrait(pokedex)
-        portrait_x = self.rect.x + 5
-        portrait_y = self.rect.y + (self.rect.height - 40) // 2
-
-        # ID
-        formatted_id = f"#{self.pokemon_data['id']:03d}"
+    def _draw_background(self, screen):
         is_shiny = self.pokemon_data.get("is_shiny", False)
-        id_color = COLORS['TEXT']['YELLOW'] if is_shiny else COLORS['TEXT'].get('GRAY', (128, 128, 128))
-        id_font = pygame.font.Font(None, font.get_height() + 4)
-        id_text = id_font.render(formatted_id, True, id_color)
-        id_x = portrait_x + (40 - id_text.get_width()) // 2
-        id_y = portrait_y - id_text.get_height() - 4
 
-        id_shadow = id_font.render(formatted_id, True, (0, 0, 0))
-        screen.blit(id_shadow, (id_x + 1, id_y + 1))
-        screen.blit(id_text, (id_x, id_y))
+        if self.is_being_dragged:
+            color, border = (80, 110, 160), (180, 220, 255)
+        elif self.is_drag_hover:
+            color, border = (60, 100, 150), (150, 200, 255)
+        elif is_shiny:
+            t = pygame.time.get_ticks() / 1000.0
+            pulse = (math.sin(t * 2.2) + 1) * 0.5
+            shift = int(25 * pulse)
+            color = (60 + shift, 48 + shift, 18 + shift // 2)
+            border = (255, 215, 0)
+        elif self.is_hovered:
+            color = COLORS['GRID']['HOVER']
+            border = COLORS['GRID']['BORDER_HOVER']
+        else:
+            color = COLORS['GRID']['DEFAULT']
+            border = COLORS['GRID']['BORDER']
 
-        if portrait:
-            screen.blit(portrait, (portrait_x, portrait_y))
+        pygame.draw.rect(screen, color, self.rect, border_radius=8)
+        if is_shiny:
+            pygame.draw.rect(screen, border, self.rect, 3, border_radius=8)
+            pygame.draw.rect(screen, (180, 140, 40),
+                             self.rect.inflate(-6, -6), 1, border_radius=6)
+        else:
+            pygame.draw.rect(screen, border, self.rect, 2, border_radius=8)
 
-    def _draw_info(self, screen, font):
-        name_color = COLORS['TEXT']['YELLOW'] if self.pokemon_data.get("is_shiny", False) else COLORS['TEXT']['WHITE']
-        name_x = self.rect.x + 55
-        name_text = font.render(self.pokemon_data["name"], True, name_color)
-        screen.blit(name_text, (name_x, self.rect.y + 10))
+    def _draw_content(self, screen):
+        is_shiny = self.pokemon_data.get("is_shiny", False)
+        top_h = 20
 
-        lvl_text = font.render(f"Lv.{self.pokemon_data['level']}", True, COLORS['TEXT']['YELLOW'])
-        screen.blit(lvl_text, (name_x, self.rect.y + 30))
+        # ID canto superior esquerdo
+        id_color = (255, 235, 150) if is_shiny else COLORS['TEXT'].get('GRAY', (128, 128, 128))
+        id_f = get_font(16)
+        id_t = id_f.render(f"#{self.pokemon_data['id']:03d}", True, id_color)
+        if is_shiny:
+            sh = id_f.render(f"#{self.pokemon_data['id']:03d}", True, (0, 0, 0))
+            screen.blit(sh, (self.rect.x + 8, self.rect.y + 4))
+        screen.blit(id_t, (self.rect.x + 7, self.rect.y + 3))
 
-        type_font = pygame.font.Font(None, 11)
-        type_colors = {
-            "normal": (168, 168, 120),
-            "fire": (240, 128, 48),
-            "water": (104, 144, 240),
-            "electric": (248, 208, 48),
-            "grass": (120, 200, 80),
-            "ice": (152, 216, 216),
-            "fighting": (192, 48, 40),
-            "poison": (160, 64, 160),
-            "ground": (224, 192, 104),
-            "flying": (168, 144, 240),
-            "psychic": (248, 88, 136),
-            "bug": (168, 184, 32),
-            "rock": (184, 160, 56),
-            "ghost": (112, 88, 152),
-            "dragon": (112, 56, 248),
-            "dark": (112, 88, 72),
-            "steel": (184, 184, 208),
-            "fairy": (238, 153, 172),
-        }
-        for i, type_name in enumerate(self.pokemon_data.get("types", [])):
-            color = type_colors.get(type_name.lower(), (128, 128, 128))
-            type_text = type_font.render(type_name.upper(), True, color)
-            screen.blit(type_text, (name_x + (i * 45), self.rect.y + 50))
+        # TIPAGEM À DIREITA
+        types = self.pokemon_data.get("types", []) or []
+        if types:
+            self._draw_types_right(screen, types)
+
+        # ÍCONE
+        footer_h = 32
+        top = self.rect.y + top_h
+        bottom = self.rect.bottom - footer_h
+        avail_h = bottom - top
+        avail_w = self.rect.width - 14
+        icon_size = max(40, min(int(avail_h * 0.70), avail_w, 130))
+
+        try:
+            icon = pokemon_icon_loader.get_animated_icon(
+                self.pokemon_data["id"], icon_size,
+                pygame.time.get_ticks(), 400,
+            )
+        except Exception:
+            icon = None
+
+        if icon:
+            screen.blit(icon, (
+                self.rect.centerx - icon_size // 2,
+                top + (avail_h - icon_size) // 2,
+            ))
+
+        # NOME + LEVEL (fonte maior)
+        name_font = get_font(18)
+        lvl_font = get_font(16)
+
+        name_color = (255, 235, 150) if is_shiny else COLORS['TEXT']['WHITE']
+        name_text = self.pokemon_data["name"]
+        lvl_text = f" Lv.{self.pokemon_data['level']}"
+
+        name_s = name_font.render(name_text, True, name_color)
+        lvl_s = lvl_font.render(lvl_text, True, COLORS['TEXT']['YELLOW'])
+
+        total_w = name_s.get_width() + lvl_s.get_width()
+        max_w = self.rect.width - 10
+        if total_w > max_w:
+            while name_s.get_width() + lvl_s.get_width() > max_w and len(name_text) > 3:
+                name_text = name_text[:-1]
+                name_s = name_font.render(name_text + ".", True, name_color)
+
+        total_w = name_s.get_width() + lvl_s.get_width()
+        x = self.rect.centerx - total_w // 2
+        y = self.rect.bottom - footer_h + 4
+
+        if is_shiny:
+            sh_n = name_font.render(name_text, True, (0, 0, 0))
+            sh_l = lvl_font.render(lvl_text, True, (0, 0, 0))
+            screen.blit(sh_n, (x + 1, y + 1))
+            screen.blit(sh_l, (x + name_s.get_width() + 1, y + 2))
+
+        screen.blit(name_s, (x, y))
+        screen.blit(lvl_s, (x + name_s.get_width(), y + 2))
+
+    def _draw_types_right(self, screen, types):
+        bw, bh, gap = 40, 13, 3
+        total_w = len(types) * bw + (len(types) - 1) * gap
+        x = self.rect.right - 5 - total_w
+        y = self.rect.y + 4
+        f = get_font(10)
+
+        for t in types:
+            c = TYPE_COLORS.get(t.lower(), (128, 128, 128))
+            b = pygame.Rect(x, y, bw, bh)
+            pygame.draw.rect(screen, c, b, border_radius=3)
+            pygame.draw.rect(screen, (0, 0, 0), b, 1, border_radius=3)
+            s = f.render(t.upper(), True, (255, 255, 255))
+            screen.blit(s, s.get_rect(center=b.center))
+            x += bw + gap
+
+    def _draw_item_icon(self, screen):
+        icon = self._get_held_icon()
+        if icon:
+            s = pygame.transform.scale(icon, (16, 16))
+            x = self.rect.right - 22
+            y = self.rect.bottom - 22
+            bg = pygame.Rect(x - 2, y - 2, 20, 20)
+            pygame.draw.rect(screen, (0, 0, 0), bg, border_radius=4)
+            pygame.draw.rect(screen, (255, 215, 0), bg, 1, border_radius=4)
+            screen.blit(s, (x, y))
