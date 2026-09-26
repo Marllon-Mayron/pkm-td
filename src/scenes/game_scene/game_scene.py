@@ -48,7 +48,7 @@ GYM_PHASES = {
     (7, 4): 8,   # 8º Ginásio
 }
 
-MYTHICAL_SPAWN_CHANCE = 0.10
+MYTHICAL_SPAWN_CHANCE = 0.05
 
 class GameScene(BaseScene):
     def __init__(self, game, chapter_id=1, phase_number=1):
@@ -399,36 +399,54 @@ class GameScene(BaseScene):
 
     def _check_mythical_spawn(self):
         """
-        Se houver um mítico agendado para ESTA fase, arma o spawner
-        e limpa o estado pendente do player.
+        Verifica se há um mítico agendado para ESTA fase.
+          - Se for a fase correta: arma o spawner e limpa o estado pendente.
+          - Se for fase errada: LIMPA o estado pendente (jogador perdeu a chance)
+            e mostra um toast avisando.
         """
         from src.data.mythical_catalog import MythicalCatalog
+        from src.ui.toast_renderer import toast_battle
 
         pending_id = getattr(self.player, 'pending_mythical_id', None)
         pending_phase = getattr(self.player, 'pending_mythical_phase_id', None)
 
+        # Nada agendado
         if not pending_id or not pending_phase:
             return
 
-        # Não é esta fase? Só ignora.
-        if pending_phase != self.phase_id:
-            return
-
-        # Mítico inválido (catálogo mudou)? Limpa e sai.
+        # Mítico inválido (catálogo mudou) — limpa e sai
         if not MythicalCatalog.is_mythical(pending_id):
             print(f"[Mythical] ID {pending_id} não está mais no catálogo — limpando.")
-            self.player.pending_mythical_id = None
-            self.player.pending_mythical_phase_id = None
-            self.player.auto_save()
+            self._clear_pending_mythical()
             return
 
-        # Arma o spawner
-        if hasattr(self, 'wave_manager') and getattr(self.wave_manager, 'spawner', None):
-            self.wave_manager.spawner.set_mythical_to_spawn(pending_id)
-            entry = MythicalCatalog.get_mythical(pending_id)
-            print(f"[Mythical]  {entry.name} vai aparecer na fase {self.phase_id}! ")
+        entry = MythicalCatalog.get_mythical(pending_id)
 
-        # Consome o estado pendente
+        # ===== ACERTOU A FASE =====
+        if pending_phase == self.phase_id:
+            if hasattr(self, 'wave_manager') and getattr(self.wave_manager, 'spawner', None):
+                self.wave_manager.spawner.set_mythical_to_spawn(pending_id)
+                print(f"[Mythical]  {entry.name} vai aparecer na fase {self.phase_id}! ✨")
+            self._clear_pending_mythical()
+            return
+
+        # ===== ERROU A FASE =====
+        print(f"[Mythical] Jogador entrou em {self.phase_id} "
+              f"mas {entry.name} estava agendado para {pending_phase}. "
+              f"Chance perdida!")
+
+        self._clear_pending_mythical()
+
+        # Toast de "escapou"
+        toast_battle(
+            f"O {entry.name} fugiu... você escolheu a fase errada!",
+            duration=5.0,
+        )
+
+    def _clear_pending_mythical(self):
+        """Limpa o estado do mítico pendente do player e salva."""
+        if not hasattr(self, 'player') or not self.player:
+            return
         self.player.pending_mythical_id = None
         self.player.pending_mythical_phase_id = None
         self.player.auto_save()
