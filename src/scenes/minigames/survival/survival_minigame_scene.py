@@ -1070,7 +1070,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
             if pokemon.level > old_level:
                 print(f"[SURVIVAL] {pokemon.name} subiu do nível {old_level} para {pokemon.level}!")
 
-                evolution = evolution_manager.check_evolution(pokemon.id, current_level=pokemon.level)
+                evolution = evolution_manager.check_evolution(pokemon.id, current_level=pokemon.level, pokemon=pokemon, )
                 if evolution:
                     print(f"[SURVIVAL] {pokemon.name} pode evoluir! Abrindo overlay...")
                     self.open_evolution_overlay(pokemon, evolution)

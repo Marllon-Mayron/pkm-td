@@ -844,7 +844,14 @@
         "spot_size": 24,
         "grid_size": 24,
         "snap_to_grid": true,
-        "spots": []
+        "spots": [
+            {
+                "x": 96,
+                "y": 144,
+                "size": 24,
+                "allowed_types": []
+            }
+        ]
     },
     "target_items": {
         "grid_size": 16,
@@ -864,7 +871,7 @@
                         "event_type": "message",
                         "delay": 0.0,
                         "pause_game": true,
-                        "message_text": "Bem-vindo a nossa 13 Edicao do Torneio no Feno! As regas sao simples, ganhe de todos os competidores e voce se tornará o campeao! N~ao é permitido moves de stdo tipo especial , queremos ver uma briga justa e limpa! ",
+                        "message_text": "Bem-vindo a nossa 13° Edição do TORNEIO NO FENO! As regas sao simples, ganhe de todos os competidores e voce se tornará o campeao! NÃO é permitido moves do tipo ESPECIAL , queremos ver uma briga justa e limpa! ",
                         "speaker_name": "Mestre do Dojo ",
                         "speaker_sprite_path": "res/PokemonSprites/characters/BLACKBELT.png",
                         "action_label": "Vamos lá!",

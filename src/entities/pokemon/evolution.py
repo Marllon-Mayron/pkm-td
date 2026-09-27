@@ -11,7 +11,7 @@ class PokemonEvolution:
         self.pokemon = pokemon
 
     def check_and_evolve(self):
-        evolution = evolution_manager.check_evolution(self.pokemon.id, current_level=self.pokemon.level)
+        evolution = evolution_manager.check_evolution( self.pokemon.id, current_level=self.pokemon.level, pokemon=self.pokemon)
 
         if evolution:
             evolve_to_id = evolution["evolve_to"]
@@ -525,9 +525,7 @@ class PokemonEvolution:
         # ==================================================================
         evolution = None
         if self.pokemon.level < MAX_LEVEL:
-            evolution = evolution_manager.check_evolution(
-                self.pokemon.id, current_level=self.pokemon.level
-            )
+            evolution = evolution_manager.check_evolution(self.pokemon.id, current_level=self.pokemon.level, pokemon=self.pokemon)
             if not evolution:
                 evolution = evolution_manager.check_happiness_evolution(self.pokemon)
 

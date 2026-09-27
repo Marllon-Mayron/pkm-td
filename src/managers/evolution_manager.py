@@ -65,7 +65,8 @@ class EvolutionManager:
                             "location": detail.get("location"),
                             "gender": detail.get("gender"),
                             "known_move": detail.get("known_move"),
-                            "trade_species": detail.get("trade_species")
+                            "trade_species": detail.get("trade_species"),
+                            "relative_physical_stats": detail.get("relative_physical_stats"),
                         }
                         # Remove None values
                         variant = {k: v for k, v in variant.items() if v is not None}
@@ -87,7 +88,11 @@ class EvolutionManager:
                             "known_move": variant.get("known_move")
                         }
                         norm_variant = {k: v for k, v in norm_variant.items() if v is not None}
-                        if norm_variant not in all_variants:
+                        already = any(
+                            v.get("evolves_to_id") == norm_variant.get("evolves_to_id")
+                            for v in all_variants
+                        )
+                        if not already:
                             all_variants.append(norm_variant)
 
                     # Armazena as variantes
@@ -146,7 +151,7 @@ class EvolutionManager:
             "8": {"lvlMin": 36, "EvolveTo": 9, "method": "level_up"},
             "9": {"lvlMin": "none", "EvolveTo": "none", "method": "none"},
         }
-        print("⚠️ Usando dados de evolução de fallback (apenas starters)")
+        print("Usando dados de evolução de fallback (apenas starters)")
 
     def get_evolution_variants(self, pokemon_id) -> List[Dict]:
         """
@@ -160,21 +165,44 @@ class EvolutionManager:
         variants = self.get_evolution_variants(pokemon_id)
         return len(variants) > 1
 
-    def can_evolve_by_level(self, pokemon_id, current_level):
+    def can_evolve_by_level(self, pokemon_id, current_level, pokemon=None):
         """Verifica se o Pokémon pode evoluir por nível (pega a PRIMEIRA evolução por nível)"""
         variants = self.get_evolution_variants(pokemon_id)
 
         for variant in variants:
             method = variant.get("method", "")
-            if method == "level_up":
-                min_level = variant.get("min_level")
-                if isinstance(min_level, (int, float)) and current_level >= min_level:
-                    return {
-                        "evolve_to": variant.get("evolves_to_id"),
-                        "method": "level",
-                        "requirement": min_level,
-                        "variant_name": variant.get("evolves_to_name")
-                    }
+            if method != "level_up":
+                continue
+
+            min_level = variant.get("min_level")
+            if not isinstance(min_level, (int, float)) or current_level < min_level:
+                continue
+
+            # ===== CASO ESPECIAL: relative_physical_stats =====
+            rel = variant.get("relative_physical_stats")
+            if rel is not None:
+                if pokemon is None:
+                    # Sem o Pokémon não dá pra decidir — pula esse variant
+                    continue
+
+                atk = pokemon.attack
+                dfn = pokemon.defense
+
+                if rel == 1 and not (atk > dfn):
+                    continue
+                if rel == -1 and not (atk < dfn):
+                    continue
+                if rel == 0 and atk != dfn:
+                    continue
+
+            return {
+                "evolve_to": variant.get("evolves_to_id"),
+                "method": "level",
+                "requirement": min_level,
+                "variant_name": variant.get("evolves_to_name"),
+                "relative_physical_stats": rel,
+            }
+
         return None
 
     def can_evolve_by_stone(self, pokemon_id, stone_name):
@@ -374,14 +402,14 @@ class EvolutionManager:
 
     def check_evolution(self, pokemon_id, current_level=None, stone_name=None,
                         is_trade=False, current_happiness=None, time_of_day=None,
-                        location_name=None):
+                        location_name=None, pokemon=None):
         """
         Verifica todas as possibilidades de evolução
         Retorna a PRIMEIRA evolução encontrada (para compatibilidade)
         """
         # 1. Evolução por nível (prioridade máxima)
         if current_level is not None:
-            level_evo = self.can_evolve_by_level(pokemon_id, current_level)
+            level_evo = self.can_evolve_by_level(pokemon_id, current_level, pokemon=pokemon)
             if level_evo:
                 return level_evo
 

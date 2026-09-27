@@ -370,27 +370,37 @@ class MinigameSelectScene(BaseScene):
         print(f"Iniciando minigame {self.selected_minigame_folder} - "
               f"Capítulo {chapter_val}, Nível {level_val}")
 
+        # ---------- SURVIVAL ----------
         if self.selected_minigame_folder == "survival":
             from src.scenes.minigames.survival import SurvivalMinigameScene
-
-            # chapter_val vira chapter_id (nomes dos arquivos: level_{chapter}_{phase}.json)
-            # level_val vira phase_number
             self.game.current_scene = SurvivalMinigameScene(
                 self.game,
                 chapter_id=chapter_val,
-                phase_number=level_val
+                phase_number=level_val,
             )
+            return
+
+        # ---------- DOJO ----------
+        if self.selected_minigame_folder == "Dojo":
+            from src.scenes.minigames.dojo.dojo_select_scene import DojoSelectScene
+            self.game.current_scene = DojoSelectScene(
+                self.game,
+                chapter_id=chapter_val,
+                phase_number=level_val,
+            )
+            return
+
+        # ---------- FALLBACK ----------
+        phase_data = self.exporter.load_phase(
+            chapter_val,
+            level_val,
+            localization_type="custom",
+            custom_folder=self.selected_minigame_folder,
+        )
+        if phase_data:
+            print(f"Minigame carregado: {phase_data.get('name', 'Sem nome')}")
         else:
-            phase_data = self.exporter.load_phase(
-                chapter_val,
-                level_val,
-                localization_type="custom",
-                custom_folder=self.selected_minigame_folder
-            )
-            if phase_data:
-                print(f"Minigame carregado: {phase_data.get('name', 'Sem nome')}")
-            else:
-                print(f"Erro ao carregar nível {chapter_val}-{level_val}")
+            print(f"Erro ao carregar nível {chapter_val}-{level_val}")
 
     def _get_scroll_bar_rect(self):
         """Retorna retângulo da barra de scroll"""
