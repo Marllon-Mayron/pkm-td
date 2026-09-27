@@ -9,7 +9,11 @@ Fluxo:
   4) Ciclo: Headbutt → Tackle → Amnesia → Headbutt → REST.
   5) Ao usar Rest, HP cheio, dorme. Só acorda com Poké Flute arrastada
      da bag. Aviso persistente aparece enquanto ele dorme.
-  6) Ao derrotar o Snorlax, vitória.
+  6) Ao derrotar o Snorlax, vitória + prêmio Snorlax Lv.5 na Box.
+
+PRÊMIO:
+  Ao vencer, entrega um Snorlax Lv.5 na PC Box (mesmo padrão do Dojo/
+  Tyrogue). O overlay mostra o portrait + nome + tipos.
 
 TOASTS:
   O ArenaBattleScene NÃO inicializa notification_manager. Aqui fazemos
@@ -23,6 +27,12 @@ import pygame
 
 from src.scenes.arena_scene.arena_battle_scene import ArenaBattleScene
 from src.config.paths import PROJECT_ROOT
+
+
+# =====================================================================
+# CONSTANTES DO PRÊMIO
+# =====================================================================
+_SNORLAX_REWARD_LEVEL = 5
 
 
 class DesafiosMinigameScene(ArenaBattleScene):
@@ -39,6 +49,9 @@ class DesafiosMinigameScene(ArenaBattleScene):
 
         self._snorlax = None
         self._sleep_toast_timer = 0.0
+
+        # ===== PRÊMIO =====
+        self._snorlax_reward_obj = None
 
         # Time do jogador
         player_data = []
@@ -453,6 +466,40 @@ class DesafiosMinigameScene(ArenaBattleScene):
         # ===== Resto delega pro handler da Arena =====
         return super()._on_item_use(target, item_data, target_type)
 
+    # -----------------------------------------------------------------
+    # PRÊMIO: SNORLAX Lv.5 NA BOX
+    # -----------------------------------------------------------------
+    def _give_snorlax_reward(self):
+        """Adiciona o Snorlax Lv.5 SEMPRE à PC Box do jogador."""
+        try:
+            from datetime import datetime
+            from src.entities.pokemon import Pokemon
+
+            snorlax = Pokemon(
+                0, 0,
+                self.BOSS_ID,
+                level=_SNORLAX_REWARD_LEVEL,
+                is_wild=False,
+            )
+            snorlax.capture_date = datetime.now().isoformat()
+            snorlax.capture_method = "desafios_reward"
+            snorlax.is_in_team = False
+            snorlax.is_placed = False
+
+            self.player.add_to_box(snorlax)
+            print("[DESAFIOS] Snorlax enviado para a PC Box.")
+
+            try:
+                self.player.caught_pokemon.add(self.BOSS_ID)
+                self.player.register_seen(self.BOSS_ID)
+            except Exception:
+                pass
+
+            self._snorlax_reward_obj = snorlax
+        except Exception as e:
+            print(f"[DESAFIOS] Erro ao entregar Snorlax: {e}")
+            self._snorlax_reward_obj = None
+
     def _end_battle(self, result):
         if self.arena_state == "finished":
             return
@@ -468,12 +515,16 @@ class DesafiosMinigameScene(ArenaBattleScene):
         }
 
         if result == "win":
+            # ===== PRÊMIO: SNORLAX Lv.5 =====
+            self._give_snorlax_reward()
+
             try:
                 self.player.money += rewards["money"]
                 self.player.score += rewards["xp"]
                 self.player.auto_save()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[DESAFIOS] Erro ao aplicar recompensas: {e}")
+
         else:
             try:
                 self.player.money = max(0, self.player.money - rewards["money"])
@@ -487,7 +538,9 @@ class DesafiosMinigameScene(ArenaBattleScene):
         from src.scenes.minigames.desafios.desafios_result_overlay import (
             DesafiosResultOverlay,
         )
-        self._arena_overlay = DesafiosResultOverlay(self, result, rewards)
+        self._arena_overlay = DesafiosResultOverlay(
+            self, result, rewards, self._snorlax_reward_obj,
+        )
 
     def _finish_arena_battle(self, broadcast=True):
         self._restore_team()
