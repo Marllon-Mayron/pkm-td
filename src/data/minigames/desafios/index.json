@@ -1,0 +1,22 @@
+{
+    "name": "desafios",
+    "levels": [
+        {
+            "chapter": 1,
+            "level": 1,
+            "unlock_requirement": {
+                "chapter": 5,
+                "phase": 5
+            }
+        },
+        {
+            "chapter": 1,
+            "level": 2,
+            "unlock_requirement": {
+                "chapter": 6,
+                "phase": 5
+            },
+            "requires_flute": true
+        }
+    ]
+}

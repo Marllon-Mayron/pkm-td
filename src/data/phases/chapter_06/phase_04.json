@@ -1659,11 +1659,15 @@
         "item_rewards": [
             {
                 "item_id": "potion",
-                "weight": 60
+                "weight": 30
             },
             {
                 "item_id": "pokeball",
-                "weight": 40
+                "weight": 20
+            },
+            {
+                "item_id": "pokeflute",
+                "weight": 100
             }
         ],
         "drop_chance": 0.02,

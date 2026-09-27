@@ -1200,9 +1200,7 @@ class ArenaBattleScene(BaseScene):
         screen.blit(hint, (panel.centerx - hint.get_width() // 2, panel.y + 10))
 
         sub = pygame.font.Font(None, 18).render(
-            "Arraste pokémons do HUD inferior até os spots verdes. "
-            "O oponente posiciona após cada pokémon seu. "
-            "Clique direito remove.",
+            "Arraste pokémons do HUD inferior até os spots verdes. ",
             True, (190, 200, 220))
         screen.blit(sub, (panel.centerx - sub.get_width() // 2, panel.y + 42))
 

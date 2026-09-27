@@ -1951,11 +1951,15 @@
         "item_rewards": [
             {
                 "item_id": "x_speed",
-                "weight": 30
+                "weight": 10
             },
             {
                 "item_id": "moomoo_milk",
                 "weight": 70
+            },
+            {
+                "item_id": "pokeflute",
+                "weight": 100
             }
         ],
         "drop_chance": 0.05,

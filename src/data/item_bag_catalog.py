@@ -650,6 +650,24 @@ class ItemBagCatalog:
                 "unlock_chapter": None,
             }
 
+        # ============================================================
+        # ITENS ESPECIAIS DE MINIGAME
+        # ============================================================
+        items["pokeflute"] = {
+            "id": "pokeflute",
+            "name": "POKE FLUTE",
+            "sprite_path": battle_items_path / "POKEFLUTE.png",
+            "description": "Uma flauta mágica que acorda Pokémon adormecidos.",
+            "category": "battle_item",
+            "usable_in_battle": False,
+            "usable_on_map": True,
+            "effect": "wake_snorlax",
+            "effect_value": None,
+            "price": 500,
+            "not_for_sale": True,
+            "unlock_phase": None,
+            "unlock_chapter": None,
+        }
 
         # ============================================================
         # ITENS ESPECIAIS (não vendidos na loja, mas revendíveis pelo jogador)
@@ -711,10 +729,10 @@ class ItemBagCatalog:
             ("tm_self_destruct", "TM36 - Self Destruct", "machine_NORMAL.png", "self-destruct", "2-6", 1000),
             ("tm_dig", "TM28 - Dig", "machine_WATER.png", "dig", "2-7", 2000),
             ("tm_bubble_beam", "TM11 - Bubble Beam", "machine_WATER.png", "bubble-beam", "2-8", 2500),
-            ("hm_body_slam", "TM08 - Body Slam", "machine_NORMAL.png", "body-slam", "3-1", 2000),
-            ("hm_rest", "TM44 - Rest", "machine_NORMAL.png", "rest", "3-3", 2000),
-            ("hm_rage", "TM20 - Rage", "machine_NORMAL.png", "rage", "3-3", 2000),
-            ("hm_swift", "TM39 - Swift", "machine_NORMAL.png", "swift", "3-3", 2000),
+            ("tm_body_slam", "TM08 - Body Slam", "machine_NORMAL.png", "body-slam", "3-1", 2000),
+            ("tm_rest", "TM44 - Rest", "machine_NORMAL.png", "rest", "3-3", 2000),
+            ("tm_rage", "TM20 - Rage", "machine_NORMAL.png", "rage", "3-3", 2000),
+            ("tm_swift", "TM39 - Swift", "machine_NORMAL.png", "swift", "3-3", 2000),
             ("tm_tri_attack", "TM49 - Tri Attack", "machine_NORMAL.png", "tri-attack", "3-3", 3333),
             ("tm_thunderbolt", "TM24 - Thunderbolt", "machine_ELECTRIC.png", "thunderbolt", "3-4", 3000),
             ("tm_pay_day", "TM16 - Pay Day", "machine_NORMAL.png", "pay-day", "3-5", 5000),
@@ -755,7 +773,7 @@ class ItemBagCatalog:
             ("hm_flash", "HM05 - FLASH", "machine_NORMAL.png", "flash", "2-3", 1000),
             ("hm_fly", "HM02 - FLY", "machine_FLYING.png", "fly", "3-4", 3000),
             ("hm_surf", "HM03 - SURF", "machine_WATER.png", "surf", "5-1", 5000),
-            ("hm_fly", "HM04 - STRENGTH", "machine_NORMAL.png", "fly", "4-5", 3000),
+            ("hm_strength", "HM04 - STRENGTH", "machine_NORMAL.png", "strength", "4-5", 3000),
         ]
 
         for tm_id, tm_name, sprite_file, move_name, unlock_phase, price in tms:

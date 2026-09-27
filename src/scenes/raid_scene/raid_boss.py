@@ -8,10 +8,11 @@ from src.entities.pokemon import Pokemon
 
 
 class RaidBoss(Pokemon):
-    SIZE_MULTIPLIER = 1.0   # ⚠️ NÃO aumentar o sprite
+    SIZE_MULTIPLIER = 1.0
     HP_MULTIPLIER = 12
     DEF_MULTIPLIER = 1.5
     ATTACK_RANGE = 900
+    FIXED_HP = 10000
 
     def __init__(self, x, y, pokemon_id, level=100, shiny=False,
                  hp_multiplier=None, size_multiplier=None, attack_all=True):
@@ -22,7 +23,7 @@ class RaidBoss(Pokemon):
         self._attack_all = attack_all
         self._raid_size_multiplier = size_multiplier if size_multiplier is not None else self.SIZE_MULTIPLIER
 
-        # ⚠️ NÃO MEXER EM _current_sprite_scale — o rendering base já usa isso.
+        # NÃO MEXER EM _current_sprite_scale — o rendering base já usa isso.
         # Se mexermos aqui E no _prepare_sprite, o sprite fica 2x escalado (4x total).
         # Deixamos apenas _raid_size_multiplier e aplicamos no _prepare_sprite.
         self._sprite_scaled = None
@@ -33,6 +34,11 @@ class RaidBoss(Pokemon):
         # HP
         multiplier = hp_multiplier or self.HP_MULTIPLIER
         self.max_hp = int(self.max_hp * multiplier)
+
+        # Se FIXED_HP estiver definido, ele VENCE — todo boss de raid tem exatamente esse HP, ignorando level / IVs / multiplicador.
+        if self.FIXED_HP is not None:
+            self.max_hp = int(self.FIXED_HP)
+
         self.current_hp = self.max_hp
 
         # DEF
@@ -54,7 +60,9 @@ class RaidBoss(Pokemon):
         from src.battle.attack_pattern import AttackPattern
         self.attack_pattern = AttackPattern.RANDOM
 
-        print(f"[RAID_BOSS] {self.name} Lv.{self.level} | HP: {self.max_hp} | "
+        hp_tag = "FIXO" if self.FIXED_HP is not None else f"x{multiplier}"
+        print(f"[RAID_BOSS] {self.name} Lv.{self.level} | "
+              f"HP: {self.max_hp} ({hp_tag}) | "
               f"Size: {self._raid_size_multiplier}x")
 
     def restore_all_pp(self):

@@ -188,10 +188,17 @@ class ItemDragManager:
             self._check_tm_target(allied_pokemon, screen_pos, camera)
 
         elif self.drag_item_data["category"] == "battle_item":
-            # Verifica se é ESCAPEROPE (efeito especial)
-            if self.drag_item_data.get("effect") == "escape_phase":
+
+            if self.drag_item_data.get("effect") == "wake_snorlax":
+
+                self._check_wake_snorlax_target(enemy_pokemon, screen_pos, camera)
+
+            elif self.drag_item_data.get("effect") == "escape_phase":
+
                 self._check_escape_target(allied_pokemon, screen_pos, camera)
+
             else:
+
                 self._check_battle_item_target(allied_pokemon, screen_pos, camera)
 
         # ===== LIMPA MENSAGEM DE ERRO SE O ALVO MUDOU =====
@@ -330,6 +337,23 @@ class ItemDragManager:
                     self.error_message_target = None
                 break
 
+    def _check_wake_snorlax_target(self, enemies, screen_pos, camera):
+        """Poké Flute: alvo é um Snorlax DORMINDO."""
+        for enemy in enemies:
+            if not getattr(enemy, '_is_snorlax_boss', False):
+                continue
+            if not getattr(enemy, '_snorlax_sleeping', False):
+                continue
+            if self._is_target_valid(enemy, screen_pos, camera, tolerance=80):
+                self.hovered_target = enemy
+                self.target_type = "enemy"
+                self.valid_target = True
+                if self.error_message_target == enemy:
+                    self.error_message = None
+                    self.error_message_timer = 0
+                    self.error_message_target = None
+                return
+
     def _is_target_valid(self, target, screen_pos, camera, tolerance=50):
         """Verifica se um alvo é válido baseado na posição do mouse"""
         target_x, target_y = self.game.screen_manager.world_to_screen(
@@ -373,6 +397,10 @@ class ItemDragManager:
                 valid_use = True
 
             elif self.drag_item_data["category"] == "battle_item" and self.target_type == "ally":
+                valid_use = True
+            elif (self.drag_item_data["category"] == "battle_item"
+                  and self.target_type == "enemy"
+                  and self.drag_item_data.get("effect") == "wake_snorlax"):
                 valid_use = True
 
             if valid_use:
@@ -530,7 +558,10 @@ class ItemDragManager:
             text = error_text
             valid = False
         elif self.valid_target:
-            if self.target_type == "enemy":
+            if self.drag_item_data and self.drag_item_data.get("effect") == "wake_snorlax":
+                color = (255, 215, 0)
+                text = "SOLTAR PARA ACORDAR!"
+            elif self.target_type == "enemy":
                 color = (100, 255, 100)
                 text = "SOLTAR PARA CAPTURAR"
             else:
