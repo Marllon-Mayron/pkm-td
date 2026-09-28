@@ -51,8 +51,12 @@ GYM_PHASES = {
 MYTHICAL_SPAWN_CHANCE = 0.05
 
 class GameScene(BaseScene):
-    def __init__(self, game, chapter_id=1, phase_number=1):
+    def __init__(self, game, chapter_id=1, phase_number=1, keep_placement=False, placement_snapshot=None):
         super().__init__(game)
+
+        # ===== parâmetros de restauração de placement =====
+        self._keep_placement = keep_placement
+        self._placement_snapshot = placement_snapshot
 
         # Flag de debug
         self.debug_in_game = False
@@ -180,6 +184,10 @@ class GameScene(BaseScene):
 
         # Inicia o jogo
         self._start_game()
+
+        # RESTAURA POSICIONAMENTO SE SOLICITADO
+        if self._keep_placement and self._placement_snapshot:
+            self._restore_placement(self._placement_snapshot)
 
     def toggle_pause(self):
         """Alterna pausa do jogo usando o novo overlay"""
@@ -1619,6 +1627,69 @@ class GameScene(BaseScene):
             spot = placement_data['spot']
             self.placement_manager.add_pokemon(spot, pokemon)
 
+    def _restore_placement(self, snapshot):
+        """
+        Restaura pokémons para os spots onde estavam antes de rejogar.
+        - Casa por `unique_id` (preferencial) ou por (id, level) como fallback.
+        - Usa _add_pokemon_to_spot para evitar checagens de evolução/eventos.
+        - Ignora entradas cujo spot não existe ou já está ocupado.
+        """
+        if not snapshot:
+            return
+
+        print(f"[RETRY] Restaurando {len(snapshot)} pokémon(s) para seus spots...")
+
+        tile_size = self.placement_manager.tile_size
+
+        # Mapeia time por unique_id e por (id, level)
+        team_by_uid = {}
+        team_by_id_level = {}
+        for p in self.player.team:
+            uid = getattr(p, 'unique_id', None)
+            if uid:
+                team_by_uid[uid] = p
+            team_by_id_level.setdefault((p.id, p.level), p)
+
+        # Mapeia spots por tile
+        spots_by_tile = {}
+        for spot in self.spot_renderer.get_spots():
+            key = (spot.x // tile_size, spot.y // tile_size)
+            spots_by_tile[key] = spot
+
+        restored = 0
+        skipped = 0
+
+        for entry in snapshot:
+            # 1) localiza o pokémon no time atual
+            pokemon = None
+            uid = entry.get('unique_id')
+            if uid and uid in team_by_uid:
+                pokemon = team_by_uid[uid]
+            else:
+                fallback_key = (entry.get('pokemon_id'), entry.get('level'))
+                pokemon = team_by_id_level.get(fallback_key)
+
+            if pokemon is None:
+                skipped += 1
+                continue
+
+            # 2) localiza o spot pelo tile
+            tile = (entry.get('tile_x'), entry.get('tile_y'))
+            spot = spots_by_tile.get(tile)
+            if spot is None or spot.occupied:
+                skipped += 1
+                continue
+
+            # 3) coloca sem checar evolução por combinação
+            try:
+                self.placement_manager._add_pokemon_to_spot(spot, pokemon)
+                restored += 1
+            except Exception as e:
+                print(f"[RETRY] Erro ao restaurar {pokemon.name}: {e}")
+                skipped += 1
+
+        print(f"[RETRY] {restored} restaurado(s), {skipped} ignorado(s).")
+
     def _on_pokemon_swap(self, swap_data):
         """Troca as posições de dois Pokémon"""
         pokemon_a = swap_data['pokemon_a']
@@ -2757,7 +2828,7 @@ class GameScene(BaseScene):
         # ===== QUICK SWITCH DE MOVES (SEMPRE VISÍVEL) =====
         perf_monitor.start_section("RENDER_QUICK_SWITCH")
         if hasattr(self, 'move_quick_switch_manager'):
-            self.move_quick_switch_manager.render( screen, self.camera, self.screen_manager  )
+            self.move_quick_switch_manager.render(screen, self.camera, self.screen_manager)
         perf_monitor.end_section()
 
         # ===== NOTIFICATIONS (sempre renderizadas) =====

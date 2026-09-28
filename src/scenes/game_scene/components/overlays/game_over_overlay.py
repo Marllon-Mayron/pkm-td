@@ -24,6 +24,12 @@ class GameOverOverlay(BaseOverlay):
         self.button_hovered = False
         self.menu_button_hovered = False
 
+        # ===== NOVO: sub-overlay de confirmação de retry =====
+        # Quando não for None, ele intercepta todos os eventos e é renderizado
+        # por cima deste overlay, perguntando se o jogador quer manter os
+        # pokémons nos spots onde estavam antes de rejogar.
+        self.retry_confirm_overlay = None
+
     def _apply_gold_penalty(self):
         player = self.game_scene.player
         current_gold = player.money
@@ -37,6 +43,13 @@ class GameOverOverlay(BaseOverlay):
             print(f"[GAME_OVER] Sem gold para perder")
 
     def handle_event(self, event):
+        # ===== NOVO: se o confirm está aberto, ele intercepta tudo =====
+        # Enquanto o jogador não responder SIM/NÃO, nenhum outro botão
+        # deste overlay responde.
+        if self.retry_confirm_overlay is not None:
+            self.retry_confirm_overlay.handle_event(event)
+            return True
+
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self._return_to_team_select()
             return True
@@ -66,6 +79,10 @@ class GameOverOverlay(BaseOverlay):
         if not self.music_played:
             self._play_defeat_music()
             self.music_played = True
+
+        # ===== NOVO: atualiza o sub-overlay de confirmação (se aberto) =====
+        if self.retry_confirm_overlay is not None:
+            self.retry_confirm_overlay.update(dt)
 
     def _play_defeat_music(self):
         from src.managers.sounds.sound_manager import sound_manager
@@ -168,6 +185,10 @@ class GameOverOverlay(BaseOverlay):
         esc_x = center_x - esc_text.get_width() // 2
         screen.blit(esc_text, (esc_x, y_offset))
 
+        # ===== NOVO: renderiza o confirm por cima de tudo =====
+        if self.retry_confirm_overlay is not None:
+            self.retry_confirm_overlay.render(screen)
+
     def _draw_button(self, screen, x, y, w, h, text, font, hovered,
                      base_color, hover_color, border_color, hover_border):
         """Desenha um botão genérico com hover"""
@@ -186,12 +207,71 @@ class GameOverOverlay(BaseOverlay):
         )
         return rect
 
+    # ================================================================
+    # RETRY (REJOGAR FASE)
+    # ================================================================
     def _retry_phase(self):
-        """Reinicia a fase atual sem sair da tela de jogo"""
-        from src.scenes.game_scene.game_scene import GameScene
-        from src.managers.sounds.sound_manager import sound_manager
+        """
+        Chamado quando o jogador clica em REJOGAR FASE.
+        Antes de efetivamente reiniciar, abre um sub-overlay perguntando
+        se o jogador deseja manter os pokémons nos spots onde estavam.
+        """
+        from .retry_confirm_overlay import RetryConfirmOverlay
 
-        print(f"[GAME_OVER] Reiniciando fase {self.game_scene.phase_id}...")
+        # Captura o snapshot AGORA (antes do cleanup), pois é o estado
+        # que representa "onde os pokémons estavam" durante a fase perdida.
+        snapshot = self._capture_placement_snapshot()
+
+        def on_confirm(keep_placement):
+            self._do_retry_phase(keep_placement, snapshot)
+
+        self.retry_confirm_overlay = RetryConfirmOverlay(self.game_scene, on_confirm)
+        print("[GAME_OVER] Overlay de confirmação de retry aberto.")
+
+    def _capture_placement_snapshot(self):
+        """
+        Captura a posição atual de todos os Pokémon colocados no mapa.
+        Retorna uma lista de dicts com o mínimo necessário para restaurar:
+        identificação do pokémon (unique_id + fallback id/level) e o tile.
+        """
+        snapshot = []
+        pm = getattr(self.game_scene, 'placement_manager', None)
+        if not pm:
+            return snapshot
+
+        tile_size = getattr(pm, 'tile_size', 16)
+        for pokemon in pm.placed_pokemon:
+            if not getattr(pokemon, 'is_placed', False):
+                continue
+
+            tile_x = getattr(pokemon, 'placed_tile_x', None)
+            tile_y = getattr(pokemon, 'placed_tile_y', None)
+            if tile_x is None:
+                tile_x = int(pokemon.x // tile_size)
+            if tile_y is None:
+                tile_y = int(pokemon.y // tile_size)
+
+            snapshot.append({
+                'unique_id': getattr(pokemon, 'unique_id', None),
+                'pokemon_id': pokemon.id,
+                'level': pokemon.level,
+                'tile_x': tile_x,
+                'tile_y': tile_y,
+            })
+
+        print(f"[GAME_OVER] Snapshot capturado: {len(snapshot)} pokémon(s) no mapa.")
+        return snapshot
+
+    def _do_retry_phase(self, keep_placement, snapshot):
+        """
+        Efetivamente reinicia a fase.
+        - keep_placement=True: passa o snapshot para a nova cena restaurar.
+        - keep_placement=False: comportamento antigo (fase totalmente limpa).
+        """
+        from src.scenes.game_scene.game_scene import GameScene
+
+        print(f"[GAME_OVER] Reiniciando fase {self.game_scene.phase_id} "
+              f"(keep_placement={keep_placement})...")
 
         self._stop_music()
         self.game_scene.cleanup()
@@ -200,7 +280,9 @@ class GameOverOverlay(BaseOverlay):
         new_game_scene = GameScene(
             self.game,
             self.game_scene.chapter_id,
-            self.game_scene.phase_number
+            self.game_scene.phase_number,
+            keep_placement=keep_placement,
+            placement_snapshot=snapshot if keep_placement else None,
         )
         self.game.current_scene = new_game_scene
 
