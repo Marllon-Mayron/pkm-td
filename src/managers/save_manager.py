@@ -192,6 +192,11 @@ class SaveManager:
             if getattr(pokemon, '_is_raid_copy', False):
                 pokemon_dict["_is_raid_copy"] = True
 
+            # ===== MARCADOR DE COPIA TEMPORARIA DE PVP =====
+            # Mesma logica, mas para PvPBattleScene._setup_raid_team (PvP).
+            if getattr(pokemon, '_is_pvp_copy', False):
+                pokemon_dict["_is_pvp_copy"] = True
+
             return pokemon_dict
 
         # ===== POKÉMON NORMAL (não transformado) =====
@@ -239,6 +244,10 @@ class SaveManager:
         # (mesmo motivo do branch do Ditto transformado acima)
         if getattr(pokemon, '_is_raid_copy', False):
             pokemon_dict["_is_raid_copy"] = True
+
+        # ===== MARCADOR DE COPIA TEMPORARIA DE PVP =====
+        if getattr(pokemon, '_is_pvp_copy', False):
+            pokemon_dict["_is_pvp_copy"] = True
 
         return pokemon_dict
 
@@ -303,16 +312,17 @@ class SaveManager:
 
     def _clean_raid_copies(self, pokemon_list, label="list"):
         """
-        Remove duplicatas e copias temporarias de raid de uma lista de dicts.
+        Remove duplicatas e copias temporarias de raid/PvP de uma lista de dicts.
 
         Duas camadas de defesa:
           1) Filtra entradas marcadas explicitamente com _is_raid_copy=True
+             OU _is_pvp_copy=True.
           2) Deduplica por (unique_id, id, capture_date) — se dois pokemon
              tem exatamente essas tres chaves iguais, sao a mesma criatura
-             (original + copia de raid, ou duplicata por outro bug).
+             (original + copia de raid/PvP, ou duplicata por outro bug).
 
         Quando dois registros batem a chave, a preferencia e:
-          - Manter o que NAO esta marcado com _is_raid_copy
+          - Manter o que NAO esta marcado com _is_raid_copy / _is_pvp_copy
           - Se ambos tem o mesmo status, mantem o primeiro encontrado
 
         Muta a lista in-place. Retorna o numero de entradas removidas.
@@ -322,10 +332,10 @@ class SaveManager:
 
         removed = 0
 
-        # -------- Camada 1: filtro explicito por _is_raid_copy --------
+        # -------- Camada 1: filtro explicito --------
         filtered = []
         for d in pokemon_list:
-            if d.get("_is_raid_copy"):
+            if d.get("_is_raid_copy") or d.get("_is_pvp_copy"):
                 removed += 1
                 continue
             filtered.append(d)
@@ -348,8 +358,10 @@ class SaveManager:
                 existing_idx = seen[key]
                 existing = unique_list[existing_idx]
 
-                existing_is_copy = existing.get("_is_raid_copy", False)
-                current_is_copy = d.get("_is_raid_copy", False)
+                existing_is_copy = (existing.get("_is_raid_copy", False)
+                                    or existing.get("_is_pvp_copy", False))
+                current_is_copy = (d.get("_is_raid_copy", False)
+                                   or d.get("_is_pvp_copy", False))
 
                 if not existing_is_copy and current_is_copy:
                     # Mantem existing, descarta current
@@ -372,7 +384,7 @@ class SaveManager:
         pokemon_list.extend(unique_list)
 
         if removed > 0:
-            print(f"[SAVE] Limpeza de raid em '{label}': "
+            print(f"[SAVE] Limpeza de raid/PvP em '{label}': "
                   f"{removed} duplicata(s)/copia(s) removida(s)")
 
         return removed
@@ -464,35 +476,36 @@ class SaveManager:
                 data["capture_method"] = "unknown"
 
         # ============================================================
-        # DETECCAO DE ESTADO DE RAID
+        # DETECCAO DE ESTADO DE RAID / PVP
         # ============================================================
-        # Se o time contem copias temporarias de raid (marcadas com
-        # _is_raid_copy=True), NAO salvamos essas copias. O time REAL
-        # esta na pc_box marcado com is_in_team=True.
+        # Se o time contem copias temporarias de raid (_is_raid_copy=True)
+        # OU de PvP (_is_pvp_copy=True), NAO salvamos essas copias. O time
+        # REAL esta na pc_box marcado com is_in_team=True.
         #
-        # Isso garante que, mesmo se o jogo fechar durante a raid,
+        # Isso garante que, mesmo se o jogo fechar durante a raid ou o PvP,
         # o save em disco contenha apenas os pokemon originais.
         # No proximo load, os originais voltam ao time e qualquer
         # copia orfa e limpa automaticamente pelo load_game.
         # ============================================================
         has_raid_copies = any(
-            getattr(p, '_is_raid_copy', False) for p in player.team
+            getattr(p, '_is_raid_copy', False) or getattr(p, '_is_pvp_copy', False)
+            for p in player.team
         )
 
         if has_raid_copies:
-            print("[SAVE] Estado de RAID detectado - copias temporarias ignoradas")
+            print("[SAVE] Estado de RAID/PVP detectado - copias temporarias ignoradas")
 
             # Filtra qualquer copia que tenha vazado para a box (defesa)
             player.pc_box = [
                 d for d in player.pc_box
-                if not d.get("_is_raid_copy")
+                if not d.get("_is_raid_copy") and not d.get("_is_pvp_copy")
             ]
 
             # Deduplica por seguranca (defesa em profundidade)
-            self._clean_raid_copies(player.pc_box, label="pc_box (raid)")
+            self._clean_raid_copies(player.pc_box, label="pc_box (raid/pvp)")
 
             # Time real = entradas da pc_box marcadas com is_in_team=True
-            # (foram os originais movidos para a box ao entrar na raid)
+            # (foram os originais movidos para a box ao entrar na raid/PvP)
             team_order = [d for d in player.pc_box if d.get("is_in_team")]
 
             # pc_box sem consolidacao (ja esta limpa)
@@ -501,7 +514,8 @@ class SaveManager:
             player_data["pc_box"] = box_list
             player_data["team"] = team_order
 
-            print(f"[SAVE] RAID - box: {len(box_list)} | team: {len(team_order)}")
+            print(f"[SAVE] RAID/PVP - box: {len(box_list)} | "
+                  f"team: {len(team_order)}")
 
         else:
             # ===== TIME - converte objetos para dicionarios =====
@@ -656,14 +670,17 @@ class SaveManager:
 
             # ============================================================
             # CARREGA PC BOX COMO DICIONARIOS
-            # Defesas contra duplicatas de raid:
-            #   1) Filtra entradas com _is_raid_copy=True
+            # Defesas contra duplicatas de raid/PvP:
+            #   1) Filtra entradas com _is_raid_copy=True OU _is_pvp_copy=True
             #   2) Deduplica por (unique_id, id, capture_date)
             # ============================================================
             box_data = player_data.get("pc_box", [])
 
-            # Filtra copias explicitas de raid
-            box_data = [d for d in box_data if not d.get("_is_raid_copy")]
+            # Filtra copias explicitas de raid/PvP
+            box_data = [
+                d for d in box_data
+                if not d.get("_is_raid_copy") and not d.get("_is_pvp_copy")
+            ]
 
             # Deduplica (defesa em profundidade contra qualquer duplicata)
             self._clean_raid_copies(box_data, label="pc_box")
@@ -676,16 +693,19 @@ class SaveManager:
             # ============================================================
             team_data = player_data.get("team", [])
 
-            # Filtra copias explicitas de raid tambem do team
-            team_data = [d for d in team_data if not d.get("_is_raid_copy")]
+            # Filtra copias explicitas de raid/PvP tambem do team
+            team_data = [
+                d for d in team_data
+                if not d.get("_is_raid_copy") and not d.get("_is_pvp_copy")
+            ]
 
             # Deduplica
             self._clean_raid_copies(team_data, label="team")
 
             # ------------------------------------------------------------
             # SAFETY NET: reconstroi time a partir da box se necessario.
-            # Se o save foi feito DURANTE uma raid (auto_save acidental) e
-            # por algum motivo o time ficou vazio, os originais estao na
+            # Se o save foi feito DURANTE uma raid/PvP (auto_save acidental)
+            # e por algum motivo o time ficou vazio, os originais estao na
             # box marcados com is_in_team=True. Recupera eles.
             # ------------------------------------------------------------
             if not team_data:

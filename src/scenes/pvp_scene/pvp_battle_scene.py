@@ -401,7 +401,13 @@ class PvPBattleScene(BaseScene):
         self._ally_team_objs = []
         self._enemy_team_objs = []
         self._local_team_dead = False
+
+        # ============================================================
+        # BACKUP DO TIME ORIGINAL (mesmo padrão da RaidBattleScene)
+        # ============================================================
         self._original_team = None
+        self._saved_team_ids = None
+
         self._applying_remote_weather = False
         self._applying_remote_day_night = False
 
@@ -467,15 +473,51 @@ class PvPBattleScene(BaseScene):
 
         self._setup_teams()
 
+        # ============================================================
+        # BACKUP DO TIME ORIGINAL (mesmo padrão da RaidBattleScene)
+        #   1) Guarda referência dos originais em memória
+        #   2) Move originais pra box com is_in_team=True preservado
+        #   3) Cria cópias temporárias no time, marcadas _is_pvp_copy=True
+        #
+        # Assim, se houver auto_save/crash durante o PvP, o save_manager
+        # reconstrói o time a partir da box (is_in_team=True) e descarta
+        # as cópias órfãs. NENHUM pokémon é perdido permanentemente.
+        # ============================================================
         self._original_team = list(game.player.team)
-        game.player.team = self._local_team_objs
+        self._saved_team_ids = {p.unique_id for p in self._original_team}
+
+        # 2) Move os originais para a box (com is_in_team=True preservado)
+        for p in self._original_team:
+            p.is_in_team = False  # instância em memória
+            p_dict = p.to_dict()
+            p_dict["is_in_team"] = True  # MARCA na box que era do time
+            # Remove possível duplicata antes de adicionar
+            self.player.pc_box = [
+                d for d in self.player.pc_box
+                if d.get("unique_id") != p.unique_id
+            ]
+            self.player.pc_box.append(p_dict)
+
+        print(f"[PVP] Backup do time original: "
+              f"{len(self._original_team)} pokemon "
+              f"({[p.name for p in self._original_team]})")
+
+        # 3) Limpa o time e repovoa com CÓPIAS temporárias
+        game.player.team.clear()
         for p in self._local_team_objs:
             try:
                 p.full_restore()
             except Exception:
                 pass
+            # MESMO unique_id do original (intencional).
+            # O save_manager usa isso para identificar e limpar cópias.
+            p._is_pvp_copy = True
+            p._pvp_original_uid = p.unique_id
             p.is_in_team = True
-        print(f"[PVP] Time do HUD trocado ({len(self._local_team_objs)})")
+            game.player.team.append(p)
+
+        print(f"[PVP] Time do HUD trocado ({len(self._local_team_objs)}) "
+              f"— cópias temporárias (unique_id preservado)")
 
         self.wave_manager = _PvPWaveManagerShim(self)
 
@@ -2215,7 +2257,13 @@ class PvPBattleScene(BaseScene):
         except Exception:
             pass
 
+        # ============================================================
+        # RESTAURA O TIME ORIGINAL ANTES DE SAIR
+        # Cobre todos os caminhos de saída (victory, defeat, ESC,
+        # DISCONNECT, finish).
+        # ============================================================
         self._restore_team()
+
         if self._on_exit_callback:
             try:
                 self._on_exit_callback()
@@ -2231,10 +2279,57 @@ class PvPBattleScene(BaseScene):
             print(f"[PVP] erro sair: {e}")
 
     def _restore_team(self):
-        if self._original_team is not None:
-            self.game.player.team = self._original_team
-            self._original_team = None
-            print("[PVP] Time original restaurado")
+        """
+        Restaura o time ORIGINAL do jogador (idempotente).
+
+        Chamar ANTES de qualquer auto_save e em TODOS os caminhos de saída
+        do PvP (victory, defeat, disconnect, ESC, finish).
+
+        - Remove os originais da box (eles voltam pro time)
+        - Remove qualquer cópia PvP órfã (do time ou da box)
+        - Devolve os objetos originais ao player.team
+        """
+        saved = self._original_team
+        if saved is None:
+            return
+
+        saved_ids = self._saved_team_ids or set()
+
+        # 1) Remove os originais da box (eles voltam para o time)
+        self.player.pc_box = [
+            d for d in self.player.pc_box
+            if d.get("unique_id") not in saved_ids
+        ]
+
+        # 2) Remove qualquer cópia PvP órfã que tenha sobrado na box
+        self.player.pc_box = [
+            d for d in self.player.pc_box
+            if not d.get("_is_pvp_copy")
+        ]
+
+        # 3) Marca as cópias remanescentes no time como fora do time
+        for p in list(self.player.team):
+            if getattr(p, '_is_pvp_copy', False):
+                p.is_in_team = False
+
+        # 4) Devolve os objetos originais ao time
+        self.game.player.team = list(saved)
+        for p in self.game.player.team:
+            p.is_in_team = True
+            p.is_placed = False
+            # Remove marcadores (por segurança)
+            if hasattr(p, '_is_pvp_copy'):
+                delattr(p, '_is_pvp_copy')
+            if hasattr(p, '_pvp_original_uid'):
+                delattr(p, '_pvp_original_uid')
+
+        # 5) Limpa o backup (idempotência)
+        self._original_team = None
+        self._saved_team_ids = None
+
+        print(f"[PVP] Time original restaurado: "
+              f"{len(self.game.player.team)} pokemon "
+              f"({[p.name for p in self.game.player.team]})")
 
     # ==================================================================
     # OVERLAYS
