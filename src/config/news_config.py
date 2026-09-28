@@ -16,7 +16,7 @@ import re
 NEWS_DEVLOGS = {
     "0.1.18": "https://bojackjeguin.itch.io/pokemon-tower-defense-by-bojackjeguin/devlog/1665606/v0118-sua-galeria",
     "0.1.17": "https://bojackjeguin.itch.io/pokemon-tower-defense-by-bojackjeguin/devlog/1661725/v0117-sorria-para-a-cmera",
-    # "0.1.19": "https://...",
+    "0.1.22": "https://bojackjeguin.itch.io/pokemon-tower-defense-by-bojackjeguin/devlog/1680959/v0122-caando-mticos",
 }
 
 
@@ -26,6 +26,12 @@ NEWS_DEVLOGS = {
 # O número é extraído do nome do arquivo (news_1.png -> 1, news_2.png -> 2)
 # =====================================================================
 NEWS_IMAGE_TITLES = {
+    "0.1.22": {
+        1: "Capa da versão: 0.1.22.",
+        2: "Adicionado minigame no DOJO",
+        3: "Adicionado minigame Acorde o snorlax",
+        4: "Novo sistema de caça a míticos nas fases"
+    },
     "0.1.21": {
         1: "Capa da versão: 0.1.21.",
         2: "Tela de seleçaõ de time para o pvp.",

@@ -268,7 +268,7 @@ class DojoMinigameScene(ArenaBattleScene):
     # =================================================================
     def _load_arena_map(self):
         path = os.path.join(
-            PROJECT_ROOT, "src", "data", "minigames", "Dojo",
+            PROJECT_ROOT, "src", "data", "minigames", "desafios",
             f"level_{self._dojo_chapter:02d}_{self._dojo_phase:02d}.json"
         )
 
