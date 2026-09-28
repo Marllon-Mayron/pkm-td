@@ -81,10 +81,12 @@ REGIONS = {
     'ALL': 'all',
     'KANTO': 'kanto',
     'JOHTO': 'johto',
+    'HOENN': 'hoenn',
 }
 
 # Faixas de IDs por região
 REGION_RANGES = {
-    'kanto': (1, 151),    # Geração 1
-    'johto': (152, 251),  # Geração 2
+    'kanto': (1, 151),
+    'johto': (152, 251),
+    'hoenn': (252, 386),
 }

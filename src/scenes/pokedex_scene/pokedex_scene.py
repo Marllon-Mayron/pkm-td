@@ -103,6 +103,7 @@ class PokedexScene(BaseScene):
             {'key': REGIONS['ALL'],   'label': "TODAS AS REGIÕES"},
             {'key': REGIONS['KANTO'], 'label': "KANTO (GEN 1)"},
             {'key': REGIONS['JOHTO'], 'label': "JOHTO (GEN 2)"},
+            {'key': REGIONS['HOENN'], 'label': "HOENN (GEN 3)"},
         ]
         filter_options = [
             {'key': FILTERS['ALL'],        'label': "TODOS"},
