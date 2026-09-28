@@ -467,6 +467,32 @@ class SaveManager:
 
         # ===== PC BOX - normaliza dicionarios (idempotente) =====
         from datetime import datetime
+        from src.entities.pokemon import Pokemon as _Pokemon
+
+        # DEFESA: se algum Pokemon vivo vazou pra box, converte para dict.
+        # Isso evita o crash 'argument of type Pokemon is not iterable'
+        # quando alguém esquece de chamar .to_dict() antes de dar append.
+        normalized_pc_box = []
+        converted_count = 0
+        discarded_count = 0
+        for data in player.pc_box:
+            if isinstance(data, _Pokemon):
+                print(f"[SAVE] AVISO: '{data.name}' estava na pc_box como OBJETO — "
+                      f"convertendo para dict (corrigido)")
+                data = data.to_dict()
+                converted_count += 1
+            elif not isinstance(data, dict):
+                print(f"[SAVE] AVISO: entrada inválida na pc_box "
+                      f"({type(data).__name__}) — descartada")
+                discarded_count += 1
+                continue
+            normalized_pc_box.append(data)
+
+        if converted_count or discarded_count:
+            print(f"[SAVE] pc_box corrigida: {converted_count} convertido(s), "
+                  f"{discarded_count} descartado(s)")
+            player.pc_box = normalized_pc_box
+
         for data in player.pc_box:
             if "unique_id" not in data:
                 data["unique_id"] = str(uuid.uuid4())
@@ -725,7 +751,8 @@ class SaveManager:
             # ===== ATUALIZA STATUS DE is_in_team NA BOX =====
             team_ids = {p.unique_id for p in player.team}
             for data in player.pc_box:
-                data["is_in_team"] = data.get("unique_id") in team_ids
+                if isinstance(data, dict):
+                    data["is_in_team"] = data.get("unique_id") in team_ids
 
             # ===== POKEDEX =====
             player.seen_pokemon = set(player_data.get("seen_pokemon", []))
