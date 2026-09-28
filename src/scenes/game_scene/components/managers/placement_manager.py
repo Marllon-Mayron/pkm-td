@@ -10,7 +10,7 @@ class PlacementManager:
     def __init__(self, game):
         self.game = game
         self.placed_pokemon = []  # Lista de Pokémon no mapa
-        self.tile_size = 24
+        self.tile_size = 16
         # ===== NOVO: flag de celebração de vitória =====
         self._victory_celebration_active = False
 

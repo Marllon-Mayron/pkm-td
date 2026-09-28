@@ -1,115 +1,183 @@
 # src/scenes/editor/components/tile_palette.py
 
+"""
+Paleta de tiles do editor.
+
+Recursos:
+- Grade com número de COLUNAS configurável pelo usuário (botões [−]/[+]/[A])
+- Modo single (1x1) e modo multi (seleção por arrasto, ex: árvore 3x3)
+- Suporta QUALQUER tamanho de tileset (não há mais 6x8 fixo)
+- Zoom com Ctrl +/−
+- Scroll com roda, arraste da barra ou arraste da grade
+"""
+
 import pygame
 
 
 class TilePalette:
+    # Layout
+    TITLE_HEIGHT = 24
+    CONTROLS_HEIGHT = 26
+    FOOTER_HEIGHT = 40
+
     def __init__(self, x, y, width, height):
         self.rect = pygame.Rect(x, y, width, height)
         self.tiles = []
-        self.selected_tile = 0  # Garantir que é inteiro
+        self.selected_tile = 0
         self.scroll_y = 0
         self.max_scroll = 0
-        self.tile_size = 24
+        self.tile_size = 16
         self.visible = True
         self.focused = False
 
-        # Configuração para 6 colunas
-        self.cols = 6
-        self.tile_spacing = 2
-        self.min_tile_size = 16
-        self.max_tile_size = 64
+        # ===== Colunas configuráveis =====
+        self.cols = 6                 # colunas exibidas
+        self.natural_cols = 6         # colunas do tileset de origem (auto)
+        self.min_cols = 1
+        self.max_cols = 40
+        self._cols_user_customized = False  # se True, "A" não sobrescreve
 
-        # Informações sobre os tilesets
+        # ===== Multi-seleção =====
+        self.selection_mode = "single"     # "single" | "multi"
+        self.is_selecting = False
+        self.selection_start = None        # (col, row)
+        self.selection_end = None          # (col, row)
+        self.multi_selection = None        # [{'dx','dy','tile_id'}, ...]
+        self.multi_selection_bounds = None # (min_c, min_r, max_c, max_r)
+        self.multi_selection_size = (0, 0) # (w, h) em tiles
+
+        # ===== Spacing / tamanho =====
+        self.tile_spacing = 2
+        self.min_tile_size = 12
+        self.max_tile_size = 48
+
+        # ===== Separadores entre arquivos de tileset =====
         self.tileset_boundaries = []
 
-        # Para redimensionamento
+        # ===== Redimensionamento / arraste =====
         self.resizing = False
         self.resize_margin = 10
-        self.min_width = 180
-        self.min_height = 250
+        self.min_width = 220
+        self.min_height = 320
 
-        # Para arrastar
         self.dragging = False
         self.drag_start_x = 0
         self.drag_start_y = 0
-        self.original_x = x
-        self.original_y = y
 
-        # Para arrastar a barra de scroll
         self.scroll_dragging = False
         self.scroll_drag_start_y = 0
         self.scroll_drag_start_scroll = 0
 
-    def set_tileset(self, tileset, tileset_boundaries=None):
-        """
-        Define o tileset e atualiza a palette
-        """
-        print(f"\n[TilePalette.set_tileset]")
-        print(f"  Recebendo {len(tileset)} tiles")
-        print(f"  Boundaries: {tileset_boundaries}")
+        # Botões dos controles (calculados em _update_button_positions)
+        self.cols_minus_rect = pygame.Rect(0, 0, 0, 0)
+        self.cols_value_rect = pygame.Rect(0, 0, 0, 0)
+        self.cols_plus_rect = pygame.Rect(0, 0, 0, 0)
+        self.cols_auto_rect = pygame.Rect(0, 0, 0, 0)
+        self.mode_single_rect = pygame.Rect(0, 0, 0, 0)
+        self.mode_multi_rect = pygame.Rect(0, 0, 0, 0)
+        self.clear_sel_rect = pygame.Rect(0, 0, 0, 0)
+        self.cols_label_x = 0
+        self.mode_label_x = 0
+
+        self.hovered_control = None
+
+        # Botões do rodapé
+        self.left_button_rect = pygame.Rect(0, 0, 0, 0)
+        self.right_button_rect = pygame.Rect(0, 0, 0, 0)
+
+        self._update_button_positions()
+
+    # =========================================================
+    # LAYOUT
+    # =========================================================
+    def _header_height(self):
+        return self.TITLE_HEIGHT + self.CONTROLS_HEIGHT
+
+    def _grid_rect(self):
+        return pygame.Rect(
+            self.rect.x + 5,
+            self.rect.y + self._header_height(),
+            self.rect.width - 10,
+            self.rect.height - self._header_height() - self.FOOTER_HEIGHT,
+        )
+
+    def _update_button_positions(self):
+        y = self.rect.y + self.TITLE_HEIGHT + 2
+        h = self.CONTROLS_HEIGHT - 4
+        x = self.rect.x + 6
+
+        # Colunas
+        self.cols_label_x = x
+        x += 34
+
+        self.cols_minus_rect = pygame.Rect(x, y, 18, h); x += 20
+        self.cols_value_rect = pygame.Rect(x, y, 26, h); x += 28
+        self.cols_plus_rect  = pygame.Rect(x, y, 18, h); x += 20
+        self.cols_auto_rect  = pygame.Rect(x, y, 22, h); x += 28
+
+        # Modo
+        self.mode_label_x = x
+        x += 40
+        self.mode_single_rect = pygame.Rect(x, y, 22, h); x += 24
+        self.mode_multi_rect  = pygame.Rect(x, y, 22, h); x += 26
+
+        # Limpar seleção
+        self.clear_sel_rect = pygame.Rect(x, y, 22, h)
+
+    # =========================================================
+    # TILESET
+    # =========================================================
+    def set_tileset(self, tileset, tileset_boundaries=None, natural_cols=None):
+        print(f"\n[TilePalette.set_tileset] {len(tileset)} tiles, "
+              f"boundaries={tileset_boundaries}, natural_cols={natural_cols}")
 
         self.tiles = tileset
         self.tileset_boundaries = tileset_boundaries or []
-
-        # Garante que selected_tile é inteiro
         self.selected_tile = 0
 
-        # Se não temos boundaries, cria boundaries automáticos
-        if not self.tileset_boundaries and self.tiles:
-            TILES_PER_SET = 48
-            for i in range(0, len(self.tiles), TILES_PER_SET):
-                self.tileset_boundaries.append(i)
-            print(f"  Boundaries automáticos: {self.tileset_boundaries}")
+        if natural_cols is not None and natural_cols > 0:
+            self.natural_cols = int(natural_cols)
+            # Só sobrescreve self.cols se o usuário nunca mexeu
+            if not self._cols_user_customized:
+                self.cols = self.natural_cols
 
         self._update_max_scroll()
-        print(f"  Após update: {len(self.tiles)} tiles, {len(self.tileset_boundaries)} boundaries")
+
+    def set_cols(self, cols, user_customized=True):
+        cols = max(self.min_cols, min(self.max_cols, int(cols)))
+        if cols == self.cols:
+            return
+        self.cols = cols
+        if user_customized:
+            self._cols_user_customized = True
+        self._update_max_scroll()
 
     def _update_max_scroll(self):
-        """Atualiza o limite máximo de scroll"""
         if not self.tiles:
             self.max_scroll = 0
+            self.scroll_y = 0
             return
-
-        rows = (len(self.tiles) + self.cols - 1) // self.cols
+        cols = max(1, self.cols)
+        rows = (len(self.tiles) + cols - 1) // cols
         content_height = rows * (self.tile_size + self.tile_spacing)
-        visible_height = self.rect.height - 40
+        visible_height = self._grid_rect().height
         self.max_scroll = max(0, content_height - visible_height)
         self.scroll_y = max(0, min(self.scroll_y, self.max_scroll))
 
+    # =========================================================
+    # EVENTOS
+    # =========================================================
     def handle_event(self, event):
-        """Processa eventos da palette"""
         if not self.visible:
             return False
 
-        mouse_pos = pygame.mouse.get_pos()
-        mouse_x, mouse_y = mouse_pos
-
+        mouse_x, mouse_y = pygame.mouse.get_pos()
         self.focused = self.rect.collidepoint(mouse_x, mouse_y)
+        self._update_control_hover(mouse_x, mouse_y)
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
-                if self._is_mouse_on_scrollbar(mouse_x, mouse_y):
-                    self.scroll_dragging = True
-                    self.scroll_drag_start_y = mouse_y
-                    self.scroll_drag_start_scroll = self.scroll_y
-                    return True
-
-                elif (self.rect.right - self.resize_margin <= mouse_x <= self.rect.right + self.resize_margin and
-                      self.rect.bottom - self.resize_margin <= mouse_y <= self.rect.bottom + self.resize_margin):
-                    self.resizing = True
-                    return True
-
-                title_rect = pygame.Rect(self.rect.x, self.rect.y, self.rect.width, 30)
-                if title_rect.collidepoint(mouse_x, mouse_y):
-                    self.dragging = True
-                    self.drag_start_x = mouse_x - self.rect.x
-                    self.drag_start_y = mouse_y - self.rect.y
-                    return True
-
-                if self.focused:
-                    return self._handle_tile_selection(mouse_x, mouse_y)
-
+                return self._handle_left_down(mouse_x, mouse_y)
             elif event.button == 4 and self.focused:
                 self.scroll_y = max(0, self.scroll_y - 30)
                 return True
@@ -119,299 +187,551 @@ class TilePalette:
 
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:
+                self._handle_left_up(mouse_x, mouse_y)
                 self.resizing = False
                 self.dragging = False
                 self.scroll_dragging = False
 
         elif event.type == pygame.MOUSEMOTION:
-            if self.scroll_dragging:
-                delta_y = mouse_y - self.scroll_drag_start_y
-                visible_height = self.rect.height - 35
-                scrollbar_height = max(30, visible_height * (visible_height / (visible_height + self.max_scroll)))
-                scroll_ratio = (visible_height - scrollbar_height) / self.max_scroll if self.max_scroll > 0 else 1
-                scroll_delta = delta_y / scroll_ratio if scroll_ratio > 0 else 0
-                self.scroll_y = max(0, min(self.max_scroll, self.scroll_drag_start_scroll + scroll_delta))
-                return True
-            elif self.resizing:
-                new_width = max(self.min_width, mouse_x - self.rect.x)
-                new_height = max(self.min_height, mouse_y - self.rect.y)
-                self.rect.width = new_width
-                self.rect.height = new_height
-                self._update_max_scroll()
-                return True
-            elif self.dragging:
-                self.rect.x = mouse_x - self.drag_start_x
-                self.rect.y = mouse_y - self.drag_start_y
-                return True
+            return self._handle_motion(mouse_x, mouse_y)
 
         elif event.type == pygame.KEYDOWN and self.focused:
             return self._handle_shortcuts(event)
 
         return False
 
+    def _handle_left_down(self, mouse_x, mouse_y):
+        # 1) Controles
+        if self._handle_control_click(mouse_x, mouse_y):
+            return True
+
+        # 2) Scrollbar
+        if self._is_mouse_on_scrollbar(mouse_x, mouse_y):
+            self.scroll_dragging = True
+            self.scroll_drag_start_y = mouse_y
+            self.scroll_drag_start_scroll = self.scroll_y
+            return True
+
+        # 3) Resize
+        if (self.rect.right - self.resize_margin <= mouse_x <= self.rect.right + self.resize_margin and
+                self.rect.bottom - self.resize_margin <= mouse_y <= self.rect.bottom + self.resize_margin):
+            self.resizing = True
+            return True
+
+        # 4) Arraste pela barra de título
+        title_rect = pygame.Rect(self.rect.x, self.rect.y, self.rect.width, self.TITLE_HEIGHT)
+        if title_rect.collidepoint(mouse_x, mouse_y):
+            self.dragging = True
+            self.drag_start_x = mouse_x - self.rect.x
+            self.drag_start_y = mouse_y - self.rect.y
+            return True
+
+        # 5) Grade de tiles
+        if self._grid_rect().collidepoint(mouse_x, mouse_y):
+            if self.selection_mode == "single":
+                return self._handle_tile_selection(mouse_x, mouse_y)
+            else:
+                return self._handle_multi_select_start(mouse_x, mouse_y)
+
+        return False
+
+    def _handle_left_up(self, mouse_x, mouse_y):
+        if self.is_selecting:
+            self._handle_multi_select_end()
+
+    def _handle_motion(self, mouse_x, mouse_y):
+        if self.scroll_dragging:
+            delta_y = mouse_y - self.scroll_drag_start_y
+            visible_height = self._grid_rect().height
+            if self.max_scroll > 0 and visible_height > 0:
+                scrollbar_height = max(30, visible_height * (visible_height / (visible_height + self.max_scroll)))
+                scroll_ratio = (visible_height - scrollbar_height) / self.max_scroll
+                if scroll_ratio > 0:
+                    scroll_delta = delta_y / scroll_ratio
+                    self.scroll_y = max(0, min(self.max_scroll, self.scroll_drag_start_scroll + scroll_delta))
+            return True
+
+        if self.resizing:
+            new_width = max(self.min_width, mouse_x - self.rect.x)
+            new_height = max(self.min_height, mouse_y - self.rect.y)
+            self.rect.width = new_width
+            self.rect.height = new_height
+            self._update_button_positions()
+            self._update_max_scroll()
+            return True
+
+        if self.dragging:
+            self.rect.x = mouse_x - self.drag_start_x
+            self.rect.y = mouse_y - self.drag_start_y
+            self._update_button_positions()
+            return True
+
+        if self.is_selecting:
+            return self._handle_multi_select_update(mouse_x, mouse_y)
+
+        return False
+
+    # =========================================================
+    # CONTROLES
+    # =========================================================
+    def _update_control_hover(self, mouse_x, mouse_y):
+        self.hovered_control = None
+        for rect, name in [
+            (self.cols_minus_rect, "cols_minus"),
+            (self.cols_plus_rect, "cols_plus"),
+            (self.cols_auto_rect, "cols_auto"),
+            (self.mode_single_rect, "mode_single"),
+            (self.mode_multi_rect, "mode_multi"),
+            (self.clear_sel_rect, "clear_sel"),
+        ]:
+            if rect.collidepoint(mouse_x, mouse_y):
+                self.hovered_control = name
+                return
+
+    def _handle_control_click(self, mouse_x, mouse_y):
+        if self.cols_minus_rect.collidepoint(mouse_x, mouse_y):
+            self.set_cols(self.cols - 1); return True
+        if self.cols_plus_rect.collidepoint(mouse_x, mouse_y):
+            self.set_cols(self.cols + 1); return True
+        if self.cols_auto_rect.collidepoint(mouse_x, mouse_y):
+            self._cols_user_customized = False
+            self.set_cols(self.natural_cols, user_customized=False)
+            print(f"[TilePalette] Colunas resetadas para natural: {self.natural_cols}")
+            return True
+        if self.mode_single_rect.collidepoint(mouse_x, mouse_y):
+            self.selection_mode = "single"
+            return True
+        if self.mode_multi_rect.collidepoint(mouse_x, mouse_y):
+            self.selection_mode = "multi"
+            return True
+        if self.clear_sel_rect.collidepoint(mouse_x, mouse_y):
+            self.clear_multi_selection()
+            return True
+        return False
+
+    # =========================================================
+    # GRID / SELEÇÃO
+    # =========================================================
+    def _mouse_to_grid(self, mouse_x, mouse_y):
+        grid = self._grid_rect()
+        local_x = mouse_x - grid.x
+        local_y = mouse_y - grid.y + self.scroll_y
+
+        cell = self.tile_size + self.tile_spacing
+        if cell <= 0:
+            return None
+
+        col = int(local_x // cell)
+        row = int(local_y // cell)
+
+        if col < 0: col = 0
+        if row < 0: row = 0
+        if self.cols > 0 and col >= self.cols:
+            col = self.cols - 1
+
+        return col, row
+
+    def _handle_tile_selection(self, mouse_x, mouse_y):
+        result = self._mouse_to_grid(mouse_x, mouse_y)
+        if result is None:
+            return False
+        col, row = result
+        idx = row * self.cols + col
+        if 0 <= idx < len(self.tiles):
+            self.selected_tile = idx
+            return True
+        return False
+
+    def _handle_multi_select_start(self, mouse_x, mouse_y):
+        result = self._mouse_to_grid(mouse_x, mouse_y)
+        if result is None:
+            return False
+        self.is_selecting = True
+        self.selection_start = result
+        self.selection_end = result
+        return True
+
+    def _handle_multi_select_update(self, mouse_x, mouse_y):
+        if not self.is_selecting:
+            return False
+        result = self._mouse_to_grid(mouse_x, mouse_y)
+        if result is None:
+            return False
+        self.selection_end = result
+        return True
+
+    def _handle_multi_select_end(self):
+        if not self.is_selecting:
+            return False
+        if self.selection_start is None or self.selection_end is None:
+            self.is_selecting = False
+            return False
+
+        c1, r1 = self.selection_start
+        c2, r2 = self.selection_end
+        min_c, max_c = min(c1, c2), max(c1, c2)
+        min_r, max_r = min(r1, r2), max(r1, r2)
+
+        pattern = []
+        for r in range(min_r, max_r + 1):
+            for c in range(min_c, max_c + 1):
+                idx = r * self.cols + c
+                if 0 <= idx < len(self.tiles):
+                    pattern.append({
+                        'dx': c - min_c,
+                        'dy': r - min_r,
+                        'tile_id': idx + 1,   # IDs são 1-based
+                    })
+
+        if pattern:
+            self.multi_selection = pattern
+            self.multi_selection_bounds = (min_c, min_r, max_c, max_r)
+            self.multi_selection_size = (max_c - min_c + 1, max_r - min_r + 1)
+            print(f"[TilePalette] Multi-seleção: "
+                  f"{self.multi_selection_size[0]}x{self.multi_selection_size[1]} = "
+                  f"{len(pattern)} tiles")
+        else:
+            self.clear_multi_selection()
+
+        self.is_selecting = False
+        self.selection_start = None
+        self.selection_end = None
+        return True
+
+    def clear_multi_selection(self):
+        self.multi_selection = None
+        self.multi_selection_bounds = None
+        self.multi_selection_size = (0, 0)
+
+    # =========================================================
+    # API PÚBLICA — CONSULTADA PELO MAP_HANDLER
+    # =========================================================
+    def get_current_brush_pattern(self):
+        """
+        Retorna a lista de células do pattern multi-tile
+        [{dx, dy, tile_id}, ...] ou None se estiver em modo single.
+        """
+        if self.selection_mode == "multi" and self.multi_selection:
+            return self.multi_selection
+        return None
+
+    # =========================================================
+    # ATALHOS / SCROLL / HELPERS
+    # =========================================================
+    def _handle_shortcuts(self, event):
+        mods = pygame.key.get_mods()
+        if event.key in (pygame.K_PLUS, pygame.K_EQUALS) and (mods & pygame.KMOD_CTRL):
+            self.tile_size = min(self.max_tile_size, self.tile_size + 4)
+            self._update_max_scroll()
+            return True
+        if event.key == pygame.K_MINUS and (mods & pygame.KMOD_CTRL):
+            self.tile_size = max(self.min_tile_size, self.tile_size - 4)
+            self._update_max_scroll()
+            return True
+        return False
+
     def _is_mouse_on_scrollbar(self, mouse_x, mouse_y):
         if not self.focused or self.max_scroll <= 0:
             return False
+        grid = self._grid_rect()
+        sb = pygame.Rect(grid.right - 12, grid.y, 10, grid.height)
+        return sb.collidepoint(mouse_x, mouse_y)
 
-        scrollbar_rect = pygame.Rect(
-            self.rect.x + self.rect.width - 15,
-            self.rect.y + 35,
-            10,
-            self.rect.height - 35
-        )
-        return scrollbar_rect.collidepoint(mouse_x, mouse_y)
-
-    def _handle_tile_selection(self, mouse_x, mouse_y):
-        """Processa a seleção de um tile - garante índice inteiro"""
-        local_x = mouse_x - self.rect.x - 5
-        local_y = mouse_y - self.rect.y - 35 + self.scroll_y
-
-        col = int(local_x // (self.tile_size + self.tile_spacing))
-        row = int(local_y // (self.tile_size + self.tile_spacing))
-
-        if 0 <= col < self.cols:
-            tile_index = int(row * self.cols + col)
-            if 0 <= tile_index < len(self.tiles):
-                self.selected_tile = tile_index
-                return True
+    def handle_current_tile_buttons(self, mouse_pos):
+        """Setas ‹ › do rodapé (só em modo single)."""
+        if not self.visible or not self.tiles:
+            return False
+        if self.selection_mode != "single":
+            return False
+        if self.left_button_rect.collidepoint(mouse_pos):
+            self.selected_tile = (self.selected_tile - 1) % len(self.tiles)
+            return True
+        if self.right_button_rect.collidepoint(mouse_pos):
+            self.selected_tile = (self.selected_tile + 1) % len(self.tiles)
+            return True
         return False
 
-    def _handle_shortcuts(self, event):
-        if event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS:
-            if pygame.key.get_mods() & pygame.KMOD_CTRL:
-                self.tile_size = min(self.max_tile_size, self.tile_size + 8)
-                self._update_max_scroll()
-                return True
-        elif event.key == pygame.K_MINUS:
-            if pygame.key.get_mods() & pygame.KMOD_CTRL:
-                self.tile_size = max(self.min_tile_size, self.tile_size - 8)
-                self._update_max_scroll()
-                return True
-        return False
-
+    # =========================================================
+    # RENDER
+    # =========================================================
     def render(self, screen):
         if not self.visible:
             return
-
         self._render_background(screen)
         self._render_title(screen)
+        self._render_controls(screen)
         self._render_tiles(screen)
+        self._render_selection_overlay(screen)
         self._render_scrollbar(screen)
         self._render_resize_handle(screen)
-        self._render_current_tile_selector(screen)
+        self._render_footer(screen)
 
     def _render_background(self, screen):
-        shadow_rect = self.rect.copy()
-        shadow_rect.x += 3
-        shadow_rect.y += 3
-        pygame.draw.rect(screen, (20, 20, 30), shadow_rect, border_radius=8)
+        shadow = self.rect.copy()
+        shadow.x += 3
+        shadow.y += 3
+        pygame.draw.rect(screen, (20, 20, 30), shadow, border_radius=8)
 
         if self.focused:
-            bg_color = (60, 60, 75)
-            border_color = (140, 140, 160)
+            bg = (60, 60, 75); border = (140, 140, 160)
         else:
-            bg_color = (45, 45, 55)
-            border_color = (90, 90, 100)
+            bg = (45, 45, 55); border = (90, 90, 100)
 
-        pygame.draw.rect(screen, bg_color, self.rect, border_radius=8)
-        pygame.draw.rect(screen, border_color, self.rect, 2, border_radius=8)
+        pygame.draw.rect(screen, bg, self.rect, border_radius=8)
+        pygame.draw.rect(screen, border, self.rect, 2, border_radius=8)
 
     def _render_title(self, screen):
-        title_font = pygame.font.Font(None, 20)
-        title = title_font.render("TILES (6x8)", True, (255, 255, 255))
-        screen.blit(title, (self.rect.x + 10, self.rect.y + 5))
+        font = pygame.font.Font(None, 16)
+        title = font.render("TILES", True, (255, 255, 255))
+        screen.blit(title, (self.rect.x + 8, self.rect.y + 4))
 
         num_tilesets = len(self.tileset_boundaries) if self.tileset_boundaries else (1 if self.tiles else 0)
-        info_text = f"{self.tile_size}px | {num_tilesets} sets | {len(self.tiles)} tiles"
-        info = title_font.render(info_text, True, (200, 200, 200))
-        screen.blit(info, (self.rect.x + self.rect.width - 140, self.rect.y + 5))
+        info = f"{self.tile_size}px  |  {num_tilesets} set(s)  |  {len(self.tiles)} tiles"
+        info_surf = font.render(info, True, (200, 200, 200))
+        screen.blit(info_surf, (self.rect.x + 55, self.rect.y + 4))
 
-        if self.focused:
-            hint_font = pygame.font.Font(None, 14)
-            hint = hint_font.render("Ctrl + ± :size | Scroll: navegar", True, (150, 150, 150))
-            screen.blit(hint, (self.rect.x + 10, self.rect.y + 20))
+    def _render_controls(self, screen):
+        font = pygame.font.Font(None, 14)
+        y = self.rect.y + self.TITLE_HEIGHT + 2
+
+        lbl = font.render("Cols:", True, (200, 200, 200))
+        screen.blit(lbl, (self.cols_label_x, y + 4))
+
+        self._draw_button(screen, self.cols_minus_rect, "-", "cols_minus")
+
+        pygame.draw.rect(screen, (30, 34, 44), self.cols_value_rect)
+        pygame.draw.rect(screen, (90, 95, 110), self.cols_value_rect, 1)
+        v = font.render(str(self.cols), True, (255, 255, 255))
+        screen.blit(v, v.get_rect(center=self.cols_value_rect.center))
+
+        self._draw_button(screen, self.cols_plus_rect, "+", "cols_plus")
+        self._draw_button(screen, self.cols_auto_rect, "A", "cols_auto",
+                          tooltip="Auto (usa colunas do tileset)")
+
+        mlbl = font.render("Mode:", True, (200, 200, 200))
+        screen.blit(mlbl, (self.mode_label_x, y + 4))
+
+        # Modo 1x1
+        active = self.selection_mode == "single"
+        color = (100, 150, 200) if active else ((60, 70, 90) if self.hovered_control == "mode_single" else (40, 45, 60))
+        pygame.draw.rect(screen, color, self.mode_single_rect, border_radius=3)
+        pygame.draw.rect(screen, (150, 150, 160), self.mode_single_rect, 1, border_radius=3)
+        screen.blit(font.render("1", True, (255, 255, 255)),
+                    font.render("1", True, (255, 255, 255)).get_rect(center=self.mode_single_rect.center))
+
+        # Modo NxN
+        active = self.selection_mode == "multi"
+        color = (100, 150, 200) if active else ((60, 70, 90) if self.hovered_control == "mode_multi" else (40, 45, 60))
+        pygame.draw.rect(screen, color, self.mode_multi_rect, border_radius=3)
+        pygame.draw.rect(screen, (150, 150, 160), self.mode_multi_rect, 1, border_radius=3)
+        screen.blit(font.render("N", True, (255, 255, 255)),
+                    font.render("N", True, (255, 255, 255)).get_rect(center=self.mode_multi_rect.center))
+
+        # Limpar seleção (só quando tem pattern)
+        if self.multi_selection:
+            color = (150, 60, 60) if self.hovered_control == "clear_sel" else (100, 40, 40)
+            pygame.draw.rect(screen, color, self.clear_sel_rect, border_radius=3)
+            pygame.draw.rect(screen, (180, 100, 100), self.clear_sel_rect, 1, border_radius=3)
+            screen.blit(font.render("X", True, (255, 255, 255)),
+                        font.render("X", True, (255, 255, 255)).get_rect(center=self.clear_sel_rect.center))
+
+    def _draw_button(self, screen, rect, label, name, tooltip=None):
+        hovered = self.hovered_control == name
+        color = (70, 85, 110) if hovered else (40, 45, 60)
+        pygame.draw.rect(screen, color, rect, border_radius=3)
+        pygame.draw.rect(screen, (120, 125, 140), rect, 1, border_radius=3)
+        font = pygame.font.Font(None, 14)
+        t = font.render(label, True, (255, 255, 255))
+        screen.blit(t, t.get_rect(center=rect.center))
 
     def _render_tiles(self, screen):
-        clip_rect = pygame.Rect(
-            self.rect.x + 5,
-            self.rect.y + 35,
-            self.rect.width - 10,
-            self.rect.height - 40
-        )
-
+        grid = self._grid_rect()
         old_clip = screen.get_clip()
-        screen.set_clip(clip_rect)
+        screen.set_clip(grid)
 
-        if self.tiles:
-            for i, tile in enumerate(self.tiles):
-                row = i // self.cols
-                col = i % self.cols
+        if not self.tiles:
+            font = pygame.font.Font(None, 16)
+            msg = font.render("CTRL+I para importar", True, (150, 150, 150))
+            screen.blit(msg, msg.get_rect(center=grid.center))
+            screen.set_clip(old_clip)
+            return
 
-                tile_x = self.rect.x + 5 + col * (self.tile_size + self.tile_spacing)
-                tile_y = self.rect.y + 35 + row * (self.tile_size + self.tile_spacing) - self.scroll_y
+        cell = self.tile_size + self.tile_spacing
+        cols = max(1, self.cols)
 
-                if tile_y + self.tile_size > self.rect.y + 35 and tile_y < self.rect.y + self.rect.height:
+        for i, tile in enumerate(self.tiles):
+            row = i // cols
+            col = i % cols
 
-                    # Linha separadora entre tilesets
-                    if self.tileset_boundaries and i in self.tileset_boundaries and i > 0:
-                        line_y = tile_y - 3
-                        if line_y > self.rect.y + 35:
-                            line_rect = pygame.Rect(self.rect.x + 5, line_y, self.rect.width - 10, 2)
-                            pygame.draw.rect(screen, (100, 150, 200), line_rect)
+            tile_x = grid.x + col * cell
+            tile_y = grid.y + row * cell - self.scroll_y
 
-                            ts_num = self.tileset_boundaries.index(i) + 1
-                            font = pygame.font.Font(None, 10)
-                            ts_text = font.render(f"Set {ts_num}", True, (100, 150, 200))
-                            screen.blit(ts_text, (self.rect.x + 10, line_y - 8))
+            if tile_y + self.tile_size < grid.y or tile_y > grid.bottom:
+                continue
+            if tile_x + self.tile_size < grid.x or tile_x > grid.right:
+                continue
 
-                    if i == self.selected_tile:
-                        highlight_rect = pygame.Rect(
-                            tile_x - 2,
-                            tile_y - 2,
-                            self.tile_size + 4,
-                            self.tile_size + 4
-                        )
-                        pygame.draw.rect(screen, (255, 255, 0), highlight_rect, 2, border_radius=4)
+            # Separador entre tilesets
+            if self.tileset_boundaries and i in self.tileset_boundaries and i > 0 and col == 0:
+                line_y = tile_y - 2
+                if line_y > grid.y:
+                    pygame.draw.line(screen, (100, 150, 200),
+                                     (grid.x, line_y), (grid.right, line_y), 1)
+                    f = pygame.font.Font(None, 10)
+                    ts_num = self.tileset_boundaries.index(i) + 1
+                    screen.blit(f.render(f"Set {ts_num}", True, (100, 150, 200)),
+                                (grid.x + 2, line_y - 10))
 
-                    if tile.get_width() != self.tile_size or tile.get_height() != self.tile_size:
-                        scaled_tile = pygame.transform.scale(tile, (self.tile_size, self.tile_size))
-                        screen.blit(scaled_tile, (tile_x, tile_y))
-                    else:
-                        screen.blit(tile, (tile_x, tile_y))
+            # Highlight single
+            if self.selection_mode == "single" and i == self.selected_tile:
+                pygame.draw.rect(screen, (255, 255, 0),
+                                 (tile_x - 2, tile_y - 2, self.tile_size + 4, self.tile_size + 4),
+                                 2, border_radius=3)
 
-                    if self.tile_size >= 24:
-                        font = pygame.font.Font(None, 10)
-                        num_text = font.render(str(i + 1), True, (255, 255, 255, 128))
-                        screen.blit(num_text, (tile_x + 2, tile_y + 2))
-        else:
-            no_tiles_font = pygame.font.Font(None, 16)
-            msg = no_tiles_font.render("CTRL+I para importar", True, (150, 150, 150))
-            msg_x = self.rect.x + (self.rect.width - msg.get_width()) // 2
-            msg_y = self.rect.y + (self.rect.height - msg.get_height()) // 2
-            screen.blit(msg, (msg_x, msg_y))
+            if tile.get_width() != self.tile_size or tile.get_height() != self.tile_size:
+                screen.blit(pygame.transform.scale(tile, (self.tile_size, self.tile_size)), (tile_x, tile_y))
+            else:
+                screen.blit(tile, (tile_x, tile_y))
+
+            if self.tile_size >= 24:
+                f = pygame.font.Font(None, 10)
+                screen.blit(f.render(str(i + 1), True, (255, 255, 255)), (tile_x + 2, tile_y + 2))
 
         screen.set_clip(old_clip)
 
-    def _render_current_tile_selector(self, screen):
-        """Renderiza o seletor do tile atual com setas"""
-        if not self.tiles:
-            return
+    def _render_selection_overlay(self, screen):
+        grid = self._grid_rect()
+        old_clip = screen.get_clip()
+        screen.set_clip(grid)
 
-        selector_y = self.rect.y + self.rect.height - 35
-        selector_height = 30
+        cell = self.tile_size + self.tile_spacing
 
-        pygame.draw.rect(screen, (30, 30, 40),
-                         (self.rect.x + 5, selector_y, self.rect.width - 10, selector_height),
-                         border_radius=5)
+        # Durante o arrasto
+        if self.is_selecting and self.selection_start and self.selection_end:
+            c1, r1 = self.selection_start
+            c2, r2 = self.selection_end
+            min_c, max_c = min(c1, c2), max(c1, c2)
+            min_r, max_r = min(r1, r2), max(r1, r2)
 
-        font = pygame.font.Font(None, 12)
-        title = font.render("TILE ATUAL", True, (180, 180, 180))
-        screen.blit(title, (self.rect.x + 10, selector_y + 3))
+            x = grid.x + min_c * cell
+            y = grid.y + min_r * cell - self.scroll_y
+            w = (max_c - min_c + 1) * cell - self.tile_spacing
+            h = (max_r - min_r + 1) * cell - self.tile_spacing
 
-        left_btn = pygame.Rect(self.rect.x + self.rect.width - 55, selector_y + 4, 20, 22)
-        right_btn = pygame.Rect(self.rect.x + self.rect.width - 30, selector_y + 4, 20, 22)
+            surf = pygame.Surface((w, h), pygame.SRCALPHA)
+            surf.fill((80, 160, 255, 60))
+            screen.blit(surf, (x, y))
+            pygame.draw.rect(screen, (100, 180, 255), (x, y, w, h), 2, border_radius=3)
 
-        left_color = (80, 80, 90) if self.focused else (60, 60, 70)
-        right_color = (80, 80, 90) if self.focused else (60, 60, 70)
+        # Seleção persistente
+        if self.multi_selection and self.multi_selection_bounds:
+            min_c, min_r, max_c, max_r = self.multi_selection_bounds
+            x = grid.x + min_c * cell
+            y = grid.y + min_r * cell - self.scroll_y
+            w = (max_c - min_c + 1) * cell - self.tile_spacing
+            h = (max_r - min_r + 1) * cell - self.tile_spacing
 
-        pygame.draw.rect(screen, left_color, left_btn, border_radius=3)
-        pygame.draw.rect(screen, right_color, right_btn, border_radius=3)
+            if y + h > grid.y and y < grid.bottom:
+                surf = pygame.Surface((w, h), pygame.SRCALPHA)
+                surf.fill((100, 180, 255, 70))
+                screen.blit(surf, (x, y))
+                pygame.draw.rect(screen, (255, 215, 0), (x, y, w, h), 2, border_radius=3)
 
-        left_text = font.render("<", True, (255, 255, 255))
-        right_text = font.render(">", True, (255, 255, 255))
-
-        screen.blit(left_text, (left_btn.x + 6, left_btn.y + 4))
-        screen.blit(right_text, (right_btn.x + 6, right_btn.y + 4))
-
-        preview_x = self.rect.x + self.rect.width - 90
-        preview_y = selector_y + 3
-        preview_size = 24
-
-        pygame.draw.rect(screen, (20, 20, 30),
-                         (preview_x, preview_y, preview_size, preview_size), border_radius=3)
-        pygame.draw.rect(screen, (100, 100, 100),
-                         (preview_x, preview_y, preview_size, preview_size), 1, border_radius=3)
-
-        # GARANTE QUE selected_tile É INTEIRO
-        selected_idx = int(self.selected_tile) if isinstance(self.selected_tile, float) else self.selected_tile
-
-        if 0 <= selected_idx < len(self.tiles):
-            tile = self.tiles[selected_idx]
-            scaled_tile = pygame.transform.scale(tile, (preview_size, preview_size))
-            screen.blit(scaled_tile, (preview_x, preview_y))
-
-        # Mostra posição na grade
-        row = selected_idx // self.cols
-        col = selected_idx % self.cols
-        pos_text = font.render(f"({col + 1},{row + 1})", True, (200, 200, 200))
-        screen.blit(pos_text, (preview_x - 45, preview_y + 6))
-
-        # Mostra qual tileset pertence
-        if self.tileset_boundaries:
-            ts_index = 0
-            for i, boundary in enumerate(self.tileset_boundaries):
-                if selected_idx >= boundary:
-                    ts_index = i + 1
-            ts_text = font.render(f"S{ts_index}", True, (100, 150, 200))
-            screen.blit(ts_text, (preview_x - 25, preview_y + 6))
-
-        num_text = font.render(f"#{selected_idx + 1}", True, (200, 200, 200))
-        screen.blit(num_text, (preview_x - 35, preview_y + 6))
-
-        self.left_button_rect = left_btn
-        self.right_button_rect = right_btn
-
-    def handle_current_tile_buttons(self, mouse_pos):
-        """Processa cliques nos botões de seleção do tile atual"""
-        if not self.visible or not self.tiles:
-            return False
-
-        if hasattr(self, 'left_button_rect') and self.left_button_rect.collidepoint(mouse_pos):
-            self.selected_tile = (self.selected_tile - 1) % len(self.tiles)
-            return True
-
-        if hasattr(self, 'right_button_rect') and self.right_button_rect.collidepoint(mouse_pos):
-            self.selected_tile = (self.selected_tile + 1) % len(self.tiles)
-            return True
-
-        return False
+        screen.set_clip(old_clip)
 
     def _render_scrollbar(self, screen):
         if not self.focused or self.max_scroll <= 0:
             return
-
-        visible_height = self.rect.height - 35
+        grid = self._grid_rect()
+        visible_height = grid.height
         scrollbar_height = max(30, visible_height * (visible_height / (visible_height + self.max_scroll)))
         scroll_ratio = self.scroll_y / self.max_scroll if self.max_scroll > 0 else 0
-        scrollbar_y = self.rect.y + 35 + scroll_ratio * (visible_height - scrollbar_height)
+        sb_y = grid.y + scroll_ratio * (visible_height - scrollbar_height)
 
-        scrollbar_bg = pygame.Rect(
-            self.rect.x + self.rect.width - 15,
-            self.rect.y + 35,
-            10,
-            visible_height
-        )
-        pygame.draw.rect(screen, (70, 70, 80), scrollbar_bg)
-        pygame.draw.rect(screen, (90, 90, 100), scrollbar_bg, 1)
+        bg = pygame.Rect(grid.right - 12, grid.y, 10, visible_height)
+        pygame.draw.rect(screen, (70, 70, 80), bg)
+        pygame.draw.rect(screen, (90, 90, 100), bg, 1)
 
-        scrollbar = pygame.Rect(
-            self.rect.x + self.rect.width - 15,
-            scrollbar_y,
-            10,
-            scrollbar_height
-        )
-        bar_color = (180, 180, 200) if self.scroll_dragging else (130, 130, 150)
-        pygame.draw.rect(screen, bar_color, scrollbar)
-        pygame.draw.rect(screen, (200, 200, 220), scrollbar, 1)
+        thumb = pygame.Rect(grid.right - 12, sb_y, 10, scrollbar_height)
+        color = (180, 180, 200) if self.scroll_dragging else (130, 130, 150)
+        pygame.draw.rect(screen, color, thumb)
+        pygame.draw.rect(screen, (200, 200, 220), thumb, 1)
 
     def _render_resize_handle(self, screen):
-        resize_handle = pygame.Rect(
-            self.rect.right - 15,
-            self.rect.bottom - 15,
-            10,
-            10
-        )
-        pygame.draw.rect(screen, (150, 150, 150), resize_handle)
+        h = pygame.Rect(self.rect.right - 15, self.rect.bottom - 15, 10, 10)
+        pygame.draw.rect(screen, (150, 150, 150), h)
         pygame.draw.line(screen, (200, 200, 200),
-                         (resize_handle.x + 2, resize_handle.bottom - 2),
-                         (resize_handle.right - 2, resize_handle.y + 2), 2)
+                         (h.x + 2, h.bottom - 2), (h.right - 2, h.y + 2), 2)
+
+    def _render_footer(self, screen):
+        footer_y = self.rect.bottom - self.FOOTER_HEIGHT
+        footer_rect = pygame.Rect(self.rect.x + 5, footer_y, self.rect.width - 10, self.FOOTER_HEIGHT)
+
+        pygame.draw.rect(screen, (30, 30, 40), footer_rect, border_radius=5)
+
+        font = pygame.font.Font(None, 12)
+        title = font.render("ATUAL", True, (180, 180, 180))
+        screen.blit(title, (footer_rect.x + 5, footer_rect.y + 2))
+
+        if self.selection_mode == "multi" and self.multi_selection:
+            # Preview do pattern
+            preview_x = footer_rect.x + 8
+            preview_y = footer_rect.y + 14
+
+            # Escala para caber no rodapé
+            w, h = self.multi_selection_size
+            avail_w = footer_rect.width - 100
+            avail_h = footer_rect.height - 18
+            if w > 0 and h > 0:
+                cell_w = min(self.tile_size, avail_w // w)
+                cell_h = min(self.tile_size, avail_h // h)
+                ps = max(6, min(cell_w, cell_h))
+
+                for cell in self.multi_selection:
+                    idx = cell['tile_id'] - 1
+                    if 0 <= idx < len(self.tiles):
+                        tile = self.tiles[idx]
+                        scaled = pygame.transform.scale(tile, (ps, ps))
+                        screen.blit(scaled, (preview_x + cell['dx'] * (ps + 1),
+                                             preview_y + cell['dy'] * (ps + 1)))
+
+            info = f"{w}x{h} ({len(self.multi_selection)} tiles)"
+            info_surf = font.render(info, True, (255, 215, 0))
+            screen.blit(info_surf, (footer_rect.right - info_surf.get_width() - 5, footer_rect.y + 2))
+
+            # Sem setas em modo multi
+            self.left_button_rect = pygame.Rect(0, 0, 0, 0)
+            self.right_button_rect = pygame.Rect(0, 0, 0, 0)
+
+        else:
+            # Preview single tile
+            preview_x = footer_rect.x + 8
+            preview_y = footer_rect.y + 14
+            ps = 24
+
+            pygame.draw.rect(screen, (20, 20, 30), (preview_x, preview_y, ps, ps), border_radius=3)
+            pygame.draw.rect(screen, (100, 100, 100), (preview_x, preview_y, ps, ps), 1, border_radius=3)
+
+            idx = int(self.selected_tile) if not isinstance(self.selected_tile, float) else self.selected_tile
+            if 0 <= idx < len(self.tiles):
+                scaled = pygame.transform.scale(self.tiles[idx], (ps, ps))
+                screen.blit(scaled, (preview_x, preview_y))
+
+            row = idx // max(1, self.cols)
+            col = idx % max(1, self.cols)
+            info = f"#{idx + 1}  ({col + 1},{row + 1})"
+            info_surf = font.render(info, True, (220, 220, 220))
+            screen.blit(info_surf, (preview_x + ps + 8, preview_y + 6))
+
+            # Setas ‹ ›
+            left_btn = pygame.Rect(footer_rect.right - 50, footer_rect.y + 10, 20, 22)
+            right_btn = pygame.Rect(footer_rect.right - 25, footer_rect.y + 10, 20, 22)
+            pygame.draw.rect(screen, (80, 80, 90), left_btn, border_radius=3)
+            pygame.draw.rect(screen, (80, 80, 90), right_btn, border_radius=3)
+            screen.blit(font.render("<", True, (255, 255, 255)),
+                        font.render("<", True, (255, 255, 255)).get_rect(center=left_btn.center))
+            screen.blit(font.render(">", True, (255, 255, 255)),
+                        font.render(">", True, (255, 255, 255)).get_rect(center=right_btn.center))
+
+            self.left_button_rect = left_btn
+            self.right_button_rect = right_btn

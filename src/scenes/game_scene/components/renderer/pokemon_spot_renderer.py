@@ -14,7 +14,7 @@ class PokemonSpotRenderer:
     def __init__(self):
         self.spot_manager = TowerSpotManager()
         self.loaded = False
-        self.tile_size = 24
+        self.tile_size = 16
         self._cached_spots = {}  # Cache de superfícies
 
     def load_from_data(self, spot_data: dict):
@@ -84,7 +84,7 @@ class PokemonSpotRenderer:
             return
 
         scale = render_context.get_scale(camera, screen_manager)
-        spot_size = max(12, int(24 * scale))  # Tamanho fixo, não depende do tile
+        spot_size = max(10, int(16 * scale))  # Tamanho fixo, não depende do tile
         half_spot = spot_size // 2
 
         for spot in self.spot_manager.spots:

@@ -14,4 +14,4 @@ Configurações globais do projeto.
 #
 # Em builds de produção, mude para False.
 # =====================================================================
-DEBUG_MODE = False
+DEBUG_MODE = True

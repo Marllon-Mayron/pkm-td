@@ -1,165 +1,278 @@
 {
     "chapter": 1,
     "phase": 1,
-    "name": "Tutorial",
+    "name": "Rota 1",
     "map": {
-        "width": 11,
-        "height": 11,
-        "tile_size": 24,
+        "width": 13,
+        "height": 17,
+        "tile_size": 16,
         "layers": [
             {
                 "name": "Chão",
                 "type": "ground",
                 "tiles": [
                     [
-                        8,
-                        8,
-                        8,
-                        9,
-                        104,
-                        104,
-                        105,
                         7,
-                        8,
-                        8,
-                        8
+                        9,
+                        9,
+                        9,
+                        1,
+                        193,
+                        199,
+                        195,
+                        1,
+                        9,
+                        9,
+                        9,
+                        9
                     ],
                     [
-                        14,
-                        14,
-                        14,
-                        15,
-                        103,
-                        104,
-                        100,
-                        13,
-                        14,
-                        14,
-                        14
+                        9,
+                        9,
+                        9,
+                        9,
+                        9,
+                        193,
+                        194,
+                        195,
+                        9,
+                        9,
+                        9,
+                        9,
+                        7
                     ],
                     [
-                        50,
-                        50,
-                        50,
-                        51,
-                        103,
-                        104,
-                        105,
-                        49,
-                        50,
-                        50,
-                        50
+                        9,
+                        9,
+                        9,
+                        1,
+                        3,
+                        193,
+                        194,
+                        195,
+                        1,
+                        1,
+                        9,
+                        9,
+                        9
                     ],
                     [
-                        56,
-                        56,
-                        56,
-                        57,
-                        104,
-                        104,
-                        105,
-                        55,
-                        56,
-                        56,
-                        56
+                        9,
+                        10,
+                        1,
+                        10,
+                        1,
+                        193,
+                        194,
+                        195,
+                        3,
+                        1,
+                        1,
+                        7,
+                        9
                     ],
                     [
-                        56,
-                        56,
-                        79,
-                        63,
-                        103,
-                        104,
-                        105,
-                        61,
-                        80,
-                        56,
-                        56
+                        9,
+                        1,
+                        1,
+                        1,
+                        1296,
+                        193,
+                        194,
+                        195,
+                        1304,
+                        68,
+                        2,
+                        10,
+                        9
                     ],
                     [
-                        56,
-                        56,
-                        57,
-                        104,
-                        103,
-                        104,
-                        105,
-                        104,
-                        55,
-                        56,
-                        56
+                        7,
+                        1,
+                        1,
+                        1,
+                        1,
+                        193,
+                        194,
+                        195,
+                        1,
+                        1,
+                        1,
+                        3,
+                        1
                     ],
                     [
-                        56,
-                        56,
-                        85,
-                        51,
-                        104,
-                        104,
-                        105,
-                        49,
-                        86,
-                        56,
-                        56
+                        1,
+                        9,
+                        1,
+                        2,
+                        1,
+                        193,
+                        194,
+                        195,
+                        1,
+                        9,
+                        1,
+                        2,
+                        1
                     ],
                     [
-                        56,
-                        56,
-                        56,
-                        57,
-                        103,
-                        104,
-                        105,
-                        55,
-                        56,
-                        56,
-                        56
+                        10,
+                        1,
+                        3,
+                        2,
+                        1,
+                        193,
+                        194,
+                        195,
+                        1,
+                        1,
+                        1,
+                        1,
+                        9
                     ],
                     [
-                        56,
-                        56,
-                        56,
-                        57,
-                        103,
-                        104,
-                        105,
-                        55,
-                        56,
-                        56,
-                        56
+                        1,
+                        1,
+                        1,
+                        1,
+                        1304,
+                        193,
+                        199,
+                        195,
+                        1296,
+                        1,
+                        1,
+                        1,
+                        6
                     ],
                     [
-                        56,
-                        56,
-                        56,
-                        57,
-                        104,
-                        104,
-                        105,
-                        55,
-                        56,
-                        56,
-                        56
+                        9,
+                        1,
+                        1,
+                        1,
+                        2,
+                        193,
+                        194,
+                        195,
+                        1,
+                        1,
+                        7,
+                        1,
+                        10
                     ],
                     [
-                        56,
-                        56,
-                        56,
-                        85,
-                        50,
-                        50,
-                        50,
-                        86,
-                        56,
-                        56,
-                        56
+                        6,
+                        2,
+                        1,
+                        1,
+                        2,
+                        193,
+                        194,
+                        195,
+                        1,
+                        1,
+                        1,
+                        9,
+                        1
+                    ],
+                    [
+                        10,
+                        2,
+                        1,
+                        1,
+                        1,
+                        193,
+                        194,
+                        195,
+                        1,
+                        1,
+                        2,
+                        3,
+                        1
+                    ],
+                    [
+                        9,
+                        1,
+                        1,
+                        1,
+                        1304,
+                        193,
+                        194,
+                        195,
+                        1296,
+                        10,
+                        1,
+                        1,
+                        6
+                    ],
+                    [
+                        1,
+                        1,
+                        1,
+                        10,
+                        2,
+                        193,
+                        194,
+                        195,
+                        1,
+                        1,
+                        10,
+                        1,
+                        9
+                    ],
+                    [
+                        9,
+                        6,
+                        9,
+                        2,
+                        1,
+                        201,
+                        202,
+                        203,
+                        1,
+                        1,
+                        1,
+                        9,
+                        1
+                    ],
+                    [
+                        7,
+                        10,
+                        9,
+                        1,
+                        1,
+                        1,
+                        1,
+                        1,
+                        3,
+                        1,
+                        6,
+                        3,
+                        1
+                    ],
+                    [
+                        9,
+                        9,
+                        1,
+                        9,
+                        10,
+                        1,
+                        1,
+                        1,
+                        6,
+                        6,
+                        2,
+                        10,
+                        9
                     ]
                 ],
-                "width": 11,
-                "height": 11,
-                "tile_size": 24,
+                "width": 13,
+                "height": 17,
+                "tile_size": 16,
                 "tileset_paths": [
-                    "res/AllTiles/TileDtef/TestDungeon/tileset_0.png"
+                    "res/AllTiles/Tilesets/Ekat's Mega Gen 3 Set.png",
+                    "res/AllTiles/Tilesets/Fairy Woods - Default Pallet.png"
                 ]
             },
             {
@@ -171,6 +284,188 @@
                         0,
                         0,
                         0,
+                        51,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        59,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        67,
+                        0,
+                        0,
+                        0,
+                        0,
+                        51,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        59,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        24,
+                        0,
+                        23,
+                        24,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        11,
+                        0,
+                        0,
+                        23
+                    ],
+                    [
+                        0,
+                        11,
+                        31,
+                        32,
+                        0,
+                        0,
+                        0,
+                        11,
+                        0,
+                        0,
+                        0,
+                        0,
+                        31
+                    ],
+                    [
+                        24,
+                        0,
+                        39,
+                        40,
+                        11,
+                        11,
+                        0,
+                        0,
+                        15,
+                        0,
+                        0,
+                        11,
+                        39
+                    ],
+                    [
+                        32,
+                        0,
+                        0,
+                        11,
+                        0,
+                        11,
+                        0,
+                        0,
+                        11,
+                        11,
+                        11,
+                        0,
+                        0
+                    ],
+                    [
+                        40,
+                        11,
+                        0,
+                        11,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        67,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        23,
+                        24,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        17,
+                        18,
+                        19,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        31,
+                        32,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        25,
+                        26,
+                        27,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        39,
+                        40,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        33,
+                        34,
+                        35,
+                        0,
+                        0,
                         0,
                         0,
                         0,
@@ -190,17 +485,6 @@
                         0,
                         0,
                         0,
-                        0
-                    ],
-                    [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
                         0,
                         0,
                         0
@@ -211,21 +495,10 @@
                         0,
                         0,
                         0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
-                    ],
-                    [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
+                        17,
+                        18,
+                        19,
+                        74,
                         0,
                         0,
                         0,
@@ -235,74 +508,26 @@
                         0,
                         0,
                         0,
+                        74,
+                        74,
+                        25,
+                        26,
+                        27,
+                        0,
+                        74,
                         0,
                         0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
+                        74
                     ],
                     [
                         0,
                         0,
+                        74,
                         0,
                         0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
-                    ],
-                    [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
-                    ],
-                    [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
-                    ],
-                    [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
-                    ],
-                    [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
+                        33,
+                        34,
+                        35,
                         0,
                         0,
                         0,
@@ -310,9 +535,70 @@
                         0
                     ]
                 ],
-                "width": 11,
-                "height": 11,
-                "tile_size": 24
+                "width": 13,
+                "height": 17,
+                "tile_size": 16,
+                "tile_offsets": {
+                    "8,6": [
+                        8,
+                        5
+                    ],
+                    "9,7": [
+                        0,
+                        -3
+                    ],
+                    "8,7": [
+                        -6,
+                        -5
+                    ],
+                    "7,5": [
+                        7,
+                        8
+                    ],
+                    "5,6": [
+                        -7,
+                        -8
+                    ],
+                    "4,6": [
+                        0,
+                        2
+                    ],
+                    "5,7": [
+                        -7,
+                        0
+                    ],
+                    "3,7": [
+                        0,
+                        -5
+                    ],
+                    "1,5": [
+                        0,
+                        -5
+                    ],
+                    "1,8": [
+                        -3,
+                        -6
+                    ],
+                    "11,6": [
+                        0,
+                        -5
+                    ],
+                    "10,7": [
+                        6,
+                        7
+                    ],
+                    "9,4": [
+                        8,
+                        7
+                    ],
+                    "3,8": [
+                        -8,
+                        -6
+                    ]
+                },
+                "tileset_paths": [
+                    "res/AllTiles/Tilesets/Ekat's Mega Gen 3 Set.png"
+                ]
             },
             {
                 "name": "Teto",
@@ -329,17 +615,6 @@
                         0,
                         0,
                         0,
-                        0
-                    ],
-                    [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
                         0,
                         0,
                         0
@@ -347,17 +622,6 @@
                     [
                         0,
                         0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
-                    ],
-                    [
                         0,
                         0,
                         0,
@@ -381,17 +645,6 @@
                         0,
                         0,
                         0,
-                        0
-                    ],
-                    [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
                         0,
                         0,
                         0
@@ -399,17 +652,6 @@
                     [
                         0,
                         0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
-                    ],
-                    [
                         0,
                         0,
                         0,
@@ -433,6 +675,23 @@
                         0,
                         0,
                         0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
                         0
                     ],
                     [
@@ -446,9 +705,148 @@
                         0,
                         0,
                         0,
+                        0,
+                        0,
                         0
                     ],
                     [
+                        0,
+                        0,
+                        52,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        60,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
                         0,
                         0,
                         0,
@@ -462,9 +860,12 @@
                         0
                     ]
                 ],
-                "width": 11,
-                "height": 11,
-                "tile_size": 24
+                "width": 13,
+                "height": 17,
+                "tile_size": 16,
+                "tileset_paths": [
+                    "res/AllTiles/Tilesets/Ekat's Mega Gen 3 Set.png"
+                ]
             }
         ]
     },
@@ -473,16 +874,16 @@
             {
                 "nodes": [
                     [
-                        132,
-                        12
+                        104,
+                        8
                     ],
                     [
-                        132,
-                        228
+                        104,
+                        232
                     ],
                     [
-                        132,
-                        12
+                        104,
+                        8
                     ]
                 ],
                 "closed": false
@@ -500,41 +901,91 @@
                 "enemies": [
                     {
                         "pokemon_id": 10,
-                        "percentage": 100.0
+                        "percentage": 50.0
+                    },
+                    {
+                        "pokemon_id": 13,
+                        "percentage": 50.0
                     }
                 ],
-                "min_level": 1,
-                "max_level": 1,
-                "wave_size": 1,
+                "min_level": 2,
+                "max_level": 5,
+                "wave_size": 6,
                 "spawn_interval": 3.0,
-                "initial_delay": 3.0,
+                "initial_delay": 5.0,
                 "repeat_wave": false,
                 "repeat_count": 1,
-                "template_id": null,
+                "template_id": "template_7253",
                 "use_variants": false,
                 "variants": []
             }
         ],
         "selected_wave": 0,
         "templates": {
-            "templates": []
+            "templates": [
+                {
+                    "template_id": "template_7253",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 10,
+                            "percentage": 50.0
+                        },
+                        {
+                            "pokemon_id": 13,
+                            "percentage": 50.0
+                        }
+                    ],
+                    "min_level": 2,
+                    "max_level": 5,
+                    "wave_size": 6,
+                    "spawn_interval": 3.0,
+                    "initial_delay": 5.0,
+                    "repeat_wave": false,
+                    "repeat_count": 1
+                }
+            ]
         }
     },
     "tower_spots": {
-        "spot_size": 24,
-        "grid_size": 24,
+        "spot_size": 16,
+        "grid_size": 16,
         "snap_to_grid": true,
         "spots": [
             {
-                "x": 72,
-                "y": 120,
-                "size": 24,
+                "x": 64,
+                "y": 64,
+                "size": 16,
                 "allowed_types": []
             },
             {
-                "x": 168,
-                "y": 120,
-                "size": 24,
+                "x": 128,
+                "y": 64,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 128,
+                "y": 128,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 64,
+                "y": 128,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 64,
+                "y": 192,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 128,
+                "y": 192,
+                "size": 16,
                 "allowed_types": []
             }
         ]
@@ -544,111 +995,35 @@
         "snap_to_grid": true,
         "items": [
             {
-                "x": 120,
-                "y": 216,
+                "x": 96,
+                "y": 208,
+                "item_id": 1
+            },
+            {
+                "x": 96,
+                "y": 208,
+                "item_id": 1
+            },
+            {
+                "x": 96,
+                "y": 208,
+                "item_id": 1
+            },
+            {
+                "x": 96,
+                "y": 208,
+                "item_id": 1
+            },
+            {
+                "x": 96,
+                "y": 208,
                 "item_id": 1
             }
         ]
     },
     "events": {
-        "triggers": [
-            {
-                "trigger_type": "start_phase",
-                "time_value": 0.0,
-                "wave_index": 0,
-                "wave_state": "wave_start",
-                "custom_condition": "",
-                "events": [
-                    {
-                        "event_type": "message",
-                        "delay": 0.0,
-                        "pause_game": true,
-                        "message_text": "Seja bem-vindo! Esse é o pokemon tower defese! Já vi que escolheu seu primeiro pokemon, vamos coloca-lo no mapa! Arraste a imagem do seu pokemon que está no seu time, e coloque no circulo no mapa.",
-                        "speaker_name": "Professor Carvalho",
-                        "speaker_sprite_path": "res/PokemonSprites/characters/introOak.png",
-                        "action_label": "Entendi",
-                        "action_trigger": ""
-                    }
-                ]
-            },
-            {
-                "trigger_type": "custom",
-                "time_value": 0.0,
-                "wave_index": 0,
-                "wave_state": "wave_start",
-                "custom_condition": "colocou_pokemon",
-                "events": [
-                    {
-                        "event_type": "message",
-                        "delay": 1.0,
-                        "pause_game": true,
-                        "message_text": "Perfeito! Você também consegue arrastar o pokemon de um circulo para outro. Em cima do seu pokémon, você consegue ver a vida dele, ele parece estar um pouco machucado... que tal dar uma potion para ele? É só arrastar da sua bolsa e coloca-la em cima do seu pokemon.",
-                        "speaker_name": "Professor Carvalho",
-                        "speaker_sprite_path": "res/PokemonSprites/characters/introOak.png",
-                        "action_label": "Entendi!",
-                        "action_trigger": ""
-                    }
-                ]
-            },
-            {
-                "trigger_type": "custom",
-                "time_value": 0.0,
-                "wave_index": 0,
-                "wave_state": "wave_start",
-                "custom_condition": "curou_pokemon",
-                "events": [
-                    {
-                        "event_type": "message",
-                        "delay": 1.0,
-                        "pause_game": true,
-                        "message_text": "Muito melhor! Que tal dar uma olhadinha nos ataques disponiveis pro seu pokemon? É só clicar na imagem do seu pokemon no time, mas não esqueça que o painel só abre se seu pokemon estiver posicionado no mapa!",
-                        "speaker_name": "Professor Carvalho",
-                        "speaker_sprite_path": "res/PokemonSprites/characters/introOak.png",
-                        "action_label": "Vou olhar",
-                        "action_trigger": ""
-                    }
-                ]
-            },
-            {
-                "trigger_type": "custom",
-                "time_value": 0.0,
-                "wave_index": 0,
-                "wave_state": "wave_start",
-                "custom_condition": "abriu_move_select",
-                "events": [
-                    {
-                        "event_type": "message",
-                        "delay": 0,
-                        "pause_game": true,
-                        "message_text": "É um bom começo... sempre que possivel verifique os PPs e Prioridade de ataque do seu pokemon para fortalecer suas estratégias. Vamos começar a batalha, feche a tela e se prepare!",
-                        "speaker_name": "Professor Carvalho",
-                        "speaker_sprite_path": "res/PokemonSprites/characters/introOak.png",
-                        "action_label": "Vamos lá! ",
-                        "action_trigger": ""
-                    }
-                ]
-            },
-            {
-                "trigger_type": "after_boss_defeat",
-                "time_value": 0.0,
-                "wave_index": 0,
-                "wave_state": "wave_start",
-                "custom_condition": "",
-                "events": [
-                    {
-                        "event_type": "message",
-                        "delay": 0.0,
-                        "pause_game": false,
-                        "message_text": "Parabens, voce já está pronto para seguir jornada sozinho!",
-                        "speaker_name": "Professor Carvalho",
-                        "speaker_sprite_path": "res/PokemonSprites/characters/introOak.png",
-                        "action_label": "Obrigado! ",
-                        "action_trigger": ""
-                    }
-                ]
-            }
-        ],
-        "selected_trigger": 3
+        "triggers": [],
+        "selected_trigger": 0
     },
     "rewards": {
         "money": 100,
@@ -660,6 +1035,6 @@
     },
     "localization_type": "default",
     "custom_folder": "",
-    "day_night_mode": "day",
-    "base_weather": "none"
+    "day_night_mode": "random",
+    "base_weather": "random"
 }

@@ -1689,7 +1689,6 @@ class GameScene(BaseScene):
                 skipped += 1
 
         print(f"[RETRY] {restored} restaurado(s), {skipped} ignorado(s).")
-
     def _on_pokemon_swap(self, swap_data):
         """Troca as posições de dois Pokémon"""
         pokemon_a = swap_data['pokemon_a']
@@ -2691,18 +2690,17 @@ class GameScene(BaseScene):
         overlay_mgr = self.overlay_manager
         show_debug = self.show_debug
 
-        # Mapa
-        perf_monitor.start_section("RENDER_MAP")
-        map_renderer.render(screen, camera, screen_mgr)
+        # =========================================================
+        # RENDER ORDEM
+        #   chão → decoração → entidades → teto → efeitos
+        # =========================================================
+
+        # 1. CHÃO
+        perf_monitor.start_section("RENDER_MAP_GROUND")
+        map_renderer.render_ground(screen, camera, screen_mgr)
         perf_monitor.end_section()
 
-        # Paths (apenas debug)
-        if show_debug:
-            perf_monitor.start_section("RENDER_PATHS")
-            path_renderer.render(screen, camera, screen_mgr, show_editing=False)
-            perf_monitor.end_section()
-
-        # Spots
+        # 2. Spots de torre (nível do chão)
         perf_monitor.start_section("RENDER_SPOTS")
         if spot_renderer:
             spot_renderer.render(
@@ -2712,49 +2710,63 @@ class GameScene(BaseScene):
             )
         perf_monitor.end_section()
 
-        # Target items (ground)
+        # 3. Itens alvo no chão
         perf_monitor.start_section("RENDER_TARGET_ITEMS_GROUND")
         target_mgr.render_in_ground(screen, camera)
         perf_monitor.end_section()
 
-        # Inimigos
+        # 4. DECORAÇÃO (agora ABAIXO das entidades)
+        perf_monitor.start_section("RENDER_MAP_DECORATION")
+        map_renderer.render_decoration(screen, camera, screen_mgr)
+        perf_monitor.end_section()
+
+        # 5. Paths (apenas debug)
+        if show_debug:
+            perf_monitor.start_section("RENDER_PATHS")
+            path_renderer.render(screen, camera, screen_mgr, show_editing=False)
+            perf_monitor.end_section()
+
+        # 6. INIMIGOS (acima da decoração)
         perf_monitor.start_section("RENDER_ENEMIES")
         for enemy in wave_mgr.active_enemies:
             enemy.render(screen, camera, show_hp=False)
         perf_monitor.end_section()
 
-        # Pokémon colocados
+        # 7. POKÉMON COLOCADOS (acima da decoração)
         perf_monitor.start_section("RENDER_PLACED_POKEMON")
         if placement_mgr:
             placement_mgr.render(screen, camera, screen_mgr)
         perf_monitor.end_section()
 
-        # Projéteis
+        # 8. TETO (por cima de tudo — arcos, copas grandes, cavernas)
+        perf_monitor.start_section("RENDER_MAP_CEILING")
+        map_renderer.render_ceiling(screen, camera, screen_mgr)
+        perf_monitor.end_section()
+
+        # 9. Projéteis (acima do teto — sempre visíveis)
         perf_monitor.start_section("RENDER_PROJECTILES")
         if hasattr(self, 'battle_system'):
             self.battle_system.render_projectiles(screen, camera, self.screen_manager)
         perf_monitor.end_section()
 
-        # Target items (on pokemon)
+        # 10. Itens sendo carregados
         perf_monitor.start_section("RENDER_TARGET_ITEMS_POKEMON")
         target_mgr.render_in_pokemon(screen, camera)
         perf_monitor.end_section()
 
-        # HP Bars - Inimigos
+        # 11. HP Bars
         perf_monitor.start_section("RENDER_ENEMY_HP")
         for enemy in wave_mgr.active_enemies:
             enemy.render_hp_enemy(screen, camera)
         perf_monitor.end_section()
 
-        # HP Bars - Pokémon
         perf_monitor.start_section("RENDER_POKEMON_HP")
         if placement_mgr:
             placement_mgr.render_hp(screen, camera)
         perf_monitor.end_section()
 
-        # ===== RENDERIZAÇÃO DOS FILTROS DE CLIMA E DIA/NOITE =====
+        # ===== CLIMA / DIA-NOITE =====
         perf_monitor.start_section("RENDER_WEATHER_AND_DAYNIGHT")
-
         viewport_rect = pygame.Rect(
             self.screen_manager.viewport_x,
             self.screen_manager.viewport_y,
@@ -2762,76 +2774,60 @@ class GameScene(BaseScene):
             self.screen_manager.viewport_height
         )
 
-        # 1. FILTRO DE CLIMA (CHUVA, AREIA, SOL) + PARTÍCULAS
-        #    O dt é necessário para mover as partículas de chuva.
         if hasattr(self, 'battle_system') and self.battle_system:
             weather = self.battle_system.weather_manager.current_weather
-            if weather and weather.active:
-                self.weather_filter.render(
-                    screen, weather, viewport_rect,
-                    dt=getattr(self, '_last_dt', 0.0),
-                )
-            else:
-                # Garante que o sistema de partículas é parado quando o clima acaba
-                self.weather_filter.render(
-                    screen, None, viewport_rect,
-                    dt=getattr(self, '_last_dt', 0.0),
-                )
+            self.weather_filter.render(
+                screen,
+                weather if (weather and weather.active) else None,
+                viewport_rect,
+                dt=getattr(self, '_last_dt', 0.0),
+            )
 
-        # 2. FILTRO DE DIA/NOITE (POR CIMA DO CLIMA)
         if hasattr(self, 'day_night_weather'):
             day_night = self.day_night_weather.day_night_state
             if day_night and day_night.active:
                 self.day_night_filter.render(screen, day_night, viewport_rect)
-
         perf_monitor.end_section()
 
-        # ===== UI DO JOGO (APENAS SE NÃO ESTIVER OCULTA) =====
+        # ===== UI =====
         if not self.ui_hidden:
             perf_monitor.start_section("RENDER_GAME_UI")
             self._render_game_ui(screen)
             perf_monitor.end_section()
 
-            # Team Manager UI
             perf_monitor.start_section("RENDER_TEAM_MANAGER")
             if team_mgr:
                 team_mgr.render(screen, camera, spot_renderer.get_spots() if spot_renderer else [])
             perf_monitor.end_section()
 
-            # Drag Manager
             perf_monitor.start_section("RENDER_DRAG_MANAGER")
             if drag_mgr:
                 drag_mgr.render(screen, camera)
             perf_monitor.end_section()
 
-            # ===== CÂMERA FOTOGRÁFICA (ATRÁS DA BOLSA) =====
-            # Renderizada ANTES da bolsa para ficar visualmente atrás dela.
-            # A moldura da área de captura é desenhada aqui também.
             perf_monitor.start_section("RENDER_CAMERA")
             if hasattr(self, 'camera_renderer'):
                 self.camera_renderer.render(screen)
             perf_monitor.end_section()
 
-            # Item Bag (na frente da câmera, acoplada por cima)
             perf_monitor.start_section("RENDER_ITEM_BAG")
             if bag_renderer:
                 bag_renderer.render(screen)
             perf_monitor.end_section()
 
-            # Borda da viewport
             perf_monitor.start_section("RENDER_VIEWPORT_BORDER")
             pygame.draw.rect(screen, (80, 80, 80),
                              (screen_mgr.viewport_x, screen_mgr.viewport_y,
                               screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
             perf_monitor.end_section()
 
-        # ===== QUICK SWITCH DE MOVES (SEMPRE VISÍVEL) =====
+        # ===== QUICK SWITCH =====
         perf_monitor.start_section("RENDER_QUICK_SWITCH")
         if hasattr(self, 'move_quick_switch_manager'):
             self.move_quick_switch_manager.render(screen, self.camera, self.screen_manager)
         perf_monitor.end_section()
 
-        # ===== NOTIFICATIONS (sempre renderizadas) =====
+        # ===== NOTIFICATIONS =====
         viewport_rect = pygame.Rect(
             self.screen_manager.viewport_x,
             self.screen_manager.viewport_y,
@@ -2840,60 +2836,54 @@ class GameScene(BaseScene):
         )
         self.notification_manager.render(screen, viewport_rect)
 
-        # ===== OVERLAY MANAGER (sempre renderizado - pausa e game over são essenciais) =====
+        # ===== OVERLAY MANAGER =====
         perf_monitor.start_section("RENDER_OVERLAY_MANAGER")
         if overlay_mgr:
             overlay_mgr.render(screen)
         perf_monitor.end_section()
 
-        # ===== EVENT PROCESSOR DIALOG (sempre renderizado) =====
+        # ===== EVENT PROCESSOR DIALOG =====
         if hasattr(self, 'event_processor') and self.event_processor.current_dialog:
             self.event_processor.current_dialog.render(screen)
 
-        # ===== OVERLAYS IMPORTANTES (SEMPRE RENDERIZADOS, INDEPENDENTE DE UI_HIDDEN) =====
-        # MOVE LEARN OVERLAY
+        # ===== OVERLAYS =====
         if self.move_learn_overlay and self.move_learn_overlay.active:
             perf_monitor.start_section("RENDER_MOVE_LEARN")
             self.move_learn_overlay.render(screen)
             perf_monitor.end_section()
 
-        # MOVE SELECT OVERLAY
         if self.move_select_overlay and self.move_select_overlay.active:
             perf_monitor.start_section("RENDER_MOVE_SELECT")
             self.move_select_overlay.render(screen)
             perf_monitor.end_section()
 
-        # EVOLUTION OVERLAY
         if hasattr(self, 'evolution_overlay') and self.evolution_overlay and self.evolution_overlay.active:
             perf_monitor.start_section("RENDER_EVOLUTION")
             self.evolution_overlay.render(screen)
             perf_monitor.end_section()
 
-        # ===== DEBUG INFO (sempre renderizado se ativo) =====
+        # ===== DEBUG =====
         if show_debug:
             perf_monitor.start_section("RENDER_DEBUG")
             self._render_debug_info(screen)
             perf_monitor.end_section()
 
-        # ===== INDICADOR DE UI OCULTA (apenas se estiver oculta) =====
+        # ===== UI OCULTA =====
         if self.ui_hidden:
-            # Mostra um pequeno indicador no canto superior direito
             hint_font = pygame.font.Font(None, 20)
             hint_text = hint_font.render("[H] Mostrar UI", True, (150, 150, 180))
             hint_x = screen_mgr.viewport_x + screen_mgr.viewport_width - hint_text.get_width() - 15
             hint_y = screen_mgr.viewport_y + 15
 
-            # Fundo semi-transparente para o texto
             bg_rect = hint_text.get_rect(topleft=(hint_x - 8, hint_y - 4))
             bg_rect.width += 16
             bg_rect.height += 8
             bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
             bg_surface.fill((0, 0, 0, 150))
             screen.blit(bg_surface, bg_rect)
-
             screen.blit(hint_text, (hint_x, hint_y))
 
-        # ===== VITORIA FINAL (por cima de tudo - cobre a tela toda) =====
+        # ===== VITÓRIA FINAL =====
         if self.final_victory_overlay is not None:
             perf_monitor.start_section("RENDER_FINAL_VICTORY")
             self.final_victory_overlay.render(screen)

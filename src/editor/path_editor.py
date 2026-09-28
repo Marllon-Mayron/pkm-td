@@ -18,10 +18,9 @@ class Path:
         self.selected_color = (255, 255, 0)
         self.start_point_color = (0, 255, 255)
 
-        # Ajustado para tile 24x24
-        self.node_radius = 8  # Aumentado
-        self.start_node_radius = 10  # Aumentado
-        self.line_width = 3
+        self.node_radius = 6
+        self.start_node_radius = 8
+        self.line_width = 2
 
 
     def add_node(self, point):

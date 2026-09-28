@@ -14,8 +14,8 @@ class TargetItemRenderer:
 
     # ===== TAMANHO BASE DO SPRITE =====
     # 16 (era pequeno demais para o jogador ver no mapa) Aumentado em 50% -> 24
-    BASE_SPRITE_SIZE = 24
-    MIN_SPRITE_SIZE = 12  # era 8; subiu proporcionalmente
+    BASE_SPRITE_SIZE = 16
+    MIN_SPRITE_SIZE = 10  # era 8; subiu proporcionalmente
 
     def __init__(self):
         self.show_debug = False

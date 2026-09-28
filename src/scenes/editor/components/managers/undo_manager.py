@@ -96,7 +96,8 @@ class UndoManager:
             layer_dict = {
                 'name': layer.name,
                 'type': layer.layer_type.value,
-                'tiles': [row[:] for row in layer.tiles],  # Cópia profunda da matriz
+                'tiles': [row[:] for row in layer.tiles],
+                'tile_offsets': dict(layer.tile_offsets),  # ← ADICIONE
                 'tileset_paths': layer.tileset_paths.copy() if hasattr(layer, 'tileset_paths') else [],
                 'tileset_path': layer.tileset_path,
                 'width': layer.width,
@@ -133,17 +134,18 @@ class UndoManager:
         return state
 
     def _restore_state(self, editor_scene, state):
-        """Restaura um estado salvo - PRESERVANDO OS TILESETS MÚLTIPLOS"""
+        """Restaura um estado salvo - PRESERVANDO OS TILESETS MÚLTIPLOS E OFFSETS."""
         try:
             print("\n[Undo] Iniciando restauração de estado...")
 
-            # Restaura layers preservando os tilesets
+            # =========================================================
+            # RESTAURA LAYERS (tiles + offsets + tilesets)
+            # =========================================================
             if 'layers' in state:
-                # Primeiro, guarda os tilesets atuais de cada layer
+                # Primeiro, guarda os tilesets atuais de cada layer (para não recarregar)
                 current_tilesets = {}
                 for i, layer in enumerate(editor_scene.layer_manager.layers):
                     if layer.tileset:
-                        # Guarda todas as informações dos tilesets atuais
                         current_tilesets[i] = {
                             'tilesets': layer.tilesets.copy() if hasattr(layer, 'tilesets') else [],
                             'tileset_paths': layer.tileset_paths.copy() if hasattr(layer, 'tileset_paths') else [],
@@ -151,110 +153,171 @@ class UndoManager:
                             'tileset_path': layer.tileset_path
                         }
 
-                # Restaura os dados das layers
+                # Ajusta a quantidade de layers do editor para bater com o estado
+                # (importante quando o usuário adiciona/remove camadas entre undos)
+                target_layer_count = len(state['layers'])
+                current_layer_count = len(editor_scene.layer_manager.layers)
+
+                if target_layer_count != current_layer_count:
+                    print(f"[Undo] Ajustando camadas: {current_layer_count} -> {target_layer_count}")
+                    from src.editor.layer_manager import Layer, LayerType
+
+                    if target_layer_count < current_layer_count:
+                        # Remove camadas extras do fim
+                        del editor_scene.layer_manager.layers[target_layer_count:]
+                    else:
+                        # Adiciona camadas vazias
+                        for j in range(current_layer_count, target_layer_count):
+                            ld = state['layers'][j]
+                            try:
+                                ltype = LayerType(ld.get('type', 'ground'))
+                            except Exception:
+                                ltype = LayerType.GROUND
+                            new_layer = Layer(
+                                ld.get('name', f'Layer {j}'),
+                                ltype,
+                                ld.get('width', editor_scene.layer_manager.width),
+                                ld.get('height', editor_scene.layer_manager.height),
+                                ld.get('tile_size', editor_scene.layer_manager.tile_size),
+                            )
+                            editor_scene.layer_manager.layers.append(new_layer)
+
+                # Restaura os dados de cada layer
                 for i, layer_data in enumerate(state['layers']):
-                    if i < len(editor_scene.layer_manager.layers):
-                        layer = editor_scene.layer_manager.layers[i]
+                    if i >= len(editor_scene.layer_manager.layers):
+                        break
 
-                        # Restaura a matriz de tiles
-                        tiles_to_restore = layer_data.get('tiles', [])
-                        for y in range(min(len(tiles_to_restore), layer.height)):
-                            for x in range(min(len(tiles_to_restore[y]), layer.width)):
-                                if y < layer.height and x < layer.width:
-                                    try:
-                                        layer.tiles[y][x] = int(tiles_to_restore[y][x])
-                                    except (ValueError, TypeError):
-                                        layer.tiles[y][x] = 0
+                    layer = editor_scene.layer_manager.layers[i]
 
-                        # PRESERVA OS TILESETS COMPLETOS
-                        # Se temos tilesets salvos no estado atual, usa eles
-                        if i in current_tilesets and current_tilesets[i]['tilesets']:
-                            # Restaura os tilesets completos
-                            layer.tilesets = current_tilesets[i]['tilesets'].copy()
-                            layer.tileset_paths = current_tilesets[i]['tileset_paths'].copy()
+                    # Atualiza metadados básicos
+                    layer.name = layer_data.get('name', layer.name)
+                    layer.width = layer_data.get('width', layer.width)
+                    layer.height = layer_data.get('height', layer.height)
+                    layer.tile_size = layer_data.get('tile_size', layer.tile_size)
 
-                            # Reconstrói a lista principal de tiles a partir dos tilesets
+                    # ===== MATRIZ DE TILES =====
+                    tiles_to_restore = layer_data.get('tiles', [])
+                    for y in range(min(len(tiles_to_restore), layer.height)):
+                        row = tiles_to_restore[y]
+                        for x in range(min(len(row), layer.width)):
+                            if y < layer.height and x < layer.width:
+                                try:
+                                    layer.tiles[y][x] = int(row[x])
+                                except (ValueError, TypeError):
+                                    layer.tiles[y][x] = 0
+
+                    # ===== OFFSETS =====
+                    if 'tile_offsets' in layer_data:
+                        restored_offsets = {}
+                        raw = layer_data['tile_offsets'] or {}
+                        for key, off in raw.items():
+                            try:
+                                # Aceita tanto tupla (x,y) quanto string "x,y"
+                                if isinstance(key, tuple):
+                                    x, y = int(key[0]), int(key[1])
+                                elif isinstance(key, str) and ',' in key:
+                                    xs, ys = key.split(",")
+                                    x, y = int(xs), int(ys)
+                                else:
+                                    continue
+
+                                dx, dy = int(off[0]), int(off[1])
+                                if (dx, dy) != (0, 0):
+                                    restored_offsets[(x, y)] = (dx, dy)
+                            except (ValueError, IndexError, TypeError):
+                                continue
+
+                        layer.tile_offsets = restored_offsets
+                        print(f"[Undo] Layer {i}: {len(layer.tile_offsets)} offsets restaurados")
+                    else:
+                        layer.tile_offsets = {}
+
+                    # ===== TILESETS =====
+                    # Preserva os tilesets atuais se existirem
+                    if i in current_tilesets and current_tilesets[i]['tilesets']:
+                        layer.tilesets = current_tilesets[i]['tilesets'].copy()
+                        layer.tileset_paths = current_tilesets[i]['tileset_paths'].copy()
+
+                        # Reconstrói a lista principal de tiles a partir dos tilesets
+                        layer.tileset = []
+                        for ts_info in layer.tilesets:
+                            layer.tileset.extend(ts_info['tiles'])
+
+                        if layer.tileset_paths:
+                            layer.tileset_path = layer.tileset_paths[0]
+
+                        print(f"[Undo] Layer {i}: {len(layer.tilesets)} tilesets preservados")
+                    else:
+                        # Fallback: tenta recarregar do caminho salvo
+                        tileset_paths = []
+                        if 'tileset_paths' in layer_data and layer_data['tileset_paths']:
+                            tileset_paths = layer_data['tileset_paths']
+                        elif 'tileset_path' in layer_data and layer_data['tileset_path']:
+                            tileset_paths = [layer_data['tileset_path']]
+
+                        if tileset_paths:
+                            print(f"[Undo] Layer {i}: recarregando {len(tileset_paths)} tilesets...")
+
+                            layer.tilesets = []
                             layer.tileset = []
-                            for ts_info in layer.tilesets:
-                                layer.tileset.extend(ts_info['tiles'])
+                            layer.tileset_paths = []
 
-                            # Mantém o tileset_path principal para compatibilidade
-                            if layer.tileset_paths:
-                                layer.tileset_path = layer.tileset_paths[0]
+                            for ts_idx, ts_path in enumerate(tileset_paths):
+                                if not ts_path:
+                                    continue
 
-                            print(f"[Undo] Layer {i}: Restaurados {len(layer.tilesets)} tilesets")
-                        else:
-                            # Fallback: tenta recarregar do caminho salvo
-                            tileset_paths = []
-                            if 'tileset_paths' in layer_data and layer_data['tileset_paths']:
-                                tileset_paths = layer_data['tileset_paths']
-                            elif 'tileset_path' in layer_data and layer_data['tileset_path']:
-                                tileset_paths = [layer_data['tileset_path']]
+                                project_root = getattr(editor_scene, 'project_root', '')
+                                base_path = project_root or getattr(editor_scene, 'base_path', '')
 
-                            if tileset_paths:
-                                print(f"[Undo] Layer {i}: Recarregando {len(tileset_paths)} tilesets...")
+                                possible_paths = []
+                                basename = os.path.basename(ts_path)
 
-                                # Limpa tilesets atuais
-                                layer.tilesets = []
-                                layer.tileset = []
-                                layer.tileset_paths = []
+                                if base_path:
+                                    clean_path = ts_path
+                                    if clean_path.startswith('pokemon-tower-defense/'):
+                                        clean_path = clean_path[len('pokemon-tower-defense/'):]
+                                    if clean_path.startswith('pokemon-tower-defense\\'):
+                                        clean_path = clean_path[len('pokemon-tower-defense\\'):]
+                                    full_path = os.path.join(base_path, clean_path)
+                                    possible_paths.append(full_path)
 
-                                # Recarrega cada tileset
-                                for ts_idx, ts_path in enumerate(tileset_paths):
-                                    if not ts_path:
-                                        continue
+                                possible_paths.append(os.path.join("res", "AllTiles", basename))
 
-                                    # Tenta encontrar o caminho
-                                    project_root = getattr(editor_scene, 'project_root', '')
-                                    base_path = project_root or getattr(editor_scene, 'base_path', '')
+                                if base_path:
+                                    res_path = os.path.join(base_path, "res", "AllTiles", basename)
+                                    possible_paths.append(res_path)
 
-                                    possible_paths = []
-                                    basename = os.path.basename(ts_path)
+                                possible_paths.append(basename)
 
-                                    if base_path:
-                                        clean_path = ts_path
-                                        if clean_path.startswith('pokemon-tower-defense/'):
-                                            clean_path = clean_path[len('pokemon-tower-defense/'):]
-                                        if clean_path.startswith('pokemon-tower-defense\\'):
-                                            clean_path = clean_path[len('pokemon-tower-defense\\'):]
-                                        full_path = os.path.join(base_path, clean_path)
-                                        possible_paths.append(full_path)
+                                loaded = False
+                                for path in possible_paths:
+                                    normalized = os.path.normpath(path)
+                                    if os.path.exists(normalized):
+                                        print(f"[Undo]   Carregando tileset {ts_idx + 1}: {normalized}")
+                                        if ts_idx == 0 and not layer.tilesets:
+                                            success = layer.load_tileset_from_image(
+                                                normalized,
+                                                editor_scene.grid_size,
+                                                editor_scene.grid_size,
+                                            )
+                                        else:
+                                            success = layer.add_tileset_from_image(
+                                                normalized,
+                                                editor_scene.grid_size,
+                                                editor_scene.grid_size,
+                                            )
+                                        if success:
+                                            loaded = True
+                                            break
 
-                                    root_path = os.path.join("res", "AllTiles", basename)
-                                    possible_paths.append(root_path)
+                                if not loaded:
+                                    print(f"[Undo]   ERRO: Não foi possível carregar tileset {ts_idx + 1}: {ts_path}")
 
-                                    if base_path:
-                                        res_path = os.path.join(base_path, "res", "AllTiles", basename)
-                                        possible_paths.append(res_path)
+                            print(f"[Undo] Layer {i}: {len(layer.tileset)} tiles recarregados")
 
-                                    possible_paths.append(basename)
-
-                                    # Tenta carregar o tileset
-                                    loaded = False
-                                    for path in possible_paths:
-                                        normalized = os.path.normpath(path)
-                                        if os.path.exists(normalized):
-                                            print(f"[Undo]   Carregando tileset {ts_idx + 1}: {normalized}")
-                                            if ts_idx == 0 and not layer.tilesets:
-                                                success = layer._load_single_tileset_6x8(normalized,
-                                                                                         editor_scene.grid_size,
-                                                                                         editor_scene.grid_size)
-                                            else:
-                                                success = layer.add_tileset_6x8(normalized,
-                                                                                editor_scene.grid_size,
-                                                                                editor_scene.grid_size)
-
-                                            if success:
-                                                loaded = True
-                                                break
-
-                                    if not loaded:
-                                        print(
-                                            f"[Undo]   ERRO: Não foi possível carregar tileset {ts_idx + 1}: {ts_path}")
-
-                                print(f"[Undo] Layer {i}: Tilesets recarregados. Total tiles: {len(layer.tileset)}")
-
-            # Restaura path_manager
+            # =========================================================
+            # PATH MANAGER
+            # =========================================================
             if 'path_manager' in state:
                 try:
                     editor_scene.path_manager.from_dict(state['path_manager'])
@@ -262,7 +325,9 @@ class UndoManager:
                 except Exception as e:
                     print(f"[Undo] Erro ao restaurar path_manager: {e}")
 
-            # Restaura tower spots
+            # =========================================================
+            # TOWER SPOTS
+            # =========================================================
             if 'tower_spots' in state:
                 try:
                     editor_scene.tower_spots.from_dict(state['tower_spots'])
@@ -270,7 +335,9 @@ class UndoManager:
                 except Exception as e:
                     print(f"[Undo] Erro ao restaurar tower_spots: {e}")
 
-            # Restaura wave manager
+            # =========================================================
+            # WAVE MANAGER
+            # =========================================================
             if 'wave_manager' in state:
                 try:
                     editor_scene.wave_manager.from_dict(state['wave_manager'])
@@ -278,7 +345,9 @@ class UndoManager:
                 except Exception as e:
                     print(f"[Undo] Erro ao restaurar wave_manager: {e}")
 
-            # Restaura target items
+            # =========================================================
+            # TARGET ITEMS
+            # =========================================================
             if 'target_items' in state:
                 try:
                     editor_scene.target_items.from_dict(state['target_items'])
@@ -286,7 +355,9 @@ class UndoManager:
                 except Exception as e:
                     print(f"[Undo] Erro ao restaurar target_items: {e}")
 
-            # Restaura event manager
+            # =========================================================
+            # EVENT MANAGER
+            # =========================================================
             if 'events' in state:
                 try:
                     editor_scene.event_manager.from_dict(state['events'])
@@ -294,32 +365,58 @@ class UndoManager:
                 except Exception as e:
                     print(f"[Undo] Erro ao restaurar event_manager: {e}")
 
-            # Restaura outras propriedades
+            # =========================================================
+            # OUTRAS PROPRIEDADES
+            # =========================================================
             if 'current_tile' in state:
                 editor_scene.current_tile = state['current_tile']
 
             if 'mode' in state:
                 editor_scene.mode = state['mode']
 
-            # Atualiza UI com todos os tilesets da layer atual
+            # =========================================================
+            # SINCRONIZA UI (palette + layer selector)
+            # =========================================================
             current_layer = editor_scene.layer_manager.get_current_layer()
             if current_layer and current_layer.tileset:
                 try:
-                    # Usa o método get_all_tiles_with_boundaries se disponível
                     if hasattr(current_layer, 'get_all_tiles_with_boundaries'):
                         all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
-                        editor_scene.tile_palette.set_tileset(all_tiles, boundaries)
-                        print(f"[Undo] Tile palette atualizada: {len(all_tiles)} tiles, {len(boundaries)} tilesets")
+
+                        natural_cols = None
+                        if hasattr(current_layer, 'tilesets') and current_layer.tilesets:
+                            natural_cols = current_layer.tilesets[0].get('cols', 6)
+
+                        if hasattr(editor_scene, 'tile_palette') and editor_scene.tile_palette:
+                            # set_tileset agora aceita natural_cols=
+                            try:
+                                editor_scene.tile_palette.set_tileset(
+                                    all_tiles, boundaries, natural_cols=natural_cols
+                                )
+                            except TypeError:
+                                # Fallback para assinatura antiga
+                                editor_scene.tile_palette.set_tileset(all_tiles, boundaries)
+
+                            print(f"[Undo] Tile palette atualizada: {len(all_tiles)} tiles, "
+                                  f"{len(boundaries)} tilesets")
                     else:
-                        # Fallback: só o tileset principal
-                        editor_scene.tile_palette.set_tileset(current_layer.tileset)
-                        print(f"[Undo] Tile palette atualizada (fallback): {len(current_layer.tileset)} tiles")
+                        if hasattr(editor_scene, 'tile_palette') and editor_scene.tile_palette:
+                            editor_scene.tile_palette.set_tileset(current_layer.tileset)
+                            print(f"[Undo] Tile palette atualizada (fallback): "
+                                  f"{len(current_layer.tileset)} tiles")
                 except Exception as e:
                     print(f"[Undo] Erro ao atualizar tile palette: {e}")
 
             # Atualiza o layer selector
             if hasattr(editor_scene, 'layer_selector') and editor_scene.layer_selector:
-                editor_scene.layer_selector.layers = editor_scene.layer_manager.layers
+                editor_scene.layer_selector.set_layers(editor_scene.layer_manager.layers)
+
+                # Garante que o índice está dentro do range
+                max_idx = max(0, len(editor_scene.layer_manager.layers) - 1)
+                if editor_scene.layer_selector.selected_layer > max_idx:
+                    editor_scene.layer_selector.selected_layer = max_idx
+                if editor_scene.layer_manager.current_layer > max_idx:
+                    editor_scene.layer_manager.current_layer = max_idx
 
             print("[Undo] Estado restaurado com sucesso")
 

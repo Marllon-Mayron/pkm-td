@@ -19,7 +19,7 @@ class DragDropManager:
         self.hovered_spot = None
         self.hovered_pokemon = None
         self.place_preview_alpha = 0
-        self.tile_size = 24
+        self.tile_size = 16
 
         # ===== ÍMÃ: raio (em pixels do mundo) que atrai o drop para o spot =====
         # ~1.5 tiles de tolerância => perdoa erros de até ~36px no centro do spot

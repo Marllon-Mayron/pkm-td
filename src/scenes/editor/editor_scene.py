@@ -71,7 +71,7 @@ class EditorScene(BaseScene):
         self.mode = "layers"  # layers, path, towers
         self.current_tile = 1
         self.show_grid = True
-        self.grid_size = 24  # ALTERADO: 24x24 pixels por tile
+        self.grid_size = 16
         self.snap_to_grid = True
 
         # Waves
@@ -137,21 +137,21 @@ class EditorScene(BaseScene):
         print(f"Editor iniciado - {self.phase_name} - Grid size: {self.grid_size}px")
 
     def _create_default_layers(self):
-        """Cria layers padrão"""
+        """Cria layers padrão."""
         self.layer_manager.add_layer("Chão", LayerType.GROUND)
         self.layer_manager.add_layer("Decoração", LayerType.DECORATION)
         self.layer_manager.add_layer("Teto", LayerType.CEILING)
 
     def _init_ui(self):
-        """Inicializa elementos da UI"""
+        """Inicializa elementos da UI."""
         viewport_x = self.screen_manager.viewport_x
         viewport_y = self.screen_manager.viewport_y
         viewport_width = self.screen_manager.viewport_width
 
-        # Palette de tiles - ajustada para 6 colunas (mais larga)
-        palette_x = viewport_x + viewport_width - 280  # Aumentado para 280
+        # Paleta de tiles (mais alta por causa dos controles)
+        palette_x = viewport_x + viewport_width - 280
         palette_y = viewport_y + 200
-        self.tile_palette = TilePalette(palette_x, palette_y, 260, 350)  # Largura 260, altura 350
+        self.tile_palette = TilePalette(palette_x, palette_y, 260, 380)
 
         # Seletor de layers
         selector_x = viewport_x + 10
@@ -161,9 +161,62 @@ class EditorScene(BaseScene):
         # Botões de modo
         self.mode_buttons = ModeButtons(viewport_x, viewport_y)
 
+        # Botões de brush
         brush_x = viewport_x + 100
         brush_y = viewport_y + 300
         self.brush_buttons = BrushButtons(brush_x, brush_y)
+
+    def _add_layer_of_type(self, layer_type):
+        """Adiciona uma nova layer do tipo indicado com nome único."""
+        # Gera nome único
+        if layer_type == LayerType.GROUND:
+            base = "Chão"
+        elif layer_type == LayerType.DECORATION:
+            base = "Decoração"
+        else:
+            base = "Teto"
+
+        existing = [l.name for l in self.layer_manager.layers]
+        if base not in existing:
+            name = base
+        else:
+            counter = 2
+            while f"{base} {counter}" in existing:
+                counter += 1
+            name = f"{base} {counter}"
+
+        self.undo_manager.save_state(self, f"Adicionar camada '{name}'")
+        self.layer_manager.add_layer(name, layer_type)
+
+        # Sincroniza UI
+        self.layer_manager.current_layer = len(self.layer_manager.layers) - 1
+        self.layer_selector.set_layers(self.layer_manager.layers)
+        self.layer_selector.selected_layer = self.layer_manager.current_layer
+        self._update_tile_palette_from_layer()
+
+        print(f"[EDITOR] Camada '{name}' adicionada. Total: {len(self.layer_manager.layers)}")
+
+    def _remove_layer_at(self, index):
+        """Remove a camada no índice, se possível."""
+        if len(self.layer_manager.layers) <= 1:
+            print("[EDITOR] Não é possível remover: mínimo 1 camada")
+            return
+        if not (0 <= index < len(self.layer_manager.layers)):
+            return
+
+        removed = self.layer_manager.layers[index].name
+
+        self.undo_manager.save_state(self, f"Remover camada '{removed}'")
+        self.layer_manager.remove_layer(index)
+
+        # Sincroniza UI
+        if self.layer_manager.current_layer >= len(self.layer_manager.layers):
+            self.layer_manager.current_layer = len(self.layer_manager.layers) - 1
+        self.layer_selector.set_layers(self.layer_manager.layers)
+        self.layer_selector.selected_layer = self.layer_manager.current_layer
+        self._update_tile_palette_from_layer()
+
+        print(f"[EDITOR] Camada '{removed}' removida. Restam: {len(self.layer_manager.layers)}")
 
     def set_mode(self, mode):
         """Altera o modo do editor"""
@@ -218,54 +271,73 @@ class EditorScene(BaseScene):
         )
 
     def _import_tileset(self):
-        """Importa um tileset (suporta múltiplos tilesets na mesma imagem)"""
+        """Importa um tileset (auto-detecta a grade)."""
         file_path = filedialog.askopenfilename(
-            title="Selecione uma imagem de tileset (pode conter múltiplos tilesets lado a lado)",
-            filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.gif")]
+            title="Selecione uma imagem de tileset",
+            filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.gif")],
         )
 
-        if file_path:
-            current_layer = self.layer_manager.get_current_layer()
-            if current_layer:
-                print(f"\n=== IMPORTANDO TILESET ===")
-                print(f"Layer: {current_layer.name}")
-                print(f"Arquivo: {file_path}")
+        if not file_path:
+            return
 
-                # Tenta detectar quantos tilesets tem na imagem
-                try:
-                    import pygame
-                    test_img = pygame.image.load(file_path)
-                    img_width = test_img.get_width()
-                    expected_width_per_set = 6 * self.grid_size  # 144px
-                    estimated_sets = img_width // expected_width_per_set
-                    print(f"Imagem detectada: {img_width}x{test_img.get_height()}px")
-                    print(f"Estimativa: {estimated_sets} tilesets de {6}x{8} tiles")
-                except:
-                    pass
+        current_layer = self.layer_manager.get_current_layer()
+        if not current_layer:
+            return
 
-                if not current_layer.tileset:
-                    success = current_layer.load_tileset(file_path, self.grid_size, self.grid_size)
-                else:
-                    success = current_layer.add_tileset_6x8(file_path, self.grid_size, self.grid_size)
+        print(f"\n=== IMPORTANDO TILESET ===")
+        print(f"Layer: {current_layer.name}")
+        print(f"Arquivo: {file_path}")
 
-                if success:
-                    # Atualiza a tile palette
-                    all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
-                    self.tile_palette.set_tileset(all_tiles, boundaries)
-                    self.tile_palette._update_max_scroll()
+        # Info estimada antes de importar
+        try:
+            test_img = pygame.image.load(file_path)
+            img_w, img_h = test_img.get_width(), test_img.get_height()
+            cols_est = img_w // self.grid_size
+            rows_est = img_h // self.grid_size
+            print(f"Imagem: {img_w}x{img_h} -> grade estimada {cols_est}x{rows_est} "
+                  f"= {cols_est * rows_est} tiles")
+        except Exception:
+            pass
 
-                    print(f"\n✓ IMPORTADO COM SUCESSO!")
-                    print(f"  Total de tiles: {len(current_layer.tileset)}")
-                    print(f"  Total de tilesets: {len(current_layer.tilesets)}")
-                else:
-                    print("Erro ao importar tileset")
+        if not current_layer.tileset:
+            success = current_layer.load_tileset_from_image(
+                file_path, self.grid_size, self.grid_size
+            )
+        else:
+            success = current_layer.add_tileset_from_image(
+                file_path, self.grid_size, self.grid_size
+            )
+
+        if not success:
+            print("Erro ao importar tileset")
+            return
+
+        # Atualiza palette
+        all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
+
+        natural_cols = None
+        if current_layer.tilesets:
+            natural_cols = current_layer.tilesets[0].get('cols', 6)
+
+        self.tile_palette.set_tileset(all_tiles, boundaries, natural_cols=natural_cols)
+        self.tile_palette._update_max_scroll()
+
+        print(f"\n✓ IMPORTADO! {len(current_layer.tileset)} tiles em "
+              f"{len(current_layer.tilesets)} tileset(s) | cols={natural_cols}")
 
     def _update_tile_palette_from_layer(self):
-        """Atualiza a tile palette a partir da layer atual"""
+        """Atualiza a tile palette a partir da layer atual."""
         current_layer = self.layer_manager.get_current_layer()
-        if current_layer and current_layer.tileset:
-            all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
-            self.tile_palette.set_tileset(all_tiles, boundaries)
+        if not current_layer or not current_layer.tileset:
+            return
+
+        all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
+
+        natural_cols = None
+        if current_layer.tilesets:
+            natural_cols = current_layer.tilesets[0].get('cols', 6)
+
+        self.tile_palette.set_tileset(all_tiles, boundaries, natural_cols=natural_cols)
 
     def _delete_selected(self):
         """Deleta item selecionado"""
@@ -679,6 +751,22 @@ class EditorScene(BaseScene):
                 print(f"Mapa encontrado com {len(phase_data['map'].get('layers', []))} layers")
                 self.layer_manager.from_dict(phase_data["map"], project_root)
 
+                # ===== RESET + SYNC DA UI =====
+                # Reset do índice de camada atual (evita índice fora dos limites)
+                self.layer_manager.current_layer = 0
+
+                # Sincroniza o seletor com as camadas recém-carregadas
+                if hasattr(self, 'layer_selector') and self.layer_selector:
+                    self.layer_selector.set_layers(self.layer_manager.layers)
+                    self.layer_selector.selected_layer = 0
+                    print(f"[EDITOR] LayerSelector sincronizado: {len(self.layer_manager.layers)} camadas")
+
+                # Sincroniza grid_size com a layer carregada
+                current_layer = self.layer_manager.get_current_layer()
+                if current_layer and getattr(current_layer, 'tile_size', None):
+                    self.grid_size = current_layer.tile_size
+                    print(f"[EDITOR] grid_size sincronizado: {self.grid_size}")
+
             # Carrega os paths
             if "paths" in phase_data:
                 self.path_manager.from_dict(phase_data["paths"])
@@ -761,8 +849,13 @@ class EditorScene(BaseScene):
             current_layer = self.layer_manager.get_current_layer()
             if current_layer and current_layer.tileset:
                 all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
-                self.tile_palette.set_tileset(all_tiles, boundaries)
-                print("Tile palette atualizada")
+
+                natural_cols = None
+                if current_layer.tilesets:
+                    natural_cols = current_layer.tilesets[0].get('cols', 6)
+
+                self.tile_palette.set_tileset(all_tiles, boundaries, natural_cols=natural_cols)
+                print(f"Tile palette atualizada | cols={natural_cols}")
 
             # Configura o wave manager com o path manager (se existir)
             if hasattr(self, 'wave_manager') and hasattr(self, 'path_manager'):

@@ -12,7 +12,7 @@ class TargetItem:
         self.x = x
         self.y = y
         self.item_id = item_id
-        self.size = 24  # ALTERADO: 24x24
+        self.size = 16
 
         # Carrega informações do catálogo
         item_info = item_catalog.get_item(item_id)

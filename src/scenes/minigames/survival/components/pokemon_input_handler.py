@@ -16,8 +16,8 @@ class PokemonInputHandler:
 
     def __init__(self, game_scene: 'SurvivalMinigameScene'):
         self.game_scene = game_scene
-        self.tile_size = 24
-        self.click_tolerance = 20  # Tolerância em pixels para clique
+        self.tile_size = 16
+        self.click_tolerance = 14  # Tolerância em pixels para clique
 
     def handle_event(self, event: pygame.event.Event) -> bool:
         """

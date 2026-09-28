@@ -11,7 +11,7 @@ class SurvivalPlacementManager:
     def __init__(self, game_scene):
         self.game_scene = game_scene
         self.placed_pokemon: List[Any] = []
-        self.tile_size = 24
+        self.tile_size = 16
 
     def add_pokemon(self, pokemon, spot):
         """Adiciona um Pokémon ao mapa e associa ao path correto"""

@@ -21,7 +21,7 @@ class TargetItemManager:
         self.game_over = False
         self.victory = False
         self.visual_variation_range = 5
-        self.tile_size = 24  # Tamanho do tile
+        self.tile_size = 16  # Tamanho do tile
         self.renderer = TargetItemRenderer()
 
     def load_from_data(self, items_data: dict):

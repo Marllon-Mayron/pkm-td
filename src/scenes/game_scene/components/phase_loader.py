@@ -16,13 +16,13 @@ class PhaseLoader:
     def __init__(self):
         self.base_path = Path(PROJECT_ROOT) / "src" / "data" / "phases"
         self.current_phase_data = None
-        self.tile_size = 24
+        self.tile_size = 16
 
     def get_tile_size(self) -> int:
         """Retorna o tile_size da fase atual"""
         if self.current_phase_data:
             map_data = self.current_phase_data.get("map", {})
-            return map_data.get("tile_size", 24)
+            return map_data.get("tile_size", 16)
         return 24
 
     def load_phase(self, chapter: int, phase_number: int) -> dict:

@@ -1,8 +1,8 @@
 # src/scenes/game_scene/components/renderer/game_layer_manager.py
 
 """
-Gerenciador de camadas para o jogo - Suporte a múltiplos tilesets e tile_size 24
-COM CACHE DE SUPERFÍCIE PARA ELIMINAR GAPS
+Gerenciador de camadas para o jogo.
+Suporta offsets por tile (pintura livre do editor).
 """
 import pygame
 import os
@@ -10,15 +10,14 @@ from src.core.render_context import render_context
 
 
 class GameLayer:
-    """Camada do mapa para o jogo - COM CACHE OTIMIZADO"""
-
-    def __init__(self, name, layer_type, width, height, tile_size=24):
+    def __init__(self, name, layer_type, width, height, tile_size=16):
         self.name = name
         self.layer_type = layer_type
         self.width = width
         self.height = height
         self.tile_size = tile_size
         self.tiles = [[0 for _ in range(width)] for _ in range(height)]
+        self.tile_offsets = {}  # {(x, y): (dx, dy)}
         self.visible = True
         self.opacity = 255
         self.tileset = []
@@ -26,18 +25,15 @@ class GameLayer:
         self.tileset_paths = []
         self._cached_tiles = {}
 
-        # ===== NOVOS CACHES =====
         self._cached_surface = None
         self._cached_scale = None
         self._cached_zoom = None
         self._cached_visible_section = None
         self._last_camera_rect = None
         self._last_screen_pos = None
-        self._frame_counter = 0
         self._recreate_counter = 0
 
     def _invalidate_surface_cache(self):
-        """Invalida o cache quando algo muda"""
         self._cached_surface = None
         self._cached_scale = None
         self._cached_zoom = None
@@ -46,322 +42,218 @@ class GameLayer:
         self._last_screen_pos = None
         self._recreate_counter += 1
 
-    def set_tile(self, x, y, tile_id):
+    def set_tile(self, x, y, tile_id, offset=None):
         if 0 <= x < self.width and 0 <= y < self.height:
             self.tiles[y][x] = int(tile_id)
-            # Quando um tile muda, invalida o cache
+            if offset and offset != (0, 0):
+                self.tile_offsets[(x, y)] = (int(offset[0]), int(offset[1]))
+            else:
+                self.tile_offsets.pop((x, y), None)
             self._invalidate_surface_cache()
             return True
         return False
 
-    def load_tileset_6x8(self, image_path, tile_width, tile_height):
-        """
-        Carrega um tileset organizado em 6 colunas x 8 linhas
-        Retorna lista de tiles e número de tilesets detectados
-        """
+    def get_tile_offset(self, x, y):
+        return self.tile_offsets.get((x, y), (0, 0))
+
+    # ==================================================================
+    # EXTRAÇÃO
+    # ==================================================================
+    def _extract_tiles(self, image_path, tile_width, tile_height, spacing=0):
         try:
-            print(f"\n--- GameLayer load_tileset_6x8 ---")
-            print(f"Tentando carregar: {image_path}")
-
             if not os.path.exists(image_path):
-                print(f"ERRO: Arquivo não encontrado!")
-                return None, 0
-
+                return None, 0, 0
             sheet = pygame.image.load(image_path).convert_alpha()
-            img_width = sheet.get_width()
-            img_height = sheet.get_height()
-
-            COLS_PER_SET = 6
-            ROWS_PER_SET = 8
-            tileset_width = COLS_PER_SET * tile_width
-
-            num_tilesets = img_width // tileset_width
-            print(f"Imagem: {img_width}x{img_height}, tilesets detectados: {num_tilesets}")
-
-            all_tiles = []
-
-            for ts_idx in range(num_tilesets):
-                offset_x = ts_idx * tileset_width
-                print(f"  Processando tileset {ts_idx + 1}/{num_tilesets}, offset X: {offset_x}")
-
-                for row in range(ROWS_PER_SET):
-                    for col in range(COLS_PER_SET):
-                        rect = pygame.Rect(
-                            offset_x + col * tile_width,
-                            row * tile_height,
-                            tile_width,
-                            tile_height
-                        )
-                        if rect.right <= img_width and rect.bottom <= img_height:
-                            tile = sheet.subsurface(rect)
-                            all_tiles.append(tile)
-                        else:
-                            empty_tile = pygame.Surface((tile_width, tile_height), pygame.SRCALPHA)
-                            empty_tile.fill((0, 0, 0, 0))
-                            all_tiles.append(empty_tile)
-
-            print(f"Total de tiles carregados: {len(all_tiles)}")
-            return all_tiles, num_tilesets
-
+            img_w, img_h = sheet.get_width(), sheet.get_height()
+            step_x = tile_width + spacing
+            step_y = tile_height + spacing
+            cols = (img_w + spacing) // step_x
+            rows = (img_h + spacing) // step_y
+            if cols <= 0 or rows <= 0:
+                return None, 0, 0
+            print(f"[GameLayer._extract] {os.path.basename(image_path)}: "
+                  f"{img_w}x{img_h} -> {cols}x{rows} = {cols * rows} tiles")
+            tiles = []
+            for r in range(rows):
+                for c in range(cols):
+                    rect = pygame.Rect(c * step_x, r * step_y, tile_width, tile_height)
+                    if rect.right > img_w or rect.bottom > img_h:
+                        empty = pygame.Surface((tile_width, tile_height), pygame.SRCALPHA)
+                        empty.fill((0, 0, 0, 0))
+                        tiles.append(empty)
+                    else:
+                        tiles.append(sheet.subsurface(rect))
+            return tiles, cols, rows
         except Exception as e:
-            print(f"Erro ao carregar tileset: {e}")
+            print(f"[GameLayer._extract] Erro: {e}")
             import traceback
             traceback.print_exc()
-            return None, 0
+            return None, 0, 0
 
-    def load_tileset(self, image_path, tile_width, tile_height):
-        """Carrega um tileset (primeiro da layer)"""
-        all_tiles, num_tilesets = self.load_tileset_6x8(image_path, tile_width, tile_height)
-
-        if all_tiles is None:
-            return False
-
-        self.tileset = all_tiles
-        self.tilesets = []
-        self.tileset_paths = []
+    def load_tileset_from_image(self, image_path, tile_width, tile_height, spacing=0):
+        tiles, cols, rows = self._extract_tiles(image_path, tile_width, tile_height, spacing)
+        if tiles is None: return False
+        self.tileset = tiles
+        self.tilesets = [{
+            'path': image_path, 'tiles': tiles, 'start_id': 1, 'count': len(tiles),
+            'cols': cols, 'rows': rows, 'tile_width': tile_width, 'tile_height': tile_height,
+            'spacing': spacing, 'tileset_index': 0,
+        }]
+        self.tileset_paths = [image_path]
         self._invalidate_surface_cache()
+        return True
 
-        # Cria informações para cada tileset
-        current_start = 0
-        for ts_idx in range(num_tilesets):
-            ts_count = 48  # 6x8 = 48 tiles
-            tileset_info = {
-                'path': image_path,
-                'tiles': all_tiles[current_start:current_start + ts_count],
-                'start_id': current_start + 1,
-                'count': ts_count,
-                'cols': 6,
-                'rows': 8,
-                'tileset_index': ts_idx
-            }
-            self.tilesets.append(tileset_info)
-            current_start += ts_count
-
-        # Adiciona caminho
-        if os.path.isabs(image_path):
-            try:
-                from src.config.paths import PROJECT_ROOT
-                relative_path = os.path.relpath(image_path, PROJECT_ROOT)
-                self.tileset_paths.append(relative_path.replace('\\', '/'))
-            except:
-                self.tileset_paths.append(os.path.basename(image_path))
-        else:
+    def add_tileset_from_image(self, image_path, tile_width, tile_height, spacing=0):
+        tiles, cols, rows = self._extract_tiles(image_path, tile_width, tile_height, spacing)
+        if tiles is None: return False
+        next_start = len(self.tileset) + 1
+        self.tilesets.append({
+            'path': image_path, 'tiles': tiles, 'start_id': next_start, 'count': len(tiles),
+            'cols': cols, 'rows': rows, 'tile_width': tile_width, 'tile_height': tile_height,
+            'spacing': spacing, 'tileset_index': len(self.tilesets),
+        })
+        self.tileset.extend(tiles)
+        if image_path not in self.tileset_paths:
             self.tileset_paths.append(image_path)
-
-        print(f"✓ Tileset carregado: {num_tilesets} tilesets, {len(self.tileset)} tiles")
-        return True
-
-    def add_tileset(self, image_path, tile_width, tile_height):
-        """Adiciona um tileset adicional à layer"""
-        all_tiles, num_tilesets = self.load_tileset_6x8(image_path, tile_width, tile_height)
-
-        if all_tiles is None:
-            return False
-
-        # Adiciona os novos tiles
-        current_start = len(self.tileset)
-        self.tileset.extend(all_tiles)
         self._invalidate_surface_cache()
-
-        # Adiciona informações de cada tileset
-        for ts_idx in range(num_tilesets):
-            ts_count = 48
-            tileset_info = {
-                'path': image_path,
-                'tiles': all_tiles[ts_idx * ts_count:(ts_idx + 1) * ts_count],
-                'start_id': current_start + 1,
-                'count': ts_count,
-                'cols': 6,
-                'rows': 8,
-                'tileset_index': len(self.tilesets) + ts_idx
-            }
-            self.tilesets.append(tileset_info)
-            current_start += ts_count
-
-        # Adiciona caminho
-        if os.path.isabs(image_path):
-            try:
-                from src.config.paths import PROJECT_ROOT
-                relative_path = os.path.relpath(image_path, PROJECT_ROOT)
-                rel_path = relative_path.replace('\\', '/')
-                if rel_path not in self.tileset_paths:
-                    self.tileset_paths.append(rel_path)
-            except:
-                if image_path not in self.tileset_paths:
-                    self.tileset_paths.append(os.path.basename(image_path))
-        else:
-            if image_path not in self.tileset_paths:
-                self.tileset_paths.append(image_path)
-
-        print(f"✓ Tileset adicionado: +{num_tilesets} tilesets, total {len(self.tileset)} tiles")
         return True
+
+    def load_tileset(self, p, w, h): return self.load_tileset_from_image(p, w, h)
+    def add_tileset(self, p, w, h): return self.add_tileset_from_image(p, w, h)
 
     def get_tile_image(self, tile_id):
-        """Retorna a imagem do tile pelo ID (1-based)"""
         try:
-            tile_index = int(tile_id) - 1
-            if 0 <= tile_index < len(self.tileset):
-                return self.tileset[tile_index]
+            idx = int(tile_id) - 1
+            if 0 <= idx < len(self.tileset):
+                return self.tileset[idx]
             return None
         except (ValueError, TypeError):
             return None
 
+    # ==================================================================
+    # CACHE / RENDER
+    # ==================================================================
     def _get_scaled_tile(self, tile_index, target_size):
-        """Obtém tile escalado do cache - OTIMIZADO"""
-        cache_key = (tile_index, target_size)
-        if cache_key not in self._cached_tiles:
+        key = (tile_index, target_size)
+        if key not in self._cached_tiles:
             original = self.tileset[tile_index]
-            # Usa smoothscale para melhor qualidade, mas é mais lento
-            # Para performance, use scale() em vez de smoothscale()
             scaled = pygame.transform.scale(original, (target_size, target_size))
-
-            # Limita o tamanho do cache para não crescer infinitamente
             if len(self._cached_tiles) > 1000:
-                # Remove metade do cache quando fica muito grande
-                keys_to_remove = list(self._cached_tiles.keys())[:500]
-                for key in keys_to_remove:
-                    del self._cached_tiles[key]
-
-            self._cached_tiles[cache_key] = scaled
-        return self._cached_tiles[cache_key]
+                for k in list(self._cached_tiles.keys())[:500]:
+                    del self._cached_tiles[k]
+            self._cached_tiles[key] = scaled
+        return self._cached_tiles[key]
 
     def _render_to_surface(self, scale):
-        """
-        Renderiza toda a camada em uma única superfície - OTIMIZADO
-        """
         tile_size_scaled = max(1, int(self.tile_size * scale))
+        total_w = self.width * tile_size_scaled
+        total_h = self.height * tile_size_scaled
+        if total_w <= 0 or total_h <= 0:
+            return None
 
-        # Calcula o tamanho total da superfície
-        total_width = self.width * tile_size_scaled
-        total_height = self.height * tile_size_scaled
-
-        # ===== OTIMIZAÇÃO: Cria superfície diretamente =====
-        # Usa SRCALPHA só se necessário (camadas com transparência)
-        if self.layer_type in ["decoration", "ceiling"]:
-            surface = pygame.Surface((total_width, total_height), pygame.SRCALPHA)
+        if self.layer_type in ("decoration", "ceiling"):
+            surface = pygame.Surface((total_w, total_h), pygame.SRCALPHA)
         else:
-            # Ground layer não precisa de alpha, é mais rápido
-            surface = pygame.Surface((total_width, total_height))
+            surface = pygame.Surface((total_w, total_h))
 
-        # ===== OTIMIZAÇÃO: Pré-aloca lista de tiles a renderizar =====
+        if not self.tileset:
+            return surface
+
+        # ===== PRÉ-COLETA COM OFFSETS =====
         tiles_to_render = []
-
         for y in range(self.height):
             for x in range(self.width):
                 tile_id = self.tiles[y][x]
                 if tile_id == 0:
                     continue
-
                 try:
-                    tile_index = int(tile_id) - 1
+                    idx = int(tile_id) - 1
                 except (ValueError, TypeError):
                     continue
+                if 0 <= idx < len(self.tileset):
+                    off = self.tile_offsets.get((x, y), (0, 0))
+                    tiles_to_render.append((
+                        idx,
+                        x * tile_size_scaled,
+                        y * tile_size_scaled,
+                        off[0], off[1],
+                    ))
 
-                if 0 <= tile_index < len(self.tileset):
-                    surface_x = x * tile_size_scaled
-                    surface_y = y * tile_size_scaled
-                    tiles_to_render.append((tile_index, surface_x, surface_y))
-
-        # ===== OTIMIZAÇÃO: Renderiza em batch =====
-        for tile_index, surface_x, surface_y in tiles_to_render:
-            tile_img = self._get_scaled_tile(tile_index, tile_size_scaled)
-            surface.blit(tile_img, (surface_x, surface_y))
+        # Blit com offset aplicado
+        for idx, sx, sy, off_x, off_y in tiles_to_render:
+            surf = self._get_scaled_tile(idx, tile_size_scaled)
+            if off_x != 0 or off_y != 0:
+                ox = round(off_x * scale)
+                oy = round(off_y * scale)
+                surface.blit(surf, (sx + ox, sy + oy))
+            else:
+                surface.blit(surf, (sx, sy))
 
         return surface
 
-    def _get_or_create_cached_surface(self, camera, screen_manager):
-        """
-        Retorna a superfície cacheada para o zoom atual
-        Recria se o zoom ou escala mudaram
-        """
-        current_scale = render_context.get_scale(camera, screen_manager)
-        current_zoom = camera.zoom if camera else 1.0
-
-        # Se a escala ou zoom mudaram, recria o cache
-        if (self._cached_surface is None or
-                self._cached_scale != current_scale or
-                self._cached_zoom != current_zoom):
-            self._cached_surface = self._render_to_surface(current_scale)
-            self._cached_scale = current_scale
-            self._cached_zoom = current_zoom
-
-        return self._cached_surface
-
     def render(self, screen, camera, screen_manager):
-        """Renderiza a camada usando superfície cacheada - OTIMIZADO"""
-        if not self.visible or not self.tileset:
+        if not self.visible:
+            return
+        if not self.tileset:
             return
 
-        # Obtém a escala atual
         current_scale = render_context.get_scale(camera, screen_manager)
         current_zoom = camera.zoom if camera else 1.0
 
-        # ===== CACHE DA SUPERFÍCIE COMPLETA =====
-        # Só recria quando escala ou zoom mudam
-        if (self._cached_surface is None or
-                self._cached_scale != current_scale or
-                self._cached_zoom != current_zoom):
+        if (self._cached_surface is None
+                or self._cached_scale != current_scale
+                or self._cached_zoom != current_zoom):
             self._cached_surface = self._render_to_surface(current_scale)
             self._cached_scale = current_scale
             self._cached_zoom = current_zoom
-            # Invalida a seção visível também
             self._cached_visible_section = None
 
-        # Calcula a posição do primeiro tile (0,0) na tela
+        if self._cached_surface is None:
+            return
+
         screen_x, screen_y = render_context.world_to_screen(0, 0, camera, screen_manager)
 
-        # ===== CACHE DA SEÇÃO VISÍVEL =====
         visible_rect = camera.get_visible_rect()
-
-        # Converte a área visível para coordenadas da superfície cacheada
         tile_size_scaled = max(1, int(self.tile_size * current_scale))
 
-        visible_start_x = max(0, int(visible_rect.x / self.tile_size) * tile_size_scaled)
-        visible_start_y = max(0, int(visible_rect.y / self.tile_size) * tile_size_scaled)
+        # Aumenta margem para acomodar offsets
+        margin = tile_size_scaled * 2
 
-        visible_end_x = min(self._cached_surface.get_width(),
-                            int((
-                                            visible_rect.x + visible_rect.width) / self.tile_size) * tile_size_scaled + tile_size_scaled)
-        visible_end_y = min(self._cached_surface.get_height(),
-                            int((
-                                            visible_rect.y + visible_rect.height) / self.tile_size) * tile_size_scaled + tile_size_scaled)
+        vx_start = max(0, int((visible_rect.x - margin) / self.tile_size) * tile_size_scaled)
+        vy_start = max(0, int((visible_rect.y - margin) / self.tile_size) * tile_size_scaled)
+        vx_end = min(self._cached_surface.get_width(),
+                     int((visible_rect.x + visible_rect.width + margin) / self.tile_size) * tile_size_scaled + tile_size_scaled)
+        vy_end = min(self._cached_surface.get_height(),
+                     int((visible_rect.y + visible_rect.height + margin) / self.tile_size) * tile_size_scaled + tile_size_scaled)
 
-        # Verifica se a área visível mudou significativamente
-        current_visible_key = (visible_start_x, visible_start_y, visible_end_x, visible_end_y, screen_x, screen_y)
+        key = (vx_start, vy_start, vx_end, vy_end, screen_x, screen_y)
 
-        if (self._cached_visible_section is None or
-                self._last_camera_rect != current_visible_key):
-
-            # Só recria se a área visível mudou
-            if visible_start_x < visible_end_x and visible_start_y < visible_end_y:
+        if (self._cached_visible_section is None or self._last_camera_rect != key):
+            if vx_start < vx_end and vy_start < vy_end:
                 try:
-                    self._cached_visible_section = self._cached_surface.subsurface((
-                        visible_start_x,
-                        visible_start_y,
-                        visible_end_x - visible_start_x,
-                        visible_end_y - visible_start_y
-                    ))
-                    self._last_camera_rect = current_visible_key
-                    self._last_screen_pos = (screen_x + visible_start_x, screen_y + visible_start_y)
+                    self._cached_visible_section = self._cached_surface.subsurface(
+                        (vx_start, vy_start, vx_end - vx_start, vy_end - vy_start)
+                    )
+                    self._last_camera_rect = key
+                    self._last_screen_pos = (screen_x + vx_start, screen_y + vy_start)
                 except ValueError:
-                    # Fallback se a subsurface for inválida
                     self._cached_visible_section = None
                     return
 
-        # Renderiza a seção visível se existir
         if self._cached_visible_section and self._last_screen_pos:
             screen.blit(self._cached_visible_section,
                         (round(self._last_screen_pos[0]), round(self._last_screen_pos[1])))
 
 
+# ======================================================================
+# MANAGER
+# ======================================================================
 class GameLayerManager:
-    """Gerenciador de camadas para o jogo"""
-
     def __init__(self):
         self.layers = []
         self.width = 100
         self.height = 100
-        self.tile_size = 24
+        self.tile_size = 16
 
     def add_layer(self, name, layer_type):
         layer = GameLayer(name, layer_type, self.width, self.height, self.tile_size)
@@ -369,120 +261,124 @@ class GameLayerManager:
         return layer
 
     def load_from_dict(self, data, base_path=""):
-        """Carrega do dicionário - suporte a múltiplos tilesets"""
-        print("\n=== Carregando GameLayerManager ===")
-
+        print("\n=== GameLayerManager.load_from_dict ===")
         self.width = data.get("width", 100)
         self.height = data.get("height", 100)
-        self.tile_size = data.get("tile_size", 24)
         self.layers = []
 
-        for layer_data in data.get("layers", []):
+        raw_layers = data.get("layers", [])
+        print(f"Encontradas {len(raw_layers)} camadas")
+
+        for layer_idx, layer_data in enumerate(raw_layers):
+            layer_name = layer_data.get("name", "?")
+            layer_type = layer_data.get("type", "ground")
             layer_width = layer_data.get("width", self.width)
             layer_height = layer_data.get("height", self.height)
             layer_tile_size = layer_data.get("tile_size", self.tile_size)
 
-            layer = GameLayer(
-                layer_data["name"],
-                layer_data["type"],
-                layer_width,
-                layer_height,
-                layer_tile_size
-            )
+            print(f"\n--- [{layer_idx}] '{layer_name}' ({layer_type}, "
+                  f"{layer_width}x{layer_height}, tile={layer_tile_size}) ---")
 
-            # Carrega os tiles
+            layer = GameLayer(layer_name, layer_type, layer_width, layer_height, layer_tile_size)
+
+            # Tiles
             loaded_tiles = layer_data.get("tiles", [])
+            non_zero = 0
             for y in range(min(layer_height, len(loaded_tiles))):
                 row = loaded_tiles[y] if y < len(loaded_tiles) else []
                 for x in range(min(layer_width, len(row))):
                     try:
-                        layer.tiles[y][x] = int(row[x])
+                        val = int(row[x])
                     except (ValueError, TypeError):
-                        layer.tiles[y][x] = 0
+                        val = 0
+                    layer.tiles[y][x] = val
+                    if val != 0:
+                        non_zero += 1
+            print(f"    Tiles não-zero: {non_zero}")
 
-            # Carrega tilesets (múltiplos)
+            # ===== OFFSETS =====
+            offsets_raw = layer_data.get("tile_offsets", {})
+            if offsets_raw:
+                for key, off in offsets_raw.items():
+                    try:
+                        xs, ys = key.split(",")
+                        x, y = int(xs), int(ys)
+                        if 0 <= x < layer_width and 0 <= y < layer_height:
+                            dx, dy = int(off[0]), int(off[1])
+                            if (dx, dy) != (0, 0):
+                                layer.tile_offsets[(x, y)] = (dx, dy)
+                    except (ValueError, IndexError, TypeError):
+                        continue
+                print(f"    Offsets: {len(layer.tile_offsets)} tiles deslocados")
+
+            # Tileset(s)
             tileset_paths = []
             if layer_data.get("tileset_paths"):
                 tileset_paths = layer_data["tileset_paths"]
             elif layer_data.get("tileset_path"):
                 tileset_paths = [layer_data["tileset_path"]]
 
-            print(f"Layer {layer_data['name']}: {len(tileset_paths)} tileset(s) para carregar")
-
+            slice_size = self.tile_size
             for ts_idx, ts_path in enumerate(tileset_paths):
-                if not ts_path:
+                if not ts_path: continue
+                found = self._find_tileset_path(ts_path, base_path)
+                if not found:
+                    print(f"    ✗ Tileset não encontrado: {ts_path}")
                     continue
-
-                found_path = self._find_tileset_path(ts_path, base_path)
-                if found_path:
-                    if ts_idx == 0 and not layer.tileset:
-                        success = layer.load_tileset(found_path, layer_tile_size, layer_tile_size)
-                    else:
-                        success = layer.add_tileset(found_path, layer_tile_size, layer_tile_size)
-
-                    if success:
-                        print(f"  ✓ Tileset {ts_idx + 1} carregado")
-                    else:
-                        print(f"  ✗ Falha ao carregar tileset {ts_idx + 1}")
+                if ts_idx == 0 and not layer.tileset:
+                    layer.load_tileset_from_image(found, slice_size, slice_size)
                 else:
-                    print(f"  ✗ Tileset {ts_idx + 1} não encontrado: {ts_path}")
+                    layer.add_tileset_from_image(found, slice_size, slice_size)
 
             self.layers.append(layer)
-            print(f"  ✓ Camada {layer.name} carregada com {len(layer.tileset)} tiles")
 
-        print(f"GameLayerManager carregado: {len(self.layers)} camadas, tile_size={self.tile_size}")
+        print(f"\n=== GameLayerManager: {len(self.layers)} camadas ===\n")
         return self
 
     def _find_tileset_path(self, tileset_path, base_path):
-        """Encontra o caminho correto do tileset"""
         basename = os.path.basename(tileset_path)
-        possible_paths = []
-
-        # 1. Caminho usando base_path (geralmente PROJECT_ROOT)
+        possible = []
         if base_path:
-            clean_path = tileset_path
-            if clean_path.startswith('pkm-td/'):
-                clean_path = clean_path[len('pkm-td/'):]
-            if clean_path.startswith('pkm-td\\'):
-                clean_path = clean_path[len('pkm-td\\'):]
-            possible_paths.append(os.path.join(base_path, clean_path))
-
-        # 2. Caminho direto na pasta res/AllTiles
-        possible_paths.append(os.path.join("res", "AllTiles", basename))
-
-        # 3. Caminho com base_path + res/AllTiles
+            clean = tileset_path
+            if clean.startswith('pkm-td/'):
+                clean = clean[len('pkm-td/'):]
+            if clean.startswith('pkm-td\\'):
+                clean = clean[len('pkm-td\\'):]
+            possible.append(os.path.join(base_path, clean))
+        possible.append(os.path.join("res", "AllTiles", basename))
         if base_path:
-            possible_paths.append(os.path.join(base_path, "res", "AllTiles", basename))
-
-        # 4. Apenas o nome do arquivo
-        possible_paths.append(basename)
-
-        for path in possible_paths:
-            normalized = os.path.normpath(path)
-            if os.path.exists(normalized):
-                print(f"  Encontrado: {normalized}")
-                return normalized
-
+            possible.append(os.path.join(base_path, "res", "AllTiles", basename))
+        possible.append(basename)
+        for p in possible:
+            n = os.path.normpath(p)
+            if os.path.exists(n):
+                return n
         return None
 
-    def render_all(self, screen, camera, screen_manager):
-        """Renderiza todas as camadas na ordem correta"""
-        # Ordem: ground, decoration, ceiling
+    def render_ground_layers(self, screen, camera, screen_manager):
         for layer in self.layers:
             if layer.layer_type == "ground":
                 layer.render(screen, camera, screen_manager)
+
+    def render_decoration_layers(self, screen, camera, screen_manager):
         for layer in self.layers:
             if layer.layer_type == "decoration":
                 layer.render(screen, camera, screen_manager)
+
+    def render_ceiling_layers(self, screen, camera, screen_manager):
         for layer in self.layers:
             if layer.layer_type == "ceiling":
                 layer.render(screen, camera, screen_manager)
+
+    def render_all(self, screen, camera, screen_manager):
+        self.render_ground_layers(screen, camera, screen_manager)
+        self.render_decoration_layers(screen, camera, screen_manager)
+        self.render_ceiling_layers(screen, camera, screen_manager)
 
     def get_dimensions(self):
         return (self.width * self.tile_size, self.height * self.tile_size)
 
     def invalidate_cache(self):
-        """Invalida o cache de todas as camadas"""
         for layer in self.layers:
             layer._invalidate_surface_cache()
             layer._cached_tiles.clear()
