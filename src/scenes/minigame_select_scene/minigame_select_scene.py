@@ -368,7 +368,7 @@ class MinigameSelectScene(BaseScene):
         visible_height = viewport_height - (grid_start_y - viewport_y) - 80
         self.max_scroll = max(0, grid_height - visible_height)
 
-        # ===== FLUTE AGORA É POR NÍVEL (não por pasta) =====
+        # ===== FLUTE POR NÍVEL =====
         # Cada card verifica seu próprio `requires_flute` no JSON.
 
         # Cria cards
@@ -422,15 +422,18 @@ class MinigameSelectScene(BaseScene):
         print(f"[MINIGAME_SELECT] {len(self.current_minigame_cards)} card(s) "
               f"criado(s) | pasta='{self.selected_minigame_folder}'")
 
-    def _minigame_requires_flute(self, folder):
-        """Minigames que exigem Poké Flute pra entrar."""
-        return folder in ("desafios",)
-
     # ------------------------------------------------------------------
-    # CRIAÇÃO DE CARDS
+    # INICIAR NÍVEL  (ÚNICA VERSÃO — a correta)
     # ------------------------------------------------------------------
     def _start_minigame_level(self, chapter_and_level):
-        """Inicia um nível de minigame."""
+        """
+        Inicia um nível de minigame.
+
+        Roteamento:
+          - survival              → SurvivalMinigameScene
+          - desafios + level 1    → DojoSelectScene  → DojoMinigameScene
+          - desafios + level 2    → DesafiosMinigameScene (Snorlax)
+        """
         chapter_val, level_val = chapter_and_level
         folder_l = (self.selected_minigame_folder or "").lower()
 
@@ -466,7 +469,7 @@ class MinigameSelectScene(BaseScene):
                 has_flute = False
                 try:
                     has_flute = (
-                            self.game.player.bag.get_quantity("pokeflute") > 0
+                        self.game.player.bag.get_quantity("pokeflute") > 0
                     )
                 except Exception:
                     has_flute = False
@@ -628,82 +631,6 @@ class MinigameSelectScene(BaseScene):
         elif event.type == pygame.MOUSEBUTTONUP:
             if event.button == 1:
                 self.dragging_scroll = False
-
-    # ==================================================================
-    # INICIAR NÍVEL
-    # ==================================================================
-    def _start_minigame_level(self, chapter_and_level):
-        """Inicia um nível de minigame."""
-        chapter_val, level_val = chapter_and_level
-
-        print(f"Iniciando minigame {self.selected_minigame_folder} - "
-              f"Capítulo {chapter_val}, Nível {level_val}")
-
-        # ---------- SURVIVAL ----------
-        if self.selected_minigame_folder == "survival":
-            from src.scenes.minigames.survival import SurvivalMinigameScene
-            self.game.current_scene = SurvivalMinigameScene(
-                self.game,
-                chapter_id=chapter_val,
-                phase_number=level_val,
-            )
-            return
-
-        # ---------- DOJO ----------
-        if self.selected_minigame_folder == "Dojo":
-            from src.scenes.minigames.dojo.dojo_select_scene import (
-                DojoSelectScene,
-            )
-            self.game.current_scene = DojoSelectScene(
-                self.game,
-                chapter_id=chapter_val,
-                phase_number=level_val,
-            )
-            return
-
-        # ---------- DESAFIOS ----------
-        if self.selected_minigame_folder == "desafios":
-            # Gate: precisa de Poké Flute na bag
-            has_flute = False
-            try:
-                has_flute = self.game.player.bag.get_quantity("pokeflute") > 0
-            except Exception:
-                has_flute = False
-
-            if not has_flute:
-                try:
-                    from src.ui.toast_renderer import toast_warning
-                    toast_warning(
-                        "Você precisa de uma POKE FLUTE para entrar!",
-                        duration=3.5,
-                    )
-                except Exception:
-                    pass
-                print("[DESAFIOS] Bloqueado: jogador sem Poké Flute.")
-                return
-
-            from src.scenes.minigames.desafios.desafios_minigame_scene import (
-                DesafiosMinigameScene,
-            )
-            self.game.current_scene = DesafiosMinigameScene(
-                self.game,
-                chapter_id=chapter_val,
-                phase_number=level_val,
-            )
-            return
-
-        # ---------- FALLBACK ----------
-        phase_data = self.exporter.load_phase(
-            chapter_val,
-            level_val,
-            localization_type="custom",
-            custom_folder=self.selected_minigame_folder,
-        )
-        if phase_data:
-            print(f"Minigame carregado: "
-                  f"{phase_data.get('name', 'Sem nome')}")
-        else:
-            print(f"Erro ao carregar nível {chapter_val}-{level_val}")
 
     # ==================================================================
     # SCROLL
