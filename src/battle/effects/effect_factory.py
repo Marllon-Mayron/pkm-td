@@ -2304,12 +2304,576 @@ class EffectFactory:
 
     }
 
-    MOVE_EFFECTS = {**MOVE_EFFECTS_GEN1, **MOVE_EFFECTS_GEN2}
+    MOVE_EFFECTS_GEN3 = {
 
-    # manter separados para organização
+        # ===== STATS MOVES (SELF) =====
+        "tail-glow": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "sp_attack",
+                "stages": 3,
+                "duration": 6.0,
+            },
+            "description": "Aumenta muito o Ataque Especial.",
+        },
+        "iron-defense": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": 2,
+                "duration": 6.0,
+            },
+            "description": "Aumenta muito a Defesa.",
+        },
+        "howl": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "attack",
+                "stages": 1,
+                "duration": 6.0,
+            },
+            "description": "Aumenta o Ataque.",
+        },
+        "bulk-up": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stats": [
+                    {"stat": "attack", "stages": 1},
+                    {"stat": "defense", "stages": 1},
+                ],
+                "duration": 6.0,
+            },
+            "description": "Aumenta Ataque e Defesa.",
+        },
+        "calm-mind": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stats": [
+                    {"stat": "sp_attack", "stages": 1},
+                    {"stat": "sp_defense", "stages": 1},
+                ],
+                "duration": 6.0,
+            },
+            "description": "Aumenta SpAtk e SpDef.",
+        },
+        "cosmic-power": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stats": [
+                    {"stat": "defense", "stages": 1},
+                    {"stat": "sp_defense", "stages": 1},
+                ],
+                "duration": 6.0,
+            },
+            "description": "Aumenta Defesa e Defesa Especial.",
+        },
+        "dragon-dance": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stats": [
+                    {"stat": "attack", "stages": 1},
+                    {"stat": "speed", "stages": 1},
+                ],
+                "duration": 6.0,
+            },
+            "description": "Aumenta Ataque e Velocidade.",
+        },
+
+        # ===== STATS MOVES (TARGET) =====
+        "feather-dance": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "attack",
+                "stages": -2,
+                "duration": 6.0,
+            },
+            "description": "Reduz muito o Ataque do alvo.",
+        },
+        "fake-tears": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "sp_defense",
+                "stages": -2,
+                "duration": 6.0,
+            },
+            "description": "Reduz muito a Defesa Especial do alvo.",
+        },
+        "metal-sound": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "sp_defense",
+                "stages": -2,
+                "duration": 6.0,
+            },
+            "description": "Reduz muito a Defesa Especial do alvo.",
+        },
+        "tickle": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stats": [
+                    {"stat": "attack", "stages": -1},
+                    {"stat": "defense", "stages": -1},
+                ],
+                "duration": 6.0,
+            },
+            "description": "Reduz Atk e Def do alvo.",
+        },
+
+        # ===== VENENO (POISON) =====
+        "poison-fang": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "toxic_poison",
+                "chance": 0.50,
+                "duration": None,
+                "overwrite": False,
+            },
+            "description": "Pode envenenar gravemente o alvo (50%).",
+        },
+
+        # ===== QUEIMADURA (BURN) =====
+        "heat-wave": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,
+            "params": {
+                "status": "burn",
+                "chance": 0.10,
+                "duration": None,
+                "overwrite": False,
+            },
+            "description": "Ataque de fogo em área. Pode queimar (10%).",
+        },
+
+        # ===== ADORMECER (SLEEP) =====
+        "grass-whistle": {
+            "effect_type": "status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "sleep",
+                "duration": None,
+                "overwrite": True,
+            },
+            "description": "Coloca o alvo para dormir.",
+        },
+
+        # ===== CONFUSÕES (CONFUSION) =====
+        "teeter-dance": {
+            "effect_type": "confusion",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,
+            "params": {
+                "duration": None,
+            },
+            "description": "Confunde todos os inimigos próximos.",
+        },
+        "signal-beam": {
+            "effect_type": "damage_with_confusion_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {"chance": 0.10},
+            "description": "Pode confundir o alvo (10%).",
+        },
+        "water-pulse": {
+            "effect_type": "damage_with_confusion_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {"chance": 0.20},
+            "description": "Pode confundir o alvo (20%).",
+        },
+        "flatter": {
+            "effect_type": "stat_mod_with_status",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat_mods": [
+                    {"stat": "sp_attack", "stages": 1, "duration": 6.0, "chance": 1.0}
+                ],
+                "status": {"type": "confusion", "chance": 1.0},
+            },
+            "description": "Confunde o alvo, mas aumenta seu Ataque Especial.",
+        },
+
+        # Flinch moves
+        "needle-arm": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"chance": 0.30},
+            "description": "Pode fazer o alvo hesitar (30%).",
+        },
+        "astonish": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"chance": 0.30},
+            "description": "Pode fazer o alvo hesitar (30%).",
+        },
+        "extrasensory": {
+            "effect_type": "flinch",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"chance": 0.10},
+            "description": "Pode fazer o alvo hesitar (10%).",
+        },
+
+        # ===== DANOS COM EFEITOS DE STATS =====
+        "luster-purge": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "sp_defense",
+                "stages": -1,
+                "chance": 0.50,
+                "duration": 6.0,
+            },
+            "description": "Causa dano e pode reduzir SpDef do alvo (50%).",
+        },
+        "mist-ball": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "sp_attack",
+                "stages": -1,
+                "chance": 0.50,
+                "duration": 6.0,
+            },
+            "description": "Causa dano e pode reduzir SpAtk do alvo (50%).",
+        },
+        "crush-claw": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "defense",
+                "stages": -1,
+                "chance": 0.50,
+                "duration": 6.0,
+            },
+            "description": "Pode reduzir a Defesa do alvo (50%).",
+        },
+        "rock-tomb": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "speed",
+                "stages": -1,
+                "chance": 1.0,
+                "duration": 4.0,
+            },
+            "description": "Reduz a Velocidade do alvo.",
+        },
+        "mud-shot": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "stat": "speed",
+                "stages": -1,
+                "chance": 1.0,
+                "duration": 4.0,
+            },
+            "description": "Reduz a Velocidade do alvo.",
+        },
+        "muddy-water": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,
+            "params": {
+                "stat": "accuracy",
+                "stages": -1,
+                "chance": 0.30,
+                "duration": 8.0,
+            },
+            "description": "Pode reduzir a precisão do alvo (30%).",
+        },
+        "meteor-mash": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "stat": "attack",
+                "stages": 1,
+                "chance": 0.20,
+                "duration": 6.0,
+            },
+            "description": "Pode aumentar o Ataque do usuário (20%).",
+        },
+        "silver-wind": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "stats": [
+                    {"stat": "attack", "stages": 1},
+                    {"stat": "defense", "stages": 1},
+                    {"stat": "sp_attack", "stages": 1},
+                    {"stat": "sp_defense", "stages": 1},
+                    {"stat": "speed", "stages": 1},
+                ],
+                "chance": 0.10,
+                "duration": 6.0,
+            },
+            "description": "Pode aumentar todos os stats do usuário (10%).",
+        },
+        "superpower": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "stats": [
+                    {"stat": "attack", "stages": -1},
+                    {"stat": "defense", "stages": -1},
+                ],
+                "duration": 6.0,
+            },
+            "description": "Dano alto, mas reduz Atk e Def do usuário.",
+        },
+        "overheat": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "stat": "sp_attack",
+                "stages": -2,
+                "duration": 6.0,
+            },
+            "description": "Dano alto, mas reduz muito o SpAtk do usuário.",
+        },
+        "psycho-boost": {
+            "effect_type": "stat_mod",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "stat": "sp_attack",
+                "stages": -2,
+                "duration": 6.0,
+            },
+            "description": "Dano alto, mas reduz muito o SpAtk do usuário.",
+        },
+
+        # Multi-hit moves
+        "arm-thrust": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"min_hits": 2, "max_hits": 5},
+            "description": "Golpeia 2–5 vezes.",
+        },
+        "bullet-seed": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"min_hits": 2, "max_hits": 5},
+            "description": "Dispara 2–5 sementes.",
+        },
+        "icicle-spear": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"min_hits": 2, "max_hits": 5},
+            "description": "Dispara 2–5 estacas de gelo.",
+        },
+        "rock-blast": {
+            "effect_type": "multi_hit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"min_hits": 2, "max_hits": 5},
+            "description": "Arremessa 2–5 pedras.",
+        },
+
+        # ===== GOLPES DE 2 TURNOS =====
+        "dive": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"charge_turn": True},
+            "charge_message": "{pokemon} mergulhou para debaixo d'água!",
+            "description": "1º turno: mergulha. 2º turno: ataca.",
+        },
+        "bounce": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"charge_turn": True},
+            "charge_message": "{pokemon} saltou para o alto!",
+            "description": "1º turno: sobe. 2º turno: ataca.",
+        },
+        "blast-burn": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"charge_turn": True},
+            "charge_message": "{pokemon} está recarregando...",
+            "description": "Poderoso, mas o usuário descansa no próximo turno.",
+        },
+        "hydro-cannon": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"charge_turn": True},
+            "charge_message": "{pokemon} está recarregando...",
+            "description": "Poderoso, mas o usuário descansa no próximo turno.",
+        },
+        "frenzy-plant": {
+            "effect_type": "two_turn_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"charge_turn": True},
+            "charge_message": "{pokemon} está recarregando...",
+            "description": "Poderoso, mas o usuário descansa no próximo turno.",
+        },
+
+        # ===== RESIDUAIS (TURN) =====
+        "sand-tomb": {
+            "effect_type": "residual",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "residual_type": "sand_tomb",
+                "duration_min": 2,
+                "duration_max": 5,
+                "tick_interval": 2.0,
+                "damage_percentage": 1 / 16,
+                "trapping": True,
+            },
+            "description": "Prende o alvo e causa dano por turno.",
+        },
+
+        # ===== CURA (HEAL) =====
+        "slack-off": {
+            "effect_type": "heal",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "heal_percentage": 0.5,
+                "heal_formula": "max_hp_percentage",
+            },
+            "description": "Recupera metade do HP máximo.",
+        },
+        "aromatherapy": {
+            "effect_type": "heal_bell",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "is_area": True,
+            "params": {
+                "heal_status": True,
+                "heal_confusion": True,
+            },
+            "description": "Cura status de todos os aliados em área.",
+        },
+
+        # ===== NUNCA ERRA (NEVER MISS) =====
+        "shadow-punch": {
+            "effect_type": "never_miss",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"never_miss": True},
+            "description": "Ataque que nunca erra.",
+        },
+        "aerial-ace": {
+            "effect_type": "never_miss",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"never_miss": True},
+            "description": "Ataque rápido que nunca erra.",
+        },
+        "magical-leaf": {
+            "effect_type": "never_miss",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"never_miss": True},
+            "description": "Ataque que nunca erra.",
+        },
+        "shock-wave": {
+            "effect_type": "never_miss",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"never_miss": True},
+            "description": "Ataque elétrico que nunca erra.",
+        },
+
+        # ===== CRÍTICO ALTO (HIGH CRIT) =====
+        "air-cutter": {
+            "effect_type": "high_crit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"crit_stage": 1},
+            "description": "Alta taxa de acerto crítico.",
+        },
+        "leaf-blade": {
+            "effect_type": "high_crit",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"crit_stage": 1},
+            "description": "Alta taxa de acerto crítico.",
+        },
+
+        # ===== HITKILL =====
+        "sheer-cold": {
+            "effect_type": "ohko",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "base_accuracy": 30,
+                "level_difference_bonus": 1,
+                "max_accuracy": 100,
+            },
+            "description": "Golpe que pode nocautear com um só hit.",
+        },
+
+        # ===== MOVIMENTOS ESPECÍFICOS =====
+        "odor-sleuth": {
+            "effect_type": "foresight",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "reset_evasion": True,
+                "block_evasion_boosts": True,
+                "bypass_ghost_immunity": True,
+                "duration": None,
+            },
+            "description": "Revela o alvo; Normal/Lutador acertam Fantasma.",
+        },
+    }
+
+    MOVE_EFFECTS = {**MOVE_EFFECTS_GEN1, **MOVE_EFFECTS_GEN2, **MOVE_EFFECTS_GEN3}
+
     MOVE_EFFECTS_BY_GEN = {
         1: MOVE_EFFECTS_GEN1,
         2: MOVE_EFFECTS_GEN2,
+        3: MOVE_EFFECTS_GEN3,
     }
 
     MOVE_EFFECTS = MOVE_EFFECTS  # Referência para o dicionário unificado

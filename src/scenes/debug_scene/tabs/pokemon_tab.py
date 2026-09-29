@@ -2,6 +2,22 @@
 """
 Aba POKÉMON — criação e edição de Pokémon do save.
 Layout maior, com portraits e divisões visuais claras.
+
+Quando em modo EDIT, o painel direito possui sub-abas:
+    - GERAL: stats, identidade, IVs, preview
+    - MOVES: editor completo de moves (adicionar/trocar/remover)
+
+O seletor de moves é um MODAL CENTRALIZADO sobre a tela inteira
+(com backdrop escuro que bloqueia cliques/scroll por trás), contendo:
+    - Busca por nome
+    - Filtro de TIPO em dropdown (18 tipos + Todos)
+    - Filtro de CATEGORIA em botões (Físico / Especial / Status / Todos)
+    - Filtro de ACURÁCIA em botões (Todas / > 50 / ≤ 50)
+    - Toggle de ordenação (A-Z ↔ Poder ↓)
+    - Lista com scrollbar arrastável
+
+As listas laterais (criar/editar Pokémon) também possuem scrollbar
+arrastável com o mouse.
 """
 
 import pygame
@@ -54,11 +70,29 @@ SECTION_GAP = 14
 SECTION_TITLE_H = 22
 FORM_HEADER_SIZE = 88
 
+# ===== Constantes para o editor de moves =====
+MOVE_ROW_H = 54
+MOVE_PICKER_ROW_H = 50
+EDIT_SUBTAB_H = 34
+
+# ===== Constantes do modal de moves =====
+MODAL_ROW_H = 52
+MODAL_PAD = 22
+
+_ALL_TYPES_ORDERED = [
+    "normal", "fire", "water", "electric", "grass", "ice",
+    "fighting", "poison", "ground", "flying", "psychic", "bug",
+    "rock", "ghost", "dragon", "dark", "steel", "fairy",
+]
+
 
 class PokemonTab:
     MODE_CREATE = "create"
     MODE_EDIT = "edit"
-    INPUT_NAMES = {"input_name", "input_search", "edit_input_name"}
+    INPUT_NAMES = {"input_name", "input_search", "edit_input_name", "move_search_input"}
+
+    SUBTAB_GENERAL = "general"
+    SUBTAB_MOVES = "moves"
 
     # ------------------------------------------------------------------
     def __init__(self, parent):
@@ -82,6 +116,49 @@ class PokemonTab:
         self.edit_form = None
         self._refresh_edit_targets()
 
+        # ===== Sub-aba atual no modo edição =====
+        self.edit_subtab = self.SUBTAB_GENERAL
+
+        # ===== Move picker (modal) state =====
+        self.move_picker_open = False
+        self.move_picker_slot = 0
+        self.move_picker_scroll = 0
+        self.move_search_text = ""
+        self._visible_move_picker_n = 8
+
+        # Filtros / ordenação
+        self.move_filter_category = None      # None | "physical" | "special" | "status"
+        self.move_filter_type = None          # None | "fire" | "water" | ...
+        self.move_filter_accuracy = "all"     # "all" | "gt50" | "le50"
+        self.move_sort_mode = "az"            # "az" | "power"
+
+        # Dropdown ativo (None | "type")
+        self.active_dropdown = None
+
+        # Cache de info de moves por nome (lower) para performance
+        self._move_info_cache = {}
+
+        # ===== Dados de moves =====
+        self.move_data = None
+        self._all_move_names = []
+        self.filtered_move_names = []
+        try:
+            from src.data.move_data import MoveData
+            self.move_data = MoveData()
+            self._all_move_names = sorted(self.move_data.get_all_move_names())
+            self.filtered_move_names = list(self._all_move_names)
+
+            # Cache name(lower) -> info
+            for name in self._all_move_names:
+                info = self.move_data.get_move_info(name)
+                if info:
+                    self._move_info_cache[name.lower()] = info
+        except Exception as e:
+            print(f"[POKEMON_TAB] Erro ao carregar MoveData: {e}")
+            self._all_move_names = []
+            self.filtered_move_names = []
+
+        # ===== Itens segurados =====
         try:
             from src.data.held_item_data import (
                 HELD_ITEM_TYPE_MAPPING, HELD_ITEM_SPECIAL_EFFECTS,
@@ -91,13 +168,24 @@ class PokemonTab:
         except Exception:
             self.held_items = [None]
 
-        # ===== Estado da scrollbar (drag) =====
+        # ===== Estado da scrollbar (drag) — listas laterais =====
         self._scroll_dragging = False
         self._scroll_geom = None  # (bar_x, list_y, list_h, total, visible, target)
         self._scrollbar_rect = None
         self._scrollbar_thumb_rect = None
         self._scrollbar_thumb_h = 0
         self._scroll_thumb_offset = 0
+
+        # ===== Estado da scrollbar (drag) — modal de moves =====
+        self._mp_scroll_dragging = False
+        self._mp_scroll_geom = None
+        self._mp_scrollbar_rect = None
+        self._mp_scrollbar_thumb_rect = None
+        self._mp_scroll_thumb_offset = 0
+
+        # Geometria do modal (última renderizada) — usada por handle_event
+        self._modal_rect = None
+        self._modal_backdrop_rect = None
 
         # Visibilidade (definida no render)
         self._visible_create_n = 8
@@ -138,6 +226,68 @@ class PokemonTab:
         self.list_scroll = 0
         self.list_selected = 0
 
+    def _apply_move_search(self):
+        """Compat: apenas delega para o filtro unificado."""
+        self._apply_move_filters()
+
+    def _apply_move_filters(self):
+        """Aplica busca + categoria + tipo + acurácia + ordenação."""
+        q = self.move_search_text.strip().lower()
+        cat_filter = self.move_filter_category
+        type_filter = self.move_filter_type
+        acc_filter = self.move_filter_accuracy
+
+        results = []
+        for name in self._all_move_names:
+            if q and q not in name.lower():
+                continue
+            info = self._move_info_cache.get(name.lower())
+            if info:
+                if cat_filter and info.get("category") != cat_filter:
+                    continue
+                if type_filter and info.get("type") != type_filter:
+                    continue
+
+                acc = info.get("accuracy", 100)
+                if acc is None:
+                    acc = 100
+                if acc_filter == "gt50" and acc <= 50:
+                    continue
+                if acc_filter == "le50" and acc > 50:
+                    continue
+            elif cat_filter or type_filter or acc_filter != "all":
+                continue
+            results.append(name)
+
+        if self.move_sort_mode == "power":
+            def _pwr(n):
+                info = self._move_info_cache.get(n.lower())
+                return info.get("power", 0) if info else 0
+            results.sort(key=lambda n: (-_pwr(n), n.lower()))
+        else:
+            results.sort(key=lambda n: n.lower())
+
+        self.filtered_move_names = results
+        self.move_picker_scroll = 0
+
+    def _cycle_move_sort(self):
+        self.move_sort_mode = "power" if self.move_sort_mode == "az" else "az"
+        self._apply_move_filters()
+
+    def _close_move_picker(self):
+        """Fecha o modal e limpa TODO o estado associado."""
+        self.move_picker_open = False
+        self.focused_input = None
+        self.move_search_text = ""
+        self.move_filter_category = None
+        self.move_filter_type = None
+        self.move_filter_accuracy = "all"
+        self.move_sort_mode = "az"
+        self.move_picker_scroll = 0
+        self.active_dropdown = None
+        self._mp_scroll_dragging = False
+        self._apply_move_filters()
+
     def _get_portrait(self, pid, shiny=False):
         try:
             p = self.pokedex.get_portrait(pid, "normal", shiny)
@@ -150,20 +300,31 @@ class PokemonTab:
             except Exception:
                 return None
 
+    @staticmethod
+    def _text_color_for_bg(bg):
+        """Retorna preto ou branco conforme a luminância do fundo."""
+        r, g, b = bg[0], bg[1], bg[2]
+        lum = 0.299 * r + 0.587 * g + 0.114 * b
+        return (10, 10, 20) if lum > 165 else (255, 255, 255)
+
     # ==================================================================
     # INTERFACE COM O PAI
     # ==================================================================
     def has_focus(self):
-        return self.focused_input is not None
+        # Modal aberto conta como "foco" para o ESC fechar o modal
+        return self.focused_input is not None or self.move_picker_open
 
     def get_focus(self):
         return self.focused_input
 
     def clear_focus(self):
+        # Se o modal está aberto, ESC fecha o modal primeiro
+        if self.move_picker_open:
+            self._close_move_picker()
         self.focused_input = None
 
     # ==================================================================
-    # DRAG DA SCROLLBAR
+    # DRAG DA SCROLLBAR (listas laterais: create/edit)
     # ==================================================================
     def _begin_scroll_drag(self, mouse_pos):
         if not self._scroll_geom:
@@ -198,10 +359,171 @@ class PokemonTab:
             self.edit_scroll = new_scroll
 
     # ==================================================================
+    # DRAG DA SCROLLBAR DO MODAL DE MOVES
+    # ==================================================================
+    def _begin_mp_scroll_drag(self, mouse_pos):
+        if not self._mp_scroll_geom:
+            return
+        _, list_y, list_h, total, visible = self._mp_scroll_geom
+        if total <= visible:
+            return
+        thumb_h = max(24, int(list_h * visible / total))
+        if self._mp_scrollbar_thumb_rect and self._mp_scrollbar_thumb_rect.collidepoint(mouse_pos):
+            self._mp_scroll_thumb_offset = mouse_pos[1] - self._mp_scrollbar_thumb_rect.y
+        else:
+            self._mp_scroll_thumb_offset = thumb_h // 2
+            self._update_mp_scroll_from_mouse(mouse_pos[1])
+        self._mp_scroll_dragging = True
+
+    def _update_mp_scroll_from_mouse(self, mouse_y):
+        if not self._mp_scroll_geom:
+            return
+        _, list_y, list_h, total, visible = self._mp_scroll_geom
+        if total <= visible:
+            return
+        thumb_h = max(24, int(list_h * visible / total))
+        desired_y = mouse_y - self._mp_scroll_thumb_offset
+        desired_y = max(list_y, min(list_y + list_h - thumb_h, desired_y))
+        track_h = max(1, list_h - thumb_h)
+        ratio = (desired_y - list_y) / track_h
+        max_s = total - visible
+        self.move_picker_scroll = max(0, min(max_s, int(round(ratio * max_s))))
+
+    # ==================================================================
     # EVENTOS
     # ==================================================================
     def handle_event(self, event):
-        # ===== Scrollbar drag (prioridade máxima) =====
+        # ==============================================================
+        # ================= MODO MODAL DE MOVES ========================
+        # ==============================================================
+        if self.move_picker_open:
+            # ---- Scrollbar drag (prioridade máxima) ----
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self._mp_scrollbar_rect and self._mp_scrollbar_rect.collidepoint(event.pos):
+                    self._begin_mp_scroll_drag(event.pos)
+                    return
+            if event.type == pygame.MOUSEMOTION and self._mp_scroll_dragging:
+                self._update_mp_scroll_from_mouse(event.pos[1])
+                return
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                if self._mp_scroll_dragging:
+                    self._mp_scroll_dragging = False
+                    return
+
+            # ---- Wheel ----
+            if event.type == pygame.MOUSEWHEEL:
+                # Se o dropdown está aberto, o wheel não rola a lista
+                if self.active_dropdown:
+                    return
+                max_s = max(0, len(self.filtered_move_names) - self._visible_move_picker_n)
+                self.move_picker_scroll = max(
+                    0, min(max_s, self.move_picker_scroll - event.y)
+                )
+                return
+
+            # ---- Cliques ----
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # Busca o que foi clicado via fila de rects registrados no último render
+                clicked = self.parent.find_click_at(event.pos)
+
+                # ---------- 1) DROPDOWN ABERTO ----------
+                if self.active_dropdown == "type":
+                    # Clique numa opção do dropdown?
+                    if clicked and clicked.startswith("move_dd_type_opt_"):
+                        val = clicked[len("move_dd_type_opt_"):]
+                        self.move_filter_type = None if val == "all" else val
+                        self.active_dropdown = None
+                        self._apply_move_filters()
+                        return
+                    # Clique no botão do dropdown → fecha (toggle)
+                    if clicked == "move_filter_type_btn":
+                        self.active_dropdown = None
+                        return
+                    # Qualquer outro clique: fecha o dropdown e NÃO processa
+                    self.active_dropdown = None
+                    return
+
+                # ---------- 2) DROPDOWN FECHADO ----------
+                # Backdrop (fora do modal) → fecha o modal
+                if clicked == "move_modal_backdrop":
+                    self._close_move_picker()
+                    return
+
+                # Painel do modal (dentro, mas fora de qualquer botão) → absorve
+                if clicked == "move_modal_panel":
+                    return
+
+                # Botões/inputs do modal
+                if clicked:
+                    if clicked == "move_modal_close":
+                        self._close_move_picker()
+                        return
+                    if clicked == "move_search_input":
+                        self.focused_input = "move_search"
+                        return
+                    if clicked == "move_search_clear":
+                        self.move_search_text = ""
+                        self._apply_move_filters()
+                        self.focused_input = "move_search"
+                        return
+                    if clicked == "move_sort_toggle":
+                        self._cycle_move_sort()
+                        return
+                    if clicked == "move_filter_type_btn":
+                        self.active_dropdown = "type"
+                        self.focused_input = None
+                        return
+                    if clicked.startswith("move_filter_cat_"):
+                        val = clicked[len("move_filter_cat_"):]
+                        self.move_filter_category = None if val == "all" else val
+                        self._apply_move_filters()
+                        return
+                    if clicked.startswith("move_filter_acc_"):
+                        val = clicked[len("move_filter_acc_"):]
+                        self.move_filter_accuracy = val if val in ("all", "gt50", "le50") else "all"
+                        self._apply_move_filters()
+                        return
+                    if clicked.startswith("move_pick_idx_"):
+                        try:
+                            idx = int(clicked[len("move_pick_idx_"):])
+                        except ValueError:
+                            return
+                        if 0 <= idx < len(self.filtered_move_names):
+                            self._pick_move(self.filtered_move_names[idx])
+                        return
+
+                # Fallback: nada reconhecido dentro do modal → consome
+                return
+
+            # ---- Teclado ----
+            if event.type == pygame.KEYDOWN:
+                # ESC: primeiro fecha dropdown, depois o modal
+                if event.key == pygame.K_ESCAPE:
+                    if self.active_dropdown:
+                        self.active_dropdown = None
+                    else:
+                        self._close_move_picker()
+                    return
+
+                if self.focused_input == "move_search":
+                    if event.key == pygame.K_BACKSPACE:
+                        self.move_search_text = self.move_search_text[:-1]
+                        self._apply_move_filters()
+                    elif event.key in (pygame.K_RETURN, pygame.K_TAB):
+                        self.focused_input = None
+                    elif event.unicode and event.unicode.isprintable():
+                        if len(self.move_search_text) < 30:
+                            self.move_search_text += event.unicode
+                            self._apply_move_filters()
+                return
+
+            # Qualquer outro evento: consome
+            return
+
+        # ==============================================================
+        # ==================== MODO NORMAL ==============================
+        # ==============================================================
+        # ---- Scrollbar drag (prioridade máxima) ----
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._scrollbar_rect and self._scrollbar_rect.collidepoint(event.pos):
                 self._begin_scroll_drag(event.pos)
@@ -214,7 +536,7 @@ class PokemonTab:
                 self._scroll_dragging = False
                 return
 
-        # ===== Wheel =====
+        # ---- Wheel ----
         if event.type == pygame.MOUSEWHEEL:
             if self.mode == self.MODE_CREATE:
                 max_s = max(0, len(self.filtered_ids) - self._visible_create_n)
@@ -224,7 +546,7 @@ class PokemonTab:
                 self.edit_scroll = max(0, min(max_s, self.edit_scroll - event.y))
             return
 
-        # ===== Mouse down (clicks) =====
+        # ---- Mouse down (clicks) ----
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             clicked = self.parent.find_click_at(event.pos)
             if clicked not in self.INPUT_NAMES:
@@ -233,7 +555,7 @@ class PokemonTab:
                 self.on_click(clicked)
             return
 
-        # ===== Teclado =====
+        # ---- Teclado ----
         if event.type == pygame.KEYDOWN and self.focused_input:
             fi = self.focused_input
             is_name = fi in ("name", "edit_name")
@@ -259,14 +581,55 @@ class PokemonTab:
                         self.search_text += event.unicode
                         self._apply_search()
 
+    # ==================================================================
+    # ON_CLICK (chamado pelo pai em modo normal)
+    # ==================================================================
     def on_click(self, name):
+        # ---- Sub-abas do modo edição ----
+        if name == "edit_subtab_general":
+            self.edit_subtab = self.SUBTAB_GENERAL
+            self.focused_input = None
+            return
+        if name == "edit_subtab_moves":
+            self.edit_subtab = self.SUBTAB_MOVES
+            self.focused_input = None
+            return
+
+        # ---- Botões dentro do editor de moves (abre o modal) ----
+        if name.startswith("move_edit_slot_"):
+            try:
+                slot = int(name[len("move_edit_slot_"):])
+            except ValueError:
+                return
+            self.move_picker_open = True
+            self.move_picker_slot = slot
+            self.move_search_text = ""
+            self.move_filter_category = None
+            self.move_filter_type = None
+            self.move_filter_accuracy = "all"
+            self.move_sort_mode = "az"
+            self.active_dropdown = None
+            self._apply_move_filters()
+            self.focused_input = "move_search"
+            return
+        if name.startswith("move_remove_slot_"):
+            try:
+                slot = int(name[len("move_remove_slot_"):])
+            except ValueError:
+                return
+            self._remove_move_at(slot)
+            return
+
+        # ---- Modo ----
         if name == "poke_mode_create":
             self.mode = self.MODE_CREATE
             self.focused_input = None
+            self.edit_subtab = self.SUBTAB_GENERAL
             return
         if name == "poke_mode_edit":
             self.mode = self.MODE_EDIT
             self.focused_input = None
+            self.edit_subtab = self.SUBTAB_GENERAL
             self._refresh_edit_targets()
             if self.edit_targets:
                 self.edit_selected = min(self.edit_selected, len(self.edit_targets) - 1)
@@ -275,6 +638,7 @@ class PokemonTab:
                 self.edit_form = None
             return
 
+        # ---- Selecionar pokémon (criar) ----
         if name.startswith("list_item_"):
             try:
                 idx = int(name[len("list_item_"):])
@@ -285,6 +649,7 @@ class PokemonTab:
                 self.form["pokemon_id"] = self.filtered_ids[idx]
             return
 
+        # ---- Selecionar pokémon (editar) ----
         if name.startswith("edit_item_"):
             try:
                 idx = int(name[len("edit_item_"):])
@@ -292,9 +657,11 @@ class PokemonTab:
                 return
             if 0 <= idx < len(self.edit_targets):
                 self.edit_selected = idx
+                self.edit_subtab = self.SUBTAB_GENERAL
                 self._load_edit_form()
             return
 
+        # ---- Inputs ----
         if name == "input_name":
             self.focused_input = "name"; return
         if name == "input_search":
@@ -306,6 +673,7 @@ class PokemonTab:
             self._apply_search()
             return
 
+        # ---- Ações ----
         if name == "action_random":
             self.form["pokemon_id"] = random.choice(self.all_ids)
             if self.form["pokemon_id"] in self.filtered_ids:
@@ -375,6 +743,41 @@ class PokemonTab:
             self._action_save_edit(); return
         if name == "action_delete":
             self._action_delete(); return
+
+    # ------------------------------------------------------------------
+    # Moves: helpers
+    # ------------------------------------------------------------------
+    def _pick_move(self, move_name):
+        if not self.edit_form:
+            return
+        moves = self.edit_form.setdefault("moves", [])
+        slot = self.move_picker_slot
+
+        info = self._move_info_cache.get(move_name.lower())
+        if info:
+            new_move = {
+                "name": info["name"],
+                "current_pp": info["pp"],
+                "max_pp": info["pp"],
+            }
+        else:
+            new_move = {"name": move_name, "current_pp": 35, "max_pp": 35}
+
+        if 0 <= slot < len(moves):
+            moves[slot] = new_move
+        else:
+            moves.append(new_move)
+
+        self._close_move_picker()
+        sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
+    def _remove_move_at(self, slot):
+        if not self.edit_form:
+            return
+        moves = self.edit_form.get("moves", [])
+        if 0 <= slot < len(moves):
+            moves.pop(slot)
+            sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
 
     def _nudge_level(self, target_attr, name):
         target = self.form if target_attr == "form" else self.edit_form
@@ -480,15 +883,31 @@ class PokemonTab:
 
         if target["source"] == "team":
             p = player.team[target["index"]]
+            moves = [
+                {
+                    "name": m.name,
+                    "current_pp": m.current_pp,
+                    "max_pp": m.max_pp,
+                }
+                for m in p.moves
+            ]
             self.edit_form = {
                 "pokemon_id": p.id, "level": p.level,
                 "ivs": dict(p.ivs), "shiny": p.is_shiny,
                 "gender": p.gender, "nature": p.nature,
                 "custom_name": p.custom_name or "",
                 "held_item": p.held_item,
+                "moves": moves,
             }
         else:
             d = player.pc_box[target["index"]]
+            moves = []
+            for m in d.get("moves", []):
+                moves.append({
+                    "name": m.get("name", ""),
+                    "current_pp": m.get("current_pp", m.get("max_pp", 0)),
+                    "max_pp": m.get("max_pp", 0),
+                })
             self.edit_form = {
                 "pokemon_id": d.get("id", 1),
                 "level": d.get("level", 5),
@@ -498,6 +917,7 @@ class PokemonTab:
                 "nature": d.get("nature", "Hardy"),
                 "custom_name": d.get("custom_name") or "",
                 "held_item": d.get("held_item"),
+                "moves": moves,
             }
 
     def _action_save_edit(self):
@@ -529,6 +949,10 @@ class PokemonTab:
                         p.held_item_data = None
                 else:
                     p.held_item_data = None
+
+                # ===== APLICA MOVES =====
+                self._apply_moves_to_team_pokemon(p, form.get("moves", []))
+
                 p.stats.calculate_stats()
                 if p.current_hp > p.max_hp:
                     p.current_hp = p.max_hp
@@ -541,6 +965,9 @@ class PokemonTab:
                 d["nature"] = form["nature"]
                 d["custom_name"] = form["custom_name"].strip() or None
                 d["held_item"] = form["held_item"]
+
+                # ===== APLICA MOVES =====
+                d["moves"] = self._serialize_moves_for_dict(form.get("moves", []))
 
                 base = self.pokedex.get_base_stats(d["id"])
                 evs = d.get("evs", {s: 0 for s in _IV_STATS})
@@ -585,6 +1012,55 @@ class PokemonTab:
         self.parent.save_game()
         self.parent.show_message("Pokémon atualizado!")
         sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
+    def _apply_moves_to_team_pokemon(self, pokemon, moves_list):
+        """Reconstrói a lista de moves do Pokémon a partir dos dicts."""
+        from src.entities.move import Move
+
+        if not self.move_data:
+            return
+        pokemon.moves = []
+        for m_dict in moves_list:
+            name = m_dict.get("name", "").strip()
+            if not name:
+                continue
+            info = self.move_data.get_move_info(name)
+            if not info:
+                continue
+            mv = Move(name, info)
+            mv.max_pp = m_dict.get("max_pp", mv.max_pp)
+            mv.current_pp = m_dict.get("current_pp", mv.max_pp)
+            mv.current_pp = min(mv.current_pp, mv.max_pp)
+            pokemon.moves.append(mv)
+
+        # Se ficou sem moves, garante pelo menos Tackle (fallback do sistema)
+        if not pokemon.moves:
+            try:
+                fallback = self.move_data.get_move_info("tackle")
+                if fallback:
+                    pokemon.moves.append(Move("tackle", fallback))
+            except Exception:
+                pass
+
+    def _serialize_moves_for_dict(self, moves_list):
+        """Converte a lista de moves do form em dicts prontos para o pc_box."""
+        result = []
+        for m_dict in moves_list:
+            name = m_dict.get("name", "").strip()
+            if not name:
+                continue
+            info = self.move_data.get_move_info(name) if self.move_data else None
+            if info:
+                result.append({
+                    "name": info["name"],
+                    "current_pp": m_dict.get("current_pp", info["pp"]),
+                    "max_pp": m_dict.get("max_pp", info["pp"]),
+                    "type": info["type"],
+                    "power": info["power"],
+                    "accuracy": info["accuracy"],
+                    "category": info["category"],
+                })
+        return result
 
     def _action_delete(self):
         if not self.edit_targets:
@@ -916,7 +1392,26 @@ class PokemonTab:
 
         y = header_rect.bottom + SECTION_GAP
 
-        # ============== IDENTIDADE ==============
+        # ============== SUB-ABAS (apenas em modo edição) ==============
+        if is_edit:
+            sub_w = (inner_w - 8) // 2
+            gen_rect = pygame.Rect(panel.x + pad, y, sub_w, EDIT_SUBTAB_H)
+            mov_rect = pygame.Rect(gen_rect.right + 8, y, sub_w, EDIT_SUBTAB_H)
+            p.register_click("edit_subtab_general", gen_rect)
+            p.register_click("edit_subtab_moves", mov_rect)
+            p.draw_subtab(screen, gen_rect, "GERAL",
+                          self.edit_subtab == self.SUBTAB_GENERAL)
+            p.draw_subtab(screen, mov_rect, "MOVES",
+                          self.edit_subtab == self.SUBTAB_MOVES)
+            y += EDIT_SUBTAB_H + 12
+
+            # --------- Se for MOVES, delega para o editor ---------
+            if self.edit_subtab == self.SUBTAB_MOVES:
+                self._render_moves_editor(screen, panel, pad, inner_w, y, form)
+                return
+
+        # ============== FORM GERAL (continua) ==============
+        # IDENTIDADE
         p.draw_section_title(screen, panel.x + pad, y, inner_w, "IDENTIDADE")
         y += SECTION_TITLE_H
 
@@ -928,7 +1423,7 @@ class PokemonTab:
                             "Gênero", form["gender"], f"{cb_prefix}gender")
         y += FORM_ROW_H + SECTION_GAP
 
-        # ============== ATRIBUTOS ==============
+        # ATRIBUTOS
         p.draw_section_title(screen, panel.x + pad, y, inner_w, "ATRIBUTOS")
         y += SECTION_TITLE_H
 
@@ -956,7 +1451,7 @@ class PokemonTab:
                             focus_key=focus_key)
         y += FORM_ROW_H + SECTION_GAP
 
-        # ============== IVs ==============
+        # IVs
         p.draw_section_title(screen, panel.x + pad, y, inner_w, "IVs (0-31)")
         y += SECTION_TITLE_H
 
@@ -992,7 +1487,7 @@ class PokemonTab:
 
         y += 3 * (FORM_ROW_H + 2) + SECTION_GAP
 
-        # ============== PREVIEW ==============
+        # PREVIEW
         if y + 90 < panel.bottom - 6:
             p.draw_section_title(screen, panel.x + pad, y, inner_w, "STATS PREVISTOS")
             y += SECTION_TITLE_H
@@ -1036,9 +1531,640 @@ class PokemonTab:
                 vs = vf.render(str(val), True, color)
                 screen.blit(vs, vs.get_rect(center=(cx, stats_box.y + 50)))
 
-    # ---------- FOOTER ----------
+    # ==================================================================
+    # EDITOR DE MOVES (dentro do painel direito)
+    # ==================================================================
+    def _render_moves_editor(self, screen, panel, pad, inner_w, start_y, form):
+        p = self.parent
+        y = start_y
+
+        moves = form.setdefault("moves", [])
+
+        # ---- Título da seção ----
+        p.draw_section_title(screen, panel.x + pad, y, inner_w,
+                             f"MOVES  ·  {len(moves)}/4")
+        y += SECTION_TITLE_H
+
+        # ---- Info de ajuda ----
+        hint_f = p.get_font(12)
+        hint = hint_f.render(
+            "Clique em Trocar/Adicionar para abrir o seletor.",
+            True, (150, 155, 180))
+        screen.blit(hint, (panel.x + pad, y))
+        y += 18
+
+        # ---- 4 slots ----
+        for slot in range(4):
+            row_y = y + slot * (MOVE_ROW_H + 6)
+            row_rect = pygame.Rect(panel.x + pad, row_y, inner_w, MOVE_ROW_H)
+
+            filled = slot < len(moves) and moves[slot]
+
+            if filled:
+                pygame.draw.rect(screen, (30, 34, 52), row_rect, border_radius=8)
+                pygame.draw.rect(screen, (90, 80, 130), row_rect, 1, border_radius=8)
+            else:
+                pygame.draw.rect(screen, (22, 24, 36), row_rect, border_radius=8)
+                pygame.draw.rect(screen, (55, 55, 75), row_rect, 1, border_radius=8)
+
+            # Slot number box
+            num_rect = pygame.Rect(row_rect.x + 8, row_rect.y + 8, 34, MOVE_ROW_H - 16)
+            num_bg = (60, 50, 100) if filled else (35, 35, 50)
+            pygame.draw.rect(screen, num_bg, num_rect, border_radius=6)
+            num_border = (170, 150, 220) if filled else (70, 70, 95)
+            pygame.draw.rect(screen, num_border, num_rect, 1, border_radius=6)
+            nf = p.get_font(18)
+            ns = nf.render(str(slot + 1), True,
+                           (230, 220, 255) if filled else (140, 140, 160))
+            screen.blit(ns, ns.get_rect(center=num_rect.center))
+
+            tx = num_rect.right + 12
+
+            if filled:
+                move = moves[slot]
+                mname = move.get("name", "?")
+                info = self._move_info_cache.get(mname.lower())
+                mtype = info["type"] if info else "normal"
+                cat = info["category"] if info else "physical"
+                cur_pp = move.get("current_pp", info["pp"] if info else 0)
+                max_pp = move.get("max_pp", info["pp"] if info else 0)
+
+                # Nome
+                name_f = p.get_font(17)
+                name_s = name_f.render(mname, True, (255, 255, 255))
+                screen.blit(name_s, (tx, row_rect.y + 8))
+
+                # Tipo
+                type_color = self.pokedex.get_type_color(mtype)
+                tf = p.get_font(11)
+                tt = tf.render(mtype.upper(), True, self._text_color_for_bg(type_color))
+                tbadge = pygame.Rect(tx, row_rect.y + 30,
+                                     tt.get_width() + 12, tt.get_height() + 4)
+                pygame.draw.rect(screen, type_color, tbadge, border_radius=3)
+                pygame.draw.rect(screen, (0, 0, 0), tbadge, 1, border_radius=3)
+                screen.blit(tt, (tbadge.x + 6, tbadge.y + 2))
+
+                # Categoria / PP
+                info_f = p.get_font(12)
+                info_s = info_f.render(
+                    f"{cat.capitalize()}  ·  PP {cur_pp}/{max_pp}",
+                    True, (180, 185, 210))
+                screen.blit(info_s,
+                            (tbadge.right + 10,
+                             row_rect.y + 30 + (tbadge.height - info_s.get_height()) // 2))
+
+                # Botões: [Trocar] [X]
+                x_btn = pygame.Rect(row_rect.right - 40, row_rect.y + 11, 28, 32)
+                ch_btn = pygame.Rect(x_btn.left - 80, row_rect.y + 11, 74, 32)
+                p.register_click(f"move_remove_slot_{slot}", x_btn)
+                p.register_click(f"move_edit_slot_{slot}", ch_btn)
+                p.draw_button(screen, ch_btn, "Trocar", font_size=12)
+                p.draw_button(screen, x_btn, "X", danger=True, font_size=14)
+            else:
+                # Slot vazio
+                empty_f = p.get_font(14)
+                es = empty_f.render("(vazio)", True, (110, 110, 130))
+                screen.blit(es, (tx, row_rect.y + (MOVE_ROW_H - es.get_height()) // 2))
+
+                add_btn = pygame.Rect(row_rect.right - 140, row_rect.y + 11, 130, 32)
+                p.register_click(f"move_edit_slot_{slot}", add_btn)
+                p.draw_button(screen, add_btn, "+ Adicionar", success=True, font_size=13)
+
+    # ==================================================================
+    # MODAL CENTRALIZADO — SELETOR DE MOVES
+    # ==================================================================
+    def _render_move_picker_modal(self, screen):
+        """Renderiza o seletor de moves como um modal centralizado na tela.
+
+        IMPORTANTE: este método é chamado por render_footer(), que roda APÓS
+        o render() normal do debug_scene. Isso garante que:
+          1. O backdrop (que cobre a tela inteira) é desenhado POR CIMA do
+             rodapé e de qualquer outro elemento;
+          2. Os cliques do modal são registrados DEPOIS de todos os cliques
+             de outras partes da cena — assim o modal sempre ganha a
+             prioridade em `find_click_at` e nada "vaza" para as páginas
+             atrás.
+        """
+        p = self.parent
+
+        # ---- Viewport (para centralizar de forma responsiva) ----
+        sm = getattr(self.parent, 'screen_manager', None)
+        if sm is not None:
+            vx = sm.viewport_x
+            vy = sm.viewport_y
+            vw = sm.viewport_width
+            vh = sm.viewport_height
+        else:
+            vx, vy = 0, 0
+            vw, vh = screen.get_size()
+
+        # ---- BACKDROP ----
+        # Escurece toda a área do viewport e absorve cliques por completo.
+        backdrop = pygame.Surface((vw, vh), pygame.SRCALPHA)
+        backdrop.fill((0, 0, 0, 190))
+        screen.blit(backdrop, (vx, vy))
+
+        self._modal_backdrop_rect = pygame.Rect(vx, vy, vw, vh)
+        p.register_click("move_modal_backdrop", self._modal_backdrop_rect)
+
+        # ---- Dimensões do MODAL ----
+        modal_w = min(880, int(vw * 0.78))
+        modal_h = min(700, int(vh * 0.90))
+        modal_x = vx + (vw - modal_w) // 2
+        modal_y = vy + (vh - modal_h) // 2
+        modal_rect = pygame.Rect(modal_x, modal_y, modal_w, modal_h)
+        self._modal_rect = modal_rect
+
+        # Sombra externa
+        shadow = pygame.Surface((modal_w + 24, modal_h + 24), pygame.SRCALPHA)
+        pygame.draw.rect(shadow, (0, 0, 0, 140),
+                         (0, 0, shadow.get_width(), shadow.get_height()),
+                         border_radius=16)
+        screen.blit(shadow, (modal_x - 12, modal_y - 12))
+
+        # Fundo do modal
+        pygame.draw.rect(screen, (26, 30, 48), modal_rect, border_radius=12)
+        pygame.draw.rect(screen, (140, 120, 200), modal_rect, 2, border_radius=12)
+
+        # Painel do modal - absorve cliques que não atingem nenhum botão
+        p.register_click("move_modal_panel", modal_rect)
+
+        # --------------------- CABEÇALHO ---------------------
+        header_rect = pygame.Rect(modal_x, modal_y, modal_w, 68)
+        pygame.draw.rect(screen, (36, 32, 60), header_rect,
+                         border_top_left_radius=12, border_top_right_radius=12)
+        pygame.draw.line(screen, (140, 120, 200),
+                         (header_rect.left, header_rect.bottom),
+                         (header_rect.right, header_rect.bottom), 2)
+
+        # Botão X (fechar) - canto superior direito
+        close_size = 34
+        close_rect = pygame.Rect(
+            header_rect.right - close_size - 14,
+            header_rect.y + (header_rect.height - close_size) // 2,
+            close_size, close_size
+        )
+        p.register_click("move_modal_close", close_rect)
+        p.draw_button(screen, close_rect, "X", danger=True, font_size=16)
+
+        # Título
+        title_f = p.get_font(22)
+        title_s = title_f.render("Escolher Move", True, (255, 255, 255))
+        screen.blit(title_s, (header_rect.x + MODAL_PAD, header_rect.y + 10))
+
+        # Subtítulo com o slot atual
+        slot_num = self.move_picker_slot + 1
+        moves = self.edit_form.get("moves", []) if self.edit_form else []
+        replacing = None
+        if 0 <= self.move_picker_slot < len(moves):
+            replacing = moves[self.move_picker_slot].get("name")
+        sub_f = p.get_font(13)
+        if replacing:
+            sub_str = f"Slot {slot_num}  ·  Substituindo: {replacing}"
+            sub_clr = (245, 180, 180)
+        else:
+            sub_str = f"Slot {slot_num}  ·  Adicionando novo move"
+            sub_clr = (170, 225, 170)
+        sub_s = sub_f.render(sub_str, True, sub_clr)
+        screen.blit(sub_s, (header_rect.x + MODAL_PAD, header_rect.y + 38))
+
+        # --------------------- BUSCA ---------------------
+        y = header_rect.bottom + 14
+        search_rect = pygame.Rect(
+            modal_x + MODAL_PAD, y,
+            modal_w - MODAL_PAD * 2, 38
+        )
+        p.register_click("move_search_input", search_rect)
+        pygame.draw.rect(screen, (15, 15, 25), search_rect, border_radius=6)
+        border = (255, 200, 60) if self.focused_input == "move_search" else (80, 80, 110)
+        pygame.draw.rect(screen, border, search_rect, 2, border_radius=6)
+
+        f = p.get_font(15)
+        display = self.move_search_text if self.move_search_text else "Buscar move por nome..."
+        color = (220, 220, 230) if self.move_search_text else (110, 110, 130)
+        if self.focused_input == "move_search":
+            display += "_"
+        ts = f.render(display, True, color)
+        screen.blit(ts, (search_rect.x + 12,
+                         search_rect.y + (search_rect.height - ts.get_height()) // 2))
+
+        if self.move_search_text:
+            clr_rect = pygame.Rect(search_rect.right - 32, search_rect.y + 5, 28, 28)
+            p.register_click("move_search_clear", clr_rect)
+            p.draw_button(screen, clr_rect, "x", font_size=14)
+
+        y = search_rect.bottom + 12
+
+        # --------------------- LINHA DE FILTROS ---------------------
+        # Coluna 1: Tipo (dropdown)
+        lbl_f = p.get_font(13)
+        lbl_color = (180, 190, 220)
+
+        # ----- TIPO (dropdown) -----
+        type_lbl = lbl_f.render("Tipo", True, lbl_color)
+        screen.blit(type_lbl, (modal_x + MODAL_PAD, y + 4))
+
+        type_btn_x = modal_x + MODAL_PAD + type_lbl.get_width() + 8
+        type_btn_w = 160
+        type_btn_h = 30
+        type_btn_rect = pygame.Rect(type_btn_x, y, type_btn_w, type_btn_h)
+        p.register_click("move_filter_type_btn", type_btn_rect)
+
+        type_hovered = type_btn_rect.collidepoint(pygame.mouse.get_pos())
+        type_open = (self.active_dropdown == "type")
+
+        # Cor do botão (usa a cor do tipo selecionado, se houver)
+        if self.move_filter_type:
+            type_bg = self.pokedex.get_type_color(self.move_filter_type)
+            type_bg = tuple(max(0, c - 30) for c in type_bg)
+            type_text = self.move_filter_type.capitalize()
+        else:
+            type_bg = (60, 60, 85)
+            type_text = "Todos"
+
+        if type_open:
+            type_bg = tuple(min(255, c + 30) for c in type_bg)
+        elif type_hovered:
+            type_bg = tuple(min(255, c + 15) for c in type_bg)
+
+        pygame.draw.rect(screen, type_bg, type_btn_rect, border_radius=5)
+        pygame.draw.rect(screen,
+                         (255, 255, 255) if type_open else (110, 110, 140),
+                         type_btn_rect, 2, border_radius=5)
+        tbf = p.get_font(13)
+        tb_txt = tbf.render(type_text, True, self._text_color_for_bg(type_bg))
+        screen.blit(tb_txt, (type_btn_rect.x + 10,
+                             type_btn_rect.y + (type_btn_h - tb_txt.get_height()) // 2))
+
+        # Seta ▾
+        arrow = "▲" if type_open else "▼"
+        arw_f = p.get_font(12)
+        arw_s = arw_f.render(arrow, True, self._text_color_for_bg(type_bg))
+        screen.blit(arw_s, (type_btn_rect.right - arw_s.get_width() - 8,
+                            type_btn_rect.y + (type_btn_h - arw_s.get_height()) // 2))
+
+        # ----- CATEGORIA (botões) -----
+        cat_lbl = lbl_f.render("Tipo do Ataque", True, lbl_color)
+        cat_lbl_x = type_btn_rect.right + 20
+        screen.blit(cat_lbl, (cat_lbl_x, y + 4))
+
+        cat_btn_x = cat_lbl_x + cat_lbl.get_width() + 8
+        cat_options = [
+            ("Todos",    None,       (90, 90, 110)),
+            ("Físico",   "physical", (200, 80, 80)),
+            ("Especial", "special",  (130, 100, 220)),
+            ("Status",   "status",   (150, 150, 150)),
+        ]
+        cat_btn_w = 70
+        cat_btn_h = 30
+        cat_gap = 5
+        cx = cat_btn_x
+        for label, val, base_color in cat_options:
+            btn = pygame.Rect(cx, y, cat_btn_w, cat_btn_h)
+            selected = (self.move_filter_category == val)
+            hovered = btn.collidepoint(pygame.mouse.get_pos())
+            bg = base_color if selected else tuple(max(0, c - 60) for c in base_color)
+            if hovered and not selected:
+                bg = tuple(min(255, c + 20) for c in bg)
+            pygame.draw.rect(screen, bg, btn, border_radius=5)
+            pygame.draw.rect(screen,
+                             (255, 255, 255) if selected else (60, 60, 80),
+                             btn, 2 if selected else 1, border_radius=5)
+            bf = p.get_font(12)
+            bt = bf.render(label, True, self._text_color_for_bg(bg))
+            screen.blit(bt, bt.get_rect(center=btn.center))
+            p.register_click(f"move_filter_cat_{val or 'all'}", btn)
+            cx += cat_btn_w + cat_gap
+
+        y += type_btn_h + 10
+
+        # --------------------- LINHA 2: ACURÁCIA + SORT ---------------------
+        # ----- ACURÁCIA (botões) -----
+        acc_lbl = lbl_f.render("Acurácia", True, lbl_color)
+        screen.blit(acc_lbl, (modal_x + MODAL_PAD, y + 4))
+
+        acc_btn_x = modal_x + MODAL_PAD + acc_lbl.get_width() + 8
+        acc_options = [
+            ("Todas", "all",  (90, 90, 110)),
+            ("> 50",  "gt50", (100, 180, 100)),
+            ("≤ 50",  "le50", (200, 140, 70)),
+        ]
+        acc_btn_w = 72
+        acc_btn_h = 30
+        acc_gap = 5
+        ax = acc_btn_x
+        for label, val, base_color in acc_options:
+            btn = pygame.Rect(ax, y, acc_btn_w, acc_btn_h)
+            selected = (self.move_filter_accuracy == val)
+            hovered = btn.collidepoint(pygame.mouse.get_pos())
+            bg = base_color if selected else tuple(max(0, c - 60) for c in base_color)
+            if hovered and not selected:
+                bg = tuple(min(255, c + 20) for c in bg)
+            pygame.draw.rect(screen, bg, btn, border_radius=5)
+            pygame.draw.rect(screen,
+                             (255, 255, 255) if selected else (60, 60, 80),
+                             btn, 2 if selected else 1, border_radius=5)
+            bf = p.get_font(12)
+            bt = bf.render(label, True, self._text_color_for_bg(bg))
+            screen.blit(bt, bt.get_rect(center=btn.center))
+            p.register_click(f"move_filter_acc_{val}", btn)
+            ax += acc_btn_w + acc_gap
+
+        # ----- SORT (à direita) -----
+        sort_w = 150
+        sort_h = 30
+        sort_rect = pygame.Rect(modal_rect.right - MODAL_PAD - sort_w, y,
+                                sort_w, sort_h)
+        sort_label = "Ordenar: Poder ↓" if self.move_sort_mode == "power" else "Ordenar: A-Z"
+        p.register_click("move_sort_toggle", sort_rect)
+        p.draw_button(screen, sort_rect, sort_label, font_size=12)
+
+        y += acc_btn_h + 12
+
+        # --------------------- CONTAGEM / SEPARADOR ---------------------
+        sep_y = y
+        pygame.draw.line(screen, (60, 60, 90),
+                         (modal_x + MODAL_PAD, sep_y),
+                         (modal_rect.right - MODAL_PAD, sep_y), 1)
+        y += 8
+
+        cnt_f = p.get_font(12)
+        cnt_s = cnt_f.render(
+            f"{len(self.filtered_move_names)} move(s) encontrados",
+            True, (150, 160, 190))
+        screen.blit(cnt_s, (modal_x + MODAL_PAD, y))
+        y += cnt_s.get_height() + 6
+
+        # --------------------- LISTA DE MOVES ---------------------
+        list_top = y
+        list_bottom = modal_rect.bottom - 14
+        list_h = list_bottom - list_top
+        row_h = MODAL_ROW_H
+        visible = max(1, list_h // row_h)
+        self._visible_move_picker_n = visible
+
+        total = len(self.filtered_move_names)
+        max_s = max(0, total - visible)
+        self.move_picker_scroll = max(0, min(max_s, self.move_picker_scroll))
+
+        start = self.move_picker_scroll
+        end = min(total, start + visible)
+
+        show_scroll = total > visible
+        list_left = modal_x + MODAL_PAD
+        list_width = modal_w - MODAL_PAD * 2 - (14 if show_scroll else 0)
+
+        # ---- Slot list frame ----
+        frame_rect = pygame.Rect(list_left - 4, list_top - 4,
+                                 list_width + 8, list_h + 8)
+        pygame.draw.rect(screen, (20, 22, 34), frame_rect, border_radius=8)
+        pygame.draw.rect(screen, (60, 60, 90), frame_rect, 1, border_radius=8)
+
+        # ---- Pré-calcula moves já equipados ----
+        equipped_slots = {}
+        if self.edit_form:
+            for si, m_dict in enumerate(self.edit_form.get("moves", [])):
+                nm = (m_dict.get("name") or "").lower()
+                if nm:
+                    equipped_slots.setdefault(nm, []).append(si + 1)
+
+        # ---- Estado vazio ----
+        if total == 0:
+            ef = p.get_font(15)
+            es = ef.render("Nenhum move encontrado com esses filtros.",
+                           True, (160, 160, 180))
+            screen.blit(es, es.get_rect(center=(modal_rect.centerx,
+                                                 list_top + list_h // 2)))
+        else:
+            # ---- Renderiza linhas ----
+            for i in range(start, end):
+                idx = i - start
+                move_name = self.filtered_move_names[i]
+                row = pygame.Rect(list_left, list_top + idx * row_h,
+                                  list_width, row_h - 4)
+                hovered = row.collidepoint(pygame.mouse.get_pos())
+
+                if hovered:
+                    bg = (48, 42, 70)
+                    border = (140, 120, 200)
+                else:
+                    bg = (30, 32, 48)
+                    border = (60, 60, 85)
+
+                pygame.draw.rect(screen, bg, row, border_radius=6)
+                pygame.draw.rect(screen, border, row,
+                                 2 if hovered else 1, border_radius=6)
+                p.register_click(f"move_pick_idx_{i}", row)
+
+                info = self._move_info_cache.get(move_name.lower())
+                mtype = info["type"] if info else "normal"
+                cat = info["category"] if info else "physical"
+                power = info.get("power", 0) if info else 0
+                acc = info.get("accuracy", 100) if info else 100
+                pp = info.get("pp", 0) if info else 0
+                desc = info.get("description", "") if info else ""
+
+                # ---- Type badge (à direita) ----
+                type_color = self.pokedex.get_type_color(mtype)
+                tf = p.get_font(11)
+                tt = tf.render(mtype.upper(), True, self._text_color_for_bg(type_color))
+                tbadge_w = tt.get_width() + 14
+                tbadge = pygame.Rect(row.right - 10 - tbadge_w, row.y + 8,
+                                     tbadge_w, 18)
+                pygame.draw.rect(screen, type_color, tbadge, border_radius=3)
+                pygame.draw.rect(screen, (0, 0, 0), tbadge, 1, border_radius=3)
+                screen.blit(tt, tt.get_rect(center=tbadge.center))
+
+                # ---- Stats (à esquerda do badge) ----
+                sf = p.get_font(12)
+                cat_pt = {"physical": "Físico",
+                          "special": "Especial",
+                          "status": "Status"}.get(cat, cat.capitalize())
+                pwr_str = f"{power}" if power and power > 0 else "—"
+                acc_str = f"{acc}" if acc and acc > 0 else "—"
+                stats_str = f"{cat_pt}  ·  PWR {pwr_str}  ·  ACC {acc_str}  ·  PP {pp}"
+                stats_s = sf.render(stats_str, True, (180, 185, 210))
+                stats_x = tbadge.left - 12 - stats_s.get_width()
+                stats_y = row.y + 8 + (18 - stats_s.get_height()) // 2
+                screen.blit(stats_s, (stats_x, stats_y))
+
+                # ---- Nome (esquerda, truncado) ----
+                nf = p.get_font(16)
+                name_max_w = stats_x - (row.x + 12) - 8
+                disp_name = move_name
+                while nf.size(disp_name)[0] > name_max_w and len(disp_name) > 4:
+                    disp_name = disp_name[:-2] + "…"
+                name_color = (255, 255, 255) if hovered else (235, 235, 245)
+                ns = nf.render(disp_name, True, name_color)
+                screen.blit(ns, (row.x + 12, row.y + 6))
+
+                # ---- Indicador "Slot N" (já equipado) ----
+                key = move_name.lower()
+                tag_right_edge = None
+                if key in equipped_slots:
+                    slots_txt = "Slot " + ",".join(str(s) for s in equipped_slots[key])
+                    ef2 = p.get_font(10)
+                    es2 = ef2.render(slots_txt, True, (255, 220, 120))
+                    tag_rect = pygame.Rect(row.x + 12, row.y + 26,
+                                           es2.get_width() + 10, 15)
+                    pygame.draw.rect(screen, (60, 50, 20), tag_rect, border_radius=3)
+                    pygame.draw.rect(screen, (170, 140, 60), tag_rect, 1, border_radius=3)
+                    screen.blit(es2, (tag_rect.x + 5, tag_rect.y + 1))
+                    tag_right_edge = tag_rect.right
+
+                # ---- Descrição (linha de baixo) ----
+                if desc:
+                    df = p.get_font(11)
+                    desc_x = row.x + 12
+                    if tag_right_edge:
+                        desc_x = tag_right_edge + 8
+                    max_desc_w = (row.right - 12) - desc_x - 120
+                    if max_desc_w < 40:
+                        max_desc_w = 40
+                    d_txt = desc
+                    while df.size(d_txt)[0] > max_desc_w and len(d_txt) > 3:
+                        d_txt = d_txt[:-2] + "…"
+                    ds = df.render(d_txt, True, (140, 145, 170))
+                    screen.blit(ds, (desc_x, row.y + 28))
+
+            # ---- Scrollbar (arrastável) ----
+            if show_scroll:
+                bar_x = modal_rect.right - 14
+                self._mp_scroll_geom = (bar_x, list_top, list_h, total, visible)
+                thumb_h = max(24, int(list_h * visible / total))
+                thumb_y = list_top + int((list_h - thumb_h) * self.move_picker_scroll / max_s)
+
+                pygame.draw.rect(screen, (40, 40, 60),
+                                 (bar_x, list_top, 6, list_h), border_radius=3)
+                pygame.draw.rect(screen, (160, 130, 210),
+                                 (bar_x, thumb_y, 6, thumb_h), border_radius=3)
+
+                # Área clicável mais larga para facilitar o arrasto
+                self._mp_scrollbar_rect = pygame.Rect(bar_x - 5, list_top, 16, list_h)
+                self._mp_scrollbar_thumb_rect = pygame.Rect(bar_x, thumb_y, 6, thumb_h)
+            else:
+                self._mp_scrollbar_rect = None
+                self._mp_scrollbar_thumb_rect = None
+
+        # --------------------- DROPDOWN DE TIPO (por cima) ---------------------
+        # Renderizado POR ÚLTIMO para ficar visualmente sobre a lista
+        # e ter prioridade de clique (find_click_at percorre reversed).
+        if self.active_dropdown == "type":
+            self._render_type_dropdown(screen, type_btn_rect)
+
+    def _render_type_dropdown(self, screen, anchor_rect):
+        """Renderiza o dropdown de tipos abaixo do botão de tipo.
+
+        Layout: grade de 3 colunas por N linhas, com botões coloridos
+        por tipo. `Todos` é a primeira opção (cinza).
+        """
+        p = self.parent
+
+        # Opções: ("Todos", None) + 18 tipos
+        options = [("Todos", None)] + [(t.capitalize(), t) for t in _ALL_TYPES_ORDERED]
+
+        cols = 3
+        btn_w = 92
+        btn_h = 26
+        pad = 8
+        gap_x = 6
+        gap_y = 6
+
+        rows = (len(options) + cols - 1) // cols
+        dd_w = cols * btn_w + (cols - 1) * gap_x + pad * 2
+        dd_h = rows * btn_h + (rows - 1) * gap_y + pad * 2
+
+        # Posição: abaixo do anchor, alinhado à esquerda
+        dd_x = anchor_rect.x
+        dd_y = anchor_rect.bottom + 4
+
+        # Ajuste se sair do modal pela direita/baixo
+        modal = self._modal_rect
+        if modal:
+            if dd_x + dd_w > modal.right - 6:
+                dd_x = modal.right - 6 - dd_w
+            if dd_y + dd_h > modal.bottom - 6:
+                dd_y = anchor_rect.y - dd_h - 4
+
+        dd_rect = pygame.Rect(dd_x, dd_y, dd_w, dd_h)
+
+        # Sombra
+        shadow = pygame.Surface((dd_w + 12, dd_h + 12), pygame.SRCALPHA)
+        pygame.draw.rect(shadow, (0, 0, 0, 150),
+                         (0, 0, shadow.get_width(), shadow.get_height()),
+                         border_radius=10)
+        screen.blit(shadow, (dd_x - 6, dd_y - 6))
+
+        # Fundo do dropdown
+        pygame.draw.rect(screen, (34, 30, 54), dd_rect, border_radius=8)
+        pygame.draw.rect(screen, (140, 120, 200), dd_rect, 2, border_radius=8)
+
+        # Importante: registrar o painel do dropdown para absorver cliques
+        # (assim clicar em área vazia do dropdown NÃO fecha o modal)
+        p.register_click("move_dd_type_panel", dd_rect)
+
+        # Renderiza as opções em grade
+        for i, (label, val) in enumerate(options):
+            col = i % cols
+            row = i // cols
+            bx = dd_rect.x + pad + col * (btn_w + gap_x)
+            by = dd_rect.y + pad + row * (btn_h + gap_y)
+            btn = pygame.Rect(bx, by, btn_w, btn_h)
+
+            selected = (self.move_filter_type == val)
+            hovered = btn.collidepoint(pygame.mouse.get_pos())
+
+            if val is None:
+                base = (90, 90, 110)
+            else:
+                base = self.pokedex.get_type_color(val)
+
+            if selected:
+                bg = base
+            else:
+                bg = tuple(max(0, c - 65) for c in base)
+                if hovered:
+                    bg = tuple(min(255, c + 25) for c in bg)
+
+            pygame.draw.rect(screen, bg, btn, border_radius=4)
+            pygame.draw.rect(screen,
+                             (255, 255, 255) if selected else (60, 60, 80),
+                             btn, 2 if selected else 1, border_radius=4)
+
+            bf = p.get_font(12)
+            bt = bf.render(label, True, self._text_color_for_bg(bg))
+            screen.blit(bt, bt.get_rect(center=btn.center))
+
+            # Nome de registro com o valor (para saber qual aplicar)
+            key = val if val else "all"
+            p.register_click(f"move_dd_type_opt_{key}", btn)
+
+    # ==================================================================
+    # FOOTER
+    # ==================================================================
     def render_footer(self, screen, footer_rect):
         p = self.parent
+
+        # ==============================================================
+        # MODAL DE MOVES ABERTO: renderiza modal por cima de TUDO
+        # e ignora o rodapé normal (sem botões, sem cliques).
+        # ==============================================================
+        if self.move_picker_open:
+            # Limpa as rects da scrollbar do modal — serão registradas
+            # durante o render do modal.
+            self._mp_scrollbar_rect = None
+            self._mp_scrollbar_thumb_rect = None
+            self._mp_scroll_geom = None
+
+            # Desenha o modal (backdrop + painel + lista + dropdown).
+            # Isso registra os cliques do modal DEPOIS dos cliques do
+            # resto da cena (rodapé inclusive), garantindo prioridade.
+            self._render_move_picker_modal(screen)
+            return
+
+        # ==============================================================
+        # RODAPÉ NORMAL
+        # ==============================================================
         btn_h = min(44, footer_rect.height - 14)
         btn_y = footer_rect.y + (footer_rect.height - btn_h) // 2
         hint_f = p.get_font(14)
@@ -1067,8 +2193,12 @@ class PokemonTab:
             p.register_click("action_delete", del_rect)
             p.draw_button(screen, del_rect, "REMOVER", danger=True, font_size=17)
 
-            hint = hint_f.render("ESC: voltar   ·   Scroll: navegar   ·   Arraste a barra lateral",
-                                 True, (140, 140, 160))
+            if self.edit_subtab == self.SUBTAB_MOVES:
+                hint_text = "Trocar/Adicionar move   ·   X para remover   ·   Salvar para aplicar"
+            else:
+                hint_text = "ESC: voltar   ·   Scroll: navegar   ·   Arraste a barra lateral"
+
+            hint = hint_f.render(hint_text, True, (140, 140, 160))
 
         screen.blit(hint, (footer_rect.right - hint.get_width() - 24,
                            footer_rect.y + (footer_rect.height - hint.get_height()) // 2))
