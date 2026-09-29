@@ -36,6 +36,7 @@ from src.ui.toast_renderer import toast_info, toast_warning, toast_battle
 from src.battle.effects.specific.day_night.day_night_filter import DayNightFilter
 from src.battle.effects.specific.day_night.day_night_state import DayNightType
 from src.scenes.game_scene.components.day_night_weather_system import DayNightWeatherSystem
+from src.scenes.game_scene.components.managers.in_game_debug_manager import InGameDebugManager
 
 GYM_PHASES = {
     (1, 5): 1,   # 1º Ginásio
@@ -118,6 +119,9 @@ class GameScene(BaseScene):
 
         # Battle System
         self.battle_system = BattleSystem(self)
+
+        # debug mode
+        self.in_game_debug = InGameDebugManager(self)
 
         # Configurações de mundo
         self._setup_world_dimensions()
@@ -1940,6 +1944,10 @@ class GameScene(BaseScene):
         camera = self.camera
         screen_mgr = self.screen_manager
 
+        # ===== IN-GAME DEBUG (prioridade máxima) =====
+        if self.in_game_debug.handle_event(event):
+            return None
+
         # ===== OVERLAYS PRIORITÁRIOS =====
         if self.final_victory_overlay is not None:
             self.final_victory_overlay.handle_event(event)
@@ -2260,6 +2268,9 @@ class GameScene(BaseScene):
         """Update da lógica do jogo - COM NOVO SISTEMA DE PERFORMANCE"""
 
         perf_monitor.start_frame()
+
+        self.in_game_debug.update(dt)
+        dt = dt * self.in_game_debug.get_time_multiplier()
 
         # ===== GUARDA O DT PARA USO NO RENDER (partículas de clima) =====
         self._last_dt = dt
@@ -2888,6 +2899,10 @@ class GameScene(BaseScene):
             perf_monitor.start_section("RENDER_FINAL_VICTORY")
             self.final_victory_overlay.render(screen)
             perf_monitor.end_section()
+
+        perf_monitor.start_section("RENDER_IN_GAME_DEBUG")
+        self.in_game_debug.render(screen)
+        perf_monitor.end_section()
 
         perf_monitor.end_section()
 
