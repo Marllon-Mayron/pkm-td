@@ -12,6 +12,10 @@ class ResidualEffectType(Enum):
     NIGHTMARE = "nightmare"
     CURSE = "curse"
     WHIRLPOOL = "whirlpool"
+    # 3GEN
+    WISH = "wish"
+    YAWN = "yawn"
+    DOOM_DESIRE = "doom_desire"
 
     FIRE_SPIN = "fire_spin"
     CLAMP = "clamp"

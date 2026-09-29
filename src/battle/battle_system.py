@@ -362,6 +362,16 @@ class BattleSystem:
 
             return result
 
+        if effect and effect.effect_type == "delayed_attack":
+            # O handler consome PP internamente e só agenda o efeito
+            result = effect.execute(attacker, target, self, self.effect_manager)
+            attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
+
+            if move.name.lower() != "struggle":
+                attacker._last_used_move = move.name
+                print(f"[TRACK] {attacker.name} usou {move.name}")
+
+            return result
         # ===== MOVIMENTOS NORMAIS =====
         if move.current_pp <= 0:
             print(f"[BATTLE] {attacker.name} não tem PP para {move.name}!")
@@ -1014,9 +1024,11 @@ class BattleSystem:
         if hasattr(attacker, 'play_hurt_animation'):
             attacker.play_hurt_animation()
 
-    def _calculate_move_damage(self, attacker, target, move):
+    def _calculate_move_damage(self, attacker, target, move, ignore_random: bool = False):
         """Calcula dano do move com modificadores de stat e screens"""
-        damage_result = DamageCalculator.calculate_damage(attacker, target, move)
+        damage_result = DamageCalculator.calculate_damage(
+            attacker, target, move, ignore_random=ignore_random
+        )
 
         if not damage_result["hit"]:
             return damage_result

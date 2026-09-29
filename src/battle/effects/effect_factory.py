@@ -2935,6 +2935,36 @@ class EffectFactory:
             "params": {},
             "description": "Recupera o último item consumido pelo usuário."
         },
+
+        # ===== EFEITOS ATRASADOS =====
+        "wish": {
+            "effect_type": "wish",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "delay_seconds": 2.0,  # ~1 turno
+            },
+            "description": "No fim do próximo turno, recupera 50% do HP máximo."
+        },
+        "yawn": {
+            "effect_type": "yawn",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "delay_seconds": 2.0,  # ~1 turno
+            },
+            "description": "Faz o alvo dormir no fim do próximo turno."
+        },
+        "doom-desire": {
+            "effect_type": "delayed_attack",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "delay_seconds": 4.0,  # ~2 turnos
+            },
+            "description": "Dano travado no momento do uso, aplicado no fim do 3º turno."
+        },
+
     }
 
     MOVE_EFFECTS = {**MOVE_EFFECTS_GEN1, **MOVE_EFFECTS_GEN2, **MOVE_EFFECTS_GEN3}

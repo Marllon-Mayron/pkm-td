@@ -313,6 +313,18 @@ class MoveEffect:
             return self._apply_covet(attacker, target, battle_system, effect_manager, damage)
         elif self.effect_type == "recycle":
             return self._apply_recycle(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "stockpile":
+            return self._apply_stockpile(attacker, target, effect_manager)
+        elif self.effect_type == "spit_up":
+            return self._apply_spit_up(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "swallow":
+            return self._apply_swallow(attacker, target, effect_manager)
+        elif self.effect_type == "wish":
+            return self._apply_wish(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "yawn":
+            return self._apply_yawn(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "delayed_attack":
+            return self._apply_delayed_attack(attacker, target, battle_system, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -6200,4 +6212,457 @@ class MoveEffect:
             duration=2.0
         )
         print(f"[RECYCLE] {pokemon.name} recuperou {display_name}!")
+        return True
+
+    def _apply_stockpile(self, attacker, target, effect_manager):
+        """Stockpile: +1 Def/+1 SpDef, +1 carga (máx 3)."""
+        from src.battle.effects.specific.stockpile.stockpile_handler import StockpileHandler
+        from src.battle.effects.stat_modifier import StatType
+
+        current = StockpileHandler.get_stacks(attacker)
+        if current >= StockpileHandler.MAX_STACKS:
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} não pode acumular mais energia!",
+                duration=1.5
+            )
+            return False
+
+        # Adiciona carga
+        new_stacks = StockpileHandler.add_stack(attacker)
+
+        # +1 Def, +1 SpDef permanentes (removidos por Spit Up/Swallow)
+        # Spec: "Energy is still stored even if the stat boosts cannot be applied"
+        effect_manager.add_stat_modifier(attacker, StatType.DEFENSE, 1, duration=None)
+        effect_manager.add_stat_modifier(attacker, StatType.SP_DEFENSE, 1, duration=None)
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} acumulou energia! ({new_stacks}/3)",
+            duration=1.5
+        )
+        print(f"[STOCKPILE] {attacker.name} acumulou ({new_stacks}/3)")
+        return True
+
+    def _reset_stockpile_stat_boosts(self, pokemon, stacks, effect_manager):
+        """
+        Remove o boost de Def/SpDef dado pelo Stockpile.
+        Manipula stat_stages diretamente para não poluir a lista de modifiers.
+        """
+        from src.battle.effects.stat_modifier import StatType
+
+        pokemon_id = id(pokemon)
+        if pokemon_id not in effect_manager.stat_stages:
+            return
+
+        stage_obj = effect_manager.stat_stages[pokemon_id]
+        stage_obj.modify(StatType.DEFENSE, -stacks)
+        stage_obj.modify(StatType.SP_DEFENSE, -stacks)
+
+    def _apply_spit_up(self, attacker, target, battle_system, effect_manager):
+        """
+        Spit Up: dano = 100 × cargas, ignorando fator aleatório.
+        Reseta Def/SpDef e zera as cargas.
+        """
+        from src.battle.effects.specific.stockpile.stockpile_handler import StockpileHandler
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+
+        stacks = StockpileHandler.get_stacks(attacker)
+        if stacks == 0:
+            effect_manager.add_status_text(
+                attacker,
+                "Mas não há energia acumulada!",
+                duration=1.5
+            )
+            return False
+
+        power = StockpileHandler.get_spit_up_power(attacker)
+        current_move = attacker.get_current_move()
+        if not current_move:
+            return False
+
+        # ===== SUBSTITUI POWER TEMPORARIAMENTE E CALCULA =====
+        original_power = current_move.power
+        current_move.power = power
+        try:
+            damage_result = battle_system._calculate_move_damage(
+                attacker, target, current_move, ignore_random=True
+            )
+        finally:
+            current_move.power = original_power
+
+        if not damage_result["hit"]:
+            return False
+
+        # ===== APLICA DANO =====
+        damage = damage_result["damage"]
+        target.take_damage(damage, attacker=attacker)
+        effect_manager.add_status_text(target, f"-{damage} HP", duration=0.8)
+
+        if damage_result.get("critical", False):
+            effect_manager.add_status_text(attacker, "Acerto Crítico!", duration=1.0)
+        if damage_result["effectiveness"] > 1.0:
+            effect_manager.add_status_text(attacker, "Super efetivo!", duration=0.8)
+        elif 0 < damage_result["effectiveness"] < 1.0:
+            effect_manager.add_status_text(attacker, "Não é muito efetivo...", duration=0.8)
+
+        move_sound_manager.play_hit_sound(current_move.sound_name)
+
+        # ===== RESETA DEF/SPDEF E CARGA =====
+        self._reset_stockpile_stat_boosts(attacker, stacks, effect_manager)
+        StockpileHandler.clear(attacker)
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} liberou {stacks} carga(s)!",
+            duration=1.5
+        )
+        print(f"[SPIT_UP] {attacker.name} liberou {stacks} carga(s) → {damage} de dano!")
+        return True
+
+    def _apply_swallow(self, attacker, target, effect_manager):
+        """
+        Swallow: cura 1/4, 1/2 ou 100% do HP baseado nas cargas.
+        Reseta Def/SpDef e zera as cargas.
+        """
+        from src.battle.effects.specific.stockpile.stockpile_handler import StockpileHandler
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+
+        stacks = StockpileHandler.get_stacks(attacker)
+        if stacks == 0:
+            effect_manager.add_status_text(
+                attacker,
+                "Mas não há energia acumulada!",
+                duration=1.5
+            )
+            return False
+
+        # Já com HP cheio?
+        if attacker.current_hp >= attacker.max_hp:
+            effect_manager.add_status_text(
+                attacker,
+                f"O HP de {attacker.name} já está no máximo!",
+                duration=1.5
+            )
+            return False
+
+        # ===== CALCULA E APLICA CURA =====
+        fraction = StockpileHandler.get_swallow_heal_fraction(attacker)
+        heal_amount = max(1, int(attacker.max_hp * fraction))
+
+        old_hp = attacker.current_hp
+        attacker.current_hp = min(attacker.max_hp, attacker.current_hp + heal_amount)
+        actual_heal = attacker.current_hp - old_hp
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} absorveu a energia e recuperou {actual_heal} HP!",
+            duration=2.0
+        )
+        move_sound_manager.play_attack_sound("heal")
+
+        # ===== RESETA DEF/SPDEF E CARGA =====
+        self._reset_stockpile_stat_boosts(attacker, stacks, effect_manager)
+        StockpileHandler.clear(attacker)
+
+        print(f"[SWALLOW] {attacker.name} consumiu {stacks} carga(s) → curou {actual_heal} HP")
+        return True
+
+    # ===== EFEITOS ATRASADOS =====
+
+    def _apply_wish(self, attacker, target, battle_system, effect_manager):
+        """Wish: cura 50% do max_hp do caster ao fim do próximo turno."""
+        from src.battle.effects.residual_effect import (
+            ResidualEffect, ResidualEffectType, ResidualEffectManager
+        )
+
+        caster = attacker
+
+        if caster.is_defeated or not caster.is_alive():
+            effect_manager.add_status_text(caster, "Mas falhou!", duration=1.0)
+            return False
+
+        # Spec: usa o max_hp do CASTER no momento do uso
+        caster_max_hp = caster.max_hp
+        delay_seconds = self.params.get("delay_seconds", 2.0)
+
+        def on_tick(effect):
+            # Se o caster saiu de campo, o Wish não faz nada
+            if caster.is_defeated or not caster.is_alive():
+                print(f"[WISH] {caster.name} não está mais em campo, Wish falhou")
+                return
+
+            heal_amount = max(1, caster_max_hp // 2)
+            old_hp = caster.current_hp
+            caster.current_hp = min(caster.max_hp, caster.current_hp + heal_amount)
+            actual_heal = caster.current_hp - old_hp
+
+            if actual_heal > 0:
+                effect_manager.add_status_text(
+                    caster,
+                    f"O desejo se realizou! +{actual_heal} HP",
+                    duration=2.0
+                )
+                from src.managers.sounds.move_sound_manager import move_sound_manager
+                move_sound_manager.play_attack_sound("heal")
+                print(f"[WISH] {caster.name} recuperou {actual_heal} HP!")
+            else:
+                effect_manager.add_status_text(
+                    caster,
+                    "O desejo se realizou, mas o HP já estava cheio!",
+                    duration=1.5
+                )
+
+        def on_remove(effect):
+            pass
+
+        residual = ResidualEffect(
+            effect_type=ResidualEffectType.WISH,
+            source=caster,
+            target=caster,
+            duration=1,
+            tick_interval=delay_seconds,
+            on_tick_callback=on_tick,
+            on_remove_callback=on_remove
+        )
+
+        if not hasattr(battle_system, 'residual_effects'):
+            battle_system.residual_effects = ResidualEffectManager(battle_system)
+
+        battle_system.residual_effects.add_effect(residual)
+
+        effect_manager.add_status_text(
+            caster,
+            f"{caster.name} fez um desejo!",
+            duration=2.0
+        )
+        print(f"[WISH] {caster.name} fez um desejo ({delay_seconds}s)")
+        return True
+
+    def _apply_yawn(self, attacker, target, battle_system, effect_manager):
+        """Yawn: aplica SLEEP no alvo ao fim do próximo turno."""
+        from src.battle.effects.residual_effect import (
+            ResidualEffect, ResidualEffectType, ResidualEffectManager
+        )
+        from src.battle.effects.status_effect import StatusEffect, StatusType
+
+        if not target or target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, "Mas falhou!", duration=1.0)
+            return False
+
+        # Spec: falha se o alvo já tem status (no uso)
+        existing_status = effect_manager.get_status(target)
+        if existing_status and existing_status.type != StatusType.NONE:
+            effect_manager.add_status_text(
+                target,
+                f"{target.name} já está com {existing_status.name}!",
+                duration=1.5
+            )
+            return False
+
+        # Spec: falha se Safeguard protege (no uso)
+        if hasattr(target, '_safeguard_active') and target._safeguard_active:
+            effect_manager.add_status_text(
+                target,
+                f"Safeguard protegeu {target.name}!",
+                duration=1.5
+            )
+            return False
+
+        # Já tem Yawn pendente?
+        if hasattr(battle_system, 'residual_effects'):
+            existing_yawn = battle_system.residual_effects.get_effect_on_target(
+                target, ResidualEffectType.YAWN
+            )
+            if existing_yawn:
+                effect_manager.add_status_text(
+                    attacker,
+                    f"{target.name} já está com sono!",
+                    duration=1.0
+                )
+                return False
+
+        delay_seconds = self.params.get("delay_seconds", 2.0)
+
+        def on_tick(effect):
+            tgt = effect.target
+
+            # Alvo saiu de campo? Cancela
+            if tgt.is_defeated or not tgt.is_alive():
+                print(f"[YAWN] {tgt.name} saiu de campo, Yawn cancelado")
+                return
+
+            # Insomnia / Vital Spirit previnem (spec)
+            if hasattr(tgt, 'has_ability'):
+                try:
+                    if tgt.has_ability("Insomnia") or tgt.has_ability("Vital Spirit"):
+                        effect_manager.add_status_text(
+                            tgt,
+                            f"{tgt.name} não consegue dormir!",
+                            duration=1.5
+                        )
+                        return
+                except Exception:
+                    pass
+
+            # Safeguard de novo (pode ter sido ativado no meio)
+            if hasattr(tgt, '_safeguard_active') and tgt._safeguard_active:
+                effect_manager.add_status_text(
+                    tgt,
+                    f"Safeguard protegeu {tgt.name}!",
+                    duration=1.5
+                )
+                return
+
+            # Já pegou outro status no meio?
+            current = effect_manager.get_status(tgt)
+            if current and current.type != StatusType.NONE:
+                effect_manager.add_status_text(
+                    tgt,
+                    f"{tgt.name} já está com status!",
+                    duration=1.0
+                )
+                return
+
+            # Aplica o sono
+            sleep_status = StatusEffect(StatusType.SLEEP, duration=None)
+            effect_manager.apply_status(tgt, sleep_status, attacker)
+            effect_manager.add_status_text(
+                tgt,
+                f"{tgt.name} adormeceu de tanto bocejar!",
+                duration=2.0
+            )
+            print(f"[YAWN] {tgt.name} adormeceu!")
+
+        def on_remove(effect):
+            pass
+
+        residual = ResidualEffect(
+            effect_type=ResidualEffectType.YAWN,
+            source=attacker,
+            target=target,
+            duration=1,
+            tick_interval=delay_seconds,
+            on_tick_callback=on_tick,
+            on_remove_callback=on_remove
+        )
+
+        if not hasattr(battle_system, 'residual_effects'):
+            battle_system.residual_effects = ResidualEffectManager(battle_system)
+
+        battle_system.residual_effects.add_effect(residual)
+
+        effect_manager.add_status_text(
+            target,
+            f"{target.name} está com sono...",
+            duration=2.0
+        )
+        print(f"[YAWN] {attacker.name} bocejou em {target.name} ({delay_seconds}s)")
+        return True
+
+    def _apply_delayed_attack(self, attacker, target, battle_system, effect_manager):
+        """
+        Doom Desire: dano travado no momento do cast, aplicado N segundos depois.
+        - Ignora crítico (spec)
+        - Só um Doom Desire pendente por alvo
+        - Calcula dano AGORA (stat changes posteriores não afetam)
+        """
+        from src.battle.effects.residual_effect import (
+            ResidualEffect, ResidualEffectType, ResidualEffectManager
+        )
+        from src.battle.damage_calculator import DamageCalculator
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+
+        # Verifica PP
+        current_move = attacker.get_current_move()
+        if not current_move or current_move.current_pp <= 0:
+            effect_manager.add_status_text(attacker, "Sem PP!", duration=1.0)
+            return False
+
+        # Verifica alvo
+        if not target or target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, "Mas falhou!", duration=1.0)
+            return False
+
+        # Já tem Doom Desire pendente no alvo?
+        if hasattr(battle_system, 'residual_effects'):
+            existing = battle_system.residual_effects.get_effect_on_target(
+                target, ResidualEffectType.DOOM_DESIRE
+            )
+            if existing:
+                effect_manager.add_status_text(
+                    attacker,
+                    f"{target.name} já foi condenado!",
+                    duration=1.5
+                )
+                return False
+
+        # Consome PP
+        current_move.current_pp -= 1
+
+        # ===== CALCULA DANO AGORA (fica travado) =====
+        damage_result = DamageCalculator.calculate_damage(attacker, target, current_move)
+
+        if not damage_result["hit"]:
+            effect_manager.add_status_text(attacker, "Mas falhou!", duration=1.0)
+            return False
+
+        # Spec: sem crítico
+        if damage_result.get("critical"):
+            damage_result["damage"] = int(damage_result["damage"] / 1.5)
+            damage_result["critical"] = False
+
+        locked_damage = damage_result["damage"]
+        locked_effectiveness = damage_result.get("effectiveness", 1.0)
+        delay_seconds = self.params.get("delay_seconds", 4.0)
+
+        def on_tick(effect):
+            tgt = effect.target
+
+            if tgt.is_defeated or not tgt.is_alive():
+                print(f"[DOOM_DESIRE] Alvo {tgt.name} já foi derrotado")
+                return
+
+            tgt.take_damage(locked_damage, attacker=attacker)
+            effect_manager.add_status_text(
+                tgt,
+                f"-{locked_damage} HP (Doom Desire)",
+                duration=1.5
+            )
+
+            if locked_effectiveness > 1.0:
+                effect_manager.add_status_text(tgt, "Super efetivo!", duration=0.8)
+            elif 0 < locked_effectiveness < 1.0:
+                effect_manager.add_status_text(tgt, "Não é muito efetivo...", duration=0.8)
+
+            if hasattr(tgt, 'play_hurt_animation'):
+                tgt.play_hurt_animation()
+
+            move_sound_manager.play_attack_sound("doom-desire")
+            print(f"[DOOM_DESIRE] {attacker.name} → {tgt.name}: {locked_damage} de dano!")
+
+        def on_remove(effect):
+            pass
+
+        residual = ResidualEffect(
+            effect_type=ResidualEffectType.DOOM_DESIRE,
+            source=attacker,
+            target=target,
+            duration=1,
+            tick_interval=delay_seconds,
+            on_tick_callback=on_tick,
+            on_remove_callback=on_remove
+        )
+
+        if not hasattr(battle_system, 'residual_effects'):
+            battle_system.residual_effects = ResidualEffectManager(battle_system)
+
+        battle_system.residual_effects.add_effect(residual)
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} selou o destino de {target.name}!",
+            duration=2.0
+        )
+        print(f"[DOOM_DESIRE] Agendado: {attacker.name} → {target.name} ({delay_seconds}s)")
         return True

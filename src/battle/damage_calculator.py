@@ -171,7 +171,7 @@ class DamageCalculator:
     }
 
     @classmethod
-    def calculate_damage(cls, attacker, defender, move) -> Dict:
+    def calculate_damage(cls, attacker, defender, move, ignore_random: bool = False) -> Dict:
         """
         Calcula o dano de um move
 
@@ -317,7 +317,8 @@ class DamageCalculator:
                 print(f"[CRITICAL] {move.name} causou um acerto crítico! {old_damage:.0f} -> {damage:.0f} de dano!")
 
         # Random entre 0.85 e 1.0
-        damage = damage * random.uniform(0.85, 1.0)
+        if not ignore_random:
+            damage = damage * random.uniform(0.85, 1.0)
 
         # Dano mínimo de 1
         damage = max(1, int(damage))

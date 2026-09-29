@@ -230,7 +230,8 @@ class Pokemon(Entity):
         self.held_item_data = None  # Dados completos do item (cache)
         # ===== RECYCLE: último item consumido =====
         self._last_consumed_item = None  # tupla (item_id, item_data) ou None
-
+        # ===== STOCKPILE =====
+        self._stockpile_count = 0
         # ===== 19. ATRIBUTOS DE COMBATE =====
         self.attack_range = 90
         self.combat_state = "idle"
@@ -1540,6 +1541,7 @@ class Pokemon(Entity):
         self.clear_foresight()
         self.clear_perish_song()
         self.clear_protection_effects()
+        self.clear_stockpile()
 
         # Remove referência local ao status_effect se existir
         if hasattr(self, 'status_effect'):
@@ -1555,6 +1557,10 @@ class Pokemon(Entity):
         """Reseta o contador do Fury Cutter"""
         if hasattr(self, '_fury_cutter_hits'):
             self._fury_cutter_hits = 0
+
+    def clear_stockpile(self):
+        """Zera as cargas de Stockpile."""
+        self._stockpile_count = 0
 
     def clear_destiny_bond(self):
         """Remove Destiny Bond do Pokémon"""
@@ -1754,6 +1760,8 @@ class Pokemon(Entity):
         self.update_status_animation()
         if self.current_animation == "sleep":
             self.set_animation_direct("idle")
+
+        self.clear_stockpile()
 
         print(f"[FULL_RESTORE] {self.name} completamente restaurado! HP: {self.current_hp}/{self.max_hp}")
         return True
