@@ -152,6 +152,13 @@ class DragDropManager:
 
     def start_drag_placed(self, pokemon, spot, screen_pos, world_pos):
         """Inicia o arrasto de um Pokémon já colocado no mapa (para troca de spots)"""
+        # ===== BLOQUEIA SE ESTIVER PRESO =====
+        if hasattr(pokemon, 'is_trapped') and pokemon.is_trapped():
+            from src.ui.toast_renderer import toast_warning
+            toast_warning(f"{pokemon.name} está preso e não pode ser movido!", duration=2.5)
+            print(f"[TRAP] {pokemon.name} está preso! Drag bloqueado.")
+            return False
+
         self.is_dragging = True
         self.drag_type = "placed"
         self.drag_slot_index = -1

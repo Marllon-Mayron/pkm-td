@@ -16,6 +16,7 @@ class ResidualEffectType(Enum):
     WISH = "wish"
     YAWN = "yawn"
     DOOM_DESIRE = "doom_desire"
+    INGRAIN = "ingrain"
 
     FIRE_SPIN = "fire_spin"
     CLAMP = "clamp"

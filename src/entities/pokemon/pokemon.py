@@ -232,11 +232,18 @@ class Pokemon(Entity):
         self._last_consumed_item = None  # tupla (item_id, item_data) ou None
         # ===== STOCKPILE =====
         self._stockpile_count = 0
+
+        # ===== PREnder (Ingrain / Block) =====
+        self._trapped = False  # Block (aplicado por outro)
+        self._ingrain_active = False  # Ingrain (auto-imposto + regen)
+        self._ingrain_regen_timer = 0.0
         # ===== 19. ATRIBUTOS DE COMBATE =====
         self.attack_range = 90
         self.combat_state = "idle"
         self.original_spot_x = x
         self.original_spot_y = y
+
+
 
         # ===== 20. COOLDOWNS =====
         self.charge_cooldown = 0.0
@@ -1236,6 +1243,24 @@ class Pokemon(Entity):
         if hasattr(self, 'effect_manager') and self.effect_manager:
             self.update_move_speed_from_effects()
 
+            # ===== INGRAIN: REGEN CONTÍNUO =====
+            if self._ingrain_active:
+                self._ingrain_regen_timer += dt
+                if self._ingrain_regen_timer >= 2.0:
+                    self._ingrain_regen_timer = 0.0
+
+                    heal_amount = max(1, self.max_hp // 16)
+                    old_hp = self.current_hp
+                    self.current_hp = min(self.max_hp, self.current_hp + heal_amount)
+                    actual = self.current_hp - old_hp
+
+                    if actual > 0:
+                        if hasattr(self, 'effect_manager') and self.effect_manager:
+                            self.effect_manager.add_status_text(
+                                self, f"+{actual} HP (Enraizado)", duration=1.0
+                            )
+                        print(f"[INGRAIN] {self.name} regenerou {actual} HP")
+
         # Atualiza item sendo carregado
         if self.is_carrying:
             self.is_carrying.update_capture(dt)
@@ -1542,6 +1567,7 @@ class Pokemon(Entity):
         self.clear_perish_song()
         self.clear_protection_effects()
         self.clear_stockpile()
+        self.clear_trapping()
 
         # Remove referência local ao status_effect se existir
         if hasattr(self, 'status_effect'):
@@ -1639,6 +1665,16 @@ class Pokemon(Entity):
             delattr(self, '_safeguard_timer')
         if hasattr(self, '_last_protect_used'):
             self._last_protect_used = False
+
+    def is_trapped(self) -> bool:
+        """Verifica se o Pokémon está preso (Block ou Ingrain)."""
+        return getattr(self, '_trapped', False) or getattr(self, '_ingrain_active', False)
+
+    def clear_trapping(self):
+        """Remove efeitos de prender (Block/Ingrain)."""
+        self._trapped = False
+        self._ingrain_active = False
+        self._ingrain_regen_timer = 0.0
 
     def set_defeated(self, defeated: bool):
         """Define se o Pokémon está derrotado"""
@@ -1762,6 +1798,8 @@ class Pokemon(Entity):
             self.set_animation_direct("idle")
 
         self.clear_stockpile()
+
+        self.clear_trapping()
 
         print(f"[FULL_RESTORE] {self.name} completamente restaurado! HP: {self.current_hp}/{self.max_hp}")
         return True

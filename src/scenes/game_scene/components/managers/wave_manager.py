@@ -55,6 +55,14 @@ class WaveManager:
         """Define os itens alvo"""
         self.target_items = items
 
+    def _is_enemy_trapped(self, enemy) -> bool:
+        """Verifica se o inimigo está preso (Block/Ingrain)."""
+        if getattr(enemy, '_trapped', False):
+            return True
+        if getattr(enemy, '_ingrain_active', False):
+            return True
+        return False
+
     def reset_gold(self):
         """Reseta o ouro acumulado"""
         self.total_gold_earned = 0
@@ -360,16 +368,16 @@ class WaveManager:
         if enemy.is_carrying:
             self._steal_item(enemy)
 
-        if enemy.is_boss:
+        if enemy.is_boss or self._is_enemy_trapped(enemy):
+            trapped = self._is_enemy_trapped(enemy)
+            tag = "PRESO" if trapped else "BOSS"
+
             if self._is_loop_path(enemy):
-                # Path em loop: reseta para o início e continua
-                print(f"[BOSS] {enemy.name} - PATH EM LOOP, resetando para o início")
+                print(f"[{tag}] {enemy.name} - PATH EM LOOP, resetando para o início")
                 enemy.path_index = 0
-                # Reseta flags
                 self.path_tracker.reset_enemy_state(enemy)
             else:
-                # Path linear: inverte direção
-                print(f"[BOSS] {enemy.name} - INVERTENDO DIREÇÃO")
+                print(f"[{tag}] {enemy.name} - INVERTENDO DIREÇÃO")
                 self.path_tracker.reverse_direction_simple(enemy)
         else:
             self._remove_enemy(enemy)
@@ -384,14 +392,14 @@ class WaveManager:
         if enemy.is_carrying:
             self._steal_item(enemy)
 
-        if enemy.is_boss:
+        if enemy.is_boss or self._is_enemy_trapped(enemy):
+            trapped = self._is_enemy_trapped(enemy)
+            tag = "PRESO" if trapped else "BOSS"
+
             if self._is_loop_path(enemy):
-                # Path em loop: apenas continua (não faz nada)
-                print(f"[BOSS] {enemy.name} - PATH EM LOOP, continuando...")
-                # Não faz nada - o boss já está no caminho certo
+                print(f"[{tag}] {enemy.name} - PATH EM LOOP, continuando...")
             else:
-                # Path linear: inverte direção
-                print(f"[BOSS] {enemy.name} - INVERTENDO DIREÇÃO")
+                print(f"[{tag}] {enemy.name} - INVERTENDO DIREÇÃO")
                 self.path_tracker.reverse_direction_simple(enemy)
         else:
             self._remove_enemy(enemy)

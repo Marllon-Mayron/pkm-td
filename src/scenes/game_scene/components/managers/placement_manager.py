@@ -367,6 +367,13 @@ class PlacementManager:
         if pokemon:
             print(f"[PLACEMENT] Recolhendo {pokemon.name} com clique direito")
 
+            # ===== BLOQUEIA SE ESTIVER PRESO =====
+            if pokemon.is_trapped():
+                from src.ui.toast_renderer import toast_warning
+                toast_warning(f"{pokemon.name} está preso e não pode ser removido!", duration=2.5)
+                print(f"[TRAP] {pokemon.name} está preso! Não pode ser recolhido.")
+                return None
+
             # Remove da lista de colocados
             if pokemon in self.placed_pokemon:
                 self.placed_pokemon.remove(pokemon)

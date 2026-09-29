@@ -325,6 +325,10 @@ class MoveEffect:
             return self._apply_yawn(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "delayed_attack":
             return self._apply_delayed_attack(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "ingrain":
+            return self._apply_ingrain(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "block":
+            return self._apply_block(attacker, target, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -3139,6 +3143,11 @@ class MoveEffect:
             print(f"[FORCE_SWITCH] {target.name} é um BOSS e não pode ser acovardado!")
             return False
 
+        if getattr(target, '_trapped', False) or getattr(target, '_ingrain_active', False):
+            effect_manager.add_status_text(target, f"{target.name} está preso e não se abala!", duration=1.5)
+            print(f"[FORCE_SWITCH] {target.name} está preso (Block/Ingrain)! Não fugiu.")
+            return False
+
         # Verifica se o target tem um path para inverter
         if not hasattr(target, 'path') or not target.path:
             effect_manager.add_status_text(target, "Mas falhou!", duration=1.0)
@@ -3225,6 +3234,12 @@ class MoveEffect:
         if not target.is_placed or target not in placement_manager.placed_pokemon:
             effect_manager.add_status_text(target, "Mas falhou!", duration=1.0)
             print(f"[FORCE_SWITCH] {target.name} não está no mapa!")
+            return False
+
+        # ===== POKÉMON PRESO NÃO PODE RETORNAR =====
+        if getattr(target, '_trapped', False) or getattr(target, '_ingrain_active', False):
+            effect_manager.add_status_text(target, f"{target.name} está preso e não pode retornar!", duration=1.5)
+            print(f"[FORCE_SWITCH] {target.name} está preso! Não retornou.")
             return False
 
         # Mostra mensagem de retorno
@@ -6665,4 +6680,52 @@ class MoveEffect:
             duration=2.0
         )
         print(f"[DOOM_DESIRE] Agendado: {attacker.name} → {target.name} ({delay_seconds}s)")
+        return True
+
+    # ===== Prender =====
+
+    def _apply_ingrain(self, attacker, target, battle_system, effect_manager):
+        """Ingrain: prende o usuário no lugar + regen 1/16 HP a cada ~2s."""
+        if getattr(attacker, '_ingrain_active', False):
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} já está enraizado!",
+                duration=1.5
+            )
+            return False
+
+        attacker._ingrain_active = True
+        attacker._ingrain_regen_timer = 0.0
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} enraizou-se no chão!",
+            duration=2.0
+        )
+        print(f"[INGRAIN] {attacker.name} enraizou-se! Regen: {max(1, attacker.max_hp // 16)} HP/2s")
+        return True
+
+    def _apply_block(self, attacker, target, effect_manager):
+        """Block: prende o alvo (não pode fugir/trocar)."""
+        if not target or target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, "Mas falhou!", duration=1.0)
+            return False
+
+        # Já preso?
+        if getattr(target, '_trapped', False) or getattr(target, '_ingrain_active', False):
+            effect_manager.add_status_text(
+                attacker,
+                f"{target.name} já está preso!",
+                duration=1.5
+            )
+            return False
+
+        target._trapped = True
+
+        effect_manager.add_status_text(
+            target,
+            f"{target.name} não pode mais fugir!",
+            duration=2.0
+        )
+        print(f"[BLOCK] {attacker.name} bloqueou {target.name}!")
         return True

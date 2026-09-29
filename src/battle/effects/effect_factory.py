@@ -2965,6 +2965,22 @@ class EffectFactory:
             "description": "Dano travado no momento do uso, aplicado no fim do 3º turno."
         },
 
+        # ===== Prender =====
+        "ingrain": {
+            "effect_type": "ingrain",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {},
+            "description": "Enraíza o usuário: não pode trocar e recupera 1/16 do HP por turno."
+        },
+        "block": {
+            "effect_type": "block",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {},
+            "description": "Prende o oponente. Ele não pode fugir nem trocar."
+        },
+
     }
 
     MOVE_EFFECTS = {**MOVE_EFFECTS_GEN1, **MOVE_EFFECTS_GEN2, **MOVE_EFFECTS_GEN3}
