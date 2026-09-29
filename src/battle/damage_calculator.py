@@ -246,30 +246,6 @@ class DamageCalculator:
                 print(
                     f"[HELD_ITEM] {attacker.name} segura {attacker.held_item_data['name']} - +10% de dano para {move.type}!")
 
-        # ===== MODIFICADORES DE CLIMA =====
-        weather_multiplier = 1.0
-        weather = None
-
-        # Verifica se o atacante tem battle_system com clima
-        if hasattr(attacker, 'battle_system') and attacker.battle_system:
-            weather = attacker.battle_system.get_weather_type()
-
-            if weather == WeatherType.SUNNY:
-                if move.type.lower() == "fire":
-                    weather_multiplier = 1.5  # +50% para Fire
-                    print(f"[WEATHER] Sol forte: {move.name} +50% de dano!")
-                elif move.type.lower() == "water":
-                    weather_multiplier = 0.5  # -50% para Water
-                    print(f"[WEATHER] Sol forte: {move.name} -50% de dano!")
-
-            elif weather == WeatherType.RAIN:
-                if move.type.lower() == "water":
-                    weather_multiplier = 1.5  # +50% para Water
-                    print(f"[WEATHER] Chuva: {move.name} +50% de dano!")
-                elif move.type.lower() == "fire":
-                    weather_multiplier = 0.5  # -50% para Fire
-                    print(f"[WEATHER] Chuva: {move.name} -50% de dano!")
-
         # 6. Calcular stats de ataque/defesa
         if move.category == "physical":
             attack_stat = attacker.attack
@@ -329,7 +305,7 @@ class DamageCalculator:
         damage = ((2 * level / 5 + 2) * power * attack_stat / defense_stat) / 50 + 2
 
         # Aplicar STAB e eficácia
-        damage = damage * stab * effectiveness * weather_multiplier
+        damage = damage * stab * effectiveness
 
         # ===== VERIFICAÇÃO DE CRÍTICO =====
         is_critical = False

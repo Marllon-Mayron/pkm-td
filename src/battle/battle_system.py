@@ -28,6 +28,12 @@ class BattleSystem:
         self.weather_manager = WeatherManager(self)
         self.weather_filter = None
 
+        # ===== SPORT EFFECTS =====
+        # Efeito GLOBAL de campo: enquanto a fonte está em campo, o tipo correspondente causa metade do dano para TODOS.
+
+        self.mud_sport_source = None  # Pokémon que usou Mud Sport
+        self.water_sport_source = None  # Pokémon que usou Water Sport
+
         # ===== RASTREAMENTO DE PARTICIPANTES DA BATALHA =====
         self.battle_participants: Set[int] = set()  # IDs dos Pokémon que participaram
 
@@ -1035,6 +1041,20 @@ class BattleSystem:
         }
         weather_effects = self.apply_weather_effects(attacker, target, move_info)
 
+        # ===== APLICA MUD/WATER SPORT =====
+
+        sport_mult = self.get_sport_damage_multiplier(move.type)
+        if sport_mult < 1.0:
+            old_damage = damage_result["damage"]
+            damage_result["damage"] = int(damage_result["damage"] * sport_mult)
+            sport_name = "Mud Sport" if move.type.lower() == "electric" else "Water Sport"
+            self.effect_manager.add_status_text(
+                attacker,
+                f"{sport_name} enfraqueceu o ataque!",
+                duration=1.0
+            )
+            print(f"[SPORT] {sport_name}: dano ajustado {old_damage} -> {damage_result['damage']} (x{sport_mult})")
+
         if weather_effects['damage_multiplier'] != 1.0:
             old_damage = damage_result["damage"]
             damage_result["damage"] = int(damage_result["damage"] * weather_effects['damage_multiplier'])
@@ -1147,6 +1167,13 @@ class BattleSystem:
         if hasattr(self, 'active_screens'):
             self.active_screens.clear()
             print(f"[SCREEN] Todos os screens foram limpos!")
+
+        # ===== LIMPA SPORTS =====
+        if not self.mud_sport_source is None or not self.water_sport_source is None:
+            print(f"[SPORT] Todos os efeitos de Sport foram limpos!")
+        self.mud_sport_source = None
+        self.water_sport_source = None
+
 
         # ===== LIMPA MODIFICADORES DE CRÍTICO =====
         from src.battle.effects.critical_hit import CriticalHitSystem
@@ -1307,6 +1334,59 @@ class BattleSystem:
                     f"#{player.achievement_manager.get_counter('weather_boosted_attack_count')}")
 
         return effects
+
+    def get_sport_damage_multiplier(self, move_type: str) -> float:
+        """
+        Retorna o multiplicador de dano por causa de Mud/Water Sport.
+        Deve ser chamado ANTES de calcular o dano final.
+        """
+        # Limpa fontes que já saíram de campo
+        self._validate_sport_sources()
+
+        move_type = move_type.lower()
+
+        if move_type == "electric" and self.mud_sport_source:
+            return 0.5
+        if move_type == "fire" and self.water_sport_source:
+            return 0.5
+        return 1.0
+
+    def _validate_sport_sources(self):
+        """Remove efeitos de sport cuja fonte não está mais em campo."""
+        if self.mud_sport_source and not self._is_source_on_field(self.mud_sport_source):
+            print(f"[SPORT] Mud Sport terminou (fonte saiu de campo)")
+            self.mud_sport_source = None
+
+        if self.water_sport_source and not self._is_source_on_field(self.water_sport_source):
+            print(f"[SPORT] Water Sport terminou (fonte saiu de campo)")
+            self.water_sport_source = None
+
+    # ===== MUD SPORT / WATER SPORT =====
+    def _is_source_on_field(self, pokemon) -> bool:
+        """Verifica se um Pokémon ainda está ativo em campo."""
+        if pokemon is None:
+            return False
+        if getattr(pokemon, 'is_defeated', False):
+            return False
+        if not pokemon.is_alive():
+            return False
+
+        if not self.game_scene:
+            return True  # Sem game_scene, assume ativo (fallback)
+
+        gs = self.game_scene
+
+        # Selvagens: checa wave_manager
+        if getattr(pokemon, 'is_wild', False):
+            if hasattr(gs, 'wave_manager'):
+                return pokemon in gs.wave_manager.active_enemies
+            return False
+
+        # Aliados: checa placement_manager
+        if hasattr(gs, 'placement_manager'):
+            return pokemon in gs.placement_manager.placed_pokemon
+
+        return False
 
     def register_attacker_for_enemy(self, attacker: 'Pokemon', enemy: 'Pokemon'):
         """Registra que um atacante atingiu um inimigo específico"""

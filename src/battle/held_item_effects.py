@@ -220,6 +220,11 @@ class HeldItemEffectProcessor:
         if pokemon.held_item_data:
             item_name = pokemon.held_item_data.get("name", pokemon.held_item)
 
+        # ===== REGISTRA PARA RECYCLE =====
+        from src.battle.effects.item_manipulation import ItemManipulation
+        ItemManipulation.register_consumed_item(pokemon)
+
+
         pokemon.held_item = None
         pokemon.held_item_data = None
 

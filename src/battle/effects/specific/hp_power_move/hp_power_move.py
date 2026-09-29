@@ -92,6 +92,22 @@ class HPPowerMove:
         """
         return cls("wring-out", None)  # Caso especial
 
+    @classmethod
+    def for_eruption(cls) -> 'HPPowerMove':
+        """
+        Eruption (Gen 3): poder = 150 × HP atual / HP máximo.
+        Poder máximo (150) com HP cheio, escala linearmente para baixo.
+        """
+        return cls("eruption", None)
+
+    @classmethod
+    def for_water_spout(cls) -> 'HPPowerMove':
+        """
+        Water Spout (Gen 3): poder = 150 × HP atual / HP máximo.
+        Mesmo mecanismo do Eruption, só muda o tipo.
+        """
+        return cls("water-spout", None)
+
     def calculate_power(self, attacker, target=None) -> int:
         """
         Calcula o poder baseado no estado atual.
@@ -118,6 +134,16 @@ class HPPowerMove:
                         return power
             return 40
 
+        elif self.move_name in ("eruption", "water-spout"):
+            # ===== PODER ESCALA LINEARMENTE COM HP ATUAL =====
+            # power = 150 * current_hp / max_hp  (mínimo 1)
+            if attacker.max_hp <= 0:
+                return 150
+
+            hp_ratio = attacker.current_hp / attacker.max_hp
+            power = int(150 * hp_ratio)
+            return max(1, min(150, power))
+
         else:
             # Flail/Reversal: baseado no HP do atacante
             if attacker.max_hp <= 0:
@@ -133,12 +159,23 @@ class HPPowerMove:
 
     def get_power_message(self, power: int, pokemon_name: str) -> str:
         """Retorna a mensagem apropriada para o nível de poder"""
-        # Procura mensagem específica para este poder
+
+        # ===== MENSAGENS ESPECÍFICAS PARA ERUPTION / WATER SPOUT =====
+        if self.move_name in ("eruption", "water-spout"):
+            if power >= 120:
+                return f"{pokemon_name} liberou toda a sua energia! Poder {power}!"
+            elif power >= 75:
+                return f"{pokemon_name} está forte! Poder {power}!"
+            elif power >= 40:
+                return f"{pokemon_name} está enfraquecendo... Poder {power}!"
+            else:
+                return f"{pokemon_name} está quase exausto... Poder {power}!"
+
+        # ===== MENSAGENS ORIGINAIS (Flail/Reversal/Trump Card) =====
         for threshold, template in self.POWER_MESSAGES.items():
             if isinstance(threshold, int) and power >= threshold:
                 return template.format(pokemon=pokemon_name, power=power)
 
-        # Mensagem padrão
         return self.POWER_MESSAGES["default"].format(pokemon=pokemon_name, power=power)
 
     def execute(self, attacker, target, battle_system, effect_manager) -> bool:

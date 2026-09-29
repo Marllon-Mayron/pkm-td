@@ -228,6 +228,8 @@ class Pokemon(Entity):
         # ===== ITEM SEGURÁVEL =====
         self.held_item = None  # ID do item que o Pokémon está segurando
         self.held_item_data = None  # Dados completos do item (cache)
+        # ===== RECYCLE: último item consumido =====
+        self._last_consumed_item = None  # tupla (item_id, item_data) ou None
 
         # ===== 19. ATRIBUTOS DE COMBATE =====
         self.attack_range = 90

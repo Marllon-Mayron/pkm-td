@@ -302,6 +302,17 @@ class MoveEffect:
             return self._apply_sleep_talk(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "spider_web":
             return self._apply_spider_web(attacker, target, battle_system, effect_manager)
+        #GEN 3
+        elif self.effect_type == "sport":
+            return self._apply_sport(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "trick":
+            return self._apply_trick(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "knock_off":
+            return self._apply_knock_off(attacker, target, battle_system, effect_manager, damage)
+        elif self.effect_type == "covet":
+            return self._apply_covet(attacker, target, battle_system, effect_manager, damage)
+        elif self.effect_type == "recycle":
+            return self._apply_recycle(attacker, target, battle_system, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -3755,6 +3766,10 @@ class MoveEffect:
             hp_move = HPPowerMove.for_trump_card()
         elif move_variant == "wring_out":
             hp_move = HPPowerMove.for_wring_out()
+        elif move_variant == "eruption":
+            hp_move = HPPowerMove.for_eruption()
+        elif move_variant == "water-spout":
+            hp_move = HPPowerMove.for_water_spout()
         else:
             hp_move = HPPowerMove(move_variant)
 
@@ -5955,4 +5970,234 @@ class MoveEffect:
         from src.managers.sounds.move_sound_manager import move_sound_manager
         move_sound_manager.play_attack_sound("spider-web")
 
+        return True
+
+    def _apply_sport(self, attacker, target, battle_system, effect_manager):
+        """
+        Aplica Mud Sport ou Water Sport.
+        Efeito GLOBAL: enfraquece um tipo de ataque pela metade
+        até o usuário sair de campo.
+        """
+        sport_type = self.params.get("sport_type", "mud")  # "mud" ou "water"
+
+        if sport_type == "mud":
+            # Já ativo pela mesma fonte? (não acumula)
+            if battle_system.mud_sport_source == attacker:
+                effect_manager.add_status_text(
+                    attacker,
+                    f"{attacker.name} já está coberto de lama!",
+                    duration=1.0
+                )
+                return False
+
+            battle_system.mud_sport_source = attacker
+
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} cobriu o campo de lama!",
+                duration=2.0
+            )
+            effect_manager.add_status_text(
+                attacker,
+                "Ataques Elétricos causarão metade do dano!",
+                duration=2.0
+            )
+            print(f"[MUD_SPORT] {attacker.name} ativou Mud Sport! Electric x0.5")
+
+        elif sport_type == "water":
+            if battle_system.water_sport_source == attacker:
+                effect_manager.add_status_text(
+                    attacker,
+                    f"{attacker.name} já está encharcado!",
+                    duration=1.0
+                )
+                return False
+
+            battle_system.water_sport_source = attacker
+
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} molhou todo o campo!",
+                duration=2.0
+            )
+            effect_manager.add_status_text(
+                attacker,
+                "Ataques de Fogo causarão metade do dano!",
+                duration=2.0
+            )
+            print(f"[WATER_SPORT] {attacker.name} ativou Water Sport! Fire x0.5")
+
+        else:
+            return False
+
+        # Toca som
+        from src.managers.sounds.move_sound_manager import move_sound_manager
+        move_sound_manager.play_attack_sound(self.name)
+
+        return True
+
+    #  MANIPULAÇÃO DE ITENS
+
+    def _apply_trick(self, attacker, target, battle_system, effect_manager):
+        """Trick: troca itens segurados com o alvo."""
+        from src.battle.effects.item_manipulation import ItemManipulation
+
+        if not ItemManipulation.can_manipulate_item(attacker):
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} não consegue trocar de item!",
+                duration=1.5
+            )
+            return False
+
+        if not ItemManipulation.can_manipulate_item(target):
+            effect_manager.add_status_text(
+                target,
+                f"{target.name} segura o item firmemente!",
+                duration=1.5
+            )
+            return False
+
+        attacker_item = ItemManipulation.get_item(attacker)
+        target_item = ItemManipulation.get_item(target)
+
+        # Se nenhum dos dois tem item, Trick falha
+        if not attacker_item and not target_item:
+            effect_manager.add_status_text(
+                attacker,
+                "Mas nenhum dos dois está segurando item!",
+                duration=1.5
+            )
+            return False
+
+        success = ItemManipulation.swap_items(attacker, target)
+        if not success:
+            return False
+
+        # Mensagens
+        if attacker_item and target_item:
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} trocou {attacker_item[0]} por {target_item[0]}!",
+                duration=2.0
+            )
+        elif target_item:
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} tomou {target_item[0]} de {target.name}!",
+                duration=2.0
+            )
+        elif attacker_item:
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} entregou {attacker_item[0]} para {target.name}!",
+                duration=2.0
+            )
+
+        print(f"[TRICK] {attacker.name} <-> {target.name} (itens trocados)")
+        return True
+
+    def _apply_knock_off(self, attacker, target, battle_system, effect_manager, damage):
+        """Knock Off: dano + remove o item segurado do alvo."""
+        from src.battle.effects.item_manipulation import ItemManipulation
+
+        # Só age se o ataque causou dano (evita remover com imunidade)
+        if damage <= 0:
+            return False
+
+        if not ItemManipulation.can_manipulate_item(target):
+            effect_manager.add_status_text(
+                target,
+                f"{target.name} segura o item firmemente!",
+                duration=1.5
+            )
+            return False
+
+        item = ItemManipulation.get_item(target)
+        if not item:
+            return False
+
+        item_id, item_data = item
+        ItemManipulation.remove_item(target)
+
+        display_name = item_data.get("name", item_id) if item_data else item_id
+        effect_manager.add_status_text(
+            target,
+            f"{display_name} foi derrubado!",
+            duration=2.0
+        )
+        print(f"[KNOCK_OFF] {attacker.name} derrubou {display_name} de {target.name}!")
+        return True
+
+    def _apply_covet(self, attacker, target, battle_system, effect_manager, damage):
+        """Covet: dano + rouba o item do alvo (se o atacante não tiver item)."""
+        from src.battle.effects.item_manipulation import ItemManipulation
+
+        if damage <= 0:
+            return False
+
+        # Atacante já tem item? Não rouba nada.
+        if ItemManipulation.get_item(attacker):
+            return False
+
+        if not ItemManipulation.can_manipulate_item(target):
+            effect_manager.add_status_text(
+                target,
+                f"{target.name} segura o item firmemente!",
+                duration=1.5
+            )
+            return False
+
+        item = ItemManipulation.get_item(target)
+        if not item:
+            return False
+
+        item_id, item_data = item
+        ItemManipulation.remove_item(target)
+        ItemManipulation.give_item(attacker, item_id, item_data)
+
+        display_name = item_data.get("name", item_id) if item_data else item_id
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} tomou {display_name}!",
+            duration=2.0
+        )
+        print(f"[COVET] {attacker.name} roubou {display_name} de {target.name}!")
+        return True
+
+    def _apply_recycle(self, attacker, target, battle_system, effect_manager):
+        """Recycle: recupera o último item consumido pelo usuário."""
+        # Recycle é SELF — sempre usa o attacker
+        pokemon = attacker
+
+        # Já tem item? Falha
+        if getattr(pokemon, 'held_item', None):
+            effect_manager.add_status_text(
+                pokemon,
+                f"{pokemon.name} já está segurando um item!",
+                duration=1.5
+            )
+            return False
+
+        last = getattr(pokemon, '_last_consumed_item', None)
+        if not last:
+            effect_manager.add_status_text(
+                pokemon,
+                "Mas não há nada para reciclar!",
+                duration=1.5
+            )
+            return False
+
+        item_id, item_data = last
+        pokemon.held_item = item_id
+        pokemon.held_item_data = item_data
+        pokemon._last_consumed_item = None  # Consome o recycle (não pode repetir)
+
+        display_name = item_data.get("name", item_id) if item_data else item_id
+        effect_manager.add_status_text(
+            pokemon,
+            f"{pokemon.name} reciclou {display_name}!",
+            duration=2.0
+        )
+        print(f"[RECYCLE] {pokemon.name} recuperou {display_name}!")
         return True

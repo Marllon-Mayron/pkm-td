@@ -2316,7 +2316,7 @@ class EffectFactory:
                 "stages": 3,
                 "duration": 6.0,
             },
-            "description": "Aumenta muito o Ataque Especial.",
+            "description": "Aumenta o Ataque Especial em 3.",
         },
         "iron-defense": {
             "effect_type": "stat_mod",
@@ -2338,7 +2338,7 @@ class EffectFactory:
                 "stages": 1,
                 "duration": 6.0,
             },
-            "description": "Aumenta o Ataque.",
+            "description": "Aumenta o Ataque em +1.",
         },
         "bulk-up": {
             "effect_type": "stat_mod",
@@ -2351,7 +2351,7 @@ class EffectFactory:
                 ],
                 "duration": 6.0,
             },
-            "description": "Aumenta Ataque e Defesa.",
+            "description": "Aumenta Ataque e Defesa em +1.",
         },
         "calm-mind": {
             "effect_type": "stat_mod",
@@ -2364,7 +2364,7 @@ class EffectFactory:
                 ],
                 "duration": 6.0,
             },
-            "description": "Aumenta SpAtk e SpDef.",
+            "description": "Aumenta SpAtk e SpDef em +1.",
         },
         "cosmic-power": {
             "effect_type": "stat_mod",
@@ -2865,6 +2865,75 @@ class EffectFactory:
                 "duration": None,
             },
             "description": "Revela o alvo; Normal/Lutador acertam Fantasma.",
+        },
+
+        "eruption": {
+            "effect_type": "hp_power_move",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "move_variant": "eruption",
+            },
+            "description": "Quanto mais HP o usuário tem, mais forte é o ataque."
+        },
+        "water-spout": {
+            "effect_type": "hp_power_move",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "move_variant": "water-spout",
+            },
+            "description": "Quanto mais HP o usuário tem, mais forte é o ataque."
+        },
+
+        #Sports
+        "mud-sport": {
+            "effect_type": "sport",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "sport_type": "mud",
+            },
+            "description": "Cobre o campo de lama. Ataques Elétricos causam metade do dano até o usuário sair de campo."
+        },
+        "water-sport": {
+            "effect_type": "sport",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "sport_type": "water",
+            },
+            "description": "Molha o campo. Ataques de Fogo causam metade do dano até o usuário sair de campo."
+        },
+
+        # ===== MANIPULAÇÃO DE ITENS =====
+        "trick": {
+            "effect_type": "trick",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {},
+            "description": "Troca itens segurados com o oponente."
+        },
+        "knock-off": {
+            "effect_type": "knock_off",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {},
+            "description": "Derruba o item segurado do oponente."
+        },
+        "covet": {
+            "effect_type": "covet",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {},
+            "description": "Rouba o item segurado do oponente (se o usuário não tiver item)."
+        },
+        "recycle": {
+            "effect_type": "recycle",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {},
+            "description": "Recupera o último item consumido pelo usuário."
         },
     }
 
