@@ -542,7 +542,7 @@ class EffectFactory:
                 "duration": None,
                 "overwrite": False
             },
-            "description": "Pode congelar o oponente (10% de chance)"
+            "description": "Pode congelar o alvo (10%). Durante o Granizo, este ataque nunca erra."
         },
         "ice-punch": {
             "effect_type": "status_chance",
@@ -1948,7 +1948,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "weather_type": "rain",
-                "duration": 10.0
+                "duration": 15.0
             },
             "description": "Faz chover por 10 segundos "
         },
@@ -1958,7 +1958,7 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "weather_type": "sunny",
-                "duration": 10.0
+                "duration": 15.0
             },
             "description": "Cria sol forte por 10 segundos . (NÃO FUNCIONA À NOITE!)"
         },
@@ -3065,6 +3065,19 @@ class EffectFactory:
             "timing": EffectTiming.ON_HIT,
             "params": {},
             "description": "Troca habilidades com o alvo temporariamente."
+        },
+
+        # ===== CLIMA:
+
+        "hail": {
+            "effect_type": "weather",
+            "target": EffectTarget.BOTH,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "weather_type": "hail",
+                "duration": 15.0,
+            },
+            "description": "Causa uma tempestade de granizo por 10 segundos. Ice é imune."
         },
     }
 

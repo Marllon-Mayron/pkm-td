@@ -5,13 +5,36 @@ import random
 
 
 class DayNightType(Enum):
-    """Tipos de período do dia/ambiente"""
     DAY = "day"
     NIGHT = "night"
     DUSK = "dusk"
     DAWN = "dawn"
     CAVE = "cave"
     DEEP = "deep"
+
+
+DAY_NIGHT_DISPLAY_NAMES = {
+    DayNightType.DAY: "Dia",
+    DayNightType.NIGHT: "Noite",
+    DayNightType.DUSK: "Entardecer",
+    DayNightType.DAWN: "Amanhecer",
+    DayNightType.CAVE: "Caverna",
+    DayNightType.DEEP: "Fundo do Mar",
+}
+
+
+def get_day_night_ui_options():
+    return [
+        (dt.value, DAY_NIGHT_DISPLAY_NAMES.get(dt, dt.value.title()))
+        for dt in DayNightType
+    ]
+
+
+def day_night_from_string(s: str) -> DayNightType:
+    try:
+        return DayNightType(s.lower())
+    except ValueError:
+        return DayNightType.DAY
 
 
 class DayNightState:

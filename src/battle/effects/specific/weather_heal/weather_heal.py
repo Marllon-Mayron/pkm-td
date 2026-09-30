@@ -27,6 +27,7 @@ class WeatherHealMove:
         WeatherType.SUNNY: 2 / 3,  # 66.6%
         WeatherType.RAIN: 0.25,  # 25%
         WeatherType.SANDSTORM: 0.25,  # 25%
+        WeatherType.HAIL: 0.25,
     }
 
     # ===== Efeito do dia/noite =====
@@ -66,7 +67,7 @@ class WeatherHealMove:
         # Mensagem de clima
         if weather_type == WeatherType.SUNNY:
             messages.append("O sol forte aumentou a cura!")
-        elif weather_type in [WeatherType.RAIN, WeatherType.SANDSTORM]:
+        elif weather_type in [WeatherType.RAIN, WeatherType.SANDSTORM, WeatherType.HAIL]:
             messages.append("O clima ruim reduziu a cura...")
 
         # Mensagem de noite (Morning Sun)

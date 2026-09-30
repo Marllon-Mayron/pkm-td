@@ -13,9 +13,10 @@ class DayNightWeatherSystem:
         self._initialized = False
 
         self.MAP_WEATHER_TYPES = [
-            None, None, None, None, None, None, None, None, None,
+            None, None, None, None, None, None, None, None,
             WeatherType.SUNNY,
             WeatherType.RAIN,
+            WeatherType.HAIL,
         ]
 
     def initialize(self):
@@ -71,12 +72,16 @@ class DayNightWeatherSystem:
         if hasattr(self.game_scene, 'battle_system'):
             self.game_scene.battle_system.weather_manager.set_base_weather(weather_type)
 
-            # ===== TOCA SOM AMBIENTE PARA CLIMA BASE =====
             from src.managers.sounds.ambient_sound_manager import ambient_sound_manager
             if weather_type.value == "rain":
                 ambient_sound_manager.play_ambient("rain", loop=True)
             elif weather_type.value == "sandstorm":
                 ambient_sound_manager.play_ambient("sandstorm", loop=True)
+            elif weather_type.value == "hail":
+                try:
+                    ambient_sound_manager.play_ambient("hail", loop=True)
+                except Exception:
+                    ambient_sound_manager.stop_ambient()
             else:
                 ambient_sound_manager.stop_ambient()
 

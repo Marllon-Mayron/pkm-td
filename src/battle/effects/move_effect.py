@@ -4051,6 +4051,7 @@ class MoveEffect:
             'sandstorm': WeatherType.SANDSTORM,
             'rain': WeatherType.RAIN,
             'sunny': WeatherType.SUNNY,
+            'hail': WeatherType.HAIL,
         }
 
         weather_type = weather_map.get(weather_type_str.lower(), WeatherType.SANDSTORM)

@@ -141,8 +141,8 @@ class WeatherManager:
         if not self.current_weather or not self.current_weather.active:
             return
 
-        # Só Sandstorm causa dano
-        if self.current_weather.type.value != "sandstorm":
+        # Só Sandstorm e Hail causa dano
+        if self.current_weather.type.value not in ("sandstorm", "hail"):
             return
 
         self._weather_damage_timer += dt
@@ -150,53 +150,52 @@ class WeatherManager:
         # Tick a cada 2 segundos (simula um "turno")
         if self._weather_damage_timer >= 2.0:
             self._weather_damage_timer = 0
-            self._apply_sandstorm_damage()
+            self._apply_weather_tick_damage()
 
-    def _apply_sandstorm_damage(self):
-        """Aplica dano de 1/16 do HP máximo para todos os Pokémon não-imunes"""
+    def _apply_weather_tick_damage(self):
+        """Aplica dano de Sandstorm ou Hail (1/16 do HP máximo) a cada tick."""
         if not self.battle_system or not self.battle_system.game_scene:
             return
 
+        weather_type = self.current_weather.type.value
         game_scene = self.battle_system.game_scene
         all_pokemon = []
 
-        # Aliados
         if hasattr(game_scene, 'placement_manager'):
             all_pokemon.extend(game_scene.placement_manager.placed_pokemon)
-
-        # Inimigos
         if hasattr(game_scene, 'wave_manager'):
             all_pokemon.extend(game_scene.wave_manager.active_enemies)
+
+        # ===== Tipos imunes por clima =====
+        if weather_type == "sandstorm":
+            immune_types = {'rock', 'ground', 'steel'}
+            immune_msg = "não foi afetado pela tempestade!"
+        elif weather_type == "hail":
+            immune_types = {'ice'}
+            immune_msg = "não foi afetado pelo granizo!"
+        else:
+            return
 
         for pokemon in all_pokemon:
             if not pokemon.is_alive() or pokemon.is_defeated:
                 continue
 
-            # Tipos imunes a Sandstorm: Rock, Ground, Steel
-            is_immune = any(t.lower() in ['rock', 'ground', 'steel'] for t in pokemon.types)
-
-            if is_immune:
+            if any(t.lower() in immune_types for t in pokemon.types):
                 if self.battle_system.effect_manager:
                     self.battle_system.effect_manager.add_status_text(
-                        pokemon,
-                        f"{pokemon.name} não foi afetado pela tempestade!",
-                        duration=1.0
+                        pokemon, f"{pokemon.name} {immune_msg}", duration=1.0
                     )
                 continue
 
-            # Calcula dano: 1/16 do HP máximo
             damage = max(1, pokemon.max_hp // 16)
-
             old_hp = pokemon.current_hp
             pokemon.take_damage(damage, attacker=None)
             actual_damage = old_hp - pokemon.current_hp
 
             if actual_damage > 0 and self.battle_system.effect_manager:
+                label = "Tempestade de Areia" if weather_type == "sandstorm" else "Granizo"
                 self.battle_system.effect_manager.add_status_text(
-                    pokemon,
-                    f"Tempestade de Areia: -{actual_damage} HP",
-                    duration=1.5
+                    pokemon, f"{label}: -{actual_damage} HP", duration=1.5
                 )
-
                 if hasattr(pokemon, 'play_hurt_animation'):
                     pokemon.play_hurt_animation()

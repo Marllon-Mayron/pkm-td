@@ -184,7 +184,17 @@ class DamageCalculator:
         - critical: True se foi acerto crítico
         """
         # 1. Verificar acerto (accuracy)
+        # 1. Verificar acerto (accuracy)
         hit_chance = move.accuracy / 100
+
+        # ===== BLIZZARD: 100% de acerto durante Hail =====
+        move_key = move.name.lower().replace(" ", "-")
+        if move_key == "blizzard":
+            if hasattr(attacker, 'battle_system') and attacker.battle_system:
+                if attacker.battle_system.get_weather_type() == WeatherType.HAIL:
+                    hit_chance = 1.0
+                    print("[HAIL] Blizzard tem 100% de acerto durante o granizo!")
+
         if random.random() > hit_chance:
             return {
                 "damage": 0,

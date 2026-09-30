@@ -63,21 +63,15 @@ _TABS = [
     ("god", "GOD"),
 ]
 
-_DAY_NIGHT_OPTIONS = [
-    ("day", "Dia"),
-    ("night", "Noite"),
-    ("dusk", "Entardecer"),
-    ("dawn", "Amanhecer"),
-    ("cave", "Caverna"),
-    ("deep", "Fundo do Mar"),
-]
+from src.battle.effects.specific.weather.weather_state import (
+    WeatherType, get_weather_ui_options, weather_from_string,
+)
+from src.battle.effects.specific.day_night.day_night_state import (
+    DayNightType, get_day_night_ui_options, day_night_from_string,
+)
 
-_WEATHER_OPTIONS = [
-    ("none", "Nenhum"),
-    ("rain", "Chuva"),
-    ("sunny", "Sol Forte"),
-    ("sandstorm", "Tempestade de Areia"),
-]
+_DAY_NIGHT_OPTIONS = get_day_night_ui_options()
+_WEATHER_OPTIONS = get_weather_ui_options()
 
 _ALL_ATTACK_PATTERNS = [
     (AttackPattern.RANDOM, "Aleatorio"),
@@ -750,29 +744,11 @@ class InGameDebugManager:
     # =========================================================
     # ACOES
     # =========================================================
-    def _set_day_night_type(self, type_val: str):
-        if not hasattr(self.gs, "day_night_weather"):
-            return
-        dns = self.gs.day_night_weather
-        type_map = {
-            "day": DayNightType.DAY, "night": DayNightType.NIGHT,
-            "dusk": DayNightType.DUSK, "dawn": DayNightType.DAWN,
-            "cave": DayNightType.CAVE, "deep": DayNightType.DEEP,
-        }
-        new_type = type_map.get(type_val)
-        if new_type is None:
-            return
-        duration = dns.day_night_state.duration if dns.day_night_state else 60
-        if new_type in (DayNightType.CAVE, DayNightType.DEEP):
-            duration = 999999.0
-        dns.day_night_state = DayNightState(new_type, duration)
-        dns.day_night_state.active = True
-        print(f"[DEBUG] Day/Night -> {new_type.value}")
-
     def _set_weather_type(self, type_val: str):
         if not hasattr(self.gs, "battle_system"):
             return
         wm = self.gs.battle_system.weather_manager
+
         if type_val == "none":
             wm.clear_weather()
             if getattr(wm, "base_weather", None):
@@ -780,16 +756,28 @@ class InGameDebugManager:
                 wm.base_weather = None
             wm.current_weather = None
             return
-        type_map = {
-            "rain": WeatherType.RAIN,
-            "sunny": WeatherType.SUNNY,
-            "sandstorm": WeatherType.SANDSTORM,
-        }
-        wtype = type_map.get(type_val)
-        if wtype is None:
+
+        wtype = weather_from_string(type_val)
+        if wtype == WeatherType.NONE:
             return
+
         wm.set_weather(wtype, duration=999999.0, source=None)
         print(f"[DEBUG] Weather -> {type_val}")
+
+    def _set_day_night_type(self, type_val: str):
+        if not hasattr(self.gs, "day_night_weather"):
+            return
+        dns = self.gs.day_night_weather
+
+        new_type = day_night_from_string(type_val)
+        duration = dns.day_night_state.duration if dns.day_night_state else 60
+
+        if new_type in (DayNightType.CAVE, DayNightType.DEEP):
+            duration = 999999.0
+
+        dns.day_night_state = DayNightState(new_type, duration)
+        dns.day_night_state.active = True
+        print(f"[DEBUG] Day/Night -> {new_type.value}")
 
     def _apply_weather(self):
         if not hasattr(self.gs, "battle_system"):
