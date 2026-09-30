@@ -184,16 +184,37 @@ class DamageCalculator:
         - critical: True se foi acerto crítico
         """
         # 1. Verificar acerto (accuracy)
-        # 1. Verificar acerto (accuracy)
         hit_chance = move.accuracy / 100
 
-        # ===== BLIZZARD: 100% de acerto durante Hail =====
+        # ===== COMBOS COM CLIMA (accuracy) =====
         move_key = move.name.lower().replace(" ", "-")
-        if move_key == "blizzard":
-            if hasattr(attacker, 'battle_system') and attacker.battle_system:
-                if attacker.battle_system.get_weather_type() == WeatherType.HAIL:
+        weather = None
+        if hasattr(attacker, 'battle_system') and attacker.battle_system:
+            weather = attacker.battle_system.get_weather_type()
+
+        if weather is not None:
+            # Blizzard: 100% em Hail
+            if move_key == "blizzard" and weather == WeatherType.HAIL:
+                hit_chance = 1.0
+                print("[HAIL] Blizzard tem 100% de acerto durante o granizo!")
+
+            # Thunder: 100% em Rain, 50% em Sunny
+            elif move_key == "thunder":
+                if weather == WeatherType.RAIN:
                     hit_chance = 1.0
-                    print("[HAIL] Blizzard tem 100% de acerto durante o granizo!")
+                    print("[RAIN] Thunder tem 100% de acerto durante a chuva!")
+                elif weather == WeatherType.SUNNY:
+                    hit_chance = 0.50
+                    print("[SUNNY] Thunder tem apenas 50% de acerto sob o sol forte!")
+
+            # Hurricane (quando existir): mesmo comportamento do Thunder
+            elif move_key == "hurricane":
+                if weather == WeatherType.RAIN:
+                    hit_chance = 1.0
+                    print("[RAIN] Hurricane tem 100% de acerto durante a chuva!")
+                elif weather == WeatherType.SUNNY:
+                    hit_chance = 0.50
+                    print("[SUNNY] Hurricane tem apenas 50% de acerto sob o sol forte!")
 
         if random.random() > hit_chance:
             return {

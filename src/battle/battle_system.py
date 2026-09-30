@@ -1,6 +1,7 @@
 # src/battle/battle_system.py
 import random
 
+from src.battle.effects import EffectTarget
 from src.battle.effects.specific.weather.weather_manager import WeatherManager
 from src.battle.effects.specific.weather.weather_state import WeatherType
 from src.battle.effects.residual_effect import ResidualEffectManager
@@ -56,6 +57,8 @@ class BattleSystem:
 
         # ===== ATUALIZA BLOQUEIOS DE AÇÃO (Torment/Taunt/Imprison) =====
         self._update_action_blocks(dt)
+        # ===== ATUALIZA REDIRECIONAMENTOS DE MOVES
+        self._update_redirect_effects(dt)
 
         # Atualiza multi-hit ativo
         if self.active_multi_hit:
@@ -265,6 +268,11 @@ class BattleSystem:
             print(f"[BATTLE] {attacker.name} está derrotado e não pode atacar!")
             return False
 
+        # ===== DETECTA SE É O 1º MOVE DO POKÉMON EM CAMPO (Fake Out) =====
+        was_first = not getattr(attacker, '_has_used_move_this_battle', False)
+        attacker._has_used_move_this_battle = True
+        attacker._was_first_attack_this_battle = was_first
+
         if target and target.is_defeated:
             print(f"[BATTLE] {target.name} está derrotado e não pode ser atacado!")
             return False
@@ -461,13 +469,46 @@ class BattleSystem:
                 # ===== MISS QUEBRA LOCK-IN =====
                 self._on_move_miss(attacker, move)
             else:
-                # Aplica o efeito do move de status
                 from src.battle.effects import EffectFactory
                 effect = EffectFactory.create_effect(move.name)
-                if effect:
-                    effect.execute(attacker, target, self, self.effect_manager)
-                else:
-                    self.effect_manager.add_status_text(attacker, f"{attacker.name} usou {move.name}!", duration=1.0)
+
+                # ===== MAGIC COAT: reflete moves de status TARGET =====
+                reflected = False
+                if (
+                        target
+                        and getattr(target, '_magic_coat_active', False)
+                        and effect is not None
+                        and effect.target == EffectTarget.TARGET
+                        and move.name.lower().replace(" ", "-") != "magic-coat"
+                ):
+                    # Mostra a reflexão
+                    self.effect_manager.add_status_text(
+                        target,
+                        f"{target.name} refletiu {move.name}!",
+                        duration=2.0
+                    )
+                    self.effect_manager.add_status_text(
+                        attacker,
+                        f"{attacker.name} foi atingido pelo próprio {move.name}!",
+                        duration=2.0
+                    )
+                    print(f"[MAGIC_COAT] {target.name} refletiu {move.name} de volta para {attacker.name}!")
+
+                    # Executa o efeito com papeis INVERTIDOS
+                    if effect:
+                        effect.execute(target, attacker, self, self.effect_manager)
+                    reflected = True
+
+                # ===== FLUXO NORMAL =====
+                if not reflected:
+                    if effect:
+                        effect.execute(attacker, target, self, self.effect_manager)
+                    else:
+                        self.effect_manager.add_status_text(
+                            attacker,
+                            f"{attacker.name} usou {move.name}!",
+                            duration=1.0
+                        )
 
             if move.name.lower() != "struggle":
                 attacker._last_used_move = move.name
@@ -816,17 +857,20 @@ class BattleSystem:
         if not getattr(attacker, '_locked_move_name', None):
             return
 
-        # Só Ice Ball quebra em miss (Uproar sempre acerta)
-        if move.name.lower().replace(" ", "-") != "ice-ball":
+        norm = move.name.lower().replace(" ", "-")
+
+        # Rollout e Ice Ball quebram o lock em miss
+        if norm not in ("rollout", "ice-ball"):
             return
 
+        display = "Bola de Gelo" if norm == "ice-ball" else "Rolagem"
         attacker.clear_lock_in()
         self.effect_manager.add_status_text(
             attacker,
-            f"{attacker.name} errou! A Bola de Gelo quebrou!",
+            f"{attacker.name} errou! {display} quebrou!",
             duration=2.0
         )
-        print(f"[ICE_BALL] {attacker.name} errou → lock-in quebrado")
+        print(f"[LOCK_IN] {attacker.name} errou {norm} → lock-in quebrado")
 
     def _calculate_struggle_damage(self, attacker, target, move):
         """
@@ -1056,9 +1100,16 @@ class BattleSystem:
 
     def _calculate_move_damage(self, attacker, target, move, ignore_random: bool = False):
         """Calcula dano do move com modificadores de stat e screens"""
-        damage_result = DamageCalculator.calculate_damage(
-            attacker, target, move, ignore_random=ignore_random
-        )
+        # ===== APLICA MODIFICADORES CONDICIONAIS DE PODER =====
+        original_power = move.power
+        move.power = self._apply_conditional_power_modifiers(attacker, target, move)
+
+        try:
+            damage_result = DamageCalculator.calculate_damage(
+                attacker, target, move, ignore_random=ignore_random
+            )
+        finally:
+            move.power = original_power
 
         if not damage_result["hit"]:
             return damage_result
@@ -1119,6 +1170,42 @@ class BattleSystem:
                 damage_result["damage"] = int(damage_result["damage"] * 0.5)
 
         return damage_result
+
+    def _apply_conditional_power_modifiers(self, attacker, target, move) -> int:
+        """
+        Retorna o poder final do move após modificadores condicionais
+        (Facade, Smelling Salts, Charge). Não muta o move.
+        """
+        if not move.power or move.power <= 0:
+            return move.power or 0
+
+        key = move.name.lower().replace(" ", "-")
+        base = move.power
+        multiplier = 1.0
+
+        # ===== FACADE: dobra se o ATACANTE tem status (queimadura/veneno/paralisia) =====
+        if key == "facade":
+            status = self.effect_manager.get_status(attacker)
+            if status and status.type in (
+                    StatusType.POISON, StatusType.TOXIC_POISON,
+                    StatusType.PARALYSIS, StatusType.BURN):
+                multiplier = 2.0
+                print(f"[FACADE] {attacker.name} está com status → poder x2!")
+
+        # ===== SMELLING SALTS: dobra se o ALVO está paralisado =====
+        elif key == "smelling-salts":
+            status = self.effect_manager.get_status(target)
+            if status and status.type == StatusType.PARALYSIS:
+                multiplier = 2.0
+                print(f"[SMELLING_SALTS] {target.name} está paralisado → poder x2!")
+
+        # ===== CHARGE: próximo Elétrico dobrado =====
+        elif move.type.lower() == "electric" and getattr(attacker, '_charge_active', False):
+            multiplier = 2.0
+            attacker._charge_active = False  # consome (só o próximo)
+            print(f"[CHARGE] {attacker.name} usou Elétrico carregado → poder x2!")
+
+        return int(base * multiplier)
 
     def _apply_move_effect(self, attacker, target, move, damage):
         """Aplica efeitos especiais do move (multi-hit, flinch, etc)"""
@@ -1271,6 +1358,52 @@ class BattleSystem:
 
         for pokemon in pokemon_list:
             self._update_pokemon_action_blocks(pokemon, dt)
+
+    def _update_redirect_effects(self, dt: float):
+        """Atualiza contadores de Follow Me e Magic Coat."""
+        if not hasattr(self, 'game_scene') or not self.game_scene:
+            return
+
+        pokemon_list = []
+        if hasattr(self.game_scene, 'placement_manager'):
+            pokemon_list.extend(self.game_scene.placement_manager.placed_pokemon)
+        if hasattr(self.game_scene, 'wave_manager'):
+            pokemon_list.extend(self.game_scene.wave_manager.active_enemies)
+
+        for pokemon in pokemon_list:
+            # Follow Me
+            if getattr(pokemon, '_follow_me_turns', 0) > 0:
+                pokemon._follow_me_timer = getattr(pokemon, '_follow_me_timer', 0.0) + dt
+                if pokemon._follow_me_timer >= 2.0:
+                    pokemon._follow_me_timer = 0.0
+                    pokemon._follow_me_turns -= 1
+                    if pokemon._follow_me_turns <= 0:
+                        pokemon._follow_me_active = False
+                        pokemon._follow_me_turns = 0
+                        if hasattr(pokemon, 'effect_manager') and pokemon.effect_manager:
+                            pokemon.effect_manager.add_status_text(
+                                pokemon,
+                                f"{pokemon.name} parou de chamar a atenção!",
+                                duration=1.5
+                            )
+                        print(f"[FOLLOW_ME] {pokemon.name} expirou")
+
+            # Magic Coat
+            if getattr(pokemon, '_magic_coat_turns', 0) > 0:
+                pokemon._magic_coat_timer = getattr(pokemon, '_magic_coat_timer', 0.0) + dt
+                if pokemon._magic_coat_timer >= 2.0:
+                    pokemon._magic_coat_timer = 0.0
+                    pokemon._magic_coat_turns -= 1
+                    if pokemon._magic_coat_turns <= 0:
+                        pokemon._magic_coat_active = False
+                        pokemon._magic_coat_turns = 0
+                        if hasattr(pokemon, 'effect_manager') and pokemon.effect_manager:
+                            pokemon.effect_manager.add_status_text(
+                                pokemon,
+                                f"{pokemon.name} baixou a barreira mágica!",
+                                duration=1.5
+                            )
+                        print(f"[MAGIC_COAT] {pokemon.name} expirou")
 
     def _update_pokemon_action_blocks(self, pokemon, dt: float):
         """Atualiza bloqueios de ação de um Pokémon individual."""

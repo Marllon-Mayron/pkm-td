@@ -357,15 +357,16 @@ class EffectFactory:
             "description": "Paralisa o oponente"
         },
         "thunder": {
-            "effect_type": "status",
+            "effect_type": "status_chance",    # ← CORRIGIDO
             "target": EffectTarget.TARGET,
             "timing": EffectTiming.ON_HIT,
             "params": {
                 "status": "paralysis",
-                "chance": 0.3,
-                "duration": None
+                "chance": 0.30,
+                "duration": None,
+                "overwrite": False,
             },
-            "description": "Paralisa o oponente"
+            "description": "Pode paralisar o alvo (30%). Na chuva, acerto perfeito. Sob o sol, acerta apenas 50%."
         },
         "stun-spore": {
             "effect_type": "status",
@@ -1496,6 +1497,35 @@ class EffectFactory:
             },
             "description": "Soco rápido. Aumenta a Velocidade do usuário por alguns segundos."
         },
+
+        "fake-out": {
+            "effect_type": "fake_out",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {},
+            "description": "Só funciona no 1º movimento. Faz o alvo hesitar."
+        },
+        "facade": {
+            "effect_type": "no_runtime_effect",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {},
+            "description": "Dobra o dano se o usuário estiver com queimadura, veneno ou paralisia."
+        },
+        "smelling-salts": {
+            "effect_type": "smelling_salts",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {},
+            "description": "Dobra o dano se o alvo estiver paralisado. Cura a paralisia."
+        },
+        "charge": {
+            "effect_type": "charge",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {},
+            "description": "Aumenta Defesa Especial e dobra o poder do próximo move Elétrico."
+        },
     }
 
     MOVE_EFFECTS_GEN2 = {
@@ -2156,15 +2186,13 @@ class EffectFactory:
         "rollout": {
             "effect_type": "rollout",
             "target": EffectTarget.TARGET,
-            "timing": EffectTiming.ON_HIT,
+            "timing": EffectTiming.AFTER_DAMAGE,
             "params": {
+                "turns": 5,
                 "base_power": 30,
-                "power_multiplier": 2,  # Dobra a cada acerto consecutivo
-                "max_multiplier": 16,   # Máximo 16x (poder 480)
-                "defense_curl_boost": 2,  # Defense Curl dobra poder base
-                "reset_on_miss": True,    # Reseta se errar
+                "max_multiplier": 16,
             },
-            "description": "Poder dobra a cada acerto consecutivo. Máximo 480. Defense Curl dobra o poder base."
+            "description": "Rolagem: 5 turnos, poder dobra a cada acerto (máx 16x). Defense Curl dobra base."
         },
         "foresight": {
             "effect_type": "foresight",
@@ -3078,6 +3106,26 @@ class EffectFactory:
                 "duration": 15.0,
             },
             "description": "Causa uma tempestade de granizo por 10 segundos. Ice é imune."
+        },
+
+        # ===== REDIRECIONAR / REFLETIR =====
+        "follow-me": {
+            "effect_type": "follow_me",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "turns": 2,  # 2 turnos = ~4 segundos
+            },
+            "description": "Redireciona os ataques dos inimigos para o usuário por 2 turnos."
+        },
+        "magic-coat": {
+            "effect_type": "magic_coat",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "turns": 2,
+            },
+            "description": "Reflete moves de status de volta para o atacante por 2 turnos."
         },
     }
 

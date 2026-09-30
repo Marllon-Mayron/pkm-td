@@ -343,6 +343,16 @@ class MoveEffect:
             return self._apply_role_play(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "skill_swap":
             return self._apply_skill_swap(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "fake_out":
+            return self._apply_fake_out(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "smelling_salts":
+            return self._apply_smelling_salts(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "charge":
+            return self._apply_charge(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "follow_me":
+            return self._apply_follow_me(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "magic_coat":
+            return self._apply_magic_coat(attacker, target, battle_system, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -430,17 +440,15 @@ class MoveEffect:
         """
         from src.battle.effects.stat_modifier import StatType
 
+        # ===== DEFENSE CURL MARCA O POKÉMON =====
+        if self.name.lower().replace(" ", "-") == "defense-curl":
+            attacker._defense_curl_used = True
+            print(f"[DEFENSE_CURL] {attacker.name} marcado para Rollout/Ice Ball")
+
         # Verifica se é formato antigo (stat único) ou novo (stats lista)
         if "stats" in self.params:
             stats_list = self.params.get("stats", [])
             duration = self.params.get("duration", 8.0)
-
-            # Verifica condições climáticas (Sunny Day para Growth)
-            #sun_boost = self.params.get("sun_boost", False)
-            #if sun_boost:
-                # Verifica se está com Sunny Day ativo
-                #is_sunny = self._is_sunny_day_active(attacker, effect_manager)
-
 
             # Aplica cada modificador
             success_count = 0
@@ -472,7 +480,7 @@ class MoveEffect:
                     effect_manager.add_stat_modifier(target_entity, stat_type, stages, duration)
                     success_count += 1
 
-                    # Mensagem para cada stat (opcional, pode ser simplificado)
+                    # Mensagem para cada stat
                     stat_display = {
                         StatType.ATTACK: "Ataque",
                         StatType.DEFENSE: "Defesa",
@@ -5415,145 +5423,65 @@ class MoveEffect:
 
     def _apply_rollout(self, attacker, target, battle_system, effect_manager):
         """
-        Aplica o efeito Rollout (sem lock-in).
-
-        Mecânica:
-        - Poder dobra a cada acerto consecutivo
-        - Se errar, reseta o contador
-        - Defense Curl dobra o poder base
+        Rollout: 5 turnos de lock-in. Delega para o handler genérico.
         """
-        from src.battle.damage_calculator import DamageCalculator
+        return self._apply_lock_in_attack(
+            attacker, battle_system, effect_manager,
+            move_name="rollout", turns=5
+        )
+
+    def _apply_lock_in_attack(self, attacker, battle_system, effect_manager,
+                              move_name: str, turns: int):
+        """
+        Handler genérico para Rollout / Ice Ball.
+        - Primeiro uso: ativa lock-in com N turnos
+        - Usos seguintes: decrementa turns; ao chegar em 0, limpa o lock
+        O scaling de poder é feito por Pokemon._get_locked_move().
+        """
         from src.managers.sounds.move_sound_manager import move_sound_manager
-        from src.battle.effects.stat_modifier import StatType
-        import random
 
-        # ===== OBTÉM O MOVE ATUAL =====
-        current_move = attacker.get_current_move()
-        if not current_move:
-            print(f"[ROLLOUT] {attacker.name} não tem move selecionado!")
-            return False
+        # ===== PRIMEIRO USO =====
+        if not getattr(attacker, '_locked_move_name', None):
+            base = 60 if getattr(attacker, '_defense_curl_used', False) else 30
 
-        # Verifica PP
-        if current_move.current_pp <= 0:
-            effect_manager.add_status_text(attacker, f"Não há PP para {current_move.name}!", duration=1.0)
-            return False
+            attacker._locked_move_name = move_name
+            attacker._locked_move_turns = turns - 1  # 1º hit já foi
+            attacker._locked_move_hit_count = 2  # próximo hit usa ×2
+            attacker._locked_move_original_power = base
 
-        # Gasta PP
-        current_move.current_pp -= 1
-
-        # ===== INICIALIZA CONTADOR SE NÃO EXISTIR =====
-        if not hasattr(attacker, '_rollout_hit_count'):
-            attacker._rollout_hit_count = 0
-            attacker._rollout_base_power = 0
-
-        # ===== CALCULA PODER BASE =====
-        base_power = self.params.get("base_power", 30)
-
-        # Verifica se usou Defense Curl
-        if hasattr(attacker, '_defense_curl_used') and attacker._defense_curl_used:
-            base_power *= self.params.get("defense_curl_boost", 2)
+            display = "Bola de Gelo" if move_name == "ice-ball" else "Rolagem"
             effect_manager.add_status_text(
                 attacker,
-                f"Defense Curl dobrou o poder!",
-                duration=1.0
+                f"{attacker.name} começou uma {display}! ({turns} turnos)",
+                duration=2.0
             )
-            print(f"[ROLLOUT] Defense Curl ativo! Poder base: {base_power}")
+            print(f"[LOCK_IN] {attacker.name} iniciou {move_name} (turns={turns}, base={base})")
+            return True
 
-        attacker._rollout_base_power = base_power
+        # ===== USOS SUBSEQUENTES =====
+        if attacker._locked_move_name != move_name:
+            return False
 
-        # ===== CALCULA PODER ATUAL =====
-        # Poder = base_power * (2 ^ hit_count), máximo 16x
-        power_multiplier = 2 ** attacker._rollout_hit_count
-        max_multiplier = self.params.get("max_multiplier", 16)
-        power_multiplier = min(power_multiplier, max_multiplier)
-        current_power = base_power * power_multiplier
+        attacker._locked_move_hit_count += 1
+        attacker._locked_move_turns -= 1
 
-        # Mostra mensagem de acúmulo
-        if attacker._rollout_hit_count > 0:
+        base = 60 if getattr(attacker, '_defense_curl_used', False) else 30
+        mult = min(2 ** (attacker._locked_move_hit_count - 1), 16)
+        current_power = base * mult
+
+        display = "Bola de Gelo" if move_name == "ice-ball" else "Rolagem"
+        effect_manager.add_status_text(
+            attacker,
+            f"{display} ficou mais forte! (Poder {current_power})",
+            duration=1.0
+        )
+
+        if attacker._locked_move_turns <= 0:
+            attacker.clear_lock_in()
             effect_manager.add_status_text(
-                attacker,
-                f"Rolagem crescente! Poder {current_power}!",
-                duration=1.0
+                attacker, f"A {display} acabou!", duration=2.0
             )
-
-        print(
-            f"[ROLLOUT] {attacker.name}: hits={attacker._rollout_hit_count}, mult={power_multiplier}x, power={current_power}")
-
-        # ===== SUBSTITUI O PODER TEMPORARIAMENTE =====
-        original_power = current_move.power
-        current_move.power = current_power
-
-        # ===== TOCA SOM =====
-        move_sound_manager.play_attack_sound(current_move.sound_name)
-
-        # ===== CALCULA ACERTO =====
-        hit_chance = current_move.accuracy / 100
-        accuracy_mult = effect_manager.get_stat_multiplier(attacker, StatType.ACCURACY)
-        evasion_mult = effect_manager.get_stat_multiplier(target, StatType.EVASION)
-        final_hit_chance = hit_chance * accuracy_mult / evasion_mult
-        final_hit_chance = max(0.01, min(1.0, final_hit_chance))
-
-        will_hit = random.random() <= final_hit_chance
-
-        if not will_hit:
-            # ===== ERROU - RESETA CONTADOR =====
-            effect_manager.add_status_text(attacker, f"{attacker.name} errou! A sequência foi quebrada!", duration=1.0)
-            move_sound_manager.play_attack_sound("miss")
-
-            # Reseta o contador
-            attacker._rollout_hit_count = 0
-            attacker._rollout_base_power = 0
-            print(f"[ROLLOUT] {attacker.name} errou! Sequência resetada.")
-
-            # Restaura poder original
-            current_move.power = original_power
-            attacker.attack_cooldown = attacker.attack_cooldown_max
-            return True
-
-        # ===== ACERTOU - CALCULA DANO =====
-        damage_result = DamageCalculator.calculate_damage(attacker, target, current_move)
-
-        # Restaura poder original
-        current_move.power = original_power
-
-        if not damage_result["hit"]:
-            if damage_result.get("effectiveness", 1.0) == 0:
-                effect_manager.add_status_text(target, "Não afeta!", duration=1.0)
-                # Se for imune, também reseta
-                attacker._rollout_hit_count = 0
-                attacker._rollout_base_power = 0
-            attacker.attack_cooldown = attacker.attack_cooldown_max
-            return True
-
-        # ===== APLICA DANO =====
-        damage = damage_result["damage"]
-
-        if damage > 0:
-            target.take_damage(damage, attacker=attacker)
-
-
-            print(
-                f"[ROLLOUT] {attacker.name} causou {damage} de dano (poder: {current_power}, hits: {attacker._rollout_hit_count})")
-
-            # ===== INCREMENTA CONTADOR PARA PRÓXIMO USO =====
-            # Verifica se já atingiu o máximo de multiplicador
-            max_hits = 0
-            mult = 1
-            while mult < max_multiplier:
-                mult *= 2
-                max_hits += 1
-            # max_hits = 4 para 16x (1,2,4,8,16)
-
-            if attacker._rollout_hit_count < max_hits:
-                attacker._rollout_hit_count += 1
-            else:
-                # Já no máximo, não aumenta mais
-                if attacker._rollout_hit_count < max_hits + 1:
-                    attacker._rollout_hit_count += 1
-                print(f"[ROLLOUT] {attacker.name} atingiu o poder máximo!")
-
-        # Cooldown
-        attacker.attack_cooldown = attacker.attack_cooldown_max
+            print(f"[LOCK_IN] {attacker.name} terminou {move_name}")
 
         return True
 
@@ -6932,56 +6860,11 @@ class MoveEffect:
         print(f"[UPROAR] {attacker.name} parou o alvoroço")
 
     def _apply_ice_ball(self, attacker, target, battle_system, effect_manager):
-        """
-        Ice Ball: 5 turnos de lock-in.
-        - Poder dobra a cada acerto (aplicado em _get_locked_move)
-        - Se errar, lock quebra (via BattleSystem._on_move_miss)
-        - Defense Curl dobra a base (60 em vez de 30)
-        """
-        # ===== PRIMEIRO USO =====
-        if not getattr(attacker, '_locked_move_name', None):
-            base_power = 30
-            if getattr(attacker, '_defense_curl_used', False):
-                base_power = 60
-
-            attacker._locked_move_name = "ice-ball"
-            attacker._locked_move_turns = 5
-            attacker._locked_move_hit_count = 1
-            attacker._locked_move_original_power = base_power
-
-            effect_manager.add_status_text(
-                attacker,
-                f"{attacker.name} começou uma Bola de Gelo! (5 turnos)",
-                duration=2.0
-            )
-            print(f"[ICE_BALL] {attacker.name} iniciou Ice Ball (base={base_power})")
-            return True
-
-        # ===== USOS SUBSEQUENTES =====
-        if attacker._locked_move_name != "ice-ball":
-            return False
-
-        attacker._locked_move_hit_count += 1
-        attacker._locked_move_turns -= 1
-
-        base = 60 if getattr(attacker, '_defense_curl_used', False) else 30
-        mult = min(2 ** (attacker._locked_move_hit_count - 1), 16)
-        current_power = base * mult
-
-        effect_manager.add_status_text(
-            attacker,
-            f"Bola de Gelo ficou mais forte! (Poder {current_power})",
-            duration=1.0
+        """Ice Ball: 5 turnos de lock-in. Delega para o handler genérico."""
+        return self._apply_lock_in_attack(
+            attacker, battle_system, effect_manager,
+            move_name="ice-ball", turns=5
         )
-
-        if attacker._locked_move_turns <= 0:
-            attacker.clear_lock_in()
-            effect_manager.add_status_text(
-                attacker, "A Bola de Gelo acabou!", duration=2.0
-            )
-            print(f"[ICE_BALL] {attacker.name} terminou Ice Ball")
-
-        return True
 
     def _any_uproar_active(self, battle_system) -> bool:
         """Verifica se algum Pokémon em campo está com Uproar ativo."""
@@ -7073,3 +6956,140 @@ class MoveEffect:
         if isinstance(ability, (list, tuple)):
             return " / ".join(str(a).replace("-", " ").title() for a in ability)
         return str(ability)
+
+    # ===== COMPORTAMENTO CONDICIONAL =====
+
+    def _apply_fake_out(self, attacker, target, battle_system, effect_manager):
+        """Fake Out: flinch 100% no 1º move da batalha, senão falha."""
+        if not getattr(attacker, '_was_first_attack_this_battle', False):
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} já usou um move! Fake Out falhou!",
+                duration=1.5
+            )
+            print(f"[FAKE_OUT] {attacker.name} não é o 1º move → falhou")
+            return False
+
+        if not target or target.is_defeated or not target.is_alive():
+            return False
+
+        # Aplica flinch 100% (reset do cooldown do alvo)
+        target.attack_cooldown = max(0.5, 1.0 - (target.speed_stat / 500))
+
+        effect_manager.add_status_text(
+            target, f"{target.name} hesitou com o susto!", duration=1.5
+        )
+        print(f"[FAKE_OUT] {attacker.name} fez {target.name} hesitar!")
+        return True
+
+    def _apply_smelling_salts(self, attacker, target, battle_system, effect_manager):
+        """
+        Smelling Salts: cura a paralisia do alvo (se houver) após o dano.
+        O ×2 de poder é aplicado em BattleSystem._calculate_move_damage.
+        """
+        if not target or target.is_defeated or not target.is_alive():
+            return False
+
+        status = effect_manager.get_status(target)
+        if not status or status.type != StatusType.PARALYSIS:
+            return False
+
+        # Cura a paralisia
+        effect_manager.remove_status(target)
+
+        effect_manager.add_status_text(
+            target,
+            f"{target.name} foi curado da paralisia!",
+            duration=2.0
+        )
+        print(f"[SMELLING_SALTS] {target.name} curou paralisia!")
+        return True
+
+    def _apply_charge(self, attacker, target, battle_system, effect_manager):
+        """
+        Charge: +1 SpDef e marca o próximo move Elétrico para ter poder dobrado.
+        """
+        from src.battle.effects.stat_modifier import StatType
+
+        # +1 SpDef (6s, mesmo padrão do resto do projeto)
+        effect_manager.add_stat_modifier(
+            attacker, StatType.SP_DEFENSE, 1, duration=6.0
+        )
+
+        # Marca o "carga ativa"
+        attacker._charge_active = True
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} está carregado!",
+            duration=2.0
+        )
+        effect_manager.add_status_text(
+            attacker,
+            "O próximo move Elétrico terá o dobro de poder!",
+            duration=2.0
+        )
+        print(f"[CHARGE] {attacker.name} carregou energia! Próximo Elétrico x2")
+        return True
+
+
+    # ===== REDIRECIONAR / REFLETIR =====
+
+    def _apply_follow_me(self, attacker, target, battle_system, effect_manager):
+        """Follow Me: os atacantes no range preferem este Pokémon como alvo."""
+        if getattr(attacker, '_follow_me_active', False):
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} já está chamando a atenção!",
+                duration=1.5
+            )
+            return False
+
+        turns = self.params.get("turns", 2)
+
+        attacker._follow_me_active = True
+        attacker._follow_me_turns = turns
+        attacker._follow_me_timer = 0.0
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} chamou a atenção dos inimigos!",
+            duration=2.0
+        )
+        effect_manager.add_status_text(
+            attacker,
+            f"Todos vão mirar em {attacker.name}!",
+            duration=2.0
+        )
+        print(f"[FOLLOW_ME] {attacker.name} ativou Follow Me ({turns} turnos)")
+        return True
+
+
+    def _apply_magic_coat(self, attacker, target, battle_system, effect_manager):
+        """Magic Coat: reflete moves de status que têm como alvo o usuário."""
+        if getattr(attacker, '_magic_coat_active', False):
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} já está com Magic Coat ativo!",
+                duration=1.5
+            )
+            return False
+
+        turns = self.params.get("turns", 2)
+
+        attacker._magic_coat_active = True
+        attacker._magic_coat_turns = turns
+        attacker._magic_coat_timer = 0.0
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} ergueu uma barreira mágica!",
+            duration=2.0
+        )
+        effect_manager.add_status_text(
+            attacker,
+            "Moves de status serão refletidos!",
+            duration=2.0
+        )
+        print(f"[MAGIC_COAT] {attacker.name} ativou Magic Coat ({turns} turnos)")
+        return True

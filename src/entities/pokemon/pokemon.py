@@ -252,6 +252,18 @@ class Pokemon(Entity):
         self._locked_move_original_power = None
         self._uproar_active = False  # impede sono em campo
 
+        # ===== Comportamento por Batalha (Fake Out / Facade / Charge) =====
+        self._has_used_move_this_battle = False  # já atacou desde que entrou em campo
+        self._was_first_attack_this_battle = False  # foi o 1º ataque?
+        self._charge_active = False  # próximo Elétrico com poder dobrado
+
+        # ===== Sprint 12: Redirecionar / Refletir =====
+        self._follow_me_active = False
+        self._follow_me_turns = 0
+        self._follow_me_timer = 0.0
+        self._magic_coat_active = False
+        self._magic_coat_turns = 0
+        self._magic_coat_timer = 0.0
         # ===== HABILIDADE (Role Play / Skill Swap) =====
         # NOTA: habilidades ainda não têm efeito no jogo.
         # Deixamos None por padrão — has_ability() sempre retorna False
@@ -1624,6 +1636,9 @@ class Pokemon(Entity):
         self.clear_action_blocks()
         self.clear_lock_in()
         self.restore_original_ability()
+        self.clear_redirect_effects()
+
+        self._charge_active = False
 
         # Remove referência local ao status_effect se existir
         if hasattr(self, 'status_effect'):
@@ -1722,6 +1737,15 @@ class Pokemon(Entity):
         if hasattr(self, '_last_protect_used'):
             self._last_protect_used = False
 
+    def clear_redirect_effects(self):
+        """Remove Follow Me / Magic Coat."""
+        self._follow_me_active = False
+        self._follow_me_turns = 0
+        self._follow_me_timer = 0.0
+        self._magic_coat_active = False
+        self._magic_coat_turns = 0
+        self._magic_coat_timer = 0.0
+
     def is_trapped(self) -> bool:
         """Verifica se o Pokémon está preso (Block ou Ingrain)."""
         return getattr(self, '_trapped', False) or getattr(self, '_ingrain_active', False)
@@ -1783,8 +1807,7 @@ class Pokemon(Entity):
     def _get_locked_move(self):
         """
         Retorna o move forçado se houver lock-in ativo.
-        - Se o move não estiver mais disponível (PP = 0), limpa o lock e retorna None.
-        - Aplica scaling de poder do Ice Ball aqui (antes do cálculo de dano).
+        Aplica scaling de poder para moves que dobram a cada hit.
         """
         if not self._locked_move_name:
             return None
@@ -1797,12 +1820,11 @@ class Pokemon(Entity):
                 break
 
         if locked is None:
-            # Move indisponível → quebra o lock
             self.clear_lock_in()
             return None
 
-        # ===== SCALING DO ICE BALL =====
-        if self._locked_move_name == "ice-ball":
+        # ===== SCALING PARA ROLLOUT / ICE BALL =====
+        if self._locked_move_name in ("rollout", "ice-ball"):
             base = 60 if getattr(self, '_defense_curl_used', False) else 30
             mult = min(2 ** (self._locked_move_hit_count - 1), 16)
             locked.power = base * mult
@@ -1935,6 +1957,12 @@ class Pokemon(Entity):
         self.clear_action_blocks()
         self.clear_lock_in()
         self.restore_original_ability()
+        self.clear_redirect_effects()
+
+        # ===== Reset de estados de batalha =====
+        self._has_used_move_this_battle = False
+        self._was_first_attack_this_battle = False
+        self._charge_active = False
 
         print(f"[FULL_RESTORE] {self.name} completamente restaurado! HP: {self.current_hp}/{self.max_hp}")
         return True
