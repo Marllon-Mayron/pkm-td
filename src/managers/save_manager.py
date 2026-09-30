@@ -7,9 +7,12 @@ import pickle
 from datetime import datetime
 from typing import Dict
 
-SAVE_FORMAT_VERSION = "0.1.9"  # Versão do FORMATO do save (ATUALIZADA)
-GAME_VERSION_COMPATIBLE = "0.1.22"  # Versão do jogo que usa este formato
+SAVE_FORMAT_VERSION = "0.2.0"  # Versão do FORMATO do save (ATUALIZADA)
+GAME_VERSION_COMPATIBLE = "0.2.0"
 
+from src.config.regions import (
+    DEFAULT_REGION_ID, parse_phase_id, make_phase_id, normalize_phase_id
+)
 
 class SaveManager:
     """
@@ -54,6 +57,7 @@ class SaveManager:
             },
             "player": {
                 "uuid": str(uuid.uuid4()),
+                "current_region": 1,
                 "money": 100,
                 "score": 0,
                 "position": {"x": 0, "y": 0},
@@ -81,10 +85,11 @@ class SaveManager:
                 },
             },
             "game_state": {
+                "current_region": 1,
                 "current_chapter": 1,
                 "current_phase": 1,
                 "unlocked_chapters": [1],
-                "unlocked_phases": ["1-1"],
+                "unlocked_phases": ["1:1:1"],
                 "completed_phases": [],
                 "stars": {}
             },
@@ -917,7 +922,7 @@ class SaveManager:
         completed = set(str(p) for p in game_state.get("completed_phases", []))
 
         # 1-1 sempre desbloqueada (fallback de segurança)
-        unlocked.add("1-1")
+        unlocked.add("1:1:1")
 
         changes = False
         sorted_chapters = sorted(all_phases.keys())
@@ -1347,6 +1352,72 @@ class SaveManager:
                 print(f"[MIGRATE] 'speed' adicionado (fallback final) para {pokemon_data.get('name', 'Unknown')} na box")
             elif "speed_stat" in pokemon_data:
                 del pokemon_data["speed_stat"]
+
+                # ===== MIGRAÇÃO PARA 0.2.0 (REGIÕES) =====
+                if version <= "0.1.9":
+                    print("[MIGRATE] Migrando para 0.2.0 (REGIÕES)...")
+
+                    from src.config.regions import DEFAULT_REGION_ID
+
+                    def _normalize_pid(raw):
+                        try:
+                            from src.config.regions import normalize_phase_id
+                            return normalize_phase_id(raw)
+                        except Exception:
+                            return "1:1:1"
+
+                    # --- 1) NORMALIZA IDs DE FASE (não reseta!) ---
+                    gs = migrated.setdefault("game_state", {})
+                    old_unlocked = gs.get("unlocked_phases", [])
+                    old_completed = gs.get("completed_phases", [])
+                    old_stars = gs.get("stars", {})
+
+                    gs["unlocked_phases"] = sorted({_normalize_pid(p) for p in old_unlocked}) or ["1:1:1"]
+                    gs["completed_phases"] = sorted({_normalize_pid(p) for p in old_completed})
+                    gs["stars"] = {_normalize_pid(k): v for k, v in old_stars.items()}
+
+                    # Garante 1:1:1
+                    if "1:1:1" not in gs["unlocked_phases"]:
+                        gs["unlocked_phases"].append("1:1:1")
+                        gs["unlocked_phases"].sort()
+
+                    gs["current_region"] = DEFAULT_REGION_ID
+                    gs.setdefault("current_chapter", 1)
+                    gs.setdefault("current_phase", 1)
+
+                    print(f"[MIGRATE] unlocked: {len(old_unlocked)} -> "
+                          f"{len(gs['unlocked_phases'])} (normalizado)")
+                    print(f"[MIGRATE] completed: {len(old_completed)} -> "
+                          f"{len(gs['completed_phases'])} (normalizado)")
+
+                    # --- 2) CONQUISTAS: normaliza phase_id e fallback p/ Kanto ---
+                    ach = migrated.get("player", {}).get("achievements", {})
+                    if not isinstance(ach, dict):
+                        ach = {"unlocked": [], "counters": {}, "unlocked_data": {}}
+                        migrated["player"]["achievements"] = ach
+                    ud = ach.setdefault("unlocked_data", {})
+
+                    fixed = 0
+                    for aid, data in ud.items():
+                        if not isinstance(data, dict):
+                            continue
+                        raw = data.get("unlocked_phase")
+                        if raw is None:
+                            data["unlocked_phase"] = "1:1:1"
+                            fixed += 1
+                        else:
+                            new = _normalize_pid(raw)
+                            if new != raw:
+                                data["unlocked_phase"] = new
+                                fixed += 1
+                    print(f"[MIGRATE] {fixed} conquista(s) com phase_id normalizado")
+
+                    # --- 3) Player: current_region ---
+                    migrated.setdefault("player", {}).setdefault("current_region", DEFAULT_REGION_ID)
+
+                    migrated["meta"]["version"] = "0.2.0"
+                    version = "0.2.0"
+                    print("[MIGRATE] Migração 0.2.0 concluída")
 
         print(f"[MIGRATE] Migracao concluida! Versao final: {migrated['meta']['version']}")
         return migrated

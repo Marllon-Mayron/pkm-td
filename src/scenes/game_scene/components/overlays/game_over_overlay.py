@@ -13,21 +13,21 @@ class GameOverOverlay(BaseOverlay):
         self.music_played = False
         self.reason = reason
 
+        # ===== Guarda região atual (evita depender do game_scene em callbacks) =====
+        self.region_id = getattr(game_scene, 'region_id', 1)
+
         self.gold_lost = 0
         self._apply_gold_penalty()
 
         # Botões
         self.retry_button_rect = None       # REJOGAR FASE
-        self.button_rect = None             # VOLTAR (team select)
-        self.menu_button_rect = None        # SELECIONAR FASE (phase select)
+        self.button_rect = None             # TIME
+        self.menu_button_rect = None        # SELECIONAR FASE
         self.retry_button_hovered = False
         self.button_hovered = False
         self.menu_button_hovered = False
 
-        # ===== NOVO: sub-overlay de confirmação de retry =====
-        # Quando não for None, ele intercepta todos os eventos e é renderizado
-        # por cima deste overlay, perguntando se o jogador quer manter os
-        # pokémons nos spots onde estavam antes de rejogar.
+        # Sub-overlay de confirmação de retry
         self.retry_confirm_overlay = None
 
     def _apply_gold_penalty(self):
@@ -43,9 +43,7 @@ class GameOverOverlay(BaseOverlay):
             print(f"[GAME_OVER] Sem gold para perder")
 
     def handle_event(self, event):
-        # ===== NOVO: se o confirm está aberto, ele intercepta tudo =====
-        # Enquanto o jogador não responder SIM/NÃO, nenhum outro botão
-        # deste overlay responde.
+        # Se o confirm está aberto, ele intercepta tudo
         if self.retry_confirm_overlay is not None:
             self.retry_confirm_overlay.handle_event(event)
             return True
@@ -80,7 +78,6 @@ class GameOverOverlay(BaseOverlay):
             self._play_defeat_music()
             self.music_played = True
 
-        # ===== NOVO: atualiza o sub-overlay de confirmação (se aberto) =====
         if self.retry_confirm_overlay is not None:
             self.retry_confirm_overlay.update(dt)
 
@@ -107,13 +104,13 @@ class GameOverOverlay(BaseOverlay):
 
         y_offset = center_y - 100
 
-        # ===== TÍTULO =====
+        # TÍTULO
         game_over_text = font_large.render("GAME OVER", True, (255, 0, 0))
         game_over_x = center_x - game_over_text.get_width() // 2
         screen.blit(game_over_text, (game_over_x, y_offset))
         y_offset += game_over_text.get_height() + 15
 
-        # ===== MOTIVO =====
+        # MOTIVO
         if self.reason == "team_defeated":
             reason_text = font_medium.render(
                 "Seu time inteiro foi derrotado!",
@@ -128,7 +125,7 @@ class GameOverOverlay(BaseOverlay):
         screen.blit(reason_text, (reason_x, y_offset))
         y_offset += reason_text.get_height() + 15
 
-        # ===== GOLD PERDIDO =====
+        # GOLD PERDIDO
         if self.gold_lost > 0:
             gold_text = font_gold.render(
                 f"Você perdeu {self.gold_lost} gold! (10%)",
@@ -143,7 +140,7 @@ class GameOverOverlay(BaseOverlay):
         screen.blit(gold_text, (gold_x, y_offset))
         y_offset += gold_text.get_height() + 30
 
-        # ===== BOTÕES (3 botões) =====
+        # BOTÕES
         button_width = 180
         button_height = 50
         spacing = 20
@@ -151,7 +148,6 @@ class GameOverOverlay(BaseOverlay):
         total_width = button_width * 3 + spacing * 2
         left_x = center_x - total_width // 2
 
-        # Botão REJOGAR FASE (novo - destaque verde)
         self.retry_button_rect = self._draw_button(
             screen, left_x, y_offset, button_width, button_height,
             "REJOGAR FASE", font_small, self.retry_button_hovered,
@@ -159,7 +155,6 @@ class GameOverOverlay(BaseOverlay):
             border_color=(60, 140, 70), hover_border=(80, 200, 100)
         )
 
-        # Botão TIME (existente)
         self.button_rect = self._draw_button(
             screen, left_x + button_width + spacing, y_offset, button_width, button_height,
             "TIME", font_medium, self.button_hovered,
@@ -167,7 +162,6 @@ class GameOverOverlay(BaseOverlay):
             border_color=(160, 60, 60), hover_border=(220, 80, 80)
         )
 
-        # Botão SELECIONAR FASE (existente)
         self.menu_button_rect = self._draw_button(
             screen, left_x + (button_width + spacing) * 2, y_offset,
             button_width, button_height,
@@ -185,13 +179,11 @@ class GameOverOverlay(BaseOverlay):
         esc_x = center_x - esc_text.get_width() // 2
         screen.blit(esc_text, (esc_x, y_offset))
 
-        # ===== NOVO: renderiza o confirm por cima de tudo =====
         if self.retry_confirm_overlay is not None:
             self.retry_confirm_overlay.render(screen)
 
     def _draw_button(self, screen, x, y, w, h, text, font, hovered,
                      base_color, hover_color, border_color, hover_border):
-        """Desenha um botão genérico com hover"""
         rect = pygame.Rect(x, y, w, h)
         color = hover_color if hovered else base_color
         border = hover_border if hovered else border_color
@@ -207,19 +199,12 @@ class GameOverOverlay(BaseOverlay):
         )
         return rect
 
-    # ================================================================
-    # RETRY (REJOGAR FASE)
-    # ================================================================
+    # ==================================================================
+    # RETRY
+    # ==================================================================
     def _retry_phase(self):
-        """
-        Chamado quando o jogador clica em REJOGAR FASE.
-        Antes de efetivamente reiniciar, abre um sub-overlay perguntando
-        se o jogador deseja manter os pokémons nos spots onde estavam.
-        """
         from .retry_confirm_overlay import RetryConfirmOverlay
 
-        # Captura o snapshot AGORA (antes do cleanup), pois é o estado
-        # que representa "onde os pokémons estavam" durante a fase perdida.
         snapshot = self._capture_placement_snapshot()
 
         def on_confirm(keep_placement):
@@ -229,11 +214,6 @@ class GameOverOverlay(BaseOverlay):
         print("[GAME_OVER] Overlay de confirmação de retry aberto.")
 
     def _capture_placement_snapshot(self):
-        """
-        Captura a posição atual de todos os Pokémon colocados no mapa.
-        Retorna uma lista de dicts com o mínimo necessário para restaurar:
-        identificação do pokémon (unique_id + fallback id/level) e o tile.
-        """
         snapshot = []
         pm = getattr(self.game_scene, 'placement_manager', None)
         if not pm:
@@ -263,11 +243,6 @@ class GameOverOverlay(BaseOverlay):
         return snapshot
 
     def _do_retry_phase(self, keep_placement, snapshot):
-        """
-        Efetivamente reinicia a fase.
-        - keep_placement=True: passa o snapshot para a nova cena restaurar.
-        - keep_placement=False: comportamento antigo (fase totalmente limpa).
-        """
         from src.scenes.game_scene.game_scene import GameScene
 
         print(f"[GAME_OVER] Reiniciando fase {self.game_scene.phase_id} "
@@ -276,11 +251,11 @@ class GameOverOverlay(BaseOverlay):
         self._stop_music()
         self.game_scene.cleanup()
 
-        # Cria uma nova GameScene com a mesma fase
         new_game_scene = GameScene(
             self.game,
             self.game_scene.chapter_id,
             self.game_scene.phase_number,
+            region_id=self.region_id,
             keep_placement=keep_placement,
             placement_snapshot=snapshot if keep_placement else None,
         )
@@ -289,7 +264,6 @@ class GameOverOverlay(BaseOverlay):
         print(f"[GAME_OVER] Fase {self.game_scene.phase_id} reiniciada!")
 
     def _return_to_team_select(self):
-        """Volta para a tela de seleção de time"""
         from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
 
         self._stop_music()
@@ -298,24 +272,23 @@ class GameOverOverlay(BaseOverlay):
         team_select = TeamSelectScene(
             self.game,
             self.game_scene.phase_info.get("chapter", 1),
-            self.game_scene.phase_number
+            self.game_scene.phase_number,
+            region_id=self.region_id,
         )
         team_select._needs_refresh = True
         self.game.current_scene = team_select
 
     def _return_to_phase_select(self):
-        """Volta para a tela de seleção de fase (mesmo caminho do start_game do menu)"""
         from src.config.progress import progress_manager
         from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 
         self._stop_music()
         self.game_scene.cleanup()
 
-        # Mesmo fluxo do MenuScene.start_game() quando o jogador já tem starter:
         progress_manager._load_settings_from_save()
 
         phase_select = PhaseSelectScene(self.game)
-        phase_select._needs_refresh = True   # força refresh dos dados do time/box
+        phase_select._needs_refresh = True
 
         self.game.current_scene = phase_select
 

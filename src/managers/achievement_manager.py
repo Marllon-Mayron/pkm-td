@@ -1,525 +1,453 @@
 # src/managers/achievement_manager.py
 
-from typing import Dict, List, Optional, Set, Any
+from typing import Dict, List, Optional, Set
 from datetime import datetime
-from src.data.achievement_data import Achievement, ACHIEVEMENTS, AchievementRarity
+
+from src.data.achievement_data import Achievement, ACHIEVEMENTS
 from src.ui.toast_renderer import toast_achievement
 from src.data.item_bag_catalog import item_bag_catalog
+from src.config.regions import (
+    DEFAULT_REGION_ID, parse_phase_id, normalize_phase_id, make_phase_id,
+    RegionCatalog,
+)
+
+
+def _key(region_id: int, achievement_id: str) -> str:
+    return f"{int(region_id)}:{achievement_id}"
+
+
+def _ckey(region_id: int, counter_id: str) -> str:
+    return f"{int(region_id)}:{counter_id}"
 
 
 class AchievementManager:
-    """Gerencia conquistas do jogador"""
+    """
+    Conquistas do jogador — UMA POR REGIÃO.
+
+    Cada conquista pode ser desbloqueada independentemente em Kanto, Hoenn, etc.
+    A região efetiva é derivada do `phase_id` no momento do unlock ("R:C:P").
+    """
 
     def __init__(self, player):
         self.player = player
-        self._unlocked: Set[str] = set()
-        self._counters: Dict[str, int] = {}
-        self._unlocked_data: Dict[str, Dict] = {}
+        self._current_region: int = DEFAULT_REGION_ID
 
-        # Carrega estado do jogador
+        self._unlocked: Set[str] = set()           # "R:achievement_id"
+        self._counters: Dict[str, int] = {}        # "R:counter_id" -> int
+        self._unlocked_data: Dict[str, Dict] = {}  # "R:achievement_id" -> {...}
+
         self.load_from_player()
 
-    def load_from_player(self):
-        """Carrega estado das conquistas do jogador"""
-        if hasattr(self.player, 'achievements'):
-            self._unlocked = set(self.player.achievements.get("unlocked", []))
-            self._counters = self.player.achievements.get("counters", {}).copy()
-            self._unlocked_data = self.player.achievements.get("unlocked_data", {}).copy()
-        else:
-            self._unlocked = set()
-            self._counters = {}
-            self._unlocked_data = {}
+    # ==================================================================
+    # REGIÃO ATUAL
+    # ==================================================================
+    def set_current_region(self, region_id) -> None:
+        try:
+            self._current_region = int(region_id)
+        except (TypeError, ValueError):
+            self._current_region = DEFAULT_REGION_ID
 
-    def save_to_player(self):
-        """Salva estado das conquistas no jogador"""
+    def get_current_region(self) -> int:
+        return self._current_region
+
+    # ==================================================================
+    # PERSISTÊNCIA
+    # ==================================================================
+    def load_from_player(self):
+        """Aceita formato antigo (sem região) e novo (composto "R:id")."""
         if not hasattr(self.player, 'achievements'):
             self.player.achievements = {
-                "unlocked": [],
-                "counters": {},
-                "unlocked_data": {}
+                "unlocked": [], "counters": {}, "unlocked_data": {},
             }
 
-        self.player.achievements["unlocked"] = list(self._unlocked)
-        self.player.achievements["counters"] = self._counters.copy()
-        self.player.achievements["unlocked_data"] = self._unlocked_data.copy()
+        raw = self.player.achievements or {}
+        raw_unlocked = raw.get("unlocked", []) or []
+        raw_counters = raw.get("counters", {}) or {}
+        raw_udata = raw.get("unlocked_data", {}) or {}
 
-    def get_all_achievements(self) -> List[Achievement]:
-        """Retorna todas as conquistas com estado atualizado"""
-        achievements = []
+        self._unlocked = set()
+        self._counters = {}
+        self._unlocked_data = {}
+
+        # ---- unlocked ----
+        for entry in raw_unlocked:
+            s = str(entry)
+            parts = s.split(":")
+            if len(parts) == 2:
+                try:
+                    int(parts[0])
+                    self._unlocked.add(s)
+                    continue
+                except (TypeError, ValueError):
+                    pass
+            # Formato antigo → assume Kanto
+            self._unlocked.add(_key(DEFAULT_REGION_ID, s))
+
+        # ---- counters ----
+        for key, val in raw_counters.items():
+            s = str(key)
+            parts = s.split(":")
+            if len(parts) == 2:
+                try:
+                    int(parts[0])
+                    self._counters[s] = int(val)
+                    continue
+                except (TypeError, ValueError):
+                    pass
+            self._counters[_ckey(DEFAULT_REGION_ID, s)] = int(val)
+
+        # ---- unlocked_data ----
+        for key, data in raw_udata.items():
+            if not isinstance(data, dict):
+                continue
+            s = str(key)
+            parts = s.split(":")
+            if len(parts) == 2:
+                try:
+                    int(parts[0])
+                    self._unlocked_data[s] = dict(data)
+                    continue
+                except (TypeError, ValueError):
+                    pass
+            # Antigo — descobre região do phase_id
+            raw_phase = data.get("unlocked_phase")
+            if raw_phase:
+                r, _, _ = parse_phase_id(raw_phase)
+            else:
+                r = DEFAULT_REGION_ID
+            nd = dict(data)
+            nd["region_id"] = r
+            nd["achievement_id"] = s
+            if raw_phase:
+                nd["unlocked_phase"] = normalize_phase_id(raw_phase)
+            self._unlocked_data[_key(r, s)] = nd
+
+    def save_to_player(self):
+        if not hasattr(self.player, 'achievements'):
+            self.player.achievements = {}
+        self.player.achievements["unlocked"] = sorted(self._unlocked)
+        self.player.achievements["counters"] = dict(self._counters)
+        self.player.achievements["unlocked_data"] = {
+            k: dict(v) for k, v in self._unlocked_data.items()
+        }
+
+    # ==================================================================
+    # CONSULTAS
+    # ==================================================================
+    def is_unlocked(self, achievement_id: str,
+                    region_id: Optional[int] = None) -> bool:
+        """None -> checa em QUALQUER região. X -> só naquela."""
+        if region_id is None:
+            suffix = f":{achievement_id}"
+            return any(k.endswith(suffix) for k in self._unlocked)
+        return _key(int(region_id), achievement_id) in self._unlocked
+
+    def get_counter(self, counter_id: str,
+                    region_id: Optional[int] = None) -> int:
+        rid = int(region_id) if region_id is not None else self._current_region
+        return self._counters.get(_ckey(rid, counter_id), 0)
+
+    def increment_counter(self, counter_id: str, amount: int = 1,
+                          region_id: Optional[int] = None) -> int:
+        rid = int(region_id) if region_id is not None else self._current_region
+        k = _ckey(rid, counter_id)
+        self._counters[k] = self._counters.get(k, 0) + amount
+        self.save_to_player()
+        return self._counters[k]
+
+    def set_counter(self, counter_id: str, value: int,
+                    region_id: Optional[int] = None):
+        rid = int(region_id) if region_id is not None else self._current_region
+        self._counters[_ckey(rid, counter_id)] = int(value)
+        self.save_to_player()
+
+    def get_unlocked_count(self, region_id: Optional[int] = None) -> int:
+        rid = int(region_id) if region_id is not None else self._current_region
+        prefix = f"{rid}:"
+        return sum(1 for k in self._unlocked if k.startswith(prefix))
+
+    def get_total_count(self) -> int:
+        return len(ACHIEVEMENTS)
+
+    def get_all_achievements(self, region_id: Optional[int] = None) -> List[Achievement]:
+        rid = int(region_id) if region_id is not None else self._current_region
+        out = []
         for ach_id, ach in ACHIEVEMENTS.items():
-            unlocked = ach_id in self._unlocked
-            unlocked_data = self._unlocked_data.get(ach_id, {})
-
-            ach_copy = Achievement(
+            k = _key(rid, ach_id)
+            unlocked = k in self._unlocked
+            udata = self._unlocked_data.get(k, {})
+            out.append(Achievement(
                 id=ach.id,
                 title=ach.title,
                 description=ach.description,
                 rarity=ach.rarity,
                 rewards=ach.rewards.copy(),
+                region_id=rid,
                 unlocked=unlocked,
-                unlocked_at=unlocked_data.get("unlocked_at") if unlocked else None,
-                unlocked_phase=unlocked_data.get("unlocked_phase") if unlocked else None
-            )
-            achievements.append(ach_copy)
-        return achievements
+                unlocked_at=udata.get("unlocked_at") if unlocked else None,
+                unlocked_phase=udata.get("unlocked_phase") if unlocked else None,
+            ))
+        return out
 
-    def get_unlocked_count(self) -> int:
-        return len(self._unlocked)
+    # ==================================================================
+    # UNLOCK
+    # ==================================================================
+    def unlock(self, achievement_id: str,
+               phase_id: Optional[str] = None) -> bool:
+        """Região é extraída do phase_id (fallback: região atual)."""
+        if phase_id:
+            region_id, _, _ = parse_phase_id(phase_id)
+            normalized = normalize_phase_id(phase_id)
+        else:
+            region_id = self._current_region
+            normalized = make_phase_id(region_id, 1, 1)
 
-    def get_total_count(self) -> int:
-        return len(ACHIEVEMENTS)
-
-    def is_unlocked(self, achievement_id: str) -> bool:
-        return achievement_id in self._unlocked
-
-    def get_counter(self, counter_id: str) -> int:
-        return self._counters.get(counter_id, 0)
-
-    def increment_counter(self, counter_id: str, amount: int = 1) -> int:
-        new_value = self._counters.get(counter_id, 0) + amount
-        self._counters[counter_id] = new_value
-        self.save_to_player()
-        return new_value
-
-    def set_counter(self, counter_id: str, value: int):
-        self._counters[counter_id] = value
-        self.save_to_player()
-
-    def unlock(self, achievement_id: str, phase_id: Optional[str] = None) -> bool:
-        """Desbloqueia uma conquista e aplica recompensas"""
-        if achievement_id in self._unlocked:
+        k = _key(region_id, achievement_id)
+        if k in self._unlocked:
             return False
 
-        achievement = ACHIEVEMENTS.get(achievement_id)
-        if not achievement:
+        ach = ACHIEVEMENTS.get(achievement_id)
+        if not ach:
             return False
 
-        # Registra data/hora
-        now = datetime.now()
-        unlocked_at = now.strftime("%d/%m/%Y as %H:%M")
-
-        self._unlocked.add(achievement_id)
-        self._unlocked_data[achievement_id] = {
+        unlocked_at = datetime.now().strftime("%d/%m/%Y as %H:%M")
+        self._unlocked.add(k)
+        self._unlocked_data[k] = {
+            "region_id": region_id,
+            "achievement_id": achievement_id,
             "unlocked_at": unlocked_at,
-            "unlocked_phase": phase_id if phase_id else "Desconhecida"
+            "unlocked_phase": normalized,
         }
-
         self.save_to_player()
-
-        # APLICA RECOMPENSAS
-        self._apply_rewards(achievement)
-
-        # Mostra toast
-        self._show_achievement_toast(achievement)
-
-        print(f"[ACHIEVEMENT] Desbloqueado: {achievement.title} em {unlocked_at}")
+        self._apply_rewards(ach)
+        self._show_achievement_toast(ach, region_id)
+        print(f"[ACHIEVEMENT] {ach.title} (região {region_id}) em {unlocked_at}")
         return True
 
+    # ==================================================================
+    # REWARDS
+    # ==================================================================
     def _apply_rewards(self, achievement: Achievement):
-        """Aplica recompensas variadas (gold, xp, items, pokemon)"""
-        rewards = achievement.rewards
-
-        # ===== OURO =====
-        if "gold" in rewards:
-            amount = rewards["gold"]
-            self.player.money += amount
-            print(f"[ACHIEVEMENT] +{amount} ouro")
-
-        # ===== XP =====
-        if "xp" in rewards:
-            amount = rewards["xp"]
-            self.player.score += amount
-            print(f"[ACHIEVEMENT] +{amount} XP para o jogador")
-
-        # ===== ITENS =====
-        if "items" in rewards:
-            items = rewards["items"]
-            for item_id, quantity in items.items():
-                self.player.bag.add_item(item_id, quantity)
-                item_name = item_bag_catalog.get_item(item_id)["name"]
-                print(f"[ACHIEVEMENT] +{quantity}x {item_name}")
-
-        # ===== POKÉMON =====
-        if "pokemon" in rewards:
-            pokemon_id = rewards["pokemon"]
-            self._give_pokemon_reward(pokemon_id)
+        r = achievement.rewards
+        if "gold" in r:
+            self.player.money += r["gold"]
+        if "xp" in r:
+            self.player.score += r["xp"]
+        if "items" in r:
+            for item_id, qty in r["items"].items():
+                self.player.bag.add_item(item_id, qty)
+        if "pokemon" in r:
+            self._give_pokemon_reward(r["pokemon"])
 
     def _give_pokemon_reward(self, pokemon_id: int):
-        """Dá um Pokémon como recompensa (nível 5)"""
         from src.entities.pokemon import Pokemon
-
-        # Cria o Pokémon nível 5
         new_pokemon = Pokemon(0, 0, pokemon_id, level=5, is_wild=False)
-
-        # Tenta adicionar ao time
         if len(self.player.team) < 6:
             self.player.team.append(new_pokemon)
             new_pokemon.is_in_team = True
-            location = "time"
         else:
             self.player.pc_box.append(new_pokemon)
             new_pokemon.is_in_team = False
-            location = "PC Box"
-
         self.player.caught_pokemon.add(pokemon_id)
-
-        print(f"[ACHIEVEMENT] Pokémon {new_pokemon.name} adicionado ao {location}!")
-
-        # Mostra mensagem especial no toast
         from src.ui.toast_renderer import toast_battle
-        toast_battle(
-            f"Você ganhou um {new_pokemon.name} como recompensa!",
-            duration=4.0,
-            pokemon=new_pokemon,
-            portrait="happy"
-        )
+        toast_battle(f"Você ganhou um {new_pokemon.name} como recompensa!",
+                     duration=4.0, pokemon=new_pokemon, portrait="happy")
 
-    def _show_achievement_toast(self, achievement: Achievement):
-        """Mostra toast de conquista desbloqueada"""
+    def _show_achievement_toast(self, achievement: Achievement,
+                                region_id: int = DEFAULT_REGION_ID):
+        from src.data.pokedex import Pokedex
         rarity_name = achievement.rarity.display_name.upper()
-
-        # Verifica se tem recompensa especial para destacar
         rewards_text = []
         if "pokemon" in achievement.rewards:
-            from src.data.pokedex import Pokedex
-            pokedex = Pokedex()
-            pokemon_name = pokedex.get_name(achievement.rewards["pokemon"])
-            rewards_text.append(f"{pokemon_name}")
+            rewards_text.append(Pokedex().get_name(achievement.rewards["pokemon"]))
         if "items" in achievement.rewards:
-            items = achievement.rewards["items"]
-            for item_id, qty in items.items():
-                item_name = item_bag_catalog.get_item(item_id)["name"]
-                rewards_text.append(f"{qty}x {item_name}")
+            for item_id, qty in achievement.rewards["items"].items():
+                try:
+                    nm = item_bag_catalog.get_item(item_id)["name"]
+                    rewards_text.append(f"{qty}x {nm}")
+                except Exception:
+                    pass
 
-        if rewards_text:
-            message = f"{achievement.title} ({rarity_name})\n+ {', '.join(rewards_text)}"
+        try:
+            rname = RegionCatalog.get_name(region_id)
+        except Exception:
+            rname = f"Região {region_id}"
+
+        base = f"{achievement.title} ({rarity_name}) — {rname}"
+        msg = f"{base}\n+ {', '.join(rewards_text)}" if rewards_text else base
+        toast_achievement(msg, duration=4.0)
+
+    # ==================================================================
+    # CHECK & UNLOCK
+    # ==================================================================
+    def check_and_unlock(self, achievement_id: str,
+                         phase_id: Optional[str] = None) -> bool:
+        if phase_id:
+            region_id, _, _ = parse_phase_id(phase_id)
         else:
-            message = f"{achievement.title} ({rarity_name})"
+            region_id = self._current_region
 
-        toast_achievement(message, duration=4.0)
-
-    def check_and_unlock(self, achievement_id: str, phase_id: Optional[str] = None) -> bool:
-        """Verifica se uma conquista pode ser desbloqueada"""
-        if self.is_unlocked(achievement_id):
+        if self.is_unlocked(achievement_id, region_id=region_id):
             return False
 
-        # ===== CONQUISTAS EXISTENTES =====
-        if achievement_id == "first_capture":
-            if self.get_counter("capture_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
+        def c(counter_id: str) -> int:
+            return self.get_counter(counter_id, region_id=region_id)
 
-        elif achievement_id == "heal_5":
-            if self.get_counter("heal_count") >= 5:
-                return self.unlock(achievement_id, phase_id)
+        hit = False
+        a = achievement_id
 
-        elif achievement_id == "first_badge":
-            if self.get_counter("badge_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
+        if a == "first_capture":                     hit = c("capture_count") >= 1
+        elif a == "capture_10":                      hit = c("capture_count") >= 10
+        elif a == "capture_50":                      hit = c("capture_count") >= 50
+        elif a == "first_badge":                     hit = c("badge_count") >= 1
+        elif a == "all_badges":                      hit = c("badge_count") >= 8
+        elif a == "first_shiny_capture":             hit = c("shiny_capture_count") >= 1
 
-        elif achievement_id == "all_badges":
-            if self.get_counter("badge_count") >= 8:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "heal_5":                          hit = c("heal_count") >= 5
+        elif a == "heal_100":                        hit = c("heal_count") >= 100
+        elif a == "first_burn_heal":                 hit = c("burn_heal_count") >= 1
+        elif a == "burn_heal_10":                    hit = c("burn_heal_count") >= 10
+        elif a == "first_freeze_heal":               hit = c("freeze_heal_count") >= 1
+        elif a == "freeze_heal_10":                  hit = c("freeze_heal_count") >= 10
 
-        elif achievement_id == "capture_10":
-            if self.get_counter("capture_count") >= 10:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "perfect_phase":                   hit = c("perfect_phase_count") >= 1
+        elif a == "boss_defeated":                   hit = c("boss_defeated_count") >= 1
 
-        elif achievement_id == "first_shiny_capture":
-            # Verifica se capturou pelo menos 1 shiny (o contador é incrementado)
-            if self.get_counter("shiny_capture_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_weather_change":            hit = c("weather_change_count") >= 1
+        elif a == "weather_change_50":               hit = c("weather_change_count") >= 50
+        elif a == "weather_change_100":              hit = c("weather_change_count") >= 100
+        elif a == "first_weather_boosted_attack":    hit = c("weather_boosted_attack_count") >= 1
 
-        elif achievement_id == "heal_100":
-            if self.get_counter("heal_count") >= 100:
-                return self.unlock(achievement_id, phase_id)
-        elif achievement_id == "first_burn_heal":
-            if self.get_counter("burn_heal_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "rare_candy_3":                    hit = c("rare_candy_count") >= 3
 
-        elif achievement_id == "burn_heal_10":
-            if self.get_counter("burn_heal_count") >= 10:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_evolution":                 hit = c("evolution_count") >= 1
+        elif a == "evolution_10":                    hit = c("evolution_count") >= 10
+        elif a == "evolution_50":                    hit = c("evolution_count") >= 50
 
-            # ===== CURA DE CONGELAMENTO =====
-        elif achievement_id == "first_freeze_heal":
-            if self.get_counter("freeze_heal_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_level_evolution":           hit = c("level_evolution_count") >= 1
+        elif a == "level_evolution_50":              hit = c("level_evolution_count") >= 50
 
-        elif achievement_id == "freeze_heal_10":
-            if self.get_counter("freeze_heal_count") >= 10:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "max_level_reached":
+            for p in self.player.team:
+                if getattr(p, 'level', 0) >= 100:
+                    hit = True; break
+            if not hit:
+                for data in self.player.pc_box:
+                    if data.get("level", 0) >= 100:
+                        hit = True; break
 
-        elif achievement_id == "capture_50":
-            if self.get_counter("capture_count") >= 50:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_stone_evolution":           hit = c("stone_evolution_count") >= 1
+        elif a == "stone_evolution_5":               hit = c("stone_evolution_count") >= 5
+        elif a == "stone_evolution_20":              hit = c("stone_evolution_count") >= 20
 
-        elif achievement_id == "perfect_phase":
-            if self.get_counter("perfect_phase_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "max_happiness":
+            for p in self.player.team:
+                try:
+                    if p.get_happiness() >= 255:
+                        hit = True; break
+                except Exception:
+                    pass
 
-        elif achievement_id == "boss_defeated":
-            if self.get_counter("boss_defeated_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "full_team_max_happiness":
+            if self.player.team and all(
+                getattr(p, 'get_happiness', lambda: 0)() >= 255
+                for p in self.player.team
+            ):
+                hit = True
 
-        # ===== CLIMA =====
-        elif achievement_id == "first_weather_change":
-            if self.get_counter("weather_change_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_happiness_evolution":       hit = c("happiness_evolution_count") >= 1
+        elif a == "happiness_evolution_3":           hit = c("happiness_evolution_count") >= 3
+        elif a == "happiness_evolution_10":          hit = c("happiness_evolution_count") >= 10
+        elif a == "friendball_capture_5":            hit = c("friendball_capture_count") >= 5
 
-        elif achievement_id == "weather_change_50":
-            if self.get_counter("weather_change_count") >= 50:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_weather_evolution":         hit = c("weather_evolution_count") >= 1
+        elif a == "weather_evolution_5":             hit = c("weather_evolution_count") >= 5
 
-        elif achievement_id == "weather_change_100":
-            if self.get_counter("weather_change_count") >= 100:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_evolution_blocked":         hit = c("evolution_blocked_count") >= 1
+        elif a == "evolution_blocked_10":            hit = c("evolution_blocked_count") >= 10
 
-        elif achievement_id == "first_weather_boosted_attack":
-            if self.get_counter("weather_boosted_attack_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-        # ===== RARE CANDY =====
-        elif achievement_id == "rare_candy_3":
-            if self.get_counter("rare_candy_count") >= 3:
-                return self.unlock(achievement_id, phase_id)
-        # ===== EVOLUÇÃO GERAL =====
-        elif achievement_id == "first_evolution":
-            if self.get_counter("evolution_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_antidote":                  hit = c("antidote_count") >= 1
+        elif a == "antidote_100":                    hit = c("antidote_count") >= 100
+        elif a == "first_awake":                     hit = c("awake_count") >= 1
+        elif a == "awake_100":                       hit = c("awake_count") >= 100
+        elif a == "first_paralyze_heal":             hit = c("paralyze_heal_count") >= 1
+        elif a == "paralyze_heal_100":               hit = c("paralyze_heal_count") >= 100
+        elif a == "first_revive":                    hit = c("revive_count") >= 1
+        elif a == "revive_25":                       hit = c("revive_count") >= 25
 
-        elif achievement_id == "evolution_10":
-            if self.get_counter("evolution_count") >= 10:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_move_taught":               hit = c("move_taught_count") >= 1
+        elif a == "move_taught_10":                  hit = c("move_taught_count") >= 10
 
-        elif achievement_id == "evolution_50":
-            if self.get_counter("evolution_count") >= 50:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "battle_item_use_10":              hit = c("battle_item_use_count") >= 10
+        elif a == "battle_item_replace":             hit = c("battle_item_replace_count") >= 1
+        elif a == "accuracy_buff_miss":              hit = c("accuracy_buff_miss_count") >= 1
+        elif a == "first_escaperope_use":            hit = c("escaperope_use_count") >= 1
+        elif a == "escaperope_last_stand":           hit = c("escaperope_last_stand_count") >= 10
 
-        # ===== EVOLUÇÃO POR NÍVEL =====
-        elif achievement_id == "first_level_evolution":
-            if self.get_counter("level_evolution_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_incubator_revive":          hit = c("incubator_revive_count") >= 1
+        elif a == "buy_second_incubator":            hit = c("second_incubator_bought") >= 1
+        elif a == "first_incubator_upgrade":         hit = c("incubator_upgrade_count") >= 1
 
-        elif achievement_id == "level_evolution_50":
-            if self.get_counter("level_evolution_count") >= 50:
-                return self.unlock(achievement_id, phase_id)
-        elif achievement_id == "max_level_reached":
-            # Verifica se algum Pokémon do time ou box tem level >= 100
-            for pokemon in self.player.team:
-                if pokemon.level >= 100:
-                    return self.unlock(achievement_id, phase_id)
-            for pokemon in self.player.pc_box:
-                if pokemon.level >= 100:
-                    return self.unlock(achievement_id, phase_id)
-            return False
-        # ===== EVOLUÇÃO POR PEDRA =====
-        elif achievement_id == "first_stone_evolution":
-            if self.get_counter("stone_evolution_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_trade":                     hit = c("trade_count") >= 1
+        elif a == "trade_10":                        hit = c("trade_count") >= 10
+        elif a == "first_trade_evolution":           hit = c("trade_evolution_count") >= 1
 
-        elif achievement_id == "stone_evolution_5":
-            if self.get_counter("stone_evolution_count") >= 5:
-                return self.unlock(achievement_id, phase_id)
+        elif a == "first_berry_consumed":            hit = c("berry_consumed_count") >= 1
+        elif a == "capture_with_item":               hit = c("capture_with_item_count") >= 1
 
-        elif achievement_id == "stone_evolution_20":
-            if self.get_counter("stone_evolution_count") >= 20:
-                return self.unlock(achievement_id, phase_id)
-
-        # ===== SISTEMA DE FELICIDADE =====
-        elif achievement_id == "max_happiness":
-            # Verifica se algum Pokémon do time tem felicidade >= 255
-            for pokemon in self.player.team:
-                if pokemon.get_happiness() >= 255:
-                    return self.unlock(achievement_id, phase_id)
-            return False
-
-        elif achievement_id == "full_team_max_happiness":
-            # Verifica se TODOS os Pokémon do time têm felicidade máxima (255)
-            if not self.player.team:
-                return False
-            all_max = all(pokemon.get_happiness() >= 255 for pokemon in self.player.team)
-            if all_max:
-                return self.unlock(achievement_id, phase_id)
-            return False
-
-        elif achievement_id == "first_happiness_evolution":
-            if self.get_counter("happiness_evolution_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "happiness_evolution_3":
-            if self.get_counter("happiness_evolution_count") >= 3:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "happiness_evolution_10":
-            if self.get_counter("happiness_evolution_count") >= 10:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "friendball_capture_5":
-            if self.get_counter("friendball_capture_count") >= 5:
-                return self.unlock(achievement_id, phase_id)
-        # ===== EVOLUÇÃO POR CLIMA =====
-        elif achievement_id == "first_weather_evolution":
-            if self.get_counter("weather_evolution_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "weather_evolution_5":
-            if self.get_counter("weather_evolution_count") >= 5:
-                return self.unlock(achievement_id, phase_id)
-
-        # ===== BLOQUEIO DE EVOLUÇÃO =====
-        elif achievement_id == "first_evolution_blocked":
-            if self.get_counter("evolution_blocked_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "evolution_blocked_10":
-            if self.get_counter("evolution_blocked_count") >= 10:
-                return self.unlock(achievement_id, phase_id)
-
-        # ===== CURA DE STATUS =====
-        elif achievement_id == "first_antidote":
-            if self.get_counter("antidote_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "antidote_100":
-            if self.get_counter("antidote_count") >= 100:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "first_awake":
-            if self.get_counter("awake_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "awake_100":
-            if self.get_counter("awake_count") >= 100:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "first_paralyze_heal":
-            if self.get_counter("paralyze_heal_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "paralyze_heal_100":
-            if self.get_counter("paralyze_heal_count") >= 100:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "first_revive":
-            if self.get_counter("revive_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "revive_25":
-            if self.get_counter("revive_count") >= 25:
-                return self.unlock(achievement_id, phase_id)
-
-        # ===== ENSINO DE MOVES =====
-        elif achievement_id == "first_move_taught":
-            if self.get_counter("move_taught_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "move_taught_10":
-            if self.get_counter("move_taught_count") >= 10:
-                return self.unlock(achievement_id, phase_id)
-
-        # ===== ITENS DE BATALHA =====
-        elif achievement_id == "battle_item_use_10":
-            if self.get_counter("battle_item_use_count") >= 10:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "battle_item_replace":
-            if self.get_counter("battle_item_replace_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "accuracy_buff_miss":
-            if self.get_counter("accuracy_buff_miss_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "first_escaperope_use":
-            if self.get_counter("escaperope_use_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "escaperope_last_stand":
-            if self.get_counter("escaperope_last_stand_count") >= 10:
-                return self.unlock(achievement_id, phase_id)
-
-        # ===== FÓSSEIS / INCUBADORA =====
-        elif achievement_id == "first_incubator_revive":
-            if self.get_counter("incubator_revive_count") >= 1:
-                 return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "buy_second_incubator":
-            if self.get_counter("second_incubator_bought") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "first_incubator_upgrade":
-            if self.get_counter("incubator_upgrade_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        # ===== TROCA =====
-        elif achievement_id == "first_trade":
-            if self.get_counter("trade_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "trade_10":
-            if self.get_counter("trade_count") >= 10:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "first_trade_evolution":
-            if self.get_counter("trade_evolution_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        # ===== ITENS SEGURADOS =====
-        elif achievement_id == "first_berry_consumed":
-            if self.get_counter("berry_consumed_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
-        elif achievement_id == "capture_with_item":
-            if self.get_counter("capture_with_item_count") >= 1:
-                return self.unlock(achievement_id, phase_id)
-
+        if hit:
+            return self.unlock(achievement_id, phase_id)
         return False
 
     def check_all_counters(self, phase_id: Optional[str] = None):
         for ach_id in ACHIEVEMENTS.keys():
             self.check_and_unlock(ach_id, phase_id)
 
-    def get_progress(self, achievement_id: str) -> tuple:
-        """Retorna o progresso de uma conquista (atual, necessário)"""
+    # ==================================================================
+    # PROGRESS
+    # ==================================================================
+    def get_progress(self, achievement_id: str,
+                     region_id: Optional[int] = None) -> tuple:
+        rid = int(region_id) if region_id is not None else self._current_region
+
         progress_map = {
-            # ===== EXISTENTES =====
             "first_capture": ("capture_count", 1),
-            "heal_5": ("heal_count", 5),
+            "capture_10": ("capture_count", 10),
+            "capture_50": ("capture_count", 50),
             "first_badge": ("badge_count", 1),
             "all_badges": ("badge_count", 8),
-            "capture_10": ("capture_count", 10),
             "first_shiny_capture": ("shiny_capture_count", 1),
+
+            "heal_5": ("heal_count", 5),
             "heal_100": ("heal_count", 100),
+
             "first_burn_heal": ("burn_heal_count", 1),
             "burn_heal_10": ("burn_heal_count", 10),
             "first_freeze_heal": ("freeze_heal_count", 1),
             "freeze_heal_10": ("freeze_heal_count", 10),
-            "capture_50": ("capture_count", 50),
+
             "perfect_phase": ("perfect_phase_count", 1),
             "boss_defeated": ("boss_defeated_count", 1),
 
-            # ===== CLIMA =====
             "first_weather_change": ("weather_change_count", 1),
             "weather_change_50": ("weather_change_count", 50),
             "weather_change_100": ("weather_change_count", 100),
             "first_weather_boosted_attack": ("weather_boosted_attack_count", 1),
 
-            # ===== RARE CANDY =====
             "rare_candy_3": ("rare_candy_count", 3),
-            # ===== EVOLUÇÃO GERAL =====
+
             "first_evolution": ("evolution_count", 1),
             "evolution_10": ("evolution_count", 10),
             "evolution_50": ("evolution_count", 50),
 
-            # ===== EVOLUÇÃO POR NÍVEL =====
             "first_level_evolution": ("level_evolution_count", 1),
             "level_evolution_50": ("level_evolution_count", 50),
             "max_level_reached": ("max_level_check", 1),
-            # ===== EVOLUÇÃO POR PEDRA =====
+
             "first_stone_evolution": ("stone_evolution_count", 1),
             "stone_evolution_5": ("stone_evolution_count", 5),
             "stone_evolution_20": ("stone_evolution_count", 20),
 
-            # ===== SISTEMA DE FELICIDADE =====
             "max_happiness": ("max_happiness_check", 1),
             "full_team_max_happiness": ("full_team_max_happiness_check", 1),
             "first_happiness_evolution": ("happiness_evolution_count", 1),
@@ -527,15 +455,12 @@ class AchievementManager:
             "happiness_evolution_10": ("happiness_evolution_count", 10),
             "friendball_capture_5": ("friendball_capture_count", 5),
 
-            # ===== EVOLUÇÃO POR CLIMA =====
             "first_weather_evolution": ("weather_evolution_count", 1),
             "weather_evolution_5": ("weather_evolution_count", 5),
 
-            # ===== BLOQUEIO DE EVOLUÇÃO =====
             "first_evolution_blocked": ("evolution_blocked_count", 1),
             "evolution_blocked_10": ("evolution_blocked_count", 10),
 
-            # ===== CURA DE STATUS =====
             "first_antidote": ("antidote_count", 1),
             "antidote_100": ("antidote_count", 100),
             "first_awake": ("awake_count", 1),
@@ -545,35 +470,28 @@ class AchievementManager:
             "first_revive": ("revive_count", 1),
             "revive_25": ("revive_count", 25),
 
-            # ===== ENSINO DE MOVES =====
             "first_move_taught": ("move_taught_count", 1),
             "move_taught_10": ("move_taught_count", 10),
 
-            # ===== ITENS DE BATALHA =====
             "battle_item_use_10": ("battle_item_use_count", 10),
             "battle_item_replace": ("battle_item_replace_count", 1),
             "accuracy_buff_miss": ("accuracy_buff_miss_count", 1),
             "first_escaperope_use": ("escaperope_use_count", 1),
             "escaperope_last_stand": ("escaperope_last_stand_count", 10),
 
-            # ===== FÓSSEIS / INCUBADORA =====
             "first_incubator_revive": ("incubator_revive_count", 1),
             "buy_second_incubator": ("second_incubator_bought", 1),
             "first_incubator_upgrade": ("incubator_upgrade_count", 1),
 
-            # ===== TROCA =====
             "first_trade": ("trade_count", 1),
             "trade_10": ("trade_count", 10),
             "first_trade_evolution": ("trade_evolution_count", 1),
 
-            # ===== ITENS SEGURADOS =====
             "first_berry_consumed": ("berry_consumed_count", 1),
             "capture_with_item": ("capture_with_item_count", 1),
         }
 
         if achievement_id in progress_map:
-            counter_id, required = progress_map[achievement_id]
-            current = self.get_counter(counter_id)
-            return (current, required)
-
+            cid, req = progress_map[achievement_id]
+            return (self.get_counter(cid, region_id=rid), req)
         return (0, 1)

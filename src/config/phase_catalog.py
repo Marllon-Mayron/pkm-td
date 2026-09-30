@@ -1,103 +1,155 @@
 # src/config/phase_catalog.py
 """
-Catálogo de fases - Lista todas as fases disponíveis no jogo
+Catálogo de fases — Suporta REGIÕES.
+
+Formato novo:   src/data/phases/region_XX/chapter_YY/phase_ZZ.json
+Formato legado: src/data/phases/chapter_YY/phase_ZZ.json  (assume região 1 = Kanto)
 """
 import json
 from pathlib import Path
-from typing import List, Dict, Optional
-from src.config.paths import PROJECT_ROOT  # Importe o caminho absoluto
+from typing import Dict, List, Optional, Union
+
+from src.config.paths import PROJECT_ROOT
+from src.config.regions import DEFAULT_REGION_ID
 
 
 class PhaseCatalog:
-    """Gerencia o catálogo de todas as fases disponíveis no jogo"""
-
     def __init__(self):
-        # Use o PROJECT_ROOT para construir o caminho absoluto
         self.base_path = Path(PROJECT_ROOT) / "src" / "data" / "phases"
         print(f"[PhaseCatalog] Base path: {self.base_path}")
         print(f"[PhaseCatalog] Base path existe? {self.base_path.exists()}")
-        self.cache = None
+        self.cache: Optional[Dict[int, Dict[int, List[Dict]]]] = None
 
-    def get_all_phases(self) -> Dict[int, List[Dict]]:
-        """
-        Retorna todas as fases organizadas por capítulo
-
-        Returns:
-            {
-                1: [{"number": 1, "name": "Nome", "file": "path"}, ...],
-                2: [...],
-                ...
+    # ==================================================================
+    # CARGA
+    # ==================================================================
+    def _load_single_phase(self, phase_file: Path, chapter_num: int, region_id: int) -> Optional[Dict]:
+        try:
+            with open(phase_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            phase_num = int(phase_file.stem.split("_")[1])
+            return {
+                "number": phase_num,
+                "name": data.get("name", f"Fase {phase_num}"),
+                "file": str(phase_file),
+                "chapter": chapter_num,
+                "region": region_id,
             }
-        """
-        if self.cache is not None:
-            return self.cache
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            print(f"[PhaseCatalog] Erro ao carregar {phase_file}: {e}")
+            return None
 
-        catalog = {}
+    def _load_chapter(self, chapter_dir: Path, region_id: int):
+        try:
+            chapter_num = int(chapter_dir.name.split("_")[1])
+        except (ValueError, IndexError):
+            return None
 
-        # Verifica se o diretório base existe
+        phases = []
+        for phase_file in sorted(chapter_dir.glob("phase_*.json")):
+            p = self._load_single_phase(phase_file, chapter_num, region_id)
+            if p:
+                phases.append(p)
+        return (chapter_num, phases) if phases else None
+
+    def _load_all(self) -> Dict[int, Dict[int, List[Dict]]]:
+        catalog: Dict[int, Dict[int, List[Dict]]] = {}
+
         if not self.base_path.exists():
             print(f"[ERRO] Diretório de fases não encontrado: {self.base_path}")
-            print(f"[ERRO] PROJECT_ROOT: {PROJECT_ROOT}")
             return catalog
 
-        # Procura por pastas de capítulo
-        for chapter_dir in sorted(self.base_path.glob("chapter_*")):
+        # ----- 1) NOVO FORMATO -----
+        for region_dir in sorted(self.base_path.glob("region_*")):
             try:
-                chapter_num = int(chapter_dir.name.split("_")[1])
-                phases = []
-                # Lista todos os arquivos JSON de fase
-                for phase_file in sorted(chapter_dir.glob("phase_*.json")):
-                    try:
-                        # Carrega o arquivo para pegar o nome
-                        with open(phase_file, 'r', encoding='utf-8') as f:
-                            data = json.load(f)
-
-                        phase_num = int(phase_file.stem.split("_")[1])
-                        phases.append({
-                            "number": phase_num,
-                            "name": data.get("name", f"Fase {phase_num}"),
-                            "file": str(phase_file),
-                            "chapter": chapter_num
-                        })
-                    except (json.JSONDecodeError, ValueError, KeyError) as e:
-                        print(f"Erro ao carregar fase {phase_file}: {e}")
-                        continue
-                if phases:
-                    catalog[chapter_num] = phases
-            except (ValueError, IndexError) as e:
-                print(f"Pasta ignorada: {chapter_dir} - {e}")
+                region_id = int(region_dir.name.split("_")[1])
+            except (ValueError, IndexError):
                 continue
 
-        self.cache = catalog
+            for chapter_dir in sorted(region_dir.glob("chapter_*")):
+                result = self._load_chapter(chapter_dir, region_id)
+                if result:
+                    ch_num, phases = result
+                    catalog.setdefault(region_id, {})[ch_num] = phases
+
+        # ----- 2) LEGADO (region padrão) -----
+        for chapter_dir in sorted(self.base_path.glob("chapter_*")):
+            result = self._load_chapter(chapter_dir, DEFAULT_REGION_ID)
+            if result:
+                ch_num, phases = result
+                existing = catalog.setdefault(DEFAULT_REGION_ID, {})
+                # Só adiciona se não tiver vindo do formato novo
+                if ch_num not in existing:
+                    existing[ch_num] = phases
+
         return catalog
 
-    def get_chapter_phases(self, chapter: int) -> List[Dict]:
-        """Retorna as fases de um capítulo específico"""
-        catalog = self.get_all_phases()
-        return catalog.get(chapter, [])
+    # ==================================================================
+    # API PÚBLICA
+    # ==================================================================
+    def get_all_phases(self, region_id: Optional[int] = None):
+        """
+        Sem args -> {region_id: {chapter: [phases]}}
+        Com region_id -> {chapter: [phases]}
+        """
+        if self.cache is None:
+            self.cache = self._load_all()
+        if region_id is None:
+            return self.cache
+        return self.cache.get(int(region_id), {})
 
-    def get_total_chapters(self) -> int:
-        """Retorna o número total de capítulos"""
-        return len(self.get_all_phases())
+    def get_all_regions(self) -> List[int]:
+        if self.cache is None:
+            self.cache = self._load_all()
+        return sorted(self.cache.keys())
 
-    def get_phase_info(self, chapter: int, phase: int) -> Optional[Dict]:
-        """Retorna informações de uma fase específica"""
-        phases = self.get_chapter_phases(chapter)
-        for p in phases:
+    def get_chapter_phases(self, region_id_or_chapter, chapter: Optional[int] = None) -> List[Dict]:
+        """Aceita get_chapter_phases(chapter) [legado] ou (region_id, chapter) [novo]."""
+        if chapter is None:
+            chapter = int(region_id_or_chapter)
+            region_id = DEFAULT_REGION_ID
+        else:
+            region_id = int(region_id_or_chapter)
+            chapter = int(chapter)
+        return self.get_all_phases(region_id).get(chapter, [])
+
+    def get_total_chapters(self, region_id: Optional[int] = None) -> int:
+        if region_id is None:
+            if self.cache is None:
+                self.cache = self._load_all()
+            return sum(len(chs) for chs in self.cache.values())
+        return len(self.get_all_phases(int(region_id)))
+
+    def get_phase_info(self, *args) -> Optional[Dict]:
+        """Aceita (chapter, phase) [legado] ou (region_id, chapter, phase) [novo]."""
+        if len(args) == 2:
+            region_id = DEFAULT_REGION_ID
+            chapter, phase = args
+        elif len(args) == 3:
+            region_id, chapter, phase = args
+        else:
+            return None
+
+        for p in self.get_chapter_phases(int(region_id), int(chapter)):
             if p["number"] == phase:
                 return p
         return None
 
-    def get_max_phase_per_chapter(self) -> Dict[int, int]:
-        """Retorna o número máximo de fase por capítulo"""
-        catalog = self.get_all_phases()
-        return {chapter: len(phases) for chapter, phases in catalog.items()}
+    def get_max_phase_per_chapter(self, region_id: Optional[int] = None) -> Dict:
+        if region_id is None:
+            if self.cache is None:
+                self.cache = self._load_all()
+            return {
+                (r, c): len(phases)
+                for r, chs in self.cache.items()
+                for c, phases in chs.items()
+            }
+        chapters = self.get_all_phases(int(region_id))
+        return {c: len(phases) for c, phases in chapters.items()}
 
     def refresh(self):
-        """Força o recarregamento do catálogo"""
         self.cache = None
         self.get_all_phases()
 
 
-# Instância global
 phase_catalog = PhaseCatalog()

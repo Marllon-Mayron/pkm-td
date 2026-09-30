@@ -2,9 +2,11 @@
 
 import pygame
 from collections import Counter
+
 from .base_overlay import BaseOverlay
 from src.config.progress import progress_manager
 from src.config.phase_catalog import phase_catalog
+from src.config.regions import parse_phase_id
 from src.data.item_bag_catalog import item_bag_catalog
 from src.data.pokedex import Pokedex
 from src.scenes.game_scene.components.phase_loader import phase_loader
@@ -19,6 +21,7 @@ class PhaseCompleteOverlay(BaseOverlay):
         self.phase_id = game_scene.phase_id
         self.phase_number = game_scene.phase_number
         self.chapter_id = game_scene.chapter_id
+        self.region_id = getattr(game_scene, 'region_id', 1)
         self.music_played = False
 
         # Dados da conclusão
@@ -51,18 +54,38 @@ class PhaseCompleteOverlay(BaseOverlay):
         # --- Cache para o sprite de desconhecido ---
         self._unknown_portrait_cache = None
 
-        # --- Verifica se existe próxima fase ---
+        # --- Próxima fase (agora com suporte a região) ---
         self.next_phase = progress_manager.get_next_phase(self.phase_id)
         self.has_next_phase = self.next_phase is not None
 
-        # ===== NOVO: sub-overlay de confirmação de retry =====
-        # Quando não for None, ele intercepta todos os eventos e é renderizado
-        # por cima deste overlay, perguntando se o jogador quer manter os
-        # pokémons nos spots onde estavam antes de rejogar.
+        # Cache dos dados da próxima fase (evita .split("-") no render)
+        self.next_phase_region = None
+        self.next_phase_chapter = None
+        self.next_phase_number = None
+        self.next_phase_info = None
+
+        if self.next_phase:
+            try:
+                r, c, p = parse_phase_id(self.next_phase)
+                self.next_phase_region = r
+                self.next_phase_chapter = c
+                self.next_phase_number = p
+                try:
+                    self.next_phase_info = phase_catalog.get_phase_info(r, c, p)
+                except TypeError:
+                    # Catálogo antigo (só chapter, phase)
+                    self.next_phase_info = phase_catalog.get_phase_info(c, p)
+            except Exception as e:
+                print(f"[PHASE_COMPLETE] Erro ao resolver next_phase: {e}")
+
+        # ===== Sub-overlay de confirmação de retry =====
         self.retry_confirm_overlay = None
 
+    # ==================================================================
+    # EVENTOS
+    # ==================================================================
     def handle_event(self, event):
-        # ===== NOVO: se o confirm está aberto, ele intercepta tudo =====
+        # Se o confirm está aberto, ele intercepta tudo
         if self.retry_confirm_overlay is not None:
             self.retry_confirm_overlay.handle_event(event)
             return True
@@ -100,7 +123,6 @@ class PhaseCompleteOverlay(BaseOverlay):
         if self.fade_in < 1.0:
             self.fade_in = min(1.0, self.fade_in + dt * 2.0)
 
-        # ===== NOVO: atualiza o sub-overlay de confirmação (se aberto) =====
         if self.retry_confirm_overlay is not None:
             self.retry_confirm_overlay.update(dt)
 
@@ -132,7 +154,6 @@ class PhaseCompleteOverlay(BaseOverlay):
             except Exception:
                 continue
 
-        # Fallback: criar um retângulo com "?"
         surf = pygame.Surface((64, 64), pygame.SRCALPHA)
         surf.fill((40, 40, 50))
         pygame.draw.rect(surf, (60, 60, 70), (0, 0, 64, 64), 2)
@@ -143,14 +164,15 @@ class PhaseCompleteOverlay(BaseOverlay):
         self._unknown_portrait_cache = surf
         return surf
 
+    # ==================================================================
+    # RENDER
+    # ==================================================================
     def render(self, screen):
-        # Overlay com fade-in
         overlay, viewport = self.create_overlay_surface(int(180 * self.fade_in))
         screen.blit(overlay, (viewport.x, viewport.y))
 
         center_x = viewport.x + viewport.width // 2
 
-        # Fontes responsivas
         base_size = min(viewport.width, viewport.height)
         font_large = pygame.font.Font(None, max(32, int(base_size * 0.06)))
         font_medium = pygame.font.Font(None, max(24, int(base_size * 0.045)))
@@ -158,31 +180,25 @@ class PhaseCompleteOverlay(BaseOverlay):
         font_tiny = pygame.font.Font(None, max(16, int(base_size * 0.025)))
 
         # ============================================================
-        # 1. COLETA DE DADOS (para calcular a altura total)
+        # 1. COLETA DE DADOS
         # ============================================================
-
-        # Dados dos cartões
         gold_total = self.complete_data.get("gold_total", 0)
         total_xp = self.complete_data.get("total_xp", 0)
         bonus_amount = self.complete_data.get("bonus_amount", 0)
         stars = self.complete_data.get('stars', 0)
 
-        # Título
         title_text = "FASE COMPLETA!"
         title_surf = font_large.render(title_text, True, (255, 215, 0))
         title_height = int(title_surf.get_height() * max(0.1, self.title_scale)) + 10
 
-        # Nome da fase
         phase_name = self.phase_info.get("name", f"Fase {self.phase_number}")
         name_surf = font_medium.render(phase_name, True, (255, 255, 255))
         name_height = name_surf.get_height() + 15
 
-        # Cartões (altura fixa)
         card_height = min(80, int(viewport.height * 0.13))
         card_spacing = int(viewport.width * 0.02)
         card_section_height = card_height + 20
 
-        # Grade de itens (variável)
         items_height = 0
         if self.item_counts:
             icon_size = 64
@@ -194,27 +210,21 @@ class PhaseCompleteOverlay(BaseOverlay):
             items_height = rows * (icon_size + spacing) + 30 + 20
             items_height = min(items_height, viewport.height * 0.35)
         else:
-            items_height = 30  # texto "Nenhum item recebido" + margem
+            items_height = 30
 
-        # Estrelas
         stars_height = 0
         if stars > 0:
             star_size = int(min(viewport.width, viewport.height) * 0.025)
             stars_height = star_size + 20
 
-        # Próxima fase
+        # ---- Próxima fase (usa dados cacheados no __init__) ----
         next_height = 0
-        if self.next_phase:
-            chapter, phase = map(int, self.next_phase.split("-"))
-            next_info = phase_catalog.get_phase_info(chapter, phase)
-            if next_info:
-                next_height = font_tiny.get_height() + 20
+        if self.next_phase and self.next_phase_info:
+            next_height = font_tiny.get_height() + 20
 
-        # Botões (agora 3 botões em linha)
         button_height = min(50, int(viewport.height * 0.08))
         button_section_height = button_height + 20
 
-        # Grade de Pokémon
         pokemon_height = 0
         if self.pokemon_ids:
             icon_size = 64
@@ -222,15 +232,13 @@ class PhaseCompleteOverlay(BaseOverlay):
             padding = 20
             cols = min(6, len(self.pokemon_ids))
             rows = (len(self.pokemon_ids) + cols - 1) // cols
-            pokemon_height = rows * (icon_size + spacing) + padding * 2 + 20 + 40  # título + margem
+            pokemon_height = rows * (icon_size + spacing) + padding * 2 + 20 + 40
 
-        # Instrução ESC
         esc_height = font_tiny.get_height() + 10
 
         # ============================================================
-        # 2. CÁLCULO DA ALTURA TOTAL E POSIÇÃO INICIAL
+        # 2. CÁLCULO DE ALTURA / POSIÇÃO
         # ============================================================
-
         total_height = (
                 title_height +
                 name_height +
@@ -243,12 +251,11 @@ class PhaseCompleteOverlay(BaseOverlay):
                 esc_height
         )
 
-        # Centraliza verticalmente
         start_y = viewport.y + (viewport.height - total_height) // 2
         y_offset = start_y
 
         # ============================================================
-        # 3. RENDERIZAÇÃO (usando y_offset acumulado)
+        # 3. RENDERIZAÇÃO
         # ============================================================
 
         # ----- Título -----
@@ -269,7 +276,6 @@ class PhaseCompleteOverlay(BaseOverlay):
 
         y_offset += scaled_title.get_height() + 10
 
-        # Linha decorativa
         line_y = y_offset
         pygame.draw.line(screen, (255, 215, 0),
                          (center_x - int(viewport.width * 0.15), line_y),
@@ -365,7 +371,6 @@ class PhaseCompleteOverlay(BaseOverlay):
                     screen.blit(count_bg, (bg_x, bg_y))
                     screen.blit(count_surf, (bg_x + 5, bg_y + 3))
 
-                # Nome do item (truncado)
                 item_data = item_bag_catalog.get_item(item_id)
                 item_name = item_data['name'] if item_data else item_id
                 if len(item_name) > 10:
@@ -391,29 +396,27 @@ class PhaseCompleteOverlay(BaseOverlay):
             y_offset += star_size + 15
 
         # ----- Próxima fase (texto informativo) -----
-        if self.next_phase:
-            chapter, phase = map(int, self.next_phase.split("-"))
-            next_info = phase_catalog.get_phase_info(chapter, phase)
-            if next_info:
-                next_text = font_tiny.render(f"Próxima fase: {next_info['name']}", True, (180, 180, 255))
-                screen.blit(next_text, (center_x - next_text.get_width() // 2, y_offset))
-                y_offset += next_text.get_height() + 15
+        if self.next_phase and self.next_phase_info:
+            next_text = font_tiny.render(
+                f"Próxima fase: {self.next_phase_info['name']}",
+                True, (180, 180, 255)
+            )
+            screen.blit(next_text, (center_x - next_text.get_width() // 2, y_offset))
+            y_offset += next_text.get_height() + 15
 
         # ============================================================
-        # BOTÕES (agora 3 botões)
+        # BOTÕES (3 botões)
         # ============================================================
         button_width = min(180, int(viewport.width * 0.20))
         button_height = min(50, int(viewport.height * 0.08))
         spacing = int(viewport.width * 0.015)
 
-        # Calcula se cabe 3 botões ou se precisa de 2 linhas
         total_buttons_width = button_width * 3 + spacing * 2
 
         if total_buttons_width <= viewport.width * 0.9:
             # 3 botões em linha
             start_x_buttons = center_x - total_buttons_width // 2
 
-            # Botão REJOGAR
             self.retry_button_rect = pygame.Rect(
                 start_x_buttons, y_offset, button_width, button_height
             )
@@ -424,7 +427,6 @@ class PhaseCompleteOverlay(BaseOverlay):
                 border_color=(160, 80, 60), hover_border=(220, 120, 80)
             )
 
-            # Botão PRÓXIMA FASE (só se existir)
             if self.has_next_phase:
                 self.next_phase_button_rect = pygame.Rect(
                     start_x_buttons + button_width + spacing, y_offset,
@@ -439,7 +441,6 @@ class PhaseCompleteOverlay(BaseOverlay):
             else:
                 self.next_phase_button_rect = None
 
-            # Botão CONTINUAR (menu)
             continue_x = start_x_buttons + (button_width + spacing) * (2 if self.has_next_phase else 1)
             self.button_rect = pygame.Rect(
                 continue_x, y_offset, button_width, button_height
@@ -451,8 +452,7 @@ class PhaseCompleteOverlay(BaseOverlay):
                 border_color=(70, 100, 200), hover_border=(120, 160, 255)
             )
         else:
-            # 2 linhas de botões
-            # Primeira linha: REJOGAR + PRÓXIMA FASE
+            # 2 linhas
             first_row_width = button_width * 2 + spacing
             first_row_x = center_x - first_row_width // 2
 
@@ -482,7 +482,6 @@ class PhaseCompleteOverlay(BaseOverlay):
 
             y_offset += button_height + spacing
 
-            # Segunda linha: CONTINUAR centralizado
             self.button_rect = pygame.Rect(
                 center_x - button_width // 2, y_offset, button_width, button_height
             )
@@ -506,13 +505,14 @@ class PhaseCompleteOverlay(BaseOverlay):
         esc_text = font_tiny.render("Pressione ESC para continuar", True, (120, 120, 120))
         screen.blit(esc_text, (center_x - esc_text.get_width() // 2, y_offset))
 
-        # ===== NOVO: renderiza o confirm por cima de tudo =====
         if self.retry_confirm_overlay is not None:
             self.retry_confirm_overlay.render(screen)
 
+    # ==================================================================
+    # HELPERS DE RENDER
+    # ==================================================================
     def _render_action_button(self, screen, rect, text, font, hovered,
                               base_color, hover_color, border_color, hover_border):
-        """Renderiza um botão de ação com sombra e hover"""
         if hovered:
             shadow_offset = 2
         else:
@@ -534,7 +534,6 @@ class PhaseCompleteOverlay(BaseOverlay):
         screen.blit(text_surf, text_rect)
 
     def _render_pokemon_grid(self, screen, center_x, y_offset, viewport):
-        """Renderiza a grade de Pokémon da fase, com portrait ou ?"""
         if not self.pokemon_ids:
             return y_offset
 
@@ -577,12 +576,12 @@ class PhaseCompleteOverlay(BaseOverlay):
             x = start_x + col * horizontal_step
             y = start_y + row * vertical_step
 
-            # Ícone
             icon_rect = pygame.Rect(x, y, icon_size, icon_size)
             pygame.draw.rect(screen, (50, 50, 60), icon_rect, border_radius=8)
             pygame.draw.rect(screen, (100, 100, 120), icon_rect, 2, border_radius=8)
 
-            is_seen = pid in self.game_scene.game.player.seen_pokemon or pid in self.game_scene.game.player.caught_pokemon
+            is_seen = pid in self.game_scene.game.player.seen_pokemon or \
+                      pid in self.game_scene.game.player.caught_pokemon
 
             if is_seen:
                 portrait = self.pokedex.get_portrait(pid, "normal", shiny=False)
@@ -599,7 +598,6 @@ class PhaseCompleteOverlay(BaseOverlay):
                 text = font.render("?", True, (200, 200, 200))
                 screen.blit(text, text.get_rect(center=icon_rect.center))
 
-            # Nome abaixo do ícone
             name = self.pokedex.get_name(pid) if is_seen else "????"
             if len(name) > 8:
                 name = name[:8] + "."
@@ -639,19 +637,12 @@ class PhaseCompleteOverlay(BaseOverlay):
         pygame.draw.polygon(screen, color, points)
         pygame.draw.polygon(screen, (200, 170, 0), points, 1)
 
-    # ================================================================
-    # RETRY (REJOGAR FASE)
-    # ================================================================
+    # ==================================================================
+    # RETRY
+    # ==================================================================
     def _retry_phase(self):
-        """
-        Chamado quando o jogador clica em REJOGAR.
-        Antes de efetivamente reiniciar, abre um sub-overlay perguntando
-        se o jogador deseja manter os pokémons nos spots onde estavam.
-        """
         from .retry_confirm_overlay import RetryConfirmOverlay
 
-        # Captura o snapshot AGORA (antes do cleanup), pois é o estado
-        # que representa "onde os pokémons estavam" durante a fase.
         snapshot = self._capture_placement_snapshot()
 
         def on_confirm(keep_placement):
@@ -661,11 +652,6 @@ class PhaseCompleteOverlay(BaseOverlay):
         print("[PHASE_COMPLETE] Overlay de confirmação de retry aberto.")
 
     def _capture_placement_snapshot(self):
-        """
-        Captura a posição atual de todos os Pokémon colocados no mapa.
-        Retorna uma lista de dicts com o mínimo necessário para restaurar:
-        identificação do pokémon (unique_id + fallback id/level) e o tile.
-        """
         snapshot = []
         pm = getattr(self.game_scene, 'placement_manager', None)
         if not pm:
@@ -695,11 +681,6 @@ class PhaseCompleteOverlay(BaseOverlay):
         return snapshot
 
     def _do_retry_phase(self, keep_placement, snapshot):
-        """
-        Efetivamente reinicia a fase.
-        - keep_placement=True: passa o snapshot para a nova cena restaurar.
-        - keep_placement=False: comportamento antigo (fase totalmente limpa).
-        """
         from src.scenes.game_scene.game_scene import GameScene
 
         print(f"[PHASE_COMPLETE] Reiniciando fase {self.phase_id} "
@@ -707,15 +688,14 @@ class PhaseCompleteOverlay(BaseOverlay):
 
         self._stop_music()
 
-        # Limpa a cena do jogo
         if hasattr(self.game_scene, 'cleanup'):
             self.game_scene.cleanup()
 
-        # Cria uma nova GameScene com a mesma fase
         new_game_scene = GameScene(
             self.game,
             self.chapter_id,
             self.phase_number,
+            region_id=self.region_id,
             keep_placement=keep_placement,
             placement_snapshot=snapshot if keep_placement else None,
         )
@@ -724,47 +704,44 @@ class PhaseCompleteOverlay(BaseOverlay):
         print(f"[PHASE_COMPLETE] Fase {self.phase_id} reiniciada!")
 
     def _go_to_next_phase(self):
-        """Avança diretamente para a próxima fase"""
         from src.scenes.game_scene.game_scene import GameScene
 
         if not self.next_phase:
             print("[PHASE_COMPLETE] Não há próxima fase!")
             return
 
-        chapter, phase = map(int, self.next_phase.split("-"))
+        if self.next_phase_region is None:
+            print("[PHASE_COMPLETE] next_phase_region não definida — abortando.")
+            return
+
         print(f"[PHASE_COMPLETE] Indo para próxima fase: {self.next_phase}")
 
         self._stop_music()
 
-        # Limpa a cena do jogo
         if hasattr(self.game_scene, 'cleanup'):
             self.game_scene.cleanup()
 
-        # Cria uma nova GameScene para a próxima fase
-        new_game_scene = GameScene(self.game, chapter, phase)
+        new_game_scene = GameScene(
+            self.game,
+            self.next_phase_chapter,
+            self.next_phase_number,
+            region_id=self.next_phase_region,
+        )
         self.game.current_scene = new_game_scene
 
         print(f"[PHASE_COMPLETE] Próxima fase {self.next_phase} iniciada!")
 
     def _return_to_phase_select(self):
-        """
-        Retorna para a tela de seleção de fase com refresh forçado.
-        """
         from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
 
         self._stop_music()
 
-        # Limpa a cena do jogo
         if hasattr(self.game_scene, 'cleanup'):
             self.game_scene.cleanup()
 
-        # Cria a cena de seleção de fase com refresh forçado
-        phase_select_scene = PhaseSelectScene(
-            self.game,
-        )
+        phase_select_scene = PhaseSelectScene(self.game)
         phase_select_scene._needs_refresh = True
 
-        # Define como cena atual
         self.game.current_scene = phase_select_scene
 
         print(f"[PHASE_COMPLETE] Retornando ao PhaseSelectScene com refresh forçado")

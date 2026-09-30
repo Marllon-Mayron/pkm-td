@@ -37,6 +37,7 @@ from src.battle.effects.specific.day_night.day_night_filter import DayNightFilte
 from src.battle.effects.specific.day_night.day_night_state import DayNightType
 from src.scenes.game_scene.components.day_night_weather_system import DayNightWeatherSystem
 from src.scenes.game_scene.components.managers.in_game_debug_manager import InGameDebugManager
+from src.config.regions import make_phase_id, DEFAULT_REGION_ID
 
 GYM_PHASES = {
     (1, 5): 1,   # 1º Ginásio
@@ -52,7 +53,7 @@ GYM_PHASES = {
 MYTHICAL_SPAWN_CHANCE = 0.05
 
 class GameScene(BaseScene):
-    def __init__(self, game, chapter_id=1, phase_number=1, keep_placement=False, placement_snapshot=None):
+    def __init__(self, game, chapter_id=1, phase_number=1, region_id=DEFAULT_REGION_ID, keep_placement=False, placement_snapshot=None):
         super().__init__(game)
 
         # ===== parâmetros de restauração de placement =====
@@ -70,9 +71,10 @@ class GameScene(BaseScene):
 
         self.ui_hidden = False  # True = oculta todas as UIs
 
+        self.region_id = int(region_id) if region_id is not None else DEFAULT_REGION_ID
         self.chapter_id = chapter_id
         self.phase_number = phase_number
-        self.phase_id = f"{chapter_id}-{phase_number}"
+        self.phase_id = make_phase_id(self.region_id, chapter_id, phase_number)
         self.phase_info = None
 
         # Carrega informações da fase
@@ -127,6 +129,10 @@ class GameScene(BaseScene):
         self._setup_world_dimensions()
 
         self.player = game.player
+
+        # ===== Sincroniza região atual do AchievementManager =====
+        if hasattr(self.player, 'achievement_manager'):
+            self.player.achievement_manager.set_current_region(self.region_id)
 
         # Renderizadores
         self.item_bag_renderer = ItemBagRenderer(game, self.player.bag)
@@ -349,12 +355,23 @@ class GameScene(BaseScene):
 
     def _load_phase_info(self):
         """Carrega informações da fase do catálogo"""
-        self.phase_info = phase_catalog.get_phase_info(self.chapter_id, self.phase_number)
+        # Tenta novo formato (region, chapter, phase)
+        try:
+            self.phase_info = phase_catalog.get_phase_info(
+                self.region_id, self.chapter_id, self.phase_number
+            )
+        except TypeError:
+            # Fallback catálogo antigo
+            self.phase_info = phase_catalog.get_phase_info(
+                self.chapter_id, self.phase_number
+            )
+
         if not self.phase_info:
             self.phase_info = {
                 "name": f"Fase {self.chapter_id}-{self.phase_number}",
                 "number": self.phase_number,
-                "chapter": self.chapter_id
+                "chapter": self.chapter_id,
+                "region": self.region_id,
             }
 
     def _load_phase_data(self):
@@ -687,12 +704,11 @@ class GameScene(BaseScene):
         # ===== TM: aplica conquistas =====
         if not cancel and hasattr(self, 'pending_tm_data') and self.pending_tm_data:
             print(f"[TM] {self.pending_tm_data['move_name']} aprendido com sucesso!")
-            phase_id = f"{self.chapter_id}-{self.phase_number}"
             if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
                 ach_mgr = self.player.achievement_manager
                 ach_mgr.increment_counter("move_taught_count")
-                ach_mgr.check_and_unlock("first_move_taught", phase_id)
-                ach_mgr.check_and_unlock("move_taught_10", phase_id)
+                ach_mgr.check_and_unlock("first_move_taught", self.phase_id)
+                ach_mgr.check_and_unlock("move_taught_10", self.phase_id)
             self.pending_tm_data = None
 
         # ===== Retoma a fila de moves pendentes (do pokémon) =====
@@ -862,39 +878,38 @@ class GameScene(BaseScene):
                                      portrait="happy")
 
                         # ===== CONQUISTAS: CURA DE STATUS =====
-                        phase_id = f"{self.chapter_id}-{self.phase_number}"
                         if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
                             ach_mgr = self.player.achievement_manager
 
                             # Cura de Veneno com Antídoto
                             if status_to_cure == "poison" and item_data.get("id") == "antidote":
                                 ach_mgr.increment_counter("antidote_count")
-                                ach_mgr.check_and_unlock("first_antidote", phase_id)
-                                ach_mgr.check_and_unlock("antidote_100", phase_id)
+                                ach_mgr.check_and_unlock("first_antidote", self.phase_id)
+                                ach_mgr.check_and_unlock("antidote_100", self.phase_id)
 
                             # Cura de Sono com Awakening
                             elif status_to_cure == "sleep" and item_data.get("id") == "awakening":
                                 ach_mgr.increment_counter("awake_count")
-                                ach_mgr.check_and_unlock("first_awake", phase_id)
-                                ach_mgr.check_and_unlock("awake_100", phase_id)
+                                ach_mgr.check_and_unlock("first_awake", self.phase_id)
+                                ach_mgr.check_and_unlock("awake_100", self.phase_id)
 
                             # Cura de Paralisia
                             elif status_to_cure == "paralysis":
                                 ach_mgr.increment_counter("paralyze_heal_count")
-                                ach_mgr.check_and_unlock("first_paralyze_heal", phase_id)
-                                ach_mgr.check_and_unlock("paralyze_heal_100", phase_id)
+                                ach_mgr.check_and_unlock("first_paralyze_heal", self.phase_id)
+                                ach_mgr.check_and_unlock("paralyze_heal_100", self.phase_id)
 
                             # Cura de Queimadura =====
                             elif status_to_cure == "burn" and item_data.get("id") == "burn_heal":
                                 ach_mgr.increment_counter("burn_heal_count")
-                                ach_mgr.check_and_unlock("first_burn_heal", phase_id)
-                                ach_mgr.check_and_unlock("burn_heal_10", phase_id)
+                                ach_mgr.check_and_unlock("first_burn_heal", self.phase_id)
+                                ach_mgr.check_and_unlock("burn_heal_10", self.phase_id)
 
                             # Cura de Congelamento =====
                             elif status_to_cure == "freeze" and item_data.get("id") == "ice_heal":
                                 ach_mgr.increment_counter("freeze_heal_count")
-                                ach_mgr.check_and_unlock("first_freeze_heal", phase_id)
-                                ach_mgr.check_and_unlock("freeze_heal_10", phase_id)
+                                ach_mgr.check_and_unlock("first_freeze_heal", self.phase_id)
+                                ach_mgr.check_and_unlock("freeze_heal_10", self.phase_id)
 
                         return True
                 return False
@@ -980,11 +995,10 @@ class GameScene(BaseScene):
                         portrait="joyous"
                     )
                     # ===== CONQUISTAS: RARE CANDY =====
-                    phase_id = f"{self.chapter_id}-{self.phase_number}"
                     if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
                         ach_mgr = self.player.achievement_manager
                         ach_mgr.increment_counter("rare_candy_count")
-                        ach_mgr.check_and_unlock("rare_candy_3", phase_id)
+                        ach_mgr.check_and_unlock("rare_candy_3", self.phase_id)
                     return True
                 else:
                     return False
@@ -1041,8 +1055,7 @@ class GameScene(BaseScene):
             # Conquista de substituição
             if hasattr(self.player, 'achievement_manager'):
                 self.player.achievement_manager.increment_counter("battle_item_replace_count")
-                phase_id = f"{self.chapter_id}-{self.phase_number}"
-                self.player.achievement_manager.check_and_unlock("battle_item_replace", phase_id)
+                self.player.achievement_manager.check_and_unlock("battle_item_replace", self.phase_id)
             # Mensagem de substituição
             self.battle_system.effect_manager.add_status_text(
                 pokemon,
@@ -1082,8 +1095,7 @@ class GameScene(BaseScene):
         # Conquista de uso de item de batalha
         if hasattr(self.player, 'achievement_manager'):
             self.player.achievement_manager.increment_counter("battle_item_use_count")
-            phase_id = f"{self.chapter_id}-{self.phase_number}"
-            self.player.achievement_manager.check_and_unlock("battle_item_use_10", phase_id)
+            self.player.achievement_manager.check_and_unlock("battle_item_use_10", self.phase_id)
 
         # Consome o item (retorna True)
         return True
@@ -1164,12 +1176,11 @@ class GameScene(BaseScene):
             print(f"[TM] {pokemon.name} aprendeu {move_name} via TM!")
             pokemon.add_happiness(5, f"Usou {item_data.get('name', 'Aprendeu um move')}")
             # ===== CONQUISTAS: Ensino de Moves =====
-            phase_id = f"{self.chapter_id}-{self.phase_number}"
             if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
                 ach_mgr = self.player.achievement_manager
                 ach_mgr.increment_counter("move_taught_count")
-                ach_mgr.check_and_unlock("first_move_taught", phase_id)
-                ach_mgr.check_and_unlock("move_taught_10", phase_id)
+                ach_mgr.check_and_unlock("first_move_taught", self.phase_id)
+                ach_mgr.check_and_unlock("move_taught_10", self.phase_id)
 
             return True
 
@@ -1307,10 +1318,9 @@ class GameScene(BaseScene):
 
             # ===== INCREMENTA CONTADOR DA FRIEND BALL =====
             if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
-                phase_id = f"{self.chapter_id}-{self.phase_number}"
                 ach_mgr = self.player.achievement_manager
                 ach_mgr.increment_counter("friendball_capture_count")
-                ach_mgr.check_and_unlock("friendball_capture_5", phase_id)
+                ach_mgr.check_and_unlock("friendball_capture_5", self.phase_id)
 
             # Limpa a flag
             self._last_capture_item = None
@@ -1329,26 +1339,25 @@ class GameScene(BaseScene):
 
         # ===== CONQUISTAS: Captura =====
         if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
-            phase_id = f"{self.chapter_id}-{self.phase_number}"
             ach_mgr = self.player.achievement_manager
 
             # Incrementa contador de capturas
             ach_mgr.increment_counter("capture_count")
 
             # Verifica conquistas de captura (passando a fase atual)
-            ach_mgr.check_and_unlock("first_capture", phase_id)
-            ach_mgr.check_and_unlock("capture_10", phase_id)
-            ach_mgr.check_and_unlock("capture_50", phase_id)
+            ach_mgr.check_and_unlock("first_capture", self.phase_id)
+            ach_mgr.check_and_unlock("capture_10", self.phase_id)
+            ach_mgr.check_and_unlock("capture_50", self.phase_id)
 
             # ===== CONQUISTAS: SHINY =====
             if enemy.is_shiny:
                 ach_mgr.increment_counter("shiny_capture_count")
-                ach_mgr.check_and_unlock("first_shiny_capture", phase_id)
+                ach_mgr.check_and_unlock("first_shiny_capture", self.phase_id)
 
             # ===== CONQUISTAS: CAPTURA COM ITEM =====
             ach_mgr = self.player.achievement_manager
             ach_mgr.increment_counter("capture_with_item_count")
-            ach_mgr.check_and_unlock("capture_with_item", phase_id)
+            ach_mgr.check_and_unlock("capture_with_item", self.phase_id)
             print(f"[CAPTURE] Pokémon capturado segurando item! Conquista verificada.")
 
         self.show_capture_overlay(caught, is_to_team)
@@ -1376,7 +1385,7 @@ class GameScene(BaseScene):
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
                 player = game_scene.player
-                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                phase_id = phase_id = game_scene.phase_id
                 if hasattr(player, 'achievement_manager'):
                     ach_mgr = player.achievement_manager
                     ach_mgr.increment_counter("revive_count")
@@ -1386,7 +1395,7 @@ class GameScene(BaseScene):
             # ===== CONQUISTAS: Cura (Revive também conta) =====
             if game_scene and hasattr(game_scene, 'player'):
                 player = game_scene.player
-                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                phase_id = phase_id = game_scene.phase_id
                 if hasattr(player, 'achievement_manager'):
                     player.achievement_manager.increment_counter("heal_count")
                     player.achievement_manager.check_and_unlock("heal_5", phase_id)
@@ -1411,7 +1420,7 @@ class GameScene(BaseScene):
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
                 player = game_scene.player
-                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                phase_id = phase_id = game_scene.phase_id
                 if hasattr(player, 'achievement_manager'):
                     player.achievement_manager.increment_counter("heal_count")
                     player.achievement_manager.check_and_unlock("heal_5", phase_id)
@@ -1431,7 +1440,7 @@ class GameScene(BaseScene):
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
                 player = game_scene.player
-                phase_id = f"{game_scene.chapter_id}-{game_scene.phase_number}"
+                phase_id = phase_id = game_scene.phase_id
                 if hasattr(player, 'achievement_manager'):
                     player.achievement_manager.increment_counter("heal_count")
                     player.achievement_manager.check_and_unlock("heal_5", phase_id)
@@ -1461,15 +1470,14 @@ class GameScene(BaseScene):
                 is_last_stand = True
 
         if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
-            phase_id = f"{self.chapter_id}-{self.phase_number}"
             ach_mgr = self.player.achievement_manager
 
             ach_mgr.increment_counter("escaperope_use_count")
-            ach_mgr.check_and_unlock("first_escaperope_use", phase_id)
+            ach_mgr.check_and_unlock("first_escaperope_use", self.phase_id)
 
             if is_last_stand:
                 ach_mgr.increment_counter("escaperope_last_stand_count")
-                ach_mgr.check_and_unlock("escaperope_last_stand", phase_id)
+                ach_mgr.check_and_unlock("escaperope_last_stand", self.phase_id)
 
         sound_manager.stop_music(fade_ms=500)
         self.reset_all_transformed_dittos()
@@ -1497,7 +1505,7 @@ class GameScene(BaseScene):
         from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
 
         # Cria a cena com flag de refresh
-        team_scene = TeamSelectScene(self.game, self.chapter_id, self.phase_number)
+        team_scene = TeamSelectScene(self.game, self.chapter_id, self.phase_number,  region_id=self.region_id, )
         team_scene._needs_refresh = True  # Força refresh ao entrar
         self.game.current_scene = team_scene
 
@@ -2455,13 +2463,12 @@ class GameScene(BaseScene):
         # ===== VERIFICA CONQUISTAS DE FELICIDADE =====
         if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
             ach_mgr = self.player.achievement_manager
-            phase_id = f"{self.chapter_id}-{self.phase_number}"
 
             if not ach_mgr.is_unlocked("full_team_max_happiness"):
-                ach_mgr.check_and_unlock("full_team_max_happiness", phase_id)
+                ach_mgr.check_and_unlock("full_team_max_happiness", self.phase_id)
 
             if not ach_mgr.is_unlocked("max_happiness"):
-                ach_mgr.check_and_unlock("max_happiness", phase_id)
+                ach_mgr.check_and_unlock("max_happiness", self.phase_id)
 
         # Effect Manager
         if hasattr(self, 'battle_system') and self.battle_system:
@@ -2595,9 +2602,8 @@ class GameScene(BaseScene):
             perfect_run = True
             # ===== CONQUISTAS: Fase Perfeita =====
             if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
-                phase_id = f"{self.chapter_id}-{self.phase_number}"
                 self.player.achievement_manager.increment_counter("perfect_phase_count")
-                self.player.achievement_manager.check_and_unlock("perfect_phase", phase_id)
+                self.player.achievement_manager.check_and_unlock("perfect_phase", self.phase_id)
                 print(f"[ACHIEVEMENT] Fase perfeita! Verificando conquistas...")
 
         # ===== GOLD TOTAL =====

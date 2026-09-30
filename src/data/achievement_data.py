@@ -44,6 +44,9 @@ class Achievement:
     rarity: AchievementRarity
     rewards: Dict[str, Any]
 
+    # ===== REGIÃO (fallback: Kanto = 1) =====
+    region_id: int = 1
+
     # Estado (não salvo, vem do jogador)
     unlocked: bool = False
     unlocked_at: Optional[str] = None
