@@ -53,6 +53,10 @@ class BattleSystem:
 
         # ===== ATUALIZA DISABLE =====
         self._update_disable(dt)
+
+        # ===== ATUALIZA BLOQUEIOS DE AÇÃO (Torment/Taunt/Imprison) =====
+        self._update_action_blocks(dt)
+
         # Atualiza multi-hit ativo
         if self.active_multi_hit:
             still_active = self.active_multi_hit.update(dt)
@@ -453,6 +457,9 @@ class BattleSystem:
             if not will_hit and target:
                 print(f"[BATTLE] {move.name} errou!")
                 self._show_miss_on_attacker(attacker)
+
+                # ===== MISS QUEBRA LOCK-IN =====
+                self._on_move_miss(attacker, move)
             else:
                 # Aplica o efeito do move de status
                 from src.battle.effects import EffectFactory
@@ -615,6 +622,9 @@ class BattleSystem:
             else:
                 print(f"[BATTLE] {move.name} errou!")
                 self._show_miss_on_attacker(attacker)
+
+                # ===== MISS QUEBRA LOCK-IN =====
+                self._on_move_miss(attacker, move)
                 if has_crash_effect:
                     self._apply_crash_damage(attacker, move, effect)
 
@@ -680,6 +690,9 @@ class BattleSystem:
             self._show_miss_on_attacker(attacker)
             attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
             self.miss_hit_general(attacker)
+
+            # ===== MISS QUEBRA LOCK-IN =====
+            self._on_move_miss(attacker, move)
             return True
 
         # Toca som
@@ -797,6 +810,23 @@ class BattleSystem:
         attacker.attack_cooldown = max(0.3, 1.0 - (attacker.speed_stat / 500))
 
         return True
+
+    def _on_move_miss(self, attacker, move):
+        """Callback quando um move erra. Quebra lock-ins que resetam em miss."""
+        if not getattr(attacker, '_locked_move_name', None):
+            return
+
+        # Só Ice Ball quebra em miss (Uproar sempre acerta)
+        if move.name.lower().replace(" ", "-") != "ice-ball":
+            return
+
+        attacker.clear_lock_in()
+        self.effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} errou! A Bola de Gelo quebrou!",
+            duration=2.0
+        )
+        print(f"[ICE_BALL] {attacker.name} errou → lock-in quebrado")
 
     def _calculate_struggle_damage(self, attacker, target, move):
         """
@@ -1227,6 +1257,49 @@ class BattleSystem:
             if pokemon._disabled_turns <= 0:
                 # Remove o disable
                 self._remove_disable(pokemon)
+
+    def _update_action_blocks(self, dt: float):
+        """Atualiza contadores de Torment/Taunt/Imprison em todos os Pokémon em campo."""
+        if not hasattr(self, 'game_scene') or not self.game_scene:
+            return
+
+        pokemon_list = []
+        if hasattr(self.game_scene, 'placement_manager'):
+            pokemon_list.extend(self.game_scene.placement_manager.placed_pokemon)
+        if hasattr(self.game_scene, 'wave_manager'):
+            pokemon_list.extend(self.game_scene.wave_manager.active_enemies)
+
+        for pokemon in pokemon_list:
+            self._update_pokemon_action_blocks(pokemon, dt)
+
+    def _update_pokemon_action_blocks(self, pokemon, dt: float):
+        """Atualiza bloqueios de ação de um Pokémon individual."""
+        # ===== TAUNT: decrementa turnos a cada 2 segundos =====
+        if getattr(pokemon, '_taunt_turns', 0) > 0:
+            pokemon._taunt_timer = getattr(pokemon, '_taunt_timer', 0.0) + dt
+            if pokemon._taunt_timer >= 2.0:
+                pokemon._taunt_timer = 0.0
+                pokemon._taunt_turns -= 1
+                print(f"[TAUNT] {pokemon.name}: restam {pokemon._taunt_turns} turno(s)")
+                if pokemon._taunt_turns <= 0:
+                    pokemon._taunt_turns = 0
+                    if hasattr(pokemon, 'effect_manager') and pokemon.effect_manager:
+                        pokemon.effect_manager.add_status_text(
+                            pokemon, f"{pokemon.name} não está mais provocado!",
+                            duration=1.5
+                        )
+                    print(f"[TAUNT] {pokemon.name} saiu do efeito de Taunt!")
+
+        # ===== IMPRISON: remove se a fonte saiu de campo =====
+        src = getattr(pokemon, '_imprison_source', None)
+        if src is not None and (src.is_defeated or not src.is_alive()):
+            pokemon._imprison_source = None
+            if hasattr(pokemon, 'effect_manager') and pokemon.effect_manager:
+                pokemon.effect_manager.add_status_text(
+                    pokemon, f"{pokemon.name} foi liberado do Imprison!",
+                    duration=1.5
+                )
+            print(f"[IMPRISON] {pokemon.name} liberado (fonte saiu de campo)")
 
     def _update_held_item_effects(self, dt: float):
         """Processa efeitos automáticos de itens segurados (berries, etc)."""

@@ -329,6 +329,20 @@ class MoveEffect:
             return self._apply_ingrain(attacker, target, battle_system, effect_manager)
         elif self.effect_type == "block":
             return self._apply_block(attacker, target, effect_manager)
+        elif self.effect_type == "torment":
+            return self._apply_torment(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "taunt":
+            return self._apply_taunt(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "imprison":
+            return self._apply_imprison(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "uproar":
+            return self._apply_uproar(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "ice_ball":
+            return self._apply_ice_ball(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "role_play":
+            return self._apply_role_play(attacker, target, battle_system, effect_manager)
+        elif self.effect_type == "skill_swap":
+            return self._apply_skill_swap(attacker, target, battle_system, effect_manager)
         return True
 
     def _apply_status(self, attacker, target, effect_manager):
@@ -643,6 +657,13 @@ class MoveEffect:
         """
         from src.battle.effects.status_effect import StatusEffect, StatusType
         from src.ui.toast_renderer import toast_battle
+
+        if self._any_uproar_active(battle_system):
+            toast_battle(
+                f"O alvoroço impede o descanso!",
+                duration=2.5, pokemon=attacker, portrait="sad"
+            )
+            return False
 
         # ===== VERIFICA SE JÁ ESTÁ DORMINDO =====
         current_status = effect_manager.get_status(attacker)
@@ -5879,6 +5900,7 @@ class MoveEffect:
 
         # ===== OBTÉM O MOVE ATUAL =====
         current_move = attacker.get_current_move()
+
         if not current_move:
             print(f"[SLEEP_TALK] {attacker.name} não tem move selecionado!")
             return False
@@ -5889,7 +5911,11 @@ class MoveEffect:
             return False
 
         # ===== FILTRA MOVES DISPONÍVEIS (EXCLUINDO SLEEP TALK) =====
-        available_moves = [m for m in attacker.moves if m.name.lower() != "sleep-talk" and m.current_pp > 0]
+        excluded = {"sleep-talk", "uproar"}
+        available_moves = [
+            m for m in attacker.moves
+            if m.name.lower().replace(" ", "-") not in excluded and m.current_pp > 0
+        ]
 
         if not available_moves:
             effect_manager.add_status_text(
@@ -6729,3 +6755,320 @@ class MoveEffect:
         )
         print(f"[BLOCK] {attacker.name} bloqueou {target.name}!")
         return True
+
+    # ===== BLOQUEAR AÇÕES =====
+
+    def _apply_torment(self, attacker, target, battle_system, effect_manager):
+        """Torment: alvo não pode repetir o mesmo move consecutivamente."""
+        if not target or target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, "Mas falhou!", duration=1.0)
+            return False
+
+        if getattr(target, '_torment_active', False):
+            effect_manager.add_status_text(
+                target, f"{target.name} já está atormentado!", duration=1.5
+            )
+            return False
+
+        target._torment_active = True
+
+        effect_manager.add_status_text(
+            target,
+            f"{target.name} não pode repetir o mesmo move!",
+            duration=2.0
+        )
+        print(f"[TORMENT] {attacker.name} atormentou {target.name}!")
+        return True
+
+    def _apply_taunt(self, attacker, target, battle_system, effect_manager):
+        """Taunt: alvo não pode usar moves de status por X turnos."""
+        if not target or target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, "Mas falhou!", duration=1.0)
+            return False
+
+        if getattr(target, '_taunt_turns', 0) > 0:
+            effect_manager.add_status_text(
+                target, f"{target.name} já está provocado!", duration=1.5
+            )
+            return False
+
+        turns = self.params.get("turns", 3)
+        target._taunt_turns = turns
+        target._taunt_timer = 0.0
+
+        effect_manager.add_status_text(
+            target,
+            f"{target.name} está provocado! ({turns} turnos)",
+            duration=2.0
+        )
+        effect_manager.add_status_text(
+            target,
+            f"{target.name} não pode usar moves de status!",
+            duration=2.0
+        )
+        print(f"[TAUNT] {attacker.name} provocou {target.name} por {turns} turnos!")
+        return True
+
+    def _apply_imprison(self, attacker, target, battle_system, effect_manager):
+        """
+        Imprison: SELF. Enquanto o usuário estiver em campo, os inimigos
+        não podem usar moves que o usuário conhece.
+        """
+        if getattr(attacker, '_imprison_self_active', False):
+            effect_manager.add_status_text(
+                attacker, f"{attacker.name} já está imprisionando!", duration=1.5
+            )
+            return False
+
+        attacker._imprison_self_active = True
+
+        # ===== APLICA EM TODOS OS INIMIGOS EM CAMPO =====
+        enemies = []
+        if hasattr(battle_system, 'game_scene') and battle_system.game_scene:
+            gs = battle_system.game_scene
+            if not attacker.is_wild:
+                # Aliado → inimigos são os wilds
+                if hasattr(gs, 'wave_manager'):
+                    enemies = list(gs.wave_manager.active_enemies)
+            else:
+                # Selvagem → inimigos são os aliados
+                if hasattr(gs, 'placement_manager'):
+                    enemies = list(gs.placement_manager.placed_pokemon)
+
+        applied = 0
+        for enemy in enemies:
+            if enemy.is_defeated or not enemy.is_alive():
+                continue
+            enemy._imprison_source = attacker
+            applied += 1
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} selou as ações dos inimigos!",
+            duration=2.0
+        )
+        print(f"[IMPRISON] {attacker.name} ativou Imprison ({applied} alvo(s))!")
+        return True
+
+    # ===== LOCK-IN  =====
+
+    def _apply_uproar(self, attacker, target, battle_system, effect_manager):
+        """
+        Uproar: 2-5 turnos de lock-in (aleatório).
+        - Acorda todos em campo
+        - Impede novos sono enquanto ativo
+        """
+        from src.battle.effects.status_effect import StatusType
+
+        # ===== PRIMEIRO USO =====
+        if not getattr(attacker, '_locked_move_name', None):
+            turns = self.params.get("min_turns", 2)
+            max_turns = self.params.get("max_turns", 5)
+            turns = random.randint(turns, max_turns)
+
+            attacker._locked_move_name = "uproar"
+            attacker._locked_move_turns = turns
+            attacker._locked_move_hit_count = 1
+            attacker._locked_move_original_power = 90  # base JSON
+            attacker._uproar_active = True
+
+            # ===== ACORDA TODO MUNDO EM CAMPO =====
+            self._uproar_wake_all(battle_system, effect_manager)
+
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} começou um alvoroço! ({turns} turnos)",
+                duration=2.0
+            )
+            print(f"[UPROAR] {attacker.name} iniciou Uproar ({turns} turnos)")
+            return True
+
+        # ===== USOS SUBSEQUENTES =====
+        if attacker._locked_move_name != "uproar":
+            return False
+
+        attacker._locked_move_turns -= 1
+        effect_manager.add_status_text(
+            attacker,
+            f"Alvoroço continua! ({attacker._locked_move_turns} usos restantes)",
+            duration=1.0
+        )
+
+        if attacker._locked_move_turns <= 0:
+            self._uproar_end(attacker, effect_manager)
+
+        return True
+
+    def _uproar_wake_all(self, battle_system, effect_manager):
+        """Acorda todos os Pokémon em campo ao iniciar Uproar."""
+        from src.battle.effects.status_effect import StatusType
+
+        gs = getattr(battle_system, 'game_scene', None)
+        if not gs:
+            return
+
+        all_pokemon = []
+        if hasattr(gs, 'placement_manager'):
+            all_pokemon.extend(gs.placement_manager.placed_pokemon)
+        if hasattr(gs, 'wave_manager'):
+            all_pokemon.extend(gs.wave_manager.active_enemies)
+
+        for p in all_pokemon:
+            status = effect_manager.get_status(p)
+            if status and status.type == StatusType.SLEEP:
+                effect_manager.remove_status(p)
+                effect_manager.add_status_text(
+                    p, f"{p.name} acordou com o barulho!", duration=1.5
+                )
+                print(f"[UPROAR] {p.name} acordou!")
+
+    def _uproar_end(self, attacker, effect_manager):
+        """Encerra o lock-in de Uproar."""
+        attacker.clear_lock_in()
+        effect_manager.add_status_text(
+            attacker, "O alvoroço acabou!", duration=2.0
+        )
+        print(f"[UPROAR] {attacker.name} parou o alvoroço")
+
+    def _apply_ice_ball(self, attacker, target, battle_system, effect_manager):
+        """
+        Ice Ball: 5 turnos de lock-in.
+        - Poder dobra a cada acerto (aplicado em _get_locked_move)
+        - Se errar, lock quebra (via BattleSystem._on_move_miss)
+        - Defense Curl dobra a base (60 em vez de 30)
+        """
+        # ===== PRIMEIRO USO =====
+        if not getattr(attacker, '_locked_move_name', None):
+            base_power = 30
+            if getattr(attacker, '_defense_curl_used', False):
+                base_power = 60
+
+            attacker._locked_move_name = "ice-ball"
+            attacker._locked_move_turns = 5
+            attacker._locked_move_hit_count = 1
+            attacker._locked_move_original_power = base_power
+
+            effect_manager.add_status_text(
+                attacker,
+                f"{attacker.name} começou uma Bola de Gelo! (5 turnos)",
+                duration=2.0
+            )
+            print(f"[ICE_BALL] {attacker.name} iniciou Ice Ball (base={base_power})")
+            return True
+
+        # ===== USOS SUBSEQUENTES =====
+        if attacker._locked_move_name != "ice-ball":
+            return False
+
+        attacker._locked_move_hit_count += 1
+        attacker._locked_move_turns -= 1
+
+        base = 60 if getattr(attacker, '_defense_curl_used', False) else 30
+        mult = min(2 ** (attacker._locked_move_hit_count - 1), 16)
+        current_power = base * mult
+
+        effect_manager.add_status_text(
+            attacker,
+            f"Bola de Gelo ficou mais forte! (Poder {current_power})",
+            duration=1.0
+        )
+
+        if attacker._locked_move_turns <= 0:
+            attacker.clear_lock_in()
+            effect_manager.add_status_text(
+                attacker, "A Bola de Gelo acabou!", duration=2.0
+            )
+            print(f"[ICE_BALL] {attacker.name} terminou Ice Ball")
+
+        return True
+
+    def _any_uproar_active(self, battle_system) -> bool:
+        """Verifica se algum Pokémon em campo está com Uproar ativo."""
+        gs = getattr(battle_system, 'game_scene', None)
+        if not gs:
+            return False
+        all_pokemon = []
+        if hasattr(gs, 'placement_manager'):
+            all_pokemon.extend(gs.placement_manager.placed_pokemon)
+        if hasattr(gs, 'wave_manager'):
+            all_pokemon.extend(gs.wave_manager.active_enemies)
+        return any(getattr(p, '_uproar_active', False) for p in all_pokemon)
+    # ===== TROCA DE HABILIDADE (Role Play / Skill Swap) =====
+
+    def _apply_role_play(self, attacker, target, battle_system, effect_manager):
+        """Role Play: copia a habilidade do alvo (temporário, restaurado no full_restore)."""
+        if not target or target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, "Mas falhou!", duration=1.0)
+            return False
+
+        target_ability = target.get_ability() if hasattr(target, 'get_ability') else None
+
+        if target_ability is None:
+            effect_manager.add_status_text(
+                attacker,
+                f"{target.name} não tem habilidade para copiar!",
+                duration=1.5
+            )
+            print(f"[ROLE_PLAY] {target.name} não tem ability definida")
+            return False
+
+        attacker.ability = target_ability
+        display = self._format_ability_name(target_ability)
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} copiou {display}!",
+            duration=2.0
+        )
+        print(f"[ROLE_PLAY] {attacker.name} copiou '{display}' de {target.name}")
+        return True
+
+    def _apply_skill_swap(self, attacker, target, battle_system, effect_manager):
+        """Skill Swap: troca habilidades com o alvo (temporário)."""
+        if not target or target.is_defeated or not target.is_alive():
+            effect_manager.add_status_text(attacker, "Mas falhou!", duration=1.0)
+            return False
+
+        atk_ab = attacker.get_ability() if hasattr(attacker, 'get_ability') else None
+        tgt_ab = target.get_ability() if hasattr(target, 'get_ability') else None
+
+        # Falha se NENHUM dos dois tem habilidade (padrão atual)
+        if atk_ab is None and tgt_ab is None:
+            effect_manager.add_status_text(
+                attacker,
+                "Mas nenhum dos dois tem habilidade!",
+                duration=1.5
+            )
+            print(f"[SKILL_SWAP] {attacker.name} e {target.name} não têm abilities")
+            return False
+
+        # ===== SWAP =====
+        attacker.ability = tgt_ab
+        target.ability = atk_ab
+
+        atk_display = self._format_ability_name(atk_ab)
+        tgt_display = self._format_ability_name(tgt_ab)
+
+        effect_manager.add_status_text(
+            attacker,
+            f"{attacker.name} trocou de habilidade!",
+            duration=2.0
+        )
+        effect_manager.add_status_text(
+            target,
+            f"{target.name} trocou de habilidade!",
+            duration=2.0
+        )
+        print(f"[SKILL_SWAP] {attacker.name} ({atk_display}) <-> {target.name} ({tgt_display})")
+        return True
+
+    @staticmethod
+    def _format_ability_name(ability) -> str:
+        """Formata nome da habilidade para exibição."""
+        if ability is None:
+            return "Nenhuma"
+        if isinstance(ability, str):
+            return ability.replace("-", " ").title()
+        if isinstance(ability, (list, tuple)):
+            return " / ".join(str(a).replace("-", " ").title() for a in ability)
+        return str(ability)

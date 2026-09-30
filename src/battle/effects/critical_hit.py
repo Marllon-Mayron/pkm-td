@@ -38,7 +38,8 @@ class CriticalHitSystem:
     HIGH_CRIT_MOVES = {
         "karate-chop", "slash", "razor-leaf", "crabhammer",
         "air-cutter", "night-slash", "cross-poison",
-        "shadow-claw", "stone-edge", "leaf-blade"
+        "shadow-claw", "stone-edge", "leaf-blade",
+        "blaze-kick", "poison-tail",
     }
 
     # ===== ATRIBUTOS DE CLASSE =====

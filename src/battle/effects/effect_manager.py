@@ -41,6 +41,17 @@ class EffectManager:
         """Aplica um efeito de status a um Pokémon (com verificação de imunidade)"""
         from .status_effect import TypeImmunity
 
+        # ===== UPROAR IMPEDE NOVO SONO =====
+        if status.type == StatusType.SLEEP:
+            if self._any_uproar_active(pokemon):
+                self.add_status_text(
+                    pokemon,
+                    f"O alvoroço impede {pokemon.name} de dormir!",
+                    duration=1.5
+                )
+                print(f"[UPROAR] {pokemon.name} não pode dormir durante Uproar!")
+                return False
+
         # ===== VERIFICA SAFEGUARD =====
         if hasattr(pokemon, '_safeguard_active') and pokemon._safeguard_active:
             # Safeguard previne status, exceto se for auto-aplicado (Rest, etc)
@@ -115,6 +126,19 @@ class EffectManager:
             pokemon.update_status_animation()
 
         return True
+
+    def _any_uproar_active(self, pokemon) -> bool:
+        """Verifica se algum Pokémon em campo está com Uproar ativo."""
+        bs = getattr(pokemon, 'battle_system', None)
+        if not bs or not bs.game_scene:
+            return False
+        gs = bs.game_scene
+        all_pokemon = []
+        if hasattr(gs, 'placement_manager'):
+            all_pokemon.extend(gs.placement_manager.placed_pokemon)
+        if hasattr(gs, 'wave_manager'):
+            all_pokemon.extend(gs.wave_manager.active_enemies)
+        return any(getattr(p, '_uproar_active', False) for p in all_pokemon)
 
     def remove_status(self, pokemon):
         """Remove efeito de status do Pokémon"""

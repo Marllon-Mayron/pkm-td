@@ -2981,6 +2981,91 @@ class EffectFactory:
             "description": "Prende o oponente. Ele não pode fugir nem trocar."
         },
 
+        # ===== BLOQUEAR AÇÕES =====
+        "torment": {
+            "effect_type": "torment",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {},
+            "description": "Impede o alvo de repetir o mesmo move consecutivamente."
+        },
+        "taunt": {
+            "effect_type": "taunt",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {"turns": 3},
+            "description": "Impede o alvo de usar moves de status por 3 turnos."
+        },
+        "imprison": {
+            "effect_type": "imprison",
+            "target": EffectTarget.SELF,
+            "timing": EffectTiming.ON_HIT,
+            "params": {},
+            "description": "Impede os inimigos de usar moves que o usuário conhece."
+        },
+
+        # ===== LOCK-IN=====
+        "uproar": {
+            "effect_type": "uproar",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "min_turns": 2,
+                "max_turns": 5,
+            },
+            "description": "Alvoroço por 2-5 turnos. Acorda todos e impede sono no campo."
+        },
+        "ice-ball": {
+            "effect_type": "ice_ball",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.AFTER_DAMAGE,
+            "params": {
+                "turns": 5,
+                "base_power": 30,
+                "max_multiplier": 16,
+            },
+            "description": "Bola de Gelo: 5 turnos, poder dobra a cada acerto (máx 16x)."
+        },
+        # ===== CRIT ALTO + STATUS (Sprint 11) =====
+        "blaze-kick": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "burn",
+                "chance": 0.10,
+                "duration": None,
+                "overwrite": False,
+            },
+            "description": "Alta taxa de crítico. Pode queimar (10%)."
+        },
+        "poison-tail": {
+            "effect_type": "status_chance",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {
+                "status": "poison",
+                "chance": 0.10,
+                "duration": None,
+                "overwrite": False,
+            },
+            "description": "Alta taxa de crítico. Pode envenenar (10%)."
+        },
+        # ===== TROCA DE HABILIDADE  =====
+        "role-play": {
+            "effect_type": "role_play",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {},
+            "description": "Copia a habilidade do alvo temporariamente."
+        },
+        "skill-swap": {
+            "effect_type": "skill_swap",
+            "target": EffectTarget.TARGET,
+            "timing": EffectTiming.ON_HIT,
+            "params": {},
+            "description": "Troca habilidades com o alvo temporariamente."
+        },
     }
 
     MOVE_EFFECTS = {**MOVE_EFFECTS_GEN1, **MOVE_EFFECTS_GEN2, **MOVE_EFFECTS_GEN3}

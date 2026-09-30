@@ -237,6 +237,29 @@ class Pokemon(Entity):
         self._trapped = False  # Block (aplicado por outro)
         self._ingrain_active = False  # Ingrain (auto-imposto + regen)
         self._ingrain_regen_timer = 0.0
+
+        # ===== Bloquear Ações (Torment / Taunt / Imprison) =====
+        self._torment_active = False
+        self._taunt_turns = 0
+        self._taunt_timer = 0.0
+        self._imprison_source = None
+        self._imprison_self_active = False
+
+        # ===== LOCK-IN (Uproar / Ice Ball) =====
+        self._locked_move_name = None  # nome normalizado do move forçado
+        self._locked_move_turns = 0  # usos restantes
+        self._locked_move_hit_count = 1  # já conta o 1º uso (power = base * 2^hits)
+        self._locked_move_original_power = None
+        self._uproar_active = False  # impede sono em campo
+
+        # ===== HABILIDADE (Role Play / Skill Swap) =====
+        # NOTA: habilidades ainda não têm efeito no jogo.
+        # Deixamos None por padrão — has_ability() sempre retorna False
+        # até que alguém carregue do pokedex explicitamente.
+        # NUNCA adicionar em to_dict() / from_dict() — é estado de batalha.
+        self._original_ability = None
+        self.ability = None
+
         # ===== 19. ATRIBUTOS DE COMBATE =====
         self.attack_range = 90
         self.combat_state = "idle"
@@ -460,6 +483,30 @@ class Pokemon(Entity):
 
     def _get_current_animation_frame_count(self) -> int:
         return self.animation._get_current_animation_frame_count()
+
+    def get_ability(self):
+        """Retorna a habilidade atual (pode ter sido trocada por Skill Swap)."""
+        return getattr(self, 'ability', None)
+
+    def has_ability(self, name: str) -> bool:
+        """
+        Verifica se o Pokémon tem a habilidade informada.
+        Retorna False se ability for None (padrão atual — habilidades inativas).
+        """
+        ab = self.get_ability()
+        if ab is None:
+            return False
+
+        target = name.lower()
+        if isinstance(ab, str):
+            return ab.lower() == target
+        if isinstance(ab, (list, tuple, set)):
+            return any(str(a).lower() == target for a in ab)
+        return False
+
+    def restore_original_ability(self):
+        """Restaura a habilidade original (swaps são temporários)."""
+        self.ability = getattr(self, '_original_ability', None)
 
     def _is_moving(self) -> bool:
         return self.animation._is_moving()
@@ -1469,51 +1516,57 @@ class Pokemon(Entity):
             print(f"[ATTACK_PATTERN] {self.name} é PASSIVO (não ataca)!")
 
     def get_current_move_for_pattern(self):
-        """Retorna o move atual baseado no padrão de ataque"""
+        """Retorna o move atual, respeitando o padrão de ataque E os bloqueios."""
         if not self.moves:
             return None
-
-        # Se está derrotado, não ataca
         if self.is_defeated:
             return None
 
-        # Se tem padrão passivo, não ataca
+        # ===== LOCK-IN TEM PRIORIDADE ABSOLUTA =====
+        locked = self._get_locked_move()
+        if locked is not None:
+            return locked
+
+        # ===== ALIADO: usa o move selecionado, mas checa bloqueio =====
+        if self.attack_pattern is None:
+            selected = self.get_current_move()
+            if selected and self.is_move_blocked(selected):
+                return None
+            return selected
+
+        # ===== SELVAGEM: filtra bloqueados =====
         if self.attack_pattern == AttackPattern.PASSIVE:
             return None
 
-        # Se tem um move específico para VICIOUS
+        def _pick_blocked_filtered(available):
+            valid = [m for m in available if not self.is_move_blocked(m)]
+            if not valid:
+                return None
+            return random.choice(valid)
+
+        # VICIOUS
         if self.attack_pattern == AttackPattern.VICIOUS and self.vicious_move_name:
             for move in self.moves:
                 if move.name == self.vicious_move_name and move.current_pp > 0:
-                    return move
+                    if not self.is_move_blocked(move):
+                        return move
+            # Fallback: qualquer outro move válido
+            return _pick_blocked_filtered([m for m in self.moves if m.current_pp > 0])
 
-            # Se acabou PP do golpe vicioso, tenta qualquer outro
-            for move in self.moves:
-                if move.current_pp > 0:
-                    return move
-            return None
-
-        # Para VICIOUS_SELECTIVE
+        # VICIOUS_SELECTIVE
         if self.attack_pattern == AttackPattern.VICIOUS_SELECTIVE and self.selected_category:
-            available_moves = [m for m in self.moves
-                               if m.category == self.selected_category.value and m.current_pp > 0]
-            if available_moves:
-                return random.choice(available_moves)
+            available = [m for m in self.moves
+                         if m.category == self.selected_category.value and m.current_pp > 0]
+            picked = _pick_blocked_filtered(available)
+            if picked:
+                return picked
+            return _pick_blocked_filtered([m for m in self.moves if m.current_pp > 0])
 
-            # Se não tem mais moves da categoria, tenta qualquer outro
-            for move in self.moves:
-                if move.current_pp > 0:
-                    return move
-            return None
-
-        # Para RANDOM (padrão)
+        # RANDOM
         if self.attack_pattern == AttackPattern.RANDOM:
-            available_moves = [m for m in self.moves if m.current_pp > 0]
-            if available_moves:
-                return random.choice(available_moves)
-            return None
+            return _pick_blocked_filtered([m for m in self.moves if m.current_pp > 0])
 
-        # Fallback: usa o sistema normal
+        # Fallback
         return self.get_current_move()
 
     def clear_all_status(self):
@@ -1568,6 +1621,9 @@ class Pokemon(Entity):
         self.clear_protection_effects()
         self.clear_stockpile()
         self.clear_trapping()
+        self.clear_action_blocks()
+        self.clear_lock_in()
+        self.restore_original_ability()
 
         # Remove referência local ao status_effect se existir
         if hasattr(self, 'status_effect'):
@@ -1675,6 +1731,83 @@ class Pokemon(Entity):
         self._trapped = False
         self._ingrain_active = False
         self._ingrain_regen_timer = 0.0
+
+    def is_move_blocked(self, move) -> bool:
+        """
+        Verifica se um move está bloqueado por Torment/Taunt/Imprison.
+        Retorna True se o Pokémon NÃO pode usar esse move.
+        """
+        if move is None:
+            return False
+
+        # ===== TORMENT: não pode repetir o último move =====
+        if self._torment_active:
+            last = getattr(self, '_last_used_move', None)
+            if last and last.lower() == move.name.lower():
+                return True
+
+        # ===== TAUNT: não pode usar moves de status =====
+        if self._taunt_turns > 0 and move.category == "status":
+            return True
+
+        # ===== IMPRISON: não pode usar moves que a fonte conhece =====
+        src = self._imprison_source
+        if src and not src.is_defeated and src.is_alive():
+            for m in src.moves:
+                if m.name.lower() == move.name.lower():
+                    return True
+
+        return False
+
+    def clear_action_blocks(self):
+        """Remove Torment/Taunt/Imprison do Pokémon."""
+        self._torment_active = False
+        self._taunt_turns = 0
+        self._taunt_timer = 0.0
+        self._imprison_source = None
+        self._imprison_self_active = False
+
+    def clear_lock_in(self):
+        """Remove lock-in (Uproar / Ice Ball) e restaura poder original do move."""
+        if self._locked_move_name and self._locked_move_original_power is not None:
+            for m in self.moves:
+                if m.name.lower().replace(" ", "-") == self._locked_move_name:
+                    m.power = self._locked_move_original_power
+                    break
+        self._locked_move_name = None
+        self._locked_move_turns = 0
+        self._locked_move_hit_count = 1
+        self._locked_move_original_power = None
+        self._uproar_active = False
+
+    def _get_locked_move(self):
+        """
+        Retorna o move forçado se houver lock-in ativo.
+        - Se o move não estiver mais disponível (PP = 0), limpa o lock e retorna None.
+        - Aplica scaling de poder do Ice Ball aqui (antes do cálculo de dano).
+        """
+        if not self._locked_move_name:
+            return None
+
+        locked = None
+        for m in self.moves:
+            norm = m.name.lower().replace(" ", "-")
+            if norm == self._locked_move_name and m.current_pp > 0:
+                locked = m
+                break
+
+        if locked is None:
+            # Move indisponível → quebra o lock
+            self.clear_lock_in()
+            return None
+
+        # ===== SCALING DO ICE BALL =====
+        if self._locked_move_name == "ice-ball":
+            base = 60 if getattr(self, '_defense_curl_used', False) else 30
+            mult = min(2 ** (self._locked_move_hit_count - 1), 16)
+            locked.power = base * mult
+
+        return locked
 
     def set_defeated(self, defeated: bool):
         """Define se o Pokémon está derrotado"""
@@ -1798,8 +1931,10 @@ class Pokemon(Entity):
             self.set_animation_direct("idle")
 
         self.clear_stockpile()
-
         self.clear_trapping()
+        self.clear_action_blocks()
+        self.clear_lock_in()
+        self.restore_original_ability()
 
         print(f"[FULL_RESTORE] {self.name} completamente restaurado! HP: {self.current_hp}/{self.max_hp}")
         return True
