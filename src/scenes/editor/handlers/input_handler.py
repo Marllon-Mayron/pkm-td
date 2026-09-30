@@ -14,8 +14,8 @@ class EditorInputHandler:
 
         # Pintura contínua
         self.painting = False
-        self.erasing = False             # apagando 1x1 (com botão direito, fora da borracha)
-        self.eraser_dragging = False     # arrastando a borracha (left OU right)
+        self.erasing = False
+        self.eraser_dragging = False
 
         self.last_paint_pos = None
         self.last_erase_pos = None
@@ -30,6 +30,13 @@ class EditorInputHandler:
     # ENTRY POINT
     # ==================================================================
     def handle_event(self, event):
+        # ===== MOUSEWHEEL — prioridade MÁXIMA no viewport =====
+        # Trata antes de qualquer UI para garantir que scroll/zoom funcione
+        # mesmo com estrutura carregada, preview ativo, etc.
+        if event.type == pygame.MOUSEWHEEL:
+            if self._handle_mousewheel(event):
+                return True
+
         if self._handle_ui_events(event):
             return True
         return self._handle_editor_events(event)
@@ -44,8 +51,6 @@ class EditorInputHandler:
         if self.editor.tile_palette and self.editor.tile_palette.visible:
             if self.editor.tile_palette.handle_event(event):
                 ui_handled = True
-                if event.type == pygame.MOUSEWHEEL:
-                    return True
                 if self.editor.tile_palette.selected_tile is not None:
                     self.editor.current_tile = self.editor.tile_palette.selected_tile + 1
 
@@ -98,8 +103,6 @@ class EditorInputHandler:
             return self._handle_mouseup(event)
         elif event.type == pygame.MOUSEMOTION:
             return self._handle_mousemotion(event)
-        elif event.type == pygame.MOUSEWHEEL:
-            return self._handle_mousewheel(event)
         return False
 
     # ==================================================================
@@ -111,6 +114,9 @@ class EditorInputHandler:
         elif event.key == pygame.K_ESCAPE:
             if self.editor.map_handler.shape_active:
                 self.editor.map_handler.cancel_shape()
+                return True
+            if getattr(self.editor, 'loaded_structure', None) is not None:
+                self.editor.clear_loaded_structure()
                 return True
             self.editor.game.current_scene = self.editor.game.menu_scene
         elif event.key == pygame.K_g:
@@ -221,7 +227,6 @@ class EditorInputHandler:
         if event.button == 3 and self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
             brush = self.editor.brush_buttons.get_current_brush()
 
-            # Se for borracha → mesma coisa que left-click
             if brush == self.editor.brush_buttons.BRUSH_ERASER:
                 self.eraser_dragging = True
                 self.last_eraser_pos = None
@@ -233,7 +238,6 @@ class EditorInputHandler:
                     self.editor.map_handler.handle_erase(world_pos, continuous=False)
                 return True
 
-            # Senão: apaga 1x1 (comportamento antigo)
             self.erasing = True
             self.painting = False
             self.last_erase_pos = None
@@ -287,7 +291,6 @@ class EditorInputHandler:
     # MOUSEMOTION
     # ==================================================================
     def _handle_mousemotion(self, event):
-        # ===== SHAPE UPDATE =====
         if self.editor.map_handler.shape_active:
             mouse_pos = pygame.mouse.get_pos()
             if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
@@ -300,7 +303,6 @@ class EditorInputHandler:
                     self.editor.map_handler.update_shape(tx, ty)
             return True
 
-        # ===== BORRACHA (arrastar) =====
         if self.eraser_dragging and not self.dragging_camera:
             current_time = time.time()
             if current_time - self.last_eraser_time >= self.paint_cooldown:
@@ -319,7 +321,6 @@ class EditorInputHandler:
                             self.last_eraser_time = current_time
                 return True
 
-        # ===== PINTURA CONTÍNUA =====
         if self.painting and not self.dragging_camera:
             current_time = time.time()
             if current_time - self.last_paint_time >= self.paint_cooldown:
@@ -338,7 +339,6 @@ class EditorInputHandler:
                             self.last_paint_time = current_time
                 return True
 
-        # ===== APAGAR CONTÍNUO 1x1 =====
         if self.erasing and not self.dragging_camera:
             current_time = time.time()
             if current_time - self.last_erase_time >= self.paint_cooldown:
@@ -357,7 +357,6 @@ class EditorInputHandler:
                             self.last_erase_time = current_time
                 return True
 
-        # ===== ARRASTAR CÂMERA =====
         if self.dragging_camera and self.last_mouse_pos:
             dx = event.pos[0] - self.last_mouse_pos[0]
             dy = event.pos[1] - self.last_mouse_pos[1]
@@ -371,37 +370,68 @@ class EditorInputHandler:
         return False
 
     # ==================================================================
-    # MOUSEWHEEL
+    # MOUSEWHEEL (agora no TOPO do handle_event)
     # ==================================================================
     def _handle_mousewheel(self, event):
+        """
+        Retorna True SEMPRE (consome o evento).
+        Faz zoom no viewport de forma robusta (sem depender de is_mouse_in_viewport).
+        """
         mouse_pos = pygame.mouse.get_pos()
+        mx, my = mouse_pos
 
+        # ===== 1) Ignora se está sobre UIs com scroll próprio =====
         if self.editor.tile_palette and self.editor.tile_palette.visible:
             if self.editor.tile_palette.rect.collidepoint(mouse_pos):
-                return True
+                return False  # deixa a palette processar
 
         if self.editor.layer_selector and self.editor.layer_selector.visible:
             if self.editor.layer_selector.rect.collidepoint(mouse_pos):
-                return True
+                return False  # deixa o layer selector processar
 
-        if not self.editor.paused and not self.dragging_camera:
-            if self.editor.screen_manager.is_mouse_in_viewport(mouse_pos):
-                world_pos = self.editor.screen_manager.get_mouse_world_position(
-                    mouse_pos, self.editor.camera
-                )
-                if world_pos:
-                    target_world_x, target_world_y = world_pos
-                    self.editor.camera.handle_zoom(event.y > 0)
-                    new_mouse_pos = pygame.mouse.get_pos()
-                    new_world_pos = self.editor.screen_manager.get_mouse_world_position(
-                        new_mouse_pos, self.editor.camera
-                    )
-                    if new_world_pos:
-                        dx = target_world_x - new_world_pos[0]
-                        dy = target_world_y - new_world_pos[1]
-                        self.editor.camera.x += dx
-                        self.editor.camera.y += dy
-                        self.editor.camera._clamp_position()
+        if self.editor.brush_buttons and self.editor.brush_buttons.rect.collidepoint(mouse_pos):
+            return True  # consome para não dar zoom acidental
+
+        # ===== 2) Verifica viewport de forma inline (robusta) =====
+        sm = self.editor.screen_manager
+        vx, vy = sm.viewport_x, sm.viewport_y
+        vw, vh = sm.viewport_width, sm.viewport_height
+
+        inside = (vx <= mx < vx + vw) and (vy <= my < vy + vh)
+
+        if not inside:
+            return True  # consome fora do viewport (menus etc.)
+
+        if self.editor.paused:
+            return True
+
+        if self.dragging_camera:
+            return True
+
+        # ===== 3) Zoom centrado no cursor =====
+        world_pos = sm.get_mouse_world_position(mouse_pos, self.editor.camera)
+        if world_pos is None:
+            return True
+
+        target_world_x, target_world_y = world_pos
+
+        # Aplica zoom
+        self.editor.camera.handle_zoom(event.y > 0)
+
+        # Recalcula posição do mundo sob o mouse após o zoom
+        new_world_pos = sm.get_mouse_world_position(
+            pygame.mouse.get_pos(), self.editor.camera
+        )
+        if new_world_pos is not None:
+            dx = target_world_x - new_world_pos[0]
+            dy = target_world_y - new_world_pos[1]
+            self.editor.camera.x += dx
+            self.editor.camera.y += dy
+            try:
+                self.editor.camera._clamp_position()
+            except Exception:
+                pass
+
         return True
 
     # ==================================================================

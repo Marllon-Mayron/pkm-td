@@ -38,11 +38,6 @@ class MapHandler:
         return True
 
     def _compute_tile_offset(self, world_pos, tile_x, tile_y):
-        """
-        Calcula o offset em pixels do mouse dentro da célula.
-        Retorna (dx, dy) em pixels (inteiros), ou (0, 0) se dentro do "dead zone".
-        Dead zone evita offsets absurdos quando o mouse está quase no centro.
-        """
         grid_size = self.editor.grid_size
         world_x, world_y = world_pos
 
@@ -52,12 +47,10 @@ class MapHandler:
         dx = int(round(world_x - cell_center_x))
         dy = int(round(world_y - cell_center_y))
 
-        # Clamp para evitar offsets gigantes
         half = grid_size // 2
         dx = max(-half, min(half, dx))
         dy = max(-half, min(half, dy))
 
-        # Dead zone: se estiver muito perto do centro, considera alinhado
         dead_zone = max(1, grid_size // 8)
         if abs(dx) < dead_zone:
             dx = 0
@@ -65,6 +58,43 @@ class MapHandler:
             dy = 0
 
         return (dx, dy)
+
+    # ==================================================================
+    # ESTRUTURAS (NOVO)
+    # ==================================================================
+    def handle_structure_paste(self, world_pos, continuous=False):
+        """
+        Cola a estrutura carregada (self.editor.loaded_structure) na posição
+        do mouse. Só executa em clique único (continuous=False) e com pincel.
+        """
+        if continuous:
+            return  # só cola em clique único
+
+        structure = getattr(self.editor, 'loaded_structure', None)
+        if not structure:
+            return
+
+        tile_x = int(world_pos[0] // self.editor.grid_size)
+        tile_y = int(world_pos[1] // self.editor.grid_size)
+
+        # Verifica compatibilidade de camadas
+        ok, msg = self.editor.structure_manager.check_can_paste(
+            self.editor.layer_manager, structure
+        )
+        if not ok:
+            print(f"[MapHandler] {msg}")
+            return
+
+        # Salva undo
+        self._save_undo_state(
+            f"Colar estrutura '{self.editor.loaded_structure_name}' em ({tile_x},{tile_y})"
+        )
+
+        # Aplica
+        ok, msg = self.editor.structure_manager.apply_to_map(
+            self.editor.layer_manager, structure, tile_x, tile_y
+        )
+        print(f"[MapHandler] {msg}")
 
     # ==================================================================
     # FLOOD FILL
@@ -89,7 +119,7 @@ class MapHandler:
 
         while queue:
             x, y = queue.popleft()
-            layer.set_tile(x, y, new_tile_id, offset=None)  # Balde limpa offset
+            layer.set_tile(x, y, new_tile_id, offset=None)
             count += 1
             for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
                 if 0 <= nx < layer.width and 0 <= ny < layer.height:
@@ -99,7 +129,7 @@ class MapHandler:
         return count
 
     # ==================================================================
-    # PATTERN MULTI-TILE (sempre alinhado ao grid)
+    # PATTERN MULTI-TILE
     # ==================================================================
     def _paint_pattern(self, pattern, anchor_x, anchor_y, layer, continuous=False):
         has_change = False
@@ -324,6 +354,12 @@ class MapHandler:
             return
 
         if self.editor.mode == "layers":
+            # ===== PINCEL + ESTRUTURA CARREGADA → COLA =====
+            if (brush == self.editor.brush_buttons.BRUSH_PENCIL
+                    and getattr(self.editor, 'loaded_structure', None) is not None):
+                self.handle_structure_paste(world_pos, continuous=False)
+                return
+
             if 0 <= tile_x < current_layer.width and 0 <= tile_y < current_layer.height:
 
                 if brush == self.editor.brush_buttons.BRUSH_PENCIL:
@@ -332,13 +368,10 @@ class MapHandler:
                         pattern = self.editor.tile_palette.get_current_brush_pattern()
 
                     if pattern:
-                        # Pattern sempre alinhado ao grid
                         self._paint_pattern(pattern, tile_x, tile_y, current_layer, continuous)
                     else:
-                        # ===== PINCEL NORMAL =====
                         current_tile_int = self._get_current_tile_int()
 
-                        # Calcula offset (só aplica se snap estiver desligado)
                         offset = (0, 0)
                         if not self.editor.brush_buttons.is_snap_enabled():
                             offset = self._compute_tile_offset(world_pos, tile_x, tile_y)
@@ -346,7 +379,6 @@ class MapHandler:
                         cur_tile = current_layer.get_tile(tile_x, tile_y)
                         cur_offset = current_layer.get_tile_offset(tile_x, tile_y)
 
-                        # Só pinta se mudou (tile ou offset)
                         if cur_tile != current_tile_int or cur_offset != offset:
                             should_save_undo = True
                             if continuous:
@@ -408,6 +440,13 @@ class MapHandler:
             self.cancel_shape()
             return
 
+        # Cancelar estrutura carregada com botão direito
+        if getattr(self.editor, 'loaded_structure', None) is not None:
+            self.editor.loaded_structure = None
+            self.editor.loaded_structure_name = None
+            print("[MapHandler] Estrutura descarregada")
+            return
+
         tile_x = int(world_pos[0] // self.editor.grid_size)
         tile_y = int(world_pos[1] // self.editor.grid_size)
         current_tile_pos = (tile_x, tile_y)
@@ -441,13 +480,13 @@ class MapHandler:
                 self.handle_erase(world_pos, continuous=continuous)
                 return
 
-            # Apaga 1 tile
             if brush in (self.editor.brush_buttons.BRUSH_PENCIL,
                          self.editor.brush_buttons.BRUSH_LINE,
                          self.editor.brush_buttons.BRUSH_CIRCLE):
                 if not (0 <= tile_x < current_layer.width and 0 <= tile_y < current_layer.height):
                     return
-                if current_layer.get_tile(tile_x, tile_y) != 0 or current_layer.get_tile_offset(tile_x, tile_y) != (0, 0):
+                if (current_layer.get_tile(tile_x, tile_y) != 0
+                        or current_layer.get_tile_offset(tile_x, tile_y) != (0, 0)):
                     should_save_undo = True
                     if continuous:
                         current_time = pygame.time.get_ticks() / 1000.0

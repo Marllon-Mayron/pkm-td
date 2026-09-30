@@ -9,6 +9,7 @@ Ferramentas:
     LINHA    (L) — clique/arraste (Bresenham)
     CÍRCULO  (O) — clique/arraste define centro+raio
     BORRACHA (E) — apaga com formato e tamanho ajustáveis
+    ESTRUTURA    — abre o diálogo de estruturas customizadas
 """
 import pygame
 
@@ -23,7 +24,7 @@ class BrushButtons:
     ERASER_SQUARE = "square"
     ERASER_CIRCLE = "circle"
 
-    def __init__(self, x, y, width=200, height=240):
+    def __init__(self, x, y, width=200, height=270):
         self.rect = pygame.Rect(x, y, width, height)
         self.visible = True
         self.focused = False
@@ -46,7 +47,7 @@ class BrushButtons:
         self.resizing = False
         self.resize_margin = 10
         self.min_width = 190
-        self.min_height = 220
+        self.min_height = 250
 
         # Hover
         self.hovered_control = None
@@ -56,6 +57,9 @@ class BrushButtons:
         self.tooltip_text = ""
         self.tooltip_timer = 0
         self.tooltip_mouse_pos = (0, 0)
+
+        # Ação pendente que o editor processa (ex: abrir diálogo de estruturas)
+        self.pending_action = None
 
         self._init_buttons()
 
@@ -80,27 +84,32 @@ class BrushButtons:
         full_w = bw * 2 + gap
         self.eraser_rect = pygame.Rect(self.rect.x + m, self.rect.y + row3_y, full_w, bh)
 
-        row4_y = row3_y + bh + 10
-        self._init_dynamic_row(row4_y, m)
+        # ===== NOVA LINHA: ESTRUTURA =====
+        row4_y = row3_y + bh + 6
+        self.structure_rect = pygame.Rect(self.rect.x + m, self.rect.y + row4_y, full_w, bh)
 
-    def _init_dynamic_row(self, row4_y, m):
+        # Linha dinâmica (snap/fill/eraser)
+        row5_y = row4_y + bh + 10
+        self._init_dynamic_row(row5_y, m)
+
+    def _init_dynamic_row(self, row_y, m):
         # Preenchimento do círculo
-        self.fill_checkbox = pygame.Rect(self.rect.x + m, self.rect.y + row4_y, 18, 18)
-        self.fill_label_rect = pygame.Rect(self.rect.x + m + 24, self.rect.y + row4_y, 130, 18)
+        self.fill_checkbox = pygame.Rect(self.rect.x + m, self.rect.y + row_y, 18, 18)
+        self.fill_label_rect = pygame.Rect(self.rect.x + m + 24, self.rect.y + row_y, 130, 18)
 
         # SNAP (pincel)
-        self.snap_checkbox = pygame.Rect(self.rect.x + m, self.rect.y + row4_y, 18, 18)
-        self.snap_label_rect = pygame.Rect(self.rect.x + m + 24, self.rect.y + row4_y, 150, 18)
+        self.snap_checkbox = pygame.Rect(self.rect.x + m, self.rect.y + row_y, 18, 18)
+        self.snap_label_rect = pygame.Rect(self.rect.x + m + 24, self.rect.y + row_y, 150, 18)
 
         # Forma da borracha
-        self.eraser_square_rect = pygame.Rect(self.rect.x + m, self.rect.y + row4_y, 24, 22)
-        self.eraser_circle_rect = pygame.Rect(self.rect.x + m + 28, self.rect.y + row4_y, 24, 22)
+        self.eraser_square_rect = pygame.Rect(self.rect.x + m, self.rect.y + row_y, 24, 22)
+        self.eraser_circle_rect = pygame.Rect(self.rect.x + m + 28, self.rect.y + row_y, 24, 22)
 
         size_start_x = self.rect.x + m + 62
         self.eraser_size_label_x = size_start_x
-        self.eraser_minus_rect = pygame.Rect(size_start_x + 34, self.rect.y + row4_y, 18, 22)
-        self.eraser_value_rect = pygame.Rect(size_start_x + 54, self.rect.y + row4_y, 22, 22)
-        self.eraser_plus_rect  = pygame.Rect(size_start_x + 78, self.rect.y + row4_y, 18, 22)
+        self.eraser_minus_rect = pygame.Rect(size_start_x + 34, self.rect.y + row_y, 18, 22)
+        self.eraser_value_rect = pygame.Rect(size_start_x + 54, self.rect.y + row_y, 22, 22)
+        self.eraser_plus_rect  = pygame.Rect(size_start_x + 78, self.rect.y + row_y, 18, 22)
 
     def _update_button_positions(self):
         bw = 80
@@ -120,8 +129,12 @@ class BrushButtons:
         self.eraser_rect.topleft = (self.rect.x + m, self.rect.y + row3_y)
         self.eraser_rect.width = bw * 2 + gap
 
-        row4_y = row3_y + bh + 10
-        self._init_dynamic_row(row4_y, m)
+        row4_y = row3_y + bh + 6
+        self.structure_rect.topleft = (self.rect.x + m, self.rect.y + row4_y)
+        self.structure_rect.width = bw * 2 + gap
+
+        row5_y = row4_y + bh + 10
+        self._init_dynamic_row(row5_y, m)
 
     # =========================================================
     # EVENTOS
@@ -152,6 +165,7 @@ class BrushButtons:
             (self.line_rect, "line"),
             (self.circle_rect, "circle"),
             (self.eraser_rect, "eraser"),
+            (self.structure_rect, "structure"),
         ]
         if self.current_brush == self.BRUSH_CIRCLE:
             rects.append((self.fill_checkbox, "fill"))
@@ -193,6 +207,11 @@ class BrushButtons:
         if self.eraser_rect.collidepoint(mx, my):
             self.current_brush = self.BRUSH_ERASER; return True
 
+        # ===== NOVO: ESTRUTURA =====
+        if self.structure_rect.collidepoint(mx, my):
+            self.pending_action = {'action': 'open_structure_dialog'}
+            return True
+
         # Círculo fill
         if self.current_brush == self.BRUSH_CIRCLE:
             if self.fill_checkbox.collidepoint(mx, my):
@@ -233,7 +252,6 @@ class BrushButtons:
         return False
 
     def _handle_keydown(self, event):
-        # Atalhos de ferramenta
         if event.key == pygame.K_b:
             self.current_brush = self.BRUSH_PENCIL; return True
         if event.key == pygame.K_v:
@@ -245,7 +263,6 @@ class BrushButtons:
         if event.key == pygame.K_e:
             self.current_brush = self.BRUSH_ERASER; return True
 
-        # Shift = toggle snap temporário
         if event.key == pygame.K_LSHIFT or event.key == pygame.K_RSHIFT:
             self.snap_enabled = not self.snap_enabled
             print(f"[BrushButtons] Snap (Shift) {'ON' if self.snap_enabled else 'OFF'}")
@@ -279,7 +296,11 @@ class BrushButtons:
     # =========================================================
     # RENDER
     # =========================================================
-    def render(self, screen, font_small):
+    def render(self, screen, font_small, structure_loaded=False):
+        """
+        structure_loaded: se True, destaca o botão ESTRUTURA
+        (indica que há uma estrutura pronta para colar com o pincel)
+        """
         if not self.visible:
             return
 
@@ -318,6 +339,24 @@ class BrushButtons:
                                  self.BRUSH_CIRCLE, "circle")
         self._render_tool_button(screen, font_small, self.eraser_rect, "BORRACHA",
                                  self.BRUSH_ERASER, "eraser")
+
+        # ===== BOTÃO ESTRUTURA =====
+        hovered = self.hovered_control == "structure"
+        if structure_loaded:
+            color = (80, 140, 90)
+            border_color = (180, 255, 180)
+            label = "ESTRUTURA (ATIVA)"
+        elif hovered:
+            color, border_color = (70, 100, 130), (150, 200, 255)
+            label = "ESTRUTURA"
+        else:
+            color, border_color = (60, 80, 100), (100, 130, 160)
+            label = "ESTRUTURA"
+
+        pygame.draw.rect(screen, color, self.structure_rect, border_radius=3)
+        pygame.draw.rect(screen, border_color, self.structure_rect, 1, border_radius=3)
+        txt = font_small.render(label, True, (255, 255, 255))
+        screen.blit(txt, txt.get_rect(center=self.structure_rect.center))
 
         # Linha dinâmica
         if self.current_brush == self.BRUSH_PENCIL:
@@ -358,7 +397,6 @@ class BrushButtons:
         screen.blit(font_small.render("Snap na grade", True, label_color),
                     (self.snap_label_rect.x, self.snap_label_rect.y))
 
-        # Dica extra quando snap OFF
         if not self.snap_enabled:
             tip = font_small.render("(posicionamento livre)", True, (180, 180, 200))
             screen.blit(tip, (self.snap_label_rect.x, self.snap_label_rect.y + 14))

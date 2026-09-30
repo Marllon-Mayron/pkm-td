@@ -1,7 +1,7 @@
 # src/scenes/editor/editor_scene.py
 
 """
-Cena do Editor de Fases — com suporte a REGIÕES.
+Cena do Editor de Fases — com suporte a REGIÕES e ESTRUTURAS CUSTOMIZADAS.
 """
 import pygame, os
 from tkinter import filedialog, Tk
@@ -13,6 +13,7 @@ from src.editor.layer_manager import LayerManager, LayerType
 from src.editor.path_editor import Path
 from src.editor.tower_spot_editor import TowerSpotManager
 from src.editor.phase_exporter import PhaseExporter
+from src.editor.structure_manager import StructureManager
 from src.scenes.base_scene import BaseScene
 from src.scenes.editor import WaveConfigDialog
 from src.scenes.editor.components.event_config_dialog import EventConfigDialog
@@ -27,6 +28,8 @@ from src.scenes.editor.components.target_item_dialog import TargetItemDialog
 from src.scenes.editor.components.tile_palette import TilePalette
 from src.scenes.editor.components.load_phase_dialog import LoadPhaseDialog
 from src.scenes.editor.components.rewards_config_dialog import RewardsConfigDialog
+from src.scenes.editor.components.structure_manager_dialog import StructureManagerDialog
+from src.scenes.editor.components.structure_selection_panel import StructureSelectionPanel
 from src.scenes.editor.handlers.input_handler import EditorInputHandler
 from src.scenes.editor.handlers.map_handler import MapHandler
 from src.scenes.editor.handlers.render_handler import EditorRenderHandler
@@ -58,7 +61,6 @@ class EditorScene(BaseScene):
         self.day_night_mode = "random"
         self.base_weather = "random"
 
-        # ===== REGIÕES =====
         self.current_region = int(region) if region is not None else DEFAULT_REGION_ID
         self.unlock_region = DEFAULT_REGION_ID
 
@@ -70,6 +72,7 @@ class EditorScene(BaseScene):
         self.undo_manager = UndoManager(max_steps=10)
         self.target_items = TargetItemManager()
         self.event_manager = EventManager()
+        self.structure_manager = StructureManager()
 
         # Estado do editor
         self.mode = "layers"
@@ -82,12 +85,8 @@ class EditorScene(BaseScene):
         self.path_manager.set_wave_manager(self.wave_manager)
 
         self.phase_rewards = {
-            "money": 100,
-            "experience": 50,
-            "item_rewards": [],
-            "drop_chance": 0.0,
-            "max_items": 3,
-            "template_name": None,
+            "money": 100, "experience": 50, "item_rewards": [],
+            "drop_chance": 0.0, "max_items": 3, "template_name": None,
         }
 
         self.tile_palette = None
@@ -104,6 +103,7 @@ class EditorScene(BaseScene):
         self.event_config_dialog = None
         self.tileset_manager_dialog = None
         self.rewards_config_dialog = None
+        self.structure_manager_dialog = None
 
         self.selected_item_id = None
 
@@ -113,6 +113,18 @@ class EditorScene(BaseScene):
 
         self.root = Tk()
         self.root.withdraw()
+
+        # ===== COLAR (preview) =====
+        self.loaded_structure = None
+        self.loaded_structure_name = None
+
+        # ===== SELEÇÃO (novo fluxo) =====
+        self.structure_selection_active = False
+        self.structure_selection_mask = set()          # {(tx, ty)}
+        self.structure_selection_dragging = False
+        self.structure_selection_drag_start = None     # (tx, ty)
+        self.structure_selection_drag_end = None       # (tx, ty)
+        self.structure_selection_panel = None
 
         self._create_default_layers()
         self._init_ui()
@@ -212,6 +224,97 @@ class EditorScene(BaseScene):
             self._open_rewards_config_dialog()
 
     # ==================================================================
+    # ESTRUTURAS — COLAR (preview)
+    # ==================================================================
+    def _open_structure_dialog(self):
+        dialog_w, dialog_h = 640, 540
+        dx = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - dialog_w) // 2
+        dy = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - dialog_h) // 2
+        self.structure_manager_dialog = StructureManagerDialog(dx, dy, dialog_w, dialog_h, self)
+
+    def clear_loaded_structure(self):
+        self.loaded_structure = None
+        self.loaded_structure_name = None
+
+    # ==================================================================
+    # ESTRUTURAS — SELEÇÃO (novo fluxo de captura)
+    # ==================================================================
+    def start_structure_selection(self):
+        """Ativa o modo de seleção para criar uma nova estrutura."""
+        self.structure_selection_active = True
+        self.structure_selection_mask = set()
+        self.structure_selection_dragging = False
+        self.structure_selection_drag_start = None
+        self.structure_selection_drag_end = None
+
+        vx = self.screen_manager.viewport_x
+        vy = self.screen_manager.viewport_y
+        self.structure_selection_panel = StructureSelectionPanel(vx + 20, vy + 80, self)
+
+        print("[Editor] Modo de seleção de estrutura ativo")
+        print("       [R]etângulo / [C]írculo | Add/Rem | Botão direito cancela arraste")
+
+    def cancel_structure_selection(self):
+        self.structure_selection_active = False
+        self.structure_selection_mask = set()
+        self.structure_selection_dragging = False
+        self.structure_selection_drag_start = None
+        self.structure_selection_drag_end = None
+        self.structure_selection_panel = None
+        print("[Editor] Seleção de estrutura cancelada")
+
+    def save_structure_selection(self):
+        """Salva a estrutura selecionada (só camadas visíveis)."""
+        if not self.structure_selection_mask:
+            print("[Editor] Nada selecionado — abortando")
+            return
+
+        name = ""
+        if self.structure_selection_panel:
+            name = self.structure_selection_panel.name_input.strip()
+        if not name:
+            name = "estrutura_nova"
+
+        structure = self.structure_manager.capture_from_mask(
+            self.layer_manager, self.structure_selection_mask, only_visible=True
+        )
+        if not structure:
+            print("[Editor] Falha ao capturar estrutura")
+            return
+
+        ok = self.structure_manager.save(name, structure)
+        if ok:
+            w = structure.get("width")
+            h = structure.get("height")
+            n = len(structure.get("layers", []))
+            print(f"[Editor] ✓ Estrutura '{name}' salva ({w}x{h}, {n} camadas visíveis)")
+        self.cancel_structure_selection()
+
+    def _commit_selection_drag(self):
+        if not self.structure_selection_drag_start or not self.structure_selection_drag_end:
+            return
+        x0, y0 = self.structure_selection_drag_start
+        x1, y1 = self.structure_selection_drag_end
+
+        panel = self.structure_selection_panel
+        tool = panel.tool if panel else "rect"
+        op = panel.operation if panel else "add"
+        filled = panel.filled if panel else True
+
+        if tool == "rect":
+            cells = self.structure_manager.get_rect_cells(x0, y0, x1, y1)
+        else:
+            cells = self.structure_manager.get_circle_cells(x0, y0, x1, y1, filled=filled)
+
+        if op == "add":
+            self.structure_selection_mask.update(cells)
+        else:
+            self.structure_selection_mask.difference_update(cells)
+
+        self.structure_selection_drag_start = None
+        self.structure_selection_drag_end = None
+
+    # ==================================================================
     # DIÁLOGOS
     # ==================================================================
     def _open_rewards_config_dialog(self):
@@ -234,7 +337,6 @@ class EditorScene(BaseScene):
         dialog_w, dialog_h = 520, 560
         dx = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - dialog_w) // 2
         dy = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - dialog_h) // 2
-
         self.map_config_dialog = MapConfigDialog(
             dx, dy, dialog_w, dialog_h,
             current_layer.width, current_layer.height,
@@ -309,7 +411,6 @@ class EditorScene(BaseScene):
     def _handle_map_config_result(self, result):
         if not result:
             return
-
         if result['width'] != self.layer_manager.width or result['height'] != self.layer_manager.height:
             self.layer_manager.resize_all_layers(result['width'], result['height'])
             print(f"Mapa redimensionado para {result['width']}x{result['height']}")
@@ -337,8 +438,7 @@ class EditorScene(BaseScene):
             self.unlock_phase = 1
 
         if old_key != new_key:
-            print(f"Fase alterada para: {self.phase_name} "
-                  f"(Regiao {self.current_region}, Cap {self.current_chapter}, Fase {self.current_phase})")
+            print(f"Fase alterada para: {self.phase_name}")
             self.clear_undo_history()
 
     def _handle_target_item_selected(self, item_id):
@@ -348,6 +448,11 @@ class EditorScene(BaseScene):
     # HANDLE EVENT
     # ==================================================================
     def handle_event(self, event):
+        # ===== SELEÇÃO DE ESTRUTURA ATIVA — intercepta tudo =====
+        if self.structure_selection_active:
+            self._handle_structure_selection_event(event)
+            return True
+
         # Diálogos têm prioridade máxima
         if self.tileset_manager_dialog and self.tileset_manager_dialog.visible:
             self.tileset_manager_dialog.handle_event(event)
@@ -408,44 +513,194 @@ class EditorScene(BaseScene):
                 self.event_config_dialog = None
             return True
 
-        if self.brush_buttons.handle_event(event):
+        # Diálogo de estruturas
+        if self.structure_manager_dialog and self.structure_manager_dialog.visible:
+            result = self.structure_manager_dialog.handle_event(event)
+            if result == "loaded":
+                self.structure_manager_dialog = None
+            elif not self.structure_manager_dialog.visible:
+                self.structure_manager_dialog = None
+            return True
+
+        # Botões de ferramenta
+        handled_by_brush = self.brush_buttons.handle_event(event)
+
+        if self.brush_buttons.pending_action:
+            action = self.brush_buttons.pending_action
+            self.brush_buttons.pending_action = None
+            if action.get('action') == 'open_structure_dialog':
+                self._open_structure_dialog()
+
+        if handled_by_brush:
             return True
 
         self.input_handler.handle_event(event)
 
     # ==================================================================
-    # CLICKS NO MAPA
+    # HANDLE EVENT — MODO SELEÇÃO DE ESTRUTURA
+    # ==================================================================
+    def _handle_structure_selection_event(self, event):
+        # ===== 1) PAINEL DE SELEÇÃO (prioridade máxima) =====
+        if self.structure_selection_panel and self.structure_selection_panel.visible:
+            result = self.structure_selection_panel.handle_event(event)
+            if result == "save":
+                self.save_structure_selection();
+                return
+            if result == "cancel":
+                self.cancel_structure_selection();
+                return
+            if result == "clear":
+                self.structure_selection_mask.clear();
+                return
+
+            # Consome se o mouse está sobre o painel
+            if event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION):
+                if self.structure_selection_panel.rect.collidepoint(pygame.mouse.get_pos()):
+                    return
+            if event.type == pygame.KEYDOWN and self.structure_selection_panel.active_input:
+                return
+
+        # ===== 2) LAYER SELECTOR (para ocultar/mostrar camadas) =====
+        if self.layer_selector and self.layer_selector.handle_event(event):
+            pending = self.layer_selector.pending_action
+            if pending:
+                self.layer_selector.pending_action = None
+                action = pending['action']
+
+                if action == 'add':
+                    self._add_layer_of_type(pending['type'])
+                elif action == 'remove':
+                    self._remove_layer_at(pending['index'])
+                elif action == 'toggle_visibility':
+                    idx = pending['index']
+                    if 0 <= idx < len(self.layer_manager.layers):
+                        layer = self.layer_manager.layers[idx]
+                        layer.visible = not layer.visible
+                        state = "visível" if layer.visible else "oculta"
+                        print(f"[EDITOR] Camada {idx} ('{layer.name}') {state}")
+
+            self.layer_manager.current_layer = self.layer_selector.selected_layer
+
+            current_layer = self.layer_manager.get_current_layer()
+            if current_layer and current_layer.tileset:
+                all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
+                natural_cols = None
+                if current_layer.tilesets:
+                    natural_cols = current_layer.tilesets[0].get('cols', 6)
+                self.tile_palette.set_tileset(all_tiles, boundaries, natural_cols=natural_cols)
+
+            return
+
+        # ===== 3) ATALHOS =====
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                if self.structure_selection_dragging:
+                    self.structure_selection_dragging = False
+                    self.structure_selection_drag_start = None
+                    self.structure_selection_drag_end = None
+                else:
+                    self.cancel_structure_selection()
+                return
+            if event.key == pygame.K_r and self.structure_selection_panel:
+                self.structure_selection_panel.tool = "rect";
+                return
+            if event.key == pygame.K_c and self.structure_selection_panel:
+                self.structure_selection_panel.tool = "circle";
+                return
+            if event.key == pygame.K_f and self.structure_selection_panel:
+                self.structure_selection_panel.filled = not self.structure_selection_panel.filled;
+                return
+
+        # ===== 4) CÂMERA (botão do meio) =====
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 2:
+            self.input_handler.handle_event(event);
+            return
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 2:
+            self.input_handler.handle_event(event);
+            return
+        if event.type == pygame.MOUSEMOTION and self.input_handler.dragging_camera:
+            self.input_handler.handle_event(event);
+            return
+
+        # ===== 5) BOTÃO DIREITO — cancela arraste =====
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
+            self.structure_selection_dragging = False
+            self.structure_selection_drag_start = None
+            self.structure_selection_drag_end = None
+            return
+
+        # ===== 6) BOTÃO ESQUERDO — inicia arraste (só no viewport, fora de UIs) =====
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mp = pygame.mouse.get_pos()
+            # Ignora se o mouse está sobre qualquer UI flutuante
+            if (self.structure_selection_panel and
+                    self.structure_selection_panel.rect.collidepoint(mp)):
+                return
+            if self.layer_selector and self.layer_selector.rect.collidepoint(mp):
+                return
+            if self.brush_buttons and self.brush_buttons.rect.collidepoint(mp):
+                return
+            if self.tile_palette and self.tile_palette.rect.collidepoint(mp):
+                return
+
+            if self.screen_manager.is_mouse_in_viewport(mp):
+                world_pos = self.screen_manager.get_mouse_world_position(mp, self.camera)
+                if world_pos:
+                    tx = int(world_pos[0] // self.grid_size)
+                    ty = int(world_pos[1] // self.grid_size)
+                    self.structure_selection_dragging = True
+                    self.structure_selection_drag_start = (tx, ty)
+                    self.structure_selection_drag_end = (tx, ty)
+            return
+
+        # ===== 7) MOVIMENTO — atualiza ponta =====
+        if event.type == pygame.MOUSEMOTION and self.structure_selection_dragging:
+            mp = pygame.mouse.get_pos()
+            if self.screen_manager.is_mouse_in_viewport(mp):
+                world_pos = self.screen_manager.get_mouse_world_position(mp, self.camera)
+                if world_pos:
+                    tx = int(world_pos[0] // self.grid_size)
+                    ty = int(world_pos[1] // self.grid_size)
+                    self.structure_selection_drag_end = (tx, ty)
+            return
+
+        # ===== 8) SOLTA — commita =====
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self.structure_selection_dragging:
+                self._commit_selection_drag()
+                self.structure_selection_dragging = False
+            return
+
+    # ==================================================================
+    # CLICKS NO MAPA (fluxo normal)
     # ==================================================================
     def _handle_left_click(self, world_pos, continuous=False):
         if self.mode == "items" and not continuous:
             if getattr(self, 'selected_item_id', None) is None:
                 print("Nenhum item selecionado! Use o modo Items.")
                 return True
-
             tile_x = int(world_pos[0] // self.grid_size)
             tile_y = int(world_pos[1] // self.grid_size)
             gx, gy = tile_x * self.grid_size, tile_y * self.grid_size
-
             self.undo_manager.save_state(self, f"Criar item {self.selected_item_id} em ({gx}, {gy})")
             self.target_items.add_item(gx, gy, self.selected_item_id)
             return True
-
         self.map_handler.handle_left_click(world_pos, continuous)
 
     def _handle_right_click(self, world_pos):
+        if self.loaded_structure is not None:
+            self.clear_loaded_structure()
+            print("[Editor] Estrutura descarregada")
+            return True
+
         if self.mode == "items":
             tile_x = int(world_pos[0] // self.grid_size)
             tile_y = int(world_pos[1] // self.grid_size)
             gx, gy = tile_x * self.grid_size, tile_y * self.grid_size
-
             items_at = self.target_items.get_items_at(gx + 8, gy + 8)
             if items_at:
                 self.undo_manager.save_state(self, f"Remover item em ({gx}, {gy})")
                 self.target_items.remove_item(items_at[0])
-                if self.target_item_dialog:
-                    sel = self.target_item_dialog.selected_item_index
-                    if 0 <= sel < len(self.target_items.items) and self.target_items.items[sel] == items_at[0]:
-                        self.target_item_dialog.selected_item_index = -1
             return True
 
         self.map_handler.handle_right_click(world_pos)
@@ -460,18 +715,15 @@ class EditorScene(BaseScene):
         )
         if not file_path:
             return
-
         current_layer = self.layer_manager.get_current_layer()
         if not current_layer:
             return
-
         if not current_layer.tileset:
             ok = current_layer.load_tileset_from_image(file_path, self.grid_size, self.grid_size)
         else:
             ok = current_layer.add_tileset_from_image(file_path, self.grid_size, self.grid_size)
         if not ok:
             return
-
         all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
         natural_cols = current_layer.tilesets[0].get('cols', 6) if current_layer.tilesets else None
         self.tile_palette.set_tileset(all_tiles, boundaries, natural_cols=natural_cols)
@@ -510,23 +762,17 @@ class EditorScene(BaseScene):
             "day_night_mode": self.day_night_mode,
             "base_weather": self.base_weather,
         }
-
         self.exporter.export_phase(
             phase_data,
-            self.current_chapter,
-            self.current_phase,
-            self.localization_type,
-            self.custom_folder,
+            self.current_chapter, self.current_phase,
+            self.localization_type, self.custom_folder,
             getattr(self, 'unlock_chapter', 1),
             getattr(self, 'unlock_phase', 1),
             region=self.current_region,
             unlock_region=getattr(self, 'unlock_region', DEFAULT_REGION_ID),
         )
-
         tipo = "Minigame" if self.localization_type == "custom" else "Fase"
-        print(f"{tipo} salva em Regiao {self.current_region}: "
-              f"{len(self.wave_manager.waves)} waves, {len(self.tower_spots.spots)} spots, "
-              f"{len(self.target_items.items)} itens, {len(self.event_manager.triggers)} gatilhos")
+        print(f"{tipo} salva em Regiao {self.current_region}")
 
     def load_phase(self, chapter, phase_number):
         phase_data = self.exporter.load_phase(
@@ -534,7 +780,6 @@ class EditorScene(BaseScene):
             self.localization_type, self.custom_folder,
             region=self.current_region,
         )
-
         if not phase_data:
             print(f"Fase {self.current_region}:{chapter}-{phase_number} nao encontrada!")
             return False
@@ -552,7 +797,6 @@ class EditorScene(BaseScene):
                 if hasattr(self, 'layer_selector') and self.layer_selector:
                     self.layer_selector.set_layers(self.layer_manager.layers)
                     self.layer_selector.selected_layer = 0
-
                 cur = self.layer_manager.get_current_layer()
                 if cur and getattr(cur, 'tile_size', None):
                     self.grid_size = cur.tile_size
@@ -580,7 +824,6 @@ class EditorScene(BaseScene):
                 self.event_manager.from_dict(phase_data["events"])
             else:
                 self.event_manager = EventManager()
-
             if "rewards" in phase_data:
                 self.phase_rewards = phase_data["rewards"]
 
@@ -615,6 +858,11 @@ class EditorScene(BaseScene):
             if hasattr(self, 'wave_manager') and hasattr(self, 'path_manager'):
                 self.path_manager.set_wave_manager(self.wave_manager)
 
+            # limpeza
+            self.clear_loaded_structure()
+            if self.structure_selection_active:
+                self.cancel_structure_selection()
+
             self.clear_undo_history()
 
             if cur:
@@ -627,7 +875,6 @@ class EditorScene(BaseScene):
                 if hasattr(self, 'camera'):
                     self.camera.set_limits(self.min_world_x, self.max_world_x,
                                             self.min_world_y, self.max_world_y)
-
             return True
         except Exception as e:
             print(f"Erro ao carregar fase: {e}")

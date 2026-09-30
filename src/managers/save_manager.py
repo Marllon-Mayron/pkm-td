@@ -895,19 +895,16 @@ class SaveManager:
 
     def _sync_unlocked_phases_with_catalog(self) -> bool:
         """
-        Sincroniza `unlocked_phases` com o catálogo REAL de fases do jogo.
+        Sincroniza `unlocked_phases` com o catálogo real.
 
-        Roda em TODO load — não só em migração de versão. Isso resolve o caso
-        onde o jogador completou tudo e depois uma fase NOVA foi adicionada
-        ao jogo (ex: `7-5`). A fase nova é desbloqueada automaticamente se
-        a anterior (mesmo capítulo) ou a última do capítulo anterior já foi
-        completada.
+        Suporta:
+          - Formato novo: {region_id: {chapter_id: [phases]}}
+          - Formato antigo: {chapter_id: [phases]}   (trata como região 1)
 
-        Retorna True se modificou o save (e portanto precisa salvar de novo).
+        Fases em `[phases]` podem ser dicts com "number" OU ints.
         """
         try:
             from src.config.phase_catalog import phase_catalog
-            # Força recarregar do disco (a pasta pode ter mudado desde o último run)
             phase_catalog.refresh()
             all_phases = phase_catalog.get_all_phases()
         except Exception as e:
@@ -917,67 +914,89 @@ class SaveManager:
         if not all_phases:
             return False
 
+        # ---- Detecta formato ----
+        try:
+            sample_key = next(iter(all_phases.keys()))
+            sample_val = all_phases[sample_key]
+            is_new_format = isinstance(sample_val, dict)
+        except (StopIteration, KeyError, TypeError):
+            return False
+
+        if is_new_format:
+            regions_dict = all_phases  # {r: {c: [p]}}
+        else:
+            regions_dict = {DEFAULT_REGION_ID: all_phases}  # {1: {c: [p]}}
+
         game_state = self.save_data.setdefault("game_state", {})
         unlocked = set(str(p) for p in game_state.get("unlocked_phases", []))
         completed = set(str(p) for p in game_state.get("completed_phases", []))
 
-        # 1-1 sempre desbloqueada (fallback de segurança)
         unlocked.add("1:1:1")
-
         changes = False
-        sorted_chapters = sorted(all_phases.keys())
 
-        for ch_idx, chapter_num in enumerate(sorted_chapters):
-            phases_list = all_phases[chapter_num]
-            if not phases_list:
+        def _phase_numbers(phases_list):
+            nums = []
+            for p in phases_list:
+                if isinstance(p, dict) and "number" in p:
+                    nums.append(p["number"])
+                elif isinstance(p, int):
+                    nums.append(p)
+            return sorted(nums)
+
+        for region_id, chapters_dict in regions_dict.items():
+            if not isinstance(chapters_dict, dict):
                 continue
-            phase_nums = sorted(p["number"] for p in phases_list)
 
-            for idx, phase_num in enumerate(phase_nums):
-                phase_id = f"{chapter_num}-{phase_num}"
-                if phase_id in unlocked:
+            sorted_chapters = sorted(chapters_dict.keys())
+
+            for ch_idx, chapter_num in enumerate(sorted_chapters):
+                phases_list = chapters_dict[chapter_num]
+                if not phases_list:
                     continue
 
-                should_unlock = False
+                phase_nums = _phase_numbers(phases_list)
+                if not phase_nums:
+                    continue
 
-                if idx == 0:
-                    # Primeira fase do capítulo
-                    if chapter_num == 1:
-                        should_unlock = True
+                for idx, phase_num in enumerate(phase_nums):
+                    phase_id = f"{region_id}:{chapter_num}:{phase_num}"
+                    if phase_id in unlocked:
+                        continue
+
+                    should_unlock = False
+
+                    if idx == 0:
+                        # Primeira fase do capítulo
+                        if region_id == 1 and chapter_num == 1:
+                            should_unlock = True
+                        elif ch_idx > 0:
+                            prev_ch = sorted_chapters[ch_idx - 1]
+                            prev_nums = _phase_numbers(chapters_dict[prev_ch])
+                            if prev_nums:
+                                last_prev_num = max(prev_nums)
+                                last_prev_id = f"{region_id}:{prev_ch}:{last_prev_num}"
+                                should_unlock = last_prev_id in completed
                     else:
-                        # Precisa ter completado a ÚLTIMA fase do capítulo anterior
-                        prev_ch = sorted_chapters[ch_idx - 1]
-                        prev_phases = all_phases[prev_ch]
-                        if prev_phases:
-                            last_prev_num = max(p["number"] for p in prev_phases)
-                            last_prev_id = f"{prev_ch}-{last_prev_num}"
-                            should_unlock = last_prev_id in completed
-                else:
-                    # Fase N depende de N-1 no MESMO capítulo
-                    prev_num = phase_nums[idx - 1]
-                    prev_id = f"{chapter_num}-{prev_num}"
-                    should_unlock = prev_id in completed
+                        prev_num = phase_nums[idx - 1]
+                        prev_id = f"{region_id}:{chapter_num}:{prev_num}"
+                        should_unlock = prev_id in completed
 
-                if should_unlock:
-                    unlocked.add(phase_id)
-                    changes = True
-                    print(f"[SAVE]  Fase nova detectada e desbloqueada: {phase_id}")
+                    if should_unlock:
+                        unlocked.add(phase_id)
+                        changes = True
+                        print(f"[SAVE] Fase nova detectada e desbloqueada: {phase_id}")
 
-        # Também garante que fases recém-desbloqueadas por progressão apareçam
-        # na lista canônica em ordem
         if changes:
             game_state["unlocked_phases"] = sorted(unlocked)
-            # Salva o arquivo imediatamente para persistir
             if self.current_save_file:
                 filename = f"save_{self.current_save_file}.json"
                 filepath = os.path.join(self.save_dir, filename)
                 try:
                     with open(filepath, 'w', encoding='utf-8') as f:
                         json.dump(self.save_data, f, indent=2, ensure_ascii=False)
-                    print(f"[SAVE] unlocked_phases atualizado no arquivo ({len(unlocked)} fases)")
+                    print(f"[SAVE] unlocked_phases atualizado ({len(unlocked)} fases)")
                 except Exception as e:
                     print(f"[SAVE] Erro ao gravar unlocked_phases: {e}")
-            # também atualiza o player_data em memória
             self.save_data["game_state"] = game_state
             return True
 
@@ -1353,71 +1372,71 @@ class SaveManager:
             elif "speed_stat" in pokemon_data:
                 del pokemon_data["speed_stat"]
 
-                # ===== MIGRAÇÃO PARA 0.2.0 (REGIÕES) =====
-                if version <= "0.1.9":
-                    print("[MIGRATE] Migrando para 0.2.0 (REGIÕES)...")
+        # ===== MIGRAÇÃO PARA 0.2.0 (REGIÕES) =====
+        if version <= "0.1.9":
+            print("[MIGRATE] Migrando para 0.2.0 (REGIÕES)...")
 
-                    from src.config.regions import DEFAULT_REGION_ID
+            from src.config.regions import DEFAULT_REGION_ID
 
-                    def _normalize_pid(raw):
-                        try:
-                            from src.config.regions import normalize_phase_id
-                            return normalize_phase_id(raw)
-                        except Exception:
-                            return "1:1:1"
+            def _normalize_pid(raw):
+                try:
+                    from src.config.regions import normalize_phase_id
+                    return normalize_phase_id(raw)
+                except Exception:
+                    return "1:1:1"
 
-                    # --- 1) NORMALIZA IDs DE FASE (não reseta!) ---
-                    gs = migrated.setdefault("game_state", {})
-                    old_unlocked = gs.get("unlocked_phases", [])
-                    old_completed = gs.get("completed_phases", [])
-                    old_stars = gs.get("stars", {})
+            # --- 1) NORMALIZA IDs DE FASE (não reseta!) ---
+            gs = migrated.setdefault("game_state", {})
+            old_unlocked = gs.get("unlocked_phases", [])
+            old_completed = gs.get("completed_phases", [])
+            old_stars = gs.get("stars", {})
 
-                    gs["unlocked_phases"] = sorted({_normalize_pid(p) for p in old_unlocked}) or ["1:1:1"]
-                    gs["completed_phases"] = sorted({_normalize_pid(p) for p in old_completed})
-                    gs["stars"] = {_normalize_pid(k): v for k, v in old_stars.items()}
+            gs["unlocked_phases"] = sorted({_normalize_pid(p) for p in old_unlocked}) or ["1:1:1"]
+            gs["completed_phases"] = sorted({_normalize_pid(p) for p in old_completed})
+            gs["stars"] = {_normalize_pid(k): v for k, v in old_stars.items()}
 
-                    # Garante 1:1:1
-                    if "1:1:1" not in gs["unlocked_phases"]:
-                        gs["unlocked_phases"].append("1:1:1")
-                        gs["unlocked_phases"].sort()
+            # Garante 1:1:1
+            if "1:1:1" not in gs["unlocked_phases"]:
+                gs["unlocked_phases"].append("1:1:1")
+                gs["unlocked_phases"].sort()
 
-                    gs["current_region"] = DEFAULT_REGION_ID
-                    gs.setdefault("current_chapter", 1)
-                    gs.setdefault("current_phase", 1)
+            gs["current_region"] = DEFAULT_REGION_ID
+            gs.setdefault("current_chapter", 1)
+            gs.setdefault("current_phase", 1)
 
-                    print(f"[MIGRATE] unlocked: {len(old_unlocked)} -> "
-                          f"{len(gs['unlocked_phases'])} (normalizado)")
-                    print(f"[MIGRATE] completed: {len(old_completed)} -> "
-                          f"{len(gs['completed_phases'])} (normalizado)")
+            print(f"[MIGRATE] unlocked: {len(old_unlocked)} -> "
+                  f"{len(gs['unlocked_phases'])} (normalizado)")
+            print(f"[MIGRATE] completed: {len(old_completed)} -> "
+                  f"{len(gs['completed_phases'])} (normalizado)")
 
-                    # --- 2) CONQUISTAS: normaliza phase_id e fallback p/ Kanto ---
-                    ach = migrated.get("player", {}).get("achievements", {})
-                    if not isinstance(ach, dict):
-                        ach = {"unlocked": [], "counters": {}, "unlocked_data": {}}
-                        migrated["player"]["achievements"] = ach
-                    ud = ach.setdefault("unlocked_data", {})
+            # --- 2) CONQUISTAS: normaliza phase_id e fallback p/ Kanto ---
+            ach = migrated.get("player", {}).get("achievements", {})
+            if not isinstance(ach, dict):
+                ach = {"unlocked": [], "counters": {}, "unlocked_data": {}}
+                migrated["player"]["achievements"] = ach
+            ud = ach.setdefault("unlocked_data", {})
 
-                    fixed = 0
-                    for aid, data in ud.items():
-                        if not isinstance(data, dict):
-                            continue
-                        raw = data.get("unlocked_phase")
-                        if raw is None:
-                            data["unlocked_phase"] = "1:1:1"
-                            fixed += 1
-                        else:
-                            new = _normalize_pid(raw)
-                            if new != raw:
-                                data["unlocked_phase"] = new
-                                fixed += 1
-                    print(f"[MIGRATE] {fixed} conquista(s) com phase_id normalizado")
+            fixed = 0
+            for aid, data in ud.items():
+                if not isinstance(data, dict):
+                    continue
+                raw = data.get("unlocked_phase")
+                if raw is None:
+                    data["unlocked_phase"] = "1:1:1"
+                    fixed += 1
+                else:
+                    new = _normalize_pid(raw)
+                    if new != raw:
+                        data["unlocked_phase"] = new
+                        fixed += 1
+            print(f"[MIGRATE] {fixed} conquista(s) com phase_id normalizado")
 
-                    # --- 3) Player: current_region ---
-                    migrated.setdefault("player", {}).setdefault("current_region", DEFAULT_REGION_ID)
+            # --- 3) Player: current_region ---
+            migrated.setdefault("player", {}).setdefault("current_region", DEFAULT_REGION_ID)
 
-                    migrated["meta"]["version"] = "0.2.0"
-                    version = "0.2.0"
-                    print("[MIGRATE] Migração 0.2.0 concluída")
+            migrated["meta"]["version"] = "0.2.0"
+            version = "0.2.0"
+            print("[MIGRATE] Migração 0.2.0 concluída")
 
         print(f"[MIGRATE] Migracao concluida! Versao final: {migrated['meta']['version']}")
         return migrated
