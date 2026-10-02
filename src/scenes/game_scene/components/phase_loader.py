@@ -1,12 +1,17 @@
 # src/config/phase_loader.py
 """
-Carregador de fases - Carrega dados das fases do disco
+Carregador de fases - Carrega dados das fases do disco.
+Suporta:
+  - Novo:    src/data/phases/region_RR/chapter_CC/phase_PP.json
+  - Legado:  src/data/phases/chapter_CC/phase_PP.json  (assume região 1)
 """
 import json
 import pygame
 from pathlib import Path
+
 from src.config.phase_catalog import phase_catalog
-from src.config.paths import PROJECT_ROOT  # Importe o caminho absoluto
+from src.config.paths import PROJECT_ROOT
+from src.config.regions import DEFAULT_REGION_ID
 from src.editor.wave_config import WaveTemplateManager
 
 
@@ -18,43 +23,84 @@ class PhaseLoader:
         self.current_phase_data = None
         self.tile_size = 16
 
-    def get_tile_size(self) -> int:
-        """Retorna o tile_size da fase atual"""
-        if self.current_phase_data:
-            map_data = self.current_phase_data.get("map", {})
-            return map_data.get("tile_size", 16)
-        return 24
+    # ==================================================================
+    # RESOLUÇÃO DE PATH
+    # ==================================================================
+    def _resolve_phase_path(self, chapter: int, phase_number: int, region):
+        """
+        Retorna (Path, mode) onde mode é:
+          - "new"     → arquivo no formato region_RR/chapter_CC/phase_PP.json
+          - "legacy"  → arquivo no formato antigo chapter_CC/phase_PP.json
+          - "missing" → nenhum existe (retorna o path novo para log)
+        """
+        region = int(region) if region is not None else DEFAULT_REGION_ID
 
-    def load_phase(self, chapter: int, phase_number: int) -> dict:
-        """
-        Carrega uma fase do disco
-        """
-        # Formata com 2 dígitos (01, 02, etc)
-        filepath = self.base_path / f"chapter_{chapter:02d}" / f"phase_{phase_number:02d}.json"
+        new_path = (
+            self.base_path
+            / f"region_{region:02d}"
+            / f"chapter_{chapter:02d}"
+            / f"phase_{phase_number:02d}.json"
+        )
+        if new_path.exists():
+            return new_path, "new"
+
+        # Fallback para o layout antigo — só faz sentido na região 1
+        if region == DEFAULT_REGION_ID:
+            legacy_path = (
+                self.base_path
+                / f"chapter_{chapter:02d}"
+                / f"phase_{phase_number:02d}.json"
+            )
+            if legacy_path.exists():
+                return legacy_path, "legacy"
+
+        return new_path, "missing"
+
+    # ==================================================================
+    # LOAD
+    # ==================================================================
+    def load_phase(self, chapter: int, phase_number: int,
+                   region_id: int = DEFAULT_REGION_ID) -> dict:
+        """Carrega uma fase do disco."""
+        region_id = int(region_id) if region_id is not None else DEFAULT_REGION_ID
+        filepath, mode = self._resolve_phase_path(chapter, phase_number, region_id)
 
         print(f"\n[PhaseLoader] Procurando fase: {filepath}")
-        print(f"[PhaseLoader] Caminho absoluto: {filepath.absolute()}")
+        print(f"[PhaseLoader] Região={region_id} Cap={chapter} Fase={phase_number} | modo={mode}")
         print(f"[PhaseLoader] Arquivo existe? {filepath.exists()}")
 
         if not filepath.exists():
             print(f"[ERRO] Fase não encontrada: {filepath}")
-            # Lista o que existe na pasta para debug
-            chapter_dir = self.base_path / f"chapter_{chapter:02d}"
-            if chapter_dir.exists():
-                print(f"[Debug] Arquivos em {chapter_dir}:")
-                for f in sorted(chapter_dir.glob("*.json")):
-                    print(f"  - {f.name}")
-            else:
-                print(f"[Debug] Pasta do capítulo não existe: {chapter_dir}")
+
+            # Debug: lista o que existe nos dois possíveis diretórios
+            debug_dirs = [
+                self.base_path / f"region_{region_id:02d}" / f"chapter_{chapter:02d}",
+                self.base_path / f"chapter_{chapter:02d}",
+            ]
+            for d in debug_dirs:
+                if d.exists():
+                    print(f"[Debug] Arquivos em {d}:")
+                    for f in sorted(d.glob("*.json")):
+                        print(f"  - {f.name}")
+                else:
+                    print(f"[Debug] Pasta não existe: {d}")
             return None
 
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            print(f"\n=== PHASE LOADER: Fase {chapter}-{phase_number} carregada ===")
+            print(f"\n=== PHASE LOADER: Fase {region_id}:{chapter}-{phase_number} carregada ===")
             print(f"Arquivo: {filepath}")
             print(f"Keys no JSON: {data.keys()}")
+
+            # Garante região e fallbacks
+            if "region" not in data:
+                data["region"] = region_id
+            if "chapter" not in data:
+                data["chapter"] = chapter
+            if "phase" not in data:
+                data["phase"] = phase_number
 
             self.current_phase_data = data
             return data
@@ -65,24 +111,27 @@ class PhaseLoader:
             traceback.print_exc()
             return None
 
-    def get_all_pokemon_ids_from_phase(self) -> list[int]:
-        """
-        Retorna uma lista com todos os pokemon_id únicos que podem aparecer
-        em qualquer wave, template ou variant da fase atual.
-        """
+    # ==================================================================
+    # MÉTODOS EXISTENTES (inalterados)
+    # ==================================================================
+    def get_tile_size(self) -> int:
+        if self.current_phase_data:
+            map_data = self.current_phase_data.get("map", {})
+            return map_data.get("tile_size", 16)
+        return 24
+
+    def get_all_pokemon_ids_from_phase(self) -> list:
         ids = set()
         waves = self.get_waves_data()
         if not waves:
             return []
 
         for wave in waves:
-            # 1. Inimigos diretos da wave
             for enemy in wave.get("enemies", []):
                 pid = enemy.get("pokemon_id")
                 if pid:
                     ids.add(pid)
 
-            # 2. Template principal da wave
             template_id = wave.get("template_id")
             if template_id:
                 template = WaveTemplateManager.get_template(template_id)
@@ -90,17 +139,14 @@ class PhaseLoader:
                     for e in template.enemies:
                         ids.add(e.pokemon_id)
 
-            # 3. Variants (se ativados)
             if wave.get("use_variants", False):
                 for variant in wave.get("variants", []):
-                    # 3a. Template do variant
                     var_template_id = variant.get("template_id")
                     if var_template_id:
                         var_template = WaveTemplateManager.get_template(var_template_id)
                         if var_template:
                             for e in var_template.enemies:
                                 ids.add(e.pokemon_id)
-                    # 3b. Inimigos diretos do variant
                     for enemy in variant.get("enemies", []):
                         pid = enemy.get("pokemon_id")
                         if pid:
@@ -109,110 +155,70 @@ class PhaseLoader:
         return list(ids)
 
     def get_base_path(self) -> str:
-        """Retorna o caminho base do projeto (onde está a pasta res)"""
         return str(PROJECT_ROOT)
 
     def get_phase_info(self) -> dict:
-        """Retorna informações básicas da fase atual"""
         if not self.current_phase_data:
             return {}
-
         return {
             "name": self.current_phase_data.get("name", "Fase"),
             "chapter": self.current_phase_data.get("chapter", 1),
-            "phase": self.current_phase_data.get("phase", 1)
+            "phase": self.current_phase_data.get("phase", 1),
+            "region": self.current_phase_data.get("region", DEFAULT_REGION_ID),
         }
 
     def get_map_data(self) -> dict:
-        """Retorna dados do mapa"""
         if not self.current_phase_data:
             return {}
         return self.current_phase_data.get("map", {})
 
     def get_path_data(self) -> dict:
-        """Retorna dados do path"""
         if not self.current_phase_data:
             return {}
         return self.current_phase_data.get("path", {})
 
     def get_tower_spots_data(self) -> dict:
-        """Retorna dados dos spots de torre"""
         if not self.current_phase_data:
             return {}
         return self.current_phase_data.get("tower_spots", {})
 
     def get_waves_data(self) -> list:
-        """Retorna dados das waves como lista (compatível com novo formato)"""
         if not self.current_phase_data:
             print("[PhaseLoader] Sem dados da fase carregados")
             return []
 
         waves_data = self.current_phase_data.get("waves", {})
 
-        print(f"\n=== PHASE LOADER DEBUG ===")
-        print(f"Tipo de waves_data: {type(waves_data)}")
-        print("==========================\n")
-
-        # CASO 1: É um dicionário com chave "waves" (formato atual)
         if isinstance(waves_data, dict) and "waves" in waves_data:
-            waves_list = waves_data["waves"]
-            print(f"[PhaseLoader] Encontrou {len(waves_list)} waves no formato dict['waves']")
+            return waves_data["waves"]
 
-            # ===== VERIFICA SE TEM TEMPLATES E VARIANTS =====
-            templates = waves_data.get("templates", {})
-            if templates.get("templates"):
-                print(f"[PhaseLoader] Encontrou {len(templates.get('templates', []))} templates")
-
-            # ===== VERIFICA SE TEM VARIANTS NAS WAVES =====
-            for wave in waves_list:
-                if wave.get("use_variants", False):
-                    variants = wave.get("variants", [])
-                    print(f"[PhaseLoader] Wave {wave.get('wave_index', 0)} tem {len(variants)} variants")
-                if wave.get("template_id"):
-                    print(f"[PhaseLoader] Wave {wave.get('wave_index', 0)} usa template {wave.get('template_id')}")
-
-            return waves_list
-
-        # CASO 2: É uma lista direta (formato antigo)
         if isinstance(waves_data, list):
-            print(f"[PhaseLoader] Encontrou {len(waves_data)} waves no formato lista")
             return waves_data
 
-        # CASO 3: É um dicionário sem a chave "waves" (formato muito antigo)
         if isinstance(waves_data, dict) and waves_data:
-            print(f"[PhaseLoader] Convertendo dicionário para lista (1 wave)")
             return [waves_data]
 
-        print("[PhaseLoader] Nenhuma wave encontrada")
         return []
 
     def get_rewards_data(self) -> dict:
-        """Retorna dados das recompensas"""
         if not self.current_phase_data:
             return {}
         return self.current_phase_data.get("rewards", {})
 
     def get_paths_data(self) -> dict:
-        """Retorna dados dos paths (múltiplos)"""
         if not self.current_phase_data:
             return {"paths": []}
 
-        # Compatibilidade com versões antigas
         if "paths" in self.current_phase_data:
             return self.current_phase_data.get("paths", {"paths": []})
         elif "path" in self.current_phase_data:
-            # Converte path único para formato de múltiplos paths
             return {
                 "paths": [self.current_phase_data["path"]],
-                "current_path_index": 0
+                "current_path_index": 0,
             }
         return {"paths": []}
 
     def get_event_manager(self):
-        """
-        Retorna um EventManager a partir dos dados da fase atual.
-        Se não houver dados de eventos, retorna um EventManager vazio.
-        """
         from src.editor.event_system import EventManager
         if not self.current_phase_data:
             return EventManager()
@@ -220,6 +226,7 @@ class PhaseLoader:
         event_manager = EventManager()
         event_manager.from_dict(events_data)
         return event_manager
+
 
 # Instância global
 phase_loader = PhaseLoader()

@@ -680,7 +680,10 @@ class SaveManager:
             self.save_data = raw_data
             self.current_save_file = slot
 
-            self._sync_unlocked_phases_with_catalog()
+            try:
+                self._sync_unlocked_phases_with_catalog()
+            except Exception as e:
+                print(f"[SAVE] Aviso: sync de unlocked_phases falhou (ignorando): {e}")
 
             player_data = self.save_data["player"]
 
@@ -847,7 +850,10 @@ class SaveManager:
             player.achievements["unlocked_data"] = dict(achievements_data.get("unlocked_data", {}))
 
             if hasattr(player, 'achievement_manager'):
-                player.achievement_manager.load_from_player()
+                try:
+                    player.achievement_manager.load_from_player()
+                except Exception as e:
+                    print(f"[SAVE] Aviso: load_from_player falhou (ignorando): {e}")
 
             # ===== PROFILE CUSTOMIZATION =====
             player.profile_customization = dict(player_data.get(

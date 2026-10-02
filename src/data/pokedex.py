@@ -462,7 +462,8 @@ class Pokedex:
         return anim_details.get("durations", [])
 
     def get_map_sprite_size(self, pokemon_id: int, shiny: bool = False) -> int:
-        return self.sprite_manager.get_sprite_size(pokemon_id, shiny)
+        original = self.sprite_manager.get_sprite_size(pokemon_id, shiny)
+        return max(1, int(original * (16 / 24)))
 
     def get_raw_inmap_data(self, pokemon_id: int, shiny: bool = False) -> Dict:
         return self.sprite_manager.loader.load_pokemon_sprites(pokemon_id, shiny)

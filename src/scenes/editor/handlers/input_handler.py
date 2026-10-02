@@ -78,6 +78,10 @@ class EditorInputHandler:
                         layer.visible = not layer.visible
                         state = "visível" if layer.visible else "oculta"
                         print(f"[EDITOR] Camada {idx} ('{layer.name}') {state}")
+                elif action == 'move_layer':
+                    self.editor._move_layer(pending['from'], pending['to'])
+                elif action == 'change_type':
+                    self.editor._cycle_layer_type(pending['index'])
 
             self.editor.layer_manager.current_layer = self.editor.layer_selector.selected_layer
 

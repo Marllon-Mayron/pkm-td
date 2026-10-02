@@ -14,15 +14,16 @@ from src.scenes.team_select_scene.handlers.event_handler import EventHandler
 from src.scenes.team_select_scene.utils.constants import FONT_SIZES, LAYOUT
 from src.data.pokedex import Pokedex
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
-
+from src.config.regions import DEFAULT_REGION_ID
 
 class TeamSelectScene(BaseScene):
-    def __init__(self, game, chapter, phase):
+    def __init__(self, game, chapter_id=1, phase_number=1, region_id=DEFAULT_REGION_ID, **kwargs):
         super().__init__(game)
 
         self.pokedex = Pokedex()
-        self.phase = phase
-        self.chapter = chapter
+        self.region_id = int(region_id) if region_id is not None else DEFAULT_REGION_ID
+        self.chapter_id = chapter_id
+        self.phase_number = phase_number
 
         # ===== MANAGERS =====
         self.pokemon_manager = PokemonManager(game.player)
@@ -439,7 +440,10 @@ class TeamSelectScene(BaseScene):
         elif action_type == 'START_GAME':
             sound_manager.play_effect(SoundEffect.CLICK)
             sound_manager.stop_music(fade_ms=300)
-            self.game.game_scene = GameScene(self.game, self.chapter, self.phase)
+            self.game.game_scene = GameScene(self.game,
+            self.chapter_id,
+            self.phase_number,
+            region_id=self.region_id,)
             self.game.current_scene = self.game.game_scene
 
         elif action_type == 'PREV_PAGE':

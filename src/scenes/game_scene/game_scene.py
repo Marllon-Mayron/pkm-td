@@ -376,7 +376,11 @@ class GameScene(BaseScene):
 
     def _load_phase_data(self):
         """Carrega os dados da fase do disco"""
-        data = phase_loader.load_phase(self.chapter_id, self.phase_number)
+        data = phase_loader.load_phase(
+            self.chapter_id,
+            self.phase_number,
+            region_id=getattr(self, 'region_id', DEFAULT_REGION_ID),
+        )
 
         # ===== ARMAZENA OS DADOS DA FASE =====
         self._phase_data = data
@@ -2727,21 +2731,21 @@ class GameScene(BaseScene):
             )
         perf_monitor.end_section()
 
-        # 3. Itens alvo no chão
-        perf_monitor.start_section("RENDER_TARGET_ITEMS_GROUND")
-        target_mgr.render_in_ground(screen, camera)
-        perf_monitor.end_section()
-
-        # 4. DECORAÇÃO (agora ABAIXO das entidades)
+        # 3. DECORAÇÃO (agora ABAIXO das entidades)
         perf_monitor.start_section("RENDER_MAP_DECORATION")
         map_renderer.render_decoration(screen, camera, screen_mgr)
         perf_monitor.end_section()
 
-        # 5. Paths (apenas debug)
+        # 4. Paths (apenas debug)
         if show_debug:
             perf_monitor.start_section("RENDER_PATHS")
             path_renderer.render(screen, camera, screen_mgr, show_editing=False)
             perf_monitor.end_section()
+
+        # 5. Itens alvo no chão
+        perf_monitor.start_section("RENDER_TARGET_ITEMS_GROUND")
+        target_mgr.render_in_ground(screen, camera)
+        perf_monitor.end_section()
 
         # 6. INIMIGOS (acima da decoração)
         perf_monitor.start_section("RENDER_ENEMIES")

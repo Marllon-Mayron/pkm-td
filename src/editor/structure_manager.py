@@ -9,6 +9,8 @@ Recursos:
     remapear IDs ao colar em mapas com tilesets diferentes
   - Cache de tilesets em memória — usado para preview sem alterar o mapa
   - Ao colar: carrega tilesets ausentes do disco e remapeia IDs
+  - Ao colar: IGNORA tiles vazios (tile_id == 0), preservando o
+    conteúdo existente no destino (colagem aditiva)
 """
 import json
 import os
@@ -175,21 +177,17 @@ class StructureManager:
         if not path:
             return None
 
-        # 1) Absoluto e existe
         if os.path.isabs(path):
             return path if os.path.exists(path) else None
 
-        # 2) Relativo à raiz do projeto
         if PROJECT_ROOT:
             full = os.path.join(str(PROJECT_ROOT), path.replace('/', os.sep))
             if os.path.exists(full):
                 return full
 
-        # 3) Como está
         if os.path.exists(path):
             return path
 
-        # 4) Só o basename, dentro de res/AllTiles
         basename = os.path.basename(path)
         if RES_PATH:
             try:
@@ -199,7 +197,6 @@ class StructureManager:
             except Exception:
                 pass
 
-        # 5) Fallback: PROJECT_ROOT/res/AllTiles/basename
         if PROJECT_ROOT:
             candidate = os.path.join(str(PROJECT_ROOT), "res", "AllTiles", basename)
             if os.path.exists(candidate):
@@ -217,7 +214,6 @@ class StructureManager:
     # TILESET CACHE (para preview)
     # ==================================================================
     def get_tileset_image(self, path, tile_size, spacing=0):
-        """Carrega a imagem-sheet do tileset (com cache)."""
         key = (path, tile_size)
         if key in self._sheet_cache:
             return self._sheet_cache[key]
@@ -238,7 +234,6 @@ class StructureManager:
         return img
 
     def get_tile_surface(self, path, tile_idx_0based, tile_size, cols, spacing=0):
-        """Extrai um tile específico da sheet (com cache)."""
         key = (path, tile_idx_0based, tile_size, cols, spacing)
         if key in self._tile_cache:
             return self._tile_cache[key]
@@ -268,7 +263,6 @@ class StructureManager:
 
     @staticmethod
     def _find_tileset_for_tile(tilesets_info, tile_id_1based):
-        """Acha a qual tileset_info pertence um tile (ID 1-based global)."""
         cumulative = 0
         for ts in tilesets_info:
             count = int(ts.get('count', 0))
@@ -278,10 +272,6 @@ class StructureManager:
         return None, None
 
     def get_tile_surface_for_structure(self, tilesets_info, tile_id_1based, target_size):
-        """
-        Retorna uma Surface (target_size x target_size) para um tile de
-        estrutura. Usa cache por sheet+índice+tamanho nativo.
-        """
         if not tilesets_info or tile_id_1based <= 0:
             return None
 
@@ -411,7 +401,6 @@ class StructureManager:
     # COLAGEM — carregar tilesets faltantes + remapear IDs
     # ==================================================================
     def _add_tileset_to_layer(self, target_layer, struct_ts):
-        """Carrega um tileset do disco e adiciona na layer. Retorna o ts_info."""
         path = struct_ts.get('path')
         full = self._resolve_path(path)
         if not full:
@@ -430,17 +419,11 @@ class StructureManager:
         return target_layer.tilesets[-1]
 
     def _ensure_tilesets_and_build_id_map(self, target_layer, struct_layer):
-        """
-        Garante que todos os tilesets da estrutura existam na layer destino.
-        Retorna dict {struct_id_1based: target_id_1based}.
-        """
         struct_infos = struct_layer.get('tilesets_info', []) or []
 
-        # Sem metadados → identidade (fallback)
         if not struct_infos:
             return {}
 
-        # Lookup por basename
         existing_by_key = {}
         for ts in target_layer.tilesets:
             key = self._normalize_tileset_key(ts.get('path', ''))
@@ -448,14 +431,14 @@ class StructureManager:
                 existing_by_key[key] = ts
 
         id_map = {}
-        struct_cursor = 0  # contador global (0-based)
+        struct_cursor = 0
 
         for struct_ts in struct_infos:
             count = int(struct_ts.get('count', 0))
             if count <= 0:
                 continue
 
-            struct_start = struct_cursor + 1  # 1-based
+            struct_start = struct_cursor + 1
             path = struct_ts.get('path')
             key = self._normalize_tileset_key(path)
 
@@ -477,6 +460,9 @@ class StructureManager:
 
         return id_map
 
+    # ==================================================================
+    # APLICAR AO MAPA — com colagem ADITIVA (ignora tiles vazios)
+    # ==================================================================
     def apply_to_map(self, layer_manager, structure, anchor_x, anchor_y):
         if not structure:
             return False, "Estrutura inválida"
@@ -492,6 +478,8 @@ class StructureManager:
             return False, f"Precisa de {len(struct_layers)} camada(s)"
 
         total_added_tilesets = 0
+        total_pasted = 0
+        total_skipped_empty = 0
 
         for layer_idx, struct_layer in enumerate(struct_layers):
             target_layer = layer_manager.layers[layer_idx]
@@ -506,6 +494,10 @@ class StructureManager:
 
             tiles = struct_layer.get("tiles", []) or []
             offsets = struct_layer.get("tile_offsets", {}) or {}
+
+            tw = target_layer.width
+            th = target_layer.height
+            set_tile = target_layer.set_tile
 
             for dy in range(height):
                 row = tiles[dy] if dy < len(tiles) else []
@@ -524,8 +516,14 @@ class StructureManager:
                     except (ValueError, TypeError):
                         continue
 
-                    # Sem máscara: pula vazios (preserva conteúdo existente)
-                    if not mask_grid and tid_int == 0:
+                    # =========================================================
+                    # ★ COLAGEM ADITIVA ★
+                    # SEMPRE ignora tiles vazios — preserva o conteúdo do
+                    # destino onde a estrutura tem "buracos" (máscara ou
+                    # tiles vazios dentro da seleção).
+                    # =========================================================
+                    if tid_int == 0:
+                        total_skipped_empty += 1
                         continue
 
                     # Remapeia
@@ -533,12 +531,16 @@ class StructureManager:
 
                     tx = anchor_x + dx
                     ty = anchor_y + dy
-                    if 0 <= tx < target_layer.width and 0 <= ty < target_layer.height:
+                    if 0 <= tx < tw and 0 <= ty < th:
                         off = offsets.get(f"{dx},{dy}")
                         offset_tuple = (int(off[0]), int(off[1])) if off else None
-                        target_layer.set_tile(tx, ty, new_id, offset=offset_tuple)
+                        set_tile(tx, ty, new_id, offset=offset_tuple)
+                        total_pasted += 1
 
-        msg = f"Estrutura colada ({width}x{height}, {len(struct_layers)} camadas"
+        msg = (f"Estrutura colada ({width}x{height}, {len(struct_layers)} camadas"
+               f", {total_pasted} tiles")
+        if total_skipped_empty:
+            msg += f", {total_skipped_empty} vazios ignorados"
         if total_added_tilesets:
             msg += f", +{total_added_tilesets} tileset(s)"
         msg += ")"

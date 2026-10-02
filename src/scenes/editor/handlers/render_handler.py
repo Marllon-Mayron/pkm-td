@@ -293,58 +293,97 @@ class EditorRenderHandler:
         if not self.editor.map_handler.shape_active:
             return
 
-        tiles = self.editor.map_handler.get_shape_tiles()
+        # ===== Usa anchors ESPAÇADOS (resultado real do commit) =====
+        tiles = self.editor.map_handler.get_shape_placement_tiles()
         if not tiles:
             return
 
         camera = self.editor.camera
         sm = self.editor.screen_manager
         grid_size = self.editor.grid_size
-
         tile_size_scaled = max(1, round(grid_size * camera.zoom * sm.render_scale))
 
         current_layer = self.editor.layer_manager.get_current_layer()
-        current_tile_int = self.editor.current_tile
+        if not current_layer:
+            return
 
-        tile_img = None
-        if current_layer and current_layer.tileset:
-            try:
-                idx = int(current_tile_int) - 1
-                if 0 <= idx < len(current_layer.tileset):
-                    tile_img = current_layer.tileset[idx]
-            except (ValueError, TypeError):
+        stamp_type, stamp_data = self.editor.map_handler._get_active_stamp()
+        tileset = current_layer.tileset
+
+        def _to_screen(tx, ty):
+            sx = round((tx * grid_size - camera.x) * camera.zoom * sm.render_scale +
+                       (sm.render_width / 2) * sm.render_scale + sm.viewport_x)
+            sy = round((ty * grid_size - camera.y) * camera.zoom * sm.render_scale +
+                       (sm.render_height / 2) * sm.render_scale + sm.viewport_y)
+            return sx, sy
+
+        for (tx, ty) in tiles:
+            if stamp_type == 'pattern':
+                # Pré-visualiza o pattern INTEIRO no anchor (semi-transparente)
+                for cell in stamp_data:
+                    cx = tx + cell['dx']
+                    cy = ty + cell['dy']
+                    try:
+                        idx = int(cell['tile_id']) - 1
+                    except (ValueError, TypeError):
+                        continue
+                    if tileset and 0 <= idx < len(tileset):
+                        img = tileset[idx]
+                        if img.get_width() != tile_size_scaled:
+                            img = pygame.transform.scale(
+                                img, (tile_size_scaled, tile_size_scaled)
+                            )
+                        prev = img.copy()
+                        prev.set_alpha(130)
+                        screen.blit(prev, _to_screen(cx, cy))
+
+            elif stamp_type == 'structure':
+                # Bbox da estrutura
+                sw = int(stamp_data.get('width', 1))
+                sh = int(stamp_data.get('height', 1))
+                bw = sw * tile_size_scaled
+                bh = sh * tile_size_scaled
+                sx, sy = _to_screen(tx, ty)
+                ov = pygame.Surface((bw, bh), pygame.SRCALPHA)
+                ov.fill((255, 215, 0, 55))
+                screen.blit(ov, (sx, sy))
+                pygame.draw.rect(screen, (255, 215, 0), (sx, sy, bw, bh), 1)
+
+            else:
+                # Tile único
+                current_tile_int = self.editor.current_tile
                 tile_img = None
+                if tileset:
+                    try:
+                        idx = int(current_tile_int) - 1
+                        if 0 <= idx < len(tileset):
+                            tile_img = tileset[idx]
+                    except (ValueError, TypeError):
+                        tile_img = None
+                if tile_img is not None:
+                    if tile_img.get_width() != tile_size_scaled:
+                        img = pygame.transform.scale(
+                            tile_img, (tile_size_scaled, tile_size_scaled)
+                        )
+                    else:
+                        img = tile_img
+                    prev = img.copy()
+                    prev.set_alpha(170)
+                    screen.blit(prev, _to_screen(tx, ty))
+                pygame.draw.rect(screen, (255, 215, 0),
+                                 (*_to_screen(tx, ty),
+                                  tile_size_scaled, tile_size_scaled), 1)
 
-        for tx, ty in tiles:
-            screen_x = round((tx * grid_size - camera.x) * camera.zoom * sm.render_scale +
-                             (sm.render_width / 2) * sm.render_scale + sm.viewport_x)
-            screen_y = round((ty * grid_size - camera.y) * camera.zoom * sm.render_scale +
-                             (sm.render_height / 2) * sm.render_scale + sm.viewport_y)
-
-            if tile_img is not None:
-                if tile_img.get_width() != tile_size_scaled:
-                    scaled = pygame.transform.scale(tile_img, (tile_size_scaled, tile_size_scaled))
-                else:
-                    scaled = tile_img
-
-                preview = scaled.copy()
-                preview.set_alpha(170)
-                screen.blit(preview, (screen_x, screen_y))
-
-            pygame.draw.rect(screen, (255, 215, 0),
-                             (screen_x, screen_y, tile_size_scaled, tile_size_scaled), 1)
-
+        # ===== Marcador de início =====
         if self.editor.map_handler.shape_start:
             sx, sy = self.editor.map_handler.shape_start
-            start_screen_x = round((sx * grid_size - camera.x) * camera.zoom * sm.render_scale +
-                                   (sm.render_width / 2) * sm.render_scale + sm.viewport_x)
-            start_screen_y = round((sy * grid_size - camera.y) * camera.zoom * sm.render_scale +
-                                   (sm.render_height / 2) * sm.render_scale + sm.viewport_y)
-            center_x = start_screen_x + tile_size_scaled // 2
-            center_y = start_screen_y + tile_size_scaled // 2
+            start_sx, start_sy = _to_screen(sx, sy)
+            center_x = start_sx + tile_size_scaled // 2
+            center_y = start_sy + tile_size_scaled // 2
             pygame.draw.circle(screen, (255, 60, 60), (center_x, center_y),
                                max(3, tile_size_scaled // 4))
 
+        # ===== Hint =====
         tool = self.editor.map_handler.shape_tool or ""
         if tool == "line":
             hint = "LINHA: arraste para definir o fim | ESC cancela"
@@ -354,11 +393,17 @@ class EditorRenderHandler:
         else:
             hint = ""
 
+        if stamp_type == 'pattern':
+            hint += " | patterns espaçados automaticamente"
+        elif stamp_type == 'structure':
+            hint += " | estruturas espaçadas automaticamente"
+
         if hint:
             font = pygame.font.Font(None, 18)
             text = font.render(hint, True, (255, 230, 120))
             pad = 6
-            bg = pygame.Surface((text.get_width() + pad * 2, text.get_height() + pad), pygame.SRCALPHA)
+            bg = pygame.Surface((text.get_width() + pad * 2, text.get_height() + pad),
+                                pygame.SRCALPHA)
             bg.fill((0, 0, 0, 180))
             hint_x = sm.viewport_x + (sm.viewport_width - text.get_width()) // 2
             hint_y = sm.viewport_y + sm.viewport_height - 40
@@ -490,40 +535,53 @@ class EditorRenderHandler:
 
     def _render_grid(self, screen):
         sm = self.editor.screen_manager
+
+        # ===== Cache da Surface (evita alocar full-screen todo frame) =====
+        size = (sm.viewport_width, sm.viewport_height)
+        if (getattr(self, '_grid_surface', None) is None
+                or self._grid_surface.get_size() != size):
+            self._grid_surface = pygame.Surface(size, pygame.SRCALPHA)
+
+        grid_surface = self._grid_surface
+        grid_surface.fill((0, 0, 0, 0))
+
         first_visible_x = (-self._cam_offset_x) // self._tile_size_scaled
         first_visible_y = (-self._cam_offset_y) // self._tile_size_scaled
         tiles_visible_x = (sm.viewport_width // self._tile_size_scaled) + 2
         tiles_visible_y = (sm.viewport_height // self._tile_size_scaled) + 2
 
-        grid_surface = pygame.Surface(
-            (sm.viewport_width, sm.viewport_height), pygame.SRCALPHA
-        )
+        tile_size = self._tile_size_scaled
+        cam_x = self._cam_offset_x
+        cam_y = self._cam_offset_y
+        vw = sm.viewport_width
+        vh = sm.viewport_height
+        draw_line = pygame.draw.line
 
         for i in range(tiles_visible_x):
             tile_x = first_visible_x + i
-            screen_x = tile_x * self._tile_size_scaled + self._cam_offset_x
-            grid_x = screen_x - sm.viewport_x
-            if -1 <= grid_x <= sm.viewport_width + 1:
+            grid_x = tile_x * tile_size + cam_x - sm.viewport_x
+            if -1 <= grid_x <= vw + 1:
                 if tile_x == 0:
-                    color = (255, 100, 100, 180); width = 2
+                    color = (255, 100, 100, 180);
+                    width = 2
                 else:
-                    color = (100, 100, 100, 100); width = 1
-                grid_x_int = int(round(grid_x))
-                pygame.draw.line(grid_surface, color, (grid_x_int, 0),
-                                 (grid_x_int, sm.viewport_height), width)
+                    color = (100, 100, 100, 100);
+                    width = 1
+                gx = int(round(grid_x))
+                draw_line(grid_surface, color, (gx, 0), (gx, vh), width)
 
         for i in range(tiles_visible_y):
             tile_y = first_visible_y + i
-            screen_y = tile_y * self._tile_size_scaled + self._cam_offset_y
-            grid_y = screen_y - sm.viewport_y
-            if -1 <= grid_y <= sm.viewport_height + 1:
+            grid_y = tile_y * tile_size + cam_y - sm.viewport_y
+            if -1 <= grid_y <= vh + 1:
                 if tile_y == 0:
-                    color = (100, 255, 100, 180); width = 2
+                    color = (100, 255, 100, 180);
+                    width = 2
                 else:
-                    color = (100, 100, 100, 100); width = 1
-                grid_y_int = int(round(grid_y))
-                pygame.draw.line(grid_surface, color, (0, grid_y_int),
-                                 (sm.viewport_width, grid_y_int), width)
+                    color = (100, 100, 100, 100);
+                    width = 1
+                gy = int(round(grid_y))
+                draw_line(grid_surface, color, (0, gy), (vw, gy), width)
 
         screen.blit(grid_surface, (sm.viewport_x, sm.viewport_y))
 

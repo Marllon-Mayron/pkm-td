@@ -200,6 +200,56 @@ class EditorScene(BaseScene):
         self.layer_selector.selected_layer = self.layer_manager.current_layer
         self._update_tile_palette_from_layer()
 
+    def _move_layer(self, from_index, to_index):
+        """Reordena uma camada; ajusta índices de seleção."""
+        n = len(self.layer_manager.layers)
+        if not (0 <= from_index < n) or not (0 <= to_index < n) or from_index == to_index:
+            return
+
+        # Preserva a camada selecionada
+        sel = self.layer_selector.selected_layer
+        current = self.layer_manager.current_layer
+
+        self.undo_manager.save_state(self, f"Mover camada {from_index} → {to_index}")
+        self.layer_manager.move_layer(from_index, to_index)
+
+        def _adjust(idx):
+            if idx == from_index:
+                return to_index
+            if from_index < idx <= to_index:
+                return idx - 1
+            if to_index <= idx < from_index:
+                return idx + 1
+            return idx
+
+        new_sel = _adjust(sel)
+        new_cur = _adjust(current)
+        self.layer_selector.selected_layer = max(0, min(n - 1, new_sel))
+        self.layer_manager.current_layer = max(0, min(n - 1, new_cur))
+
+        self.layer_selector.set_layers(self.layer_manager.layers)
+        self._update_tile_palette_from_layer()
+
+    def _cycle_layer_type(self, index):
+        """Cicla o tipo: GROUND → DECORATION → CEILING → GROUND."""
+        n = len(self.layer_manager.layers)
+        if not (0 <= index < n):
+            return
+
+        layer = self.layer_manager.layers[index]
+        cycle = [LayerType.GROUND, LayerType.DECORATION, LayerType.CEILING]
+        try:
+            cur = cycle.index(layer.layer_type)
+        except ValueError:
+            cur = 0
+        new_type = cycle[(cur + 1) % len(cycle)]
+
+        self.undo_manager.save_state(
+            self, f"Camada {index} ('{layer.name}') → {new_type.value}"
+        )
+        layer.layer_type = new_type
+        print(f"[EDITOR] Camada {index} ('{layer.name}') agora é '{new_type.value}'")
+
     # ==================================================================
     # MODO
     # ==================================================================
@@ -578,6 +628,10 @@ class EditorScene(BaseScene):
                         layer.visible = not layer.visible
                         state = "visível" if layer.visible else "oculta"
                         print(f"[EDITOR] Camada {idx} ('{layer.name}') {state}")
+                elif action == 'move_layer':
+                    self._move_layer(pending['from'], pending['to'])
+                elif action == 'change_type':
+                    self._cycle_layer_type(pending['index'])
 
             self.layer_manager.current_layer = self.layer_selector.selected_layer
 

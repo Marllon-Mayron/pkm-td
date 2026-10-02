@@ -34,8 +34,6 @@ class Layer:
         self.tiles = [[0 for _ in range(width)] for _ in range(height)]
 
         # ===== OFFSETS POR TILE (pintura livre) =====
-        # {(x, y): (dx, dy)} — chave = célula, valor = pixels de deslocamento
-        # Só células com offset != (0, 0) aparecem aqui. Retrocompatível com JSON antigo.
         self.tile_offsets = {}
 
         self.visible = True
@@ -47,15 +45,65 @@ class Layer:
         self.tilesets = []
         self.tileset_paths = []
 
+        # ===== CACHE DE TILES ESCALADOS =====
+        # Chave: (tile_size_scaled, opacity) -> lista de Surfaces prontas.
+        # Pequeno LRU (máx 3) para não explodir memória durante zoom.
+        # Evita chamar pygame.transform.scale() por tile por frame.
+        self._scaled_cache = {}
+        self._scaled_cache_order = []  # lista de chaves (LRU)
+        self._SCALED_CACHE_MAX = 3
+
+    # ------------------------------------------------------------------
+    # CACHE
+    # ------------------------------------------------------------------
+    def _invalidate_scaled_cache(self):
+        self._scaled_cache.clear()
+        self._scaled_cache_order.clear()
+
+    def _get_scaled_tiles(self, tile_size_scaled, opacity):
+        """
+        Retorna lista de Surfaces já escaladas para (tile_size_scaled, opacity).
+        Reconstrói apenas quando a chave muda; reusa nas demais chamadas.
+        """
+        key = (tile_size_scaled, opacity)
+        cached = self._scaled_cache.get(key)
+        if cached is not None:
+            # LRU touch
+            try:
+                self._scaled_cache_order.remove(key)
+            except ValueError:
+                pass
+            self._scaled_cache_order.append(key)
+            return cached
+
+        needs_alpha = opacity < 255
+        out = []
+        for tile in self.tileset:
+            if (tile.get_width() != tile_size_scaled
+                    or tile.get_height() != tile_size_scaled):
+                s = pygame.transform.scale(
+                    tile, (tile_size_scaled, tile_size_scaled)
+                )
+            else:
+                s = tile
+            if needs_alpha:
+                s = s.copy()
+                s.set_alpha(opacity)
+            out.append(s)
+
+        # LRU evict
+        if len(self._scaled_cache_order) >= self._SCALED_CACHE_MAX:
+            oldest = self._scaled_cache_order.pop(0)
+            self._scaled_cache.pop(oldest, None)
+
+        self._scaled_cache[key] = out
+        self._scaled_cache_order.append(key)
+        return out
+
     # ==================================================================
     # TILES
     # ==================================================================
     def set_tile(self, x, y, tile_id, offset=None):
-        """
-        Define um tile na posição.
-
-        offset: tupla (dx, dy) em pixels ou None. Se (0, 0) ou None, remove offset.
-        """
         if 0 <= x < self.width and 0 <= y < self.height:
             try:
                 self.tiles[y][x] = int(tile_id)
@@ -76,7 +124,6 @@ class Layer:
         return 0
 
     def get_tile_offset(self, x, y):
-        """Retorna (dx, dy) ou (0, 0)."""
         return self.tile_offsets.get((x, y), (0, 0))
 
     def get_all_tiles_with_boundaries(self):
@@ -88,7 +135,7 @@ class Layer:
         return all_tiles, boundaries
 
     # ==================================================================
-    # EXTRAÇÃO DE TILES (AUTO-DETECÇÃO)
+    # EXTRAÇÃO DE TILES (auto-detecção)
     # ==================================================================
     def _extract_tiles(self, image_path, tile_width, tile_height, spacing=0):
         try:
@@ -162,6 +209,7 @@ class Layer:
         }]
         self.tileset_paths = [self._make_relative_path(image_path)]
         self.tileset_path = self.tileset_paths[0]
+        self._invalidate_scaled_cache()
         print(f"[Layer] ✓ Tileset carregado: {len(tiles)} tiles ({cols}x{rows})")
         return True
 
@@ -189,11 +237,11 @@ class Layer:
         if rel_path not in self.tileset_paths:
             self.tileset_paths.append(rel_path)
 
+        self._invalidate_scaled_cache()
         print(f"[Layer] ✓ Tileset adicionado: +{len(tiles)} tiles. "
               f"Total: {len(self.tileset)} em {len(self.tilesets)} sets")
         return True
 
-    # Aliases de compatibilidade
     def load_tileset(self, image_path, tile_width, tile_height):
         return self.load_tileset_from_image(image_path, tile_width, tile_height)
 
@@ -248,7 +296,6 @@ class Layer:
             for x in range(min(self.width, new_width)):
                 new_tiles[y][x] = self.tiles[y][x]
 
-        # Filtra offsets válidos
         new_offsets = {}
         for (x, y), off in self.tile_offsets.items():
             if 0 <= x < new_width and 0 <= y < new_height:
@@ -261,64 +308,70 @@ class Layer:
         return True
 
     # ==================================================================
-    # RENDER
+    # RENDER — OTIMIZADO (usa cache de tiles escalados)
     # ==================================================================
     def render(self, screen, camera, screen_manager):
         if not self.visible or not self.tileset:
             return
 
-        cam_offset_x = round((-camera.x * camera.zoom * screen_manager.render_scale +
-                              (screen_manager.render_width / 2) * screen_manager.render_scale +
-                              screen_manager.viewport_x))
-        cam_offset_y = round((-camera.y * camera.zoom * screen_manager.render_scale +
-                              (screen_manager.render_height / 2) * screen_manager.render_scale +
-                              screen_manager.viewport_y))
+        sm = screen_manager
+        cam_offset_x = round((-camera.x * camera.zoom * sm.render_scale +
+                              (sm.render_width / 2) * sm.render_scale +
+                              sm.viewport_x))
+        cam_offset_y = round((-camera.y * camera.zoom * sm.render_scale +
+                              (sm.render_height / 2) * sm.render_scale +
+                              sm.viewport_y))
 
-        tile_size_scaled = max(1, round(self.tile_size * camera.zoom * screen_manager.render_scale))
+        tile_size_scaled = max(1, round(self.tile_size * camera.zoom * sm.render_scale))
 
         start_x = max(0, (-cam_offset_x) // tile_size_scaled - 2)
         start_y = max(0, (-cam_offset_y) // tile_size_scaled - 2)
-        end_x = min(self.width, start_x + (screen_manager.viewport_width // tile_size_scaled) + 6)
-        end_y = min(self.height, start_y + (screen_manager.viewport_height // tile_size_scaled) + 6)
+        end_x = min(self.width, start_x + (sm.viewport_width // tile_size_scaled) + 6)
+        end_y = min(self.height, start_y + (sm.viewport_height // tile_size_scaled) + 6)
 
-        zoom_scale = camera.zoom * screen_manager.render_scale
+        zoom_scale = camera.zoom * sm.render_scale
+
+        # ===== USA CACHE (evita pygame.transform.scale por tile/frame) =====
+        scaled_tiles = self._get_scaled_tiles(tile_size_scaled, self.opacity)
+        num_scaled = len(scaled_tiles)
+
+        # Local vars para acelerar o loop
+        screen_blit = screen.blit
+        tiles_matrix = self.tiles
+        offsets_map = self.tile_offsets
+        vx = sm.viewport_x
+        vy = sm.viewport_y
+        vw = sm.viewport_width
+        vh = sm.viewport_height
 
         for y in range(start_y, end_y):
+            row = tiles_matrix[y]
+            base_y = y * tile_size_scaled + cam_offset_y
             for x in range(start_x, end_x):
-                tile_id = self.tiles[y][x]
+                tile_id = row[x]
                 try:
-                    tile_index = int(tile_id) - 1
+                    tile_index = tile_id - 1 if isinstance(tile_id, int) else int(tile_id) - 1
                 except (ValueError, TypeError):
-                    tile_index = -1
+                    continue
 
-                if 0 <= tile_index < len(self.tileset):
+                if 0 <= tile_index < num_scaled:
                     base_screen_x = x * tile_size_scaled + cam_offset_x
-                    base_screen_y = y * tile_size_scaled + cam_offset_y
+                    base_screen_y = base_y
 
-                    # ===== OFFSET POR TILE (pintura livre) =====
-                    off = self.tile_offsets.get((x, y))
-                    if off and off != (0, 0):
+                    # Offset por tile
+                    off = offsets_map.get((x, y))
+                    if off is not None:
                         base_screen_x += round(off[0] * zoom_scale)
                         base_screen_y += round(off[1] * zoom_scale)
 
                     # Culling
-                    if (base_screen_x + tile_size_scaled < screen_manager.viewport_x or
-                            base_screen_x > screen_manager.viewport_x + screen_manager.viewport_width or
-                            base_screen_y + tile_size_scaled < screen_manager.viewport_y or
-                            base_screen_y > screen_manager.viewport_y + screen_manager.viewport_height):
+                    if (base_screen_x + tile_size_scaled < vx or
+                            base_screen_x > vx + vw or
+                            base_screen_y + tile_size_scaled < vy or
+                            base_screen_y > vy + vh):
                         continue
 
-                    tile_img = self.tileset[tile_index]
-                    if (tile_img.get_width() != tile_size_scaled or
-                            tile_img.get_height() != tile_size_scaled):
-                        scaled_tile = pygame.transform.scale(
-                            tile_img, (tile_size_scaled, tile_size_scaled)
-                        )
-                        scaled_tile.set_alpha(self.opacity)
-                        screen.blit(scaled_tile, (base_screen_x, base_screen_y))
-                    else:
-                        tile_img.set_alpha(self.opacity)
-                        screen.blit(tile_img, (base_screen_x, base_screen_y))
+                    screen_blit(scaled_tiles[tile_index], (base_screen_x, base_screen_y))
 
     # ==================================================================
     # HELPERS
@@ -358,6 +411,27 @@ class LayerManager:
             del self.layers[index]
             if self.current_layer >= len(self.layers):
                 self.current_layer = max(0, len(self.layers) - 1)
+
+    def move_layer(self, from_index, to_index):
+        """
+        Reordena uma camada. Alterar a posição na lista muda a prioridade
+        de renderização (dentro do mesmo tipo: index maior = mais na frente).
+        """
+        n = len(self.layers)
+        if not (0 <= from_index < n) or not (0 <= to_index < n):
+            return False
+        if from_index == to_index:
+            return False
+        layer = self.layers.pop(from_index)
+        self.layers.insert(to_index, layer)
+        return True
+
+    def set_layer_type(self, index, new_type):
+        """Troca o tipo de uma camada (GROUND / DECORATION / CEILING)."""
+        if 0 <= index < len(self.layers):
+            self.layers[index].layer_type = new_type
+            return True
+        return False
 
     def resize_all_layers(self, new_width, new_height, default_tile=0):
         if new_width == self.width and new_height == self.height:

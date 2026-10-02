@@ -1,0 +1,367 @@
+{
+  "width": 10,
+  "height": 6,
+  "tile_size": 16,
+  "layers": [
+    {
+      "name": "Decoração",
+      "type": "decoration",
+      "tiles": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          422,
+          0,
+          0,
+          0,
+          0,
+          471,
+          0,
+          0
+        ],
+        [
+          471,
+          429,
+          430,
+          0,
+          471,
+          0,
+          0,
+          479,
+          0,
+          0
+        ],
+        [
+          479,
+          0,
+          0,
+          0,
+          479,
+          0,
+          0,
+          487,
+          0,
+          0
+        ],
+        [
+          487,
+          0,
+          0,
+          0,
+          487,
+          0,
+          7,
+          0,
+          0,
+          0
+        ]
+      ],
+      "tile_offsets": {},
+      "tileset_paths": [
+        "res/AllTiles/Tilesets/OutsideFireRed.png"
+      ],
+      "tilesets_info": [
+        {
+          "path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/AllTiles/Tilesets/OutsideFireRed.png",
+          "count": 4016,
+          "cols": 8,
+          "rows": 502,
+          "tile_width": 16,
+          "tile_height": 16,
+          "spacing": 0
+        }
+      ],
+      "visible": true,
+      "opacity": 255
+    },
+    {
+      "name": "Teto",
+      "type": "ceiling",
+      "tiles": [
+        [
+          0,
+          0,
+          421,
+          422,
+          0,
+          0,
+          421,
+          422,
+          0,
+          0
+        ],
+        [
+          421,
+          422,
+          429,
+          430,
+          422,
+          0,
+          429,
+          430,
+          0,
+          0
+        ],
+        [
+          0,
+          421,
+          0,
+          429,
+          430,
+          421,
+          422,
+          0,
+          421,
+          422
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          429,
+          430
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "tile_offsets": {},
+      "tileset_paths": [
+        "res/AllTiles/Tilesets/OutsideFireRed.png"
+      ],
+      "tilesets_info": [
+        {
+          "path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/AllTiles/Tilesets/OutsideFireRed.png",
+          "count": 4016,
+          "cols": 8,
+          "rows": 502,
+          "tile_width": 16,
+          "tile_height": 16,
+          "spacing": 0
+        }
+      ],
+      "visible": true,
+      "opacity": 255
+    },
+    {
+      "name": "Teto 2",
+      "type": "ceiling",
+      "tiles": [
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          421,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "tile_offsets": {},
+      "tileset_paths": [
+        "res/AllTiles/Tilesets/OutsideFireRed.png"
+      ],
+      "tilesets_info": [
+        {
+          "path": "C:/Users/Marllon/PycharmProjects/pkm-td/res/AllTiles/Tilesets/OutsideFireRed.png",
+          "count": 4016,
+          "cols": 8,
+          "rows": 502,
+          "tile_width": 16,
+          "tile_height": 16,
+          "spacing": 0
+        }
+      ],
+      "visible": true,
+      "opacity": 255
+    }
+  ],
+  "mask": [
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  ],
+  "name": "estrutura_nova"
+}

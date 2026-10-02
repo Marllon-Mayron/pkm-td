@@ -60,16 +60,126 @@ class MapHandler:
         return (dx, dy)
 
     # ==================================================================
-    # ESTRUTURAS (NOVO)
+    # STAMP ATIVO (estrutura > pattern > single)
+    # ==================================================================
+    def _get_active_stamp(self):
+        """
+        Retorna (tipo, dados) do stamp ativo:
+            ('structure', dict)   -> estrutura customizada carregada
+            ('pattern',   list)   -> pattern composto do tile_palette
+            (None,        None)   -> nenhum (fallback: tile único)
+        Prioridade: estrutura > pattern > single.
+        """
+        if getattr(self.editor, 'loaded_structure', None) is not None:
+            return ('structure', self.editor.loaded_structure)
+
+        if getattr(self.editor, 'tile_palette', None) is not None:
+            palette = self.editor.tile_palette
+            if getattr(palette, 'selection_mode', 'single') == 'multi':
+                pattern = palette.get_current_brush_pattern()
+                if pattern:
+                    return ('pattern', pattern)
+
+        return (None, None)
+
+    def _has_stamp(self):
+        t, _ = self._get_active_stamp()
+        return t is not None
+
+    def _get_pattern_anchor_tile(self):
+        """Retorna o tile_id 'âncora' do pattern (dx=0, dy=0) ou o primeiro."""
+        if not getattr(self.editor, 'tile_palette', None):
+            return None
+        pattern = self.editor.tile_palette.get_current_brush_pattern()
+        if not pattern:
+            return None
+        for cell in pattern:
+            if cell['dx'] == 0 and cell['dy'] == 0:
+                return cell['tile_id']
+        return pattern[0]['tile_id']
+
+    # ==================================================================
+    # TAMANHO DO STAMP + PLANEJAMENTO DE ANCHORS (NOVO)
+    # ==================================================================
+    def _compute_stamp_size(self, stamp_type, stamp_data):
+        """
+        Retorna (pw, ph) — tamanho do stamp em tiles.
+        Usado para espaçar anchors em linha/círculo.
+        """
+        if stamp_type == 'pattern':
+            min_dx = min(c['dx'] for c in stamp_data)
+            max_dx = max(c['dx'] for c in stamp_data)
+            min_dy = min(c['dy'] for c in stamp_data)
+            max_dy = max(c['dy'] for c in stamp_data)
+            return (max_dx - min_dx + 1, max_dy - min_dy + 1)
+        if stamp_type == 'structure':
+            return (max(1, int(stamp_data.get('width', 1))),
+                    max(1, int(stamp_data.get('height', 1))))
+        return (1, 1)
+
+    def _plan_stamp_placements(self, anchor_tiles, stamp_type, stamp_data):
+        """
+        Filtra anchors espaçando-os pelo tamanho do stamp.
+        Um anchor é aceito somente se NÃO cair dentro do bbox de um
+        stamp já planejado. Isso evita a sobreposição em linha/círculo
+        (o bug do 'mosaico' de patterns).
+        """
+        if not anchor_tiles or stamp_type is None:
+            return []
+
+        pw, ph = self._compute_stamp_size(stamp_type, stamp_data)
+        if pw <= 0 or ph <= 0:
+            return []
+
+        covered = set()
+        placements = []
+
+        for (tx, ty) in anchor_tiles:
+            if (tx, ty) in covered:
+                continue
+            placements.append((tx, ty))
+            for dy in range(ph):
+                base = ty + dy
+                for dx in range(pw):
+                    covered.add((tx + dx, base))
+
+        return placements
+
+    # ==================================================================
+    # APLICAÇÃO
+    # ==================================================================
+    def _apply_pattern_at(self, tx, ty, layer):
+        """Aplica o pattern atual na posição (tx, ty). Sem undo (caller salva)."""
+        if not getattr(self.editor, 'tile_palette', None):
+            return
+        pattern = self.editor.tile_palette.get_current_brush_pattern()
+        if not pattern:
+            return
+
+        w, h = layer.width, layer.height
+        set_tile = layer.set_tile
+        for cell in pattern:
+            cx = tx + cell['dx']
+            cy = ty + cell['dy']
+            if 0 <= cx < w and 0 <= cy < h:
+                set_tile(cx, cy, cell['tile_id'], offset=None)
+
+    def _apply_structure_at(self, tx, ty, structure):
+        """Cola a estrutura na posição (tx, ty). Sem undo (caller salva)."""
+        self.editor.structure_manager.apply_to_map(
+            self.editor.layer_manager, structure, tx, ty
+        )
+
+    def _apply_single_tile_at(self, tx, ty, layer, offset=None):
+        if 0 <= tx < layer.width and 0 <= ty < layer.height:
+            self.editor.layer_manager.set_tile(tx, ty, self._get_current_tile_int(), offset)
+
+    # ==================================================================
+    # ESTRUTURAS (colar com pincel)
     # ==================================================================
     def handle_structure_paste(self, world_pos, continuous=False):
-        """
-        Cola a estrutura carregada (self.editor.loaded_structure) na posição
-        do mouse. Só executa em clique único (continuous=False) e com pincel.
-        """
         if continuous:
-            return  # só cola em clique único
-
+            return
         structure = getattr(self.editor, 'loaded_structure', None)
         if not structure:
             return
@@ -77,7 +187,6 @@ class MapHandler:
         tile_x = int(world_pos[0] // self.editor.grid_size)
         tile_y = int(world_pos[1] // self.editor.grid_size)
 
-        # Verifica compatibilidade de camadas
         ok, msg = self.editor.structure_manager.check_can_paste(
             self.editor.layer_manager, structure
         )
@@ -85,12 +194,9 @@ class MapHandler:
             print(f"[MapHandler] {msg}")
             return
 
-        # Salva undo
         self._save_undo_state(
             f"Colar estrutura '{self.editor.loaded_structure_name}' em ({tile_x},{tile_y})"
         )
-
-        # Aplica
         ok, msg = self.editor.structure_manager.apply_to_map(
             self.editor.layer_manager, structure, tile_x, tile_y
         )
@@ -129,7 +235,7 @@ class MapHandler:
         return count
 
     # ==================================================================
-    # PATTERN MULTI-TILE
+    # PATTERN MULTI-TILE (usado pelo pincel)
     # ==================================================================
     def _paint_pattern(self, pattern, anchor_x, anchor_y, layer, continuous=False):
         has_change = False
@@ -190,30 +296,69 @@ class MapHandler:
         self.shape_start = None
         self.shape_end = None
 
+    # ------------------------------------------------------------------
+    # COMMIT — com espaçamento de anchors por tamanho do stamp
+    # ------------------------------------------------------------------
     def commit_shape(self):
         if not self.shape_active:
             return False
+
         current_layer = self.editor.layer_manager.get_current_layer()
         if not current_layer:
-            self.cancel_shape(); return False
+            self.cancel_shape()
+            return False
 
-        tiles = self.get_shape_tiles()
-        if not tiles:
-            self.cancel_shape(); return False
+        raw_tiles = self.get_shape_tiles()
+        if not raw_tiles:
+            self.cancel_shape()
+            return False
 
-        current_tile_int = self._get_current_tile_int()
-        self._save_undo_state(
-            f"Shape {self.shape_tool} ({len(tiles)} tiles)", continuous=False
-        )
+        stamp_type, stamp_data = self._get_active_stamp()
 
-        for tx, ty in tiles:
-            if 0 <= tx < current_layer.width and 0 <= ty < current_layer.height:
-                self.editor.layer_manager.set_tile(tx, ty, current_tile_int, offset=None)
+        # ===== Planejamento: anchors efetivamente usados (sem sobreposição) =====
+        if stamp_type is not None:
+            placements = self._plan_stamp_placements(
+                raw_tiles, stamp_type, stamp_data
+            )
+        else:
+            placements = raw_tiles
+
+        if not placements:
+            self.cancel_shape()
+            return False
+
+        # ===== Descrição de undo =====
+        if stamp_type == 'pattern':
+            desc = (f"Shape {self.shape_tool} com pattern "
+                    f"({len(placements)} stamps de {len(raw_tiles)} anchors)")
+        elif stamp_type == 'structure':
+            name = getattr(self.editor, 'loaded_structure_name', '?')
+            desc = (f"Shape {self.shape_tool} com '{name}' "
+                    f"({len(placements)} stamps)")
+        else:
+            desc = f"Shape {self.shape_tool} ({len(placements)} tiles)"
+
+        self._save_undo_state(desc, continuous=False)
+
+        # ===== Aplicação =====
+        if stamp_type == 'pattern':
+            for tx, ty in placements:
+                self._apply_pattern_at(tx, ty, current_layer)
+        elif stamp_type == 'structure':
+            for tx, ty in placements:
+                self._apply_structure_at(tx, ty, stamp_data)
+        else:
+            for tx, ty in placements:
+                if 0 <= tx < current_layer.width and 0 <= ty < current_layer.height:
+                    self.editor.layer_manager.set_tile(
+                        tx, ty, self._get_current_tile_int(), offset=None
+                    )
 
         self.cancel_shape()
         return True
 
     def get_shape_tiles(self):
+        """Anchors brutos da forma (Bresenham / círculo)."""
         if not self.shape_active or not self.shape_start or not self.shape_end:
             return []
         x0, y0 = self.shape_start
@@ -227,6 +372,19 @@ class MapHandler:
             return self._get_circle_tiles(x0, y0, radius, filled)
         return []
 
+    def get_shape_placement_tiles(self):
+        """
+        Anchors APÓS o espaçamento (o que será de fato aplicado no commit).
+        Usado pela preview para mostrar o resultado real.
+        """
+        raw = self.get_shape_tiles()
+        if not raw:
+            return []
+        stamp_type, stamp_data = self._get_active_stamp()
+        if stamp_type is None:
+            return raw
+        return self._plan_stamp_placements(raw, stamp_type, stamp_data)
+
     def _get_line_tiles(self, x0, y0, x1, y1):
         tiles = []
         dx, dy = abs(x1 - x0), abs(y1 - y0)
@@ -238,17 +396,22 @@ class MapHandler:
         while guard < mg:
             guard += 1
             tiles.append((x, y))
-            if x == x1 and y == y1: break
+            if x == x1 and y == y1:
+                break
             e2 = 2 * err
             if e2 > -dy:
-                err -= dy; x += sx
+                err -= dy
+                x += sx
             if e2 < dx:
-                err += dx; y += sy
+                err += dx
+                y += sy
         return tiles
 
     def _get_circle_tiles(self, cx, cy, radius, filled=False):
-        if radius < 0: return []
-        if radius == 0: return [(cx, cy)]
+        if radius < 0:
+            return []
+        if radius == 0:
+            return [(cx, cy)]
         tiles = set()
         x, y = radius, 0
         err = 1 - radius
@@ -273,7 +436,8 @@ class MapHandler:
             for py, xs in rows.items():
                 for fx in range(min(xs), max(xs) + 1):
                     tiles.add((fx, py))
-        return list(tiles)
+        # Ordena por (y, x) para determinismo do espaçamento em círculos
+        return sorted(tiles, key=lambda p: (p[1], p[0]))
 
     # ==================================================================
     # BORRACHA
@@ -354,56 +518,74 @@ class MapHandler:
             return
 
         if self.editor.mode == "layers":
-            # ===== PINCEL + ESTRUTURA CARREGADA → COLA =====
-            if (brush == self.editor.brush_buttons.BRUSH_PENCIL
-                    and getattr(self.editor, 'loaded_structure', None) is not None):
-                self.handle_structure_paste(world_pos, continuous=False)
-                return
+            # ===== PINCEL =====
+            if brush == self.editor.brush_buttons.BRUSH_PENCIL:
+                if getattr(self.editor, 'loaded_structure', None) is not None:
+                    self.handle_structure_paste(world_pos, continuous=False)
+                    return
 
-            if 0 <= tile_x < current_layer.width and 0 <= tile_y < current_layer.height:
+                if not (0 <= tile_x < current_layer.width
+                        and 0 <= tile_y < current_layer.height):
+                    return
 
-                if brush == self.editor.brush_buttons.BRUSH_PENCIL:
-                    pattern = None
-                    if hasattr(self.editor, 'tile_palette') and self.editor.tile_palette:
-                        pattern = self.editor.tile_palette.get_current_brush_pattern()
+                pattern = None
+                if getattr(self.editor, 'tile_palette', None):
+                    pattern = self.editor.tile_palette.get_current_brush_pattern()
 
-                    if pattern:
-                        self._paint_pattern(pattern, tile_x, tile_y, current_layer, continuous)
-                    else:
-                        current_tile_int = self._get_current_tile_int()
+                if pattern:
+                    self._paint_pattern(pattern, tile_x, tile_y,
+                                        current_layer, continuous)
+                    return
 
-                        offset = (0, 0)
-                        if not self.editor.brush_buttons.is_snap_enabled():
-                            offset = self._compute_tile_offset(world_pos, tile_x, tile_y)
+                current_tile_int = self._get_current_tile_int()
+                offset = (0, 0)
+                if not self.editor.brush_buttons.is_snap_enabled():
+                    offset = self._compute_tile_offset(world_pos, tile_x, tile_y)
 
-                        cur_tile = current_layer.get_tile(tile_x, tile_y)
-                        cur_offset = current_layer.get_tile_offset(tile_x, tile_y)
+                cur_tile = current_layer.get_tile(tile_x, tile_y)
+                cur_offset = current_layer.get_tile_offset(tile_x, tile_y)
 
-                        if cur_tile != current_tile_int or cur_offset != offset:
-                            should_save_undo = True
-                            if continuous:
-                                if current_tile_pos == self.last_undo_tile:
-                                    should_save_undo = False
-                                else:
-                                    self.last_undo_tile = current_tile_pos
-                            if should_save_undo:
-                                self._save_undo_state(
-                                    f"Tile {current_tile_int} em ({tile_x}, {tile_y})"
-                                    + (f" offset={offset}" if offset != (0, 0) else ""),
-                                    continuous,
-                                )
-                            self.editor.layer_manager.set_tile(
-                                tile_x, tile_y, current_tile_int, offset
-                            )
-
-                elif brush == self.editor.brush_buttons.BRUSH_BUCKET and not continuous:
-                    target_tile = current_layer.get_tile(tile_x, tile_y)
-                    current_tile_int = self._get_current_tile_int()
-                    if target_tile != current_tile_int:
+                if cur_tile != current_tile_int or cur_offset != offset:
+                    should_save_undo = True
+                    if continuous:
+                        if current_tile_pos == self.last_undo_tile:
+                            should_save_undo = False
+                        else:
+                            self.last_undo_tile = current_tile_pos
+                    if should_save_undo:
                         self._save_undo_state(
-                            f"Preenchimento em ({tile_x}, {tile_y}) com tile {current_tile_int}"
+                            f"Tile {current_tile_int} em ({tile_x}, {tile_y})"
+                            + (f" offset={offset}" if offset != (0, 0) else ""),
+                            continuous,
                         )
-                        self._flood_fill(current_layer, tile_x, tile_y, current_tile_int)
+                    self.editor.layer_manager.set_tile(
+                        tile_x, tile_y, current_tile_int, offset
+                    )
+
+            # ===== BALDE =====
+            elif brush == self.editor.brush_buttons.BRUSH_BUCKET and not continuous:
+                stamp_type, _ = self._get_active_stamp()
+
+                if stamp_type == 'pattern':
+                    anchor = self._get_pattern_anchor_tile()
+                    if anchor is None:
+                        return
+                    target_tile = current_layer.get_tile(tile_x, tile_y)
+                    if target_tile != anchor:
+                        self._save_undo_state(
+                            f"Preencher com pattern (âncora {anchor}) em "
+                            f"({tile_x}, {tile_y})"
+                        )
+                        self._flood_fill(current_layer, tile_x, tile_y, anchor)
+                    return
+
+                target_tile = current_layer.get_tile(tile_x, tile_y)
+                current_tile_int = self._get_current_tile_int()
+                if target_tile != current_tile_int:
+                    self._save_undo_state(
+                        f"Preenchimento em ({tile_x}, {tile_y}) com tile {current_tile_int}"
+                    )
+                    self._flood_fill(current_layer, tile_x, tile_y, current_tile_int)
 
         elif self.editor.mode == "path" and not continuous:
             current_path = self.editor.path_manager.get_current_path()
@@ -440,7 +622,6 @@ class MapHandler:
             self.cancel_shape()
             return
 
-        # Cancelar estrutura carregada com botão direito
         if getattr(self.editor, 'loaded_structure', None) is not None:
             self.editor.loaded_structure = None
             self.editor.loaded_structure_name = None
@@ -483,7 +664,8 @@ class MapHandler:
             if brush in (self.editor.brush_buttons.BRUSH_PENCIL,
                          self.editor.brush_buttons.BRUSH_LINE,
                          self.editor.brush_buttons.BRUSH_CIRCLE):
-                if not (0 <= tile_x < current_layer.width and 0 <= tile_y < current_layer.height):
+                if not (0 <= tile_x < current_layer.width
+                        and 0 <= tile_y < current_layer.height):
                     return
                 if (current_layer.get_tile(tile_x, tile_y) != 0
                         or current_layer.get_tile_offset(tile_x, tile_y) != (0, 0)):
@@ -496,30 +678,46 @@ class MapHandler:
                             self.last_undo_erase_tile = current_tile_pos
                             self.last_erase_time = current_time
                     if should_save_undo:
-                        self._save_undo_state(f"Remover tile em ({tile_x}, {tile_y})", continuous)
+                        self._save_undo_state(
+                            f"Remover tile em ({tile_x}, {tile_y})", continuous
+                        )
                     self.editor.layer_manager.set_tile(tile_x, tile_y, 0, offset=None)
 
         elif self.editor.mode == "path":
             current_path = self.editor.path_manager.get_current_path()
-            if not current_path: return
-            min_dist = float('inf'); node_to_remove = -1; pos_to_remove = None
+            if not current_path:
+                return
+            min_dist = float('inf')
+            node_to_remove = -1
+            pos_to_remove = None
             for i, node in enumerate(current_path.nodes):
-                dist = ((node[0] - world_pos[0]) ** 2 + (node[1] - world_pos[1]) ** 2) ** 0.5
+                dist = ((node[0] - world_pos[0]) ** 2
+                        + (node[1] - world_pos[1]) ** 2) ** 0.5
                 if dist < 20 and dist < min_dist:
-                    min_dist = dist; node_to_remove = i; pos_to_remove = node
+                    min_dist = dist
+                    node_to_remove = i
+                    pos_to_remove = node
             if node_to_remove >= 0:
                 self._save_undo_state(
-                    f"Remover path node {node_to_remove} em ({pos_to_remove[0]:.0f}, {pos_to_remove[1]:.0f})"
+                    f"Remover path node {node_to_remove} em "
+                    f"({pos_to_remove[0]:.0f}, {pos_to_remove[1]:.0f})"
                 )
                 current_path.remove_node(node_to_remove)
 
         elif self.editor.mode == "towers":
-            spot_to_remove = None; min_dist = float('inf'); spot_pos = None
+            spot_to_remove = None
+            min_dist = float('inf')
+            spot_pos = None
             for spot in self.editor.tower_spots.spots:
-                cx = spot.x + spot.size // 2; cy = spot.y + spot.size // 2
+                cx = spot.x + spot.size // 2
+                cy = spot.y + spot.size // 2
                 dist = ((cx - world_pos[0]) ** 2 + (cy - world_pos[1]) ** 2) ** 0.5
                 if dist < spot.size and dist < min_dist:
-                    min_dist = dist; spot_to_remove = spot; spot_pos = (spot.x, spot.y)
+                    min_dist = dist
+                    spot_to_remove = spot
+                    spot_pos = (spot.x, spot.y)
             if spot_to_remove:
-                self._save_undo_state(f"Remover tower spot em ({spot_pos[0]:.0f}, {spot_pos[1]:.0f})")
+                self._save_undo_state(
+                    f"Remover tower spot em ({spot_pos[0]:.0f}, {spot_pos[1]:.0f})"
+                )
                 self.editor.tower_spots.remove_spot(spot_to_remove)

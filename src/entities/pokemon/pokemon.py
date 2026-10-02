@@ -1363,14 +1363,15 @@ class Pokemon(Entity):
 
         self.camera = camera
 
+        TILE_SCALE = 16 / 24  # 0.6667 — ajuste fino depois se quiser
+
         if camera and hasattr(self, 'screen_manager') and self.screen_manager:
             screen_x, screen_y = self.screen_manager.world_to_screen(self.x, self.y, camera)
-            zoom_scale = camera.zoom * self.screen_manager.render_scale
+            zoom_scale = camera.zoom * self.screen_manager.render_scale * TILE_SCALE
         else:
             screen_x = self.x
             screen_y = self.y
-            zoom_scale = 1.0
-
+            zoom_scale = TILE_SCALE
         sprite_to_render = self._prepare_sprite(zoom_scale)
 
         sprite_rect = None
