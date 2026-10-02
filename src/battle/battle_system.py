@@ -90,7 +90,11 @@ class BattleSystem:
         self.battle_participants.clear()
 
     def distribute_xp_for_defeated_enemy(self, defeated_enemy: 'Pokemon'):
-        """Distribui XP APENAS para os Pokémon que atacaram este inimigo específico"""
+        """Distribui XP APENAS para os Pokémon que atacaram este inimigo específico.
+
+        Adicionalmente, distribui metade do XP ganho por cada atacante para
+        qualquer Pokémon do time que esteja segurando Exp Share.
+        """
 
         # ===== OBTÉM OS ATACANTES QUE ATINGIRAM ESTE INIMIGO =====
         attackers = self.get_attackers_for_enemy(defeated_enemy)
@@ -100,38 +104,53 @@ class BattleSystem:
             self.clear_enemy_attackers(defeated_enemy)
             return
 
-        # ===== CALCULA XP BASE (exponencial pelo nível do inimigo) =====
+        # ==================================================================
+        # CÁLCULO DE XP BASE — AGORA COM exp_yield DA ESPÉCIE
+        # ==================================================================
         level = defeated_enemy.level
-        base_xp = 5 + int((level ** 1.5) * 2)
 
-        # Bônus para boss (2x)
+        exp_yield = 100  # fallback global ultra-seguro
+        if self.game_scene and hasattr(self.game_scene, 'player'):
+            exp_yield = self.game_scene.player.pokedex.get_exp_yield(defeated_enemy.id)
+
+        try:
+            from src.data.xp_config import get_config
+            xp_multiplier = get_config().get("xp_multiplier", 1.0)
+        except Exception:
+            xp_multiplier = 1.0
+
+        base_xp = int((exp_yield * level) / 7 * xp_multiplier)
+        base_xp = max(1, base_xp)
+
+        print(f"[XP] {defeated_enemy.name} (lvl {level}, exp_yield {exp_yield}) "
+              f"→ XP base: {base_xp} (mult: {xp_multiplier})")
+
         if defeated_enemy.is_boss:
             base_xp = int(base_xp * 1.5)
-            print(f"[XP] BOSS derrotado! XP base: {base_xp}")
+            print(f"[XP] BOSS derrotado! XP com bônus: {base_xp}")
 
-        # Bônus para shiny (1.5x)
         if defeated_enemy.is_shiny:
             base_xp = int(base_xp * 1.5)
+            print(f"[XP] SHINY derrotado! XP com bônus: {base_xp}")
 
         # ===== XP DIVIDIDO IGUALMENTE ENTRE OS ATACANTES =====
         xp_per_attacker = max(1, base_xp // len(attackers))
 
-        print(f"[XP] {defeated_enemy.name} (nível {level}) foi atacado por {len(attackers)} Pokémon")
+        print(f"[XP] {defeated_enemy.name} foi atacado por {len(attackers)} Pokémon")
         print(f"[XP] Distribuindo {xp_per_attacker} XP para cada atacante")
 
-        # Obtém EVs do inimigo
+        # ===== EVS =====
         ev_yield = {}
         if self.game_scene and hasattr(self.game_scene, 'player'):
             ev_yield = self.game_scene.player.pokedex.get_ev_yield(defeated_enemy.id)
 
-        # Multiplicador de EV para boss/shiny
         ev_multiplier = 1.0
         if defeated_enemy.is_boss:
             ev_multiplier *= 3
         if defeated_enemy.is_shiny:
             ev_multiplier *= 2
 
-        # Aplica multiplicador de Pay Day se houver
+        # ===== PAY DAY =====
         pay_day_xp_mult = 1.0
         if hasattr(defeated_enemy, '_pay_day_hit') and defeated_enemy._pay_day_hit:
             pay_day_xp_mult = getattr(defeated_enemy, '_pay_day_xp_multiplier', 1.5)
@@ -139,13 +158,12 @@ class BattleSystem:
             ev_multiplier *= pay_day_xp_mult
             print(f"[PAY_DAY] Bônus XP! Multiplicador x{pay_day_xp_mult}")
 
-        # Distribui XP e EVs para cada atacante
+        # ==================================================================
+        # DISTRIBUI XP E EVS PARA OS ATACANTES
+        # ==================================================================
         for attacker in attackers:
-            # Ganha XP
-            old_level = attacker.level
             attacker.gain_xp(xp_per_attacker)
 
-            # Ganha EVs
             if any(ev_yield.values()):
                 evs_gained = {}
                 for stat, value in ev_yield.items():
@@ -161,8 +179,85 @@ class BattleSystem:
             else:
                 print(f"[XP] {attacker.name} ganhou {xp_per_attacker} XP")
 
+        # ==================================================================
+        # EXP SHARE — METADE DO XP PARA QUEM ESTIVER SEGURANDO
+        # ==================================================================
+        # Regras:
+        #  - Só considera aliados do TIME (não selvagens)
+        #  - Portador NÃO recebe pelo próprio XP (evita duplicar)
+        #  - Cada aliado atacante gera uma "metade" para cada portador
+        #  - Se houver N portadores, cada um recebe integralmente (não divide)
+        # ==================================================================
+        self._distribute_exp_share(attackers, xp_per_attacker)
+
         # ===== LIMPA OS ATACANTES DO INIMIGO =====
         self.clear_enemy_attackers(defeated_enemy)
+
+    def _distribute_exp_share(self, attackers: list, xp_per_attacker: int):
+        """
+        Distribui XP via Exp Share.
+
+        Para cada atacante, metade do XP ganho é enviado para cada aliado
+        em campo que esteja segurando Exp Share (e que NÃO seja um dos atacantes).
+        """
+        if xp_per_attacker <= 0:
+            return
+
+        if not self.game_scene or not hasattr(self.game_scene, 'placement_manager'):
+            return
+
+        # ===== COLETA OS PORTADORES DE EXP SHARE =====
+        exp_share_holders = []
+        for ally in self.game_scene.placement_manager.placed_pokemon:
+            # Ignora selvagens (não deveria estar aqui, mas por segurança)
+            if getattr(ally, 'is_wild', False):
+                continue
+
+            # Ignora derrotados
+            if getattr(ally, 'is_defeated', False) or not ally.is_alive():
+                continue
+
+            # Ignora quem já está entre os atacantes (não acumula)
+            if ally in attackers:
+                continue
+
+            # Verifica se está segurando Exp Share
+            if getattr(ally, 'held_item', None) == "exp_share":
+                exp_share_holders.append(ally)
+
+        if not exp_share_holders:
+            return
+
+        # ===== CALCULA O VALOR A COMPARTILHAR =====
+        # Metade do XP por atacante (arredondado para baixo, mínimo 1)
+        shared_xp_per_attacker = max(1, xp_per_attacker // 2)
+
+        # Cada portador recebe (shared_xp_per_attacker × número de atacantes)
+        # Porque cada atacante gerou uma "fração" de XP para compartilhar
+        total_shared = shared_xp_per_attacker * len(attackers)
+
+        print(f"[EXP_SHARE] {len(exp_share_holders)} portador(es) de Exp Share "
+              f"detectado(s). Total compartilhado: {total_shared} XP "
+              f"({shared_xp_per_attacker} × {len(attackers)} atacante(s))")
+
+        # ===== DISTRIBUI PARA CADA PORTADOR =====
+        for holder in exp_share_holders:
+            holder.gain_xp(total_shared)
+
+            # Toast informativo (usa display name se custom_name existir)
+            try:
+                from src.ui.toast_renderer import toast_battle
+                display_name = holder.get_display_name() if hasattr(holder, 'get_display_name') else holder.name
+                toast_battle(
+                    f"{display_name} recebeu {total_shared} XP (Exp Share)!",
+                    duration=3.0,
+                    pokemon=holder,
+                    portrait="inspired"
+                )
+            except Exception:
+                pass
+
+            print(f"[EXP_SHARE] {holder.name} recebeu {total_shared} XP via Exp Share")
 
     def _give_xp_to_pokemon(self, pokemon: 'Pokemon', xp_amount: int, defeated_enemy: 'Pokemon'):
         """Dá XP a um Pokémon individual"""

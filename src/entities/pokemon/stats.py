@@ -52,25 +52,39 @@ class PokemonStats:
         """
         Calcula XP necessário para o próximo nível.
 
-        Fórmula: level² × 2
+        Lê os parâmetros da config global de dificuldade (`xp_config`).
+        Fórmula: base + (level² × k)
 
-        Resultado: nível 100 → 20,000 XP (metade do original que era 1,000,000)
+        Presets (ver src/data/xp_config.py):
+        - Fácil:   base=0,  k=2   → nível 100 = 20.000 XP
+        - Médio:   base=0,  k=5   → nível 100 = 50.000 XP
+        - Difícil: base=0,  k=10  → nível 100 = 100.000 XP
 
-        Exemplos:
-        - Nível 1 → 2 XP
-        - Nível 5 → 50 XP
-        - Nível 10 → 200 XP
-        - Nível 20 → 800 XP
-        - Nível 30 → 1,800 XP
-        - Nível 40 → 3,200 XP
-        - Nível 50 → 5,000 XP
-        - Nível 100 → 20,000 XP
+        Exemplos (Modo Médio, k=5):
+        - Nível 5   → 125 XP
+        - Nível 10  → 500 XP
+        - Nível 20  → 2.000 XP
+        - Nível 30  → 4.500 XP
+        - Nível 50  → 12.500 XP
+        - Nível 80  → 32.000 XP
+        - Nível 100 → 50.000 XP
         """
 
         if self.pokemon.level >= 100:
-                return 999999999
+            return 999999999  # trava: nunca sobe do 100
 
-        return (self.pokemon.level ** 2) * 2
+        # ===== LÊ CONFIGURAÇÃO GLOBAL DE DIFICULDADE =====
+        try:
+            from src.data.xp_config import get_config
+            cfg = get_config()
+            base = cfg.get("xp_curve_base", 0)
+            k = cfg.get("xp_curve_k", 5)
+        except Exception:
+            # Fallback seguro se xp_config não existir
+            base = 0
+            k = 5
+
+        return base + (self.pokemon.level ** 2) * k
 
     def calculate_attack_damage(self) -> float:
         return (self.pokemon.attack + self.pokemon.sp_attack) / 2

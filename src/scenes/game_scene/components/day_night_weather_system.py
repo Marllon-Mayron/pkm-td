@@ -1,7 +1,10 @@
 # src/scenes/game_scene/components/day_night_weather_system.py
 
 import random
-from src.battle.effects.specific.day_night.day_night_state import DayNightType, DayNightState
+from src.battle.effects.specific.day_night.day_night_state import (
+    DayNightType, DayNightState,
+    CYCLE_ORDER, DEFAULT_PERIOD_DURATION, get_next_cycle_period,
+)
 from src.battle.effects.specific.weather.weather_state import WeatherType
 
 
@@ -23,13 +26,8 @@ class DayNightWeatherSystem:
         if self._initialized:
             return
 
-        day_night_mode = "random"
-        base_weather = "random"
-
-        if hasattr(self.game_scene, 'day_night_mode'):
-            day_night_mode = self.game_scene.day_night_mode
-        if hasattr(self.game_scene, 'base_weather'):
-            base_weather = self.game_scene.base_weather
+        day_night_mode = getattr(self.game_scene, 'day_night_mode', 'random')
+        base_weather = getattr(self.game_scene, 'base_weather', 'random')
 
         mode_map = {
             "day": DayNightType.DAY,
@@ -43,24 +41,25 @@ class DayNightWeatherSystem:
         if day_night_mode in mode_map:
             period_type = mode_map[day_night_mode]
 
-            if period_type in [DayNightType.CAVE, DayNightType.DEEP]:
-                duration = 999999.0
-                self.day_night_state = DayNightState(period_type, duration)
+            if period_type in (DayNightType.CAVE, DayNightType.DEEP):
+                self.day_night_state = DayNightState(period_type, 999999.0)
                 self.day_night_state.active = True
                 self._initialized = True
-
                 weather_type = self._get_weather_from_config(base_weather)
                 if weather_type:
                     self._apply_base_weather(weather_type)
                 return
         else:
+            # Sorteio inicial ponderado (dia é mais comum)
             period_type = random.choices(
-                [DayNightType.DAY, DayNightType.NIGHT, DayNightType.DUSK, DayNightType.DAWN],
-                weights=[0.65, 0.25, 0.050, 0.050]
+                CYCLE_ORDER,
+                weights=[0.05, 0.65, 0.05, 0.25],  # DAWN, DAY, DUSK, NIGHT
             )[0]
 
-        duration = random.uniform(30.0, 90.0)
-        self.day_night_state = DayNightState(period_type, duration)
+        # ===== DURAÇÃO IGUAL PARA TODOS OS PERÍODOS =====
+        self.day_night_state = DayNightState(
+            period_type, DEFAULT_PERIOD_DURATION
+        )
 
         weather_type = self._get_weather_from_config(base_weather)
         if weather_type:
@@ -68,6 +67,7 @@ class DayNightWeatherSystem:
 
         self._initialized = True
 
+    # ------------------------------------------------------------------
     def _apply_base_weather(self, weather_type):
         if hasattr(self.game_scene, 'battle_system'):
             self.game_scene.battle_system.weather_manager.set_base_weather(weather_type)
@@ -90,31 +90,28 @@ class DayNightWeatherSystem:
             if self.day_night_state and self.day_night_state.is_night():
                 return None
             return WeatherType.SUNNY
-        elif base_weather == "rain":
+        if base_weather == "rain":
             return WeatherType.RAIN
-        elif base_weather == "none":
-            return None
-        else:
-            is_night = self.day_night_state and self.day_night_state.is_night()
-            for _ in range(10):
-                weather_type = random.choice(self.MAP_WEATHER_TYPES)
-                if weather_type == WeatherType.SUNNY and is_night:
-                    continue
-                return weather_type
+        if base_weather == "none":
             return None
 
+        is_night = self.day_night_state and self.day_night_state.is_night()
+        for _ in range(10):
+            weather_type = random.choice(self.MAP_WEATHER_TYPES)
+            if weather_type == WeatherType.SUNNY and is_night:
+                continue
+            return weather_type
+        return None
+
+    # ------------------------------------------------------------------
     def update(self, dt: float):
-        """Atualiza o sistema de dia/noite"""
         if not self._initialized:
             self.initialize()
             return
 
         if self.day_night_state:
-            # ===== SEMPRE ATUALIZA O ESTADO, MESMO PARA CAVE =====
-            # Isso garante que o flash seja atualizado
             self.day_night_state.update(dt)
 
-            # Se for transicional e acabou, muda o período
             if self.day_night_state.is_transitional() and not self.day_night_state.active:
                 self._change_period()
 
@@ -123,26 +120,35 @@ class DayNightWeatherSystem:
             return
 
         day_night_mode = getattr(self.game_scene, 'day_night_mode', 'random')
+        current_type = self.day_night_state.type
 
-        if day_night_mode in ["cave", "deep"]:
+        # CAVE / DEEP são permanentes
+        if day_night_mode in ("cave", "deep"):
             self.day_night_state.active = True
             self.day_night_state.duration = 999999.0
             return
 
-        if day_night_mode == "day":
-            period_type = DayNightType.DAY
-        elif day_night_mode == "night":
-            period_type = DayNightType.NIGHT
+        # ===== CICLO NATURAL: DAWN → DAY → DUSK → NIGHT → DAWN =====
+        forced_map = {
+            "day": DayNightType.DAY,
+            "night": DayNightType.NIGHT,
+            "dusk": DayNightType.DUSK,
+            "dawn": DayNightType.DAWN,
+        }
+
+        if day_night_mode in forced_map:
+            next_type = forced_map[day_night_mode]
         else:
-            period_type = random.choices(
-                [DayNightType.DAY, DayNightType.NIGHT],
-                weights=[0.8, 0.2]
-            )[0]
+            next_type = get_next_cycle_period(current_type)
 
-        duration = random.uniform(30.0, 90.0)
-        self.day_night_state = DayNightState(period_type, duration)
+        # ===== MESMA DURAÇÃO PARA TODOS OS PERÍODOS =====
+        self.day_night_state = DayNightState(
+            next_type,
+            DEFAULT_PERIOD_DURATION,
+            previous_type=current_type,
+        )
 
-        if period_type == DayNightType.NIGHT:
+        if next_type == DayNightType.NIGHT:
             self._validate_weather_on_night()
 
     def _validate_weather_on_night(self):
@@ -160,9 +166,10 @@ class DayNightWeatherSystem:
                     weather_mgr.battle_system.effect_manager.add_status_text(
                         None,
                         "O sol se pôs! O clima voltou ao normal.",
-                        duration=3.0
+                        duration=3.0,
                     )
 
+    # ------------------------------------------------------------------
     def get_day_night_type(self) -> DayNightType:
         if self.day_night_state:
             return self.day_night_state.type

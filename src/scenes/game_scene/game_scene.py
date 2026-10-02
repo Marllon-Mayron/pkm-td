@@ -1105,8 +1105,20 @@ class GameScene(BaseScene):
         return True
 
     def _use_evolution_stone(self, pokemon, item_data):
-        """Usa pedra de evolução em um Pokémon"""
+        """Usa pedra de evolução em um Pokémon. Bloqueado por Everstone."""
         from src.managers.evolution_manager import evolution_manager
+
+        # ===== EVERSTONE: bloqueia evolução por pedra =====
+        if hasattr(pokemon, 'is_holding_everstone') and pokemon.is_holding_everstone():
+            toast_battle(
+                f"{pokemon.name} está segurando Everstone e não pode evoluir!",
+                duration=3.0,
+                pokemon=pokemon,
+                portrait="sad"
+            )
+            print(f"[EVERSTONE] {pokemon.name} bloqueou evolução por pedra — item NÃO consumido")
+            # NÃO consome a pedra
+            return {"consume_item": False, "success": False}
 
         stone_name = item_data["id"]
         evolution = evolution_manager.check_evolution(pokemon.id, stone_name=stone_name)
@@ -1120,24 +1132,18 @@ class GameScene(BaseScene):
 
         evolve_to_id = evolution["evolve_to"]
 
-        # Define o método de evolução antes de executar
         if hasattr(pokemon, 'evolution'):
             pokemon.evolution._pending_evolution_method = "stone"
 
-        # Guarda os dados da evolução para referência
         pokemon._last_evolution_data = evolution
 
-        # Executa a evolução (instantânea)
         pokemon._perform_evolution(evolve_to_id)
 
-        # Registra na Pokédex
         self.player.caught_pokemon.add(evolve_to_id)
         self.player.register_seen(evolve_to_id)
 
-        # Salva
         self.player.auto_save()
 
-        # Toast de confirmação
         toast_battle(
             f"{pokemon.name} evoluiu para {pokemon.get_display_name()}!",
             duration=3.0,
@@ -1145,12 +1151,10 @@ class GameScene(BaseScene):
             portrait="joyous"
         )
 
-        # Toca som de evolução
         sound_manager.play_effect(SoundEffect.EVOLUTION)
 
         print(f"[STONE_EVOLUTION] {pokemon.name} evoluiu com {item_data['name']}!")
 
-        # Retorna sucesso e CONSUME o item
         return {"consume_item": True, "success": True}
 
     def _teach_move_to_pokemon(self, pokemon, move_name, item_data):

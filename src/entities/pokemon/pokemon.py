@@ -864,6 +864,13 @@ class Pokemon(Entity):
             return self.custom_name.strip()
         return self.name
 
+    def is_holding_everstone(self) -> bool:
+        """
+        Retorna True se o Pokémon está segurando uma Everstone.
+        Nesse caso, TODA tentativa de evolução deve ser bloqueada.
+        """
+        return getattr(self, 'held_item', None) == "everstone"
+
     def get_happiness(self) -> int:
         return self.happiness
 
@@ -895,8 +902,14 @@ class Pokemon(Entity):
         """
         Verifica se o Pokémon pode evoluir por felicidade.
         Se puder, mostra o overlay de evolução.
+        BLOQUEADO se o Pokémon estiver segurando Everstone.
         """
         from src.managers.evolution_manager import evolution_manager
+
+        # ===== EVERSTONE: bloqueia evolução =====
+        if self.is_holding_everstone():
+            print(f"[EVERSTONE] {self.name} está segurando Everstone — evolução por felicidade bloqueada!")
+            return
 
         # Só verifica se tiver game_scene e não for selvagem
         if not hasattr(self, 'game_scene') or not self.game_scene:

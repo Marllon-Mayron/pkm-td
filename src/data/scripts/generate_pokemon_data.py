@@ -142,6 +142,7 @@ class PokemonCompleteGenerator:
                     "speed": pokemon_data['stats'][5]['base_stat']
                 },
                 "ev": ev_yield,
+                "exp_yield": pokemon_data.get('base_experience'),
                 "capture_rate": species_data['capture_rate'],
                 "base_happiness": species_data['base_happiness'],
                 "abilities": abilities,

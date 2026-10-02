@@ -73,11 +73,13 @@ class ResidualEffect:
             self.timer = 0
             self.duration -= 1
 
-            # Executa o tick
             if self.on_tick_callback:
                 self.on_tick_callback(self)
 
-            # Se acabou a duração, remove
+            # Se o callback já removeu o efeito (ex: alvo morreu), não continue
+            if not self.is_active:
+                return False
+
             if self.duration <= 0:
                 self.remove()
                 return False
@@ -149,13 +151,11 @@ class ResidualEffectManager:
     def update(self, dt: float):
         """Atualiza todos os efeitos residuais"""
         to_remove = []
-
-        for effect in self.effects:  # Não precisa de cópia
+        for effect in self.effects[:]:  # ← cópia!
             still_active = effect.update(dt)
             if not still_active:
                 to_remove.append(effect)
 
-        # Remove depois da iteração
         for effect in to_remove:
             if effect in self.effects:
                 self.effects.remove(effect)

@@ -1,0 +1,120 @@
+{
+  "width": 4,
+  "height": 3,
+  "tile_size": 16,
+  "layers": [
+    {
+      "name": "Decoração",
+      "type": "decoration",
+      "tiles": [
+        [
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          957,
+          0
+        ],
+        [
+          957,
+          487,
+          40,
+          957
+        ]
+      ],
+      "tile_offsets": {
+        "2,2": [
+          -8,
+          0
+        ]
+      },
+      "tileset_paths": [
+        "res/AllTiles/Tilesets/OutsideFireRed.png"
+      ],
+      "tilesets_info": [
+        {
+          "path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Tilesets\\OutsideFireRed.png",
+          "count": 4016,
+          "cols": 8,
+          "rows": 502,
+          "tile_width": 16,
+          "tile_height": 16,
+          "spacing": 0
+        }
+      ],
+      "visible": true,
+      "opacity": 255
+    },
+    {
+      "name": "Teto",
+      "type": "ceiling",
+      "tiles": [
+        [
+          0,
+          471,
+          0,
+          0
+        ],
+        [
+          0,
+          479,
+          0,
+          0
+        ],
+        [
+          0,
+          40,
+          0,
+          0
+        ]
+      ],
+      "tile_offsets": {
+        "1,2": [
+          8,
+          0
+        ]
+      },
+      "tileset_paths": [
+        "res/AllTiles/Tilesets/OutsideFireRed.png"
+      ],
+      "tilesets_info": [
+        {
+          "path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Tilesets\\OutsideFireRed.png",
+          "count": 4016,
+          "cols": 8,
+          "rows": 502,
+          "tile_width": 16,
+          "tile_height": 16,
+          "spacing": 0
+        }
+      ],
+      "visible": true,
+      "opacity": 255
+    }
+  ],
+  "mask": [
+    [
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      1
+    ],
+    [
+      1,
+      1,
+      1,
+      1
+    ]
+  ],
+  "name": "Arvore com flores"
+}

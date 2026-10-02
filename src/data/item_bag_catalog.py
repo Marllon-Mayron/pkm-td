@@ -586,10 +586,8 @@ class ItemBagCatalog:
             # Fantasma
             ("spelltag", "SPELLTAG", "Aumenta o poder de golpes do tipo Fantasma em 10%.", "held_item", 8000),
             # Demais itens seguráveis (venda na loja)
-            ("kings_rock", "KINGSROCK",
-             "Dá 10% de chance de fazer o oponente hesitar ao usar um ataque que causa dano.", "held_item", 9000),
-            ("dragon_scale", "DRAGONSCALE", "Escama especial que faz o Seadra evoluir para Kingdra.", "held_item",
-             9000),
+            ("kings_rock", "KINGSROCK", "Dá 10% de chance de fazer o oponente hesitar ao usar um ataque que causa dano.", "held_item", 9000),
+            ("dragon_scale", "DRAGONSCALE", "Escama especial que faz o Seadra evoluir para Kingdra.", "held_item",9000),
             ("upgrade", "UPGRADE", "Dispositivo avançado que faz o Porygon evoluir para Porygon2.", "held_item", 9000),
         ]
 
@@ -611,6 +609,9 @@ class ItemBagCatalog:
              2400),
             ("tiny_mushroom", "TINYMUSHROOM", "Cogumelo pequeno e comum. Pode ser vendido por um preço razoável.",
              "held_item", 600),
+            ("exp_share", "EXPSHARE", "O Pokémon que segurar este item recebe metade do XP ganho pelos outros membros do time em batalha.","held_item", 5000,),
+            ("everstone", "EVERSTONE", "Uma pedra misteriosa que impede a evolução do Pokémon que a segura.", "held_item", 3000,
+            ),
         ]
 
         for item_id, name, description, category, price in held_items:

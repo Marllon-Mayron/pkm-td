@@ -19,7 +19,15 @@ from src.data.move_data import MoveData
 from src.data.item_bag_catalog import item_bag_catalog
 from src.battle.attack_pattern import AttackPattern
 from src.battle.effects.specific.weather.weather_state import WeatherType
-from src.battle.effects.specific.day_night.day_night_state import DayNightType, DayNightState
+from src.battle.effects.specific.day_night.day_night_state import (
+    DayNightType, DayNightState,
+    DAY_NIGHT_DISPLAY_NAMES,
+    PERIOD_DISPLAY_COLORS,
+    CYCLE_ORDER,
+    DEFAULT_PERIOD_DURATION,
+    get_next_cycle_period,
+    get_day_night_ui_options, day_night_from_string,
+)
 from src.entities.move import Move
 
 
@@ -770,12 +778,16 @@ class InGameDebugManager:
         dns = self.gs.day_night_weather
 
         new_type = day_night_from_string(type_val)
-        duration = dns.day_night_state.duration if dns.day_night_state else 60
+        prev_type = dns.day_night_state.type if dns.day_night_state else None
 
         if new_type in (DayNightType.CAVE, DayNightType.DEEP):
             duration = 999999.0
+        else:
+            duration = DEFAULT_PERIOD_DURATION
 
-        dns.day_night_state = DayNightState(new_type, duration)
+        dns.day_night_state = DayNightState(
+            new_type, duration, previous_type=prev_type,
+        )
         dns.day_night_state.active = True
         print(f"[DEBUG] Day/Night -> {new_type.value}")
 
@@ -1445,11 +1457,97 @@ class InGameDebugManager:
         if hasattr(self.gs, "day_night_weather"):
             dn = self.gs.day_night_weather.day_night_state
 
-        # -------- PERIODO DO DIA --------
-        self._draw_section_title(screen, x, y, w, "PERIODO DO DIA / AMBIENTE")
+        # =========================================================
+        # RELÓGIO DO CICLO
+        # =========================================================
+        self._draw_section_title(screen, x, y, w, "CICLO DIA/NOITE")
         y += 28
 
-        # Dropdown do tipo
+        clock_size = 240
+        clock_cx = x + clock_size // 2 + 12
+        clock_cy = y + clock_size // 2 + 8
+        self._render_day_night_clock(
+            screen, clock_cx, clock_cy, radius=clock_size // 2 - 30
+        )
+
+        # ----- Painel de infos à direita do relógio -----
+        info_x = x + clock_size + 24
+        info_y = y + 16
+        f_small = _get_font(14)
+        f_big = _get_font(20)
+
+        if dn:
+            cur_name = DAY_NIGHT_DISPLAY_NAMES.get(dn.type, "?")
+            cur_color = PERIOD_DISPLAY_COLORS.get(dn.type, (255, 255, 255))
+            t = f_big.render(f"Atual: {cur_name}", True, cur_color)
+            screen.blit(t, (info_x, info_y));
+            info_y += 32
+
+            if dn.type in (DayNightType.CAVE, DayNightType.DEEP):
+                screen.blit(
+                    f_small.render("(permanente)", True, (180, 180, 200)),
+                    (info_x, info_y),
+                )
+                info_y += 22
+            else:
+                prog = dn.get_progress()
+                remaining = max(0.0, dn.duration - dn.elapsed)
+                screen.blit(
+                    f_small.render(f"Progresso: {int(prog * 100)}%",
+                                   True, (220, 220, 240)),
+                    (info_x, info_y),
+                );
+                info_y += 22
+                screen.blit(
+                    f_small.render(f"Restam: {remaining:.1f}s",
+                                   True, (220, 220, 240)),
+                    (info_x, info_y),
+                );
+                info_y += 22
+                screen.blit(
+                    f_small.render(f"Duração: {DEFAULT_PERIOD_DURATION:.0f}s por período",
+                                   True, (180, 180, 210)),
+                    (info_x, info_y),
+                );
+                info_y += 22
+
+                # Próximo período
+                nxt = get_next_cycle_period(dn.type)
+                nxt_color = PERIOD_DISPLAY_COLORS.get(nxt, (255, 255, 255))
+                screen.blit(
+                    f_small.render(
+                        f"Próximo: {DAY_NIGHT_DISPLAY_NAMES.get(nxt, '?')}",
+                        True, nxt_color,
+                    ),
+                    (info_x, info_y),
+                );
+                info_y += 22
+
+                # Barra de progresso circular "linear"
+                bar_w, bar_h = 200, 10
+                bar_rect = pygame.Rect(info_x, info_y + 4, bar_w, bar_h)
+                pygame.draw.rect(screen, (35, 35, 50), bar_rect, border_radius=5)
+                fill_w = int(bar_w * prog)
+                if fill_w > 0:
+                    pygame.draw.rect(screen, cur_color,
+                                     (bar_rect.x, bar_rect.y, fill_w, bar_h),
+                                     border_radius=5)
+                pygame.draw.rect(screen, (110, 110, 140), bar_rect, 1,
+                                 border_radius=5)
+        else:
+            screen.blit(
+                f_small.render("Sistema inativo", True, (255, 120, 120)),
+                (info_x, info_y),
+            )
+
+        y += clock_size + 24
+
+        # =========================================================
+        # PERIODO DO DIA (dropdown + slider)
+        # =========================================================
+        self._draw_section_title(screen, x, y, w, "CONTROLES DO PERÍODO")
+        y += 28
+
         cur_dn = dn.type.value if dn else "day"
         dn_disp = next((l for v, l in _DAY_NIGHT_OPTIONS if v == cur_dn),
                        "Desconhecido")
@@ -1458,12 +1556,11 @@ class InGameDebugManager:
                                     dn_disp, ("dn_select", None))
         y += INPUT_H + 14
 
-        # Slider de duracao
-        cur_dur = int(dn.duration) if dn else 60
+        cur_dur = int(dn.duration) if dn else int(DEFAULT_PERIOD_DURATION)
         if cur_dur > 300:
             cur_dur = 300
         sr = pygame.Rect(x, y, w // 2, SLIDER_H)
-        self._draw_slider(screen, sr, "Duracao (s)",
+        self._draw_slider(screen, sr, "Duração (s)",
                           cur_dur, 5, 300, "dn_duration",
                           on_change=lambda v: self._set_day_night_duration(v))
         y += SLIDER_H + 18
@@ -1473,7 +1570,9 @@ class InGameDebugManager:
                           font_size=14, click_name="dn_flash")
         y += BTN_H + 26
 
-        # -------- CLIMA --------
+        # =========================================================
+        # CLIMA
+        # =========================================================
         self._draw_section_title(screen, x, y, w, "CLIMA")
         y += 28
 
@@ -1488,7 +1587,7 @@ class InGameDebugManager:
         y += INPUT_H + 14
 
         sr = pygame.Rect(x, y, w // 2, SLIDER_H)
-        self._draw_slider(screen, sr, "Duracao (s)",
+        self._draw_slider(screen, sr, "Duração (s)",
                           self._weather_duration, 5, 300,
                           "weather_duration",
                           on_change=lambda v: setattr(self, "_weather_duration", v))
@@ -1499,15 +1598,19 @@ class InGameDebugManager:
                           primary=True, font_size=14, click_name="weather_apply")
         y += BTN_H + 26
 
-        # Dicas
+        # =========================================================
+        # DICAS
+        # =========================================================
         self._draw_section_title(screen, x, y, w, "DICAS")
         y += 26
         hint_f = _get_font(FONT_SMALL)
         for h in [
-            "Noite ativa variants 'night' nas waves com use_variants.",
-            "Caverna e Fundo do Mar sao permanentes.",
-            "Chuva buffa Agua, enfraquece Fogo.",
-            "Tempestade de Areia: 1/16 do HP max a cada 2s.",
+            "Ciclo: Amanhecer → Dia → Entardecer → Noite → Amanhecer…",
+            "Cada período dura o mesmo tempo (60s por padrão).",
+            "A transição entre períodos é suave (3s de blend).",
+            "Caverna e Fundo do Mar são permanentes (fora do ciclo).",
+            "Noite ativa variantes 'night' nas waves com use_variants.",
+            "Chuva buffa Água, enfraquece Fogo.",
         ]:
             ht = hint_f.render(h, True, (150, 160, 190))
             screen.blit(ht, (x, y))
@@ -1515,13 +1618,119 @@ class InGameDebugManager:
 
         return y - y_start
 
+    # =========================================================
+    # RELÓGIO DO CICLO DIA/NOITE
+    # =========================================================
+    def _render_day_night_clock(self, screen, cx, cy, radius=110):
+        """Desenha um relógio circular com 4 fatias (um período cada) + ponteiro."""
+        import math
+
+        dn = None
+        if hasattr(self.gs, "day_night_weather"):
+            dn = self.gs.day_night_weather.day_night_state
+
+        # ===== 4 fatias iguais, na ordem do ciclo =====
+        slices = [
+            (DayNightType.DAWN, "Amanhecer", PERIOD_DISPLAY_COLORS[DayNightType.DAWN]),
+            (DayNightType.DAY, "Dia", PERIOD_DISPLAY_COLORS[DayNightType.DAY]),
+            (DayNightType.DUSK, "Entardecer", PERIOD_DISPLAY_COLORS[DayNightType.DUSK]),
+            (DayNightType.NIGHT, "Noite", PERIOD_DISPLAY_COLORS[DayNightType.NIGHT]),
+        ]
+
+        slice_angle = 90.0  # graus por fatia
+        start_offset = -90.0  # topo = -90°
+
+        # =========================================================
+        # FATIAS
+        # =========================================================
+        for i, (ptype, _label, color) in enumerate(slices):
+            start_a = start_offset + i * slice_angle
+            end_a = start_a + slice_angle
+
+            points = [(cx, cy)]
+            steps = 36
+            for s in range(steps + 1):
+                a = start_a + (end_a - start_a) * s / steps
+                rad = math.radians(a)
+                points.append((
+                    cx + radius * math.cos(rad),
+                    cy + radius * math.sin(rad),
+                ))
+
+            # Preenchimento da fatia
+            pygame.draw.polygon(screen, color, points)
+
+            # Borda — destaca o período ATUAL em branco
+            is_current = (dn is not None and dn.type == ptype)
+            if is_current:
+                # Sombra preta por baixo (visível mesmo sobre amarelo claro)
+                pygame.draw.polygon(screen, (0, 0, 0), points, 5)
+                pygame.draw.polygon(screen, (255, 255, 255), points, 3)
+            else:
+                pygame.draw.polygon(screen, (25, 25, 40), points, 2)
+
+        # =========================================================
+        # BORDA EXTERNA + CENTRO
+        # =========================================================
+        pygame.draw.circle(screen, (240, 240, 255), (cx, cy), radius, 2)
+
+        # Centro do relógio (pino)
+        pygame.draw.circle(screen, (20, 20, 30), (cx, cy), 8)
+        pygame.draw.circle(screen, (255, 255, 255), (cx, cy), 4)
+
+        # =========================================================
+        # PONTEIRO
+        # =========================================================
+        if dn is not None and dn.type in CYCLE_ORDER:
+            idx = CYCLE_ORDER.index(dn.type)
+            progress = dn.get_progress()
+
+            angle_deg = start_offset + idx * slice_angle + progress * slice_angle
+            rad = math.radians(angle_deg)
+
+            tip = (
+                cx + (radius - 4) * math.cos(rad),
+                cy + (radius - 4) * math.sin(rad),
+            )
+
+            # Sombra preta por baixo — garante visibilidade em qualquer fatia
+            pygame.draw.line(screen, (0, 0, 0), (cx, cy), tip, 7)
+            # Haste branca
+            pygame.draw.line(screen, (255, 255, 255), (cx, cy), tip, 3)
+
+            # Ponta vermelha (com contorno preto)
+            pygame.draw.circle(screen, (0, 0, 0),
+                               (int(tip[0]), int(tip[1])), 7)
+            pygame.draw.circle(screen, (255, 70, 70),
+                               (int(tip[0]), int(tip[1])), 5)
+
+        # =========================================================
+        # LABELS AO REDOR
+        # =========================================================
+        label_r = radius + 22
+        lf = _get_font(12)
+        for i, (ptype, label, _c) in enumerate(slices):
+            mid_angle = start_offset + (i + 0.5) * slice_angle
+            rad = math.radians(mid_angle)
+            lx = cx + label_r * math.cos(rad)
+            ly = cy + label_r * math.sin(rad)
+
+            is_current = (dn is not None and dn.type == ptype)
+            col = (255, 255, 255) if is_current else (200, 200, 220)
+
+            t = lf.render(label, True, col)
+            screen.blit(t, t.get_rect(center=(int(lx), int(ly))))
+
     def _set_day_night_duration(self, v):
         if not hasattr(self.gs, "day_night_weather"):
             return
         dns = self.gs.day_night_weather
-        if dns.day_night_state:
-            dns.day_night_state.duration = float(v)
-            dns.day_night_state.max_duration = float(v)
+        if not dns.day_night_state:
+            return
+        if dns.day_night_state.type in (DayNightType.CAVE, DayNightType.DEEP):
+            return  # CAVE/DEEP são permanentes — ignora
+        dns.day_night_state.duration = float(v)
+        dns.day_night_state.max_duration = float(v)
 
     # ---------------------------------------------------------
     # ABA WAVES

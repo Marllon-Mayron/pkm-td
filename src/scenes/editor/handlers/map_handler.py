@@ -165,9 +165,11 @@ class MapHandler:
                 set_tile(cx, cy, cell['tile_id'], offset=None)
 
     def _apply_structure_at(self, tx, ty, structure):
-        """Cola a estrutura na posição (tx, ty). Sem undo (caller salva)."""
+        """Aplica a estrutura começando da camada selecionada."""
+        start_layer_index = self.editor.layer_manager.current_layer
         self.editor.structure_manager.apply_to_map(
-            self.editor.layer_manager, structure, tx, ty
+            self.editor.layer_manager, structure, tx, ty,
+            start_layer_index=start_layer_index,
         )
 
     def _apply_single_tile_at(self, tx, ty, layer, offset=None):
@@ -187,18 +189,24 @@ class MapHandler:
         tile_x = int(world_pos[0] // self.editor.grid_size)
         tile_y = int(world_pos[1] // self.editor.grid_size)
 
+        # ★ Camada inicial = a selecionada atualmente
+        start_layer_index = self.editor.layer_manager.current_layer
+
         ok, msg = self.editor.structure_manager.check_can_paste(
-            self.editor.layer_manager, structure
+            self.editor.layer_manager, structure,
+            start_layer_index=start_layer_index,
         )
         if not ok:
             print(f"[MapHandler] {msg}")
             return
 
         self._save_undo_state(
-            f"Colar estrutura '{self.editor.loaded_structure_name}' em ({tile_x},{tile_y})"
+            f"Colar '{self.editor.loaded_structure_name}' em "
+            f"({tile_x},{tile_y}) a partir da camada {start_layer_index}"
         )
         ok, msg = self.editor.structure_manager.apply_to_map(
-            self.editor.layer_manager, structure, tile_x, tile_y
+            self.editor.layer_manager, structure, tile_x, tile_y,
+            start_layer_index=start_layer_index,
         )
         print(f"[MapHandler] {msg}")
 

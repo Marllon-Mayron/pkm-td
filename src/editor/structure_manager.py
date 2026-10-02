@@ -388,13 +388,29 @@ class StructureManager:
     # ==================================================================
     # COLAGEM — compatibilidade
     # ==================================================================
-    def check_can_paste(self, layer_manager, structure):
+    def check_can_paste(self, layer_manager, structure, start_layer_index=None):
+        """
+        Verifica se dá pra colar a estrutura a partir da camada
+        `start_layer_index` (default = layer_manager.current_layer).
+        """
         if not structure:
             return False, "Nenhuma estrutura carregada"
+
         need = len(structure.get("layers", []))
         have = len(layer_manager.layers)
-        if have < need:
-            return False, f"Precisa de {need} camada(s), mapa tem {have}"
+
+        if start_layer_index is None:
+            start_layer_index = getattr(layer_manager, 'current_layer', 0)
+
+        start_layer_index = max(0, int(start_layer_index))
+
+        if start_layer_index + need > have:
+            disponiveis = have - start_layer_index
+            return False, (
+                f"Precisa de {need} camada(s) a partir do index {start_layer_index}, "
+                f"mas só há {disponiveis} disponível(is) (total: {have}). "
+                f"Selecione uma camada mais baixa ou adicione mais camadas."
+            )
         return True, "OK"
 
     # ==================================================================
@@ -463,7 +479,17 @@ class StructureManager:
     # ==================================================================
     # APLICAR AO MAPA — com colagem ADITIVA (ignora tiles vazios)
     # ==================================================================
-    def apply_to_map(self, layer_manager, structure, anchor_x, anchor_y):
+    def apply_to_map(self, layer_manager, structure, anchor_x, anchor_y,
+                     start_layer_index=None):
+        """
+        Cola a estrutura a partir da camada `start_layer_index`
+        (default = camada atualmente selecionada no editor).
+        A camada 0 da estrutura vai para `start_layer_index`,
+        a camada 1 para `start_layer_index + 1`, e assim por diante.
+
+        Tiles vazios são IGNORADOS (colagem aditiva), preservando o
+        conteúdo existente no destino.
+        """
         if not structure:
             return False, "Estrutura inválida"
 
@@ -474,23 +500,37 @@ class StructureManager:
 
         if width <= 0 or height <= 0:
             return False, "Dimensões inválidas"
-        if len(layer_manager.layers) < len(struct_layers):
-            return False, f"Precisa de {len(struct_layers)} camada(s)"
+
+        if start_layer_index is None:
+            start_layer_index = getattr(layer_manager, 'current_layer', 0)
+
+        start_layer_index = max(0, int(start_layer_index))
+        have = len(layer_manager.layers)
+        need = len(struct_layers)
+
+        # ===== Bounds considerando o offset =====
+        if start_layer_index + need > have:
+            disponiveis = have - start_layer_index
+            return False, (
+                f"Precisa de {need} camada(s) a partir do index {start_layer_index}, "
+                f"mas só há {disponiveis} disponível(is) (total: {have})"
+            )
 
         total_added_tilesets = 0
         total_pasted = 0
         total_skipped_empty = 0
 
-        for layer_idx, struct_layer in enumerate(struct_layers):
-            target_layer = layer_manager.layers[layer_idx]
+        for local_idx, struct_layer in enumerate(struct_layers):
+            target_layer_idx = start_layer_index + local_idx
+            target_layer = layer_manager.layers[target_layer_idx]
 
             before = len(target_layer.tilesets)
             id_map = self._ensure_tilesets_and_build_id_map(target_layer, struct_layer)
             added = len(target_layer.tilesets) - before
             if added > 0:
                 total_added_tilesets += added
-                print(f"[StructureManager] Camada '{target_layer.name}': "
-                      f"+{added} tileset(s) carregado(s)")
+                print(f"[StructureManager] Camada '{target_layer.name}' "
+                      f"(index {target_layer_idx}): +{added} tileset(s)")
 
             tiles = struct_layer.get("tiles", []) or []
             offsets = struct_layer.get("tile_offsets", {}) or {}
@@ -503,7 +543,6 @@ class StructureManager:
                 row = tiles[dy] if dy < len(tiles) else []
 
                 for dx in range(width):
-                    # ===== Respeita máscara, se houver =====
                     in_mask = True
                     if mask_grid and dy < len(mask_grid) and dx < len(mask_grid[dy]):
                         in_mask = bool(mask_grid[dy][dx])
@@ -516,17 +555,11 @@ class StructureManager:
                     except (ValueError, TypeError):
                         continue
 
-                    # =========================================================
-                    # ★ COLAGEM ADITIVA ★
-                    # SEMPRE ignora tiles vazios — preserva o conteúdo do
-                    # destino onde a estrutura tem "buracos" (máscara ou
-                    # tiles vazios dentro da seleção).
-                    # =========================================================
+                    # ===== Colagem aditiva: ignora vazios =====
                     if tid_int == 0:
                         total_skipped_empty += 1
                         continue
 
-                    # Remapeia
                     new_id = id_map.get(tid_int, tid_int)
 
                     tx = anchor_x + dx
@@ -537,8 +570,9 @@ class StructureManager:
                         set_tile(tx, ty, new_id, offset=offset_tuple)
                         total_pasted += 1
 
-        msg = (f"Estrutura colada ({width}x{height}, {len(struct_layers)} camadas"
-               f", {total_pasted} tiles")
+        msg = (f"Estrutura colada ({width}x{height}, {need} camadas "
+               f"em {start_layer_index}..{start_layer_index + need - 1}, "
+               f"{total_pasted} tiles")
         if total_skipped_empty:
             msg += f", {total_skipped_empty} vazios ignorados"
         if total_added_tilesets:

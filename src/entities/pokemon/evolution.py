@@ -11,7 +11,16 @@ class PokemonEvolution:
         self.pokemon = pokemon
 
     def check_and_evolve(self):
-        evolution = evolution_manager.check_evolution( self.pokemon.id, current_level=self.pokemon.level, pokemon=self.pokemon)
+        """Verifica e executa evolução. BLOQUEADO por Everstone."""
+        # ===== EVERSTONE: bloqueia evolução =====
+        if self.pokemon.is_holding_everstone():
+            return False
+
+        evolution = evolution_manager.check_evolution(
+            self.pokemon.id,
+            current_level=self.pokemon.level,
+            pokemon=self.pokemon
+        )
 
         if evolution:
             evolve_to_id = evolution["evolve_to"]
@@ -193,10 +202,18 @@ class PokemonEvolution:
         """
         Verifica se há evolução por combinação com outro Pokémon próximo.
         Retorna o novo ID se evoluir, None caso contrário.
+        BLOQUEADO se qualquer um dos dois estiver segurando Everstone.
         """
+        # ===== EVERSTONE: bloqueia evolução =====
+        if self.pokemon.is_holding_everstone():
+            print(f"[EVERSTONE] {self.pokemon.name} não pode evoluir por combinação (Everstone)")
+            return None
+
+        if hasattr(nearby_pokemon, 'is_holding_everstone') and nearby_pokemon.is_holding_everstone():
+            print(f"[EVERSTONE] {nearby_pokemon.name} está com Everstone — combinação bloqueada")
+            return None
+
         combination_rules = {
-            # (meu_id, outro_id) -> (novo_id_meu, novo_id_outro, mensagem, remover_parceiro)
-            # Shellder (90) + Slowpoke (79) = Slowbro (80), Shellder some
             (90, 79): (80, None, "Shellder se juntou a Slowpoke e evoluiu para Slowbro!", True),
             (79, 90): (80, None, "Shellder mordeu Slowpoke e evoluiu para Slowbro!", True),
         }
@@ -524,8 +541,16 @@ class PokemonEvolution:
         # serão processados quando o overlay de evolução fechar.
         # ==================================================================
         evolution = None
-        if self.pokemon.level < MAX_LEVEL:
-            evolution = evolution_manager.check_evolution(self.pokemon.id, current_level=self.pokemon.level, pokemon=self.pokemon)
+
+        # ===== EVERSTONE: bloqueia qualquer evolução =====
+        if self.pokemon.is_holding_everstone():
+            print(f"[EVERSTONE] {self.pokemon.name} está segurando Everstone — evolução bloqueada!")
+        elif self.pokemon.level < MAX_LEVEL:
+            evolution = evolution_manager.check_evolution(
+                self.pokemon.id,
+                current_level=self.pokemon.level,
+                pokemon=self.pokemon
+            )
             if not evolution:
                 evolution = evolution_manager.check_happiness_evolution(self.pokemon)
 

@@ -159,6 +159,18 @@ class Pokedex:
                         "special_defense": pokemon["ev"]["special-defense"],
                         "speed": pokemon["ev"]["speed"]
                     },
+                    "exp_yield": (
+                            pokemon.get("exp_yield")  # 1) já migrado
+                            or pokemon.get("base_experience")  # 2) vindo da PokeAPI
+                            or Pokedex._estimate_exp_yield({  # 3) fallback por BST
+                        "hp": pokemon["base"]["hp"],
+                        "attack": pokemon["base"]["attack"],
+                        "defense": pokemon["base"]["defense"],
+                        "special_attack": pokemon["base"]["special-attack"],
+                        "special_defense": pokemon["base"]["special-defense"],
+                        "speed": pokemon["base"]["speed"],
+                    })
+                    ),
                     "catch_rate": pokemon.get("rate", pokemon.get("capture_rate", 120)),
                     "evolution": {
                         "EvolveTo": next_evolution_id,
@@ -544,6 +556,33 @@ class Pokedex:
             return pokemon["ev_yield"]
         return {"hp": 1, "attack": 0, "defense": 0,
                 "special_attack": 0, "special_defense": 0, "speed": 0}
+
+    def get_exp_yield(self, pokemon_id: int) -> int:
+        """Retorna o XP base que este Pokémon dá ao ser derrotado."""
+        pokemon = self.get_pokemon(pokemon_id)
+        if pokemon and "exp_yield" in pokemon:
+            return pokemon["exp_yield"]
+        return 100  # fallback global (nunca deve acontecer após o load)
+
+    @staticmethod
+    def _estimate_exp_yield(base_stats: dict) -> int:
+        """
+        Estima exp_yield a partir das stats base quando o campo não existe.
+        Calibrado contra valores reais da PokéAPI.
+        """
+        bst = sum(base_stats.get(k, 50) for k in (
+            "hp", "attack", "defense",
+            "special_attack", "special_defense", "speed"
+        ))
+
+        if bst < 250:
+            return max(40, int(bst * 0.20))
+        elif bst < 400:
+            return int(50 + (bst - 250) * 0.32)
+        elif bst < 550:
+            return int(98 + (bst - 400) * 0.55)
+        else:
+            return min(350, int(180 + (bst - 550) * 0.60))
 
     def _get_placeholder_color(self, pokemon_id):
         colors = [
