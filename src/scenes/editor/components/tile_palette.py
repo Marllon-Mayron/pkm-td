@@ -217,10 +217,16 @@ class TilePalette:
 
         # ===== CLIQUES NAS ABAS =====
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # ===== LOG TEMPORÁRIO =====
+            print(f"[PALETTE] click at ({mouse_x},{mouse_y}) "
+                  f"tiles_rect={self.tab_tiles_rect} auto_rect={self.tab_auto_rect}")
+
             if self.tab_tiles_rect.collidepoint(mouse_x, mouse_y):
+                print(f"[PALETTE] -> TILES")
                 self.active_tab = "tiles"
                 return True
             if self.tab_auto_rect.collidepoint(mouse_x, mouse_y):
+                print(f"[PALETTE] -> AUTOTILES")
                 self.active_tab = "autotiles"
                 self._update_autotile_scroll()
                 return True

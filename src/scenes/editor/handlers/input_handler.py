@@ -51,6 +51,11 @@ class EditorInputHandler:
         if self.editor.tile_palette and self.editor.tile_palette.visible:
             if self.editor.tile_palette.handle_event(event):
                 ui_handled = True
+
+                # ===== SINCRONIZA O MODO DE PINTURA COM A ABA ATIVA =====
+                tab = self.editor.tile_palette.get_active_tab()
+                self.editor.paint_mode = "autotile" if tab == "autotiles" else "tile"
+
                 if self.editor.tile_palette.selected_tile is not None:
                     self.editor.current_tile = self.editor.tile_palette.selected_tile + 1
 
@@ -86,6 +91,7 @@ class EditorInputHandler:
             self.editor.layer_manager.current_layer = self.editor.layer_selector.selected_layer
 
             current_layer = self.editor.layer_manager.get_current_layer()
+            # ===== AUTOTILE: garante os tilesets na layer atual =====
             if current_layer:
                 self.editor._ensure_layer_has_all_autotiles(current_layer)
 
@@ -164,6 +170,10 @@ class EditorInputHandler:
             if self.editor.mode == "path":
                 self.editor._open_wave_config_dialog()
                 return True
+        elif event.key == pygame.K_r and not (pygame.key.get_mods() & pygame.KMOD_CTRL):
+            # Atalho para ferramenta retângulo
+            self.editor.brush_buttons.current_brush = self.editor.brush_buttons.BRUSH_RECTANGLE
+            return True
         return True
 
     # ==================================================================
@@ -207,7 +217,8 @@ class EditorInputHandler:
 
             # ---- SHAPE TOOLS ----
             if brush in (self.editor.brush_buttons.BRUSH_LINE,
-                         self.editor.brush_buttons.BRUSH_CIRCLE):
+                         self.editor.brush_buttons.BRUSH_CIRCLE,
+                         self.editor.brush_buttons.BRUSH_RECTANGLE):
                 world_pos = self.editor.screen_manager.get_mouse_world_position(
                     mouse_pos, self.editor.camera
                 )

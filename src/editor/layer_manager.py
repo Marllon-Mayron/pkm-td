@@ -348,6 +348,11 @@ class Layer:
         if tiles is None:
             return False
 
+        # ===== AUTOTILE: o tileset está sendo reconstruído do zero. =====
+        # Zera o metadata para forçar o editor a re-registrar os autotiles
+        # no final do tileset, com start_ids corretos.
+        self.autotile_tilesets = []
+
         self.tileset = tiles
         self.tilesets = [{
             'path': image_path,
@@ -371,6 +376,11 @@ class Layer:
         tiles, cols, rows = self._extract_tiles(image_path, tile_width, tile_height, spacing)
         if tiles is None:
             return False
+
+        # ===== AUTOTILE: o tileset normal está sendo adicionado no final. =====
+        # Zera o metadata para forçar o editor a re-registrar os autotiles
+        # DEPOIS deste tileset normal, com start_ids corretos.
+        self.autotile_tilesets = []
 
         next_start_id = len(self.tileset) + 1
         self.tilesets.append({

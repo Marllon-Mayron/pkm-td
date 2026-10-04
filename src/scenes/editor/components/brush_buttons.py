@@ -4,12 +4,13 @@
 Botões de ferramentas do editor.
 
 Ferramentas:
-    PINCEL   (B) — pinta 1 tile por clique (com SNAP opcional)
-    BALDE    (V) — flood fill
-    LINHA    (L) — clique/arraste (Bresenham)
-    CÍRCULO  (O) — clique/arraste define centro+raio
-    BORRACHA (E) — apaga com formato e tamanho ajustáveis
-    ESTRUTURA    — abre o diálogo de estruturas customizadas
+    PINCEL    (B) — pinta 1 tile por clique (com SNAP opcional)
+    BALDE     (V) — flood fill
+    LINHA     (L) — clique/arraste (Bresenham)
+    CÍRCULO   (O) — clique/arraste define centro+raio (com FILL opcional)
+    RETÂNGULO (R) — clique/arraste define cantos (com FILL opcional)
+    BORRACHA  (E) — apaga com formato e tamanho ajustáveis
+    ESTRUTURA     — abre o diálogo de estruturas customizadas
 """
 import pygame
 
@@ -19,6 +20,7 @@ class BrushButtons:
     BRUSH_BUCKET = "bucket"
     BRUSH_LINE = "line"
     BRUSH_CIRCLE = "circle"
+    BRUSH_RECTANGLE = "rectangle"
     BRUSH_ERASER = "eraser"
 
     ERASER_SQUARE = "square"
@@ -31,6 +33,7 @@ class BrushButtons:
 
         self.current_brush = self.BRUSH_PENCIL
         self.circle_filled = False
+        self.rectangle_filled = True
 
         # ===== SNAP (só afeta o pincel normal) =====
         self.snap_enabled = True
@@ -61,6 +64,9 @@ class BrushButtons:
         # Ação pendente que o editor processa (ex: abrir diálogo de estruturas)
         self.pending_action = None
 
+        # Botão do retângulo (criado em _init_buttons)
+        self.rectangle_rect = pygame.Rect(0, 0, 0, 0)
+
         self._init_buttons()
 
     # =========================================================
@@ -72,19 +78,25 @@ class BrushButtons:
         gap = 8
         m = 10
 
+        # Linha 1: PINCEL / BALDE (2 botões grandes)
         row1_y = 30
         self.pencil_rect = pygame.Rect(self.rect.x + m, self.rect.y + row1_y, bw, bh)
         self.bucket_rect = pygame.Rect(self.rect.x + m + bw + gap, self.rect.y + row1_y, bw, bh)
 
+        # Linha 2: LINHA / CIRC / RET (3 botões menores)
         row2_y = row1_y + bh + 6
-        self.line_rect = pygame.Rect(self.rect.x + m, self.rect.y + row2_y, bw, bh)
-        self.circle_rect = pygame.Rect(self.rect.x + m + bw + gap, self.rect.y + row2_y, bw, bh)
+        bw2 = 56
+        gap2 = 6
+        self.line_rect      = pygame.Rect(self.rect.x + m, self.rect.y + row2_y, bw2, bh)
+        self.circle_rect    = pygame.Rect(self.rect.x + m + bw2 + gap2, self.rect.y + row2_y, bw2, bh)
+        self.rectangle_rect = pygame.Rect(self.rect.x + m + 2 * (bw2 + gap2), self.rect.y + row2_y, bw2, bh)
 
+        # Linha 3: BORRACHA (full width)
         row3_y = row2_y + bh + 6
         full_w = bw * 2 + gap
         self.eraser_rect = pygame.Rect(self.rect.x + m, self.rect.y + row3_y, full_w, bh)
 
-        # ===== NOVA LINHA: ESTRUTURA =====
+        # ===== Linha 4: ESTRUTURA =====
         row4_y = row3_y + bh + 6
         self.structure_rect = pygame.Rect(self.rect.x + m, self.rect.y + row4_y, full_w, bh)
 
@@ -93,7 +105,7 @@ class BrushButtons:
         self._init_dynamic_row(row5_y, m)
 
     def _init_dynamic_row(self, row_y, m):
-        # Preenchimento do círculo
+        # Preenchimento (círculo/retângulo)
         self.fill_checkbox = pygame.Rect(self.rect.x + m, self.rect.y + row_y, 18, 18)
         self.fill_label_rect = pygame.Rect(self.rect.x + m + 24, self.rect.y + row_y, 130, 18)
 
@@ -122,8 +134,11 @@ class BrushButtons:
         self.bucket_rect.topleft = (self.rect.x + m + bw + gap, self.rect.y + row1_y)
 
         row2_y = row1_y + bh + 6
-        self.line_rect.topleft = (self.rect.x + m, self.rect.y + row2_y)
-        self.circle_rect.topleft = (self.rect.x + m + bw + gap, self.rect.y + row2_y)
+        bw2 = 56
+        gap2 = 6
+        self.line_rect.topleft      = (self.rect.x + m, self.rect.y + row2_y)
+        self.circle_rect.topleft    = (self.rect.x + m + bw2 + gap2, self.rect.y + row2_y)
+        self.rectangle_rect.topleft = (self.rect.x + m + 2 * (bw2 + gap2), self.rect.y + row2_y)
 
         row3_y = row2_y + bh + 6
         self.eraser_rect.topleft = (self.rect.x + m, self.rect.y + row3_y)
@@ -164,10 +179,12 @@ class BrushButtons:
             (self.bucket_rect, "bucket"),
             (self.line_rect, "line"),
             (self.circle_rect, "circle"),
+            (self.rectangle_rect, "rectangle"),
             (self.eraser_rect, "eraser"),
             (self.structure_rect, "structure"),
         ]
-        if self.current_brush == self.BRUSH_CIRCLE:
+        # Fill aparece para CÍRCULO e RETÂNGULO
+        if self.current_brush in (self.BRUSH_CIRCLE, self.BRUSH_RECTANGLE):
             rects.append((self.fill_checkbox, "fill"))
         if self.current_brush == self.BRUSH_PENCIL:
             rects.append((self.snap_checkbox, "snap"))
@@ -204,18 +221,23 @@ class BrushButtons:
             self.current_brush = self.BRUSH_LINE; return True
         if self.circle_rect.collidepoint(mx, my):
             self.current_brush = self.BRUSH_CIRCLE; return True
+        if self.rectangle_rect.collidepoint(mx, my):
+            self.current_brush = self.BRUSH_RECTANGLE; return True
         if self.eraser_rect.collidepoint(mx, my):
             self.current_brush = self.BRUSH_ERASER; return True
 
-        # ===== NOVO: ESTRUTURA =====
+        # ===== ESTRUTURA =====
         if self.structure_rect.collidepoint(mx, my):
             self.pending_action = {'action': 'open_structure_dialog'}
             return True
 
-        # Círculo fill
-        if self.current_brush == self.BRUSH_CIRCLE:
+        # Círculo/Retângulo fill
+        if self.current_brush in (self.BRUSH_CIRCLE, self.BRUSH_RECTANGLE):
             if self.fill_checkbox.collidepoint(mx, my):
-                self.circle_filled = not self.circle_filled
+                if self.current_brush == self.BRUSH_CIRCLE:
+                    self.circle_filled = not self.circle_filled
+                else:
+                    self.rectangle_filled = not self.rectangle_filled
                 return True
 
         # Pincel — SNAP
@@ -260,6 +282,8 @@ class BrushButtons:
             self.current_brush = self.BRUSH_LINE; return True
         if event.key == pygame.K_o:
             self.current_brush = self.BRUSH_CIRCLE; return True
+        if event.key == pygame.K_r:
+            self.current_brush = self.BRUSH_RECTANGLE; return True
         if event.key == pygame.K_e:
             self.current_brush = self.BRUSH_ERASER; return True
 
@@ -278,11 +302,22 @@ class BrushButtons:
     def is_circle_filled(self):
         return self.circle_filled
 
+    def is_rectangle_filled(self):
+        return self.rectangle_filled
+
+    def get_shape_filled(self):
+        """Retorna o estado 'filled' da ferramenta de shape ativa."""
+        if self.current_brush == self.BRUSH_RECTANGLE:
+            return self.rectangle_filled
+        return self.circle_filled
+
     def is_snap_enabled(self):
         return self.snap_enabled
 
     def is_shape_tool(self):
-        return self.current_brush in (self.BRUSH_LINE, self.BRUSH_CIRCLE)
+        return self.current_brush in (self.BRUSH_LINE,
+                                      self.BRUSH_CIRCLE,
+                                      self.BRUSH_RECTANGLE)
 
     def is_eraser(self):
         return self.current_brush == self.BRUSH_ERASER
@@ -335,8 +370,10 @@ class BrushButtons:
                                  self.BRUSH_BUCKET, "bucket")
         self._render_tool_button(screen, font_small, self.line_rect, "LINHA",
                                  self.BRUSH_LINE, "line")
-        self._render_tool_button(screen, font_small, self.circle_rect, "CIRCULO",
+        self._render_tool_button(screen, font_small, self.circle_rect, "CIRC",
                                  self.BRUSH_CIRCLE, "circle")
+        self._render_tool_button(screen, font_small, self.rectangle_rect, "RET",
+                                 self.BRUSH_RECTANGLE, "rectangle")
         self._render_tool_button(screen, font_small, self.eraser_rect, "BORRACHA",
                                  self.BRUSH_ERASER, "eraser")
 
@@ -361,7 +398,7 @@ class BrushButtons:
         # Linha dinâmica
         if self.current_brush == self.BRUSH_PENCIL:
             self._render_snap_control(screen, font_small)
-        elif self.current_brush == self.BRUSH_CIRCLE:
+        elif self.current_brush in (self.BRUSH_CIRCLE, self.BRUSH_RECTANGLE):
             self._render_fill_checkbox(screen, font_small)
         elif self.current_brush == self.BRUSH_ERASER:
             self._render_eraser_controls(screen, font_small)
@@ -403,7 +440,12 @@ class BrushButtons:
 
     def _render_fill_checkbox(self, screen, font_small):
         box = self.fill_checkbox
-        if self.circle_filled:
+        # Define qual "filled" estamos mostrando
+        is_filled = (self.rectangle_filled
+                     if self.current_brush == self.BRUSH_RECTANGLE
+                     else self.circle_filled)
+
+        if is_filled:
             pygame.draw.rect(screen, (70, 120, 190), box, border_radius=4)
             pygame.draw.rect(screen, (150, 200, 255), box, 1, border_radius=4)
             pygame.draw.line(screen, (255, 255, 255),
@@ -413,6 +455,7 @@ class BrushButtons:
         else:
             pygame.draw.rect(screen, (40, 45, 60), box, border_radius=4)
             pygame.draw.rect(screen, (120, 120, 130), box, 1, border_radius=4)
+
         label = font_small.render("Fill (preencher)", True, (220, 220, 220))
         screen.blit(label, (self.fill_label_rect.x, self.fill_label_rect.y))
 

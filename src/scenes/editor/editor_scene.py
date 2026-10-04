@@ -86,6 +86,10 @@ class EditorScene(BaseScene):
         self.show_grid = True
         self.grid_size = 16
         self.snap_to_grid = True
+        # ===== MODO DE PINTURA (sincronizado com a aba da paleta) =====
+        # "tile"     -> paleta normal (TILES) ativa
+        # "autotile" -> paleta de autotiles ativa
+        self.paint_mode = "tile"
 
         self.wave_manager = WaveManager()
         self.path_manager.set_wave_manager(self.wave_manager)
@@ -511,6 +515,11 @@ class EditorScene(BaseScene):
     # ==================================================================
     def handle_event(self, event):
         # ===== SELEÇÃO DE ESTRUTURA ATIVA — intercepta tudo =====
+        if self.tile_palette:
+            tab = self.tile_palette.get_active_tab()
+            self.paint_mode = "autotile" if tab == "autotiles" else "tile"
+
+            # ===== SELEÇÃO DE ESTRUTURA ATIVA — intercepta tudo =====
         if self.structure_selection_active:
             self._handle_structure_selection_event(event)
             return True
@@ -796,23 +805,19 @@ class EditorScene(BaseScene):
         self.tile_palette._update_max_scroll()
 
     def _ensure_layer_has_all_autotiles(self, layer):
-        """Garante que a layer tem os tiles de autotile tanto em metadata quanto no tileset real."""
+        """
+        Garante que a layer tem os tiles de autotile registrados no final
+        do tileset. Se algum foi adicionado agora (porque o metadata foi
+        zerado por load/add_tileset, ou porque a layer é nova), recalcula
+        todos os tiles de autotile já pintados.
+        """
         if not layer or not self.autotile_manager:
             return False
+
         changed = False
         for local_id, sheet in self.autotile_manager.by_local_id.items():
             info = layer.find_autotile_tileset(local_id)
-
-            # Verifica se precisa adicionar
-            needs = False
             if info is None:
-                needs = True
-            else:
-                expected_end = info['start_id'] + info['count'] - 1
-                if len(layer.tileset) < expected_end:
-                    needs = True
-
-            if needs:
                 layer.add_autotile_tileset(
                     local_id=local_id,
                     sheet_path=sheet.path,
@@ -824,9 +829,18 @@ class EditorScene(BaseScene):
                 changed = True
 
         if changed:
-            print(f"[Editor] Layer '{layer.name}': "
-                  f"tilesets de autotile sincronizados "
-                  f"(tileset agora tem {len(layer.tileset)} tiles)")
+            # ===== Recalcula todos os tiles de autotile já pintados =====
+            # (os start_ids mudaram, então tiles[y][x] precisa ser reescrito)
+            count = 0
+            for y in range(layer.height):
+                for x in range(layer.width):
+                    if layer.autotile_ids[y][x] != 0:
+                        layer._refresh_autotile_tile(x, y)
+                        count += 1
+            print(f"[Editor] Layer '{layer.name}': autotile tilesets "
+                  f"re-registrados (tileset={len(layer.tileset)} tiles, "
+                  f"{count} células recalculadas)")
+
         return changed
 
     def _ensure_all_layers_have_autotiles(self):

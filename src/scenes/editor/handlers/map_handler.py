@@ -63,15 +63,30 @@ class MapHandler:
     # AUTOTILE — helpers
     # ==================================================================
     def _is_autotile_mode(self):
-        """True quando a paleta está na aba AUTOTILES e há um autotile selecionado."""
+        """
+        True apenas se:
+          - estamos no modo layers
+          - a paleta está visível
+          - a aba AUTOTILES está ativa
+          - há um autotile selecionado (selected_autotile_id > 0)
+        """
         if self.editor.mode != "layers":
             return False
         pal = getattr(self.editor, 'tile_palette', None)
-        if not pal:
+        if not pal or not pal.visible:
             return False
-        if pal.get_active_tab() != "autotiles":
+
+        tab = pal.get_active_tab()
+        sel = pal.selected_autotile_id
+
+        # Sync forçado
+        self.editor.paint_mode = "autotile" if tab == "autotiles" else "tile"
+
+        if tab != "autotiles":
             return False
-        return pal.selected_autotile_id > 0
+        if sel <= 0:
+            return False
+        return True
 
     def _get_current_autotile_id(self):
         pal = getattr(self.editor, 'tile_palette', None)
@@ -81,25 +96,17 @@ class MapHandler:
         """Pinta um autotile numa célula (com undo controlado por célula)."""
         layer = self.editor.layer_manager.get_current_layer()
         if not layer:
-            print("[AUTOTILE] sem layer")
             return
         if not (0 <= tile_x < layer.width and 0 <= tile_y < layer.height):
-            print(f"[AUTOTILE] fora do range: ({tile_x},{tile_y}) layer={layer.width}x{layer.height}")
             return
 
         local_id = self._get_current_autotile_id()
         if local_id <= 0:
-            print(f"[AUTOTILE] local_id inválido: {local_id}")
             return
 
         # ===== AUTOTILE: garante que a layer tem o tileset registrado =====
         if self.editor._ensure_layer_has_all_autotiles(layer):
             self.editor._update_tile_palette_from_layer()
-
-        # ===== DEBUG =====
-        info = layer.find_autotile_tileset(local_id)
-        if info is None:
-            return
 
         # Se já tem o mesmo autotile aqui, nada muda
         if layer.autotile_ids[tile_y][tile_x] == local_id:
@@ -119,7 +126,7 @@ class MapHandler:
                 f"Autotile #{local_id} em ({tile_x},{tile_y})", continuous
             )
 
-        result = layer.paint_autotile(tile_x, tile_y, local_id)
+        layer.paint_autotile(tile_x, tile_y, local_id)
 
     def _flood_fill_autotile(self, layer, start_x, start_y, local_id):
         """Preenche a região conexa com o autotile."""
@@ -378,10 +385,37 @@ class MapHandler:
     # ==================================================================
     # SHAPES
     # ==================================================================
+    def _get_rectangle_tiles(self, x0, y0, x1, y1, filled=True):
+        """
+        Retorna as células do retângulo definido por (x0,y0)-(x1,y1).
+        Se filled=False, retorna apenas o contorno (perímetro).
+        """
+        min_x, max_x = min(x0, x1), max(x0, x1)
+        min_y, max_y = min(y0, y1), max(y0, y1)
+
+        tiles = []
+        if filled:
+            for y in range(min_y, max_y + 1):
+                for x in range(min_x, max_x + 1):
+                    tiles.append((x, y))
+        else:
+            # Borda superior e inferior
+            for x in range(min_x, max_x + 1):
+                tiles.append((x, min_y))
+                if max_y != min_y:
+                    tiles.append((x, max_y))
+            # Laterais (sem repetir cantos)
+            for y in range(min_y + 1, max_y):
+                tiles.append((min_x, y))
+                if max_x != min_x:
+                    tiles.append((max_x, y))
+        return tiles
+
     def start_shape(self, tile_x, tile_y):
         brush = self.editor.brush_buttons.get_current_brush()
         if brush not in (self.editor.brush_buttons.BRUSH_LINE,
-                         self.editor.brush_buttons.BRUSH_CIRCLE):
+                         self.editor.brush_buttons.BRUSH_CIRCLE,
+                         self.editor.brush_buttons.BRUSH_RECTANGLE):
             return False
         self.shape_active = True
         self.shape_tool = brush
@@ -481,18 +515,25 @@ class MapHandler:
         return True
 
     def get_shape_tiles(self):
-        """Anchors brutos da forma (Bresenham / círculo)."""
+        """Anchors brutos da forma (Bresenham / círculo / retângulo)."""
         if not self.shape_active or not self.shape_start or not self.shape_end:
             return []
         x0, y0 = self.shape_start
         x1, y1 = self.shape_end
+
         if self.shape_tool == self.editor.brush_buttons.BRUSH_LINE:
             return self._get_line_tiles(x0, y0, x1, y1)
+
         if self.shape_tool == self.editor.brush_buttons.BRUSH_CIRCLE:
             dx, dy = x1 - x0, y1 - y0
             radius = int(round((dx * dx + dy * dy) ** 0.5))
             filled = self.editor.brush_buttons.is_circle_filled()
             return self._get_circle_tiles(x0, y0, radius, filled)
+
+        if self.shape_tool == self.editor.brush_buttons.BRUSH_RECTANGLE:
+            filled = self.editor.brush_buttons.is_rectangle_filled()
+            return self._get_rectangle_tiles(x0, y0, x1, y1, filled=filled)
+
         return []
 
     def get_shape_placement_tiles(self):
@@ -561,6 +602,32 @@ class MapHandler:
                     tiles.add((fx, py))
         # Ordena por (y, x) para determinismo do espaçamento em círculos
         return sorted(tiles, key=lambda p: (p[1], p[0]))
+
+    def _get_rectangle_tiles(self, x0, y0, x1, y1, filled=True):
+        """
+        Retorna as células do retângulo definido por (x0,y0)-(x1,y1).
+        Se filled=False, retorna apenas o contorno (perímetro).
+        """
+        min_x, max_x = min(x0, x1), max(x0, x1)
+        min_y, max_y = min(y0, y1), max(y0, y1)
+
+        tiles = []
+        if filled:
+            for y in range(min_y, max_y + 1):
+                for x in range(min_x, max_x + 1):
+                    tiles.append((x, y))
+        else:
+            # Borda superior e inferior
+            for x in range(min_x, max_x + 1):
+                tiles.append((x, min_y))
+                if max_y != min_y:
+                    tiles.append((x, max_y))
+            # Laterais (sem repetir cantos)
+            for y in range(min_y + 1, max_y):
+                tiles.append((min_x, y))
+                if max_x != min_x:
+                    tiles.append((max_x, y))
+        return tiles
 
     # ==================================================================
     # BORRACHA

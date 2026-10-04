@@ -390,6 +390,9 @@ class EditorRenderHandler:
         elif tool == "circle":
             filled = "preenchido" if self.editor.brush_buttons.is_circle_filled() else "contorno"
             hint = f"CIRCULO ({filled}): arraste para definir o raio | ESC cancela"
+        elif tool == "rectangle":
+            filled = "preenchido" if self.editor.brush_buttons.is_rectangle_filled() else "contorno"
+            hint = f"RETANGULO ({filled}): arraste para definir os cantos | ESC cancela"
         else:
             hint = ""
 
