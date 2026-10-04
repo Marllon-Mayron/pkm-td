@@ -6,6 +6,7 @@ Gerenciador de layers do mapa com suporte a múltiplos tilesets de QUALQUER tama
 Suporta:
 - Auto-detecção da grade do tileset (sem limite 6x8)
 - Offsets em pixels por tile (posicionamento livre sem snap no pincel normal)
+- Autotiles 47-tile (blob) com recálculo dinâmico de bordas
 """
 import pygame
 import os
@@ -35,6 +36,13 @@ class Layer:
 
         # ===== OFFSETS POR TILE (pintura livre) =====
         self.tile_offsets = {}
+
+        # ===== AUTOTILE =====
+        # grid paralelo: 0 = célula normal; >0 = local_id do autotile
+        self.autotile_ids = [[0 for _ in range(width)] for _ in range(height)]
+        # metadados dos tilesets de autotile que foram adicionados a ESTA layer
+        # [{local_id, start_id, count, sheet_path, cell_size, cols, rows}]
+        self.autotile_tilesets = []
 
         self.visible = True
         self.opacity = 255
@@ -105,6 +113,10 @@ class Layer:
     # ==================================================================
     def set_tile(self, x, y, tile_id, offset=None):
         if 0 <= x < self.width and 0 <= y < self.height:
+            # Se um tile normal está sendo colocado, limpa o autotile da célula
+            if self.autotile_ids[y][x] != 0:
+                self.erase_autotile_at(x, y)
+
             try:
                 self.tiles[y][x] = int(tile_id)
             except (ValueError, TypeError):
@@ -133,6 +145,148 @@ class Layer:
             boundaries.append(len(all_tiles))
             all_tiles.extend(ts_info['tiles'])
         return all_tiles, boundaries
+
+    # ==================================================================
+    # AUTOTILE
+    # ==================================================================
+    def add_autotile_tileset(self, local_id, sheet_path, tiles,
+                             cell_size, cols=8, rows=6):
+        """
+        Adiciona os tiles do sheet de autotile ao tileset da layer.
+        IDEMPOTENTE: se o metadata já existe mas os tiles NÃO estão no
+        `tileset` (caso comum após load do JSON), re-adiciona mantendo o
+        `start_id` para não quebrar tiles já pintados.
+        """
+        existing = None
+        for info in self.autotile_tilesets:
+            if info['local_id'] == local_id:
+                existing = info
+                break
+
+        if existing is not None:
+            # Metadata existe — checa se os tiles reais estão no tileset
+            expected_end = existing['start_id'] + existing['count'] - 1
+            if len(self.tileset) >= expected_end:
+                # Tudo OK, nada a fazer
+                return existing
+
+            # Faltam tiles — re-adiciona mantendo o mesmo start_id (se possível)
+            current_len = len(self.tileset)
+            if current_len + 1 != existing['start_id']:
+                print(f"[Layer] Aviso: start_id do autotile #{local_id} "
+                      f"não bate (salvo={existing['start_id']}, "
+                      f"atual={current_len + 1}). Reajustando.")
+                existing['start_id'] = current_len + 1
+
+            self.tileset.extend(tiles)
+            existing['count'] = len(tiles)
+            self._invalidate_scaled_cache()
+            return existing
+
+        # Nova entrada
+        start_id = len(self.tileset) + 1
+        self.tileset.extend(tiles)
+        info = {
+            'local_id': local_id,
+            'start_id': start_id,
+            'count': len(tiles),
+            'sheet_path': sheet_path,
+            'cell_size': cell_size,
+            'cols': cols,
+            'rows': rows,
+        }
+        self.autotile_tilesets.append(info)
+        self._invalidate_scaled_cache()
+        return info
+
+    def find_autotile_tileset(self, local_id):
+        for info in self.autotile_tilesets:
+            if info['local_id'] == local_id:
+                return info
+        return None
+
+    def get_autotile(self, x, y):
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return self.autotile_ids[y][x]
+        return 0
+
+    def _compute_mask(self, x, y, local_id):
+        """Máscara 8-bit considerando só vizinhos do MESMO autotile."""
+        def same(nx, ny):
+            if 0 <= nx < self.width and 0 <= ny < self.height:
+                return self.autotile_ids[ny][nx] == local_id
+            return False
+
+        from src.editor.autotile_system import DIRS, canonical
+        m = 0
+        for dx, dy, bit in DIRS:
+            if same(x + dx, y + dy):
+                m |= bit
+        return canonical(m)
+
+    def _refresh_autotile_tile(self, x, y):
+        """Recalcula o tile_id da célula baseado no autotile atual."""
+        aid = self.autotile_ids[y][x]
+        if aid == 0:
+            return
+        info = self.find_autotile_tileset(aid)
+        if info is None:
+            return
+
+        from src.editor.autotile_system import MASK_TO_POS
+        mask = self._compute_mask(x, y, aid)
+        pos = MASK_TO_POS.get(mask)
+        if pos is None:
+            return
+        col, row = pos
+        local_idx = row * info['cols'] + col
+        if local_idx < 0 or local_idx >= info['count']:
+            return
+        self.tiles[y][x] = info['start_id'] + local_idx
+
+    def paint_autotile(self, x, y, local_id):
+        """Marca (x, y) e recalcula ele + 8 vizinhos."""
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            return False
+        if self.find_autotile_tileset(local_id) is None:
+            return False
+
+        self.autotile_ids[y][x] = local_id
+        self._refresh_autotile_tile(x, y)
+
+        from src.editor.autotile_system import DIRS
+        for dx, dy, _ in DIRS:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < self.width and 0 <= ny < self.height:
+                if self.autotile_ids[ny][nx] == local_id:
+                    self._refresh_autotile_tile(nx, ny)
+        return True
+
+    def erase_autotile_at(self, x, y):
+        """Remove o autotile desta célula e reajusta os vizinhos do mesmo id."""
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            return False
+        aid = self.autotile_ids[y][x]
+        if aid == 0:
+            return False
+
+        self.autotile_ids[y][x] = 0
+        self.tiles[y][x] = 0
+
+        from src.editor.autotile_system import DIRS
+        for dx, dy, _ in DIRS:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < self.width and 0 <= ny < self.height:
+                if self.autotile_ids[ny][nx] == aid:
+                    self._refresh_autotile_tile(nx, ny)
+        return True
+
+    def clear_autotile_if_any(self, x, y):
+        """Chamado quando um tile NORMAL é pintado em cima de um autotile."""
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            return
+        if self.autotile_ids[y][x] != 0:
+            self.erase_autotile_at(x, y)
 
     # ==================================================================
     # EXTRAÇÃO DE TILES (auto-detecção)
@@ -301,8 +455,15 @@ class Layer:
             if 0 <= x < new_width and 0 <= y < new_height:
                 new_offsets[(x, y)] = off
 
+        # ===== AUTOTILE: preserva o que cai no novo range =====
+        new_autotile_ids = [[0 for _ in range(new_width)] for _ in range(new_height)]
+        for y in range(min(self.height, new_height)):
+            for x in range(min(self.width, new_width)):
+                new_autotile_ids[y][x] = self.autotile_ids[y][x]
+
         self.tiles = new_tiles
         self.tile_offsets = new_offsets
+        self.autotile_ids = new_autotile_ids
         self.width = new_width
         self.height = new_height
         return True
@@ -505,6 +666,13 @@ class LayerManager:
                     for (x, y), off in layer.tile_offsets.items()
                 }
 
+            # ===== AUTOTILE (só salva se houver) =====
+            has_auto = any(any(c != 0 for c in row) for row in layer.autotile_ids)
+            if has_auto:
+                layer_dict["autotile_ids"] = layer.autotile_ids
+            if layer.autotile_tilesets:
+                layer_dict["autotile_tilesets"] = layer.autotile_tilesets
+
             if getattr(layer, 'tileset_paths', None):
                 layer_dict["tileset_paths"] = layer.tileset_paths
             elif layer.tileset_path:
@@ -572,6 +740,21 @@ class LayerManager:
                     except (ValueError, IndexError, TypeError):
                         continue
                 print(f"    Offsets: {len(layer.tile_offsets)} tiles com deslocamento")
+
+            # ===== AUTOTILE (retrocompatível) =====
+            auto_raw = layer_data.get("autotile_ids", None)
+            if auto_raw:
+                for y in range(min(layer_height, len(auto_raw))):
+                    for x in range(min(layer_width, len(auto_raw[y]))):
+                        try:
+                            layer.autotile_ids[y][x] = int(auto_raw[y][x])
+                        except (ValueError, TypeError, IndexError):
+                            layer.autotile_ids[y][x] = 0
+                count = sum(1 for row in layer.autotile_ids for c in row if c != 0)
+                print(f"    Autotiles: {count} células")
+            layer.autotile_tilesets = layer_data.get("autotile_tilesets", []) or []
+            if layer.autotile_tilesets:
+                print(f"    Autotile tilesets: {len(layer.autotile_tilesets)}")
 
             # Tilesets
             tileset_paths = []

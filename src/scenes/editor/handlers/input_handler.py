@@ -86,6 +86,9 @@ class EditorInputHandler:
             self.editor.layer_manager.current_layer = self.editor.layer_selector.selected_layer
 
             current_layer = self.editor.layer_manager.get_current_layer()
+            if current_layer:
+                self.editor._ensure_layer_has_all_autotiles(current_layer)
+
             if current_layer and current_layer.tileset:
                 all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
                 natural_cols = None
@@ -215,14 +218,24 @@ class EditorInputHandler:
                 return True
 
             # ---- PINTURA NORMAL ----
+            world_pos = self.editor.screen_manager.get_mouse_world_position(
+                mouse_pos, self.editor.camera
+            )
+
+            # O balde NÃO deve ficar em modo "painting" (senão o motion dispara
+            # flood fills repetidos e o clique original pode ser sobrescrito).
+            if brush == self.editor.brush_buttons.BRUSH_BUCKET:
+                self.painting = False
+                self.erasing = False
+                if world_pos:
+                    self.editor._handle_left_click(world_pos, continuous=False)
+                return True
+
             self.painting = True
             self.erasing = False
             self.last_paint_pos = None
             self.last_paint_time = 0
 
-            world_pos = self.editor.screen_manager.get_mouse_world_position(
-                mouse_pos, self.editor.camera
-            )
             if world_pos:
                 self.editor._handle_left_click(world_pos, continuous=False)
             return True

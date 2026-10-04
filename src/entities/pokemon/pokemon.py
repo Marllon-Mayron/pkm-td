@@ -129,13 +129,22 @@ class Pokemon(Entity):
         if is_boss:
             self.level = self.base_level + 3
             self.stats.calculate_stats()
-            self.max_hp = int(self.max_hp * 2)
-            self.current_hp = self.max_hp
-            self.defense = int(self.defense * 2)
-            self.sp_defense = int(self.sp_defense * 2)
-            self.defense_value = self._calculate_defense()
-            toast_battle(f"Um grande {self.name} chefe apareceu...", duration=4.0, pokemon=self, portrait="angry")
 
+            # ===== HP DO BOSS: multiplicador configurável =====
+            BOSS_HP_MULTIPLIER = 4  # era 2
+            self.max_hp = int(self.max_hp * BOSS_HP_MULTIPLIER)
+
+            self.current_hp = self.max_hp
+            self.defense = int(self.defense * 4)
+            self.sp_defense = int(self.sp_defense * 4)
+            self.defense_value = self._calculate_defense()
+
+            toast_battle(
+                f"Um grande {self.name} chefe apareceu...",
+                duration=4.0,
+                pokemon=self,
+                portrait="angry"
+            )
         # ===== 9. ESTADO ATUAL =====
         self.current_hp = self.max_hp
         self.xp = 0
@@ -273,7 +282,7 @@ class Pokemon(Entity):
         self.ability = None
 
         # ===== 19. ATRIBUTOS DE COMBATE =====
-        self.attack_range = 90
+        self.attack_range = 60
         self.combat_state = "idle"
         self.original_spot_x = x
         self.original_spot_y = y
@@ -287,7 +296,7 @@ class Pokemon(Entity):
             if is_boss :
                 self.charge_cooldown_max = 1.2
             else:
-                self.charge_cooldown_max = 3.0
+                self.charge_cooldown_max = 1.5
         else:
             self.charge_cooldown_max = 1.2  # 1.2 segundos para aliados
 

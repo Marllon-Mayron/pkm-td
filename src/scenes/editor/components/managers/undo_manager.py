@@ -1,4 +1,4 @@
-# src/editor/undo_manager.py
+# src/scenes/editor/components/managers/undo_manager.py
 
 """
 Gerenciador de Undo/Redo para o Editor
@@ -97,7 +97,10 @@ class UndoManager:
                 'name': layer.name,
                 'type': layer.layer_type.value,
                 'tiles': [row[:] for row in layer.tiles],
-                'tile_offsets': dict(layer.tile_offsets),  # ← ADICIONE
+                'tile_offsets': dict(layer.tile_offsets),
+                # ===== AUTOTILE =====
+                'autotile_ids': [row[:] for row in getattr(layer, 'autotile_ids', [])],
+                'autotile_tilesets': list(getattr(layer, 'autotile_tilesets', [])),
                 'tileset_paths': layer.tileset_paths.copy() if hasattr(layer, 'tileset_paths') else [],
                 'tileset_path': layer.tileset_path,
                 'width': layer.width,
@@ -134,12 +137,12 @@ class UndoManager:
         return state
 
     def _restore_state(self, editor_scene, state):
-        """Restaura um estado salvo - PRESERVANDO OS TILESETS MÚLTIPLOS E OFFSETS."""
+        """Restaura um estado salvo - PRESERVANDO OS TILESETS MÚLTIPLOS, OFFSETS E AUTOTILES."""
         try:
             print("\n[Undo] Iniciando restauração de estado...")
 
             # =========================================================
-            # RESTAURA LAYERS (tiles + offsets + tilesets)
+            # RESTAURA LAYERS (tiles + offsets + tilesets + autotiles)
             # =========================================================
             if 'layers' in state:
                 # Primeiro, guarda os tilesets atuais de cada layer (para não recarregar)
@@ -231,6 +234,25 @@ class UndoManager:
                         print(f"[Undo] Layer {i}: {len(layer.tile_offsets)} offsets restaurados")
                     else:
                         layer.tile_offsets = {}
+
+                    # ===== AUTOTILE =====
+                    if 'autotile_ids' in layer_data:
+                        try:
+                            saved = layer_data['autotile_ids']
+                            # Se a layer redimensionou, ajusta
+                            for y in range(min(len(saved), layer.height)):
+                                row = saved[y]
+                                for x in range(min(len(row), layer.width)):
+                                    try:
+                                        layer.autotile_ids[y][x] = int(row[x])
+                                    except (ValueError, TypeError):
+                                        layer.autotile_ids[y][x] = 0
+                            count = sum(1 for row in layer.autotile_ids for c in row if c != 0)
+                            print(f"[Undo] Layer {i}: {count} autotiles restaurados")
+                        except Exception as e:
+                            print(f"[Undo] Layer {i}: erro ao restaurar autotiles: {e}")
+
+                    layer.autotile_tilesets = list(layer_data.get('autotile_tilesets', []))
 
                     # ===== TILESETS =====
                     # Preserva os tilesets atuais se existirem

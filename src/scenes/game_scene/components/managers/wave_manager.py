@@ -144,8 +144,15 @@ class WaveManager:
 
     def update(self, dt: float) -> List['Pokemon']:
         """
-        Atualiza o sistema de waves
-        Retorna lista de inimigos que chegaram ao fim (para processar roubo de item)
+        Atualiza o sistema de waves.
+        Retorna lista de inimigos que chegaram ao fim (para processar roubo de item).
+
+        BOSSES (is_boss=True):
+          - NUNCA param de andar (nem pra atacar).
+          - Atacam TODOS os alvos no range enquanto se movem (estilo raid).
+          - Físicos: dano direto (sem encostar).
+          - Priorizam itens: como sempre seguem o path, capturam o que estiver
+            no caminho. Nunca ignoram o path por causa de combate.
         """
         if self.paused:
             return []
@@ -153,7 +160,6 @@ class WaveManager:
         # ===== SÓ PROCESSA SE O JOGO ESTIVER EM "in_wave" =====
         if self.game_scene.game_state != "in_wave":
             return []
-
 
         if self.game_scene and hasattr(self.game_scene, 'day_night_weather'):
             day_night = self.game_scene.day_night_weather.day_night_state
@@ -164,7 +170,9 @@ class WaveManager:
         enemies_at_end = []
         enemies_at_start = []
 
-        # 1. Spawnar novos inimigos
+        # ==================================================================
+        # 1. SPAWNAR NOVOS INIMIGOS
+        # ==================================================================
         new_enemies = self.spawner.update(dt)
         for enemy in new_enemies:
             # Garante que screen_manager está configurado
@@ -178,14 +186,18 @@ class WaveManager:
             enemy._path_tracker = self.path_tracker
 
             self.active_enemies.append(enemy)
+
             # Configura batalha para o novo inimigo
             if self.game_scene and hasattr(self.game_scene, 'battle_system'):
                 enemy.set_battle_system(self.game_scene.battle_system)
                 self.game_scene.battle_system.set_effect_manager_for_pokemon(enemy)
 
-            print(f"[WaveManager] SPAWN: {enemy.name} (BOSS={enemy.is_boss}) em ({enemy.x:.0f}, {enemy.y:.0f})")
+            print(f"[WaveManager] SPAWN: {enemy.name} (BOSS={enemy.is_boss}) "
+                  f"em ({enemy.x:.0f}, {enemy.y:.0f})")
 
-        # 2. Atualizar movimento de cada inimigo
+        # ==================================================================
+        # 2. ATUALIZAR MOVIMENTO / COMBATE DE CADA INIMIGO
+        # ==================================================================
         for enemy in self.active_enemies[:]:
             # ===== VERIFICA SE O INIMIGO ACABOU DE SPAWNAR =====
             if hasattr(enemy, '_just_spawned') and enemy._just_spawned:
@@ -205,33 +217,72 @@ class WaveManager:
             if not hasattr(enemy, 'path') or not enemy.path:
                 continue
 
-            # ===== VERIFICA SE ESTÁ PRESO NA TEIA (SPIDER WEB) =====
+            # ==================================================================
+            # SPIDER WEB — inimigo preso NÃO se move e NÃO ataca
+            # ==================================================================
             if hasattr(enemy, '_spider_web_active') and enemy._spider_web_active:
-                # Inimigo preso: NÃO se move, NÃO ataca
-                # Força a posição original (caso algo tente mover)
                 if hasattr(enemy, '_spider_web_locked_x'):
                     enemy.x = enemy._spider_web_locked_x
                     enemy.y = enemy._spider_web_locked_y
                     enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
 
-                # Apenas atualiza animação (para não congelar visualmente)
                 self._update_animation(enemy, dt)
-
-                # Decrementa o contador do Spider Web (a cada atualização, mas limitado)
-                # Na verdade, decrementamos ao tentar atacar. Aqui só mantemos
                 continue
 
-            # ===== VERIFICA SE DEVE IGNORAR O PATH (EM COMBATE) =====
+            # ==================================================================
+            # BOSS DE WAVE — comportamento especial (estilo RAID)
+            # ==================================================================
+            # - Sempre segue o path (nunca ignora, nunca para).
+            # - Ataca TODOS os alvos no range enquanto se move.
+            # - Físicos: dano direto (não encosta no alvo).
+            # - Especiais/status: projétil / efeito (sem encostar).
+            # - Captura itens no caminho (prioridade máxima).
+            # ==================================================================
+            if enemy.is_boss:
+                # Movimento SEMPRE (path_tracker pula a lógica de combate para bosses)
+                arrived_at_end, arrived_at_start = self.path_tracker.update_movement(enemy, dt)
+
+                # Combate enquanto move
+                self._update_boss_combat(enemy, dt)
+
+                # Captura de item (boss sempre no path, então pega o que estiver perto)
+                self._check_item_capture(enemy)
+
+                # ===== CHEGADA AO FIM =====
+                if arrived_at_end:
+                    print(f"[WaveManager] DETECTADO: {enemy.name} (BOSS) chegou ao FIM!")
+                    enemies_at_end.append(enemy)
+                    continue
+
+                # ===== CHEGADA AO INÍCIO =====
+                if arrived_at_start:
+                    print(f"[WaveManager] DETECTADO: {enemy.name} (BOSS) chegou ao INÍCIO!")
+                    enemies_at_start.append(enemy)
+                    continue
+
+                # ===== MORTE =====
+                if not enemy.is_alive():
+                    if not getattr(enemy, '_marked_for_removal', False):
+                        self._handle_enemy_death(enemy)
+                    continue
+
+                # ===== ANIMAÇÃO =====
+                self._update_animation(enemy, dt)
+                continue
+
+            # ==================================================================
+            # INIMIGO NORMAL — comportamento antigo
+            # ==================================================================
+
+            # Verifica se deve ignorar o path (em combate ativo com um alvo perto)
             should_skip_path = False
 
             if hasattr(enemy, 'target') and enemy.target and enemy.target.is_alive():
-                # Verifica se está perto do alvo ou atacando
                 dx = enemy.target.x - enemy.x
                 dy = enemy.target.y - enemy.y
                 distance_to_target = math.hypot(dx, dy)
                 is_attacking = hasattr(enemy, '_attack_animation_active') and enemy._attack_animation_active
 
-                # Obtém o move atual para saber o range necessário
                 current_move = None
                 if hasattr(enemy, 'get_current_move_for_pattern'):
                     current_move = enemy.get_current_move_for_pattern()
@@ -255,7 +306,7 @@ class WaveManager:
             # Atualiza movimento (NÃO interfere no combate)
             arrived_at_end, arrived_at_start = self.path_tracker.update_movement(enemy, dt)
 
-            # ===== ATUALIZA COMBATE ENQUANTO MOVE =====
+            # Atualiza combate enquanto move
             self._update_enemy_combat(enemy, dt)
 
             if arrived_at_end:
@@ -280,26 +331,158 @@ class WaveManager:
             # Atualiza animação
             self._update_animation(enemy, dt)
 
-        # 3. Processar chegadas ao FIM
+        # ==================================================================
+        # 3. PROCESSAR CHEGADAS AO FIM
+        # ==================================================================
         for enemy in enemies_at_end:
             if enemy in self.active_enemies and not getattr(enemy, '_marked_for_removal', False):
                 self._handle_arrival_at_end(enemy)
 
-        # 4. Processar chegadas ao INÍCIO
+        # ==================================================================
+        # 4. PROCESSAR CHEGADAS AO INÍCIO
+        # ==================================================================
         for enemy in enemies_at_start:
             if enemy in self.active_enemies and not getattr(enemy, '_marked_for_removal', False):
                 self._handle_arrival_at_start(enemy)
 
-        # 5. Remover inimigos marcados para remoção
+        # ==================================================================
+        # 5. REMOVER INIMIGOS MARCADOS PARA REMOÇÃO
+        # ==================================================================
         before_cleanup = len(self.active_enemies)
-        self.active_enemies = [e for e in self.active_enemies if not getattr(e, '_marked_for_removal', False)]
+        self.active_enemies = [
+            e for e in self.active_enemies
+            if not getattr(e, '_marked_for_removal', False)
+        ]
         after_cleanup = len(self.active_enemies)
 
         if before_cleanup != after_cleanup:
-            print(
-                f"[WaveManager] Limpeza: {before_cleanup - after_cleanup} inimigos removidos. Restam: {after_cleanup}")
+            print(f"[WaveManager] Limpeza: {before_cleanup - after_cleanup} "
+                  f"inimigos removidos. Restam: {after_cleanup}")
 
         return enemies_at_end
+
+    def _update_boss_combat(self, enemy: 'Pokemon', dt: float):
+        """
+        Combate do BOSS de wave:
+          - Ataca TODOS os alvos no range, SEM PARAR DE ANDAR.
+          - Físicos  = dano direto (boss não encosta).
+          - Especiais/status = dano via projétil / efeito (sem encostar).
+          - Cooldown próprio (não usa PokemonCombat.update_combat).
+          - Boss NUNCA abandona o path por causa de combate.
+        """
+        if not enemy.is_alive() or enemy.is_defeated:
+            return
+
+        # Pattern PASSIVE = não ataca
+        if hasattr(enemy, 'attack_pattern') and enemy.attack_pattern == AttackPattern.PASSIVE:
+            return
+
+        # Cooldown de ataque (boss não usa PokemonCombat.update_combat)
+        if enemy.charge_cooldown > 0:
+            enemy.charge_cooldown -= dt
+            return
+
+        # Já está em animação de ataque
+        if getattr(enemy, '_attack_animation_active', False):
+            return
+
+        # Busca aliados no range
+        if not self.game_scene or not hasattr(self.game_scene, 'placement_manager'):
+            return
+
+        placed = self.game_scene.placement_manager.placed_pokemon
+        range_sq = enemy.attack_range * enemy.attack_range
+
+        targets_in_range = []
+        for ally in placed:
+            if not ally.is_alive() or ally.is_defeated:
+                continue
+            if not getattr(ally, 'is_placed', False):
+                continue
+            dx = enemy.x - ally.x
+            dy = enemy.y - ally.y
+            if dx * dx + dy * dy <= range_sq:
+                targets_in_range.append(ally)
+
+        if not targets_in_range:
+            enemy.charge_cooldown = 0.3
+            return
+
+        # Escolhe move respeitando o pattern
+        if hasattr(enemy, 'get_current_move_for_pattern'):
+            move = enemy.get_current_move_for_pattern()
+        else:
+            move = enemy.get_current_move()
+
+        if move is None:
+            enemy.charge_cooldown = 0.5
+            return
+
+        # Aponta na direção do centro dos alvos (visual)
+        cx = sum(t.x for t in targets_in_range) / len(targets_in_range)
+        cy = sum(t.y for t in targets_in_range) / len(targets_in_range)
+        try:
+            enemy.combat._update_direction_to_target(cx - enemy.x, cy - enemy.y)
+        except Exception:
+            pass
+
+        # ===== ATACA TODOS OS ALVOS (físico E especial) =====
+        # Zera PP dos outros moves pra forçar o move escolhido
+        saved_pp = {}
+        for m in enemy.moves:
+            saved_pp[m.name] = m.current_pp
+            m.current_pp = m.max_pp if m.name == move.name else 0
+
+        hits = 0
+        try:
+            for target in targets_in_range:
+                if not target or not target.is_alive() or target.is_defeated:
+                    continue
+
+                # Reset PP do move antes de cada hit (lida com moves de baixo PP)
+                for m in enemy.moves:
+                    if m.name == move.name:
+                        m.current_pp = m.max_pp
+                        break
+
+                try:
+                    success = self.game_scene.battle_system.attempt_attack(enemy, target)
+                    if success:
+                        hits += 1
+                except Exception as e:
+                    print(f"[WAVE_BOSS] Erro ataque em {target.name}: {e}")
+        finally:
+            # Restaura PP
+            for m in enemy.moves:
+                m.current_pp = saved_pp.get(m.name, m.max_pp)
+
+        # ===== ANIMAÇÃO (uma vez, sem reaplicar dano) =====
+        try:
+            enemy.combat._start_attack_animation(targets_in_range[0], move)
+            # Marca como "dano já aplicado" para a animação não chamar
+            # _execute_attack de novo
+            enemy._damage_applied = True
+            enemy._current_multi_targets = None
+        except Exception as e:
+            print(f"[WAVE_BOSS] Erro ao animar: {e}")
+
+        enemy.charge_cooldown = enemy.charge_cooldown_max
+
+        # ===== TOAST =====
+        try:
+            from src.ui.toast_renderer import toast_battle
+            display = move.name.replace("-", " ").title()
+            toast_battle(
+                f"{enemy.name} usou {display}!",
+                duration=2.0,
+                pokemon=enemy,
+                portrait="angry",
+            )
+        except Exception:
+            pass
+
+        print(f"[WAVE_BOSS] {enemy.name} usou {move.name} em "
+              f"{hits}/{len(targets_in_range)} alvo(s) enquanto se move")
 
     def _check_item_capture(self, enemy: 'Pokemon'):
         """Verifica se o inimigo capturou um item"""

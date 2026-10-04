@@ -4,6 +4,7 @@
 Paleta de tiles do editor.
 
 Recursos:
+- Duas abas: TILES (tileset normal) e AUTOTILES (47-tile blob)
 - Grade com número de COLUNAS configurável pelo usuário (botões [−]/[+]/[A])
 - Modo single (1x1) e modo multi (seleção por arrasto, ex: árvore 3x3)
 - Suporta QUALQUER tamanho de tileset (não há mais 6x8 fixo)
@@ -17,6 +18,7 @@ import pygame
 class TilePalette:
     # Layout
     TITLE_HEIGHT = 24
+    TAB_HEIGHT = 22
     CONTROLS_HEIGHT = 26
     FOOTER_HEIGHT = 40
 
@@ -85,13 +87,26 @@ class TilePalette:
         self.left_button_rect = pygame.Rect(0, 0, 0, 0)
         self.right_button_rect = pygame.Rect(0, 0, 0, 0)
 
+        # ===== ABAS =====
+        self.active_tab = "tiles"        # "tiles" | "autotiles"
+        self.tab_tiles_rect = pygame.Rect(0, 0, 0, 0)
+        self.tab_auto_rect = pygame.Rect(0, 0, 0, 0)
+
+        # ===== AUTOTILE =====
+        self.autotile_manager = None
+        self.selected_autotile_id = 0    # local_id
+        self.autotile_scroll = 0
+        self.autotile_max_scroll = 0
+        self.autotile_cell_size = 32
+        self.autotile_cols = 4
+
         self._update_button_positions()
 
     # =========================================================
     # LAYOUT
     # =========================================================
     def _header_height(self):
-        return self.TITLE_HEIGHT + self.CONTROLS_HEIGHT
+        return self.TITLE_HEIGHT + self.TAB_HEIGHT + self.CONTROLS_HEIGHT
 
     def _grid_rect(self):
         return pygame.Rect(
@@ -102,7 +117,15 @@ class TilePalette:
         )
 
     def _update_button_positions(self):
-        y = self.rect.y + self.TITLE_HEIGHT + 2
+        # ===== Abas =====
+        tab_y = self.rect.y + self.TITLE_HEIGHT
+        tab_h = self.TAB_HEIGHT - 2
+        half_w = (self.rect.width - 12) // 2
+        self.tab_tiles_rect = pygame.Rect(self.rect.x + 4, tab_y, half_w, tab_h)
+        self.tab_auto_rect = pygame.Rect(self.rect.x + 8 + half_w, tab_y, half_w, tab_h)
+
+        # ===== Controles (linha abaixo das abas) =====
+        y = self.rect.y + self.TITLE_HEIGHT + self.TAB_HEIGHT + 2
         h = self.CONTROLS_HEIGHT - 4
         x = self.rect.x + 6
 
@@ -125,11 +148,29 @@ class TilePalette:
         self.clear_sel_rect = pygame.Rect(x, y, 22, h)
 
     # =========================================================
+    # ABAS
+    # =========================================================
+    def get_active_tab(self):
+        return self.active_tab
+
+    def set_autotile_manager(self, mgr):
+        self.autotile_manager = mgr
+        self._update_autotile_scroll()
+
+    def _update_autotile_scroll(self):
+        if not self.autotile_manager:
+            self.autotile_max_scroll = 0
+            return
+        n = len(self.autotile_manager.sheets)
+        rows = (n + self.autotile_cols - 1) // self.autotile_cols
+        content_h = rows * (self.autotile_cell_size + 6)
+        self.autotile_max_scroll = max(0, content_h - self._grid_rect().height)
+        self.autotile_scroll = max(0, min(self.autotile_scroll, self.autotile_max_scroll))
+
+    # =========================================================
     # TILESET
     # =========================================================
     def set_tileset(self, tileset, tileset_boundaries=None, natural_cols=None):
-        print(f"\n[TilePalette.set_tileset] {len(tileset)} tiles, "
-              f"boundaries={tileset_boundaries}, natural_cols={natural_cols}")
 
         self.tiles = tileset
         self.tileset_boundaries = tileset_boundaries or []
@@ -173,6 +214,77 @@ class TilePalette:
 
         mouse_x, mouse_y = pygame.mouse.get_pos()
         self.focused = self.rect.collidepoint(mouse_x, mouse_y)
+
+        # ===== CLIQUES NAS ABAS =====
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.tab_tiles_rect.collidepoint(mouse_x, mouse_y):
+                self.active_tab = "tiles"
+                return True
+            if self.tab_auto_rect.collidepoint(mouse_x, mouse_y):
+                self.active_tab = "autotiles"
+                self._update_autotile_scroll()
+                return True
+
+        # ===== ABA AUTOTILES: scroll + seleção =====
+        if self.active_tab == "autotiles":
+            if event.type == pygame.MOUSEBUTTONDOWN and self.focused:
+                if event.button == 4:
+                    self.autotile_scroll = max(0, self.autotile_scroll - 24)
+                    return True
+                if event.button == 5:
+                    self.autotile_scroll = min(self.autotile_max_scroll,
+                                                self.autotile_scroll + 24)
+                    return True
+
+            # Clique na grade de autotiles
+            if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                    and self._grid_rect().collidepoint(mouse_x, mouse_y)):
+                grid = self._grid_rect()
+                local_x = mouse_x - grid.x
+                local_y = mouse_y - grid.y + self.autotile_scroll
+                cell = self.autotile_cell_size + 6
+                col = local_x // cell
+                row = local_y // cell
+                idx = row * self.autotile_cols + col
+                if 0 <= col < self.autotile_cols and self.autotile_manager:
+                    ids = self.autotile_manager.list_ids()
+                    if 0 <= idx < len(ids):
+                        self.selected_autotile_id = ids[idx]
+                        return True
+
+            # Arrastar / resize continuam válidos nas abas
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # resize pelo canto
+                if (self.rect.right - self.resize_margin <= mouse_x <= self.rect.right + self.resize_margin and
+                        self.rect.bottom - self.resize_margin <= mouse_y <= self.rect.bottom + self.resize_margin):
+                    self.resizing = True
+                    return True
+                # arrastar pela barra de título
+                title_rect = pygame.Rect(self.rect.x, self.rect.y, self.rect.width, self.TITLE_HEIGHT)
+                if title_rect.collidepoint(mouse_x, mouse_y):
+                    self.dragging = True
+                    self.drag_start_x = mouse_x - self.rect.x
+                    self.drag_start_y = mouse_y - self.rect.y
+                    return True
+
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                self.resizing = False
+                self.dragging = False
+
+            if event.type == pygame.MOUSEMOTION:
+                if self.resizing:
+                    self.rect.width = max(self.min_width, mouse_x - self.rect.x)
+                    self.rect.height = max(self.min_height, mouse_y - self.rect.y)
+                    self._update_button_positions()
+                    return True
+                if self.dragging:
+                    self.rect.x = mouse_x - self.drag_start_x
+                    self.rect.y = mouse_y - self.drag_start_y
+                    self._update_button_positions()
+                    return True
+            return False
+
+        # ===== ABA TILES: comportamento original =====
         self._update_control_hover(mouse_x, mouse_y)
 
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -459,12 +571,18 @@ class TilePalette:
             return
         self._render_background(screen)
         self._render_title(screen)
-        self._render_controls(screen)
-        self._render_tiles(screen)
-        self._render_selection_overlay(screen)
-        self._render_scrollbar(screen)
+        self._render_tabs(screen)
+
+        if self.active_tab == "tiles":
+            self._render_controls(screen)
+            self._render_tiles(screen)
+            self._render_selection_overlay(screen)
+            self._render_scrollbar(screen)
+            self._render_footer(screen)
+        else:
+            self._render_autotiles(screen)
+
         self._render_resize_handle(screen)
-        self._render_footer(screen)
 
     def _render_background(self, screen):
         shadow = self.rect.copy()
@@ -490,9 +608,84 @@ class TilePalette:
         info_surf = font.render(info, True, (200, 200, 200))
         screen.blit(info_surf, (self.rect.x + 55, self.rect.y + 4))
 
+    def _render_tabs(self, screen):
+        font = pygame.font.Font(None, 15)
+        for rect, label, key in (
+            (self.tab_tiles_rect, "TILES", "tiles"),
+            (self.tab_auto_rect,  "AUTOTILES", "autotiles"),
+        ):
+            active = (self.active_tab == key)
+            bg = (100, 150, 200) if active else (50, 55, 70)
+            border = (200, 220, 255) if active else (90, 95, 110)
+            pygame.draw.rect(screen, bg, rect, border_radius=4)
+            pygame.draw.rect(screen, border, rect, 1, border_radius=4)
+            t = font.render(label, True, (255, 255, 255))
+            screen.blit(t, t.get_rect(center=rect.center))
+
+    def _render_autotiles(self, screen):
+        if not self.autotile_manager or not self.autotile_manager.sheets:
+            font = pygame.font.Font(None, 16)
+            msg = font.render("Nenhum autotile carregado", True, (200, 200, 200))
+            screen.blit(msg, msg.get_rect(center=self._grid_rect().center))
+            return
+
+        grid = self._grid_rect()
+        old_clip = screen.get_clip()
+        screen.set_clip(grid)
+
+        cell = self.autotile_cell_size
+        gap = 6
+        step = cell + gap
+        ids = self.autotile_manager.list_ids()
+
+        font = pygame.font.Font(None, 13)
+        for i, local_id in enumerate(ids):
+            col = i % self.autotile_cols
+            row = i // self.autotile_cols
+            x = grid.x + col * step + gap // 2
+            y = grid.y + row * step - self.autotile_scroll + gap // 2
+
+            if y + cell < grid.y or y > grid.bottom:
+                continue
+            if x + cell < grid.x or x > grid.right:
+                continue
+
+            # Preview
+            preview = self.autotile_manager.preview(local_id, cell)
+            pygame.draw.rect(screen, (30, 32, 42), (x - 2, y - 2, cell + 4, cell + 4))
+
+            if local_id == self.selected_autotile_id:
+                pygame.draw.rect(screen, (255, 215, 0),
+                                 (x - 3, y - 3, cell + 6, cell + 6), 2)
+            else:
+                pygame.draw.rect(screen, (90, 95, 110),
+                                 (x - 2, y - 2, cell + 4, cell + 4), 1)
+
+            screen.blit(preview, (x, y))
+
+            # Número do local_id
+            label = str(local_id)
+            t = font.render(label, True, (255, 255, 255))
+            bg = pygame.Surface((t.get_width() + 4, t.get_height() + 2), pygame.SRCALPHA)
+            bg.fill((0, 0, 0, 180))
+            screen.blit(bg, (x + 1, y + 1))
+            screen.blit(t, (x + 3, y + 2))
+
+        screen.set_clip(old_clip)
+
+        # Scrollbar
+        if self.autotile_max_scroll > 0:
+            ratio = self.autotile_scroll / self.autotile_max_scroll
+            sb_h = max(20, int(grid.height * 0.4))
+            sb_y = grid.y + int((grid.height - sb_h) * ratio)
+            pygame.draw.rect(screen, (70, 70, 80),
+                             (grid.right - 6, grid.y, 4, grid.height))
+            pygame.draw.rect(screen, (150, 150, 160),
+                             (grid.right - 6, sb_y, 4, sb_h))
+
     def _render_controls(self, screen):
         font = pygame.font.Font(None, 14)
-        y = self.rect.y + self.TITLE_HEIGHT + 2
+        y = self.rect.y + self.TITLE_HEIGHT + self.TAB_HEIGHT + 2
 
         lbl = font.render("Cols:", True, (200, 200, 200))
         screen.blit(lbl, (self.cols_label_x, y + 4))

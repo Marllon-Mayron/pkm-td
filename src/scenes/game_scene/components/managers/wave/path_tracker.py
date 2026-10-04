@@ -19,9 +19,7 @@ class PathTracker:
     """
     Gerencia o movimento de inimigos ao longo de um path.
     """
-
-    PROXIMITY_THRESHOLD = 15.0
-    ARRIVAL_THRESHOLD = 10.0
+    ARRIVAL_THRESHOLD = 8.0
 
     def __init__(self):
         self.paths: Dict[int, Path] = {}
@@ -106,146 +104,126 @@ class PathTracker:
         """
         Atualiza movimento do inimigo.
         Retorna (arrived_at_end, arrived_at_start)
+
+        BOSSES:
+          - NUNCA ignoram o path.
+          - NUNCA abandonam alvo.
+          - NUNCA param em combate.
+          - Sempre seguem o path até o fim/início, capturando itens no caminho.
+          O combate do boss é tratado separadamente em WaveManager._update_boss_combat.
         """
         state = self._enemy_state.get(id(enemy))
         if not state:
             return False, False
 
-        # ===== VERIFICA SE O ALVO AINDA ESTÁ VÁLIDO =====
-        if hasattr(enemy, 'target') and enemy.target:
-            # Verifica se o alvo ainda está vivo
-            if not enemy.target.is_alive() or enemy.target.is_defeated:
-                print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} morreu! Abandonando.")
+        is_boss = getattr(enemy, 'is_boss', False)
+
+        # ===== BOSS: PULA LÓGICA DE COMBATE =====
+        if not is_boss:
+            if hasattr(enemy, 'target') and enemy.target:
+                if not enemy.target.is_alive() or enemy.target.is_defeated:
+                    enemy.target = None
+                    state['ignore_path_timer'] = 0.0
+                    state['combat_target'] = None
+                    enemy.combat_state = "idle"
+                    return False, False
+
+                if not hasattr(enemy.target, 'is_placed') or not enemy.target.is_placed:
+                    enemy.target = None
+                    state['ignore_path_timer'] = 0.0
+                    state['combat_target'] = None
+                    return False, False
+
+                if hasattr(enemy.target, '_marked_for_removal') and enemy.target._marked_for_removal:
+                    enemy.target = None
+                    state['ignore_path_timer'] = 0.0
+                    state['combat_target'] = None
+                    return False, False
+
+            should_abandon_target = False
+
+            if hasattr(enemy, 'target') and enemy.target:
+                dx = enemy.target.x - enemy.x
+                dy = enemy.target.y - enemy.y
+                distance_to_target = math.hypot(dx, dy)
+
+                current_move = None
+                if hasattr(enemy, 'get_current_move_for_pattern'):
+                    current_move = enemy.get_current_move_for_pattern()
+                elif hasattr(enemy, 'get_current_move'):
+                    current_move = enemy.get_current_move()
+
+                if current_move and current_move.category == "physical":
+                    max_range = 50
+                else:
+                    max_range = enemy.attack_range * 2
+
+                if distance_to_target > max_range:
+                    should_abandon_target = True
+                    print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} muito longe "
+                          f"({distance_to_target:.0f} > {max_range:.0f})! Abandonando perseguição.")
+
+                if hasattr(enemy, '_attack_attempts') and enemy._attack_attempts > 5:
+                    should_abandon_target = True
+                    print(f"[PathTracker] {enemy.name}: muitas tentativas de ataque sem sucesso! Abandonando.")
+                    enemy._attack_attempts = 0
+
+            if should_abandon_target:
                 enemy.target = None
                 state['ignore_path_timer'] = 0.0
                 state['combat_target'] = None
                 enemy.combat_state = "idle"
+                if hasattr(enemy, '_attack_attempts'):
+                    enemy._attack_attempts = 0
                 return False, False
 
-            # Verifica se o alvo ainda está no mapa (is_placed)
-            if not hasattr(enemy.target, 'is_placed') or not enemy.target.is_placed:
-                print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} não está mais no mapa! Abandonando.")
-                enemy.target = None
-                state['ignore_path_timer'] = 0.0
-                state['combat_target'] = None
-                return False, False
+            is_in_combat = False
 
-            # Verifica se o alvo está marcado para remoção
-            if hasattr(enemy.target, '_marked_for_removal') and enemy.target._marked_for_removal:
-                print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} marcado para remoção! Abandonando.")
-                enemy.target = None
-                state['ignore_path_timer'] = 0.0
-                state['combat_target'] = None
-                return False, False
+            if hasattr(enemy, 'target') and enemy.target and enemy.target.is_alive():
+                is_in_combat = True
 
-        # ===== VERIFICA SE O INIMIGO DEVE PARAR DE SEGUIR O ALVO =====
-        should_abandon_target = False
+                dx = enemy.target.x - enemy.x
+                dy = enemy.target.y - enemy.y
+                distance_to_target = math.hypot(dx, dy)
 
-        if hasattr(enemy, 'target') and enemy.target:
-            # Calcula distância até o alvo
-            dx = enemy.target.x - enemy.x
-            dy = enemy.target.y - enemy.y
-            distance_to_target = math.hypot(dx, dy)
+                current_move = None
+                if hasattr(enemy, 'get_current_move_for_pattern'):
+                    current_move = enemy.get_current_move_for_pattern()
+                elif hasattr(enemy, 'get_current_move'):
+                    current_move = enemy.get_current_move()
 
-            # Obtém o move atual para saber o range necessário
-            current_move = None
-            if hasattr(enemy, 'get_current_move_for_pattern'):
-                current_move = enemy.get_current_move_for_pattern()
-            elif hasattr(enemy, 'get_current_move'):
-                current_move = enemy.get_current_move()
+                if current_move and current_move.category == "physical":
+                    required_range = 25
+                else:
+                    required_range = enemy.attack_range
 
-            # Define o range máximo para considerar o alvo válido (2x o range de ataque)
-            if current_move and current_move.category == "physical":
-                max_range = 50  # Para físicos, range máximo é 50
-            else:
-                max_range = enemy.attack_range * 2  # Para especiais/status, 2x o range
+                is_attacking = hasattr(enemy, '_attack_animation_active') and enemy._attack_animation_active
 
-            # Se o alvo está muito longe, abandona
-            if distance_to_target > max_range:
-                should_abandon_target = True
-                print(f"[PathTracker] {enemy.name}: alvo {enemy.target.name} muito longe "
-                      f"({distance_to_target:.0f} > {max_range:.0f})! Abandonando perseguição.")
+                if distance_to_target < required_range or is_attacking:
+                    state['ignore_path_timer'] = max(state['ignore_path_timer'], 0.5)
+                    state['combat_target'] = enemy.target
+                else:
+                    state['ignore_path_timer'] = 0.0
+                    enemy.target = None
+                    is_in_combat = False
 
-            # Se tentou atacar muitas vezes sem sucesso, abandona
-            if hasattr(enemy, '_attack_attempts') and enemy._attack_attempts > 5:
-                should_abandon_target = True
-                print(f"[PathTracker] {enemy.name}: muitas tentativas de ataque sem sucesso! Abandonando.")
-                enemy._attack_attempts = 0
-
-        # Se deve abandonar o alvo, limpa o target e reseta o timer
-        if should_abandon_target:
-            enemy.target = None
-            state['ignore_path_timer'] = 0.0
-            state['combat_target'] = None
-            enemy.combat_state = "idle"
-            if hasattr(enemy, '_attack_attempts'):
-                enemy._attack_attempts = 0
-            print(f"[PathTracker] {enemy.name}: voltando ao path normal!")
-            return False, False
-
-        # ===== VERIFICA SE DEVE IGNORAR O PATH (EM COMBATE ATIVO) =====
-        is_in_combat = False
-
-        # Verifica se o inimigo tem um alvo de combate válido
-        if hasattr(enemy, 'target') and enemy.target and enemy.target.is_alive():
-            is_in_combat = True
-
-            # Calcula distância até o alvo
-            dx = enemy.target.x - enemy.x
-            dy = enemy.target.y - enemy.y
-            distance_to_target = math.hypot(dx, dy)
-
-            # Obtém o move atual para saber o range necessário
-            current_move = None
-            if hasattr(enemy, 'get_current_move_for_pattern'):
-                current_move = enemy.get_current_move_for_pattern()
-            elif hasattr(enemy, 'get_current_move'):
-                current_move = enemy.get_current_move()
-
-            # Define o range de ataque baseado no tipo de move
-            if current_move and current_move.category == "physical":
-                required_range = 25  # Distância para ataque físico
-            else:
-                required_range = enemy.attack_range
-
-            # Se está perto do alvo (dentro do range) ou em animação de ataque, ignora o path
-            is_attacking = hasattr(enemy, '_attack_animation_active') and enemy._attack_animation_active
-
-            if distance_to_target < required_range or is_attacking:
-                # Mantém ou aumenta o tempo de ignorar path
-                state['ignore_path_timer'] = max(state['ignore_path_timer'], 0.5)
-                state['combat_target'] = enemy.target
-            else:
-                # Alvo está longe, não vale a pena perseguir
-                state['ignore_path_timer'] = 0.0
-                target_name = enemy.target.name if enemy.target else "None"
-                print(
-                    f"[PathTracker] {enemy.name}: alvo {target_name} está longe ({distance_to_target:.0f}), voltando ao path.")
-                enemy.target = None
-                is_in_combat = False
-
-        # Atualiza o timer de ignorar path
-        if state['ignore_path_timer'] > 0:
-            state['ignore_path_timer'] -= dt
-
-            # Se ainda está ignorando path, NÃO processa movimento do path
             if state['ignore_path_timer'] > 0:
-                return False, False
+                state['ignore_path_timer'] -= dt
+                if state['ignore_path_timer'] > 0:
+                    return False, False
 
-        # Se chegou aqui, NÃO está ignorando path
-        # Limpa o alvo se ainda existir (pois não estamos mais em combate)
-        if enemy.target:
-            print(f"[PathTracker] {enemy.name}: saindo do modo combate, limpando alvo {enemy.target.name}")
-            enemy.target = None
-            enemy.combat_state = "idle"
+            if enemy.target:
+                enemy.target = None
+                enemy.combat_state = "idle"
 
-        state['combat_target'] = None
+            state['combat_target'] = None
 
-        # Cooldown de spawn
+        # ==================================================================
+        # MOVIMENTO PELO PATH
+        # ==================================================================
         if state['spawn_cooldown'] > 0:
             state['spawn_cooldown'] -= dt
 
-        # Verifica status que impedem movimento (paralisia, sono, congelamento)
         if hasattr(enemy, 'combat') and enemy.combat.is_frozen():
             if enemy.combat.update_freeze(dt):
                 return False, False
@@ -261,27 +239,29 @@ class PathTracker:
         if not enemy.path or len(enemy.path) == 0:
             return False, False
 
-        # Cooldowns
         if state['arrival_cooldown'] > 0:
             state['arrival_cooldown'] -= dt
 
         if state['just_reversed_cooldown'] > 0:
             state['just_reversed_cooldown'] -= dt
 
-        # Garante que o path_index está dentro dos limites
         if enemy.path_index < 0:
             enemy.path_index = 0
         if enemy.path_index >= len(enemy.path):
             enemy.path_index = len(enemy.path) - 1
 
-        # Verifica se está no primeiro ponto (INÍCIO)
+        # ===== THRESHOLD ADAPTATIVO (PATCH B) =====
+        step_size = enemy.move_speed * dt * 60
+        arrival_threshold = max(self.ARRIVAL_THRESHOLD, step_size * 1.5)
+
+        # ===== CHEGOU AO INÍCIO (index 0) =====
         if enemy.path_index == 0:
             target_x, target_y = enemy.path[enemy.path_index]
             dx = target_x - enemy.x
             dy = target_y - enemy.y
             dist_to_start = math.hypot(dx, dy)
 
-            if dist_to_start < self.ARRIVAL_THRESHOLD:
+            if dist_to_start < arrival_threshold:  # <-- PATCH
                 if state['spawn_cooldown'] <= 0 and state['just_reversed_cooldown'] <= 0:
                     if not state['has_reached_start'] and state['arrival_cooldown'] <= 0:
                         state['has_reached_start'] = True
@@ -289,14 +269,14 @@ class PathTracker:
                         print(f"[PathTracker] {enemy.name} chegou ao INÍCIO!")
                         return False, True
 
-        # Verifica se está no último ponto (FIM)
+        # ===== CHEGOU AO FIM (último index) =====
         if enemy.path_index == len(enemy.path) - 1:
             target_x, target_y = enemy.path[enemy.path_index]
             dx = target_x - enemy.x
             dy = target_y - enemy.y
             dist_to_end = math.hypot(dx, dy)
 
-            if dist_to_end < self.ARRIVAL_THRESHOLD:
+            if dist_to_end < arrival_threshold:  # <-- PATCH
                 if state['spawn_cooldown'] <= 0 and state['just_reversed_cooldown'] <= 0:
                     if not state['has_reached_end'] and state['arrival_cooldown'] <= 0:
                         state['has_reached_end'] = True
@@ -304,6 +284,7 @@ class PathTracker:
                         print(f"[PathTracker] {enemy.name} chegou ao FIM!")
                         return True, False
 
+        # ===== MOVIMENTO PADRÃO =====
         target_x, target_y = enemy.path[enemy.path_index]
         dx = target_x - enemy.x
         dy = target_y - enemy.y
@@ -311,18 +292,17 @@ class PathTracker:
         move_distance = enemy.move_speed * dt * 60
 
         if distance <= move_distance:
-            # Chegou ao ponto
             enemy.x, enemy.y = target_x, target_y
             enemy.rect.x, enemy.rect.y = enemy.x, enemy.y
 
-            # Avança para o próximo ponto
             enemy.path_index += 1
 
-            move_x, move_y = target_x - state['last_pos'][0], target_y - state['last_pos'][1]
+            move_x = target_x - state['last_pos'][0]
+            move_y = target_y - state['last_pos'][1]
             state['distance_traveled'] += math.hypot(move_x, move_y)
             state['last_pos'] = (enemy.x, enemy.y)
 
-            # Verifica chegada ao FIM (depois de passar do último ponto)
+            # Passou do último nó
             if enemy.path_index >= len(enemy.path):
                 if state['spawn_cooldown'] <= 0 and state['just_reversed_cooldown'] <= 0:
                     if not state['has_reached_end'] and state['arrival_cooldown'] <= 0:
@@ -331,7 +311,7 @@ class PathTracker:
                         print(f"[PathTracker] {enemy.name} chegou ao FIM!")
                         return True, False
 
-            # Verifica chegada ao INÍCIO (depois de passar do primeiro ponto para trás)
+            # Passou do primeiro nó pra trás
             elif enemy.path_index < 0:
                 if state['spawn_cooldown'] <= 0 and state['just_reversed_cooldown'] <= 0:
                     if not state['has_reached_start'] and state['arrival_cooldown'] <= 0:
@@ -341,7 +321,6 @@ class PathTracker:
                         return False, True
 
         else:
-            # Move em direção ao ponto
             move_x = (dx / distance) * move_distance
             move_y = (dy / distance) * move_distance
             enemy.x += move_x
@@ -351,7 +330,6 @@ class PathTracker:
             state['distance_traveled'] += move_distance
             state['last_pos'] = (enemy.x, enemy.y)
 
-            # Atualiza direção baseada no movimento (8 direções)
             self._update_direction_from_movement(enemy, dx, dy)
 
         return False, False
@@ -390,23 +368,45 @@ class PathTracker:
     def reverse_direction_simple(self, enemy: 'Pokemon'):
         """
         Inverte a direção do inimigo para paths lineares.
-        O inimigo deve andar de volta pelo MESMO caminho.
+        O inimigo anda de volta pelo MESMO caminho.
+
+        CORREÇÃO:
+          Inverte `enemy.path` (path ATUAL), não `enemy.original_path`.
+          Antes, cada chamada partia sempre do original e dava o mesmo
+          resultado após a 1ª inversão — o boss "pulava" de nó na 2ª
+          chegada (bug de sair da rota).
+
+          Além disso, encontra o nó mais próximo da posição REAL do boss
+          no novo path, evitando teleportes visuais se ele não estiver
+          exatamente em um nó.
         """
-        if not enemy.original_path:
-            print(f"[PathTracker] {enemy.name} não tem original_path!")
+        if not enemy.path:
+            print(f"[PathTracker] {enemy.name} não tem path para reverter!")
             return
 
         state = self._enemy_state.get(id(enemy))
         if not state:
             return
 
-        original = enemy.original_path.copy()
-        enemy.path = list(reversed(original))
+        # ===== INVERTE O PATH ATUAL =====
+        current = list(enemy.path)
+        enemy.path = list(reversed(current))
 
-        if len(enemy.path) > 1:
-            enemy.path_index = 1
+        # ===== ENCONTRA O NÓ MAIS PRÓXIMO DA POSIÇÃO ATUAL =====
+        current_x, current_y = enemy.x, enemy.y
+        min_dist = float('inf')
+        closest_idx = 0
+        for i, point in enumerate(enemy.path):
+            dist = math.hypot(current_x - point[0], current_y - point[1])
+            if dist < min_dist:
+                min_dist = dist
+                closest_idx = i
+
+        # Avança um passo para não ficar preso no nó atual
+        if closest_idx + 1 < len(enemy.path):
+            enemy.path_index = closest_idx + 1
         else:
-            enemy.path_index = 0
+            enemy.path_index = closest_idx
 
         state['has_reached_start'] = False
         state['has_reached_end'] = False
@@ -420,15 +420,20 @@ class PathTracker:
         enemy._reverse_timer = 0.0
 
         direction = "FIM → INÍCIO" if not state['is_reversed'] else "INÍCIO → FIM"
-        print(f"[PathTracker] {enemy.name} inverteu direção. Agora: {direction}")
+        print(f"[PathTracker] {enemy.name} inverteu direção. Agora: {direction} "
+              f"(index {enemy.path_index}/{len(enemy.path) - 1})")
 
     def reverse_path(self, enemy: 'Pokemon'):
         """
         Inverte o path do inimigo (para andar de volta pelo mesmo caminho).
-        SEM TELEPORTE - mantém a posição atual e apenas inverte a direção.
+        SEM TELEPORTE — mantém a posição atual e apenas inverte a direção.
+
+        CORREÇÃO: usa `enemy.path` (path atual), para funcionar corretamente
+        quando o boss já inverteu uma vez (ex: chegou ao fim e capturou item
+        no caminho de volta).
         """
-        if not enemy.original_path:
-            print(f"[PathTracker] {enemy.name} não tem original_path para reverter!")
+        if not enemy.path:
+            print(f"[PathTracker] {enemy.name} não tem path para reverter!")
             return
 
         state = self._enemy_state.get(id(enemy))
@@ -436,9 +441,10 @@ class PathTracker:
             print(f"[PathTracker] {enemy.name} não tem estado para reverter!")
             return
 
-        reversed_points = list(reversed(enemy.original_path.copy()))
-        enemy.path = reversed_points
+        # ===== INVERTE O PATH ATUAL =====
+        enemy.path = list(reversed(enemy.path.copy()))
 
+        # Encontra o nó mais próximo da posição atual
         current_x, current_y = enemy.x, enemy.y
         min_dist = float('inf')
         closest_idx = 0
@@ -469,8 +475,9 @@ class PathTracker:
             enemy.path_index = 0
 
         direction = "FIM → INÍCIO" if not state['is_reversed'] else "INÍCIO → FIM"
-        print(f"[PathTracker] {enemy.name} (BOSS={enemy.is_boss}) REVERTEU PATH. Agora: {direction}. "
-              f"Pos: ({enemy.x:.0f}, {enemy.y:.0f}), path_index: {enemy.path_index}/{len(enemy.path)}")
+        print(f"[PathTracker] {enemy.name} (BOSS={enemy.is_boss}) REVERTEU PATH. "
+              f"Agora: {direction}. Pos: ({enemy.x:.0f}, {enemy.y:.0f}), "
+              f"index: {enemy.path_index}/{len(enemy.path)}")
 
     def _calculate_length(self, points: List[Tuple[float, float]]) -> float:
         length = 0.0

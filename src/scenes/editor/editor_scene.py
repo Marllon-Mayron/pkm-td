@@ -14,6 +14,8 @@ from src.editor.path_editor import Path
 from src.editor.tower_spot_editor import TowerSpotManager
 from src.editor.phase_exporter import PhaseExporter
 from src.editor.structure_manager import StructureManager
+from src.editor.autotile_system import AutotileManager
+from src.config.paths import ALL_TILES_PATH
 from src.scenes.base_scene import BaseScene
 from src.scenes.editor import WaveConfigDialog
 from src.scenes.editor.components.event_config_dialog import EventConfigDialog
@@ -73,6 +75,10 @@ class EditorScene(BaseScene):
         self.target_items = TargetItemManager()
         self.event_manager = EventManager()
         self.structure_manager = StructureManager()
+
+        # ===== AUTOTILE =====
+        self.autotile_manager = AutotileManager(ALL_TILES_PATH)
+        self.autotile_manager.load_all()
 
         # Estado do editor
         self.mode = "layers"
@@ -155,9 +161,14 @@ class EditorScene(BaseScene):
         vw = self.screen_manager.viewport_width
 
         self.tile_palette = TilePalette(vx + vw - 280, vy + 200, 260, 380)
+        self.tile_palette.set_autotile_manager(self.autotile_manager)
+
         self.layer_selector = LayerSelector(vx + 10, vy + 200, 180, 300)
         self.mode_buttons = ModeButtons(vx, vy)
         self.brush_buttons = BrushButtons(vx + 100, vy + 300)
+
+        self._ensure_all_layers_have_autotiles()
+        self._update_tile_palette_from_layer()
 
     def _add_layer_of_type(self, layer_type):
         if layer_type == LayerType.GROUND:
@@ -182,6 +193,7 @@ class EditorScene(BaseScene):
         self.layer_manager.current_layer = len(self.layer_manager.layers) - 1
         self.layer_selector.set_layers(self.layer_manager.layers)
         self.layer_selector.selected_layer = self.layer_manager.current_layer
+        self._ensure_layer_has_all_autotiles(self.layer_manager.get_current_layer())
         self._update_tile_palette_from_layer()
 
     def _remove_layer_at(self, index):
@@ -783,9 +795,54 @@ class EditorScene(BaseScene):
         self.tile_palette.set_tileset(all_tiles, boundaries, natural_cols=natural_cols)
         self.tile_palette._update_max_scroll()
 
+    def _ensure_layer_has_all_autotiles(self, layer):
+        """Garante que a layer tem os tiles de autotile tanto em metadata quanto no tileset real."""
+        if not layer or not self.autotile_manager:
+            return False
+        changed = False
+        for local_id, sheet in self.autotile_manager.by_local_id.items():
+            info = layer.find_autotile_tileset(local_id)
+
+            # Verifica se precisa adicionar
+            needs = False
+            if info is None:
+                needs = True
+            else:
+                expected_end = info['start_id'] + info['count'] - 1
+                if len(layer.tileset) < expected_end:
+                    needs = True
+
+            if needs:
+                layer.add_autotile_tileset(
+                    local_id=local_id,
+                    sheet_path=sheet.path,
+                    tiles=sheet.tiles,
+                    cell_size=sheet.cell_size,
+                    cols=sheet.cols,
+                    rows=sheet.rows,
+                )
+                changed = True
+
+        if changed:
+            print(f"[Editor] Layer '{layer.name}': "
+                  f"tilesets de autotile sincronizados "
+                  f"(tileset agora tem {len(layer.tileset)} tiles)")
+        return changed
+
+    def _ensure_all_layers_have_autotiles(self):
+        """Garante que TODAS as layers têm os tilesets de autotile registrados."""
+        if not self.autotile_manager:
+            return
+        for lyr in self.layer_manager.layers:
+            self._ensure_layer_has_all_autotiles(lyr)
+
     def _update_tile_palette_from_layer(self):
         current_layer = self.layer_manager.get_current_layer()
-        if not current_layer or not current_layer.tileset:
+        if not current_layer:
+            return
+        # Garante que todos os autotiles estão no tileset da layer
+        self._ensure_layer_has_all_autotiles(current_layer)
+        if not current_layer.tileset:
             return
         all_tiles, boundaries = current_layer.get_all_tiles_with_boundaries()
         natural_cols = current_layer.tilesets[0].get('cols', 6) if current_layer.tilesets else None
@@ -902,6 +959,10 @@ class EditorScene(BaseScene):
             self.phase_name = phase_data.get("name", f"Fase {chapter}-{phase_number}")
             self.current_chapter = chapter
             self.current_phase = phase_number
+
+            # ===== AUTOTILE: sincroniza em todas as layers carregadas =====
+            for lyr in self.layer_manager.layers:
+                self._ensure_layer_has_all_autotiles(lyr)
 
             cur = self.layer_manager.get_current_layer()
             if cur and cur.tileset:

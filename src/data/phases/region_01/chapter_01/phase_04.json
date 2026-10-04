@@ -228,7 +228,7 @@
                         2,
                         2,
                         162,
-                        2,
+                        163,
                         164,
                         2,
                         2,
@@ -247,7 +247,7 @@
                         2,
                         7,
                         162,
-                        2,
+                        163,
                         164,
                         2,
                         2,
@@ -266,7 +266,7 @@
                         2,
                         2,
                         162,
-                        2,
+                        163,
                         164,
                         2,
                         178,
@@ -285,7 +285,7 @@
                         7,
                         2,
                         162,
-                        2,
+                        163,
                         165,
                         180,
                         2,
@@ -304,7 +304,7 @@
                         2,
                         2,
                         162,
-                        2,
+                        163,
                         164,
                         2,
                         177,
@@ -323,7 +323,7 @@
                         2,
                         2,
                         162,
-                        2,
+                        163,
                         164,
                         2,
                         2,
@@ -1692,7 +1692,7 @@
                         811,
                         815,
                         0,
-                        163,
+                        0,
                         0,
                         811,
                         815,
@@ -1711,7 +1711,7 @@
                         0,
                         0,
                         0,
-                        163,
+                        0,
                         0,
                         0,
                         0,
@@ -1730,7 +1730,7 @@
                         0,
                         0,
                         0,
-                        163,
+                        0,
                         0,
                         0,
                         0,
@@ -1749,26 +1749,7 @@
                         0,
                         0,
                         0,
-                        163,
                         0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0
-                    ],
-                    [
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0,
-                        163,
                         0,
                         0,
                         0,
@@ -1787,7 +1768,26 @@
                         0,
                         0,
                         0,
-                        163,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                    ],
+                    [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
                         0,
                         0,
                         0,
@@ -2887,22 +2887,69 @@
                 "path_index": 0,
                 "name": "Wave 1",
                 "enabled": true,
-                "enemies": [],
-                "min_level": 1,
-                "max_level": 5,
-                "wave_size": 10,
-                "spawn_interval": 3.0,
-                "initial_delay": 2.0,
+                "enemies": [
+                    {
+                        "pokemon_id": 13,
+                        "percentage": 5.0
+                    },
+                    {
+                        "pokemon_id": 10,
+                        "percentage": 5.0
+                    },
+                    {
+                        "pokemon_id": 16,
+                        "percentage": 45.0
+                    },
+                    {
+                        "pokemon_id": 19,
+                        "percentage": 45.0
+                    }
+                ],
+                "min_level": 4,
+                "max_level": 6,
+                "wave_size": 20,
+                "spawn_interval": 2.0,
+                "initial_delay": 5.0,
                 "repeat_wave": false,
                 "repeat_count": 1,
-                "template_id": null,
+                "template_id": "template_8797",
                 "use_variants": false,
                 "variants": []
             }
         ],
         "selected_wave": 0,
         "templates": {
-            "templates": []
+            "templates": [
+                {
+                    "template_id": "template_8797",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 13,
+                            "percentage": 5.0
+                        },
+                        {
+                            "pokemon_id": 10,
+                            "percentage": 5.0
+                        },
+                        {
+                            "pokemon_id": 16,
+                            "percentage": 45.0
+                        },
+                        {
+                            "pokemon_id": 19,
+                            "percentage": 45.0
+                        }
+                    ],
+                    "min_level": 4,
+                    "max_level": 6,
+                    "wave_size": 20,
+                    "spawn_interval": 2.0,
+                    "initial_delay": 5.0,
+                    "repeat_wave": false,
+                    "repeat_count": 1
+                }
+            ]
         }
     },
     "tower_spots": {
@@ -2963,7 +3010,48 @@
     "target_items": {
         "grid_size": 16,
         "snap_to_grid": true,
-        "items": []
+        "items": [
+            {
+                "x": 160,
+                "y": 528,
+                "item_id": 1
+            },
+            {
+                "x": 160,
+                "y": 528,
+                "item_id": 1
+            },
+            {
+                "x": 160,
+                "y": 528,
+                "item_id": 1
+            },
+            {
+                "x": 160,
+                "y": 528,
+                "item_id": 1
+            },
+            {
+                "x": 160,
+                "y": 528,
+                "item_id": 1
+            },
+            {
+                "x": 160,
+                "y": 528,
+                "item_id": 1
+            },
+            {
+                "x": 160,
+                "y": 528,
+                "item_id": 1
+            },
+            {
+                "x": 160,
+                "y": 528,
+                "item_id": 1
+            }
+        ]
     },
     "events": {
         "triggers": [],

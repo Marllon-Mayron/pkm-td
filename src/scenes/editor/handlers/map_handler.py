@@ -60,6 +60,103 @@ class MapHandler:
         return (dx, dy)
 
     # ==================================================================
+    # AUTOTILE — helpers
+    # ==================================================================
+    def _is_autotile_mode(self):
+        """True quando a paleta está na aba AUTOTILES e há um autotile selecionado."""
+        if self.editor.mode != "layers":
+            return False
+        pal = getattr(self.editor, 'tile_palette', None)
+        if not pal:
+            return False
+        if pal.get_active_tab() != "autotiles":
+            return False
+        return pal.selected_autotile_id > 0
+
+    def _get_current_autotile_id(self):
+        pal = getattr(self.editor, 'tile_palette', None)
+        return pal.selected_autotile_id if pal else 0
+
+    def _paint_autotile_at(self, tile_x, tile_y, continuous=False):
+        """Pinta um autotile numa célula (com undo controlado por célula)."""
+        layer = self.editor.layer_manager.get_current_layer()
+        if not layer:
+            print("[AUTOTILE] sem layer")
+            return
+        if not (0 <= tile_x < layer.width and 0 <= tile_y < layer.height):
+            print(f"[AUTOTILE] fora do range: ({tile_x},{tile_y}) layer={layer.width}x{layer.height}")
+            return
+
+        local_id = self._get_current_autotile_id()
+        if local_id <= 0:
+            print(f"[AUTOTILE] local_id inválido: {local_id}")
+            return
+
+        # ===== AUTOTILE: garante que a layer tem o tileset registrado =====
+        if self.editor._ensure_layer_has_all_autotiles(layer):
+            self.editor._update_tile_palette_from_layer()
+
+        # ===== DEBUG =====
+        info = layer.find_autotile_tileset(local_id)
+        if info is None:
+            return
+
+        # Se já tem o mesmo autotile aqui, nada muda
+        if layer.autotile_ids[tile_y][tile_x] == local_id:
+            return
+
+        # Undo
+        if continuous:
+            if (tile_x, tile_y) == self.last_undo_tile:
+                should = False
+            else:
+                self.last_undo_tile = (tile_x, tile_y)
+                should = True
+        else:
+            should = True
+        if should:
+            self._save_undo_state(
+                f"Autotile #{local_id} em ({tile_x},{tile_y})", continuous
+            )
+
+        result = layer.paint_autotile(tile_x, tile_y, local_id)
+
+    def _flood_fill_autotile(self, layer, start_x, start_y, local_id):
+        """Preenche a região conexa com o autotile."""
+        if not (0 <= start_x < layer.width and 0 <= start_y < layer.height):
+            print(f"[BALDE] fora do range ({start_x},{start_y})")
+            return 0
+
+        # ===== AUTOTILE: garante que a layer tem o tileset registrado =====
+        if self.editor._ensure_layer_has_all_autotiles(layer):
+            self.editor._update_tile_palette_from_layer()
+
+        target = layer.autotile_ids[start_y][start_x]
+        print(f"[BALDE] target={target} local_id={local_id}")
+
+        if target == local_id:
+            print(f"[BALDE] target == local_id — nada a fazer")
+            return 0
+
+        queue = deque()
+        queue.append((start_x, start_y))
+        processed = {(start_x, start_y)}
+        count = 0
+
+        while queue:
+            x, y = queue.popleft()
+            layer.paint_autotile(x, y, local_id)
+            count += 1
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if 0 <= nx < layer.width and 0 <= ny < layer.height:
+                    if (nx, ny) not in processed and layer.autotile_ids[ny][nx] == target:
+                        queue.append((nx, ny))
+                        processed.add((nx, ny))
+
+        print(f"[BALDE] terminou: {count} células")
+        return count
+
+    # ==================================================================
     # STAMP ATIVO (estrutura > pattern > single)
     # ==================================================================
     def _get_active_stamp(self):
@@ -99,7 +196,7 @@ class MapHandler:
         return pattern[0]['tile_id']
 
     # ==================================================================
-    # TAMANHO DO STAMP + PLANEJAMENTO DE ANCHORS (NOVO)
+    # TAMANHO DO STAMP + PLANEJAMENTO DE ANCHORS
     # ==================================================================
     def _compute_stamp_size(self, stamp_type, stamp_data):
         """
@@ -321,6 +418,24 @@ class MapHandler:
             self.cancel_shape()
             return False
 
+        # ===== SHAPE COM AUTOTILE =====
+        if self._is_autotile_mode():
+            local_id = self._get_current_autotile_id()
+            if local_id > 0:
+                # ===== AUTOTILE: garante que a layer tem o tileset registrado =====
+                if self.editor._ensure_layer_has_all_autotiles(current_layer):
+                    self.editor._update_tile_palette_from_layer()
+
+                self._save_undo_state(
+                    f"Shape {self.shape_tool} autotile #{local_id} "
+                    f"({len(raw_tiles)} células)"
+                )
+                for tx, ty in raw_tiles:
+                    if 0 <= tx < current_layer.width and 0 <= ty < current_layer.height:
+                        current_layer.paint_autotile(tx, ty, local_id)
+                self.cancel_shape()
+                return True
+
         stamp_type, stamp_data = self._get_active_stamp()
 
         # ===== Planejamento: anchors efetivamente usados (sem sobreposição) =====
@@ -477,7 +592,8 @@ class MapHandler:
         has_content = False
         for tx, ty in tiles:
             if 0 <= tx < current_layer.width and 0 <= ty < current_layer.height:
-                if current_layer.get_tile(tx, ty) != 0:
+                if (current_layer.get_tile(tx, ty) != 0
+                        or current_layer.autotile_ids[ty][tx] != 0):
                     has_content = True
                     break
         if not has_content:
@@ -499,7 +615,10 @@ class MapHandler:
 
         for tx, ty in tiles:
             if 0 <= tx < current_layer.width and 0 <= ty < current_layer.height:
-                if current_layer.get_tile(tx, ty) != 0:
+                # Se é autotile, apaga como autotile
+                if current_layer.autotile_ids[ty][tx] != 0:
+                    current_layer.erase_autotile_at(tx, ty)
+                elif current_layer.get_tile(tx, ty) != 0:
                     self.editor.layer_manager.set_tile(tx, ty, 0, offset=None)
 
     # ==================================================================
@@ -519,6 +638,12 @@ class MapHandler:
 
         brush = self.editor.brush_buttons.get_current_brush()
 
+        # ===== DEBUG TEMPORÁRIO =====
+        print(f"[CLICK] brush={brush} tile=({tile_x},{tile_y}) "
+              f"cont={continuous} mode={self.editor.mode} "
+              f"auto_mode={self._is_autotile_mode()} "
+              f"local_id={self._get_current_autotile_id()}")
+
         if brush in (self.editor.brush_buttons.BRUSH_LINE,
                      self.editor.brush_buttons.BRUSH_CIRCLE):
             return
@@ -528,6 +653,11 @@ class MapHandler:
         if self.editor.mode == "layers":
             # ===== PINCEL =====
             if brush == self.editor.brush_buttons.BRUSH_PENCIL:
+                # ===== AUTOTILE =====
+                if self._is_autotile_mode():
+                    self._paint_autotile_at(tile_x, tile_y, continuous)
+                    return
+
                 if getattr(self.editor, 'loaded_structure', None) is not None:
                     self.handle_structure_paste(world_pos, continuous=False)
                     return
@@ -572,6 +702,23 @@ class MapHandler:
 
             # ===== BALDE =====
             elif brush == self.editor.brush_buttons.BRUSH_BUCKET and not continuous:
+                print(f"[CLICK] >>> BALDE acionado")
+
+                # ===== AUTOTILE: preenche área com o mesmo autotile =====
+                if self._is_autotile_mode():
+                    local_id = self._get_current_autotile_id()
+                    print(f"[CLICK] >>> BALDE AUTOTILE #{local_id}")
+                    if local_id > 0:
+                        self._save_undo_state(
+                            f"Balde autotile #{local_id} em ({tile_x},{tile_y})"
+                        )
+                        count = self._flood_fill_autotile(
+                            current_layer, tile_x, tile_y, local_id
+                        )
+                        print(f"[CLICK] >>> BALDE pintou {count} células")
+                    return
+
+                # ===== BALDE DE TILE NORMAL =====
                 stamp_type, _ = self._get_active_stamp()
 
                 if stamp_type == 'pattern':
@@ -656,6 +803,28 @@ class MapHandler:
 
         if self.editor.mode == "layers":
             if brush == self.editor.brush_buttons.BRUSH_BUCKET:
+                # ===== AUTOTILE: remove área conexa =====
+                if self._is_autotile_mode():
+                    if 0 <= tile_x < current_layer.width and 0 <= tile_y < current_layer.height:
+                        target_aid = current_layer.autotile_ids[tile_y][tile_x]
+                        if target_aid != 0:
+                            self._save_undo_state(
+                                f"Remover área de autotile #{target_aid} em ({tile_x}, {tile_y})"
+                            )
+                            # flood fill "vazio" apaga autotile
+                            queue = deque()
+                            queue.append((tile_x, tile_y))
+                            seen = {(tile_x, tile_y)}
+                            while queue:
+                                x, y = queue.popleft()
+                                current_layer.erase_autotile_at(x, y)
+                                for nx, ny in ((x+1, y), (x-1, y), (x, y+1), (x, y-1)):
+                                    if 0 <= nx < current_layer.width and 0 <= ny < current_layer.height:
+                                        if (nx, ny) not in seen and current_layer.autotile_ids[ny][nx] == target_aid:
+                                            queue.append((nx, ny))
+                                            seen.add((nx, ny))
+                    return
+
                 if 0 <= tile_x < current_layer.width and 0 <= tile_y < current_layer.height:
                     target_tile = current_layer.get_tile(tile_x, tile_y)
                     if target_tile != 0:
@@ -674,6 +843,13 @@ class MapHandler:
                          self.editor.brush_buttons.BRUSH_CIRCLE):
                 if not (0 <= tile_x < current_layer.width
                         and 0 <= tile_y < current_layer.height):
+                    return
+                # ===== AUTOTILE =====
+                if current_layer.autotile_ids[tile_y][tile_x] != 0:
+                    self._save_undo_state(
+                        f"Remover autotile em ({tile_x}, {tile_y})", continuous
+                    )
+                    current_layer.erase_autotile_at(tile_x, tile_y)
                     return
                 if (current_layer.get_tile(tile_x, tile_y) != 0
                         or current_layer.get_tile_offset(tile_x, tile_y) != (0, 0)):

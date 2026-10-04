@@ -1072,7 +1072,7 @@
                 "nodes": [
                     [
                         120,
-                        296
+                        312
                     ],
                     [
                         120,
@@ -1080,13 +1080,30 @@
                     ],
                     [
                         120,
-                        296
+                        312
+                    ]
+                ],
+                "closed": false
+            },
+            {
+                "nodes": [
+                    [
+                        120,
+                        312
+                    ],
+                    [
+                        120,
+                        104
+                    ],
+                    [
+                        120,
+                        312
                     ]
                 ],
                 "closed": false
             }
         ],
-        "current_path_index": 0
+        "current_path_index": 1
     },
     "waves": {
         "waves": [
@@ -1095,12 +1112,39 @@
                 "path_index": 0,
                 "name": "Wave 1",
                 "enabled": true,
-                "enemies": [],
-                "min_level": 1,
-                "max_level": 5,
-                "wave_size": 10,
+                "enemies": [
+                    {
+                        "pokemon_id": 74,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 11,
+                "max_level": 11,
+                "wave_size": 1,
                 "spawn_interval": 3.0,
-                "initial_delay": 2.0,
+                "initial_delay": 6.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
+            },
+            {
+                "wave_index": 1,
+                "path_index": 1,
+                "name": "Wave 2",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 95,
+                        "percentage": 0.0
+                    }
+                ],
+                "min_level": 13,
+                "max_level": 13,
+                "wave_size": 1,
+                "spawn_interval": 3.0,
+                "initial_delay": 10.0,
                 "repeat_wave": false,
                 "repeat_count": 1,
                 "template_id": null,
@@ -1108,7 +1152,7 @@
                 "variants": []
             }
         ],
-        "selected_wave": 0,
+        "selected_wave": 1,
         "templates": {
             "templates": []
         }
