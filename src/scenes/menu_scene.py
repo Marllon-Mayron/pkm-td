@@ -7,10 +7,7 @@ Agora com abas NEWS / PREVIEW + seletor de versão + título por imagem + link d
 import pygame
 import random
 import os
-import json
-import re
 import webbrowser
-from pathlib import Path
 
 from config.paths import SPRITES_PATH, RES_PATH
 from config.news_config import get_devlog_url, get_news_title, natural_sort_key
@@ -755,6 +752,16 @@ class MenuScene(BaseScene):
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_F10 and DEBUG_MODE:
+                from src.scenes.ui.ui_editor_scene.ui_editor_scene import UIEditorScene
+                sound_manager.stop_music(fade_ms=300)
+                self.game.current_scene = UIEditorScene(self.game)
+                return
+            if event.key == pygame.K_F9:
+                from src.scenes.settings_scene.settings_scene import SettingsScene
+                sound_manager.stop_music(fade_ms=300)
+                self.game.current_scene = SettingsScene(self.game)
+                return
             if event.key == pygame.K_p:
                 self.toggle_pause()
             elif event.key == pygame.K_RETURN:

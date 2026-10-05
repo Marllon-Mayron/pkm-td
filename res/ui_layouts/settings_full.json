@@ -1,0 +1,173 @@
+{
+  "name": "settings_full",
+  "design_size": [1280, 720],
+  "widgets": [
+    {
+      "id": "bg", "type": "image", "z": 0,
+      "x": 0.5, "y": 0.5, "w": 1.0, "h": 1.0, "anchor": "c",
+      "props": { "bg_image_mode": "cover" }
+    },
+    {
+      "id": "titulo", "type": "label", "z": 1,
+      "x": 0.5, "y": 0.04, "w": 0.7, "h": 0.07, "anchor": "c",
+      "font_size": 34, "bold": true, "text_color": "#F8F8F0",
+      "props": { "text": "CONFIGURACOES", "align": "center" }
+    },
+
+    {
+      "id": "tab_main", "type": "tabpanel", "z": 2,
+      "x": 0.5, "y": 0.53, "w": 0.86, "h": 0.78, "anchor": "c",
+      "bold": true, "text_color": "#F8F8F0",
+      "fill_color": "#2A3550", "border_color": "#F8B030",
+      "props": {
+        "tabs": ["Audio", "Video", "Sobre"],
+        "current_tab": "Audio",
+        "on_change": "set_tab"
+      }
+    },
+
+    {
+      "id": "card_music", "type": "panel", "z": 3, "tab": "Audio",
+      "x": 0.10, "y": 0.28, "w": 0.30, "h": 0.34, "anchor": "tl",
+      "bold": true, "text_color": "#F8F8F0",
+      "fill_color": "#3A4060", "border_color": "#5AE0FF",
+      "border_width": 3, "border_radius": 12,
+      "props": { "title": "MUSICA" }
+    },
+    {
+      "id": "lbl_music_info", "type": "label", "z": 4, "tab": "Audio",
+      "x": 0.11, "y": 0.40, "w": 0.28, "h": 0.04, "anchor": "tl",
+      "font_size": 14, "text_color": "#B0C0E0",
+      "props": { "text": "Volume da musica de fundo.", "align": "left" }
+    },
+    {
+      "id": "sl_music", "type": "slider", "z": 4, "tab": "Audio",
+      "x": 0.11, "y": 0.46, "w": 0.28, "h": 0.04, "anchor": "tl",
+      "fill_color": "#1A2540", "border_color": "#5AE0FF",
+      "props": { "value": 0.5, "min": 0.0, "max": 1.0,
+                 "on_change": "slider_music" }
+    },
+    {
+      "id": "cb_music", "type": "checkbox", "z": 4, "tab": "Audio",
+      "x": 0.11, "y": 0.54, "w": 0.28, "h": 0.05, "anchor": "tl",
+      "bold": true, "text_color": "#F8F8F0",
+      "fill_color": "#2E88A8", "border_color": "#5AE0FF",
+      "props": { "label": "Ativar musica", "checked": true,
+                 "on_toggle": "toggle_music" }
+    },
+
+    {
+      "id": "card_sfx", "type": "panel", "z": 3, "tab": "Audio",
+      "x": 0.42, "y": 0.28, "w": 0.30, "h": 0.34, "anchor": "tl",
+      "bold": true, "text_color": "#F8F8F0",
+      "fill_color": "#3A4060", "border_color": "#80E8A0",
+      "border_width": 3, "border_radius": 12,
+      "props": { "title": "EFEITOS" }
+    },
+    {
+      "id": "lbl_sfx_info", "type": "label", "z": 4, "tab": "Audio",
+      "x": 0.43, "y": 0.40, "w": 0.28, "h": 0.04, "anchor": "tl",
+      "font_size": 14, "text_color": "#B0E0C0",
+      "props": { "text": "Cliques, batalhas e UI.", "align": "left" }
+    },
+    {
+      "id": "sl_sfx", "type": "slider", "z": 4, "tab": "Audio",
+      "x": 0.43, "y": 0.46, "w": 0.28, "h": 0.04, "anchor": "tl",
+      "fill_color": "#1A3020", "border_color": "#80E8A0",
+      "props": { "value": 0.7, "min": 0.0, "max": 1.0,
+                 "on_change": "slider_sfx" }
+    },
+    {
+      "id": "cb_sfx", "type": "checkbox", "z": 4, "tab": "Audio",
+      "x": 0.43, "y": 0.54, "w": 0.28, "h": 0.05, "anchor": "tl",
+      "bold": true, "text_color": "#F8F8F0",
+      "fill_color": "#208848", "border_color": "#80E8A0",
+      "props": { "label": "Ativar efeitos", "checked": true,
+                 "on_toggle": "toggle_sfx" }
+    },
+
+    {
+      "id": "card_amb", "type": "panel", "z": 3, "tab": "Audio",
+      "x": 0.74, "y": 0.28, "w": 0.16, "h": 0.34, "anchor": "tl",
+      "bold": true, "text_color": "#F8F8F0",
+      "fill_color": "#3A3050", "border_color": "#C090F0",
+      "border_width": 3, "border_radius": 12,
+      "props": { "title": "AMB." }
+    },
+    {
+      "id": "sl_ambient", "type": "slider", "z": 4, "tab": "Audio",
+      "x": 0.75, "y": 0.46, "w": 0.14, "h": 0.04, "anchor": "tl",
+      "fill_color": "#281840", "border_color": "#C090F0",
+      "props": { "value": 0.5, "min": 0.0, "max": 1.0,
+                 "on_change": "slider_ambient" }
+    },
+    {
+      "id": "cb_ambient", "type": "checkbox", "z": 4, "tab": "Audio",
+      "x": 0.75, "y": 0.54, "w": 0.14, "h": 0.05, "anchor": "tl",
+      "bold": true, "text_color": "#F8F8F0",
+      "fill_color": "#6A40A0", "border_color": "#C090F0",
+      "props": { "label": "Ativo", "checked": true,
+                 "on_toggle": "toggle_ambient" }
+    },
+
+    {
+      "id": "lbl_video_hdr", "type": "label", "z": 3, "tab": "Video",
+      "x": 0.5, "y": 0.32, "w": 0.6, "h": 0.05, "anchor": "c",
+      "font_size": 22, "bold": true, "text_color": "#5AE0FF",
+      "props": { "text": "AJUSTES DE VIDEO", "align": "center" }
+    },
+    {
+      "id": "cb_fullscreen", "type": "checkbox", "z": 4, "tab": "Video",
+      "x": 0.18, "y": 0.44, "w": 0.64, "h": 0.05, "anchor": "tl",
+      "bold": true, "font_size": 20, "text_color": "#F8F8F0",
+      "fill_color": "#2E4A8A", "border_color": "#5AE0FF",
+      "props": { "label": "Tela cheia (reinicia a janela)",
+                 "checked": false, "on_toggle": "toggle_fullscreen" }
+    },
+    {
+      "id": "cb_vsync", "type": "checkbox", "z": 4, "tab": "Video",
+      "x": 0.18, "y": 0.54, "w": 0.64, "h": 0.05, "anchor": "tl",
+      "bold": true, "font_size": 20, "text_color": "#F8F8F0",
+      "fill_color": "#2E4A8A", "border_color": "#5AE0FF",
+      "props": { "label": "VSync (recomendado)",
+                 "checked": true, "on_toggle": "toggle_vsync" }
+    },
+
+    {
+      "id": "btn_github", "type": "button", "z": 4, "tab": "Sobre",
+      "x": 0.5, "y": 0.42, "w": 0.32, "h": 0.08, "anchor": "c",
+      "bold": true, "font_size": 18,
+      "fill_color": "#3A2E5A", "border_color": "#B090F0",
+      "text_color": "#E0D0FF",
+      "icon": "icon_github.png",
+      "icon_position": "left",
+      "icon_size": 26,
+      "props": { "label": "Ver no GitHub", "style": "primary",
+                 "on_click": "open_github" }
+    },
+    {
+      "id": "lbl_sobre", "type": "label", "z": 4, "tab": "Sobre",
+      "x": 0.5, "y": 0.55, "w": 0.7, "h": 0.10, "anchor": "c",
+      "font_size": 15, "text_color": "#D0D8F0",
+      "props": {
+        "text": "Pokemon Tower Defense - Em desenvolvimento. Agradecemos por testar!",
+        "align": "center"
+      }
+    },
+
+    {
+      "id": "btn_voltar", "type": "button", "z": 10,
+      "x": 0.26, "y": 0.90, "w": 0.20, "h": 0.075, "anchor": "tl",
+      "bold": true, "font_size": 20,
+      "props": { "label": "VOLTAR", "style": "danger",
+                 "on_click": "go_back" }
+    },
+    {
+      "id": "btn_aplicar", "type": "button", "z": 10,
+      "x": 0.54, "y": 0.90, "w": 0.20, "h": 0.075, "anchor": "tl",
+      "bold": true, "font_size": 20,
+      "props": { "label": "APLICAR", "style": "success",
+                 "on_click": "apply" }
+    }
+  ]
+}

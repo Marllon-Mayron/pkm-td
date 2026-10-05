@@ -1,0 +1,434 @@
+{
+  "name": "settings",
+  "design_size": [
+    1280,
+    720
+  ],
+  "widgets": [
+    {
+      "id": "titulo",
+      "type": "label",
+      "z": 100,
+      "x": 0.5,
+      "y": 0.05,
+      "w": 0.6,
+      "h": 0.08,
+      "anchor": "c",
+      "font_size": 40,
+      "bold": true,
+      "text_color": "#F8F8F0",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "tab": null,
+      "props": {
+        "text": "CONFIGURACOES",
+        "align": "center"
+      }
+    },
+    {
+      "id": "tab_main",
+      "type": "tabpanel",
+      "z": 1,
+      "x": 0.5,
+      "y": 0.53,
+      "w": 0.88,
+      "h": 0.7,
+      "anchor": "c",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true,
+      "text_color": "#202028",
+      "fill_color": "#E8E8D0",
+      "border_color": "#303C60",
+      "tab": null,
+      "props": {
+        "tabs": [
+          "Audio",
+          "Atalhos"
+        ],
+        "current_tab": "Audio",
+        "on_change": "set_tab"
+      }
+    },
+    {
+      "id": "lbl_music",
+      "type": "label",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.04,
+      "y": 0.05,
+      "w": 0.22,
+      "h": 0.07,
+      "anchor": "tl",
+      "font_size": 18,
+      "bold": true,
+      "text_color": "#202028",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "text": "Musica",
+        "align": "left"
+      }
+    },
+    {
+      "id": "cb_music",
+      "type": "checkbox",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.28,
+      "y": 0.05,
+      "w": 0.2,
+      "h": 0.07,
+      "anchor": "tl",
+      "bold": false,
+      "text_color": "#202028",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "label": "Ativada",
+        "checked": true,
+        "on_toggle": "toggle_music"
+      }
+    },
+    {
+      "id": "sl_music",
+      "type": "slider",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.04,
+      "y": 0.13,
+      "w": 0.44,
+      "h": 0.06,
+      "anchor": "tl",
+      "fill_color": "#3A4560",
+      "border_color": "#202028",
+      "props": {
+        "value": 0.5,
+        "min": 0.0,
+        "max": 1.0,
+        "on_change": "slider_music"
+      }
+    },
+    {
+      "id": "lbl_sfx",
+      "type": "label",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.04,
+      "y": 0.28,
+      "w": 0.22,
+      "h": 0.07,
+      "anchor": "tl",
+      "font_size": 18,
+      "bold": true,
+      "text_color": "#202028",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "text": "Efeitos",
+        "align": "left"
+      }
+    },
+    {
+      "id": "cb_sfx",
+      "type": "checkbox",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.28,
+      "y": 0.28,
+      "w": 0.2,
+      "h": 0.07,
+      "anchor": "tl",
+      "bold": false,
+      "text_color": "#202028",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "label": "Ativos",
+        "checked": true,
+        "on_toggle": "toggle_sfx"
+      }
+    },
+    {
+      "id": "sl_sfx",
+      "type": "slider",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.04,
+      "y": 0.36,
+      "w": 0.44,
+      "h": 0.06,
+      "anchor": "tl",
+      "fill_color": "#3A4560",
+      "border_color": "#202028",
+      "props": {
+        "value": 0.7,
+        "min": 0.0,
+        "max": 1.0,
+        "on_change": "slider_sfx"
+      }
+    },
+    {
+      "id": "lbl_ambient",
+      "type": "label",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.04,
+      "y": 0.51,
+      "w": 0.22,
+      "h": 0.07,
+      "anchor": "tl",
+      "font_size": 18,
+      "bold": true,
+      "text_color": "#202028",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "text": "Ambiente",
+        "align": "left"
+      }
+    },
+    {
+      "id": "cb_ambient",
+      "type": "checkbox",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.28,
+      "y": 0.51,
+      "w": 0.2,
+      "h": 0.07,
+      "anchor": "tl",
+      "bold": false,
+      "text_color": "#202028",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "label": "Ativo",
+        "checked": true,
+        "on_toggle": "toggle_ambient"
+      }
+    },
+    {
+      "id": "sl_ambient",
+      "type": "slider",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.04,
+      "y": 0.59,
+      "w": 0.44,
+      "h": 0.06,
+      "anchor": "tl",
+      "fill_color": "#3A4560",
+      "border_color": "#202028",
+      "props": {
+        "value": 0.5,
+        "min": 0.0,
+        "max": 1.0,
+        "on_change": "slider_ambient"
+      }
+    },
+    {
+      "id": "lbl_video_hdr",
+      "type": "label",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.56,
+      "y": 0.05,
+      "w": 0.4,
+      "h": 0.07,
+      "anchor": "tl",
+      "font_size": 18,
+      "bold": true,
+      "text_color": "#202028",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "text": "Video",
+        "align": "left"
+      }
+    },
+    {
+      "id": "lbl_fullscreen",
+      "type": "label",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.5799289520426287,
+      "y": 0.1986455981941309,
+      "w": 0.23978685612788633,
+      "h": 0.06997742663656885,
+      "anchor": "tl",
+      "font_size": 16,
+      "text_color": "#202028",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "text": "Tela cheia",
+        "align": "left"
+      },
+      "bold": true
+    },
+    {
+      "id": "cb_fullscreen",
+      "type": "checkbox",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.84,
+      "y": 0.2,
+      "w": 0.14,
+      "h": 0.07,
+      "anchor": "tl",
+      "text_color": "#202028",
+      "props": {
+        "label": "",
+        "checked": false,
+        "on_toggle": "toggle_fullscreen"
+      }
+    },
+    {
+      "id": "lbl_vsync",
+      "type": "label",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.5799289520426287,
+      "y": 0.33860045146726864,
+      "w": 0.23978685612788633,
+      "h": 0.06997742663656885,
+      "anchor": "tl",
+      "font_size": 16,
+      "text_color": "#202028",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "text": "VSync",
+        "align": "left"
+      },
+      "bold": true
+    },
+    {
+      "id": "cb_vsync",
+      "type": "checkbox",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.84,
+      "y": 0.34,
+      "w": 0.14,
+      "h": 0.07,
+      "anchor": "tl",
+      "text_color": "#202028",
+      "props": {
+        "label": "",
+        "checked": true,
+        "on_toggle": "toggle_vsync"
+      }
+    },
+    {
+      "id": "lbl_video_hint",
+      "type": "label",
+      "parent_id": "tab_main",
+      "tab": "Audio",
+      "z": 2,
+      "x": 0.58,
+      "y": 0.55,
+      "w": 0.38,
+      "h": 0.2,
+      "anchor": "tl",
+      "font_size": 13,
+      "text_color": "#5A5A68",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "text": "Alteracoes de video se aplicam somente ao clicar em Aplicar.",
+        "align": "left"
+      }
+    },
+    {
+      "id": "lbl_shortcuts_title",
+      "type": "label",
+      "parent_id": "tab_main",
+      "tab": "Atalhos",
+      "z": 2,
+      "x": 0.5,
+      "y": 0.04,
+      "w": 0.6,
+      "h": 0.08,
+      "anchor": "c",
+      "font_size": 20,
+      "bold": true,
+      "text_color": "#202028",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "text": "ATALHOS DO JOGO",
+        "align": "center"
+      }
+    },
+    {
+      "id": "lst_shortcuts",
+      "type": "list",
+      "parent_id": "tab_main",
+      "tab": "Atalhos",
+      "z": 2,
+      "x": 0.05,
+      "y": 0.15,
+      "w": 0.9,
+      "h": 0.8,
+      "anchor": "tl",
+      "bold": false,
+      "text_color": "#202028",
+      "fill_color": "#F0EED8",
+      "border_color": "#B8B090",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "items": [
+          "P         - Pausar / Despausar",
+          "ESC       - Voltar / Fechar menus",
+          "TAB       - Alternar categorias",
+          "C         - Abrir / Fechar Camera",
+          "SPACE     - Tirar foto (com camera aberta)",
+          "U         - Desbloquear proxima fase (debug)",
+          "A         - Desbloquear todas as fases (debug)",
+          "CTRL+R    - Resetar progresso (debug)"
+        ]
+      }
+    },
+    {
+      "id": "btn_ok",
+      "type": "button",
+      "z": 100,
+      "x": 0.32,
+      "y": 0.94,
+      "w": 0.2,
+      "h": 0.07,
+      "anchor": "c",
+      "bold": true,
+      "font_size": 18,
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "tab": null,
+      "props": {
+        "label": "VOLTAR",
+        "style": "danger",
+        "on_click": "go_back"
+      }
+    },
+    {
+      "id": "button_10",
+      "type": "button",
+      "z": 100,
+      "x": 0.68,
+      "y": 0.94,
+      "w": 0.2,
+      "h": 0.07,
+      "anchor": "c",
+      "bold": true,
+      "font_size": 18,
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "tab": null,
+      "props": {
+        "label": "APLICAR",
+        "style": "success",
+        "on_click": "apply"
+      }
+    }
+  ]
+}
