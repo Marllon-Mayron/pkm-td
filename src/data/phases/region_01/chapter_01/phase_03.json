@@ -2061,16 +2061,6 @@
         "snap_to_grid": true,
         "spots": [
             {
-                "x": 224,
-                "y": 192,
-                "size": 16,
-                "allowed_types": [
-                    "flying",
-                    "dark",
-                    "rock"
-                ]
-            },
-            {
                 "x": 288,
                 "y": 160,
                 "size": 16,
@@ -2098,20 +2088,20 @@
                 "x": 128,
                 "y": 240,
                 "size": 16,
-                "allowed_types": [
-                    "normal",
-                    "grass",
-                    "electric",
-                    "dragon"
-                ]
+                "allowed_types": []
+            },
+            {
+                "x": 224,
+                "y": 192,
+                "size": 16,
+                "allowed_types": []
             },
             {
                 "x": 32,
                 "y": 176,
                 "size": 16,
                 "allowed_types": [
-                    "grass",
-                    "normal"
+                    "grass"
                 ]
             }
         ]

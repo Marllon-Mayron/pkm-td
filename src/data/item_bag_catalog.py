@@ -40,6 +40,7 @@ class ItemBagCatalog:
 
         self.open_sprites = {}  # Sprite aberto original
         self.open_sprites_scaled = {}  # Sprite aberto escalado
+        self._in_map_frames_cache = {}
 
         # Usa o PROJECT_ROOT e ITEMS_PATH do paths.py
         self.root_dir = PROJECT_ROOT
@@ -970,6 +971,95 @@ class ItemBagCatalog:
             return scaled
         except Exception as e:
             print(f"[ItemBagCatalog] Erro ao carregar sprite aberto {open_path}: {e}")
+            return None
+
+    def get_in_map_frames(self, item_id):
+        """
+        Carrega os frames do sprite `_IN_MAP.png` de uma pokébola.
+
+        Layout esperado (mais comum):
+            - 4 frames de 16x16 empilhados verticalmente (16x64)
+            - Ordem: closed / impact / half / open
+        Também aceita 3 frames (16x48): nesse caso mapeia
+            closed / half / open (o "impact" cai no closed).
+
+        Retorna dict: {'closed', 'impact', 'half', 'open'} ou None.
+        """
+        if item_id in self._in_map_frames_cache:
+            return self._in_map_frames_cache[item_id]
+
+        item_data = self.items.get(item_id)
+        if not item_data or item_data.get("category") != "pokeball":
+            return None
+
+        sprite_path = item_data["sprite_path"]
+        candidates = [
+            sprite_path.parent / f"{sprite_path.stem}_IN_MAP{sprite_path.suffix}",
+            sprite_path.parent / f"{sprite_path.stem}_in_map{sprite_path.suffix}",
+        ]
+
+        found = None
+        for path in candidates:
+            if path.exists():
+                found = path
+                break
+
+        if not found:
+            return None
+
+        self._ensure_pygame_ready()
+        try:
+            sheet = pygame.image.load(str(found)).convert_alpha()
+            w, h = sheet.get_size()
+
+            # Detecta o número de frames
+            # 16x64 -> 4 frames | 16x48 -> 3 frames | resto: assume 4
+            if h == 4 * w:
+                frame_count = 4
+                frame_h = w
+            elif h == 3 * w:
+                frame_count = 3
+                frame_h = w
+            elif h % 4 == 0 and h // 4 >= 8:
+                frame_count = 4
+                frame_h = h // 4
+            elif h % 3 == 0 and h // 3 >= 8:
+                frame_count = 3
+                frame_h = h // 3
+            else:
+                frame_count = 1
+                frame_h = h
+
+            def _slice(idx):
+                y0 = idx * frame_h
+                y1 = y0 + frame_h
+                if y1 > h:
+                    y1 = h
+                return sheet.subsurface((0, y0, w, y1 - y0)).copy()
+
+            frames = {}
+            if frame_count >= 4:
+                frames["closed"] = _slice(0)
+                frames["impact"] = _slice(1)
+                frames["half"] = _slice(2)
+                frames["open"] = _slice(3)
+            elif frame_count == 3:
+                frames["closed"] = _slice(0)
+                frames["half"] = _slice(1)
+                frames["open"] = _slice(2)
+                frames["impact"] = frames["closed"]  # fallback
+            else:
+                frames["closed"] = _slice(0)
+                frames["impact"] = frames["closed"]
+                frames["half"] = frames["closed"]
+                frames["open"] = frames["closed"]
+
+            self._in_map_frames_cache[item_id] = frames
+            print(f"[ItemBagCatalog] {item_id}: IN_MAP {w}x{h} → "
+                  f"{frame_count} frame(s) de {frame_h}px")
+            return frames
+        except Exception as e:
+            print(f"[ItemBagCatalog] Erro ao carregar IN_MAP: {e}")
             return None
 
     def get_item(self, item_id):

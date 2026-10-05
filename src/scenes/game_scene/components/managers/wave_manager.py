@@ -199,6 +199,9 @@ class WaveManager:
         # 2. ATUALIZAR MOVIMENTO / COMBATE DE CADA INIMIGO
         # ==================================================================
         for enemy in self.active_enemies[:]:
+            # Inimigo está sendo capturado (bola balançando) — pula tudo
+            if getattr(enemy, '_capture_hidden', False):
+                continue
             # ===== VERIFICA SE O INIMIGO ACABOU DE SPAWNAR =====
             if hasattr(enemy, '_just_spawned') and enemy._just_spawned:
                 enemy._spawn_timer -= dt

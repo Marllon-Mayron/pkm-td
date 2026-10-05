@@ -68,6 +68,8 @@ class GameScene(BaseScene):
         self.game_paused = False
         self.final_victory_overlay = None
         self._pending_final_victory_delay = None
+        self._pokemon_defeated_this_phase = False
+        self.capture_shake_animation = None
 
         self.ui_hidden = False  # True = oculta todas as UIs
 
@@ -163,6 +165,7 @@ class GameScene(BaseScene):
         self.hovered_spot = None
         self.placed_pokemon = []
         self.game_state = "waiting"
+        self._pokemon_defeated_this_phase = False
         self.between_waves_timer = 3.0
         self.show_debug = False
 
@@ -298,6 +301,8 @@ class GameScene(BaseScene):
         # Reseta os Pokémon (cura)
         for pokemon in self.player.team:
             pokemon.reset(self)
+
+        self._pokemon_defeated_this_phase = False
 
         # Se for tutorial, REDUZ o HP DEPOIS do reset
         if is_tutorial:
@@ -1203,13 +1208,15 @@ class GameScene(BaseScene):
         return True
 
     def _attempt_capture(self, enemy, item_data):
-        """Tenta capturar um Pokémon selvagem."""
+        """Tenta capturar um Pokémon selvagem (com animação de pokébola)."""
+        import random
+
         # BOSS não pode ser capturado
         if hasattr(enemy, 'is_boss') and enemy.is_boss:
-            toast_battle(f"Não é possível capturar {enemy.name}!", duration=2.0, pokemon=enemy, portrait="angry")
-            return  # Sai sem fazer nada, mas a pokébola já foi consumida
+            toast_battle(f"Não é possível capturar {enemy.name}!",
+                         duration=2.0, pokemon=enemy, portrait="angry")
+            return
 
-        # ===== ARMAZENA QUAL ITEM ESTÁ SENDO USADO PARA A CAPTURA =====
         self._last_capture_item = item_data.get("id")
 
         hp_ratio = enemy.current_hp / enemy.max_hp
@@ -1220,30 +1227,103 @@ class GameScene(BaseScene):
             "greatball": 1.5,
             "ultraball": 2.0,
             "masterball": 100.0,
-            "friendball": 1.0,  # Mesma taxa que pokeball
+            "friendball": 1.0,
         }
         multiplier = multipliers.get(item_data["id"], 1.0)
         chance = min(1.0, base_chance * multiplier)
 
-        import random
         roll = random.random()
-
         print(f"[CAPTURE] Chance: {chance:.2f}, Roll: {roll:.2f}, Item: {item_data['id']}")
 
-        # Master Ball sempre captura
+        # Decide sucesso/fracasso ANTES da animação (só pra alimentá-la)
         if item_data["id"] == "masterball":
-            self._perform_capture(enemy)
+            is_success = True
+            num_shakes = 3
+        else:
+            is_success = roll < chance
+            num_shakes = 3 if is_success else random.randint(1, 2)
+
+        self._start_capture_shake(enemy, item_data, num_shakes, is_success)
+
+    def _start_capture_shake(self, enemy, item_data, num_shakes, is_success):
+        """Inicia a animação de captura (pokébola + pokémon)."""
+        from src.scenes.game_scene.components.capture_shake_animation import (
+            CaptureShakeAnimation,
+        )
+        from src.data.item_bag_catalog import item_bag_catalog
+
+        # Carrega os frames do IN_MAP (closed/impact/half/open)
+        ball_frames = item_bag_catalog.get_in_map_frames(item_data["id"])
+
+        # Fallback: sprite normal pra todos os frames
+        if ball_frames is None:
+            single = item_bag_catalog.get_sprite(item_data["id"], scaled=True)
+            if single is None:
+                print("[CAPTURE_ANIM] sem sprite de bola — executa direto")
+                if is_success:
+                    self._perform_capture(enemy)
+                else:
+                    toast_battle(f"{enemy.name} escapou...",
+                                 duration=2.0, pokemon=enemy, portrait="angry")
+                    self._last_capture_item = None
+                return
+            ball_frames = {
+                "closed": single, "impact": single,
+                "half": single, "open": single,
+            }
+
+        # ===== USA O SPRITE ATUAL DO INIMIGO (mesmo que ele renderiza) =====
+        # É EXATAMENTE o que o inimigo mostraria no mapa, então casa 1:1.
+        pokemon_sprite = getattr(enemy, 'sprite', None)
+
+        # Fallback: se por algum motivo não tiver, pega do inmap "down" frame 0
+        if pokemon_sprite is None:
+            try:
+                from src.data.pokedex import Pokedex
+                pokedex = Pokedex()
+                inmap_frames = pokedex.get_inmap_animation(enemy.id, enemy.is_shiny)
+                if inmap_frames and "down" in inmap_frames and inmap_frames["down"]:
+                    pokemon_sprite = inmap_frames["down"][0]
+            except Exception as e:
+                print(f"[CAPTURE_ANIM] Não consegui pegar in-map sprite: {e}")
+
+        if pokemon_sprite is None:
+            print("[CAPTURE_ANIM] sem sprite de pokémon — executa direto")
+            if is_success:
+                self._perform_capture(enemy)
+            else:
+                toast_battle(f"{enemy.name} escapou...",
+                             duration=2.0, pokemon=enemy, portrait="angry")
+                self._last_capture_item = None
             return
 
-        # Tentativa de captura normal
-        if roll < chance:
-            self._perform_capture(enemy)
-        else:
-            # Captura falhou
-            toast_battle(f"{enemy.name} escapou...", duration=2.0, pokemon=enemy, portrait="angry")
-            print(f"[CAPTURE] {enemy.name} escapou! Pokébola foi consumida.")
-            # Limpa a flag se falhou
-            self._last_capture_item = None
+        print(f"[CAPTURE_ANIM] _start | sprite="
+              f"{'OK' if pokemon_sprite else 'None'} | "
+              f"size={pokemon_sprite.get_size()} | "
+              f"shakes={num_shakes} | success={is_success}")
+
+        enemy._capture_hidden = True
+
+        anim = CaptureShakeAnimation(
+            self, enemy, ball_frames, pokemon_sprite,
+            num_shakes, is_success,
+            pokemon_base_scale=1.0,  # não precisa mais; sprite já é o certo
+        )
+
+        def _on_complete(success):
+            print(f"[CAPTURE_ANIM] _on_complete | success={success}")
+            if hasattr(enemy, '_capture_hidden'):
+                del enemy._capture_hidden
+            if success:
+                self._perform_capture(enemy)
+            else:
+                toast_battle(f"{enemy.name} escapou...",
+                             duration=2.0, pokemon=enemy, portrait="angry")
+                print(f"[CAPTURE] {enemy.name} escapou!")
+                self._last_capture_item = None
+
+        anim.on_complete = _on_complete
+        self.capture_shake_animation = anim
 
     def _perform_capture(self, enemy):
         """Executa a captura de um Pokémon"""
@@ -1716,6 +1796,23 @@ class GameScene(BaseScene):
         spot_a = swap_data['spot_a']
         spot_b = swap_data['spot_b']
 
+        # ===== VALIDAÇÃO DE TIPAGEM =====
+        types_a = list(getattr(pokemon_a, 'types', []) or [])
+        types_b = list(getattr(pokemon_b, 'types', []) or [])
+
+        if not spot_b.is_type_allowed(types_a) or not spot_a.is_type_allowed(types_b):
+            from src.ui.toast_renderer import toast_warning
+            toast_warning(
+                "Swap bloqueado: tipos incompatíveis com os spots.",
+                duration=2.5,
+            )
+            print(f"[SWAP] Rejeitado — "
+                  f"{pokemon_a.name} {types_a} → spot de {pokemon_b.name} "
+                  f"({spot_b.allowed_types}) | "
+                  f"{pokemon_b.name} {types_b} → spot de {pokemon_a.name} "
+                  f"({spot_a.allowed_types})")
+            return
+
         # Guarda as posições originais
         pos_a_x = pokemon_a.x
         pos_a_y = pokemon_a.y
@@ -1755,6 +1852,20 @@ class GameScene(BaseScene):
         pokemon = move_data['pokemon']
         from_spot = move_data.get('from_spot')
         to_spot = move_data['to_spot']
+
+        # ===== VALIDAÇÃO DE TIPAGEM =====
+        types = list(getattr(pokemon, 'types', []) or [])
+        if not to_spot.is_type_allowed(types):
+            from src.ui.toast_renderer import toast_warning
+            allowed = ", ".join(to_spot.allowed_types) or "?"
+            toast_warning(
+                f"{pokemon.name} não pode ocupar esse spot. "
+                f"Tipos permitidos: {allowed}",
+                duration=2.5,
+            )
+            print(f"[MOVE] Rejeitado — {pokemon.name} {types} "
+                  f"não cabe em {to_spot.allowed_types}")
+            return
 
         if from_spot:
             from_spot.occupied = False
@@ -1846,6 +1957,9 @@ class GameScene(BaseScene):
         if hasattr(self, 'camera_renderer'):
             self.camera_renderer.flash_active = False
             self.camera_renderer.flash_alpha = 0
+
+        if hasattr(self, 'capture_shake_animation'):
+            self.capture_shake_animation = None
 
         # ===== RESETA TODOS OS DITTOS TRANSFORMADOS =====
         self.reset_all_transformed_dittos()
@@ -2312,6 +2426,12 @@ class GameScene(BaseScene):
         # ===== OVERLAYS PRIORITÁRIOS =====
         perf_monitor.start_section("OVERLAYS")
 
+        if getattr(self, 'capture_shake_animation', None) is not None:
+            if self.capture_shake_animation.active:
+                self.capture_shake_animation.update(dt)
+            else:
+                self.capture_shake_animation = None
+
         # ===== VITORIA FINAL (prioridade máxima — cobre tudo) =====
         if self.final_victory_overlay is not None:
             self.final_victory_overlay.update(dt)
@@ -2486,6 +2606,21 @@ class GameScene(BaseScene):
 
         self.notification_manager.update(dt)
 
+        # Qualquer pokémon do time que ficar sem vida durante a fase
+        if not self._pokemon_defeated_this_phase:
+            for p in self.player.team:
+                if p is None:
+                    continue
+                if not getattr(p, 'is_placed', False):
+                    continue
+                if not p.is_alive():
+                    self._pokemon_defeated_this_phase = True
+                    print(f"[STARS] {p.name} caiu em combate! "
+                          f"HP={p.current_hp}/{p.max_hp} | "
+                          f"is_defeated={getattr(p, 'is_defeated', '?')} "
+                          f"— estrelas travadas em 1★")
+                    break
+
         # ===== GAME OVER CHECK =====
         perf_monitor.start_section("GAME_OVER_CHECK")
         team_defeated = self.is_team_defeated()
@@ -2658,12 +2793,27 @@ class GameScene(BaseScene):
         self._roll_mythical_chance()
 
         # ===== ESTRELAS =====
-        if total_items > 0:
-            protected_items = self.target_item_manager.items_protected
-            stars = int((protected_items / total_items) * 3)
-            stars = max(1, min(3, stars))
+        #Regras:
+        #3: nenhum pokémon derrotado E nenhum item perdido
+        #2: nenhum pokémon derrotado, mas perdeu item
+        #1: qualquer pokémon derrotado (independente dos itens)
+        items_stolen = self.target_item_manager.items_stolen
+
+        any_pokemon_defeated = self._pokemon_defeated_this_phase
+        no_items_lost = (items_stolen == 0)
+
+        if any_pokemon_defeated:
+            stars = 1
+        elif not no_items_lost:
+            stars = 2
         else:
             stars = 3
+
+        print(
+            f"[STARS] itens_perdidos={items_stolen} | "
+            f"pokemon_caiu={any_pokemon_defeated} | "
+            f"-> {stars}★"
+        )
 
         # ===== DADOS PARA O OVERLAY =====
         self.phase_complete_data = {
@@ -2754,7 +2904,14 @@ class GameScene(BaseScene):
         # 6. INIMIGOS (acima da decoração)
         perf_monitor.start_section("RENDER_ENEMIES")
         for enemy in wave_mgr.active_enemies:
+            if getattr(enemy, '_capture_hidden', False):
+                continue
             enemy.render(screen, camera, show_hp=False)
+
+        # 6.5. ANIMAÇÃO DE CAPTURA (pokébola balançando)
+        if getattr(self, 'capture_shake_animation', None) is not None:
+            if self.capture_shake_animation.active:
+                self.capture_shake_animation.render(screen, camera, screen_mgr)
         perf_monitor.end_section()
 
         # 7. POKÉMON COLOCADOS (acima da decoração)
@@ -2782,6 +2939,8 @@ class GameScene(BaseScene):
         # 11. HP Bars
         perf_monitor.start_section("RENDER_ENEMY_HP")
         for enemy in wave_mgr.active_enemies:
+            if getattr(enemy, '_capture_hidden', False):
+                continue
             enemy.render_hp_enemy(screen, camera)
         perf_monitor.end_section()
 

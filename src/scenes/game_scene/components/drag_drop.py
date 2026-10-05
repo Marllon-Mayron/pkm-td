@@ -240,13 +240,53 @@ class DragDropManager:
         # ===== 3. Define se o alvo do ímã é válido =====
         target_is_valid = False
 
+        # Tipos do pokémon que está sendo arrastado
+        drag_types = list(getattr(self.drag_pokemon, 'types', []) or [])
+
         if pokemon_at_magnet and self.drag_type == "placed":
-            # Swap / evolução entre dois Pokémon colocados
+            # Swap / evolução entre dois Pokémon colocados.
+            # Ambos precisam caber nos spots uns dos outros.
+            target_types = list(getattr(pokemon_at_magnet, 'types', []) or [])
+
+            drag_fits = magnet_spot.is_type_allowed(drag_types)
+            target_fits = True
+            if self.drag_source_spot is not None:
+                target_fits = self.drag_source_spot.is_type_allowed(target_types)
+
             self.hovered_pokemon = pokemon_at_magnet
-            target_is_valid = True
+            target_is_valid = drag_fits and target_fits
+
+            if not target_is_valid:
+                from src.ui.toast_renderer import toast_warning
+                if not drag_fits:
+                    allowed = ", ".join(magnet_spot.allowed_types) or "?"
+                    toast_warning(
+                        f"{self.drag_pokemon.name} não pode ocupar esse spot. "
+                        f"Tipos permitidos: {allowed}",
+                        duration=2.5,
+                    )
+                elif not target_fits:
+                    allowed = ", ".join(self.drag_source_spot.allowed_types) or "?"
+                    toast_warning(
+                        f"{pokemon_at_magnet.name} não pode ocupar o spot de origem. "
+                        f"Tipos permitidos: {allowed}",
+                        duration=2.5,
+                    )
+
         elif not magnet_spot.occupied:
-            # Spot vazio -> colocar (team) ou mover (placed)
-            target_is_valid = True
+            # Spot vazio -> colocar (team) ou mover (placed).
+            # Verifica tipagem do pokémon que está sendo arrastado.
+            target_is_valid = magnet_spot.is_type_allowed(drag_types)
+
+            if not target_is_valid:
+                from src.ui.toast_renderer import toast_warning
+                allowed = ", ".join(magnet_spot.allowed_types) or "?"
+                types_str = "/".join(drag_types) if drag_types else "?"
+                toast_warning(
+                    f"{self.drag_pokemon.name} ({types_str}) não pode ocupar esse spot. "
+                    f"Tipos permitidos: {allowed}",
+                    duration=2.5,
+                )
 
         if not target_is_valid:
             # Spot ocupado e sem interação válida (ex: arrastando do time p/ cima de outro)

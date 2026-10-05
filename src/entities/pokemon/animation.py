@@ -78,6 +78,8 @@ class PokemonAnimation:
         MÉTODO PRINCIPAL - Atualiza animação baseada no estado do Pokémon.
         Deve ser chamado TODO FRAME, independente do estado (vivo/morto).
         """
+        if getattr(self.pokemon, '_capture_hidden', False):
+            return
         # ===== PRIORIDADE 0: VICTORY HOP (COMEMORAÇÃO) =====
         if getattr(self, '_victory_hop_active', False):
             self.cancel_oneshot_animation()  # ← cancela pose se houver
