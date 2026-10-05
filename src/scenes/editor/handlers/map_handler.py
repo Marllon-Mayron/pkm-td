@@ -831,10 +831,16 @@ class MapHandler:
             else:
                 x = world_pos[0] - 16
                 y = world_pos[1] - 16
-            existing_spot = self.editor.tower_spots.get_spot_at(x + 8, y + 8)
-            if not existing_spot:
+            # Já existe um spot aqui?
+            existing_idx = self.editor.tower_spots.get_spot_index_at(x + 8, y + 8)
+            if existing_idx >= 0:
+                # Seleciona (para editar tipagem, mover etc.)
+                self.editor.tower_spots.selected_spot = existing_idx
+                print(f"[Editor] Spot {existing_idx} selecionado. " f"Pressione T para editar tipos permitidos.")
+            else:
                 self._save_undo_state(f"Tower spot em ({x:.0f}, {y:.0f})", continuous=False)
-                self.editor.tower_spots.add_spot(x, y)
+                new_idx = self.editor.tower_spots.add_spot(x, y)
+                self.editor.tower_spots.selected_spot = new_idx
 
     # ==================================================================
     # RIGHT CLICK

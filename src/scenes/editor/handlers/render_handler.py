@@ -78,7 +78,10 @@ class EditorRenderHandler:
                 and self.editor.event_config_dialog.visible):
             self.editor.event_config_dialog.render(screen)
 
-        # ===== DIÁLOGO DE ESTRUTURAS (NOVO) =====
+        # Diálogo de tipos do spot
+        if hasattr(self.editor, 'spot_type_dialog') and self.editor.spot_type_dialog and self.editor.spot_type_dialog.visible:
+                self.editor.spot_type_dialog.render(screen)
+        # ===== DIÁLOGO DE ESTRUTURAS =====
         if (hasattr(self.editor, 'structure_manager_dialog')
                 and self.editor.structure_manager_dialog
                 and self.editor.structure_manager_dialog.visible):

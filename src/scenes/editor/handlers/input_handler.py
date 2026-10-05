@@ -159,6 +159,9 @@ class EditorInputHandler:
             if self.editor.mode == "path":
                 self.editor.path_manager.remove_current_path()
                 return True
+        elif event.key == pygame.K_t and self.editor.mode == "towers":
+            self.editor._open_spot_type_dialog()
+            return True
         elif event.key == pygame.K_TAB:
             if self.editor.mode == "path" and self.editor.path_manager.paths:
                 current = self.editor.path_manager.current_path_index

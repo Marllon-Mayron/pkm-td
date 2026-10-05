@@ -214,8 +214,7 @@ class PlacementManager:
     # =========================================================
 
     def add_pokemon(self, spot, pokemon):
-        """Adiciona um Pokémon no spot"""
-        # Verificações básicas
+        """Adiciona um Pokémon no spot (com validação de tipo)."""
         existing = self.get_pokemon_at_spot(spot)
         if existing:
             print(f"[PLACEMENT] Spot já ocupado por {existing.name}")
@@ -229,16 +228,27 @@ class PlacementManager:
             print(f"[PLACEMENT] {pokemon.name} já está no mapa!")
             return None
 
+        # ===== VALIDAÇÃO DE TIPAGEM =====
+        pokemon_types = list(getattr(pokemon, 'types', []) or [])
+        if not spot.is_type_allowed(pokemon_types):
+            allowed_str = ", ".join(spot.allowed_types) if spot.allowed_types else "?"
+            types_str = "/".join(pokemon_types) if pokemon_types else "?"
+            from src.ui.toast_renderer import toast_warning
+            toast_warning(
+                f"{pokemon.name} ({types_str}) não pode ficar aqui. "
+                f"Tipos permitidos: {allowed_str}",
+                duration=3.0,
+            )
+            print(f"[PLACEMENT] {pokemon.name} rejeitado — tipos "
+                  f"{pokemon_types} vs {spot.allowed_types}")
+            return None
+        # =================================
+
         # ===== VERIFICA EVOLUÇÃO POR COMBINAÇÃO ANTES DE COLOCAR =====
         if self._check_combination_evolution_on_placement(pokemon, spot):
-            # Se evoluiu, o Pokémon original foi transformado/removido
-            # Não adiciona o Pokémon original ao spot (pois ele já evoluiu)
             print(f"[COMBINATION] {pokemon.name} evoluiu durante o placement!")
-
-            # Procura o Pokémon evoluído (agora está no placed_pokemon)
             for placed in self.placed_pokemon:
                 if placed.id == pokemon.id and placed != pokemon:
-                    # Atualiza a posição do Pokémon evoluído para o spot correto
                     tile_center_x = (spot.x // self.tile_size) * self.tile_size + self.tile_size // 2
                     tile_center_y = (spot.y // self.tile_size) * self.tile_size + self.tile_size // 2
                     placed.x = tile_center_x
@@ -250,10 +260,8 @@ class PlacementManager:
                     placed.is_placed = True
                     spot.occupied = True
                     return placed
-
             return None
 
-        # Se não evoluiu, coloca normalmente
         return self._add_pokemon_to_spot(spot, pokemon)
 
     def _add_pokemon_to_spot(self, spot, pokemon):

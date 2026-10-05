@@ -114,6 +114,7 @@ class EditorScene(BaseScene):
         self.tileset_manager_dialog = None
         self.rewards_config_dialog = None
         self.structure_manager_dialog = None
+        self.spot_type_dialog = None
 
         self.selected_item_id = None
 
@@ -453,6 +454,19 @@ class EditorScene(BaseScene):
         self.tileset_manager_dialog = TilesetManagerDialog(dx, dy, 600, 500,
                                                             current_layer, self)
 
+    def _open_spot_type_dialog(self):
+        ts = self.tower_spots
+        if not (0 <= ts.selected_spot < len(ts.spots)):
+            print("[Editor] Nenhum spot selecionado — clique em um spot primeiro")
+            return
+        spot = ts.spots[ts.selected_spot]
+
+        from src.scenes.editor.components.spot_type_dialog import SpotTypeDialog
+        dw, dh = 600, 500  # <— bate com SpotTypeDialog
+        dx = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - dw) // 2
+        dy = self.screen_manager.viewport_y + (self.screen_manager.viewport_height - dh) // 2
+        self.spot_type_dialog = SpotTypeDialog(dx, dy, spot)
+
     # ==================================================================
     # RESULTADO DE DIÁLOGOS
     # ==================================================================
@@ -538,6 +552,12 @@ class EditorScene(BaseScene):
                 self.rewards_config_dialog = None
             elif not self.rewards_config_dialog.visible:
                 self.rewards_config_dialog = None
+            return True
+
+        if self.spot_type_dialog and self.spot_type_dialog.visible:
+            self.spot_type_dialog.handle_event(event)
+            if not self.spot_type_dialog.visible:
+                self.spot_type_dialog = None
             return True
 
         if self.target_item_dialog and self.target_item_dialog.visible:
