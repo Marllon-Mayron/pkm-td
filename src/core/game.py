@@ -166,7 +166,9 @@ class Game:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_F11:
                     self.screen_manager.toggle_fullscreen()
-
+                elif event.key == pygame.K_F9:
+                    from src.ui.anim_editor_scene.anim_editor_scene import AnimEditorScene
+                    self.current_scene = AnimEditorScene(self)
             # Passa eventos para a cena atual
             if self.current_scene:
                 self.current_scene.handle_event(event)

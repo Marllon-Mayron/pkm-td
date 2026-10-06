@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "name": "smoke_puff",
+  "category": "effects",
+  "description": "Baforada de fumaça — 3 camadas, billowing",
+  "fps": 60,
+  "duration_frames": 70,
+  "loop": false,
+  "loop_count": 0,
+  "anchor": "target",
+  "space": "world",
+  "world_offset": { "x": 0, "y": -30 },
+  "screen_offset": { "x": 0, "y": 0 },
+  "sound": null,
+  "layers": [
+    {
+      "id": "smoke_back",
+      "type": "sprite",
+      "image": "_shared/smoke_8f.png",
+      "z": 4,
+      "blend": "normal",
+      "pivot": "center",
+      "offset": { "x": -8, "y": -6 },
+      "visible_frames": [0, 70],
+      "flip_x": false, "flip_y": false,
+      "keyframes": [
+        { "f": 0,  "x": 0,   "y": 6,   "scale": 2.0, "alpha": 0,   "tint": "#B0B0C8", "frame_index": 0 },
+        { "f": 8,  "x": -2,  "y": 2,   "scale": 3.5, "alpha": 200, "tint": "#B0B0C8", "frame_index": 1 },
+        { "f": 18, "x": -4,  "y": -3,  "scale": 4.5, "alpha": 235, "tint": "#A8A8C0", "frame_index": 2 },
+        { "f": 30, "x": -6,  "y": -9,  "scale": 5.2, "alpha": 235, "tint": "#A0A0B8", "frame_index": 3 },
+        { "f": 44, "x": -8,  "y": -16, "scale": 5.8, "alpha": 180, "tint": "#9898B0", "frame_index": 4 },
+        { "f": 56, "x": -10, "y": -24, "scale": 6.2, "alpha": 110, "tint": "#9090A8", "frame_index": 5 },
+        { "f": 70, "x": -12, "y": -34, "scale": 6.5, "alpha": 0,   "tint": "#8888A0", "frame_index": 7 }
+      ],
+      "easing": "linear",
+      "frame_width": 16, "frame_height": 16, "frame_index": 0
+    },
+    {
+      "id": "smoke_mid",
+      "type": "sprite",
+      "image": "_shared/smoke_8f.png",
+      "z": 5,
+      "blend": "normal",
+      "pivot": "center",
+      "offset": { "x": 0, "y": -4 },
+      "visible_frames": [0, 70],
+      "flip_x": false, "flip_y": false,
+      "keyframes": [
+        { "f": 0,  "x": 0,  "y": 4,   "scale": 2.5, "alpha": 0,   "tint": "#FFFFFF", "frame_index": 0 },
+        { "f": 6,  "x": 0,  "y": 1,   "scale": 4.0, "alpha": 255, "tint": "#FFFFFF", "frame_index": 0 },
+        { "f": 14, "x": 1,  "y": -2,  "scale": 5.5, "alpha": 255, "tint": "#F0F0F8", "frame_index": 1 },
+        { "f": 24, "x": 2,  "y": -7,  "scale": 6.5, "alpha": 255, "tint": "#E8E8F0", "frame_index": 2 },
+        { "f": 36, "x": 3,  "y": -14, "scale": 7.2, "alpha": 235, "tint": "#E0E0E8", "frame_index": 3 },
+        { "f": 48, "x": 3,  "y": -22, "scale": 7.8, "alpha": 180, "tint": "#D8D8E0", "frame_index": 4 },
+        { "f": 60, "x": 2,  "y": -32, "scale": 8.2, "alpha": 100, "tint": "#D0D0D8", "frame_index": 5 },
+        { "f": 70, "x": 1,  "y": -42, "scale": 8.5, "alpha": 0,   "tint": "#C8C8D0", "frame_index": 7 }
+      ],
+      "easing": "linear",
+      "frame_width": 16, "frame_height": 16, "frame_index": 0
+    },
+    {
+      "id": "smoke_front",
+      "type": "sprite",
+      "image": "_shared/smoke_8f.png",
+      "z": 6,
+      "blend": "normal",
+      "pivot": "center",
+      "offset": { "x": 8, "y": 2 },
+      "visible_frames": [4, 70],
+      "flip_x": false, "flip_y": false,
+      "keyframes": [
+        { "f": 4,  "x": 0,  "y": 6,   "scale": 1.8, "alpha": 0,   "tint": "#FFFFFF", "frame_index": 0 },
+        { "f": 12, "x": 2,  "y": 3,   "scale": 3.2, "alpha": 230, "tint": "#FFFFFF", "frame_index": 1 },
+        { "f": 22, "x": 4,  "y": -2,  "scale": 4.2, "alpha": 255, "tint": "#F8F8FF", "frame_index": 2 },
+        { "f": 34, "x": 6,  "y": -9,  "scale": 5.0, "alpha": 220, "tint": "#F0F0F8", "frame_index": 3 },
+        { "f": 46, "x": 8,  "y": -18, "scale": 5.8, "alpha": 160, "tint": "#E8E8F0", "frame_index": 4 },
+        { "f": 58, "x": 9,  "y": -28, "scale": 6.4, "alpha": 90,  "tint": "#E0E0E8", "frame_index": 6 },
+        { "f": 70, "x": 10, "y": -38, "scale": 6.8, "alpha": 0,   "tint": "#D8D8E0", "frame_index": 7 }
+      ],
+      "easing": "linear",
+      "frame_width": 16, "frame_height": 16, "frame_index": 0
+    }
+  ],
+  "default_binding": { "trigger": "effect.smoke.puff" }
+}

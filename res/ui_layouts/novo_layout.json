@@ -1,0 +1,40 @@
+{
+  "name": "novo_layout",
+  "design_size": [
+    1280,
+    720
+  ],
+  "widgets": [
+    {
+      "id": "titulo",
+      "type": "label",
+      "z": 0,
+      "x": 0.5,
+      "y": 0.1,
+      "w": 0.6,
+      "h": 0.08,
+      "anchor": "c",
+      "font_size": 42,
+      "bold": true,
+      "props": {
+        "text": "MINHA TELA",
+        "align": "center"
+      }
+    },
+    {
+      "id": "btn_ok",
+      "type": "button",
+      "z": 1,
+      "x": 0.5,
+      "y": 0.5,
+      "w": 0.22,
+      "h": 0.09,
+      "anchor": "c",
+      "bold": true,
+      "props": {
+        "label": "OK",
+        "style": "primary"
+      }
+    }
+  ]
+}

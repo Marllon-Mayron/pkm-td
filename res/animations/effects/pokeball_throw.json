@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "name": "pokeball_throw",
+  "category": "effects",
+  "description": "Pokébola cai do alto, bate e ricocheteia",
+  "fps": 60,
+  "duration_frames": 55,
+  "loop": false,
+  "loop_count": 0,
+  "anchor": "target",
+  "space": "world",
+  "world_offset": { "x": 0, "y": -30 },
+  "screen_offset": { "x": 0, "y": 0 },
+  "sound": { "name": "CLICK", "source": "sfx", "start_frame": 13, "loop": false, "volume": 0.7 },
+  "layers": [
+    {
+      "id": "impact_dust",
+      "type": "sprite",
+      "image": "_shared/smoke_8f.png",
+      "z": 4, "blend": "normal", "pivot": "center",
+      "offset": { "x": 0, "y": 6 },
+      "visible_frames": [13, 32],
+      "flip_x": false, "flip_y": false,
+      "keyframes": [
+        { "f": 13, "x": -6, "y": 2, "scale": 0.8, "alpha": 0,   "tint": "#C0A080", "frame_index": 0 },
+        { "f": 16, "x": -8, "y": 0, "scale": 1.4, "alpha": 220, "tint": "#C0A080", "frame_index": 0 },
+        { "f": 20, "x": -10,"y": -2,"scale": 1.8, "alpha": 200, "tint": "#B09070", "frame_index": 2 },
+        { "f": 26, "x": -12,"y": -4,"scale": 2.2, "alpha": 140, "tint": "#A08868", "frame_index": 4 },
+        { "f": 32, "x": -14,"y": -6,"scale": 2.6, "alpha": 0,   "tint": "#908060", "frame_index": 6 }
+      ],
+      "easing": "linear",
+      "frame_width": 16, "frame_height": 16, "frame_index": 0
+    },
+    {
+      "id": "impact_dust_r",
+      "type": "sprite",
+      "image": "_shared/smoke_8f.png",
+      "z": 4, "blend": "normal", "pivot": "center",
+      "offset": { "x": 0, "y": 6 },
+      "visible_frames": [13, 32],
+      "flip_x": true, "flip_y": false,
+      "keyframes": [
+        { "f": 13, "x": -6, "y": 2, "scale": 0.8, "alpha": 0,   "tint": "#C0A080", "frame_index": 0 },
+        { "f": 16, "x": -8, "y": 0, "scale": 1.4, "alpha": 220, "tint": "#C0A080", "frame_index": 0 },
+        { "f": 20, "x": -10,"y": -2,"scale": 1.8, "alpha": 200, "tint": "#B09070", "frame_index": 2 },
+        { "f": 26, "x": -12,"y": -4,"scale": 2.2, "alpha": 140, "tint": "#A08868", "frame_index": 4 },
+        { "f": 32, "x": -14,"y": -6,"scale": 2.6, "alpha": 0,   "tint": "#908060", "frame_index": 6 }
+      ],
+      "easing": "linear",
+      "frame_width": 16, "frame_height": 16, "frame_index": 0
+    },
+    {
+      "id": "impact_ring",
+      "type": "sprite",
+      "image": "_shared/ring_16.png",
+      "z": 5, "blend": "add", "pivot": "center",
+      "offset": { "x": 0, "y": 4 },
+      "visible_frames": [13, 26],
+      "flip_x": false, "flip_y": false,
+      "keyframes": [
+        { "f": 13, "x": 0, "y": 0, "scale": 0.4, "alpha": 0,   "tint": "#FFFFFF" },
+        { "f": 16, "x": 0, "y": 0, "scale": 1.6, "alpha": 255, "tint": "#FFF0D0" },
+        { "f": 20, "x": 0, "y": 0, "scale": 2.4, "alpha": 200, "tint": "#FFE0B0" },
+        { "f": 26, "x": 0, "y": 0, "scale": 3.4, "alpha": 0,   "tint": "#FFD090" }
+      ],
+      "easing": "ease_out",
+      "frame_width": 0, "frame_height": 0, "frame_index": 0
+    },
+    {
+      "id": "ball",
+      "type": "sprite",
+      "image": "_shared/pokeball_in_map.png",
+      "z": 10, "blend": "normal", "pivot": "center",
+      "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 55],
+      "flip_x": false, "flip_y": false,
+      "keyframes": [
+        { "f": 0,  "x": 0, "y": -60, "rot": 0, "scale": 2.2, "alpha": 255, "tint": "#FFFFFF", "frame_index": 0 },
+        { "f": 10, "x": 0, "y": -18, "rot": 0, "scale": 2.2, "alpha": 255, "tint": "#FFFFFF", "frame_index": 0 },
+        { "f": 13, "x": 0, "y": 4,   "rot": 0, "scale": 2.2, "alpha": 255, "tint": "#FFFFFF", "frame_index": 1 },
+        { "f": 18, "x": 0, "y": 0,   "rot": 0, "scale": 2.2, "alpha": 255, "tint": "#FFFFFF", "frame_index": 0 },
+        { "f": 28, "x": 0, "y": -16, "rot": 0, "scale": 2.2, "alpha": 255, "tint": "#FFFFFF", "frame_index": 0 },
+        { "f": 42, "x": 0, "y": -4,  "rot": 0, "scale": 2.2, "alpha": 255, "tint": "#FFFFFF", "frame_index": 0 },
+        { "f": 48, "x": 0, "y": 0,   "rot": 0, "scale": 2.2, "alpha": 255, "tint": "#FFFFFF", "frame_index": 0 },
+        { "f": 55, "x": 0, "y": 0,   "rot": 0, "scale": 2.2, "alpha": 255, "tint": "#FFFFFF", "frame_index": 0 }
+      ],
+      "easing": "ease_in_out",
+      "frame_width": 16, "frame_height": 16, "frame_index": 0
+    }
+  ]
+}

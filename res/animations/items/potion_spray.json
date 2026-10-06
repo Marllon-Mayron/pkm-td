@@ -1,0 +1,725 @@
+{
+  "schema_version": 1,
+  "name": "potion_spray",
+  "category": "items",
+  "description": "Borrifada de Potion",
+  "fps": 60,
+  "duration_frames": 100,
+  "loop": false,
+  "loop_count": 0,
+  "anchor": "target",
+  "space": "world",
+  "world_offset": {
+    "x": 0,
+    "y": -30
+  },
+  "screen_offset": {
+    "x": 0,
+    "y": 0
+  },
+  "sound": {
+    "name": "CLICK",
+    "source": "sfx",
+    "start_frame": 3,
+    "loop": false,
+    "volume": 0.6
+  },
+  "layers": [
+    {
+      "id": "smoke_far_back",
+      "type": "sprite",
+      "image": "_shared/smoke_8f.png",
+      "z": 2,
+      "blend": "normal",
+      "pivot": "center",
+      "offset": {
+        "x": -10,
+        "y": -45
+      },
+      "visible_frames": [
+        8,
+        96
+      ],
+      "flip_x": false,
+      "flip_y": false,
+      "keyframes": [
+        {
+          "f": 8,
+          "x": 0,
+          "y": 6,
+          "scale": 1.5,
+          "alpha": 0,
+          "tint": "#FF5050",
+          "frame_index": 0
+        },
+        {
+          "f": 20,
+          "x": 15,
+          "y": 0,
+          "scale": 3.2,
+          "alpha": 200,
+          "tint": "#FF5050",
+          "frame_index": 2
+        },
+        {
+          "f": 34,
+          "x": 34,
+          "y": -8,
+          "scale": 4.8,
+          "alpha": 220,
+          "tint": "#FF5050",
+          "frame_index": 3
+        },
+        {
+          "f": 50,
+          "x": 52,
+          "y": -18,
+          "scale": 6.0,
+          "alpha": 200,
+          "tint": "#FF5050",
+          "frame_index": 5
+        },
+        {
+          "f": 68,
+          "x": 64,
+          "y": -30,
+          "scale": 7.0,
+          "alpha": 140,
+          "tint": "#FF5050",
+          "frame_index": 6
+        },
+        {
+          "f": 84,
+          "x": 72,
+          "y": -42,
+          "scale": 7.8,
+          "alpha": 70,
+          "tint": "#FF5050",
+          "frame_index": 7
+        },
+        {
+          "f": 96,
+          "x": 76,
+          "y": -54,
+          "scale": 8.2,
+          "alpha": 0,
+          "tint": "#FF5050",
+          "frame_index": 7
+        }
+      ],
+      "easing": "linear",
+      "frame_width": 16,
+      "frame_height": 16,
+      "frame_index": 0
+    },
+    {
+      "id": "smoke_far",
+      "type": "sprite",
+      "image": "_shared/smoke_8f.png",
+      "z": 3,
+      "blend": "normal",
+      "pivot": "center",
+      "offset": {
+        "x": -10,
+        "y": -40
+      },
+      "visible_frames": [
+        6,
+        94
+      ],
+      "flip_x": false,
+      "flip_y": false,
+      "keyframes": [
+        {
+          "f": 6,
+          "x": 0,
+          "y": 4,
+          "scale": 1.6,
+          "alpha": 0,
+          "tint": "#FF6060",
+          "frame_index": 0
+        },
+        {
+          "f": 16,
+          "x": 10,
+          "y": -1,
+          "scale": 3.5,
+          "alpha": 220,
+          "tint": "#FF6060",
+          "frame_index": 1
+        },
+        {
+          "f": 28,
+          "x": 26,
+          "y": -7,
+          "scale": 5.2,
+          "alpha": 240,
+          "tint": "#FF6060",
+          "frame_index": 2
+        },
+        {
+          "f": 42,
+          "x": 40,
+          "y": -14,
+          "scale": 6.5,
+          "alpha": 220,
+          "tint": "#FF6060",
+          "frame_index": 4
+        },
+        {
+          "f": 58,
+          "x": 50,
+          "y": -24,
+          "scale": 7.4,
+          "alpha": 160,
+          "tint": "#FF6060",
+          "frame_index": 5
+        },
+        {
+          "f": 76,
+          "x": 56,
+          "y": -36,
+          "scale": 8.0,
+          "alpha": 90,
+          "tint": "#FF6060",
+          "frame_index": 6
+        },
+        {
+          "f": 94,
+          "x": 60,
+          "y": -50,
+          "scale": 8.4,
+          "alpha": 0,
+          "tint": "#FF6060",
+          "frame_index": 7
+        }
+      ],
+      "easing": "linear",
+      "frame_width": 16,
+      "frame_height": 16,
+      "frame_index": 0
+    },
+    {
+      "id": "smoke_main",
+      "type": "sprite",
+      "image": "_shared/smoke_8f.png",
+      "z": 4,
+      "blend": "normal",
+      "pivot": "center",
+      "offset": {
+        "x": -8,
+        "y": -38
+      },
+      "visible_frames": [
+        4,
+        92
+      ],
+      "flip_x": false,
+      "flip_y": false,
+      "keyframes": [
+        {
+          "f": 4,
+          "x": 0,
+          "y": 2,
+          "scale": 1.8,
+          "alpha": 0,
+          "tint": "#FF8080",
+          "frame_index": 0
+        },
+        {
+          "f": 12,
+          "x": 6,
+          "y": -2,
+          "scale": 4.0,
+          "alpha": 255,
+          "tint": "#FF8080",
+          "frame_index": 0
+        },
+        {
+          "f": 22,
+          "x": 16,
+          "y": -6,
+          "scale": 5.8,
+          "alpha": 255,
+          "tint": "#FF8080",
+          "frame_index": 1
+        },
+        {
+          "f": 34,
+          "x": 26,
+          "y": -11,
+          "scale": 7.2,
+          "alpha": 255,
+          "tint": "#FF8080",
+          "frame_index": 2
+        },
+        {
+          "f": 46,
+          "x": 34,
+          "y": -18,
+          "scale": 8.2,
+          "alpha": 240,
+          "tint": "#FF8080",
+          "frame_index": 3
+        },
+        {
+          "f": 60,
+          "x": 40,
+          "y": -26,
+          "scale": 9.0,
+          "alpha": 200,
+          "tint": "#FF8080",
+          "frame_index": 4
+        },
+        {
+          "f": 74,
+          "x": 44,
+          "y": -36,
+          "scale": 9.6,
+          "alpha": 140,
+          "tint": "#FF8080",
+          "frame_index": 5
+        },
+        {
+          "f": 84,
+          "x": 46,
+          "y": -46,
+          "scale": 10.0,
+          "alpha": 70,
+          "tint": "#FF8080",
+          "frame_index": 6
+        },
+        {
+          "f": 92,
+          "x": 48,
+          "y": -56,
+          "scale": 10.4,
+          "alpha": 0,
+          "tint": "#FF8080",
+          "frame_index": 7
+        }
+      ],
+      "easing": "linear",
+      "frame_width": 16,
+      "frame_height": 16,
+      "frame_index": 0
+    },
+    {
+      "id": "smoke_near",
+      "type": "sprite",
+      "image": "_shared/smoke_8f.png",
+      "z": 5,
+      "blend": "normal",
+      "pivot": "center",
+      "offset": {
+        "x": -6,
+        "y": -34
+      },
+      "visible_frames": [
+        8,
+        90
+      ],
+      "flip_x": false,
+      "flip_y": false,
+      "keyframes": [
+        {
+          "f": 8,
+          "x": 0,
+          "y": 0,
+          "scale": 1.4,
+          "alpha": 0,
+          "tint": "#FFA0A0",
+          "frame_index": 0
+        },
+        {
+          "f": 18,
+          "x": 8,
+          "y": -3,
+          "scale": 3.6,
+          "alpha": 240,
+          "tint": "#FFA0A0",
+          "frame_index": 1
+        },
+        {
+          "f": 30,
+          "x": 20,
+          "y": -8,
+          "scale": 5.2,
+          "alpha": 255,
+          "tint": "#FFA0A0",
+          "frame_index": 2
+        },
+        {
+          "f": 44,
+          "x": 30,
+          "y": -14,
+          "scale": 6.5,
+          "alpha": 220,
+          "tint": "#FFA0A0",
+          "frame_index": 4
+        },
+        {
+          "f": 58,
+          "x": 36,
+          "y": -22,
+          "scale": 7.4,
+          "alpha": 160,
+          "tint": "#FFA0A0",
+          "frame_index": 5
+        },
+        {
+          "f": 74,
+          "x": 40,
+          "y": -34,
+          "scale": 8.2,
+          "alpha": 90,
+          "tint": "#FFA0A0",
+          "frame_index": 6
+        },
+        {
+          "f": 90,
+          "x": 42,
+          "y": -48,
+          "scale": 8.6,
+          "alpha": 0,
+          "tint": "#FFA0A0",
+          "frame_index": 7
+        }
+      ],
+      "easing": "linear",
+      "frame_width": 16,
+      "frame_height": 16,
+      "frame_index": 0
+    },
+    {
+      "id": "smoke_front",
+      "type": "sprite",
+      "image": "_shared/smoke_8f.png",
+      "z": 6,
+      "blend": "normal",
+      "pivot": "center",
+      "offset": {
+        "x": -4,
+        "y": -30
+      },
+      "visible_frames": [
+        12,
+        96
+      ],
+      "flip_x": false,
+      "flip_y": false,
+      "keyframes": [
+        {
+          "f": 12,
+          "x": 0,
+          "y": -2,
+          "scale": 1.2,
+          "alpha": 0,
+          "tint": "#FFC8C8",
+          "frame_index": 0
+        },
+        {
+          "f": 22,
+          "x": 4,
+          "y": -4,
+          "scale": 3.0,
+          "alpha": 220,
+          "tint": "#FFC8C8",
+          "frame_index": 1
+        },
+        {
+          "f": 34,
+          "x": 12,
+          "y": -8,
+          "scale": 4.5,
+          "alpha": 240,
+          "tint": "#FFC8C8",
+          "frame_index": 2
+        },
+        {
+          "f": 48,
+          "x": 22,
+          "y": -14,
+          "scale": 5.8,
+          "alpha": 200,
+          "tint": "#FFC8C8",
+          "frame_index": 3
+        },
+        {
+          "f": 62,
+          "x": 30,
+          "y": -22,
+          "scale": 6.8,
+          "alpha": 150,
+          "tint": "#FFC8C8",
+          "frame_index": 5
+        },
+        {
+          "f": 78,
+          "x": 34,
+          "y": -32,
+          "scale": 7.6,
+          "alpha": 80,
+          "tint": "#FFC8C8",
+          "frame_index": 6
+        },
+        {
+          "f": 96,
+          "x": 36,
+          "y": -46,
+          "scale": 8.0,
+          "alpha": 0,
+          "tint": "#FFC8C8",
+          "frame_index": 7
+        }
+      ],
+      "easing": "linear",
+      "frame_width": 16,
+      "frame_height": 16,
+      "frame_index": 0
+    },
+    {
+      "id": "bottle",
+      "type": "sprite",
+      "image": "item://potion",
+      "z": 10,
+      "blend": "normal",
+      "pivot": "bottom_center",
+      "offset": {
+        "x": -52,
+        "y": -6
+      },
+      "visible_frames": [
+        0,
+        68
+      ],
+      "flip_x": true,
+      "flip_y": false,
+      "keyframes": [
+        {
+          "f": 0,
+          "x": -12,
+          "y": -22,
+          "rot": 15,
+          "scale": 2.2,
+          "alpha": 0,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 8,
+          "x": 0,
+          "y": 0,
+          "rot": 32,
+          "scale": 2.2,
+          "alpha": 255,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 16,
+          "x": 3,
+          "y": -2,
+          "rot": 36,
+          "scale": 2.2,
+          "alpha": 255,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 26,
+          "x": -2,
+          "y": -1,
+          "rot": 30,
+          "scale": 2.2,
+          "alpha": 255,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 36,
+          "x": 3,
+          "y": -2,
+          "rot": 35,
+          "scale": 2.2,
+          "alpha": 255,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 46,
+          "x": -2,
+          "y": -1,
+          "rot": 31,
+          "scale": 2.2,
+          "alpha": 255,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 56,
+          "x": 0,
+          "y": -4,
+          "rot": 33,
+          "scale": 2.2,
+          "alpha": 255,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 68,
+          "x": 0,
+          "y": -14,
+          "rot": 22,
+          "scale": 2.0,
+          "alpha": 0,
+          "tint": "#FFFFFF"
+        }
+      ],
+      "easing": "ease_out",
+      "frame_width": 0,
+      "frame_height": 0,
+      "frame_index": 0
+    },
+    {
+      "id": "sparkle_a",
+      "type": "sprite",
+      "image": "_shared/sparkle_16.png",
+      "z": 8,
+      "blend": "add",
+      "pivot": "center",
+      "offset": {
+        "x": 0,
+        "y": -30
+      },
+      "visible_frames": [
+        22,
+        98
+      ],
+      "flip_x": false,
+      "flip_y": false,
+      "keyframes": [
+        {
+          "f": 22,
+          "x": 0,
+          "y": 4,
+          "scale": 0.4,
+          "alpha": 0,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 28,
+          "x": 2,
+          "y": 0,
+          "scale": 1.0,
+          "alpha": 255,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 42,
+          "x": 4,
+          "y": -10,
+          "scale": 1.2,
+          "alpha": 255,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 58,
+          "x": 5,
+          "y": -22,
+          "scale": 1.3,
+          "alpha": 200,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 78,
+          "x": 4,
+          "y": -34,
+          "scale": 1.0,
+          "alpha": 100,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 98,
+          "x": 2,
+          "y": -44,
+          "scale": 0.6,
+          "alpha": 0,
+          "tint": "#FFFFFF"
+        }
+      ],
+      "easing": "linear",
+      "frame_width": 0,
+      "frame_height": 0,
+      "frame_index": 0
+    },
+    {
+      "id": "sparkle_b",
+      "type": "sprite",
+      "image": "_shared/sparkle_16.png",
+      "z": 8,
+      "blend": "add",
+      "pivot": "center",
+      "offset": {
+        "x": 0,
+        "y": -30
+      },
+      "visible_frames": [
+        32,
+        98
+      ],
+      "flip_x": false,
+      "flip_y": false,
+      "keyframes": [
+        {
+          "f": 32,
+          "x": -6,
+          "y": 4,
+          "scale": 0.4,
+          "alpha": 0,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 38,
+          "x": -8,
+          "y": 0,
+          "scale": 0.9,
+          "alpha": 255,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 50,
+          "x": -10,
+          "y": -12,
+          "scale": 1.1,
+          "alpha": 255,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 66,
+          "x": -10,
+          "y": -26,
+          "scale": 1.2,
+          "alpha": 180,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 82,
+          "x": -8,
+          "y": -38,
+          "scale": 0.9,
+          "alpha": 80,
+          "tint": "#FFFFFF"
+        },
+        {
+          "f": 98,
+          "x": -5,
+          "y": -48,
+          "scale": 0.5,
+          "alpha": 0,
+          "tint": "#FFFFFF"
+        }
+      ],
+      "easing": "linear",
+      "frame_width": 0,
+      "frame_height": 0,
+      "frame_index": 0
+    }
+  ],
+  "default_binding": {
+    "trigger": "item.potion.use_on_ally"
+  }
+}

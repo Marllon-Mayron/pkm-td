@@ -1,0 +1,1 @@
+"""Editor visual de animações (abre com F9)."""
