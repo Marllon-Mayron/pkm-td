@@ -1,5 +1,5 @@
 # src/ui/theme.py
-"""Tema global inspirado em Pokémon FireRed (GBA)."""
+"""Tema global + helpers de cor com suporte a alpha."""
 from pathlib import Path
 import pygame
 
@@ -105,25 +105,33 @@ def lighten(color, amount=0.3): return lerp_color(color, (255, 255, 255), amount
 
 
 # =====================================================================
-# CORES — parse / serialize
+# CORES — parse / serialize (com alpha)
 # =====================================================================
 def parse_color(value, default=None):
     """
     Aceita:
-      - None            -> default
-      - (r,g,b[,a])     -> tuple
-      - [r,g,b]         -> tuple
-      - "#RRGGBB"       -> tuple
-      - "RRGGBB"        -> tuple
-      - int 0xRRGGBB    -> tuple
+      - None                              -> default
+      - (r,g,b)   / [r,g,b]               -> tuple (sem alpha)
+      - (r,g,b,a) / [r,g,b,a]             -> tuple (com alpha)
+      - "#RRGGBB" / "#RRGGBBAA"           -> tuple
+      - int 0xRRGGBB                      -> tuple
     """
     if value is None:
         return default
-    if isinstance(value, (list, tuple)) and len(value) >= 3:
-        return (int(value[0]), int(value[1]), int(value[2]))
+    if isinstance(value, (list, tuple)):
+        if len(value) >= 4:
+            return (int(value[0]), int(value[1]), int(value[2]), int(value[3]))
+        if len(value) >= 3:
+            return (int(value[0]), int(value[1]), int(value[2]))
     if isinstance(value, int):
         return ((value >> 16) & 0xFF, (value >> 8) & 0xFF, value & 0xFF)
     s = str(value).strip().lstrip("#").upper()
+    if len(s) == 8:
+        try:
+            return (int(s[0:2], 16), int(s[2:4], 16),
+                    int(s[4:6], 16), int(s[6:8], 16))
+        except ValueError:
+            pass
     if len(s) == 6:
         try:
             return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
@@ -134,43 +142,54 @@ def parse_color(value, default=None):
 
 def to_hex(c):
     """
-    Normaliza uma cor para "#RRGGBB".
-    Aceita:
-      - None / "" / inválido       -> ""
-      - "#RRGGBB" (já formatada)   -> "#RRGGBB" (valida e devolve)
-      - "RRGGBB"                   -> "#RRGGBB"
-      - (r,g,b) / [r,g,b]          -> "#RRGGBB"
-      - int 0xRRGGBB               -> "#RRGGBB"
+    Normaliza para "#RRGGBB" ou "#RRGGBBAA" (quando alpha < 255).
     """
     if c is None or c == "":
         return ""
-
-    # Já é string
     if isinstance(c, str):
         s = c.strip().lstrip("#").upper()
-        if len(s) == 6:
+        if len(s) in (6, 8):
             try:
                 int(s, 16)
                 return f"#{s}"
             except ValueError:
                 return ""
         return ""
-
-    # Tupla / lista
-    if isinstance(c, (list, tuple)) and len(c) >= 3:
-        try:
+    if isinstance(c, (list, tuple)):
+        if len(c) >= 4:
+            r = int(c[0]) & 0xFF
+            g = int(c[1]) & 0xFF
+            b = int(c[2]) & 0xFF
+            a = int(c[3]) & 0xFF
+            if a == 255:
+                return f"#{r:02X}{g:02X}{b:02X}"
+            return f"#{r:02X}{g:02X}{b:02X}{a:02X}"
+        if len(c) >= 3:
             r = int(c[0]) & 0xFF
             g = int(c[1]) & 0xFF
             b = int(c[2]) & 0xFF
             return f"#{r:02X}{g:02X}{b:02X}"
-        except (TypeError, ValueError):
-            return ""
-
-    # Inteiro (0xRRGGBB)
     if isinstance(c, int):
         return f"#{(c >> 16) & 0xFF:02X}{(c >> 8) & 0xFF:02X}{c & 0xFF:02X}"
-
     return ""
+
+
+def with_alpha(color, alpha):
+    """Retorna a cor como tupla RGBA com o alpha informado."""
+    if color is None:
+        return None
+    if len(color) >= 4:
+        return (color[0], color[1], color[2], int(alpha))
+    return (color[0], color[1], color[2], int(alpha))
+
+
+def color_alpha(color):
+    """Retorna o alpha da cor (255 se não tiver)."""
+    if color is None:
+        return 255
+    if len(color) >= 4:
+        return int(color[3])
+    return 255
 
 
 # Auto-scan de fontes

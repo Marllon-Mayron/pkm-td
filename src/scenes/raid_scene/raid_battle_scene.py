@@ -11,8 +11,6 @@ RaidBattleScene — sync em tempo real host↔cliente (pokémons, boss, clima, a
 - Nunca dispara Game Over local (raid continua). Só game over global via RAID_ALL_DEFEATED.
 """
 import math
-import random
-import uuid
 import pygame
 
 from src.scenes.game_scene.game_scene import GameScene
@@ -1060,7 +1058,7 @@ class RaidBattleScene(GameScene):
     def open_move_select_overlay(self, pokemon):
         if not pokemon or not pokemon.moves:
             return
-        from src.scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
+        from scenes.game_scene.components.overlays.move_select.move_select_overlay import MoveSelectOverlay
         self.move_select_overlay = MoveSelectOverlay(self, pokemon)
         self.move_select_overlay.active = True
 

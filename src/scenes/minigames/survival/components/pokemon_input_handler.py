@@ -88,7 +88,7 @@ class PokemonInputHandler:
         Abre o overlay de seleção de moves para o Pokémon clicado.
         Copiado do método game_scene.open_move_select_overlay
         """
-        from src.scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
+        from scenes.game_scene.components.overlays.move_select.move_select_overlay import MoveSelectOverlay
 
         if not pokemon or not pokemon.moves:
             return

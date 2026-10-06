@@ -1,8 +1,12 @@
 # src/ui/screen_loader.py
 """
 Carrega layouts JSON e instancia widgets.
-Imagens: busca em res/PokemonSprites/UI/ e subpastas (com fallback res/ui/).
-Cria placeholders automaticamente se referenciadas e não encontradas.
+Suporta: parent-child (content rect), padding, alpha, border_sides,
+         ProgressBar, Badge, WorldSprite, ListView com render_callback,
+         pixel_art (nearest vs bilinear).
+
+Leitura de props: prioriza o WIDGET (top-level), com fallback para props{}.
+Isso mantém compatibilidade com o editor visual que salva no widget.
 """
 import inspect
 import json
@@ -11,24 +15,24 @@ from pathlib import Path
 
 from src.config.paths import UI_LAYOUTS_PATH, RES_PATH
 from src.ui.layout import rel_rect
-from src.ui.theme import parse_color
-from src.ui.widgets import (Button, Panel, Label, ListView, ImageBox,
-                            Checkbox, Slider, Dropdown, TabPanel)
+from src.ui.theme import parse_color, with_alpha, color_alpha
+from src.ui.widgets import (
+    Button, Panel, Label, ListView, ImageBox, Checkbox, Slider,
+    Dropdown, TabPanel, ProgressBar, Badge, WorldSprite, GridSelect,
+)
 
 
 LAYOUTS_DIR = UI_LAYOUTS_PATH
 _MISSING_WARNED = set()
 
 # =====================================================================
-# IMAGENS — busca em pastas do jogo
+# IMAGENS
 # =====================================================================
-# Ordem de prioridade (primeiras vencem):
 _UI_IMAGE_DIRS = [
     RES_PATH / "PokemonSprites" / "UI",
     RES_PATH / "ui",
 ]
-_UI_CREATE_DIR = RES_PATH / "PokemonSprites" / "UI"   # onde salvar placeholders
-
+_UI_CREATE_DIR = RES_PATH / "PokemonSprites" / "UI"
 _IMAGE_CACHE = {}
 _MISSING_IMAGES_LOGGED = set()
 
@@ -38,34 +42,22 @@ def _image_extensions():
 
 
 def _find_image_file(name):
-    """
-    Procura uma imagem por nome em todas as pastas registradas (recursivo).
-    Retorna Path ou None.
-    """
     name = str(name).strip().replace("\\", "/")
     if not name:
         return None
-
     p = Path(name)
     has_ext = p.suffix.lower() in _image_extensions()
-
     for base in _UI_IMAGE_DIRS:
         if not base.exists():
             continue
-
-        # 1) tentativa exata (respeita subpastas: "Background/foo.png")
         candidate = base / name
         if candidate.is_file():
             return candidate
-
-        # 2) com extensões
         if not has_ext:
             for ext in _image_extensions():
                 candidate = base / f"{name}{ext}"
                 if candidate.is_file():
                     return candidate
-
-        # 3) busca recursiva só pelo nome do arquivo
         target = p.name if has_ext else None
         if target:
             for found in base.rglob(target):
@@ -76,30 +68,22 @@ def _find_image_file(name):
                 for found in base.rglob(f"{p.name}{ext}"):
                     if found.is_file():
                         return found
-
     return None
 
 
 def _create_placeholder_image(name):
-    """
-    Cria um PNG placeholder visível na pasta do jogo.
-    Retorna a Surface do placeholder ou None.
-    """
     try:
         _UI_CREATE_DIR.mkdir(parents=True, exist_ok=True)
         rel = str(name).strip().replace("\\", "/")
         p = Path(rel)
-        # Só garante extensão
         if p.suffix.lower() not in _image_extensions():
             p = p.with_suffix(".png")
         out_path = _UI_CREATE_DIR / p
-
         surf = pygame.Surface((128, 128), pygame.SRCALPHA)
         surf.fill((230, 90, 160, 220))
         pygame.draw.rect(surf, (255, 255, 255, 255), surf.get_rect(), 3)
         pygame.draw.line(surf, (255, 255, 255, 255), (0, 0), (128, 128), 2)
         pygame.draw.line(surf, (255, 255, 255, 255), (128, 0), (0, 128), 2)
-
         try:
             font = pygame.font.Font(None, 16)
             label = p.stem[:18]
@@ -109,7 +93,6 @@ def _create_placeholder_image(name):
             surf.blit(txt2, (6, 108))
         except Exception:
             pass
-
         out_path.parent.mkdir(parents=True, exist_ok=True)
         pygame.image.save(surf, str(out_path))
         print(f"[UI] placeholder criado: {out_path}")
@@ -120,13 +103,11 @@ def _create_placeholder_image(name):
 
 
 def _load_ui_image(name, create_if_missing=False):
-    """Carrega (com cache) uma imagem. Cria placeholder se pedido."""
     if not name:
         return None
     key = str(name).strip()
     if key in _IMAGE_CACHE:
         return _IMAGE_CACHE[key]
-
     found = _find_image_file(key)
     if found is not None:
         try:
@@ -135,12 +116,10 @@ def _load_ui_image(name, create_if_missing=False):
             return surf
         except Exception as e:
             print(f"[UI] erro ao carregar {found}: {e}")
-
     if create_if_missing:
         surf = _create_placeholder_image(key)
         _IMAGE_CACHE[key] = surf
         return surf
-
     if key not in _MISSING_IMAGES_LOGGED:
         _MISSING_IMAGES_LOGGED.add(key)
         print(f"[UI] imagem não encontrada: {key!r}")
@@ -153,7 +132,7 @@ def clear_image_cache():
 
 
 # =====================================================================
-# CALLBACK HELPERS
+# HELPERS
 # =====================================================================
 def _wrap_callback(fn):
     try:
@@ -201,6 +180,13 @@ def _int_or(v, default):
         return default
 
 
+def _float_or(v, default):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return default
+
+
 def _bool_or(v, default):
     if v is None:
         return default
@@ -243,7 +229,6 @@ class ScreenLoader:
         if vp is None:
             print("[UI] cena sem `.vp` — use StandardScreen")
             return
-
         actions = {}
         if hasattr(scene, "get_actions"):
             try:
@@ -255,24 +240,19 @@ class ScreenLoader:
         if not widgets_data:
             return
 
-        # ---- Mapa id -> wdata para resolver parent_id ----
         id_to_wdata = {w.get("id"): w for w in widgets_data if w.get("id")}
 
         def _depth(w):
             d, p, guard = 0, w.get("parent_id"), 0
             while p and guard < 64:
-                d += 1
-                guard += 1
+                d += 1; guard += 1
                 parent = id_to_wdata.get(p)
                 if not parent:
                     break
                 p = parent.get("parent_id")
             return d
 
-        # ---- Constrói pais antes dos filhos ----
         ordered = sorted(widgets_data, key=_depth)
-
-        # ---- Guarda o content rect de cada widget (para seus filhos) ----
         content_rect_by_id = {}
 
         for wdata in ordered:
@@ -281,29 +261,47 @@ class ScreenLoader:
             if parent_id:
                 parent_vp = content_rect_by_id.get(parent_id, vp)
 
-            widget = cls._build_widget(wdata, parent_vp, actions)
+            widget = cls._build_widget(wdata, parent_vp, actions, scene)
             if widget is None:
                 continue
 
-            # Calcula o "content rect" para eventuais filhos
             wid = wdata.get("id")
             if wid:
+                props = wdata.get("props", {}) or {}
+
+                def _pick(key, default=None):
+                    if key in wdata:
+                        v = wdata[key]
+                        if v is not None and v != "":
+                            return v
+                    if key in props:
+                        v = props[key]
+                        if v is not None and v != "":
+                            return v
+                    return default
+
+                pad = _int_or(_pick("padding"), 0)
                 if wdata.get("type") == "tabpanel":
-                    tabs = (wdata.get("props", {}) or {}).get("tabs", [])
+                    tabs = props.get("tabs", []) or []
                     if tabs:
                         tab_h = max(28, int(widget.rect.height * 0.12))
-                        content_rect_by_id[wid] = pygame.Rect(
-                            widget.rect.x, widget.rect.y + tab_h,
-                            widget.rect.width, widget.rect.height - tab_h)
+                        base = pygame.Rect(widget.rect.x,
+                                           widget.rect.y + tab_h,
+                                           widget.rect.width,
+                                           widget.rect.height - tab_h)
                     else:
-                        content_rect_by_id[wid] = widget.rect
+                        base = widget.rect
                 else:
-                    content_rect_by_id[wid] = widget.rect
+                    base = widget.rect
+                if pad > 0:
+                    base = base.inflate(-pad * 2, -pad * 2)
+                content_rect_by_id[wid] = base
 
             scene.add(widget)
 
+    # -----------------------------------------------------------------
     @classmethod
-    def _build_widget(cls, wdata, vp, actions):
+    def _build_widget(cls, wdata, vp, actions, scene=None):
         wtype = str(wdata.get("type", "button")).lower()
         wid = wdata.get("id") or f"{wtype}_{id(wdata)}"
         rect = rel_rect(
@@ -316,8 +314,7 @@ class ScreenLoader:
         )
         props = dict(wdata.get("props", {}))
 
-        def pick(key, default=None):
-            """Lê de wdata (root) primeiro; se não existir, tenta props."""
+        def _get(key, default=None):
             if key in wdata:
                 v = wdata[key]
                 if v is not None and v != "":
@@ -328,91 +325,93 @@ class ScreenLoader:
                     return v
             return default
 
-        z = int(pick("z", 0))
-        fname = pick("font_name", "default")
-        fsize = pick("font_size", None)
-        bold = bool(pick("bold", False))
-        tcol = parse_color(pick("text_color"), None)
-        fcol = parse_color(pick("fill_color"), None)
-        bcol = parse_color(pick("border_color"), None)
-        tabname = pick("tab", None)
+        # --- comuns ---
+        z = int(wdata.get("z", 0))
+        fname = _get("font_name", "default")
+        fsize = _get("font_size")
+        bold = bool(_get("bold", False))
+        tcol = parse_color(_get("text_color"))
+        fcol = parse_color(_get("fill_color"))
+        bcol = parse_color(_get("border_color"))
+        tabname = _get("tab")
 
-        click_snd = _sound_or_none(pick("click_sound"))
-        hover_snd = _sound_or_none(pick("hover_sound"))
-        click_vol = pick("click_volume", None)
-        hover_vol = pick("hover_volume", None)
+        f_alpha = _int_or(_get("fill_alpha"), 255)
+        b_alpha = _int_or(_get("border_alpha"), 255)
+        pixel_art = _bool_or(_get("pixel_art"), True)
 
-        # Imagem de fundo
-        bg_image_name = pick("bg_image", None)
+        click_snd = _sound_or_none(_get("click_sound"))
+        hover_snd = _sound_or_none(_get("hover_sound"))
+        click_vol = _get("click_volume")
+        hover_vol = _get("hover_volume")
+
+        # --- imagens ---
+        bg_image_name = _get("bg_image")
         bg_image_surf = _load_ui_image(bg_image_name, create_if_missing=True)
 
-        # Ícone
-        icon_name = pick("icon", None) or pick("icon_surface", None)
+        icon_name = _get("icon") or _get("icon_surface")
         icon_surf = _load_ui_image(icon_name, create_if_missing=True)
 
-        # Tint
-        bg_tint = parse_color(pick("bg_tint"), None)
-
-        # Borda / sombra / modo de imagem / ícone (com fallback)
-        bg_image_mode   = pick("bg_image_mode", "stretch")
-        bg_image_alpha  = _int_or(pick("bg_image_alpha"), 255)
-        border_width    = _int_or(pick("border_width"), 2)
-        border_radius   = _int_or(pick("border_radius"), 10)
-        draw_border     = _bool_or(pick("draw_border"), True)
-        draw_shadow     = _bool_or(pick("draw_shadow"), True)
-        icon_position   = pick("icon_position", "left")
-        icon_size       = pick("icon_size", None)
-        icon_gap        = _int_or(pick("icon_gap"), 6)
+        bg_tint = parse_color(_get("bg_tint"), None)
 
         common = dict(
             z=z, font_name=fname, tab=tabname,
             text_color=tcol, fill_color=fcol, border_color=bcol,
+            fill_alpha=f_alpha, border_alpha=b_alpha,
             click_sound=click_snd, hover_sound=hover_snd,
             click_volume=click_vol, hover_volume=hover_vol,
         )
 
         bg_common = dict(
             bg_image=bg_image_surf,
-            bg_image_mode=bg_image_mode,
+            bg_image_mode=_get("bg_image_mode", "stretch"),
             bg_tint=bg_tint,
-            bg_image_alpha=bg_image_alpha,
-            border_width=border_width,
-            border_radius=border_radius,
-            draw_border=draw_border,
-            draw_shadow=draw_shadow,
+            bg_image_alpha=_int_or(_get("bg_image_alpha"), 255),
+            border_width=_int_or(_get("border_width"), 2),
+            border_radius=_int_or(_get("border_radius"), 10),
+            draw_border=_bool_or(_get("draw_border"), True),
+            draw_shadow=_bool_or(_get("draw_shadow"), True),
+            pixel_art=pixel_art,
         )
 
         try:
             if wtype == "button":
                 kw = _filter_kwargs(Button, dict(
-                    label=props.get("label", "Botão"),
-                    style=props.get("style", "primary"),
+                    label=_get("label", "Botão"),
+                    style=_get("style", "primary"),
                     font_size=fsize, bold=bold,
                     icon_surface=icon_surf,
-                    icon_size=icon_size,
-                    icon_position=icon_position,
-                    icon_gap=icon_gap,
+                    icon_size=_get("icon_size"),
+                    icon_position=_get("icon_position", "left"),
+                    icon_gap=_int_or(_get("icon_gap"), 6),
                     **bg_common, **common))
                 w = Button(wid, rect, **kw)
-                cls._bind_action(w, props.get("on_click"), actions, kind="click")
+                cls._bind_action(w, props.get("on_click"), actions,
+                                 kind="click")
 
             elif wtype == "panel":
                 kw = _filter_kwargs(Panel, dict(
-                    title=props.get("title"), bold=bold,
+                    title=_get("title"),
+                    title_font_size=_int_or(_get("title_font_size"), None),
+                    bold=bold,
+                    padding=_int_or(_get("padding"), 0),
+                    border_sides=_get("border_sides"),
                     **bg_common, **common))
                 w = Panel(wid, rect, **kw)
 
             elif wtype == "label":
                 kw = _filter_kwargs(Label, dict(
-                    text=props.get("text", "Texto"),
-                    size=fsize or props.get("size", 20),
-                    bold=bold, align=props.get("align", "center"),
+                    text=_get("text", "Texto"),
+                    size=fsize or _get("size", 20),
+                    bold=bold,
+                    align=_get("align", "center"),
                     **common))
                 w = Label(wid, rect, **kw)
 
             elif wtype == "list":
                 kw = _filter_kwargs(ListView, dict(
-                    items=props.get("items", []), bold=bold, **common))
+                    items=_get("items", []),
+                    bold=bold,
+                    **common))
                 w = ListView(wid, rect, **kw)
                 cls._bind_action(w, props.get("on_select"), actions,
                                  kind="select")
@@ -420,44 +419,106 @@ class ScreenLoader:
             elif wtype == "image":
                 kw = _filter_kwargs(ImageBox, dict(
                     surface=icon_surf,
-                    bg_image_mode=bg_image_mode,
+                    bg_image_mode=_get("bg_image_mode", "contain"),
+                    pixel_art=pixel_art,
                     **common))
                 w = ImageBox(wid, rect, **kw)
 
+            elif wtype == "world_sprite":
+                kw = _filter_kwargs(WorldSprite, dict(
+                    surface=icon_surf,
+                    world_x=_float_or(_get("world_x"), 0.0),
+                    world_y=_float_or(_get("world_y"), 0.0),
+                    max_size=_int_or(_get("max_size"), 130),
+                    pixel_art=pixel_art,
+                    screen_manager=scene.screen_manager if scene else None,
+                    game=getattr(scene, "game", None) if scene else None,
+                    z=z, tab=tabname,
+                ))
+                w = WorldSprite(wid, rect, **kw)
+
             elif wtype == "checkbox":
                 kw = _filter_kwargs(Checkbox, dict(
-                    label=props.get("label", ""),
-                    checked=props.get("checked", False),
-                    bold=bold, **common))
+                    label=_get("label", ""),
+                    checked=_get("checked", False),
+                    bold=bold,
+                    **common))
                 w = Checkbox(wid, rect, **kw)
                 cls._bind_action(w, props.get("on_toggle"), actions,
                                  kind="toggle")
 
             elif wtype == "slider":
                 kw = _filter_kwargs(Slider, dict(
-                    value=props.get("value", 0.5),
-                    min_val=props.get("min", 0.0),
-                    max_val=props.get("max", 1.0), **common))
+                    value=_float_or(_get("value"), 0.5),
+                    min_val=_float_or(_get("min"), 0.0),
+                    max_val=_float_or(_get("max"), 1.0),
+                    **common))
                 w = Slider(wid, rect, **kw)
                 cls._bind_action(w, props.get("on_change"), actions,
                                  kind="change")
 
             elif wtype == "dropdown":
                 kw = _filter_kwargs(Dropdown, dict(
-                    options=props.get("options", ["-"]),
-                    value=props.get("value"), bold=bold, **common))
+                    options=_get("options", ["-"]),
+                    value=_get("value"),
+                    bold=bold,
+                    **common))
                 w = Dropdown(wid, rect, **kw)
                 cls._bind_action(w, props.get("on_change"), actions,
                                  kind="change")
 
             elif wtype == "tabpanel":
                 kw = _filter_kwargs(TabPanel, dict(
-                    tabs=props.get("tabs", ["Tab 1"]),
-                    current_tab=props.get("current_tab"),
-                    bold=bold, **common))
+                    tabs=_get("tabs", ["Tab 1"]),
+                    current_tab=_get("current_tab"),
+                    bold=bold,
+                    **common))
                 w = TabPanel(wid, rect, **kw)
                 cls._bind_action(w, props.get("on_change"), actions,
                                  kind="change")
+
+            elif wtype == "grid":
+                kw = _filter_kwargs(GridSelect, dict(
+                    items=_get("items", []),
+                    cols=_int_or(_get("cols"), 2),
+                    rows=_int_or(_get("rows"), 2),
+                    cell_gap=_int_or(_get("cell_gap"), 8),
+                    bold=bold,
+                    **common))
+                w = GridSelect(wid, rect, **kw)
+                cls._bind_action(w, props.get("on_select"), actions,
+                                 kind="select")
+                
+            elif wtype == "progress":
+                radius_v = _get("radius")
+                kw = _filter_kwargs(ProgressBar, dict(
+                    value=_float_or(_get("value"), 0.5),
+                    max_value=_float_or(_get("max_value"), 1.0),
+                    min_value=_float_or(_get("min_value"), 0.0),
+                    bg_color=parse_color(_get("progress_bg"), None),
+                    color_low=parse_color(_get("color_low"), None),
+                    color_mid=parse_color(_get("color_mid"), None),
+                    color_high=parse_color(_get("color_high"), None),
+                    border_color=bcol,
+                    show_text=_bool_or(_get("show_text"), True),
+                    text_format=_get("text_format", "{value}/{max}"),
+                    font_name=fname, text_color=tcol, tab=tabname,
+                    radius=_int_or(radius_v, None) if radius_v is not None else None,
+                    z=z,
+                ))
+                w = ProgressBar(wid, rect, **kw)
+
+            elif wtype == "badge":
+                kw = _filter_kwargs(Badge, dict(
+                    text=_get("text", ""),
+                    bg_color=parse_color(_get("bg_color"), None),
+                    text_color=parse_color(_get("badge_text_color"), None) or tcol,
+                    border_color=parse_color(_get("badge_border_color"), None),
+                    font_name=fname, bold=bold,
+                    font_size=fsize,
+                    tab=tabname, z=z,
+                ))
+                w = Badge(wid, rect, **kw)
 
             else:
                 print(f"[UI] tipo desconhecido: {wtype}")
@@ -467,13 +528,14 @@ class ScreenLoader:
             return None
 
         if click_snd is None and hasattr(w, "click_sound"):
-            raw = pick("click_sound")
+            raw = _get("click_sound")
             if raw is not None and _sound_or_none(raw) is None:
                 w.click_sound = None
 
         w.visible = wdata.get("visible", True)
         w.enabled = wdata.get("enabled", True)
         return w
+
     @classmethod
     def _bind_action(cls, widget, action_name, actions, kind="click"):
         attr = {"click": "on_click", "toggle": "on_toggle",
@@ -505,7 +567,6 @@ class ScreenLoader:
 
     @classmethod
     def list_images(cls):
-        """Lista imagens (nome relativo) em todas as pastas de UI."""
         out = set()
         for base in _UI_IMAGE_DIRS:
             if not base.exists():
@@ -522,6 +583,5 @@ class ScreenLoader:
 
     @classmethod
     def create_image_placeholder(cls, name):
-        """Cria placeholder e retorna o nome salvo (relativo)."""
         surf = _create_placeholder_image(name)
         return str(name) if surf is not None else None

@@ -38,15 +38,18 @@ class EditorController(EditorRenderMixin, BaseScene):
     MIN_CANVAS = 260
 
     ADD_TYPES = [
-        ("button",   "Botão",    "primary"),
-        ("panel",    "Painel",   "gold"),
-        ("label",    "Texto",    "ghost"),
-        ("list",     "Lista",    "primary"),
-        ("image",    "Imagem",   "success"),
-        ("checkbox", "Checkbox", "success"),
-        ("slider",   "Slider",   "gold"),
-        ("dropdown", "Dropdown", "primary"),
-        ("tabpanel", "Abas",     "ghost"),
+        ("button",       "Botão",    "primary"),
+        ("panel",        "Painel",   "gold"),
+        ("label",        "Texto",    "ghost"),
+        ("list",         "Lista",    "primary"),
+        ("image",        "Imagem",   "success"),
+        ("checkbox",     "Checkbox", "success"),
+        ("slider",       "Slider",   "gold"),
+        ("dropdown",     "Dropdown", "primary"),
+        ("tabpanel",     "Abas",     "ghost"),
+        ("progress",     "Barra",    "success"),
+        ("badge",        "Badge",    "gold"),
+        ("world_sprite", "Sprite3D", "primary"),
     ]
 
     # =================================================================
@@ -123,11 +126,10 @@ class EditorController(EditorRenderMixin, BaseScene):
         self._color_target_key = None
         self._image_target_key = None
 
-        # Filtro de aba: None | (tabpanel_id, tab_name)
         self._editing_tab = None
         self._tab_dd = None
         self._tab_dd_rect = pygame.Rect(0, 0, 0, 0)
-        self._tab_map = {}   # label -> (tabpanel_id, tab_name)
+        self._tab_map = {}
 
         try:
             self._sound_names = available_sound_names()
@@ -136,6 +138,7 @@ class EditorController(EditorRenderMixin, BaseScene):
 
         self._bg_image_modes = S.BG_IMAGE_MODES
         self._icon_positions = S.ICON_POSITIONS
+        self._border_sides_choices = S.BORDER_SIDE_OPTIONS
 
         self._layout()
         self._new_layout()
@@ -241,7 +244,6 @@ class EditorController(EditorRenderMixin, BaseScene):
         return d
 
     def _is_descendant_of(self, wdata, ancestor_id):
-        """True se `wdata` é descendente (não incluindo ele mesmo) do widget `ancestor_id`."""
         if not ancestor_id:
             return False
         p = wdata.get("parent_id")
@@ -268,13 +270,27 @@ class EditorController(EditorRenderMixin, BaseScene):
     def _get_content_rect(self, wdata):
         r = self._design_rect(wdata)
         wtype = wdata.get("type")
+        props = wdata.get("props", {}) or {}
+
         if wtype == "tabpanel":
-            tabs = (wdata.get("props", {}) or {}).get("tabs", [])
+            tabs = props.get("tabs", [])
             if tabs:
                 tab_h = max(28, int(r.height * 0.12))
-                return pygame.Rect(r.x, r.y + tab_h,
+                base = pygame.Rect(r.x, r.y + tab_h,
                                    r.width, r.height - tab_h)
-        return r
+            else:
+                base = r
+        else:
+            base = r
+
+        # Aplica padding
+        try:
+            pad = int(float(wdata.get("padding", props.get("padding", 0)) or 0))
+        except (TypeError, ValueError):
+            pad = 0
+        if pad > 0:
+            base = base.inflate(-pad * 2, -pad * 2)
+        return base
 
     def _has_selected_ancestor(self, idx):
         if not (0 <= idx < len(self.widgets_data)):
@@ -323,10 +339,9 @@ class EditorController(EditorRenderMixin, BaseScene):
         self.right_scroll = 0
 
     # =================================================================
-    # ABAS — CADA (TabPanel, nome) É ÚNICO
+    # ABAS
     # =================================================================
     def _get_all_tabs(self):
-        """Retorna [{tp_id, tab, label}, ...] — uma entrada por aba de cada TabPanel."""
         out = []
         for w in self.widgets_data:
             if w.get("type") != "tabpanel":
@@ -358,16 +373,7 @@ class EditorController(EditorRenderMixin, BaseScene):
     def _editing_tab_name(self):
         return self._editing_tab[1] if self._editing_tab else ""
 
-    def _editing_tabpanel_id(self):
-        return self._editing_tab[0] if self._editing_tab else None
-
     def _set_editing_tab(self, value):
-        """
-        Aceita:
-          - None ou "(todas)"      -> limpa filtro
-          - string (label)         -> resolve via self._tab_map
-          - tupla (tp_id, tab_name)-> usa direto
-        """
         if value is None or value == "(todas)":
             self._editing_tab = None
         elif isinstance(value, tuple) and len(value) == 2:
@@ -398,7 +404,6 @@ class EditorController(EditorRenderMixin, BaseScene):
             self._tab_dd.value = current
 
     def _widget_hidden_by_filter(self, wdata):
-        """True se o widget está oculto pelo filtro de aba atual."""
         if not self._editing_tab:
             return False
         tp_id, tab_name = self._editing_tab
@@ -521,7 +526,7 @@ class EditorController(EditorRenderMixin, BaseScene):
                 if sid not in self.sections_open:
                     self.sections_open[sid] = (sid not in
                                                {"sounds", "image",
-                                                "border", "icon"})
+                                                "border", "icon", "alpha"})
 
         old_focus = {k: getattr(f, "focused", False)
                      for k, f in self.fields.items()}
@@ -553,6 +558,7 @@ class EditorController(EditorRenderMixin, BaseScene):
             "hover_sound": self._sound_names,
             "bg_image_mode": self._bg_image_modes,
             "icon_position": self._icon_positions,
+            "border_sides": self._border_sides_choices,
         }
 
         placeholders = {
@@ -566,6 +572,9 @@ class EditorController(EditorRenderMixin, BaseScene):
             "click_volume": "0.0 - 1.0",
             "hover_volume": "0.0 - 1.0",
             "parent_id": "id do painel pai",
+            "text_format": "{value}/{max}",
+            "world_x": "ex: 500.0",
+            "world_y": "ex: 300.0",
         }
 
         for sid, _, keys in sections:
@@ -597,6 +606,9 @@ class EditorController(EditorRenderMixin, BaseScene):
                             cur_s = str(self._pick(w, props,
                                                    "icon_position",
                                                    "left"))
+                        elif k == "border_sides":
+                            cur_s = str(self._pick(w, props,
+                                                   "border_sides", "all"))
                         else:
                             cur_s = str(self._pick(w, props, k, "-"))
 
@@ -619,8 +631,7 @@ class EditorController(EditorRenderMixin, BaseScene):
                         cur = self._pick(w, props, k, "")
                         def _mk_open(key=k):
                             return lambda: self._open_image_picker(key)
-                        f = ImageField(rect,
-                                       str(cur) if cur else "",
+                        f = ImageField(rect, str(cur) if cur else "",
                                        on_open=_mk_open())
                         self.fields[k] = f
 
@@ -635,7 +646,6 @@ class EditorController(EditorRenderMixin, BaseScene):
                             cur = ""
                         else:
                             cur = str(cur)
-
                         f = TextField(rect, cur,
                                       placeholder=placeholders.get(k, ""))
                         f.focused = old_focus.get(k, False)
@@ -683,7 +693,11 @@ class EditorController(EditorRenderMixin, BaseScene):
                 "x": 0.5, "y": 0.5, "w": 0.22, "h": 0.09,
                 "anchor": "c", "font_name": "default", "props": {}}
 
-        # ---------- Parent ----------
+        # Herda aba em edição
+        if self._editing_tab:
+            base["tab"] = self._editing_tab[1]
+
+        # Herda parent se algo tiver selecionado
         parent_id = None
         sel = None
         if 0 <= self.selected_idx < len(self.widgets_data):
@@ -694,34 +708,12 @@ class EditorController(EditorRenderMixin, BaseScene):
             else:
                 parent_id = sel.get("parent_id")
 
-        # Sem parent pela seleção, mas tem filtro de aba → vira filho do TabPanel
         if parent_id is None and self._editing_tab:
             parent_id = self._editing_tab[0]
-
         if parent_id:
             base["parent_id"] = parent_id
 
-        # ---------- Tab ----------
-        # 1) Filtro ativo
-        inherited_tab = self._editing_tab_name() if self._editing_tab else None
-        # 2) Pai é tabpanel → primeira aba dele
-        if inherited_tab is None and parent_id:
-            parent = self._get_widget_by_id(parent_id)
-            if parent and parent.get("type") == "tabpanel":
-                tabs = (parent.get("props", {}) or {}).get("tabs", []) or []
-                if tabs:
-                    inherited_tab = str(tabs[0])
-        # 3) Selecionado é tabpanel → primeira aba dele
-        if inherited_tab is None and sel and sel.get("type") == "tabpanel":
-            tabs = (sel.get("props", {}) or {}).get("tabs", []) or []
-            if tabs:
-                inherited_tab = str(tabs[0])
-
-        # Só aplica tab se o widget é filho (direto ou não) de um TabPanel
-        if inherited_tab:
-            base["tab"] = inherited_tab
-
-        # ---------- Defaults por tipo ----------
+        # Defaults por tipo
         if wtype == "button":
             base["bold"] = True
             base["props"] = {"label": "Botão", "style": "primary"}
@@ -756,6 +748,29 @@ class EditorController(EditorRenderMixin, BaseScene):
                              "current_tab": "Aba 1"}
             base["w"], base["h"] = 0.8, 0.5
             base.pop("tab", None)
+        elif wtype == "progress":
+            base["props"] = {
+                "value": 50, "max_value": 100, "min_value": 0,
+                "show_text": True, "text_format": "{value}/{max}",
+                "progress_bg": "#282D3C",
+                "color_low": "#E65A5A",
+                "color_mid": "#F8B030",
+                "color_high": "#69DC82",
+            }
+            base["w"], base["h"] = 0.35, 0.04
+        elif wtype == "badge":
+            base["bold"] = True
+            base["props"] = {
+                "text": "BADGE",
+                "bg_color": "#4A80E8",
+                "badge_text_color": "#FFFFFF",
+            }
+            base["w"], base["h"] = 0.10, 0.04
+        elif wtype == "world_sprite":
+            base["props"] = {
+                "world_x": 0.0, "world_y": 0.0, "max_size": 130,
+            }
+            base["w"], base["h"] = 0.12, 0.15
 
         self.widgets_data.append(base)
         self._select_only(len(self.widgets_data) - 1)
@@ -907,7 +922,6 @@ class EditorController(EditorRenderMixin, BaseScene):
         return candidates[0][2]
 
     def _hit_test_tab_header(self, design_pos):
-        """Retorna (wdata, tab_name) se o clique caiu no header de algum TabPanel."""
         ordered = sorted(self.widgets_data,
                          key=lambda w: self._get_depth(w))
         for wdata in ordered:
@@ -990,6 +1004,16 @@ class EditorController(EditorRenderMixin, BaseScene):
             if "tab" in self.fields:
                 w["tab"] = self.fields["tab"].text.strip() or None
 
+            if "padding" in self.fields:
+                s = self.fields["padding"].text.strip()
+                if s:
+                    try:
+                        w["padding"] = int(float(s))
+                    except ValueError:
+                        pass
+                else:
+                    w.pop("padding", None)
+
             if "font_size" in self.fields:
                 s = self.fields["font_size"].text.strip()
                 if s:
@@ -1003,7 +1027,9 @@ class EditorController(EditorRenderMixin, BaseScene):
             if "bold" in self.fields:
                 w["bold"] = bool(self.fields["bold"].value)
 
-            for k in ("text_color", "fill_color", "border_color", "bg_tint"):
+            for k in ("text_color", "fill_color", "border_color", "bg_tint",
+                      "color_low", "color_mid", "color_high", "progress_bg",
+                      "bg_color", "badge_text_color", "badge_border_color"):
                 if k in self.fields:
                     s = self.fields[k].text.strip()
                     if s:
@@ -1024,7 +1050,8 @@ class EditorController(EditorRenderMixin, BaseScene):
                         w.pop(k, None)
 
             for k in ("bg_image_alpha", "border_width", "border_radius",
-                      "icon_size", "icon_gap"):
+                      "icon_size", "icon_gap",
+                      "fill_alpha", "border_alpha", "max_size", "radius"):
                 if k in self.fields:
                     s = self.fields[k].text.strip()
                     if s:
@@ -1035,11 +1062,12 @@ class EditorController(EditorRenderMixin, BaseScene):
                     else:
                         w.pop(k, None)
 
-            for k in ("draw_border", "draw_shadow"):
+            for k in ("draw_border", "draw_shadow", "show_text"):
                 if k in self.fields:
                     w[k] = bool(self.fields[k].value)
 
-            for k in ("click_volume", "hover_volume"):
+            for k in ("click_volume", "hover_volume",
+                      "world_x", "world_y"):
                 if k in self.fields:
                     s = self.fields[k].text.strip()
                     if s:
@@ -1066,15 +1094,24 @@ class EditorController(EditorRenderMixin, BaseScene):
                 w["bg_image_mode"] = self.dropdowns["bg_image_mode"].value
             if "icon_position" in self.dropdowns:
                 w["icon_position"] = self.dropdowns["icon_position"].value
+            if "border_sides" in self.dropdowns:
+                v = self.dropdowns["border_sides"].value
+                if v and v != "all":
+                    w["border_sides"] = v
+                else:
+                    w.pop("border_sides", None)
 
-            for k in ("label", "title", "text", "current_tab"):
+            # ---- props ----
+            for k in ("label", "title", "text", "current_tab",
+                      "text_format"):
                 if k in self.fields:
                     props[k] = self.fields[k].text
 
             if "checked" in self.fields:
                 props["checked"] = bool(self.fields["checked"].value)
 
-            for k in ("value", "min", "max"):
+            for k in ("value", "min", "max",
+                      "max_value", "min_value"):
                 if k in self.fields:
                     s = self.fields[k].text.strip()
                     if s:
@@ -1101,7 +1138,7 @@ class EditorController(EditorRenderMixin, BaseScene):
                     else:
                         props.pop(k, None)
 
-            # Se mudou tabs de um tabpanel, o filtro pode ter ficado inválido
+            # Filtro pode ter ficado inválido (tabs mudaram)
             if w.get("type") == "tabpanel" and self._editing_tab:
                 tp_id, tab_name = self._editing_tab
                 if tp_id == w.get("id"):
@@ -1160,7 +1197,18 @@ class EditorController(EditorRenderMixin, BaseScene):
             self.layout_name = data.get("name", name)
             self.name_field.text = self.layout_name
             self._select_clear()
-            self._editing_tab = None
+
+            first_tp = next((w for w in self.widgets_data
+                             if w.get("type") == "tabpanel"), None)
+            if first_tp:
+                tabs = (first_tp.get("props", {}) or {}).get("tabs", []) or []
+                if tabs:
+                    self._editing_tab = (first_tp.get("id"), str(tabs[0]))
+                else:
+                    self._editing_tab = None
+            else:
+                self._editing_tab = None
+
             self._mark_dirty()
             self._rebuild_fields()
             self._rebuild_tab_dropdown()
@@ -1328,7 +1376,7 @@ class {cls}(StandardScreen):
 
     def _flatten_runtime(self, wdata):
         parent_content = self._get_parent_content_rect(wdata)
-        widget = ScreenLoader._build_widget(wdata, parent_content, {})
+        widget = ScreenLoader._build_widget(wdata, parent_content, {}, self)
         if widget is not None:
             widget.rect = self._design_to_screen_rect(widget.rect)
             self._runtime_widgets.append(widget)
@@ -1600,7 +1648,7 @@ class {cls}(StandardScreen):
             self._strong_guides_h = set()
 
     # =================================================================
-    # HANDLERS
+    # HANDLERS INTERNOS
     # =================================================================
     def _handle_ui_click(self, pos):
         for key, r in self._top_btn_rects.items():
@@ -1647,7 +1695,6 @@ class {cls}(StandardScreen):
         design = self._screen_to_design(pos)
         ctrl = bool(pygame.key.get_mods() & pygame.KMOD_CTRL)
 
-        # 1) Clique em header de tab de algum TabPanel?
         tab_hit = self._hit_test_tab_header(design)
         if tab_hit is not None:
             wdata, tab_name = tab_hit
@@ -1658,7 +1705,6 @@ class {cls}(StandardScreen):
                 self._set_editing_tab((tp_id, tab_name))
             return
 
-        # 2) Resize handle
         if len(self.selected_indices) == 1 and self.selected_idx >= 0:
             sel = self.widgets_data[self.selected_idx]
             if self._resize_handle_rect(sel).collidepoint(design):
@@ -1667,7 +1713,6 @@ class {cls}(StandardScreen):
                 self.drag_offset = design
                 return
 
-        # 3) Hit test
         idx = self._hit_test(design)
 
         if idx < 0:

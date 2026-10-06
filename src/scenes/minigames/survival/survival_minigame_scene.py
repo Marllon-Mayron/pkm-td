@@ -8,7 +8,7 @@ import pygame
 import math
 import json
 import os
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Any
 
 from src.scenes.minigames.survival.components.pokemon_input_handler import PokemonInputHandler
 from src.managers.notification_manager import notification_manager
@@ -22,7 +22,7 @@ from src.battle.effects.status_effect import StatusType
 from src.config.paths import PROJECT_ROOT
 from src.data.pokedex import Pokedex
 from src.data.item_bag_catalog import item_bag_catalog
-from src.ui.toast_renderer import toast_battle, toast_info, toast_success, toast_warning, toast_error
+from src.ui.toast_renderer import toast_success, toast_warning
 
 
 class SurvivalMinigameScene(BaseMinigameScene):
@@ -654,7 +654,7 @@ class SurvivalMinigameScene(BaseMinigameScene):
             self.wave_manager.paused = False
 
     def open_move_select_overlay(self, pokemon):
-        from src.scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
+        from scenes.game_scene.components.overlays.move_select.move_select_overlay import MoveSelectOverlay
 
         if not pokemon or not pokemon.moves:
             return

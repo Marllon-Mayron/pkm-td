@@ -1,7 +1,6 @@
 # src/ui/image_draw.py
 """
 Utilitário central de desenho de imagens.
-Todos os widgets/painéis passam por aqui.
 
 Modos:
   "stretch"   estica pra preencher (ignora aspect)
@@ -13,6 +12,10 @@ Modos:
   "cover"     mantém aspect, cobre tudo (corta sobras)
   "fit_w"     largura total, altura proporcional
   "fit_h"     altura total, largura proporcional
+
+Escala:
+  smooth=False (padrão) → pygame.transform.scale (nearest, pixel perfect)
+  smooth=True           → pygame.transform.smoothscale (bilinear)
 """
 import pygame
 
@@ -21,7 +24,6 @@ MODES = ("stretch", "tile", "tile_h", "tile_v", "center",
 
 
 def _apply_tint(img, tint):
-    """Retorna uma cópia da surface com tint aplicado (BLEND_RGBA_MULT)."""
     if not tint:
         return img
     out = img.copy()
@@ -53,7 +55,6 @@ def _scaled_size(img, rect, mode):
         return (rw, max(1, int(ih * rw / iw)))
     if mode == "fit_h":
         return (max(1, int(iw * rh / ih)), rh)
-    # contain / cover
     ratio_img = iw / ih
     ratio_rect = rw / rh
     if mode == "contain":
@@ -69,11 +70,21 @@ def _scaled_size(img, rect, mode):
     return (max(1, nw), max(1, nh))
 
 
+def _scale(img, size, smooth):
+    """Escolhe entre scale (nearest) e smoothscale (bilinear)."""
+    try:
+        if smooth:
+            return pygame.transform.smoothscale(img, size)
+        return pygame.transform.scale(img, size)
+    except Exception:
+        return pygame.transform.scale(img, size)
+
+
 def draw_image_in_rect(target, image, rect, mode="stretch",
-                       tint=None, alpha=255):
+                       tint=None, alpha=255, smooth=False):
     """
-    Desenha `image` (Surface) dentro de `rect` conforme `mode`.
-    Retorna o Rect final usado (útil pra debug).
+    Desenha `image` dentro de `rect`.
+    `smooth=False` → nearest neighbor (pixel art).
     """
     if image is None or rect.width <= 0 or rect.height <= 0:
         return rect
@@ -92,12 +103,11 @@ def draw_image_in_rect(target, image, rect, mode="stretch",
     # Modos de repetição
     if mode in ("tile", "tile_h", "tile_v"):
         iw, ih = img.get_size()
-        # tile_h: estica altura; tile_v: estica largura; tile: original
         if mode == "tile_h":
-            tile = pygame.transform.scale(img, (iw, rh))
+            tile = _scale(img, (iw, rh), smooth)
             tile_w, tile_h = iw, rh
         elif mode == "tile_v":
-            tile = pygame.transform.scale(img, (rw, ih))
+            tile = _scale(img, (rw, ih), smooth)
             tile_w, tile_h = rw, ih
         else:
             tile = img
@@ -118,15 +128,11 @@ def draw_image_in_rect(target, image, rect, mode="stretch",
 
     # Modos de escala única
     nw, nh = _scaled_size(img, rect, mode)
-    try:
-        if (nw, nh) != img.get_size():
-            surf = pygame.transform.smoothscale(img, (nw, nh))
-        else:
-            surf = img
-    except Exception:
+    if (nw, nh) != img.get_size():
+        surf = _scale(img, (nw, nh), smooth)
+    else:
         surf = img
 
-    # Clipping para evitar vazar do rect
     old = target.get_clip()
     target.set_clip(rect.clip(old))
 

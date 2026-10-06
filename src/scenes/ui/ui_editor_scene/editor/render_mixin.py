@@ -55,12 +55,14 @@ class EditorRenderMixin:
             self._paint_button(screen, r, label, style)
             x += w + gap
 
+        # Nome
         lbl = self._font(15).render("Nome:", True, Palette.TEXT_LIGHT)
         screen.blit(lbl, (self.name_field.rect.x - 50,
                           self.name_field.rect.centery -
                           lbl.get_height() // 2))
         self.name_field.render(screen)
 
+        # Dropdown de aba
         if self._tab_dd is None:
             self._rebuild_tab_dropdown()
 
@@ -77,6 +79,7 @@ class EditorRenderMixin:
         self._tab_dd.rect = self._tab_dd_rect
         self._tab_dd.render_closed(screen)
 
+        # Badge quando há filtro ativo
         if self._editing_tab:
             badge_x = self._tab_dd_rect.right + 8
             badge_w = min(260, self.top_rect.right - badge_x - 10)
@@ -108,8 +111,8 @@ class EditorRenderMixin:
         pad = 12
         gap = 6
         col_w = (self.left_rect.width - pad * 2 - gap) // 2
-        row_h = 30
-        y0 = self.left_rect.y + 44
+        row_h = 28
+        y0 = self.left_rect.y + 42
 
         self._left_tool_rects = []
         for idx, (wtype, label, style) in enumerate(self.ADD_TYPES):
@@ -165,7 +168,7 @@ class EditorRenderMixin:
             self._left_action_rects.append((r, actions_handlers[i]))
             self._paint_button(screen, r, label, style)
 
-        # Árvore
+        # Árvore de widgets
         list_y = y_actions + len(actions_disp) * (row_h + gap) + 12
         header = self._font(13, True).render("ARVORE / Z", True, Palette.GOLD)
         screen.blit(header, (self.left_rect.x + 12, list_y))
@@ -238,6 +241,7 @@ class EditorRenderMixin:
                              (0, DESIGN_H // 2), (DESIGN_W, DESIGN_H // 2))
             self.design_surface.blit(gs, (0, 0))
 
+        # Render recursivo (raízes primeiro)
         roots = [w for w in self.widgets_data if not w.get("parent_id")]
         roots.sort(key=lambda w: int(w.get("z", 0)))
         for root in roots:
@@ -247,6 +251,7 @@ class EditorRenderMixin:
             self.design_surface, (dr.width, dr.height))
         screen.blit(scaled, dr.topleft)
 
+        # Bordas de seleção
         for i in self.selected_indices:
             if not (0 <= i < len(self.widgets_data)):
                 continue
@@ -287,7 +292,7 @@ class EditorRenderMixin:
             return
 
         parent_content = self._get_parent_content_rect(wdata)
-        widget = ScreenLoader._build_widget(wdata, parent_content, {})
+        widget = ScreenLoader._build_widget(wdata, parent_content, {}, self)
         if widget is not None:
             widget._hover = False
             try:

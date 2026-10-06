@@ -23,7 +23,6 @@ from src.scenes.game_scene.components.managers.target_item_manager import Target
 from src.battle.effects.specific.weather.weather_filter import WeatherFilter
 from src.scenes.game_scene.components.managers.team_manager import GameTeamManager
 from src.scenes.game_scene.components.managers.wave_manager import WaveManager
-from src.scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
 from src.scenes.game_scene.components.overlays.evolution_overlay import EvolutionOverlay
 from src.scenes.game_scene.components.phase_loader import phase_loader
 from src.scenes.game_scene.components.renderer.item_bag_renderer import ItemBagRenderer
@@ -34,7 +33,6 @@ from src.scenes.game_scene.components.renderer.target_item_renderer import Targe
 from src.managers.notification_manager import notification_manager
 from src.ui.toast_renderer import toast_info, toast_warning, toast_battle
 from src.battle.effects.specific.day_night.day_night_filter import DayNightFilter
-from src.battle.effects.specific.day_night.day_night_state import DayNightType
 from src.scenes.game_scene.components.day_night_weather_system import DayNightWeatherSystem
 from src.scenes.game_scene.components.managers.in_game_debug_manager import InGameDebugManager
 from src.config.regions import make_phase_id, DEFAULT_REGION_ID
@@ -620,7 +618,6 @@ class GameScene(BaseScene):
     # ===== MÉTODOS DE OVERLAY  =====
 
     def open_move_select_overlay(self, pokemon):
-        """Abre o overlay de seleção de moves para um Pokémon"""
         if not pokemon or not pokemon.moves:
             return
 
@@ -634,12 +631,11 @@ class GameScene(BaseScene):
                 toast_warning("Complete a etapa anterior primeiro!", duration=5.0)
                 return
 
-        self.move_select_overlay = MoveSelectOverlay(self, pokemon)
-        self.move_select_overlay.active = True
-        self.game_paused = True
-        self.paused = True
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = True
+        from src.scenes.game_scene.components.overlays.move_select.move_select_scene import (
+            MoveSelectScene,
+        )
+        # A cena cuida de pausar o game_scene
+        self.game.current_scene = MoveSelectScene(self.game, self, pokemon)
 
     def close_move_select_overlay(self):
         """Fecha o overlay de seleção de moves"""
@@ -674,8 +670,10 @@ class GameScene(BaseScene):
     # OVERLAY: MOVE LEARN
     # ==================================================================
     def open_move_learn_overlay(self, pokemon, new_move_name):
-        """Abre o overlay de aprendizado de novo move."""
-        from src.scenes.game_scene.components.overlays.move_learn_overlay import MoveLearnOverlay
+        """Abre o overlay de aprendizado de novo move (agora como cena)."""
+        from src.scenes.game_scene.components.overlays.move_learn.move_learn_scene import (
+            MoveLearnScene,
+        )
 
         # ===== GUARDA 1: evolução ativa? DEFERE =====
         if (hasattr(self, 'evolution_overlay')
@@ -685,60 +683,57 @@ class GameScene(BaseScene):
             self.pending_move_learn = (pokemon, new_move_name)
             return
 
-        # ===== GUARDA 2: já existe um move_learn_overlay ativo? DEFERE =====
-        if self.move_learn_overlay and self.move_learn_overlay.active:
-            print(f"[MOVE_LEARN] Overlay já ativo — adiando '{new_move_name}' em {pokemon.name}")
-            # Salva na fila do pokémon se existir, senão usa pending_move_learn
+        # ===== GUARDA 2: já existe um move_learn_scene ativo? DEFERE =====
+        from src.scenes.game_scene.components.overlays.move_learn.move_learn_scene import (
+            MoveLearnScene as _MLS,
+        )
+        if isinstance(self.game.current_scene, _MLS):
+            print(f"[MOVE_LEARN] Cena já ativa — adiando '{new_move_name}' em {pokemon.name}")
             if not hasattr(pokemon, '_pending_moves_to_learn'):
                 pokemon._pending_moves_to_learn = []
             pokemon._pending_moves_to_learn.insert(0, new_move_name)
             return
 
-        self.move_learn_overlay = MoveLearnOverlay(self, pokemon, new_move_name)
-        self.move_learn_overlay.active = True
-        self.game_paused = True
-        self.paused = True
-        if hasattr(self, 'wave_manager'):
-            self.wave_manager.paused = True
+        # ===== Troca a cena (a cena pausa o game_scene internamente) =====
+        self.game.current_scene = MoveLearnScene(
+            self.game, self, pokemon, new_move_name,
+        )
 
     def close_move_learn_overlay(self, cancel=False):
-        """Fecha o overlay de aprendizado de moves."""
-        if self.move_learn_overlay:
-            self.move_learn_overlay.active = False
-            pokemon_ref = self.move_learn_overlay.pokemon
-            self.move_learn_overlay = None
-        else:
-            pokemon_ref = None
+        """
+        Compatibilidade: agora a cena nova faz o unpause sozinha.
+        Este método só existe se algo legado chamar.
+        """
+        if cancel:
+            # Descarta fila de moves pendentes
+            if hasattr(self, 'pending_move_learn') and self.pending_move_learn:
+                self.pending_move_learn = None
+            if hasattr(self, 'player') and self.player and self.player.team:
+                for p in self.player.team:
+                    if hasattr(p, '_pending_moves_to_learn'):
+                        p._pending_moves_to_learn = []
 
-        # ===== TM: aplica conquistas =====
-        if not cancel and hasattr(self, 'pending_tm_data') and self.pending_tm_data:
-            print(f"[TM] {self.pending_tm_data['move_name']} aprendido com sucesso!")
-            if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
-                ach_mgr = self.player.achievement_manager
-                ach_mgr.increment_counter("move_taught_count")
-                ach_mgr.check_and_unlock("first_move_taught", self.phase_id)
-                ach_mgr.check_and_unlock("move_taught_10", self.phase_id)
-            self.pending_tm_data = None
+        # Retoma a fila de moves pendentes (level up em cadeia)
+        if not cancel:
+            # Prioridade A: pending_move_learn (TM adiada)
+            if hasattr(self, 'pending_move_learn') and self.pending_move_learn:
+                pokemon, move_name = self.pending_move_learn
+                self.pending_move_learn = None
+                self.open_move_learn_overlay(pokemon, move_name)
+                return
 
-        # ===== Retoma a fila de moves pendentes (do pokémon) =====
-        if not cancel and pokemon_ref is not None:
-            if getattr(pokemon_ref, '_pending_moves_to_learn', None):
-                # Ainda há moves na fila — abre o próximo
-                print(f"[MOVE_LEARN] Fila tem "
-                      f"{len(pokemon_ref._pending_moves_to_learn)} move(s) pendente(s), "
-                      f"abrindo próximo...")
-                # NÃO desliga o paused ainda, porque vamos reabrir
-                self.game_paused = True
-                self.paused = True
-                if hasattr(self, 'wave_manager'):
-                    self.wave_manager.paused = True
+            # Prioridade B: fila do pokemon
+            pokemon_with_pending = None
+            for p in (self.player.team if hasattr(self, 'player') and self.player else []):
+                if getattr(p, '_pending_moves_to_learn', None):
+                    pokemon_with_pending = p
+                    break
 
-                # Processa o próximo (pode abrir novo overlay)
-                if hasattr(pokemon_ref, 'evolution'):
-                    pokemon_ref.evolution._process_pending_moves()
-                    return
+            if pokemon_with_pending:
+                pokemon_with_pending.evolution._process_pending_moves()
+                return
 
-        # ===== Sem mais pendências: retoma o jogo =====
+        # Sem pendências: retoma
         self.game_paused = False
         self.paused = False
         if hasattr(self, 'wave_manager'):
@@ -2362,7 +2357,6 @@ class GameScene(BaseScene):
         Lida com a desistência do jogador (via botão DESISTIR! no pause overlay).
         Conta como derrota: remove felicidade e mostra game over.
         """
-        from src.managers.sounds.sound_manager import sound_manager
 
         print(f"[GAME_SCENE] Jogador desistiu da fase {self.phase_id}!")
 

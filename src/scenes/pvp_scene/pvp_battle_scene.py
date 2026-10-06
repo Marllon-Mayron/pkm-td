@@ -2337,7 +2337,7 @@ class PvPBattleScene(BaseScene):
     def open_move_select_overlay(self, pokemon):
         if not pokemon or not pokemon.moves:
             return
-        from src.scenes.game_scene.components.overlays.move_select_overlay import MoveSelectOverlay
+        from scenes.game_scene.components.overlays.move_select.move_select_overlay import MoveSelectOverlay
         self.move_select_overlay = MoveSelectOverlay(self, pokemon)
         self.move_select_overlay.active = True
 
