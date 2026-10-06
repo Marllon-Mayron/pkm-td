@@ -126,7 +126,6 @@ class EditorRenderMixin:
 
         tools_bottom = y0 + math.ceil(len(self.ADD_TYPES) / 2) * (row_h + gap) + 4
 
-        # Hint do parent que vai herdar
         parent_hint = None
         if 0 <= self.selected_idx < len(self.widgets_data):
             p = self.widgets_data[self.selected_idx]
@@ -140,11 +139,11 @@ class EditorRenderMixin:
             screen.blit(htxt, (self.left_rect.x + 12, tools_bottom - 14))
 
         actions_disp = [
-            ("X  Remover",  "danger"),
+            ("X  Remover", "danger"),
             ("D  Duplicar", "success"),
-            ("Subir (z)",   "gold"),
-            ("Descer (z)",  "gold"),
-            ("Desagrupar",  "ghost"),
+            ("Subir (z)", "gold"),
+            ("Descer (z)", "gold"),
+            ("Desagrupar", "ghost"),
             (f"Grid: {'ON' if self.show_grid else 'OFF'}", "ghost"),
         ]
         actions_handlers = [
@@ -168,16 +167,39 @@ class EditorRenderMixin:
             self._left_action_rects.append((r, actions_handlers[i]))
             self._paint_button(screen, r, label, style)
 
-        # Árvore de widgets
+        # ============================================================
+        # ÁRVORE / Z  —  com scroll
+        # ============================================================
         list_y = y_actions + len(actions_disp) * (row_h + gap) + 12
         header = self._font(13, True).render("ARVORE / Z", True, Palette.GOLD)
         screen.blit(header, (self.left_rect.x + 12, list_y))
         list_y += 18
 
+        # Área do clip (reserva 8 tips * 15px + folga)
+        tips_reserved = 8 * 15 + 24
+        tree_clip_bottom = self.left_rect.bottom - tips_reserved
+        tree_clip_h = max(30, tree_clip_bottom - list_y)
+        self._left_tree_clip = pygame.Rect(
+            self.left_rect.x + 6, list_y,
+            self.left_rect.width - 16, tree_clip_h)
+
         tree = []
         self._collect_tree(self.widgets_data, None, tree, 0)
-        max_rows = max(1, (self.left_rect.bottom - list_y - 130) // 18)
-        for row, (i, w, depth) in enumerate(tree[:max_rows]):
+        row_h_tree = 18
+        total_rows = len(tree)
+        visible_rows = max(1, tree_clip_h // row_h_tree)
+        self.left_tree_max_scroll = max(0, total_rows - visible_rows)
+        self.left_tree_scroll = max(0, min(self.left_tree_scroll,
+                                           self.left_tree_max_scroll))
+
+        old_clip = screen.get_clip()
+        screen.set_clip(self._left_tree_clip)
+
+        for row_idx in range(visible_rows):
+            i_tree = row_idx + self.left_tree_scroll
+            if i_tree >= total_rows:
+                break
+            i, w, depth = tree[i_tree]
             sel = (i in self.selected_indices)
             is_primary = (i == self.selected_idx)
             hidden = self._widget_hidden_by_filter(w)
@@ -188,21 +210,51 @@ class EditorRenderMixin:
                 prefix = "~"
                 col = (110, 120, 140)
             indent = "  " * depth
-            txt = f"{prefix}{indent} z={int(w.get('z', 0)):>2}  {w.get('id', '?')[:12]}"
+            txt = (f"{prefix}{indent} z={int(w.get('z', 0)):>2}  "
+                   f"{w.get('id', '?')[:12]}")
             s = self._font(12).render(txt, True, col)
-            screen.blit(s, (self.left_rect.x + 12, list_y + row * 18))
+            screen.blit(s, (self.left_rect.x + 12,
+                            list_y + row_idx * row_h_tree))
+
+        screen.set_clip(old_clip)
+
+        # Scrollbar da árvore
+        if self.left_tree_max_scroll > 0:
+            bar_x = self.left_rect.right - 8
+            bar_top = list_y
+            bar_h = tree_clip_h
+            thumb_h = max(20, int(
+                bar_h * visible_rows / max(1, total_rows)))
+            max_s = max(1, self.left_tree_max_scroll)
+            thumb_y = bar_top + int(
+                (bar_h - thumb_h) * self.left_tree_scroll / max_s)
+            self._left_tree_scrollbar_track = pygame.Rect(
+                bar_x, bar_top, 5, bar_h)
+            self._left_tree_scrollbar_thumb = pygame.Rect(
+                bar_x, thumb_y, 5, thumb_h)
+            pygame.draw.rect(screen, (35, 42, 60),
+                             self._left_tree_scrollbar_track,
+                             border_radius=3)
+            col = (200, 220, 250) if self._dragging_left_scroll \
+                else (150, 170, 210)
+            pygame.draw.rect(screen, col,
+                             self._left_tree_scrollbar_thumb,
+                             border_radius=3)
+        else:
+            self._left_tree_scrollbar_track = None
+            self._left_tree_scrollbar_thumb = None
 
         sel_txt = self._font(12).render(
             f"Sel: {len(self.selected_indices)}", True, (150, 190, 240))
         screen.blit(sel_txt, (self.left_rect.x + 12,
-                              list_y + max_rows * 18 + 4))
+                              tree_clip_bottom + 4))
 
         tips = [
             "Ctrl+Clique multi",
             "Marquee no canvas",
             "Del / Ctrl+D",
             "Setas movem",
-            "Clique na aba = foco",
+            "Wheel: scroll arvore",
             "G grid",
             "Ctrl+S/O save/load",
             "ESC sair / limpar aba",

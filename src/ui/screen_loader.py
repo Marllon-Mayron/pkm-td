@@ -1,12 +1,9 @@
 # src/ui/screen_loader.py
 """
 Carrega layouts JSON e instancia widgets.
-Suporta: parent-child (content rect), padding, alpha, border_sides,
-         ProgressBar, Badge, WorldSprite, ListView com render_callback,
-         pixel_art (nearest vs bilinear).
-
-Leitura de props: prioriza o WIDGET (top-level), com fallback para props{}.
-Isso mantém compatibilidade com o editor visual que salva no widget.
+Suporta: parent-child, padding, alpha, border_sides, border_style,
+         ProgressBar, Badge, WorldSprite, Divider, Table, GridSelect,
+         ListView com render_callback, pixel_art.
 """
 import inspect
 import json
@@ -17,8 +14,9 @@ from src.config.paths import UI_LAYOUTS_PATH, RES_PATH
 from src.ui.layout import rel_rect
 from src.ui.theme import parse_color, with_alpha, color_alpha
 from src.ui.widgets import (
-    Button, Panel, Label, ListView, ImageBox, Checkbox, Slider,
-    Dropdown, TabPanel, ProgressBar, Badge, WorldSprite, GridSelect,
+    Button, Panel, Label, ListView, GridSelect, ImageBox, Checkbox,
+    Slider, Dropdown, TabPanel, ProgressBar, Badge, WorldSprite,
+    Divider, Table,
 )
 
 
@@ -200,6 +198,57 @@ def _bool_or(v, default):
     return default
 
 
+def _split_rows(raw):
+    """
+    Converte "a;b;c|d;e;f" em [["a","b","c"], ["d","e","f"]].
+    Aceita também uma list de list.
+    """
+    if not raw:
+        return []
+    if isinstance(raw, list):
+        return [list(r) if isinstance(r, list) else [str(r)] for r in raw]
+    out = []
+    for line in str(raw).split("|"):
+        cells = [c.strip() for c in line.split(";")]
+        if cells:
+            out.append(cells)
+    return out
+
+
+def _split_list(raw):
+    """'a;b;c' ou 'a|b|c' → ['a','b','c']."""
+    if isinstance(raw, list):
+        return [str(x) for x in raw]
+    if not raw:
+        return []
+    s = str(raw)
+    sep = ";" if ";" in s and "|" not in s else "|"
+    return [p.strip() for p in s.split(sep) if p.strip()]
+
+
+def _split_floats(raw):
+    """'0.3;0.7' → [0.3, 0.7]."""
+    if isinstance(raw, list):
+        try:
+            return [float(x) for x in raw]
+        except (TypeError, ValueError):
+            return None
+    if not raw:
+        return None
+    s = str(raw)
+    sep = ";" if ";" in s else "|"
+    out = []
+    for p in s.split(sep):
+        p = p.strip()
+        if not p:
+            continue
+        try:
+            out.append(float(p))
+        except ValueError:
+            pass
+    return out or None
+
+
 # =====================================================================
 # LOADER
 # =====================================================================
@@ -325,7 +374,6 @@ class ScreenLoader:
                     return v
             return default
 
-        # --- comuns ---
         z = int(wdata.get("z", 0))
         fname = _get("font_name", "default")
         fsize = _get("font_size")
@@ -337,6 +385,7 @@ class ScreenLoader:
 
         f_alpha = _int_or(_get("fill_alpha"), 255)
         b_alpha = _int_or(_get("border_alpha"), 255)
+        b_style = str(_get("border_style", "solid"))
         pixel_art = _bool_or(_get("pixel_art"), True)
 
         click_snd = _sound_or_none(_get("click_sound"))
@@ -344,7 +393,6 @@ class ScreenLoader:
         click_vol = _get("click_volume")
         hover_vol = _get("hover_volume")
 
-        # --- imagens ---
         bg_image_name = _get("bg_image")
         bg_image_surf = _load_ui_image(bg_image_name, create_if_missing=True)
 
@@ -368,6 +416,7 @@ class ScreenLoader:
             bg_image_alpha=_int_or(_get("bg_image_alpha"), 255),
             border_width=_int_or(_get("border_width"), 2),
             border_radius=_int_or(_get("border_radius"), 10),
+            border_style=b_style,
             draw_border=_bool_or(_get("draw_border"), True),
             draw_shadow=_bool_or(_get("draw_shadow"), True),
             pixel_art=pixel_art,
@@ -385,8 +434,7 @@ class ScreenLoader:
                     icon_gap=_int_or(_get("icon_gap"), 6),
                     **bg_common, **common))
                 w = Button(wid, rect, **kw)
-                cls._bind_action(w, props.get("on_click"), actions,
-                                 kind="click")
+                cls._bind_action(w, props.get("on_click"), actions, kind="click")
 
             elif wtype == "panel":
                 kw = _filter_kwargs(Panel, dict(
@@ -409,10 +457,27 @@ class ScreenLoader:
 
             elif wtype == "list":
                 kw = _filter_kwargs(ListView, dict(
-                    items=_get("items", []),
-                    bold=bold,
+                    items=_split_list(_get("items", [])),
+                    render_callback=None,
+                    show_scrollbar=_bool_or(_get("show_scrollbar"), True),
+                    scrollbar_width=_int_or(_get("scrollbar_width"), 8),
+                    scrollbar_color=parse_color(_get("scrollbar_color"), None),
+                    scrollbar_bg=parse_color(_get("scrollbar_bg"), None),
+                    scrollbar_radius=_int_or(_get("scrollbar_radius"), 4),
                     **common))
                 w = ListView(wid, rect, **kw)
+                cls._bind_action(w, props.get("on_select"), actions,
+                                 kind="select")
+
+            elif wtype == "grid":
+                kw = _filter_kwargs(GridSelect, dict(
+                    items=_split_list(_get("items", [])),
+                    cols=_int_or(_get("cols"), 2),
+                    rows=_int_or(_get("rows"), 2),
+                    cell_gap=_int_or(_get("cell_gap"), 8),
+                    render_callback=None,
+                    **common))
+                w = GridSelect(wid, rect, **kw)
                 cls._bind_action(w, props.get("on_select"), actions,
                                  kind="select")
 
@@ -459,36 +524,27 @@ class ScreenLoader:
 
             elif wtype == "dropdown":
                 kw = _filter_kwargs(Dropdown, dict(
-                    options=_get("options", ["-"]),
+                    options=_split_list(_get("options", ["-"])),
                     value=_get("value"),
                     bold=bold,
+                    drop_dir=str(_get("drop_dir", "down")),
                     **common))
                 w = Dropdown(wid, rect, **kw)
                 cls._bind_action(w, props.get("on_change"), actions,
                                  kind="change")
 
+
             elif wtype == "tabpanel":
                 kw = _filter_kwargs(TabPanel, dict(
-                    tabs=_get("tabs", ["Tab 1"]),
+                    tabs=_split_list(_get("tabs", ["Tab 1"])),
                     current_tab=_get("current_tab"),
                     bold=bold,
+                    font_size=fsize,
+                    tab_height=_get("tab_height"),
                     **common))
                 w = TabPanel(wid, rect, **kw)
-                cls._bind_action(w, props.get("on_change"), actions,
-                                 kind="change")
+                cls._bind_action(w, props.get("on_change"), actions, kind="change")
 
-            elif wtype == "grid":
-                kw = _filter_kwargs(GridSelect, dict(
-                    items=_get("items", []),
-                    cols=_int_or(_get("cols"), 2),
-                    rows=_int_or(_get("rows"), 2),
-                    cell_gap=_int_or(_get("cell_gap"), 8),
-                    bold=bold,
-                    **common))
-                w = GridSelect(wid, rect, **kw)
-                cls._bind_action(w, props.get("on_select"), actions,
-                                 kind="select")
-                
             elif wtype == "progress":
                 radius_v = _get("radius")
                 kw = _filter_kwargs(ProgressBar, dict(
@@ -519,6 +575,42 @@ class ScreenLoader:
                     tab=tabname, z=z,
                 ))
                 w = Badge(wid, rect, **kw)
+
+            elif wtype == "divider":
+                kw = _filter_kwargs(Divider, dict(
+                    orientation=str(_get("orientation", "horizontal")),
+                    color=parse_color(_get("color"), None) or bcol,
+                    thickness=_int_or(_get("thickness", _get("border_width")), 2),
+                    style=str(_get("style", _get("border_style", "solid"))),
+                    padding=_int_or(_get("padding"), 0),
+                    radius=_int_or(_get("radius"), 0),
+                    z=z, tab=tabname,
+                ))
+                w = Divider(wid, rect, **kw)
+
+            elif wtype == "table":
+                headers = _split_list(_get("headers", []))
+                rows = _split_rows(_get("rows", []))
+                col_widths = _split_floats(_get("col_widths"))
+                kw = _filter_kwargs(Table, dict(
+                    headers=headers,
+                    rows=rows,
+                    col_widths=col_widths,
+                    row_height=_int_or(_get("row_height"), 30),
+                    header_height=_int_or(_get("header_height"), 34),
+                    font_size=fsize or _int_or(_get("font_size"), 14),
+                    header_font_size=_int_or(_get("header_font_size"), 15),
+                    cell_padding=_int_or(_get("cell_padding"), 6),
+                    header_bg=parse_color(_get("header_bg"), None),
+                    header_text_color=parse_color(_get("header_text_color"), None),
+                    row_bg=parse_color(_get("row_bg"), None),
+                    row_bg_alt=parse_color(_get("row_bg_alt"), None),
+                    text_color=tcol,
+                    grid_color=parse_color(_get("grid_color"), None),
+                    grid_width=_int_or(_get("grid_width"), 1),
+                    font_name=fname, bold=bold, tab=tabname, z=z,
+                ))
+                w = Table(wid, rect, **kw)
 
             else:
                 print(f"[UI] tipo desconhecido: {wtype}")

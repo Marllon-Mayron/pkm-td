@@ -14,6 +14,9 @@ BORDER_SIDE_OPTIONS = [
     "top,left", "top,right",
     "bottom,left", "bottom,right",
 ]
+BORDER_STYLE_OPTIONS = ["solid", "dashed", "dotted", "none"]
+DIVIDER_ORIENT_OPTIONS = ["horizontal", "vertical"]
+DROP_DIR_OPTIONS = ["down", "up"]
 
 # =====================================================================
 # Tipos e rótulos de campo
@@ -28,6 +31,7 @@ FIELD_TYPES = {
     "style": "choice", "font_name": "choice",
     "font_size": "int", "align": "choice", "bold": "bool",
     "title_font_size": "int",
+    "tab_height": "int",
     # cores
     "text_color": "color", "fill_color": "color", "border_color": "color",
     # alpha
@@ -38,6 +42,25 @@ FIELD_TYPES = {
     "value": "float", "min": "float", "max": "float",
     "options": "list", "tabs": "list", "items": "list",
     "current_tab": "text",
+    # grid
+    "cols": "int", "rows": "int", "cell_gap": "int",
+    # list scroll
+    "show_scrollbar": "bool", "scrollbar_width": "int",
+    "scrollbar_color": "color", "scrollbar_bg": "color",
+    "scrollbar_radius": "int",
+    # divider
+    "orientation": "choice", "thickness": "int",
+    "radius": "int",
+    # table
+    "headers": "list", "rows_data": "text",
+    "col_widths": "text",
+    "row_height": "int", "header_height": "int",
+    "cell_padding": "int",
+    "header_bg": "color", "header_text_color": "color",
+    "row_bg": "color", "row_bg_alt": "color",
+    "grid_color": "color", "grid_width": "int",
+    # dropdown
+    "drop_dir": "choice",
     # ações
     "on_click": "action", "on_toggle": "action",
     "on_change": "action", "on_select": "action",
@@ -50,6 +73,7 @@ FIELD_TYPES = {
     "pixel_art": "bool",
     # borda
     "border_width": "int", "border_radius": "int",
+    "border_style": "choice",
     "draw_border": "bool", "draw_shadow": "bool",
     "border_sides": "choice", "padding": "int",
     # ícone
@@ -59,7 +83,7 @@ FIELD_TYPES = {
     "max_value": "float", "min_value": "float",
     "show_text": "bool", "text_format": "text",
     "color_low": "color", "color_mid": "color", "color_high": "color",
-    "progress_bg": "color", "radius": "int",
+    "progress_bg": "color",
     # badge
     "badge_text_color": "color", "bg_color": "color",
     "badge_border_color": "color",
@@ -73,6 +97,7 @@ FIELD_LABELS = {
     "style": "Estilo", "font_name": "Fonte",
     "font_size": "Tam.", "align": "Alinhar", "bold": "Negrito",
     "title_font_size": "Tam. titulo",
+    "tab_height": "Altura abas",
     "text_color": "Texto", "fill_color": "Fundo", "border_color": "Borda",
     "fill_alpha": "Alpha fundo", "border_alpha": "Alpha borda",
     "label": "Rotulo", "title": "Titulo", "text": "Texto",
@@ -80,6 +105,19 @@ FIELD_LABELS = {
     "value": "Valor", "min": "Min", "max": "Max",
     "options": "Opcoes (|)", "tabs": "Abas (|)", "items": "Itens (|)",
     "current_tab": "Aba inicial",
+    "cols": "Colunas", "rows": "Linhas", "cell_gap": "Gap",
+    "show_scrollbar": "Mostrar scrollbar", "scrollbar_width": "Largura sb",
+    "scrollbar_color": "Cor sb", "scrollbar_bg": "Fundo sb",
+    "scrollbar_radius": "Raio sb",
+    "orientation": "Orientacao", "thickness": "Espessura",
+    "headers": "Cabecalhos (|)", "rows_data": "Linhas (| com ; entre cols)",
+    "col_widths": "Larguras cols (;)",
+    "row_height": "Altura linha", "header_height": "Altura header",
+    "cell_padding": "Padding celula",
+    "header_bg": "Fundo header", "header_text_color": "Texto header",
+    "row_bg": "Fundo linha par", "row_bg_alt": "Fundo linha impar",
+    "grid_color": "Cor grid", "grid_width": "Largura grid",
+    "drop_dir": "Direcao drop",
     "on_click": "on_click", "on_toggle": "on_toggle",
     "on_change": "on_change", "on_select": "on_select",
     "click_sound": "Som click", "hover_sound": "Som hover",
@@ -88,6 +126,7 @@ FIELD_LABELS = {
     "bg_tint": "Tint", "bg_image_alpha": "Alpha img",
     "pixel_art": "Pixel art",
     "border_width": "Espessura", "border_radius": "Raio",
+    "border_style": "Estilo borda",
     "draw_border": "Mostrar borda", "draw_shadow": "Sombra",
     "border_sides": "Lados", "padding": "Padding",
     "icon": "Icone", "icon_size": "Tam.", "icon_position": "Posicao",
@@ -131,7 +170,8 @@ IMAGE_SECTION  = ("image", "IMAGEM",
                   ["bg_image", "bg_image_mode",
                    "bg_tint", "bg_image_alpha", "pixel_art"])
 BORDER_SECTION = ("border", "BORDA",
-                  ["border_width", "border_radius", "border_sides",
+                  ["border_width", "border_radius",
+                   "border_style", "border_sides",
                    "draw_border", "draw_shadow"])
 ICON_SECTION   = ("icon", "ICONE",
                   ["icon", "icon_size", "icon_position", "icon_gap"])
@@ -156,9 +196,35 @@ def sections_for_type(wtype):
     elif wtype == "list":
         extra = [STYLE_MIN, COLORS_FULL, ALPHA_SECTION,
                  ("content", "ITENS", ["items"]),
+                 ("content", "SCROLLBAR",
+                  ["show_scrollbar", "scrollbar_width", "scrollbar_radius",
+                   "scrollbar_color", "scrollbar_bg"]),
                  ("action", "ACAO", ["on_select"]),
                  IMAGE_SECTION, BORDER_SECTION,
                  SOUNDS_FULL]
+    elif wtype == "grid":
+        extra = [STYLE_MIN, COLORS_FULL, ALPHA_SECTION,
+                 ("content", "ITENS", ["items"]),
+                 ("content", "GRID", ["cols", "rows", "cell_gap"]),
+                 ("action", "ACAO", ["on_select"]),
+                 BORDER_SECTION,
+                 SOUNDS_FULL]
+    elif wtype == "divider":
+        extra = [("content", "LINHA",
+                  ["orientation", "thickness", "padding", "radius"]),
+                 ("colors", "CORES", ["color"]),
+                 ("border", "ESTILO", ["border_style"])]
+    elif wtype == "table":
+        extra = [STYLE_MIN,
+                 ("content", "DADOS",
+                  ["headers", "rows_data", "col_widths"]),
+                 ("content", "DIMENSOES",
+                  ["row_height", "header_height", "cell_padding"]),
+                 ("colors", "CORES",
+                  ["header_bg", "header_text_color",
+                   "row_bg", "row_bg_alt", "text_color"]),
+                 ("colors", "GRID", ["grid_color", "grid_width"]),
+                 BORDER_SECTION]
     elif wtype == "image":
         extra = [COLORS_LIGHT, ALPHA_SECTION,
                  IMAGE_SECTION, BORDER_SECTION]
@@ -179,12 +245,14 @@ def sections_for_type(wtype):
                  SOUNDS_SOFT]
     elif wtype == "dropdown":
         extra = [STYLE_MIN, COLORS_FULL, ALPHA_SECTION,
-                 ("content", "OPCOES", ["options", "value"]),
+                 ("content", "OPCOES", ["options", "value", "drop_dir"]),
                  ("action", "ACAO", ["on_change"]),
+                 BORDER_SECTION,
                  SOUNDS_FULL]
     elif wtype == "tabpanel":
         extra = [STYLE_MIN, COLORS_FULL, ALPHA_SECTION,
-                 ("content", "ABAS", ["tabs", "current_tab"]),
+                 ("content", "ABAS",
+                  ["tabs", "current_tab", "tab_height"]),
                  ("action", "ACAO", ["on_change"]),
                  SOUNDS_FULL]
     elif wtype == "progress":
@@ -214,6 +282,6 @@ def sections_for_type(wtype):
 
 
 def default_open_state(wtype):
-    """Sons/imagem/borda/ícone/alpha começam fechados."""
-    closed = {"sounds", "image", "border", "icon", "alpha"}
+    closed = {"sounds", "image", "border", "icon", "alpha", "scrollbar",
+              "grid"}
     return {sid: (sid not in closed) for sid, _, _ in sections_for_type(wtype)}

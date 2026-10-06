@@ -2,6 +2,7 @@
 """EditorController — orquestra estado, eventos e ciclo de vida."""
 import copy
 import json
+import math
 import pygame
 from pathlib import Path
 
@@ -42,6 +43,9 @@ class EditorController(EditorRenderMixin, BaseScene):
         ("panel",        "Painel",   "gold"),
         ("label",        "Texto",    "ghost"),
         ("list",         "Lista",    "primary"),
+        ("grid",         "Grid",     "primary"),
+        ("table",        "Tabela",   "gold"),
+        ("divider",      "Divisor",  "ghost"),
         ("image",        "Imagem",   "success"),
         ("checkbox",     "Checkbox", "success"),
         ("slider",       "Slider",   "gold"),
@@ -93,6 +97,15 @@ class EditorController(EditorRenderMixin, BaseScene):
         self.right_scroll = 0
         self.right_max_scroll = 0
 
+        # ---- NOVO: scroll da árvore de prioridade (left) ----
+        self.left_tree_scroll = 0
+        self.left_tree_max_scroll = 0
+        self._left_tree_clip = pygame.Rect(0, 0, 0, 0)
+        self._left_tree_scrollbar_track = None
+        self._left_tree_scrollbar_thumb = None
+        self._dragging_left_scroll = False
+        self._left_scroll_drag_offset = 0
+
         self._last_size = (0, 0)
         self.design_surface = pygame.Surface((DESIGN_W, DESIGN_H))
         self._fonts = {}
@@ -139,6 +152,9 @@ class EditorController(EditorRenderMixin, BaseScene):
         self._bg_image_modes = S.BG_IMAGE_MODES
         self._icon_positions = S.ICON_POSITIONS
         self._border_sides_choices = S.BORDER_SIDE_OPTIONS
+        self._border_style_choices = S.BORDER_STYLE_OPTIONS
+        self._drop_dir_choices = S.DROP_DIR_OPTIONS
+        self._orient_choices = S.DIVIDER_ORIENT_OPTIONS
 
         self._layout()
         self._new_layout()
@@ -283,7 +299,6 @@ class EditorController(EditorRenderMixin, BaseScene):
         else:
             base = r
 
-        # Aplica padding
         try:
             pad = int(float(wdata.get("padding", props.get("padding", 0)) or 0))
         except (TypeError, ValueError):
@@ -559,12 +574,19 @@ class EditorController(EditorRenderMixin, BaseScene):
             "bg_image_mode": self._bg_image_modes,
             "icon_position": self._icon_positions,
             "border_sides": self._border_sides_choices,
+            # NOVO:
+            "border_style": self._border_style_choices,
+            "drop_dir": self._drop_dir_choices,
+            "orientation": self._orient_choices,
         }
 
         placeholders = {
             "options": "A | B | C",
             "tabs": "Audio | Atalhos",
             "items": "Item 1 | Item 2 | Item 3",
+            "headers": "Nome | Nível | Tipo",
+            "rows_data": "Pikachu;25;Elétrico|Charmander;12;Fogo",
+            "col_widths": "0.4;0.3;0.3",
             "on_click": "nome_acao",
             "on_toggle": "nome_acao",
             "on_change": "nome_acao",
@@ -609,8 +631,22 @@ class EditorController(EditorRenderMixin, BaseScene):
                         elif k == "border_sides":
                             cur_s = str(self._pick(w, props,
                                                    "border_sides", "all"))
+                        # NOVO:
+                        elif k == "border_style":
+                            cur_s = str(self._pick(w, props,
+                                                   "border_style", "solid"))
+                        elif k == "drop_dir":
+                            cur_s = str(self._pick(w, props,
+                                                   "drop_dir", "down"))
+                        elif k == "orientation":
+                            cur_s = str(self._pick(w, props,
+                                                   "orientation",
+                                                   "horizontal"))
                         else:
                             cur_s = str(self._pick(w, props, k, "-"))
+
+                        if cur_s not in opt_list:
+                            opt_list = list(opt_list) + [cur_s]
 
                         d = EditorDropdown(
                             rect, opt_list, cur_s,
@@ -637,7 +673,18 @@ class EditorController(EditorRenderMixin, BaseScene):
 
                     else:
                         cur = self._pick(w, props, k, "")
-                        if ftype == "list":
+                        # Casos especiais:
+                        if k == "rows_data":
+                            rows = props.get("rows", []) or []
+                            cur = "|".join(
+                                ";".join(str(c) for c in r) for r in rows)
+                        elif k == "col_widths":
+                            cw = props.get("col_widths")
+                            if cw:
+                                cur = ";".join(str(x) for x in cw)
+                            else:
+                                cur = ""
+                        elif ftype == "list":
                             if isinstance(cur, list):
                                 cur = " | ".join(str(x) for x in cur)
                             else:
@@ -678,6 +725,7 @@ class EditorController(EditorRenderMixin, BaseScene):
         ]
         self._select_clear()
         self._editing_tab = None
+        self.left_tree_scroll = 0
         self._mark_dirty()
         self._rebuild_tab_dropdown()
         self.status_text = "Novo layout."
@@ -693,11 +741,9 @@ class EditorController(EditorRenderMixin, BaseScene):
                 "x": 0.5, "y": 0.5, "w": 0.22, "h": 0.09,
                 "anchor": "c", "font_name": "default", "props": {}}
 
-        # Herda aba em edição
         if self._editing_tab:
             base["tab"] = self._editing_tab[1]
 
-        # Herda parent se algo tiver selecionado
         parent_id = None
         sel = None
         if 0 <= self.selected_idx < len(self.widgets_data):
@@ -729,6 +775,27 @@ class EditorController(EditorRenderMixin, BaseScene):
             base["bold"] = False
             base["props"] = {"items": ["Item 1", "Item 2", "Item 3"]}
             base["w"], base["h"] = 0.3, 0.4
+        elif wtype == "grid":
+            base["bold"] = False
+            base["props"] = {"items": ["A", "B", "C", "D"],
+                             "cols": 2, "rows": 2, "cell_gap": 8}
+            base["w"], base["h"] = 0.3, 0.3
+        elif wtype == "table":
+            base["bold"] = False
+            base["props"] = {
+                "headers": ["Nome", "Nível", "Tipo"],
+                "rows": [["Pikachu", "25", "Elétrico"],
+                         ["Charmander", "12", "Fogo"]],
+                "col_widths": [0.4, 0.3, 0.3],
+                "row_height": 30, "header_height": 34,
+            }
+            base["w"], base["h"] = 0.5, 0.35
+        elif wtype == "divider":
+            base["props"] = {"orientation": "horizontal",
+                             "thickness": 2, "style": "solid"}
+            base["border_style"] = "solid"
+            base["w"], base["h"] = 0.6, 0.01
+            base["color"] = "#F8B030"
         elif wtype == "image":
             base["w"], base["h"] = 0.3, 0.3
         elif wtype == "checkbox":
@@ -740,10 +807,12 @@ class EditorController(EditorRenderMixin, BaseScene):
             base["w"], base["h"] = 0.3, 0.04
         elif wtype == "dropdown":
             base["bold"] = False
-            base["props"] = {"options": ["A", "B", "C"], "value": "A"}
+            base["props"] = {"options": ["A", "B", "C"], "value": "A",
+                             "drop_dir": "down"}
             base["w"], base["h"] = 0.2, 0.05
         elif wtype == "tabpanel":
             base["bold"] = True
+            base["font_size"] = 18
             base["props"] = {"tabs": ["Aba 1", "Aba 2"],
                              "current_tab": "Aba 1"}
             base["w"], base["h"] = 0.8, 0.5
@@ -1027,9 +1096,13 @@ class EditorController(EditorRenderMixin, BaseScene):
             if "bold" in self.fields:
                 w["bold"] = bool(self.fields["bold"].value)
 
+            # Cores — adicionadas: color (divider), header_bg, header_text_color,
+            # row_bg, row_bg_alt, grid_color
             for k in ("text_color", "fill_color", "border_color", "bg_tint",
                       "color_low", "color_mid", "color_high", "progress_bg",
-                      "bg_color", "badge_text_color", "badge_border_color"):
+                      "bg_color", "badge_text_color", "badge_border_color",
+                      "color", "header_bg", "header_text_color",
+                      "row_bg", "row_bg_alt", "grid_color"):
                 if k in self.fields:
                     s = self.fields[k].text.strip()
                     if s:
@@ -1051,7 +1124,10 @@ class EditorController(EditorRenderMixin, BaseScene):
 
             for k in ("bg_image_alpha", "border_width", "border_radius",
                       "icon_size", "icon_gap",
-                      "fill_alpha", "border_alpha", "max_size", "radius"):
+                      "fill_alpha", "border_alpha", "max_size", "radius",
+                      "thickness", "row_height", "header_height",
+                      "cell_padding", "grid_width", "scrollbar_width",
+                      "scrollbar_radius", "cols", "rows", "cell_gap"):
                 if k in self.fields:
                     s = self.fields[k].text.strip()
                     if s:
@@ -1062,7 +1138,8 @@ class EditorController(EditorRenderMixin, BaseScene):
                     else:
                         w.pop(k, None)
 
-            for k in ("draw_border", "draw_shadow", "show_text"):
+            for k in ("draw_border", "draw_shadow", "show_text",
+                      "show_scrollbar", "pixel_art"):
                 if k in self.fields:
                     w[k] = bool(self.fields[k].value)
 
@@ -1100,6 +1177,13 @@ class EditorController(EditorRenderMixin, BaseScene):
                     w["border_sides"] = v
                 else:
                     w.pop("border_sides", None)
+            # NOVO:
+            if "border_style" in self.dropdowns:
+                w["border_style"] = self.dropdowns["border_style"].value
+            if "drop_dir" in self.dropdowns:
+                props["drop_dir"] = self.dropdowns["drop_dir"].value
+            if "orientation" in self.dropdowns:
+                props["orientation"] = self.dropdowns["orientation"].value
 
             # ---- props ----
             for k in ("label", "title", "text", "current_tab",
@@ -1120,10 +1204,38 @@ class EditorController(EditorRenderMixin, BaseScene):
                         except ValueError:
                             pass
 
-            for k in ("options", "tabs", "items"):
+            # Listas simples
+            for k in ("options", "tabs", "items", "headers"):
                 if k in self.fields:
                     raw = self.fields[k].text
                     props[k] = [p.strip() for p in raw.split("|") if p.strip()]
+
+            # Tabela: rows_data -> rows
+            if "rows_data" in self.fields:
+                raw = self.fields["rows_data"].text.strip()
+                if raw:
+                    rows = []
+                    for line in raw.split("|"):
+                        cells = [c.strip() for c in line.split(";")]
+                        rows.append(cells)
+                    props["rows"] = rows
+                else:
+                    props.pop("rows", None)
+
+            # Tabela: col_widths
+            if "col_widths" in self.fields:
+                raw = self.fields["col_widths"].text.strip()
+                if raw:
+                    try:
+                        props["col_widths"] = [
+                            float(x.strip())
+                            for x in raw.replace(",", ";").split(";")
+                            if x.strip()
+                        ]
+                    except ValueError:
+                        pass
+                else:
+                    props.pop("col_widths", None)
 
             if "style" in self.dropdowns:
                 props["style"] = self.dropdowns["style"].value
@@ -1138,7 +1250,6 @@ class EditorController(EditorRenderMixin, BaseScene):
                     else:
                         props.pop(k, None)
 
-            # Filtro pode ter ficado inválido (tabs mudaram)
             if w.get("type") == "tabpanel" and self._editing_tab:
                 tp_id, tab_name = self._editing_tab
                 if tp_id == w.get("id"):
@@ -1197,6 +1308,7 @@ class EditorController(EditorRenderMixin, BaseScene):
             self.layout_name = data.get("name", name)
             self.name_field.text = self.layout_name
             self._select_clear()
+            self.left_tree_scroll = 0
 
             first_tp = next((w for w in self.widgets_data
                              if w.get("type") == "tabpanel"), None)
@@ -1400,6 +1512,43 @@ class {cls}(StandardScreen):
         return None
 
     # =================================================================
+    # SCROLL DA ÁRVORE (LEFT)
+    # =================================================================
+    def _left_tree_scroll_click(self, pos):
+        """Retorna True se clicou na scrollbar da árvore."""
+        thumb = self._left_tree_scrollbar_thumb
+        track = self._left_tree_scrollbar_track
+        if thumb and thumb.inflate(8, 0).collidepoint(pos):
+            self._dragging_left_scroll = True
+            self._left_scroll_drag_offset = pos[1] - thumb.y
+            return True
+        if track and track.collidepoint(pos):
+            thumb_h = thumb.height if thumb else 20
+            rel = pos[1] - track.y - thumb_h // 2
+            rel = max(0, min(track.height - thumb_h, rel))
+            if track.height - thumb_h > 0:
+                self.left_tree_scroll = int(
+                    self.left_tree_max_scroll * rel /
+                    (track.height - thumb_h))
+            self._dragging_left_scroll = True
+            self._left_scroll_drag_offset = thumb_h // 2
+            return True
+        return False
+
+    def _left_tree_scroll_drag(self, pos):
+        track = self._left_tree_scrollbar_track
+        thumb = self._left_tree_scrollbar_thumb
+        if not track or not thumb:
+            return
+        thumb_h = thumb.height
+        rel = pos[1] - self._left_scroll_drag_offset - track.y
+        rel = max(0, min(track.height - thumb_h, rel))
+        if track.height - thumb_h > 0:
+            self.left_tree_scroll = int(
+                self.left_tree_max_scroll * rel /
+                (track.height - thumb_h))
+
+    # =================================================================
     # EVENTOS
     # =================================================================
     def handle_event(self, event):
@@ -1450,6 +1599,9 @@ class {cls}(StandardScreen):
             if self._dragging_splitter:
                 self._dragging_splitter = None
                 return
+            if self._dragging_left_scroll:
+                self._dragging_left_scroll = False
+                return
         if event.type == pygame.MOUSEMOTION:
             if self._dragging_splitter == "left":
                 dx = event.pos[0] - self._split_drag_start_x
@@ -1461,25 +1613,44 @@ class {cls}(StandardScreen):
                 self.right_w = self._split_start_w - dx
                 self._layout()
                 return
+            if self._dragging_left_scroll:
+                self._left_tree_scroll_drag(event.pos)
+                return
             self._hover_splitter = self._splitter_at(event.pos)
 
         if event.type == pygame.MOUSEWHEEL:
             mx, my = pygame.mouse.get_pos()
+            # dropdowns abertos
             for d in self.dropdowns.values():
                 if d.open and d._list_rect and d._list_rect.collidepoint(mx, my):
                     if d.handle_event(event):
                         return
+            # panel de propriedades (direita)
             if self._right_clip_rect.collidepoint(mx, my):
                 self.right_scroll -= event.y * 24
                 self.right_scroll = max(0, min(self.right_max_scroll,
                                                self.right_scroll))
                 self._rebuild_fields()
                 return
+            # NOVO: árvore de prioridade (esquerda)
+            if self._left_tree_clip and \
+                    self._left_tree_clip.collidepoint(mx, my):
+                self.left_tree_scroll -= event.y
+                self.left_tree_scroll = max(
+                    0, min(self.left_tree_max_scroll, self.left_tree_scroll))
+                return
             return
 
         for d in self.dropdowns.values():
             if d.handle_event(event):
                 return
+
+        # NOVO: clique na scrollbar da árvore (antes de qualquer outra coisa)
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._left_tree_clip and \
+                    self._left_tree_clip.inflate(12, 0).collidepoint(event.pos):
+                if self._left_tree_scroll_click(event.pos):
+                    return
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._right_clip_rect.collidepoint(event.pos):
