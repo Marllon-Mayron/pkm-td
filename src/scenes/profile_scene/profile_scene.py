@@ -310,6 +310,17 @@ class ProfileScene(BaseScene):
 
         self.player_xp = getattr(p, 'score', 0)
         self.player_money = getattr(p, 'money', 0)
+
+        # ===== NÍVEL DO JOGADOR (derivado do score/XP) =====
+        try:
+            self.player_level, self.xp_in_level, self.xp_span, self.xp_ratio = \
+                p.get_level_progress()
+        except Exception:
+            self.player_level = 1
+            self.xp_in_level = 0
+            self.xp_span = 100
+            self.xp_ratio = 0.0
+
         self.team_size = len(getattr(p, 'team', []))
         self.pc_box_size = len(getattr(p, 'pc_box', []))
         self.photo_count = self._count_photos()
@@ -1012,8 +1023,8 @@ class ProfileScene(BaseScene):
         if fav_sprite is not None or True:
             cap_f = pygame.font.Font(None, max(10, int(rect.height * 0.075)))
             cap = cap_f.render("trocar" if fav_sprite is not None else "escolher",
-                              True, (200, 210, 235) if av_rect.collidepoint(mouse)
-                              else (130, 140, 170))
+                               True, (200, 210, 235) if av_rect.collidepoint(mouse)
+                               else (130, 140, 170))
             cap_rect = cap.get_rect(center=(av_rect.centerx,
                                             av_rect.bottom + int(rect.height * 0.05)))
             # Se nao couber, coloca em cima
@@ -1101,8 +1112,9 @@ class ProfileScene(BaseScene):
                                 True, (255, 220, 120)),
                 (info_x, sub_y + int(rect.height * 0.185)))
 
-        # ===== Info direita (XP, money, time/box) =====
+        # ===== Info direita (Nivel + barra XP + money + time/box) =====
         right_x = rect.right - pad
+
         # Reserva espaco para o botao COR no canto inferior direito
         palette_size = int(rect.height * 0.42)
         palette_rect = pygame.Rect(
@@ -1112,16 +1124,50 @@ class ProfileScene(BaseScene):
         )
         self._hit_palette = palette_rect
 
-        xp_font = pygame.font.Font(None, max(14, int(rect.height * 0.16)))
+        # ----- Nivel do jogador (linha grande, destacada) -----
+        level_font = pygame.font.Font(None, max(16, int(rect.height * 0.19)))
+        level_txt = f"Nivel {self.player_level}"
+        level_s = level_font.render(level_txt, True, HIGHLIGHT)
         line_y = rect.y + pad
+        screen.blit(level_s, (right_x - level_s.get_width(), line_y))
+        line_y += level_s.get_height() + 2
+
+        # ----- Barra de progresso do nivel (XP dentro do nivel) -----
+        bar_w = min(int(rect.width * 0.22), 220)
+        bar_h = max(8, int(rect.height * 0.06))
+        bar_x = right_x - bar_w
+        bar_y = line_y
+
+        pygame.draw.rect(screen, (30, 35, 55),
+                         (bar_x, bar_y, bar_w, bar_h), border_radius=3)
+        if self.xp_ratio > 0:
+            pygame.draw.rect(screen, HIGHLIGHT,
+                             (bar_x, bar_y,
+                              int(bar_w * self.xp_ratio), bar_h),
+                             border_radius=3)
+        pygame.draw.rect(screen, (100, 110, 140),
+                         (bar_x, bar_y, bar_w, bar_h), 1, border_radius=3)
+        line_y += bar_h + 2
+
+        # Texto miudo do XP dentro do nivel
+        xp_sub_font = pygame.font.Font(None, max(11, int(rect.height * 0.085)))
+        xp_sub = xp_sub_font.render(
+            f"{self.xp_in_level}/{self.xp_span} XP",
+            True, (180, 200, 230))
+        screen.blit(xp_sub, (right_x - xp_sub.get_width(), line_y))
+        line_y += xp_sub.get_height() + 4
+
+        # ----- XP total e dinheiro (linhas menores) -----
+        xp_font = pygame.font.Font(None, max(13, int(rect.height * 0.135)))
         for txt, col in [
-            (f"XP: {self.player_xp:,}".replace(",", "."), (180, 220, 255)),
+            (f"XP total: {self.player_xp:,}".replace(",", "."), (180, 220, 255)),
             (f"$ {self.player_money:,}".replace(",", "."), HIGHLIGHT),
         ]:
             ts = xp_font.render(txt, True, col)
             screen.blit(ts, (right_x - ts.get_width(), line_y))
             line_y += ts.get_height() + 2
 
+        # Time / Box
         team_font = pygame.font.Font(None, max(12, int(rect.height * 0.13)))
         team = team_font.render(
             f"Time: {self.team_size}/6  |  Box: {self.pc_box_size}",

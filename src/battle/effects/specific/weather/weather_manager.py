@@ -28,6 +28,25 @@ class WeatherManager:
 
         print(f"[WEATHER_MANAGER] Clima BASE definido: {weather_type.value} (permanente)")
 
+    def set_weather_from_move(self, weather_type: WeatherType,
+                              duration: float = 10.0, source=None):
+        """Igual a set_weather(), mas SÓ aceita climas NATURAIS.
+
+        Moves (Sunny Day, Rain Dance, etc) usam este método — nunca vão
+        conseguir ativar Sandstorm/Hail/Thunderstorm (map-only).
+        """
+        from src.battle.effects.specific.weather.weather_state import (
+            is_natural_weather,
+        )
+
+        if not is_natural_weather(weather_type):
+            print(f"[WEATHER_MANAGER] '{weather_type.value}' é MAP-ONLY — "
+                  f"move ignorado")
+            return False
+
+        self.set_weather(weather_type, duration, source)
+        return True
+
     def set_weather(self, weather_type: WeatherType, duration: float = 10.0, source=None):
         """
         Define um clima TEMPORÁRIO (de move).

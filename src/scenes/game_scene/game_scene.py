@@ -20,7 +20,6 @@ from src.scenes.game_scene.components.managers.overlay_manager import OverlayTyp
 from src.scenes.game_scene.components.managers.placement_manager import PlacementManager
 from src.scenes.game_scene.components.managers.item_drag_manager import ItemDragManager
 from src.scenes.game_scene.components.managers.target_item_manager import TargetItemManager
-from src.battle.effects.specific.weather.weather_filter import WeatherFilter
 from src.scenes.game_scene.components.managers.team_manager import GameTeamManager
 from src.scenes.game_scene.components.managers.wave_manager import WaveManager
 from src.scenes.game_scene.components.overlays.evolution_overlay import EvolutionOverlay
@@ -30,9 +29,10 @@ from src.scenes.game_scene.components.renderer.map_renderer import MapRenderer
 from src.scenes.game_scene.components.renderer.path_renderer import PathRenderer
 from src.scenes.game_scene.components.renderer.pokemon_spot_renderer import PokemonSpotRenderer # NOVO
 from src.scenes.game_scene.components.renderer.target_item_renderer import TargetItemRenderer
+from src.scenes.game_scene.components.overlays.game_over_scene.game_over_scene import GameOverScene
+from src.scenes.game_scene.components.overlays.level_complete_scene.level_complete_scene import LevelCompleteScene
 from src.managers.notification_manager import notification_manager
 from src.ui.toast_renderer import toast_info, toast_warning, toast_battle
-from src.battle.effects.specific.day_night.day_night_filter import DayNightFilter
 from src.scenes.game_scene.components.day_night_weather_system import DayNightWeatherSystem
 from src.scenes.game_scene.components.managers.in_game_debug_manager import InGameDebugManager
 from src.config.regions import make_phase_id, DEFAULT_REGION_ID
@@ -53,6 +53,12 @@ MYTHICAL_SPAWN_CHANCE = 0.05
 class GameScene(BaseScene):
     def __init__(self, game, chapter_id=1, phase_number=1, region_id=DEFAULT_REGION_ID, keep_placement=False, placement_snapshot=None):
         super().__init__(game)
+
+        # ===== REGISTRA ESTA CENA COMO DONA DAS ANIMAÇÕES =====
+        # Necessário para que `detach_from_scene(self)` funcione no cleanup
+        # e pare as animações de clima/spray/etc ao sair da cena.
+        from src.anim.animation_manager import attach_to_scene
+        attach_to_scene(self)
 
         # ===== parâmetros de restauração de placement =====
         self._keep_placement = keep_placement
@@ -93,9 +99,6 @@ class GameScene(BaseScene):
         self.target_item_manager = TargetItemManager(game)
         self.target_item_renderer = TargetItemRenderer()
         # carrega o event_manager dos dados da fase
-
-        # Weather filter
-        self.weather_filter = WeatherFilter()
 
         # CARREGA OS DADOS DA FASE (inclui _phase_data)
         self._load_phase_data()  # <--- PRIMEIRO CARREGA OS DADOS
@@ -167,12 +170,15 @@ class GameScene(BaseScene):
         self.between_waves_timer = 3.0
         self.show_debug = False
 
-        # Day/Night filter
-        self.day_night_filter = DayNightFilter()
-
         # ===== SISTEMA DIA/NOITE E CLIMA =====
         self.day_night_weather = DayNightWeatherSystem(self)
         self.day_night_weather.initialize()  # Inicializa com valores aleatórios
+
+        # ===== ANIMAÇÕES DE CLIMA (novo sistema) =====
+        # Chave + trigger atualmente rodando. Usado pra detectar mudanças
+        # e trocar suavemente. Ver `_sync_weather_animations()`.
+        self._current_weather_key = None
+        self._current_weather_trigger = None
 
         # Fontes cacheadas
         self._debug_font = pygame.font.Font(None, 18)
@@ -229,32 +235,6 @@ class GameScene(BaseScene):
         status = "ocultada" if self.ui_hidden else "mostrada"
         print(f"[UI] Todas as UIs foram {status}")
 
-    def _start_test_weather(self):
-        """
-        Inicia um clima de teste automaticamente ao carregar a fase.
-        Para testar o filtro visual.
-        """
-        # Escolha um clima para teste: SANDSTORM, RAIN ou SUNNY
-        test_weather = WeatherType.SANDSTORM
-
-        # Duração: 30 segundos
-        duration = 30.0
-
-        # Aplica o clima
-        self.battle_system.weather_manager.set_weather(test_weather, duration, source=None)
-
-        # Mensagem no console
-        weather_names = {
-            WeatherType.SANDSTORM: "TEMPESTADE DE AREIA",
-            WeatherType.RAIN: "CHUVA (TESTE)",
-            WeatherType.SUNNY: "SOL FORTE (TESTE)"
-        }
-        print(f"\n{'=' * 50}")
-        print(f"[WEATHER TEST] {weather_names.get(test_weather, 'CLIMA')} iniciado!")
-        print(f"[WEATHER TEST] Duração: {duration}s")
-        print(f"[WEATHER TEST] Filtro visual deve aparecer na tela")
-        print(f"{'=' * 50}\n")
-
     def _get_ui_font(self, size=24):
         """Obtém fonte da UI com cache"""
         if size == 24:
@@ -275,10 +255,7 @@ class GameScene(BaseScene):
         if not is_tutorial:
             self.cleanup()
         else:
-            # Para o tutorial, faz uma limpeza leve sem resetar os Pokémon
             self._stop_all_sounds(fade_ms=1000)
-            self.day_night_filter.clear()
-            self.weather_filter.clear()
             if hasattr(self, 'day_night_weather'):
                 self.day_night_weather._initialized = False
 
@@ -309,12 +286,85 @@ class GameScene(BaseScene):
         self.wave_manager.reset_gold()
         self.game_state = "waiting"
 
+        import datetime as _dt
+        self._phase_started_at = _dt.datetime.now()
+
         # ===== VERIFICA MÍTICO PENDENTE PARA ESTA FASE =====
         self._check_mythical_spawn()
 
         if not self.event_manager.triggers:
             self.game_state = "in_wave"
             self.wave_manager.start_all_waves()
+
+        # Força a primeira sincronização (toca o clima inicial, se houver)
+        self._sync_weather_animations()
+
+    def restart(self):
+        """Recomeça a mesma fase do zero."""
+        self.__init__(
+            self.game,
+            chapter_id=self.chapter_id,
+            phase_number=self.phase_number,
+            region_id=self.region_id,
+        )
+
+        # ==================================================================
+        # AVANÇO DE FASE / CAPÍTULO
+        # ==================================================================
+        def _phase_exists(self, chapter_id, phase_number):
+            """Verifica se (chapter, phase) existe no catálogo pra região atual."""
+            try:
+                from src.config.phase_catalog import phase_catalog
+                info = phase_catalog.get_phase_info(
+                    self.region_id, chapter_id, phase_number,
+                )
+                return bool(info)
+            except Exception:
+                return False
+
+        def _next_chapter_phase1(self, chapter_id):
+            """
+            Acha o próximo capítulo (>= chapter_id + 1) que tenha pelo menos
+            a fase 1. Retorna (chapter, 1) ou (None, None).
+            """
+            # Limite superior generoso — cobre qualquer jogo.
+            MAX_CHAPTERS = 32
+            for c in range(chapter_id + 1, MAX_CHAPTERS + 1):
+                if self._phase_exists(c, 1):
+                    return c, 1
+            return None, None
+
+        def advance_level(self):
+            """
+            Avança pra próxima fase da MESMA região:
+              1) tenta (chapter, phase + 1)
+              2) se não existir, tenta (chapter + 1, phase 1) — próximo capítulo
+              3) se não existir nada, retorna False (cena cai no menu)
+            """
+            # -------- 1) Próxima fase do capítulo atual --------
+            if self._phase_exists(self.chapter_id, self.phase_number + 1):
+                next_chapter = self.chapter_id
+                next_phase = self.phase_number + 1
+                print(f"[ADVANCE] {self.chapter_id}-{self.phase_number} "
+                      f"→ {next_chapter}-{next_phase} (mesma capitulo)")
+            else:
+                # -------- 2) Próximo capítulo, fase 1 --------
+                next_chapter, next_phase = self._next_chapter_phase1(self.chapter_id)
+                if next_chapter is None:
+                    print(f"[ADVANCE] Não há próxima fase nem próximo capítulo. "
+                          f"Fim do conteúdo da região {self.region_id}.")
+                    return False
+                print(f"[ADVANCE] Fim do capítulo {self.chapter_id} "
+                      f"→ capitulo {next_chapter}, fase 1")
+
+            # -------- 3) Troca de cena --------
+            self.game.current_scene = GameScene(
+                self.game,
+                chapter_id=next_chapter,
+                phase_number=next_phase,
+                region_id=self.region_id,
+            )
+            return True
 
     def _apply_tutorial_setup(self):
         """
@@ -527,6 +577,88 @@ class GameScene(BaseScene):
 
         print(f"[Mythical]  {chosen.name} agendado para a fase {chosen_phase} (10% roll)")
 
+    def _show_game_over_scene(self, reason="team_defeated"):
+        """
+        Substitui `overlay_manager.show(OverlayType.GAME_OVER, ...)`.
+        Monta o `stats` com o que temos disponível no estado atual.
+        """
+        # --- waves: usa a wave mais avançada entre os paths ---
+        waves = 0
+        try:
+            wm = self.wave_manager
+            idx_map = getattr(wm, "current_wave_idx", {}) or {}
+            if idx_map:
+                waves = max(int(v) for v in idx_map.values()) + 1
+        except Exception:
+            pass
+
+        # --- score (que é o XP total acumulado do jogador) ---
+        score = int(getattr(self.player, "score", 0))
+
+        # --- subtítulo por motivo ---
+        if reason == "items_stolen":
+            subtitle = "Todos os itens foram roubados!"
+        else:
+            subtitle = "Sua jornada termina aqui... por enquanto."
+
+        self.game.current_scene = GameOverScene(
+            self.game,
+            self,
+            stats={
+                "waves": waves,
+                "score": score,
+                "subtitle": subtitle,
+            },
+        )
+
+    def _show_level_complete_scene(self):
+        """
+        Substitui `overlay_manager.show(OverlayType.PHASE_COMPLETE)`.
+        Usa `self.phase_complete_data` que já foi montado em `_complete_phase`.
+        """
+        data = getattr(self, "phase_complete_data", {}) or {}
+
+        # --- tempo decorrido desde o início da fase ---
+        time_str = "—"
+        started = getattr(self, "_phase_started_at", None)
+        if started is not None:
+            try:
+                import datetime as _dt
+                delta = _dt.datetime.now() - started
+                total = int(delta.total_seconds())
+                time_str = f"{total // 60:02d}:{total % 60:02d}"
+            except Exception:
+                time_str = "—"
+
+        # --- próximo existe? (mesma fase +1 OU próximo capítulo fase 1) ---
+        has_next = False
+        try:
+            if self._phase_exists(self.chapter_id, self.phase_number + 1):
+                has_next = True
+            else:
+                nc, _np = self._next_chapter_phase1(self.chapter_id)
+                has_next = (nc is not None)
+        except Exception:
+            has_next = True
+
+        stars = int(data.get("stars", 3))
+        xp_gained = int(data.get("total_xp", 0))
+
+        self.game.current_scene = LevelCompleteScene(
+            self.game,
+            self,
+            stats={
+                "level": self.phase_info.get("name",
+                                             f"Fase {self.chapter_id}-{self.phase_number}"),
+                "stars": stars,
+                "max_stars": 3,
+                "score": int(getattr(self.player, "score", 0)),
+                "xp_gained": xp_gained,
+                "time": time_str,
+                "has_next": has_next,
+            },
+        )
+
     def _update_perf_monitor(self):
         """Atualiza o estado do monitor de performance baseado no debug"""
         perf_monitor.set_enabled(self.show_debug)
@@ -615,6 +747,59 @@ class GameScene(BaseScene):
         self.reset_all_transformed_dittos()
 
         return True
+
+    def _sync_weather_animations(self):
+        """Sincroniza a animação visual com o clima/período atual.
+
+        Só age quando a CHAVE muda. As animações de clima SÃO PERMANENTES
+        (loop: true no JSON), então o Animator nunca morre sozinho.
+        """
+        from src.anim.animation_manager import animation_manager
+
+        # ----- 1. Chave desejada -----
+        current_weather = None
+        if hasattr(self, 'battle_system') and self.battle_system:
+            w = self.battle_system.weather_manager.current_weather
+            if w and w.active:
+                current_weather = w.type.value
+
+        current_period = None
+        if (hasattr(self, 'day_night_weather')
+                and self.day_night_weather.day_night_state):
+            current_period = self.day_night_weather.day_night_state.type.value
+
+        # ----- 2. Define key -----
+        if current_weather and current_weather != "none":
+            key = f"weather/{current_weather}"
+        elif current_period and current_period != "day":
+            key = f"weather/{current_period}"
+        else:
+            key = None
+
+        # ----- 3. Nada mudou? Sai -----
+        if self._current_weather_key == key:
+            return
+
+        old_key = self._current_weather_key
+        self._current_weather_key = key
+
+        # ----- 4. Para a anterior -----
+        if old_key:
+            animation_manager.stop(old_key)
+            print(f"[WEATHER-ANIM] stop {old_key}")
+
+        # ----- 5. Toca a nova -----
+        if key:
+            cx = (self.screen_manager.viewport_x
+                  + self.screen_manager.viewport_width // 2)
+            cy = (self.screen_manager.viewport_y
+                  + self.screen_manager.viewport_height // 2)
+            anim = animation_manager.play(
+                key, screen_pos=(cx, cy), loop_override=True,
+            )
+            print(f"[WEATHER-ANIM] play {key}" if anim else
+                  f"[WEATHER-ANIM] ERRO: {key} não encontrada")
+
     # ===== MÉTODOS DE OVERLAY  =====
 
     def open_move_select_overlay(self, pokemon):
@@ -877,6 +1062,7 @@ class GameScene(BaseScene):
                 if status_type:
                     current_status = self.battle_system.effect_manager.get_status(target)
                     if current_status and current_status.type == status_type:
+                        self._play_item_spray_animation(item_data.get("id", ""), target)
                         self.battle_system.effect_manager.remove_status(target)
                         toast_battle(f"{target.name} curou {status_to_cure}!", duration=4.0, pokemon=target,
                                      portrait="happy")
@@ -923,6 +1109,7 @@ class GameScene(BaseScene):
             if target_type == "ally":
                 current_status = self.battle_system.effect_manager.get_status(target)
                 if current_status and current_status.type.value != "none":
+                    self._play_item_spray_animation(item_data.get("id", ""), target)
                     self.battle_system.effect_manager.remove_status(target)
                     self.battle_system.effect_manager.add_status_text(target, "todos os status curados!")
                     toast_battle(f"{item_data['name']} usado em {target.name}!", duration=4.0, pokemon=target,
@@ -1012,7 +1199,6 @@ class GameScene(BaseScene):
             if hasattr(self, 'event_processor'):
                 expected = self.event_processor.get_next_custom_flag()
                 if expected is None:
-                    # Nenhum trigger CUSTOM pendente, segue a ação
                     pass
                 elif expected == "curou_pokemon":
                     self.event_processor.custom_flags["curou_pokemon"] = True
@@ -1020,10 +1206,53 @@ class GameScene(BaseScene):
                     toast_warning("Complete a etapa anterior primeiro!", duration=5.0)
                     return False
 
+            # ===== ANIMAÇÃO DE SPRAY =====
+            # Só toca se o Pokémon estiver vivo (revive tem outro tratamento abaixo)
+            if target.is_alive():
+                self._play_item_spray_animation(item_data.get("id", ""), target)
+
             medicine_success = self.use_medicine(target, item_data)
             return medicine_success
 
         return False
+
+    # ==================================================================
+    # ANIMAÇÃO DE SPRAY PARA ITENS MEDICINAIS
+    # ==================================================================
+    def _play_item_spray_animation(self, item_id: str, target):
+        print(f"[SPRAY-DBG] 1. entrou | item={item_id!r} | target={getattr(target, 'name', '?')}")
+
+        if target is None:
+            print("[SPRAY-DBG] 2. ABORTADO: target é None")
+            return
+        if not hasattr(target, 'x'):
+            print(f"[SPRAY-DBG] 2. ABORTADO: target sem .x (attrs: {dir(target)[:5]}...)")
+            return
+
+        from src.anim.animation_registry import animation_registry
+        from src.anim.animation_manager import animation_manager
+
+        print(f"[SPRAY-DBG] 3. registry.loaded={animation_registry.loaded} | "
+              f"anims={len(animation_registry._cache)} | "
+              f"bindings={len(animation_registry._bindings)}")
+
+        trigger = f"item.{item_id}.use_on_ally"
+        print(f"[SPRAY-DBG] 4. trigger={trigger!r}")
+
+        defn = animation_registry.resolve_trigger(trigger)
+        if defn is None:
+            print(f"[SPRAY-DBG] 5. ABORTADO: resolve_trigger retornou None")
+            print(f"[SPRAY-DBG]    bindings disponíveis: {list(animation_registry._bindings.keys())}")
+            print(f"[SPRAY-DBG]    keys disponíveis: {animation_registry.all_keys()}")
+            return
+
+        print(f"[SPRAY-DBG] 6. defn encontrado: {defn.name} | "
+              f"space={defn.space} | anchor={defn.anchor} | "
+              f"dur={defn.duration_frames}f")
+
+        anim = animation_manager.play_by_trigger(trigger, anchor_target=target)
+        print(f"[SPRAY-DBG] 7. animator criado: {anim is not None} | "
+              f"active agora: {animation_manager.count_active()}")
 
     def _apply_battle_item(self, pokemon, item_data):
         """Aplica um item de batalha (X-Item) ao Pokémon alvo."""
@@ -1942,11 +2171,18 @@ class GameScene(BaseScene):
 
         self.placement_manager.stop_victory_celebration()
 
+        # ===== PARA TODAS AS ANIMAÇÕES DESTA CENA (clima, spray, etc) =====
+        # Agora funciona porque __init__ chamou attach_to_scene(self).
+        from src.anim.animation_manager import detach_from_scene
+        detach_from_scene(self)
+
         # ===== LIMPA DIA/NOITE E CLIMA =====
-        self.day_night_filter.clear()
-        self.weather_filter.clear()
         if hasattr(self, 'day_night_weather'):
             self.day_night_weather._initialized = False
+
+        # Zera as chaves de animação de clima
+        self._current_weather_key = None
+        self._current_weather_trigger = None
 
         # Reseta câmera
         if hasattr(self, 'camera_renderer'):
@@ -2357,8 +2593,16 @@ class GameScene(BaseScene):
         Lida com a desistência do jogador (via botão DESISTIR! no pause overlay).
         Conta como derrota: remove felicidade e mostra game over.
         """
-
         print(f"[GAME_SCENE] Jogador desistiu da fase {self.phase_id}!")
+
+        # ===== PARA O CLIMA VISUAL JUNTO =====
+        # (o cleanup vai rodar depois, mas garante que já pare agora)
+        from src.anim.animation_manager import animation_manager
+        if self._current_weather_key:
+            animation_manager.stop(self._current_weather_key)
+            print(f"[WEATHER-ANIM] stop {self._current_weather_key} (desistência)")
+            self._current_weather_key = None
+            self._current_weather_trigger = None
 
         # Remove felicidade dos Pokémon (penalidade por desistir)
         for pokemon in self.player.team:
@@ -2380,9 +2624,8 @@ class GameScene(BaseScene):
         # Marca como game over (motivo: desistência)
         self.game_state = "game_over"
 
-        # Mostra overlay de game over com motivo "team_defeated" (ou um motivo específico)
-        # Vamos passar "team_defeated" porque a desistência é similar a ser derrotado
-        self.overlay_manager.show(OverlayType.GAME_OVER, reason="team_defeated")
+        # Mostra overlay de game over
+        self._show_game_over_scene(reason="team_defeated")
 
         print(f"[GAME_SCENE] Desistência registrada como derrota!")
 
@@ -2395,6 +2638,10 @@ class GameScene(BaseScene):
 
         self.in_game_debug.update(dt)
         dt = dt * self.in_game_debug.get_time_multiplier()
+
+        # ===== ANIMAÇÕES GLOBAIS DO EDITOR =====
+        from src.anim.animation_manager import animation_manager
+        animation_manager.update(dt)
 
         # ===== GUARDA O DT PARA USO NO RENDER (partículas de clima) =====
         self._last_dt = dt
@@ -2451,57 +2698,6 @@ class GameScene(BaseScene):
             perf_monitor.end_frame()
             return
 
-        # ===== PHASE_COMPLETE: atualização PARCIAL (sem wave/transições/game over) =====
-        if self.overlay_manager.is_active:
-            is_phase_complete = (
-                    hasattr(self.overlay_manager, 'current_type') and
-                    self.overlay_manager.current_type == OverlayType.PHASE_COMPLETE
-            )
-
-            if is_phase_complete:
-                # ---- Roda o overlay ----
-                self.overlay_manager.update(dt)
-
-                # ---- Battle System (projéteis, efeitos visuais, partículas) ----
-                if hasattr(self, 'battle_system') and self.battle_system:
-                    self.battle_system.update(dt)
-
-                # ---- Dia/Noite e clima continuam animando ----
-                if hasattr(self, 'day_night_weather'):
-                    self.day_night_weather.update(dt)
-
-                # ---- Effect Manager (partículas de status visuais) ----
-                if hasattr(self, 'battle_system') and self.battle_system:
-                    self.battle_system.effect_manager.update(dt)
-
-                # ---- Notification manager (toasts continuam) ----
-                self.notification_manager.update(dt)
-
-                # ---- Atualiza APENAS as animações dos Pokémon colocados ----
-                # (o modo celebração interna faz pokemon.update sem combate novo,
-                #  mas mantém retorno/ataque em andamento se configurado no manager)
-                self.placement_manager.update(dt, [])
-
-                # ---- Bag/Team renderers (para animações de UI) ----
-                if self.item_bag_renderer:
-                    self.item_bag_renderer.update(dt)
-                if self.team_manager:
-                    self.team_manager.update(dt)
-
-                # ===== CÂMERA FOTOGRÁFICA =====
-                if hasattr(self, 'camera_renderer'):
-                    self.camera_renderer.update(dt)
-
-                perf_monitor.end_section()
-                perf_monitor.end_frame()
-                return
-
-            # ---- Outros overlays (PAUSE, GAME_OVER, CAPTURE): congelam tudo ----
-            self.overlay_manager.update(dt)
-            perf_monitor.end_section()
-            perf_monitor.end_frame()
-            return
-
         perf_monitor.end_section()
 
         # ===== PAUSA =====
@@ -2529,6 +2725,7 @@ class GameScene(BaseScene):
         # ===== DIA/NOITE E CLIMA =====
         if hasattr(self, 'day_night_weather'):
             self.day_night_weather.update(dt)
+            self._sync_weather_animations()
 
         perf_monitor.end_section()
 
@@ -2627,9 +2824,9 @@ class GameScene(BaseScene):
             self.game_state = "game_over"
             for pokemon in self.player.team:
                 pokemon.add_happiness(-5, "Fase perdida")
-            self.overlay_manager.show(OverlayType.GAME_OVER, reason="team_defeated")
             for pokemon in self.player.team:
                 pokemon.reset(self)
+            self._show_game_over_scene(reason="team_defeated")
             perf_monitor.end_frame()
             return
 
@@ -2638,9 +2835,9 @@ class GameScene(BaseScene):
             self.game_state = "game_over"
             for pokemon in self.player.team:
                 pokemon.add_happiness(-5, "Fase perdida")
-            self.overlay_manager.show(OverlayType.GAME_OVER, reason="items_stolen")
             for pokemon in self.player.team:
                 pokemon.reset(self)
+            self._show_game_over_scene(reason="items_stolen")
             perf_monitor.end_frame()
             return
 
@@ -2675,7 +2872,7 @@ class GameScene(BaseScene):
                     else:
                         print("[GAME] GAME OVER! Todos os itens foram roubados!")
                         self.game_state = "game_over"
-                        self.overlay_manager.show(OverlayType.GAME_OVER, reason="items_stolen")
+                        self._show_game_over_scene(reason="items_stolen")
 
         perf_monitor.end_section()
 
@@ -2684,13 +2881,28 @@ class GameScene(BaseScene):
     def _complete_phase(self):
         """
         Completa a fase com sucesso.
-        Calcula recompensas, estrelas, e mostra overlay de conclusão.
+        Calcula recompensas, estrelas, e mostra a cena de conclusão.
+
+        Regra de score/XP:
+          - `player.score` É o XP acumulado (persiste no save, nunca diminui).
+          - Nesta função, somamos o XP da fase ao score.
+          - O nível do jogador é DERIVADO do score (player.get_level()).
         """
         from src.config.progress import progress_manager
         import random
 
-        # Para a música de batalha
+        # ===== PARA A MÚSICA DE BATALHA =====
         self._stop_all_sounds(fade_ms=1000)
+
+        # ===== PARA O CLIMA VISUAL JUNTO =====
+        # Evita que a animação de clima continue tocando enquanto a cena
+        # de fase completa está na tela, e previne "animações zumbis".
+        from src.anim.animation_manager import animation_manager
+        if self._current_weather_key:
+            animation_manager.stop(self._current_weather_key)
+            print(f"[WEATHER-ANIM] stop {self._current_weather_key} (fase completa)")
+            self._current_weather_key = None
+            self._current_weather_trigger = None
 
         # Reset Dittos transformados
         self.reset_all_transformed_dittos()
@@ -2701,7 +2913,6 @@ class GameScene(BaseScene):
 
         self.placement_manager.start_victory_celebration()
 
-        # ===== VERIFICA SE É GINÁSIO =====
         # ===== VERIFICA SE É GINÁSIO =====
         if (self.chapter_id, self.phase_number) in GYM_PHASES:
             gym_number = GYM_PHASES[(self.chapter_id, self.phase_number)]
@@ -2717,13 +2928,13 @@ class GameScene(BaseScene):
                 ach_mgr.set_counter(gym_key, 1)
                 ach_mgr.increment_counter("badge_count")
 
-                # Verifica conquista de primeira insígnia
                 ach_mgr.check_and_unlock("first_badge", self.phase_id)
-                # Verifica conquista de todas as insígnias (agora com badge_count correto)
                 ach_mgr.check_and_unlock("all_badges", self.phase_id)
-                print(f"[GYM] Insígnia {gym_number} contabilizada (total: {ach_mgr.get_counter('badge_count')}/8)")
+                print(f"[GYM] Insígnia {gym_number} contabilizada "
+                      f"(total: {ach_mgr.get_counter('badge_count')}/8)")
             else:
-                print(f"[GYM] Ginásio {gym_number} já havia sido concluído — badge_count NÃO incrementado")
+                print(f"[GYM] Ginásio {gym_number} já havia sido concluído — "
+                      f"badge_count NÃO incrementado")
 
         # ===== RECOMPENSAS BASE =====
         base_reward = self.phase_rewards.get('money', 100)
@@ -2737,7 +2948,6 @@ class GameScene(BaseScene):
         if stolen_items == 0 and total_items > 0:
             bonus_amount = int(gold_from_defeats * 0.3)
             perfect_run = True
-            # ===== CONQUISTAS: Fase Perfeita =====
             if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
                 self.player.achievement_manager.increment_counter("perfect_phase_count")
                 self.player.achievement_manager.check_and_unlock("perfect_phase", self.phase_id)
@@ -2751,13 +2961,12 @@ class GameScene(BaseScene):
         item_rewards_config = self.phase_rewards.get('item_rewards', [])
         drop_chance = self.phase_rewards.get('drop_chance', 0.0)
         max_items = self.phase_rewards.get('max_items', 3)
-        earned_items = []  # lista de item_ids ganhos
+        earned_items = []
 
         if item_rewards_config and drop_chance > 0 and max_items > 0:
             total_kills = self.wave_manager.total_enemies_defeated
             print(f"[DEBUG] total_kills em _complete_phase = {total_kills}")
 
-            # Prepara lista de itens com pesos
             items_pool = []
             weights = []
             for entry in item_rewards_config:
@@ -2769,28 +2978,44 @@ class GameScene(BaseScene):
                 if drops >= max_items:
                     break
                 if random.random() < drop_chance:
-                    # Sorteia um item da lista
                     chosen = random.choices(items_pool, weights=weights, k=1)[0]
                     earned_items.append(chosen)
                     drops += 1
 
-            # Adiciona os itens ao inventário
             for item_id in earned_items:
                 self.player.bag.add_item(item_id, 1)
                 print(f"[REWARD] Item ganho: {item_id}")
 
-        # ===== XP =====
-        self.player.score += self.phase_rewards.get('experience', 50)
+        # ===== XP (score do jogador) =====
+        # `phase_rewards["experience"]` é o XP fixo desta fase.
+        # Somamos ao score acumulado. O nível é derivado depois.
+        xp_ganho = int(self.phase_rewards.get('experience', 50))
+        score_antes = int(getattr(self.player, 'score', 0))
+        self.player.score += xp_ganho
+        level_antes = self.player.get_level()   # (já é o novo, pois score mudou)
 
-        print(f"[DEBUG] phase_rewards = {self.phase_rewards}")
+        # Descobre se o jogador SUBIU de nível agora (comparando pelo XP)
+        # Truque: subtrai temporariamente o xp_ganho pra ver o nível anterior.
+        try:
+            self.player.score -= xp_ganho
+            level_antes = self.player.get_level()
+            self.player.score += xp_ganho
+        except Exception:
+            level_antes = self.player.get_level()
+
+        level_depois = self.player.get_level()
+        subiu = level_depois > level_antes
+
+        print(f"[SCORE] +{xp_ganho} XP  →  total: {self.player.score}  "
+              f"(Nivel {level_antes} → {level_depois})"
+              + ("  ⭐ LEVEL UP!" if subiu else ""))
 
         self._roll_mythical_chance()
 
         # ===== ESTRELAS =====
-        #Regras:
-        #3: nenhum pokémon derrotado E nenhum item perdido
-        #2: nenhum pokémon derrotado, mas perdeu item
-        #1: qualquer pokémon derrotado (independente dos itens)
+        # 3: nenhum pokémon derrotado E nenhum item perdido
+        # 2: nenhum pokémon derrotado, mas perdeu item
+        # 1: qualquer pokémon derrotado (independente dos itens)
         items_stolen = self.target_item_manager.items_stolen
 
         any_pokemon_defeated = self._pokemon_defeated_this_phase
@@ -2809,13 +3034,13 @@ class GameScene(BaseScene):
             f"-> {stars}★"
         )
 
-        # ===== DADOS PARA O OVERLAY =====
+        # ===== DADOS PARA A CENA DE FASE COMPLETA =====
         self.phase_complete_data = {
             "base_reward": base_reward,
             "gold_from_defeats": gold_from_defeats,
             "bonus_amount": bonus_amount,
             "gold_total": gold_total,
-            "total_xp": self.phase_rewards.get('experience', 50),
+            "total_xp": xp_ganho,           # XP GANHO NESTA FASE
             "perfect_run": perfect_run,
             "stars": stars,
             "earned_items": earned_items
@@ -2825,14 +3050,13 @@ class GameScene(BaseScene):
         progress_manager.complete_phase(self.phase_id, stars=stars)
         self.player.auto_save()
 
-        # ===== MOSTRA OVERLAY DE FASE COMPLETA =====
-        # Fase final (capitulo 8, fase 1) -> overlay especial estilo Hall of Fame
+        # ===== MOSTRA A CENA DE FASE COMPLETA =====
         if self.chapter_id == 8 and self.phase_number == 1:
-            # Delay para dar tempo da celebracao de vitoria rolar primeiro
+            # Fase final → agenda o Hall of Fame em 3.5s (não abre a cena)
             self._pending_final_victory_delay = 3.5
             print("[FINAL_VICTORY] Fase final detectada! Hall of Fame em 3.5s.")
         else:
-            self.overlay_manager.show(OverlayType.PHASE_COMPLETE)
+            self._show_level_complete_scene()
 
     # ===== MÉTODOS DE RENDER =====
 
@@ -2919,6 +3143,10 @@ class GameScene(BaseScene):
         map_renderer.render_ceiling(screen, camera, screen_mgr)
         perf_monitor.end_section()
 
+        # Animações do editor — camada world
+        from src.anim.animation_manager import animation_manager
+        animation_manager.render(screen, camera, self.screen_manager, space="world")
+
         # 9. Projéteis (acima do teto — sempre visíveis)
         perf_monitor.start_section("RENDER_PROJECTILES")
         if hasattr(self, 'battle_system'):
@@ -2943,35 +3171,13 @@ class GameScene(BaseScene):
             placement_mgr.render_hp(screen, camera)
         perf_monitor.end_section()
 
-        # ===== CLIMA / DIA-NOITE =====
-        perf_monitor.start_section("RENDER_WEATHER_AND_DAYNIGHT")
-        viewport_rect = pygame.Rect(
-            self.screen_manager.viewport_x,
-            self.screen_manager.viewport_y,
-            self.screen_manager.viewport_width,
-            self.screen_manager.viewport_height
-        )
-
-        if hasattr(self, 'battle_system') and self.battle_system:
-            weather = self.battle_system.weather_manager.current_weather
-            self.weather_filter.render(
-                screen,
-                weather if (weather and weather.active) else None,
-                viewport_rect,
-                dt=getattr(self, '_last_dt', 0.0),
-            )
-
-        if hasattr(self, 'day_night_weather'):
-            day_night = self.day_night_weather.day_night_state
-            if day_night and day_night.active:
-                self.day_night_filter.render(screen, day_night, viewport_rect)
-        perf_monitor.end_section()
-
         # ===== UI =====
         if not self.ui_hidden:
             perf_monitor.start_section("RENDER_GAME_UI")
             self._render_game_ui(screen)
             perf_monitor.end_section()
+
+            animation_manager.render(screen, camera, self.screen_manager, space="screen")
 
             perf_monitor.start_section("RENDER_TEAM_MANAGER")
             if team_mgr:
@@ -2998,7 +3204,9 @@ class GameScene(BaseScene):
                              (screen_mgr.viewport_x, screen_mgr.viewport_y,
                               screen_mgr.viewport_width, screen_mgr.viewport_height), 1)
             perf_monitor.end_section()
-
+        else:
+            # UI oculta: ainda renderiza as animações de clima (screen)
+            animation_manager.render(screen, camera, self.screen_manager, space="screen")
         # ===== QUICK SWITCH =====
         perf_monitor.start_section("RENDER_QUICK_SWITCH")
         if hasattr(self, 'move_quick_switch_manager'):

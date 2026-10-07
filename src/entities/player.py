@@ -1,7 +1,7 @@
 # src/entities/player.py
 from typing import Optional
 
-import pygame, uuid
+import pygame, uuid, math
 
 from src.entities.pokemon import Pokemon
 from src.entities.base import Entity
@@ -311,6 +311,52 @@ class Player(Entity):
         print(f"[PLAYER] Pokémon inicial adicionado: {starter.name} (ID: {starter_id})")
         return starter
 
+    # NÍVEL DO JOGADOR — derivado do score (que é XP acumulado)
+    @staticmethod
+    def _xp_for_level(n: int) -> int:
+        if n <= 1:
+            return 0
+        return 50 * n * (n - 1)
+
+    def get_level(self) -> int:
+        """Nível atual do jogador, derivado do score (XP). Sem cap."""
+        xp = int(getattr(self, "score", 0))
+        if xp <= 0:
+            return 1
+        # Resolve 50 * n * (n - 1) <= xp
+        # n² - n - xp/50 <= 0  →  n = (1 + sqrt(1 + xp/12.5)) / 2
+        n = int((1 + math.sqrt(1 + xp / 12.5)) / 2)
+        # Ajusta erro de floor (sempre converge em 1-2 iterações)
+        while self._xp_for_level(n + 1) <= xp:
+            n += 1
+        while n > 1 and self._xp_for_level(n) > xp:
+            n -= 1
+        return max(1, n)
+
+    def get_level_progress(self):
+        """
+        Retorna (level, xp_no_nivel_atual, xp_span_do_nivel, ratio_0_1).
+        Ex.: xp=350 → level=3, xp_no_nivel=50, xp_span=300, ratio=0.166
+        """
+        xp = int(getattr(self, "score", 0))
+        level = self.get_level()
+
+        xp_atual_base = self._xp_for_level(level)
+        xp_next_base = self._xp_for_level(level + 1)
+
+        xp_dentro = xp - xp_atual_base
+        xp_span = max(1, xp_next_base - xp_atual_base)
+        ratio = max(0.0, min(1.0, xp_dentro / xp_span))
+
+        return level, xp_dentro, xp_span, ratio
+
+    # ---- Aliases / helpers pra UI ----
+    def get_level_text(self) -> str:
+        lvl, xp_dentro, xp_span, _ = self.get_level_progress()
+        return f"Nivel {lvl}  ({xp_dentro}/{xp_span} XP)"
+
+    def get_total_xp_text(self) -> str:
+        return f"XP total: {int(getattr(self, 'score', 0))}"
     #SALVAMENTOS
 
     def stamp_pokemon_origin(self, pokemon, new_method: str):

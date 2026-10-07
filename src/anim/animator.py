@@ -6,6 +6,11 @@ Regras:
   - Layers seguem `anchor_actor` (ator) ou `aim_at` (direcao/alvo).
   - Filtros ignoram camera (sempre cobrem viewport).
   - `hidden_actors` permite ao editor esconder atores sem afeta-los.
+  - `scale_mult` no AnimDefinition multiplica TODAS as layers (sprite+offset).
+  - `anchor_mode` (center/head/feet) desloca a ancora verticalmente conforme
+    o tamanho real do sprite do alvo.
+  - `world_scaled` faz a animacao escalar junto com o zoom da camera de jogo,
+    IGUAL aos pokemons (camera.zoom * render_scale * TILE_SCALE).
 """
 import math
 from pathlib import Path
@@ -17,6 +22,10 @@ from src.anim.easing import apply_easing
 from src.anim.emitter import ParticleEmitter
 from src.anim.actor import ActorRuntime
 from src.anim.camera import CameraRuntime
+
+
+# Mesmo TILE_SCALE usado em Pokemon.render
+_TILE_SCALE = 16 / 24
 
 
 class Animator:
@@ -41,6 +50,7 @@ class Animator:
         self._sound_played = False
         self._sprite_cache: dict = {}
         self._emitter_runners: dict = {}
+        self._emitter_runner_scales: dict = {}  # rastreia ws do emitter
         self._actor_runtimes: dict = {}
 
         self.camera_runtime = None
@@ -99,6 +109,7 @@ class Animator:
         for r in self._emitter_runners.values():
             r.clear()
         self._emitter_runners.clear()
+        self._emitter_runner_scales.clear()
 
     def set_camera_runtime(self, cam_def):
         if (self.defn.category == "cutscene"
@@ -173,6 +184,23 @@ class Animator:
         return (cx - cam_x * eff, cy - cam_y * eff)
 
     # =================================================================
+    # ESCALA DE JOGO (mesma do Pokemon.render)
+    # =================================================================
+    def _game_scale(self, camera, screen_manager):
+        """Fator total aplicado ao sprite do pokemon no jogo.
+
+        Pokemon.render usa:
+            zoom_scale = camera.zoom * screen_manager.render_scale * TILE_SCALE
+
+        Retorna 1.0 se world_scaled=False ou se faltar camera/screen_manager.
+        """
+        if not getattr(self.defn, 'world_scaled', True):
+            return 1.0
+        if camera is None or screen_manager is None:
+            return 1.0
+        return camera.zoom * screen_manager.render_scale * _TILE_SCALE
+
+    # =================================================================
     # ATORES
     # =================================================================
     def get_actor_runtime(self, actor_id):
@@ -196,8 +224,6 @@ class Animator:
         if not actors:
             return
 
-        # Pre-pass: garante que TODOS os runtimes existem (mesmo os
-        # escondidos) — emitters que ancoram neles ainda funcionam.
         for actor_def in actors:
             self._ensure_actor_runtime(actor_def)
 
@@ -284,6 +310,22 @@ class Animator:
             from src.core.render_context import render_context
             sx, sy = render_context.world_to_screen(wx, wy, camera,
                                                     screen_manager)
+
+            # ===== ÂNCORA DINÂMICA (head/feet) =====
+            # Desloca o anchor em pixels de TELA conforme o tamanho real
+            # do sprite do alvo. Usa a MESMA fórmula do Pokemon.render.
+            if anchor_obj is not None and self.defn.anchor_mode != "center":
+                sprite = getattr(anchor_obj, 'sprite', None)
+                if sprite is not None and camera is not None and screen_manager is not None:
+                    screen_h = (sprite.get_height()
+                                * camera.zoom
+                                * screen_manager.render_scale
+                                * _TILE_SCALE)
+                    if self.defn.anchor_mode == "head":
+                        sy -= screen_h / 2.0
+                    elif self.defn.anchor_mode == "feet":
+                        sy += screen_h / 2.0
+
             if self.camera_runtime is None:
                 return (sx, sy)
             cx, cy = self._viewport_center(screen, screen_manager)
@@ -348,12 +390,12 @@ class Animator:
             try:
                 if isinstance(layer, SpriteLayerDef):
                     self._render_sprite_layer(screen, layer, anchor_pos,
-                                              screen, screen_manager)
+                                              screen, screen_manager, camera)
                 elif isinstance(layer, FilterLayerDef):
                     self._render_filter_layer(screen, layer, screen_manager)
                 elif isinstance(layer, EmitterLayerDef):
                     self._render_emitter_layer(screen, layer, anchor_pos,
-                                               screen, screen_manager)
+                                               screen, screen_manager, camera)
             except Exception as e:
                 print(f"[ANIM] erro layer '{layer.id}': {e}")
 
@@ -385,12 +427,12 @@ class Animator:
             k = kfs[0]
             return {"x": k.x, "y": k.y, "rot": k.rot, "scale": k.scale,
                     "alpha": k.alpha, "tint": k.tint,
-                    "frame_index": k.frame_index}
+                    "frame_index": getattr(k, "frame_index", -1)}
         if f >= kfs[-1].f:
             k = kfs[-1]
             return {"x": k.x, "y": k.y, "rot": k.rot, "scale": k.scale,
                     "alpha": k.alpha, "tint": k.tint,
-                    "frame_index": k.frame_index}
+                    "frame_index": getattr(k, "frame_index", -1)}
 
         for i in range(len(kfs) - 1):
             a, b = kfs[i], kfs[i + 1]
@@ -398,14 +440,16 @@ class Animator:
                 span = max(1, b.f - a.f)
                 t = apply_easing(layer.easing, (f - a.f) / span)
 
-                # frame_index: interpolação LINEAR (sem easing) — frames discretos
+                # frame_index: interpolação LINEAR (frames discretos)
                 raw = (f - a.f) / span
-                if a.frame_index >= 0 and b.frame_index >= 0:
-                    fi = int(round(a.frame_index + (b.frame_index - a.frame_index) * raw))
-                elif a.frame_index >= 0:
-                    fi = a.frame_index
-                elif b.frame_index >= 0:
-                    fi = b.frame_index
+                a_fi = getattr(a, "frame_index", -1)
+                b_fi = getattr(b, "frame_index", -1)
+                if a_fi >= 0 and b_fi >= 0:
+                    fi = int(round(a_fi + (b_fi - a_fi) * raw))
+                elif a_fi >= 0:
+                    fi = a_fi
+                elif b_fi >= 0:
+                    fi = b_fi
                 else:
                     fi = -1
 
@@ -423,7 +467,8 @@ class Animator:
                 "frame_index": -1}
 
     def _render_sprite_layer(self, screen, layer, anchor_pos,
-                             screen_obj=None, screen_manager=None):
+                             screen_obj=None, screen_manager=None,
+                             camera=None):
         img = self._get_sprite_image(layer.image_path)
         if img is None:
             self._draw_missing_sprite(screen, anchor_pos, layer)
@@ -433,11 +478,11 @@ class Animator:
         if props["alpha"] <= 0:
             return
 
+        # ===== FATIA DO SPRITESHEET =====
         base = img
         if layer.frame_width > 0 and layer.frame_height > 0:
             fw, fh = int(layer.frame_width), int(layer.frame_height)
             cols = max(1, img.get_width() // fw)
-            # keyframe.frame_index tem prioridade quando >= 0
             kf_fi = props.get("frame_index", -1)
             idx = int(kf_fi) if kf_fi >= 0 else max(0, int(layer.frame_index))
             col = idx % cols
@@ -455,10 +500,19 @@ class Animator:
         if props["tint"] != (255, 255, 255):
             base = _apply_tint(base, props["tint"])
 
+        # ===== ESCALA =====
+        # eff_zoom: zoom interno do Animator (editor usa, jogo = 1.0)
         _, _, cam_zoom = self._get_camera_state()
         eff_zoom = self.zoom * cam_zoom
 
-        total_scale = max(0.01, props["scale"]) * eff_zoom
+        # ws: escala "world" (mesma do pokemon) quando world_scaled=True
+        ws = self._game_scale(camera, screen_manager)
+
+        # Total: keyframe.scale * eff_zoom * scale_mult * ws
+        scale_mult = getattr(self.defn, "scale_mult", 1.0)
+        total_scale = (max(0.01, props["scale"])
+                       * eff_zoom * scale_mult * ws)
+
         if abs(total_scale - 1.0) > 0.001:
             w = max(1, int(round(base.get_width() * total_scale)))
             h = max(1, int(round(base.get_height() * total_scale)))
@@ -475,8 +529,11 @@ class Animator:
             base = base.copy()
             base.set_alpha(int(props["alpha"]))
 
-        px = anchor_pos[0] + (layer.offset_x + props["x"]) * eff_zoom
-        py = anchor_pos[1] + (layer.offset_y + props["y"]) * eff_zoom
+        # ===== POSIÇÃO =====
+        # Offsets e keyframes x/y escalam com scale_mult e ws (uniforme)
+        offset_scale = eff_zoom * scale_mult * ws
+        px = anchor_pos[0] + (layer.offset_x + props["x"]) * offset_scale
+        py = anchor_pos[1] + (layer.offset_y + props["y"]) * offset_scale
 
         rect = base.get_rect()
         pivot = layer.pivot
@@ -510,9 +567,12 @@ class Animator:
     # -----------------------------------------------------------------
     # EMITTER
     # -----------------------------------------------------------------
-    def _scaled_emitter_params(self, params):
+    def _scaled_emitter_params(self, params, extra_scale=1.0):
         p = dict(params or {})
-        z = self.zoom
+        scale_mult = getattr(self.defn, "scale_mult", 1.0)
+        # z combina zoom interno + scale_mult + world_scale do momento
+        z = self.zoom * scale_mult * extra_scale
+
         area = dict(p.get("spawn_area")
                     or {"x": -20, "y": -20, "w": 40, "h": 40})
         area["x"] *= z
@@ -531,15 +591,27 @@ class Animator:
         return p
 
     def _render_emitter_layer(self, screen, layer, anchor_pos,
-                              screen_obj=None, screen_manager=None):
+                              screen_obj=None, screen_manager=None,
+                              camera=None):
+        ws = self._game_scale(camera, screen_manager)
+
         runner = self._emitter_runners.get(layer.id)
+        cached_ws = self._emitter_runner_scales.get(layer.id)
+
+        # Se o ws mudou (jogador deu zoom), recria o emitter com o novo tamanho
+        if runner is not None and cached_ws is not None and abs(cached_ws - ws) > 0.001:
+            runner.clear()
+            runner = None
+
         if runner is None:
             img = self._get_sprite_image(layer.image_path)
             if img is None:
                 return
-            params = self._scaled_emitter_params(layer.emitter_params)
+            params = self._scaled_emitter_params(layer.emitter_params,
+                                                 extra_scale=ws)
             runner = ParticleEmitter(img, params)
             self._emitter_runners[layer.id] = runner
+            self._emitter_runner_scales[layer.id] = ws
 
         angle = self._compute_aim_angle(
             layer, anchor_pos, screen_obj, screen_manager)
@@ -547,8 +619,10 @@ class Animator:
 
         _, _, cam_zoom = self._get_camera_state()
         eff_zoom = self.zoom * cam_zoom
-        ox = anchor_pos[0] + layer.offset_x * eff_zoom
-        oy = anchor_pos[1] + layer.offset_y * eff_zoom
+        scale_mult = getattr(self.defn, "scale_mult", 1.0)
+        offset_scale = eff_zoom * scale_mult * ws
+        ox = anchor_pos[0] + layer.offset_x * offset_scale
+        oy = anchor_pos[1] + layer.offset_y * offset_scale
         runner.render(screen, ox, oy, blend_mode=layer.blend)
 
     # -----------------------------------------------------------------

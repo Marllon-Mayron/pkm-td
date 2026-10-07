@@ -5,6 +5,110 @@ Todos aceitam coords RELATIVAS (0.0 - 1.0) do viewport.
 """
 import pygame
 
+def _text_size(text, font):
+    try:
+        return font.size(text)
+    except Exception:
+        return (0, 0)
+
+
+def text_fits(text, font, max_w, max_h):
+    w, h = _text_size(text, font)
+    return w <= max_w and h <= max_h
+
+
+def split_wrap(text, font, max_w):
+    """Quebra `text` em linhas que caibam em max_w."""
+    words = str(text or "").split(" ")
+    lines = []
+    cur = ""
+    for w in words:
+        test = (cur + " " + w).strip()
+        if _text_size(test, font)[0] <= max_w:
+            cur = test
+        else:
+            if cur:
+                lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines or [""]
+
+
+def add_ellipsis(text, font, max_w, ellipsis="..."):
+    """Corta `text` até caber em max_w, adicionando '...'."""
+    text = str(text or "")
+    if _text_size(text, font)[0] <= max_w:
+        return text
+    ell_w = _text_size(ellipsis, font)[0]
+    if ell_w > max_w:
+        return ""
+    lo, hi = 0, len(text)
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if _text_size(text[:mid], font)[0] + ell_w <= max_w:
+            lo = mid
+        else:
+            hi = mid - 1
+    return text[:lo] + ellipsis
+
+
+def fit_font(text, font_factory, start_size, max_w, max_h, min_size=8,
+             max_steps=64):
+    """
+    Diminui a fonte até o texto caber.
+    `font_factory(size) -> pygame.Font`
+    """
+    size = max(min_size, int(start_size))
+    font = font_factory(size)
+    steps = 0
+    while size > min_size and not text_fits(text, font, max_w, max_h):
+        size -= 1
+        font = font_factory(size)
+        steps += 1
+        if steps >= max_steps:
+            break
+    return font, size
+
+
+def layout_text(text, font, max_w, max_h, text_fit="none",
+                font_factory=None, start_size=None, min_size=8):
+    """
+    Retorna (lines: list[str], font: pygame.Font).
+
+    text_fit:
+      "none"        → 1 linha (sem processar)
+      "shrink"      → encolhe até caber em 1 linha
+      "wrap"        → quebra em várias linhas
+      "ellipsis"    → 1 linha cortada com "..."
+      "shrink_wrap" → encolhe E quebra se ainda não couber
+    """
+    text = str(text or "")
+
+    if text_fit == "shrink" and font_factory is not None and start_size:
+        font, _ = fit_font(text, font_factory, start_size,
+                           max_w, max_h, min_size)
+        return [text], font
+
+    if text_fit == "ellipsis":
+        return [add_ellipsis(text, font, max_w)], font
+
+    if text_fit == "wrap":
+        return split_wrap(text, font, max_w), font
+
+    if text_fit == "shrink_wrap":
+        # 1) tenta encolher até caber na largura
+        work_font = font
+        if font_factory is not None and start_size:
+            work_font, _ = fit_font(text, font_factory, start_size,
+                                    max_w, max_h, min_size)
+        # 2) se ainda assim não couber em 1 linha, quebra
+        if _text_size(text, work_font)[0] <= max_w:
+            return [text], work_font
+        return split_wrap(text, work_font, max_w), work_font
+
+    # "none"
+    return [text], font
 
 class Anchor:
     TOP_LEFT      = "tl"
@@ -95,12 +199,36 @@ def font_size_for(vp, factor, minimum=14, maximum=72):
 
 
 def draw_text_centered(target, text, font, color, rect,
-                        shadow_color=None, shadow_offset=(2, 2)):
-    """Renderiza texto centralizado em `rect`, com sombra opcional."""
-    surf = font.render(text, True, color)
-    x = rect.centerx - surf.get_width() // 2
-    y = rect.centery - surf.get_height() // 2
-    if shadow_color:
-        sh = font.render(text, True, shadow_color)
-        target.blit(sh, (x + shadow_offset[0], y + shadow_offset[1]))
-    target.blit(surf, (x, y))
+                       shadow_color=None, shadow_offset=(2, 2),
+                       text_fit="none", font_factory=None,
+                       start_size=None, min_font_size=8,
+                       line_gap=2):
+    """
+    Renderiza texto (com opcional ajuste automático) centralizado em `rect`.
+    """
+    max_w = max(4, rect.width - 8)
+    max_h = max(4, rect.height)
+
+    lines, final_font = layout_text(
+        text, font, max_w, max_h,
+        text_fit=text_fit,
+        font_factory=font_factory,
+        start_size=start_size,
+        min_size=min_font_size,
+    )
+
+    line_h = final_font.get_height() + line_gap
+    total_h = len(lines) * line_h - line_gap
+    y0 = rect.centery - total_h // 2
+
+    for i, line in enumerate(lines):
+        if not line:
+            continue
+        surf = final_font.render(line, True, color)
+        x = rect.centerx - surf.get_width() // 2
+        y = y0 + i * line_h
+
+        if shadow_color:
+            sh = final_font.render(line, True, shadow_color)
+            target.blit(sh, (x + shadow_offset[0], y + shadow_offset[1]))
+        target.blit(surf, (x, y))

@@ -22,6 +22,13 @@ def main():
     print(f"[MAIN] Diretório raiz: {PROJECT_ROOT}")
     print(f"[MAIN] Diretório src: {Path(__file__).parent}")
     print(f"Pokémon TD - Versão {get_game_version()}")
+
+    # ===== CARREGA O REGISTRY DE ANIMAÇÕES (ANTES DE TUDO) =====
+    from src.anim.animation_registry import animation_registry
+    animation_registry.reload()
+    print(f"[MAIN] Animações: {len(animation_registry.all_keys())} | "
+          f"Bindings: {len(animation_registry.all_bindings())}")
+
     game = Game()
     game.current_version = get_game_version()
     game.run()

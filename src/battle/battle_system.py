@@ -1593,7 +1593,9 @@ class BattleSystem:
         move_type = move_info.get('type', '').lower()
         weather_boosted = False
 
-        # ===== RAIN =====
+        # =============================================================
+        # RAIN
+        # =============================================================
         if weather.type.value == "rain":
             if move_type == 'water':
                 effects['damage_multiplier'] = 1.5
@@ -1606,7 +1608,9 @@ class BattleSystem:
                 effects['damage_multiplier'] = 0.5
                 effects['message'] = "A chuva enfraqueceu o ataque!"
 
-        # ===== SUNNY =====
+        # =============================================================
+        # SUNNY
+        # =============================================================
         elif weather.type.value == "sunny":
             if move_type == 'fire':
                 effects['damage_multiplier'] = 1.5
@@ -1620,12 +1624,43 @@ class BattleSystem:
                 effects['message'] = "O sol forte carregou o ataque!"
                 weather_boosted = True
 
-        # ===== SANDSTORM =====
+        # =============================================================
+        # SANDSTORM (map-only)
+        # =============================================================
         elif weather.type.value == "sandstorm":
             if move_type in ['rock', 'ground', 'steel']:
                 effects['damage_multiplier'] = 1.3
                 effects['message'] = "A tempestade de areia fortaleceu o ataque!"
                 weather_boosted = True
+
+        # =============================================================
+        # THUNDERSTORM (map-only) — pedido: +20% em Water
+        # =============================================================
+        elif weather.type.value == "thunderstorm":
+            if move_type == 'water':
+                effects['damage_multiplier'] = 1.2
+                effects['message'] = "A tempestade energizou o ataque de água!"
+                weather_boosted = True
+            elif move_type == 'electric':
+                effects['damage_multiplier'] = 1.2
+                effects['message'] = "A tempestade energizou o ataque elétrico!"
+                weather_boosted = True
+
+        # =============================================================
+        # SNOW — frio enfraquece fogo (opcional, sutil)
+        # =============================================================
+        elif weather.type.value == "snow":
+            if move_type == 'fire':
+                effects['damage_multiplier'] = 0.8
+                effects['message'] = "O frio enfraqueceu o ataque de fogo!"
+
+        # =============================================================
+        # HAIL (map-only) — idem SNOW
+        # =============================================================
+        elif weather.type.value == "hail":
+            if move_type == 'fire':
+                effects['damage_multiplier'] = 0.8
+                effects['message'] = "O granizo enfraqueceu o ataque de fogo!"
 
         # ===== CONQUISTAS: Ataque buffado pelo clima =====
         if weather_boosted and hasattr(self, 'game_scene') and self.game_scene:

@@ -3,6 +3,9 @@
   "name": "moomoo_milk_spray",
   "category": "items",
   "description": "Borrifada de Moomoo Milk",
+  "scale_mult": 0.35,
+  "anchor_mode": "center",
+  "world_scaled": true,
   "fps": 60,
   "duration_frames": 100,
   "loop": false,
@@ -11,7 +14,7 @@
   "space": "world",
   "world_offset": {
     "x": 0,
-    "y": -30
+    "y": 0
   },
   "screen_offset": {
     "x": 0,
@@ -33,8 +36,8 @@
       "blend": "normal",
       "pivot": "center",
       "offset": {
-        "x": -10,
-        "y": -45
+        "x": 0,
+        "y": 0
       },
       "visible_frames": [
         8,
@@ -45,8 +48,8 @@
       "keyframes": [
         {
           "f": 8,
-          "x": 0,
-          "y": 6,
+          "x": -35,
+          "y": 4,
           "scale": 1.5,
           "alpha": 0,
           "tint": "#E8E0C0",
@@ -54,54 +57,54 @@
         },
         {
           "f": 20,
-          "x": 15,
+          "x": -22,
           "y": 0,
-          "scale": 3.2,
+          "scale": 3.5,
           "alpha": 200,
           "tint": "#E8E0C0",
           "frame_index": 2
         },
         {
           "f": 34,
-          "x": 34,
-          "y": -8,
-          "scale": 4.8,
+          "x": -8,
+          "y": -4,
+          "scale": 5.0,
           "alpha": 220,
           "tint": "#E8E0C0",
           "frame_index": 3
         },
         {
           "f": 50,
-          "x": 52,
-          "y": -18,
-          "scale": 6.0,
+          "x": 0,
+          "y": -10,
+          "scale": 6.5,
           "alpha": 200,
           "tint": "#E8E0C0",
           "frame_index": 5
         },
         {
           "f": 68,
-          "x": 64,
-          "y": -30,
-          "scale": 7.0,
+          "x": 0,
+          "y": -20,
+          "scale": 7.5,
           "alpha": 140,
           "tint": "#E8E0C0",
           "frame_index": 6
         },
         {
           "f": 84,
-          "x": 72,
-          "y": -42,
-          "scale": 7.8,
+          "x": 0,
+          "y": -32,
+          "scale": 8.2,
           "alpha": 70,
           "tint": "#E8E0C0",
           "frame_index": 7
         },
         {
           "f": 96,
-          "x": 76,
-          "y": -54,
-          "scale": 8.2,
+          "x": 0,
+          "y": -46,
+          "scale": 8.6,
           "alpha": 0,
           "tint": "#E8E0C0",
           "frame_index": 7
@@ -120,8 +123,8 @@
       "blend": "normal",
       "pivot": "center",
       "offset": {
-        "x": -10,
-        "y": -40
+        "x": 0,
+        "y": 0
       },
       "visible_frames": [
         6,
@@ -132,7 +135,7 @@
       "keyframes": [
         {
           "f": 6,
-          "x": 0,
+          "x": -38,
           "y": 4,
           "scale": 1.6,
           "alpha": 0,
@@ -141,54 +144,54 @@
         },
         {
           "f": 16,
-          "x": 10,
-          "y": -1,
-          "scale": 3.5,
+          "x": -24,
+          "y": 0,
+          "scale": 3.8,
           "alpha": 220,
           "tint": "#F0E8D0",
           "frame_index": 1
         },
         {
           "f": 28,
-          "x": 26,
-          "y": -7,
-          "scale": 5.2,
+          "x": -10,
+          "y": -4,
+          "scale": 5.4,
           "alpha": 240,
           "tint": "#F0E8D0",
           "frame_index": 2
         },
         {
           "f": 42,
-          "x": 40,
-          "y": -14,
-          "scale": 6.5,
+          "x": 0,
+          "y": -10,
+          "scale": 6.8,
           "alpha": 220,
           "tint": "#F0E8D0",
           "frame_index": 4
         },
         {
           "f": 58,
-          "x": 50,
-          "y": -24,
-          "scale": 7.4,
+          "x": 0,
+          "y": -18,
+          "scale": 7.7,
           "alpha": 160,
           "tint": "#F0E8D0",
           "frame_index": 5
         },
         {
           "f": 76,
-          "x": 56,
-          "y": -36,
-          "scale": 8.0,
+          "x": 0,
+          "y": -28,
+          "scale": 8.2,
           "alpha": 90,
           "tint": "#F0E8D0",
           "frame_index": 6
         },
         {
           "f": 94,
-          "x": 60,
-          "y": -50,
-          "scale": 8.4,
+          "x": 0,
+          "y": -42,
+          "scale": 8.6,
           "alpha": 0,
           "tint": "#F0E8D0",
           "frame_index": 7
@@ -207,8 +210,8 @@
       "blend": "normal",
       "pivot": "center",
       "offset": {
-        "x": -8,
-        "y": -38
+        "x": 0,
+        "y": 0
       },
       "visible_frames": [
         4,
@@ -219,7 +222,7 @@
       "keyframes": [
         {
           "f": 4,
-          "x": 0,
+          "x": -40,
           "y": 2,
           "scale": 1.8,
           "alpha": 0,
@@ -228,17 +231,17 @@
         },
         {
           "f": 12,
-          "x": 6,
-          "y": -2,
-          "scale": 4.0,
+          "x": -26,
+          "y": 0,
+          "scale": 4.2,
           "alpha": 255,
           "tint": "#FFF8E0",
           "frame_index": 0
         },
         {
           "f": 22,
-          "x": 16,
-          "y": -6,
+          "x": -12,
+          "y": -2,
           "scale": 5.8,
           "alpha": 255,
           "tint": "#FFF8E0",
@@ -246,8 +249,8 @@
         },
         {
           "f": 34,
-          "x": 26,
-          "y": -11,
+          "x": -2,
+          "y": -6,
           "scale": 7.2,
           "alpha": 255,
           "tint": "#FFF8E0",
@@ -255,8 +258,8 @@
         },
         {
           "f": 46,
-          "x": 34,
-          "y": -18,
+          "x": 0,
+          "y": -10,
           "scale": 8.2,
           "alpha": 240,
           "tint": "#FFF8E0",
@@ -264,8 +267,8 @@
         },
         {
           "f": 60,
-          "x": 40,
-          "y": -26,
+          "x": 0,
+          "y": -18,
           "scale": 9.0,
           "alpha": 200,
           "tint": "#FFF8E0",
@@ -273,8 +276,8 @@
         },
         {
           "f": 74,
-          "x": 44,
-          "y": -36,
+          "x": 0,
+          "y": -28,
           "scale": 9.6,
           "alpha": 140,
           "tint": "#FFF8E0",
@@ -282,8 +285,8 @@
         },
         {
           "f": 84,
-          "x": 46,
-          "y": -46,
+          "x": 0,
+          "y": -38,
           "scale": 10.0,
           "alpha": 70,
           "tint": "#FFF8E0",
@@ -291,8 +294,8 @@
         },
         {
           "f": 92,
-          "x": 48,
-          "y": -56,
+          "x": 0,
+          "y": -50,
           "scale": 10.4,
           "alpha": 0,
           "tint": "#FFF8E0",
@@ -312,8 +315,8 @@
       "blend": "normal",
       "pivot": "center",
       "offset": {
-        "x": -6,
-        "y": -34
+        "x": 0,
+        "y": 0
       },
       "visible_frames": [
         8,
@@ -324,7 +327,7 @@
       "keyframes": [
         {
           "f": 8,
-          "x": 0,
+          "x": -38,
           "y": 0,
           "scale": 1.4,
           "alpha": 0,
@@ -333,8 +336,8 @@
         },
         {
           "f": 18,
-          "x": 8,
-          "y": -3,
+          "x": -24,
+          "y": -2,
           "scale": 3.6,
           "alpha": 240,
           "tint": "#FFFCF0",
@@ -342,8 +345,8 @@
         },
         {
           "f": 30,
-          "x": 20,
-          "y": -8,
+          "x": -10,
+          "y": -4,
           "scale": 5.2,
           "alpha": 255,
           "tint": "#FFFCF0",
@@ -351,8 +354,8 @@
         },
         {
           "f": 44,
-          "x": 30,
-          "y": -14,
+          "x": 0,
+          "y": -8,
           "scale": 6.5,
           "alpha": 220,
           "tint": "#FFFCF0",
@@ -360,8 +363,8 @@
         },
         {
           "f": 58,
-          "x": 36,
-          "y": -22,
+          "x": 0,
+          "y": -14,
           "scale": 7.4,
           "alpha": 160,
           "tint": "#FFFCF0",
@@ -369,8 +372,8 @@
         },
         {
           "f": 74,
-          "x": 40,
-          "y": -34,
+          "x": 0,
+          "y": -22,
           "scale": 8.2,
           "alpha": 90,
           "tint": "#FFFCF0",
@@ -378,8 +381,8 @@
         },
         {
           "f": 90,
-          "x": 42,
-          "y": -48,
+          "x": 0,
+          "y": -32,
           "scale": 8.6,
           "alpha": 0,
           "tint": "#FFFCF0",
@@ -399,8 +402,8 @@
       "blend": "normal",
       "pivot": "center",
       "offset": {
-        "x": -4,
-        "y": -30
+        "x": 0,
+        "y": 0
       },
       "visible_frames": [
         12,
@@ -411,8 +414,8 @@
       "keyframes": [
         {
           "f": 12,
-          "x": 0,
-          "y": -2,
+          "x": -36,
+          "y": 0,
           "scale": 1.2,
           "alpha": 0,
           "tint": "#FFFFFF",
@@ -420,8 +423,8 @@
         },
         {
           "f": 22,
-          "x": 4,
-          "y": -4,
+          "x": -22,
+          "y": -2,
           "scale": 3.0,
           "alpha": 220,
           "tint": "#FFFFFF",
@@ -429,8 +432,8 @@
         },
         {
           "f": 34,
-          "x": 12,
-          "y": -8,
+          "x": -8,
+          "y": -4,
           "scale": 4.5,
           "alpha": 240,
           "tint": "#FFFFFF",
@@ -438,8 +441,8 @@
         },
         {
           "f": 48,
-          "x": 22,
-          "y": -14,
+          "x": 0,
+          "y": -6,
           "scale": 5.8,
           "alpha": 200,
           "tint": "#FFFFFF",
@@ -447,8 +450,8 @@
         },
         {
           "f": 62,
-          "x": 30,
-          "y": -22,
+          "x": 0,
+          "y": -12,
           "scale": 6.8,
           "alpha": 150,
           "tint": "#FFFFFF",
@@ -456,8 +459,8 @@
         },
         {
           "f": 78,
-          "x": 34,
-          "y": -32,
+          "x": 0,
+          "y": -20,
           "scale": 7.6,
           "alpha": 80,
           "tint": "#FFFFFF",
@@ -465,8 +468,8 @@
         },
         {
           "f": 96,
-          "x": 36,
-          "y": -46,
+          "x": 0,
+          "y": -30,
           "scale": 8.0,
           "alpha": 0,
           "tint": "#FFFFFF",
@@ -583,7 +586,7 @@
       "pivot": "center",
       "offset": {
         "x": 0,
-        "y": -30
+        "y": 0
       },
       "visible_frames": [
         22,
@@ -606,7 +609,7 @@
           "y": 0,
           "scale": 1.0,
           "alpha": 255,
-          "tint": "#FFFFFF"
+          "tint": "#FFF8C0"
         },
         {
           "f": 42,
@@ -614,7 +617,7 @@
           "y": -10,
           "scale": 1.2,
           "alpha": 255,
-          "tint": "#FFFFFF"
+          "tint": "#FFF8C0"
         },
         {
           "f": 58,
@@ -622,7 +625,7 @@
           "y": -22,
           "scale": 1.3,
           "alpha": 200,
-          "tint": "#FFFFFF"
+          "tint": "#FFF8C0"
         },
         {
           "f": 78,
@@ -630,7 +633,7 @@
           "y": -34,
           "scale": 1.0,
           "alpha": 100,
-          "tint": "#FFFFFF"
+          "tint": "#FFF8C0"
         },
         {
           "f": 98,
@@ -655,7 +658,7 @@
       "pivot": "center",
       "offset": {
         "x": 0,
-        "y": -30
+        "y": 0
       },
       "visible_frames": [
         32,
@@ -678,7 +681,7 @@
           "y": 0,
           "scale": 0.9,
           "alpha": 255,
-          "tint": "#FFFFFF"
+          "tint": "#FFF8C0"
         },
         {
           "f": 50,
@@ -686,7 +689,7 @@
           "y": -12,
           "scale": 1.1,
           "alpha": 255,
-          "tint": "#FFFFFF"
+          "tint": "#FFF8C0"
         },
         {
           "f": 66,
@@ -694,7 +697,7 @@
           "y": -26,
           "scale": 1.2,
           "alpha": 180,
-          "tint": "#FFFFFF"
+          "tint": "#FFF8C0"
         },
         {
           "f": 82,
@@ -702,7 +705,7 @@
           "y": -38,
           "scale": 0.9,
           "alpha": 80,
-          "tint": "#FFFFFF"
+          "tint": "#FFF8C0"
         },
         {
           "f": 98,

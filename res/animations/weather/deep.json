@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "name": "deep",
+  "category": "weather",
+  "description": "Fundo do mar — bolhas grandes subindo + feixes de luz",
+  "scale_mult": 1.0, "anchor_mode": "center", "world_scaled": false,
+  "fps": 60, "duration_frames": 480, "loop": true, "loop_count": 0,
+  "anchor": "screen", "space": "screen",
+  "world_offset": { "x": 0, "y": 0 }, "screen_offset": { "x": 0, "y": 0 },
+  "sound": null,
+  "layers": [
+    {
+      "id": "deep_tint", "type": "filter", "z": 0, "blend": "normal",
+      "color": "#0A4A78", "alpha": 150,
+      "fade_in_frames": 0, "fade_out_frames": 0
+    },
+    {
+      "id": "god_ray_1", "type": "sprite", "image": "_shared/god_ray_128.png",
+      "z": 1, "blend": "add", "pivot": "center",
+      "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 480],
+      "keyframes": [
+        { "f": 0,   "scale": 6.0, "alpha": 60, "rot": 0 },
+        { "f": 240, "scale": 7.0, "alpha": 90, "rot": 0 },
+        { "f": 480, "scale": 6.0, "alpha": 60, "rot": 0 }
+      ],
+      "easing": "linear",
+      "frame_width": 0, "frame_height": 0, "frame_index": 0
+    },
+    {
+      "id": "god_ray_2", "type": "sprite", "image": "_shared/god_ray_128.png",
+      "z": 1, "blend": "add", "pivot": "center",
+      "offset": { "x": 300, "y": 0 },
+      "visible_frames": [0, 480],
+      "keyframes": [
+        { "f": 0,   "scale": 5.0, "alpha": 40, "rot": 0 },
+        { "f": 300, "scale": 6.0, "alpha": 70, "rot": 0 },
+        { "f": 480, "scale": 5.0, "alpha": 40, "rot": 0 }
+      ],
+      "easing": "linear",
+      "frame_width": 0, "frame_height": 0, "frame_index": 0
+    },
+
+    {
+      "id": "bubbles_small", "type": "emitter", "image": "_shared/bubble_32.png",
+      "z": 3, "blend": "add", "pivot": "center", "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 480],
+      "emitter": {
+        "spawn_area": { "x": -800, "y": 500, "w": 1600, "h": 200 },
+        "spawn_rate": 4.0, "max_particles": 22,
+        "lifetime": [10.0, 16.0],
+        "velocity": { "x": [-30, 30], "y": [-95, -60] },
+        "gravity": -4.0, "scale": [1.0, 1.9], "alpha": [130, 190],
+        "rotation_speed": [-25, 25], "fade_out": true,
+        "tint_options": ["#A0E0FF", "#C0F0FF"]
+      }
+    },
+    {
+      "id": "bubbles_big", "type": "emitter", "image": "_shared/bubble_32.png",
+      "z": 4, "blend": "add", "pivot": "center", "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 480],
+      "emitter": {
+        "spawn_area": { "x": -700, "y": 550, "w": 1400, "h": 200 },
+        "spawn_rate": 2.0, "max_particles": 10,
+        "lifetime": [11.0, 18.0],
+        "velocity": { "x": [-40, 40], "y": [-105, -65] },
+        "gravity": -3.0, "scale": [2.2, 3.8], "alpha": [180, 245],
+        "rotation_speed": [-15, 15], "fade_out": true,
+        "tint_options": ["#C0F0FF", "#FFFFFF"]
+      }
+    },
+    {
+      "id": "float_particles", "type": "emitter", "image": "_shared/sparkle_16.png",
+      "z": 2, "blend": "add", "pivot": "center", "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 480],
+      "emitter": {
+        "spawn_area": { "x": -700, "y": -400, "w": 1400, "h": 800 },
+        "spawn_rate": 8.0, "max_particles": 40,
+        "lifetime": [2.0, 4.0],
+        "velocity": { "x": [-10, 10], "y": [-30, -10] },
+        "gravity": -3.0, "scale": [0.4, 0.7], "alpha": [110, 180],
+        "rotation_speed": [-20, 20], "fade_out": true,
+        "tint_options": ["#80D0FF", "#C0E8FF"]
+      }
+    }
+  ],
+  "default_binding": { "trigger": "daynight.deep.enter" }
+}

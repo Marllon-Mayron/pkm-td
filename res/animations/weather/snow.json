@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "name": "snow",
+  "category": "weather",
+  "description": "Neve calma com flocos caindo devagar",
+  "scale_mult": 1.0, "anchor_mode": "center", "world_scaled": false,
+  "fps": 60, "duration_frames": 480, "loop": true, "loop_count": 0,
+  "anchor": "screen", "space": "screen",
+  "world_offset": { "x": 0, "y": 0 }, "screen_offset": { "x": 0, "y": 0 },
+  "sound": null,
+  "layers": [
+    {
+      "id": "snow_tint", "type": "filter", "z": 0, "blend": "normal",
+      "color": "#B4DCFF", "alpha": 70,
+      "fade_in_frames": 60, "fade_out_frames": 0
+    },
+    {
+      "id": "snow_back", "type": "emitter", "image": "_shared/snowflake_16.png",
+      "z": 2, "blend": "normal", "pivot": "center", "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 480],
+      "emitter": {
+        "spawn_area": { "x": -700, "y": -450, "w": 1400, "h": 100 },
+        "spawn_rate": 25.0, "max_particles": 100,
+        "lifetime": [3.5, 5.0],
+        "velocity": { "x": [-15, 15], "y": [80, 140] },
+        "gravity": 0.0, "scale": [0.4, 0.7], "alpha": [140, 200],
+        "rotation_speed": [-30, 30], "fade_out": false,
+        "tint_options": ["#E0F0FF", "#C8E0FF"]
+      }
+    },
+    {
+      "id": "snow_front", "type": "emitter", "image": "_shared/snowflake_16.png",
+      "z": 4, "blend": "normal", "pivot": "center", "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 480],
+      "emitter": {
+        "spawn_area": { "x": -700, "y": -450, "w": 1400, "h": 100 },
+        "spawn_rate": 15.0, "max_particles": 60,
+        "lifetime": [3.0, 4.5],
+        "velocity": { "x": [-20, 20], "y": [100, 180] },
+        "gravity": 0.0, "scale": [0.7, 1.1], "alpha": [200, 255],
+        "rotation_speed": [-60, 60], "fade_out": false,
+        "tint_options": ["#FFFFFF", "#F0F8FF"]
+      }
+    }
+  ],
+  "default_binding": { "trigger": "weather.snow.enter" }
+}

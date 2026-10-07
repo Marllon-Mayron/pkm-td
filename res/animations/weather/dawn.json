@@ -1,0 +1,15 @@
+{
+  "schema_version": 1, "name": "dawn", "category": "weather",
+  "description": "Amanhecer — brilho rosado",
+  "scale_mult": 1.0, "anchor_mode": "center", "world_scaled": false,
+  "fps": 60, "duration_frames": 90, "loop": true, "loop_count": 0,
+  "anchor": "screen", "space": "screen",
+  "world_offset": { "x": 0, "y": 0 }, "screen_offset": { "x": 0, "y": 0 },
+  "sound": null,
+  "layers": [{
+    "id": "dawn_tint", "type": "filter", "z": 0, "blend": "normal",
+    "color": "#FFAFC8", "alpha": 60,
+    "fade_in_frames": 0, "fade_out_frames": 0
+  }],
+  "default_binding": { "trigger": "daynight.dawn.enter" }
+}

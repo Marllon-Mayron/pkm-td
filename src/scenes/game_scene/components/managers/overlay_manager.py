@@ -2,8 +2,6 @@
 
 from enum import Enum
 
-from src.scenes.game_scene.components.overlays.game_over_overlay import GameOverOverlay
-from src.scenes.game_scene.components.overlays.phase_complete_overlay import PhaseCompleteOverlay
 from src.scenes.game_scene.components.overlays.capture_overlay import CaptureOverlay
 from src.scenes.game_scene.components.overlays.pause_overlay import PauseOverlay  # NOVO
 
@@ -28,17 +26,7 @@ class OverlayManager:
         """Ativa um overlay - Cria o overlay no momento da exibição"""
         self.current_type = overlay_type
 
-        # Cria o overlay apenas quando for mostrar
-        if overlay_type == OverlayType.GAME_OVER:
-            reason = kwargs.get('reason', 'items_stolen')
-            self.current_overlay = GameOverOverlay(self.game_scene, reason=reason)
-            print(f"[OVERLAY] GameOverOverlay criado com motivo: {reason}")
-
-        elif overlay_type == OverlayType.PHASE_COMPLETE:
-            self.current_overlay = PhaseCompleteOverlay(self.game_scene)
-            print(f"[OVERLAY] PhaseCompleteOverlay criado com dados: {self.game_scene.phase_complete_data}")
-
-        elif overlay_type == OverlayType.CAPTURE:
+        if overlay_type == OverlayType.CAPTURE:
             pokemon = kwargs.get('pokemon')
             is_to_team = kwargs.get('is_to_team', True)
             if pokemon:

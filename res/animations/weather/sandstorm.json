@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "name": "sandstorm",
+  "category": "weather",
+  "description": "Tempestade de areia rolando pela tela",
+  "scale_mult": 1.0, "anchor_mode": "center", "world_scaled": false,
+  "fps": 60, "duration_frames": 360, "loop": true, "loop_count": 0,
+  "anchor": "screen", "space": "screen",
+  "world_offset": { "x": 0, "y": 0 }, "screen_offset": { "x": 0, "y": 0 },
+  "sound": null,
+  "layers": [
+    {
+      "id": "sand_tint", "type": "filter", "z": 0, "blend": "normal",
+      "color": "#C8A464", "alpha": 110,
+      "fade_in_frames": 0, "fade_out_frames": 0
+    },
+    {
+      "id": "sand_far", "type": "emitter", "image": "_shared/sand_grain_8.png",
+      "z": 2, "blend": "normal", "pivot": "center", "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 360],
+      "emitter": {
+        "spawn_area": { "x": -2200, "y": -650, "w": 1400, "h": 1300 },
+        "spawn_rate": 160.0, "max_particles": 500,
+        "lifetime": [3.0, 4.2],
+        "velocity": { "x": [550, 750], "y": [-30, 30] },
+        "gravity": 0.0, "scale": [0.7, 1.2], "alpha": [140, 200],
+        "rotation_speed": [-180, 180], "fade_out": false,
+        "tint_options": ["#E0C890", "#C8A464"]
+      }
+    },
+    {
+      "id": "sand_mid", "type": "emitter", "image": "_shared/sand_grain_8.png",
+      "z": 3, "blend": "normal", "pivot": "center", "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 360],
+      "emitter": {
+        "spawn_area": { "x": -1800, "y": -650, "w": 1000, "h": 1300 },
+        "spawn_rate": 90.0, "max_particles": 280,
+        "lifetime": [2.4, 3.4],
+        "velocity": { "x": [700, 900], "y": [-25, 25] },
+        "gravity": 0.0, "scale": [0.9, 1.4], "alpha": [170, 230],
+        "rotation_speed": [-220, 220], "fade_out": false,
+        "tint_options": ["#F0D8A0", "#D0B080"]
+      }
+    },
+    {
+      "id": "sand_front", "type": "emitter", "image": "_shared/sand_grain_8.png",
+      "z": 4, "blend": "normal", "pivot": "center", "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 360],
+      "emitter": {
+        "spawn_area": { "x": -1600, "y": -650, "w": 900, "h": 1300 },
+        "spawn_rate": 70.0, "max_particles": 200,
+        "lifetime": [1.8, 2.6],
+        "velocity": { "x": [850, 1100], "y": [-20, 20] },
+        "gravity": 0.0, "scale": [1.1, 1.8], "alpha": [210, 255],
+        "rotation_speed": [-270, 270], "fade_out": false,
+        "tint_options": ["#FFFFFF", "#F0D8A0"]
+      }
+    },
+    {
+      "id": "dust_clouds", "type": "emitter", "image": "_shared/dust_puff_32.png",
+      "z": 3, "blend": "normal", "pivot": "center", "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 360],
+      "emitter": {
+        "spawn_area": { "x": -2000, "y": -600, "w": 1200, "h": 1200 },
+        "spawn_rate": 25.0, "max_particles": 60,
+        "lifetime": [2.8, 4.0],
+        "velocity": { "x": [500, 700], "y": [-45, 45] },
+        "gravity": 0.0, "scale": [1.2, 2.4], "alpha": [90, 160],
+        "rotation_speed": [-35, 35], "fade_out": true,
+        "tint_options": ["#D0A870", "#B89060"]
+      }
+    }
+  ],
+  "default_binding": { "trigger": "weather.sandstorm.enter" }
+}

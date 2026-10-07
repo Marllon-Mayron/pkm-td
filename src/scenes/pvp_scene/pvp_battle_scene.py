@@ -1990,8 +1990,9 @@ class PvPBattleScene(BaseScene):
         self._applying_remote_weather = True
         try:
             if hasattr(self, 'battle_system') and self.battle_system:
-                self.battle_system.weather_manager.set_weather(
-                    weather_type, duration, source=None)
+                self.battle_system.weather_manager.set_weather_from_move(
+                    weather_type, duration, source=None
+                )
                 print(f"[PVP] Weather remoto: {weather_value} ({duration}s)")
         except Exception as e:
             print(f"[PVP] erro aplicar weather: {e}")

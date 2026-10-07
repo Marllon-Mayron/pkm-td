@@ -39,21 +39,22 @@ class EditorController(EditorRenderMixin, BaseScene):
     MIN_CANVAS = 260
 
     ADD_TYPES = [
-        ("button",       "Botão",    "primary"),
-        ("panel",        "Painel",   "gold"),
-        ("label",        "Texto",    "ghost"),
-        ("list",         "Lista",    "primary"),
-        ("grid",         "Grid",     "primary"),
-        ("table",        "Tabela",   "gold"),
-        ("divider",      "Divisor",  "ghost"),
-        ("image",        "Imagem",   "success"),
-        ("checkbox",     "Checkbox", "success"),
-        ("slider",       "Slider",   "gold"),
-        ("dropdown",     "Dropdown", "primary"),
-        ("tabpanel",     "Abas",     "ghost"),
-        ("progress",     "Barra",    "success"),
-        ("badge",        "Badge",    "gold"),
+        ("button", "Botão", "primary"),
+        ("panel", "Painel", "gold"),
+        ("label", "Texto", "ghost"),
+        ("list", "Lista", "primary"),
+        ("grid", "Grid", "primary"),
+        ("table", "Tabela", "gold"),
+        ("divider", "Divisor", "ghost"),
+        ("image", "Imagem", "success"),
+        ("checkbox", "Checkbox", "success"),
+        ("slider", "Slider", "gold"),
+        ("dropdown", "Dropdown", "primary"),
+        ("tabpanel", "Abas", "ghost"),
+        ("progress", "Barra", "success"),
+        ("badge", "Badge", "gold"),
         ("world_sprite", "Sprite3D", "primary"),
+        ("slot_row", "Slots", "gold"),
     ]
 
     # =================================================================
@@ -574,10 +575,10 @@ class EditorController(EditorRenderMixin, BaseScene):
             "bg_image_mode": self._bg_image_modes,
             "icon_position": self._icon_positions,
             "border_sides": self._border_sides_choices,
-            # NOVO:
             "border_style": self._border_style_choices,
             "drop_dir": self._drop_dir_choices,
             "orientation": self._orient_choices,
+            "text_fit": S.TEXT_FIT_OPTIONS,
         }
 
         placeholders = {
@@ -642,6 +643,12 @@ class EditorController(EditorRenderMixin, BaseScene):
                             cur_s = str(self._pick(w, props,
                                                    "orientation",
                                                    "horizontal"))
+                        elif k == "shape":
+                            cur_s = str(self._pick(w, props,
+                                                   "shape", "star"))
+                        elif k == "text_fit":
+                            cur_s = str(self._pick(w, props,
+                                                   "text_fit", "none"))
                         else:
                             cur_s = str(self._pick(w, props, k, "-"))
 
@@ -840,6 +847,18 @@ class EditorController(EditorRenderMixin, BaseScene):
                 "world_x": 0.0, "world_y": 0.0, "max_size": 130,
             }
             base["w"], base["h"] = 0.12, 0.15
+        elif wtype == "slot_row":
+            base["bold"] = True
+            base["props"] = {"value": 0, "max_slots": 3}
+            base["shape"] = "star"
+            base["orientation"] = "horizontal"
+            base["gap"] = 8
+            base["color_filled"]  = "#F8B030"
+            base["color_empty"]   = "#3A4056"
+            base["outline_color"] = "#1E1E28"
+            base["filled_alpha"] = 255
+            base["empty_alpha"]  = 110
+            base["w"], base["h"] = 0.28, 0.10
 
         self.widgets_data.append(base)
         self._select_only(len(self.widgets_data) - 1)
@@ -1096,13 +1115,13 @@ class EditorController(EditorRenderMixin, BaseScene):
             if "bold" in self.fields:
                 w["bold"] = bool(self.fields["bold"].value)
 
-            # Cores — adicionadas: color (divider), header_bg, header_text_color,
-            # row_bg, row_bg_alt, grid_color
+            # Cores — top-level
             for k in ("text_color", "fill_color", "border_color", "bg_tint",
                       "color_low", "color_mid", "color_high", "progress_bg",
                       "bg_color", "badge_text_color", "badge_border_color",
                       "color", "header_bg", "header_text_color",
-                      "row_bg", "row_bg_alt", "grid_color"):
+                      "row_bg", "row_bg_alt", "grid_color",
+                      "color_filled", "color_empty", "outline_color"):
                 if k in self.fields:
                     s = self.fields[k].text.strip()
                     if s:
@@ -1122,12 +1141,16 @@ class EditorController(EditorRenderMixin, BaseScene):
                     else:
                         w.pop(k, None)
 
+            # Inteiros — top-level
             for k in ("bg_image_alpha", "border_width", "border_radius",
                       "icon_size", "icon_gap",
                       "fill_alpha", "border_alpha", "max_size", "radius",
                       "thickness", "row_height", "header_height",
                       "cell_padding", "grid_width", "scrollbar_width",
-                      "scrollbar_radius", "cols", "rows", "cell_gap"):
+                      "scrollbar_radius", "cols", "rows", "cell_gap",
+                      "slot_size", "gap", "outline_width",
+                      "filled_alpha", "empty_alpha",
+                      "min_font_size"):
                 if k in self.fields:
                     s = self.fields[k].text.strip()
                     if s:
@@ -1138,11 +1161,13 @@ class EditorController(EditorRenderMixin, BaseScene):
                     else:
                         w.pop(k, None)
 
+            # Booleanos — top-level
             for k in ("draw_border", "draw_shadow", "show_text",
-                      "show_scrollbar", "pixel_art"):
+                      "show_scrollbar", "pixel_art", "icon_tint"):
                 if k in self.fields:
                     w[k] = bool(self.fields[k].value)
 
+            # Floats — top-level
             for k in ("click_volume", "hover_volume",
                       "world_x", "world_y"):
                 if k in self.fields:
@@ -1177,9 +1202,12 @@ class EditorController(EditorRenderMixin, BaseScene):
                     w["border_sides"] = v
                 else:
                     w.pop("border_sides", None)
-            # NOVO:
             if "border_style" in self.dropdowns:
                 w["border_style"] = self.dropdowns["border_style"].value
+            if "shape" in self.dropdowns:
+                w["shape"] = self.dropdowns["shape"].value
+            if "text_fit" in self.dropdowns:
+                props["text_fit"] = self.dropdowns["text_fit"].value
             if "drop_dir" in self.dropdowns:
                 props["drop_dir"] = self.dropdowns["drop_dir"].value
             if "orientation" in self.dropdowns:
@@ -1195,7 +1223,8 @@ class EditorController(EditorRenderMixin, BaseScene):
                 props["checked"] = bool(self.fields["checked"].value)
 
             for k in ("value", "min", "max",
-                      "max_value", "min_value"):
+                      "max_value", "min_value",
+                      "max_slots"):
                 if k in self.fields:
                     s = self.fields[k].text.strip()
                     if s:

@@ -6,53 +6,80 @@ from enum import Enum
 class WeatherType(Enum):
     """Tipos de clima"""
     NONE = "none"
-    SANDSTORM = "sandstorm"
     RAIN = "rain"
     SUNNY = "sunny"
-    HAIL = "hail"
+    SNOW = "snow"
+    HAIL = "hail"                 # map-only
+    SANDSTORM = "sandstorm"       # map-only
+    THUNDERSTORM = "thunderstorm" # map-only
 
-# ===== METADADOS DE UI (fonte única) =====
+
+# =====================================================================
+# CATEGORIAS
+# =====================================================================
+# NATURAL = moves podem ativar (Sunny Day, Rain Dance, etc)
+# MAP_ONLY = só via config de fase / debug. Moves NÃO conseguem ativar.
+NATURAL_WEATHERS = {WeatherType.NONE, WeatherType.RAIN,
+                    WeatherType.SUNNY, WeatherType.SNOW}
+
+MAP_ONLY_WEATHERS = {WeatherType.HAIL, WeatherType.SANDSTORM,
+                     WeatherType.THUNDERSTORM}
+
+
+def is_natural_weather(wt: WeatherType) -> bool:
+    return wt in NATURAL_WEATHERS
+
+
+# =====================================================================
+# UI
+# =====================================================================
 WEATHER_DISPLAY_NAMES = {
     WeatherType.NONE: "Nenhum",
-    WeatherType.SANDSTORM: "Tempestade de Areia",
     WeatherType.RAIN: "Chuva",
     WeatherType.SUNNY: "Sol Forte",
+    WeatherType.SNOW: "Neve",
     WeatherType.HAIL: "Granizo",
+    WeatherType.SANDSTORM: "Tempestade de Areia",
+    WeatherType.THUNDERSTORM: "Tempestade",
 }
 
 WEATHER_FILTER_COLORS = {
-    WeatherType.SANDSTORM: (194, 178, 128, 110),
     WeatherType.RAIN: (100, 100, 200, 110),
     WeatherType.SUNNY: (255, 200, 100, 110),
+    WeatherType.SNOW: (200, 220, 255, 90),
     WeatherType.HAIL: (180, 220, 255, 130),
+    WeatherType.SANDSTORM: (194, 178, 128, 110),
+    WeatherType.THUNDERSTORM: (40, 40, 90, 140),
 }
 
 
-def get_weather_ui_options():
-    """Lista de (value_str, label_pt) para dropdowns."""
-    return [
-        (wt.value, WEATHER_DISPLAY_NAMES.get(wt, wt.value.title()))
-        for wt in WeatherType
-    ]
+def get_weather_ui_options(only_natural: bool = False):
+    """Lista (value, label).
+
+    only_natural=True  → só rain/sunny/snow (+ NONE)
+    only_natural=False → todos (debug)
+    """
+    opts = []
+    for wt in WeatherType:
+        if only_natural and wt not in NATURAL_WEATHERS:
+            continue
+        opts.append((wt.value, WEATHER_DISPLAY_NAMES.get(wt, wt.value.title())))
+    return opts
 
 
 def weather_from_string(s: str) -> WeatherType:
-    """Converte 'hail' → WeatherType.HAIL, com fallback para NONE."""
     try:
         return WeatherType(s.lower())
     except ValueError:
         return WeatherType.NONE
 
 
+# =====================================================================
+# STATE
+# =====================================================================
 class WeatherState:
-    """
-    Estado do clima na batalha.
-    """
-
-    def __init__(self, weather_type: WeatherType, duration: float = 10.0, source=None, is_base_weather: bool = False):
-        print(f"[WeatherState] __init__: weather_type={weather_type}, type(weather_type)={type(weather_type)}")
-
-        # Garantir que é um WeatherType
+    def __init__(self, weather_type: WeatherType, duration: float = 10.0,
+                 source=None, is_base_weather: bool = False):
         if isinstance(weather_type, str):
             self.type = weather_from_string(weather_type)
         else:
@@ -62,36 +89,78 @@ class WeatherState:
         self.max_duration = duration
         self.source = source
         self.active = True
-        self.is_base_weather = is_base_weather  # True = clima permanente da fase
+        self.is_base_weather = is_base_weather
 
-        print(f"[WeatherState] Finalizado: type={self.type}, value={self.type.value}, "
-              f"active={self.active}, is_base_weather={self.is_base_weather}")
-
+    # ================================================================
+    # IMUNIDADE A DANO DE CLIMA
+    # ================================================================
     def is_immune_to_damage(self, pokemon) -> bool:
-        """Verifica se um Pokémon é imune ao dano deste clima"""
         if self.type == WeatherType.SANDSTORM:
-            # Rock, Ground, Steel são imunes
             immune_types = ['rock', 'ground', 'steel']
             return any(t.lower() in immune_types for t in pokemon.types)
         if self.type == WeatherType.HAIL:
             return any(t.lower() == "ice" for t in pokemon.types)
+        return True
 
-        return True  # Outros climas não causam dano
+    # ================================================================
+    # MULTIPLICADOR DE DANO POR TIPO DE MOVE
+    # ================================================================
+    def get_damage_multiplier(self, move_type: str) -> float:
+        """Retorna o multiplicador de dano pra um tipo de move neste clima.
 
-    def update(self, dt: float) -> bool:
-        """
-        Atualiza o clima.
-
-        Retorna False se o clima expirou.
-        Clima base (is_base_weather=True) NUNCA expira.
+        Exemplo:
+            weather = THUNDERSTORM
+            weather.get_damage_multiplier("water")  → 1.20 (+20%)
+            weather.get_damage_multiplier("fire")   → 1.00
         """
         if not self.active:
-            return False
+            return 1.0
 
-        # ===== CLIMA BASE NUNCA EXPIRE =====
+        mt = str(move_type).lower()
+        t = self.type
+
+        # ===== SOL =====
+        if t == WeatherType.SUNNY:
+            if mt == "fire":
+                return 1.5    # +50%
+            if mt == "water":
+                return 0.5    # -50%
+
+        # ===== CHUVA =====
+        elif t == WeatherType.RAIN:
+            if mt == "water":
+                return 1.5
+            if mt == "fire":
+                return 0.5
+
+        # ===== TEMPESTADE (map-only) =====
+        elif t == WeatherType.THUNDERSTORM:
+            # +20% em Water (pedido) e +20% em Electric (faz sentido temático)
+            if mt == "water":
+                return 1.2
+            if mt == "electric":
+                return 1.2
+
+        # ===== NEVE / GRANIZO =====
+        # Real: Snow não altera dano de Ice, só Defesa (não implementado aqui).
+        elif t == WeatherType.SNOW:
+            if mt == "fire":
+                return 0.7    # fogo perde força no frio
+        elif t == WeatherType.HAIL:
+            if mt == "fire":
+                return 0.7
+
+        # SANDSTORM: neutro pra tipos (o dano vem por turno)
+        return 1.0
+
+    # ================================================================
+    # CICLO
+    # ================================================================
+    def update(self, dt: float) -> bool:
+        if not self.active:
+            return False
         if self.is_base_weather:
             return True
-
         self.duration -= dt
         if self.duration <= 0:
             self.active = False

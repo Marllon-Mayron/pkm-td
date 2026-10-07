@@ -10,6 +10,7 @@ Novidades desta versão:
   - Table: grid de headers + rows com colunas proporcionais
 """
 import pygame
+import math
 
 from src.ui.theme import (Palette, FontBook, BUTTON_STYLES,
                           lerp_color, darken, lighten,
@@ -18,6 +19,7 @@ from src.ui.windowskin import panel_skin
 from src.ui.layout import draw_text_centered
 from src.ui.sound_helper import play_ui_sound
 from src.ui.image_draw import draw_image_in_rect
+from src.ui.layout import draw_text_centered, layout_text
 
 
 # =====================================================================
@@ -171,7 +173,8 @@ class Button(Widget):
                  pixel_art=True,
                  tab=None,
                  click_sound="CLICK", hover_sound=None,
-                 click_volume=None, hover_volume=None):
+                 click_volume=None, hover_volume=None,
+                 text_fit="none", min_font_size=8):
         super().__init__(wid, rect, z=z)
         self.label = label
         self.on_click = on_click
@@ -209,6 +212,10 @@ class Button(Widget):
         self._scale = 1.0
         self._target_scale = 1.0
         self._glow = 0.0
+
+        self.text_fit = text_fit
+        self.min_font_size = int(min_font_size)
+
 
     def handle_event(self, event):
         if not self.visible or not self.enabled:
@@ -256,7 +263,8 @@ class Button(Widget):
         if abs(self._scale - 1.0) > 0.001:
             wo = int(rect.width * (self._scale - 1) / 2)
             ho = int(rect.height * (self._scale - 1) / 2)
-            rect = rect.inflate(wo * 2, ho * 2); rect.center = self.rect.center
+            rect = rect.inflate(wo * 2, ho * 2)
+            rect.center = self.rect.center
 
         if self.draw_shadow:
             sh = rect.move(3, 4)
@@ -272,13 +280,17 @@ class Button(Widget):
                                alpha=self.bg_image_alpha,
                                smooth=not self.pixel_art)
         else:
-            if self._pressed:                     base = style["fill_press"]
-            elif self._hover and self.enabled:    base = style["fill_hover"]
-            else:                                 base = style["fill"]
+            if self._pressed:
+                base = style["fill_press"]
+            elif self._hover and self.enabled:
+                base = style["fill_hover"]
+            else:
+                base = style["fill"]
             fill = self.fill_color if self.fill_color else base
 
             grad = pygame.Surface(rect.size, pygame.SRCALPHA)
-            top = lighten(fill, 0.18); bot = darken(fill, 0.12)
+            top = lighten(fill, 0.18)
+            bot = darken(fill, 0.12)
             for y in range(rect.height):
                 t = y / max(1, rect.height - 1)
                 c = lerp_color(top, bot, t)
@@ -311,9 +323,16 @@ class Button(Widget):
         if self.icon is not None:
             self._render_with_icon(screen, rect, font, tcol)
         else:
-            draw_text_centered(screen, self.label, font, tcol, rect,
-                               shadow_color=(0, 0, 0, 130),
-                               shadow_offset=(2, 2))
+            draw_text_centered(
+                screen, self.label, font, tcol, rect,
+                shadow_color=(0, 0, 0, 130),
+                shadow_offset=(2, 2),
+                text_fit=self.text_fit,
+                font_factory=lambda s: FontBook.get(
+                    s, bold=self.bold, name=self.font_name),
+                start_size=self.font_size,
+                min_font_size=self.min_font_size,
+            )
 
         if self._hover and self.enabled and self._glow > 0:
             a = int(60 * self._glow)
@@ -328,14 +347,30 @@ class Button(Widget):
         isize = int(self.icon_size)
         icon = _scale_sprite(self.icon, (isize, isize), self.pixel_art)
 
+        # Helper pra reusar o mesmo "ajuste de texto" em qualquer posição
+        def _draw_label(target_rect):
+            draw_text_centered(
+                screen, self.label, font, tcol, target_rect,
+                shadow_color=(0, 0, 0, 130),
+                shadow_offset=(2, 2),
+                text_fit=self.text_fit,
+                font_factory=lambda s: FontBook.get(
+                    s, bold=self.bold, name=self.font_name),
+                start_size=self.font_size,
+                min_font_size=self.min_font_size,
+            )
+
         pos = self.icon_position
         pad = 8
+
+        # ---------- Ícone centralizado (sem texto) ----------
         if pos == "center":
             ix = rect.centerx - isize // 2
             iy = rect.centery - isize // 2
             screen.blit(icon, (ix, iy))
             return
 
+        # ---------- Ícone em cima, texto embaixo ----------
         if pos == "top":
             total_h = isize + self.icon_gap + font.get_height()
             iy = rect.centery - total_h // 2
@@ -343,23 +378,24 @@ class Button(Widget):
             screen.blit(icon, (ix, iy))
             text_rect = pygame.Rect(rect.x, iy + isize + self.icon_gap,
                                     rect.width, font.get_height())
-            draw_text_centered(screen, self.label, font, tcol, text_rect,
-                               shadow_color=(0, 0, 0, 130), shadow_offset=(2, 2))
+            _draw_label(text_rect)
             return
 
+        # ---------- Ícone à direita, texto à esquerda ----------
         if pos == "right":
             ix = rect.right - pad - isize
             tx = rect.x + pad
             tw = rect.width - isize - self.icon_gap - pad * 2
+        # ---------- Ícone à esquerda, texto à direita ----------
         else:
             ix = rect.x + pad
             tx = ix + isize + self.icon_gap
             tw = rect.right - tx - pad
+
         iy = rect.centery - isize // 2
         screen.blit(icon, (ix, iy))
         text_rect = pygame.Rect(tx, rect.y, tw, rect.height)
-        draw_text_centered(screen, self.label, font, tcol, text_rect,
-                           shadow_color=(0, 0, 0, 130), shadow_offset=(2, 2))
+        _draw_label(text_rect)
 
 
 # =====================================================================
@@ -495,7 +531,8 @@ class Label(Widget):
     def __init__(self, wid, rect, text, color=None, size=20, bold=False,
                  align="center", z=0, font_name="default",
                  text_color=None, fill_color=None, border_color=None,
-                 fill_alpha=255, border_alpha=255, tab=None):
+                 fill_alpha=255, border_alpha=255, tab=None,
+                 text_fit="none", min_font_size=8):
         super().__init__(wid, rect, z=z)
         self.text = text
         self.color = color or Palette.TEXT_DARK
@@ -509,18 +546,45 @@ class Label(Widget):
         self.fill_alpha = int(fill_alpha)
         self.border_alpha = int(border_alpha)
         self.tab = tab
+        self.text_fit = text_fit
+        self.min_font_size = int(min_font_size)
+
+    def _font_factory(self):
+        return lambda s: FontBook.get(s, bold=self.bold, name=self.font_name)
 
     def render(self, screen):
         if not self.visible:
             return
         font = FontBook.get(self.size, bold=self.bold, name=self.font_name)
         col = self.text_color or self.color
-        surf = font.render(str(self.text), True, col)
-        if self.align == "center":  x = self.rect.centerx - surf.get_width() // 2
-        elif self.align == "right": x = self.rect.right - surf.get_width()
-        else:                       x = self.rect.x
-        y = self.rect.centery - surf.get_height() // 2
-        screen.blit(surf, (x, y))
+
+        max_w = max(4, self.rect.width - 6)
+        max_h = max(4, self.rect.height)
+
+        lines, final_font = layout_text(
+            str(self.text), font, max_w, max_h,
+            text_fit=self.text_fit,
+            font_factory=self._font_factory(),
+            start_size=self.size,
+            min_size=self.min_font_size,
+        )
+
+        line_gap = 1
+        line_h = final_font.get_height() + line_gap
+        total_h = len(lines) * line_h - line_gap
+        y0 = self.rect.centery - total_h // 2
+
+        for i, line in enumerate(lines):
+            if not line:
+                continue
+            surf = final_font.render(line, True, col)
+            if self.align == "center":
+                x = self.rect.centerx - surf.get_width() // 2
+            elif self.align == "right":
+                x = self.rect.right - surf.get_width()
+            else:
+                x = self.rect.x
+            screen.blit(surf, (x, y0 + i * line_h))
 
 
 # =====================================================================
@@ -1737,3 +1801,284 @@ class TabPanel(Widget):
                 pygame.draw.line(screen, Palette.GOLD,
                                  (r.x + 8, r.bottom - 2),
                                  (r.right - 8, r.bottom - 2), 2)
+
+# =====================================================================
+# HELPERS DE FORMA — usados por SlotRow
+# =====================================================================
+def _poly_regular(cx, cy, r, n, start=-math.pi / 2):
+    return [
+        (cx + math.cos(start + i * 2 * math.pi / n) * r,
+         cy + math.sin(start + i * 2 * math.pi / n) * r)
+        for i in range(n)
+    ]
+
+
+def _poly_star(cx, cy, r, spikes=5, inner=0.45):
+    pts = []
+    for i in range(spikes * 2):
+        ang = -math.pi / 2 + i * math.pi / spikes
+        rad = r if (i % 2 == 0) else r * inner
+        pts.append((cx + math.cos(ang) * rad, cy + math.sin(ang) * rad))
+    return pts
+
+
+def _poly_heart(cx, cy, r, samples=48):
+    pts = []
+    for i in range(samples):
+        t = i / samples * 2 * math.pi
+        x = 16 * math.sin(t) ** 3
+        y = (13 * math.cos(t) - 5 * math.cos(2 * t)
+             - 2 * math.cos(3 * t) - math.cos(4 * t))
+        pts.append((cx + (x / 16) * r, cy - (y / 16) * r))
+    return pts
+
+
+def _poly_shield(cx, cy, r):
+    return [
+        (cx - r, cy - r * 0.95),
+        (cx + r, cy - r * 0.95),
+        (cx + r, cy + r * 0.10),
+        (cx,     cy + r),
+        (cx - r, cy + r * 0.10),
+    ]
+
+
+def _tint_surface(surf, color):
+    if not color or surf is None:
+        return surf
+    out = surf.copy()
+    overlay = pygame.Surface(out.get_size(), pygame.SRCALPHA)
+    overlay.fill((int(color[0]), int(color[1]), int(color[2]), 255))
+    out.blit(overlay, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    return out
+
+
+# =====================================================================
+# SLOT ROW — fileira de N slots iguais (aceso/apagado)
+# =====================================================================
+class SlotRow(Widget):
+    """
+    Fileira (ou coluna) de N slots iguais. Cada slot é "aceso" ou "apagado".
+
+    Ideal para: estrelas de fase, medalhas, insígnias de ginásio,
+    vidas, slots de inventário, checks de progresso, etc.
+
+    shape: desenha a forma proceduralmente
+      ("star" | "circle" | "square" | "diamond" | "triangle" |
+       "pentagon" | "hexagon" | "heart" | "shield" | "trophy" |
+       "medal" | "none")
+
+    icon: se fornecido, desenha a imagem no lugar do shape
+          (com tint opcional via `icon_tint`)
+    """
+    SHAPES = (
+        "star", "circle", "square", "diamond", "triangle",
+        "pentagon", "hexagon", "heart", "shield", "trophy",
+        "medal", "none",
+    )
+    ORIENTATIONS = ("horizontal", "vertical")
+
+    def __init__(self, wid, rect,
+                 value=0, max_slots=3,
+                 shape="star",
+                 orientation="horizontal",
+                 slot_size=None,
+                 gap=8,
+                 color_filled=None,
+                 color_empty=None,
+                 outline_color=None,
+                 outline_width=2,
+                 filled_alpha=255,
+                 empty_alpha=110,
+                 icon=None,
+                 icon_tint=True,
+                 pixel_art=True,
+                 z=0, tab=None):
+        super().__init__(wid, rect, z=z)
+
+        self.max_slots = max(1, int(max_slots))
+        self.value = max(0, min(self.max_slots, int(value)))
+
+        self.shape = shape if shape in self.SHAPES else "star"
+        self.orientation = (orientation
+                            if orientation in self.ORIENTATIONS
+                            else "horizontal")
+
+        self.slot_size = int(slot_size) if slot_size else None
+        self.gap = max(0, int(gap))
+
+        self.color_filled = color_filled or Palette.GOLD
+        self.color_empty = color_empty or (55, 60, 76)
+        self.outline_color = outline_color or (30, 30, 40)
+        self.outline_width = max(0, int(outline_width))
+
+        self.filled_alpha = max(0, min(255, int(filled_alpha)))
+        self.empty_alpha = max(0, min(255, int(empty_alpha)))
+
+        self.icon = icon
+        self.icon_tint = bool(icon_tint)
+        self.pixel_art = bool(pixel_art)
+        self.tab = tab
+
+    # -----------------------------------------------------------------
+    def set_value(self, v):
+        self.value = max(0, min(self.max_slots, int(v)))
+
+    def set_max(self, n):
+        self.max_slots = max(1, int(n))
+        self.value = max(0, min(self.max_slots, self.value))
+
+    # -----------------------------------------------------------------
+    def _compute_slot_size(self):
+        if self.slot_size:
+            return max(6, int(self.slot_size))
+        n = self.max_slots
+        if self.orientation == "vertical":
+            avail = self.rect.height - self.gap * (n - 1)
+        else:
+            avail = self.rect.width - self.gap * (n - 1)
+        return max(6, avail // max(1, n))
+
+    def _slot_centers(self):
+        n = self.max_slots
+        s = self._compute_slot_size()
+        if self.orientation == "vertical":
+            total = n * s + (n - 1) * self.gap
+            x = self.rect.centerx
+            y0 = self.rect.centery - total // 2 + s // 2
+            return [(x, y0 + i * (s + self.gap), s) for i in range(n)]
+        total = n * s + (n - 1) * self.gap
+        y = self.rect.centery
+        x0 = self.rect.centerx - total // 2 + s // 2
+        return [(x0 + i * (s + self.gap), y, s) for i in range(n)]
+
+    # -----------------------------------------------------------------
+    def render(self, screen):
+        if not self.visible:
+            return
+        for i, (cx, cy, size) in enumerate(self._slot_centers()):
+            self._draw_slot(screen, cx, cy, size, filled=(i < self.value))
+
+    def _draw_slot(self, screen, cx, cy, size, filled):
+        color = self.color_filled if filled else self.color_empty
+        alpha = self.filled_alpha if filled else self.empty_alpha
+
+        # ---- Ícone custom (imagem) ----
+        if self.icon is not None:
+            iw, ih = self.icon.get_size()
+            if iw > 0 and ih > 0:
+                scale = min(size / iw, size / ih)
+                nw = max(1, int(iw * scale))
+                nh = max(1, int(ih * scale))
+                scaled = _scale_sprite(self.icon, (nw, nh), self.pixel_art)
+                if self.icon_tint:
+                    scaled = _tint_surface(scaled, color)
+                if alpha < 255:
+                    scaled = scaled.copy()
+                    scaled.set_alpha(alpha)
+                screen.blit(scaled, (cx - nw // 2, cy - nh // 2))
+            return
+
+        if self.shape == "none":
+            return
+
+        r = size // 2
+        fill_rgba = with_alpha(color, alpha)
+        outline_rgba = with_alpha(self.outline_color, alpha)
+
+        pts = self._shape_points(self.shape, cx, cy, r)
+        if isinstance(pts, list) and len(pts) >= 3:
+            pygame.draw.polygon(screen, fill_rgba, pts)
+            if self.outline_width > 0:
+                pygame.draw.polygon(screen, outline_rgba, pts,
+                                    self.outline_width)
+        elif self.shape == "medal":
+            self._draw_medal(screen, cx, cy, r, fill_rgba, outline_rgba, alpha)
+        elif self.shape == "trophy":
+            self._draw_trophy(screen, cx, cy, r, fill_rgba, outline_rgba)
+
+    @staticmethod
+    def _shape_points(shape, cx, cy, r):
+        if shape == "circle":
+            return [
+                (cx + math.cos(i * math.pi / 24) * r,
+                 cy + math.sin(i * math.pi / 24) * r)
+                for i in range(48)
+            ]
+        if shape == "square":
+            k = r * 0.82
+            return [(cx - k, cy - k), (cx + k, cy - k),
+                    (cx + k, cy + k), (cx - k, cy + k)]
+        if shape == "diamond":
+            return [(cx, cy - r), (cx + r, cy),
+                    (cx, cy + r), (cx - r, cy)]
+        if shape == "triangle":
+            return _poly_regular(cx, cy, r, 3)
+        if shape == "pentagon":
+            return _poly_regular(cx, cy, r, 5)
+        if shape == "hexagon":
+            return _poly_regular(cx, cy, r, 6)
+        if shape == "star":
+            return _poly_star(cx, cy, r, spikes=5, inner=0.45)
+        if shape == "heart":
+            return _poly_heart(cx, cy, r)
+        if shape == "shield":
+            return _poly_shield(cx, cy, r)
+        return None
+
+    @staticmethod
+    def _draw_medal(screen, cx, cy, r, fill, outline, alpha):
+        pygame.draw.circle(screen, fill, (cx, cy + int(r * 0.15)),
+                           int(r * 0.85))
+        pygame.draw.circle(screen, outline, (cx, cy + int(r * 0.15)),
+                           int(r * 0.85), 2)
+        top = cy - int(r * 0.85)
+        ribbon = [
+            (cx - r * 0.55, top),
+            (cx - r * 0.10, top),
+            (cx, cy + int(r * 0.05)),
+        ]
+        ribbon2 = [
+            (cx + r * 0.55, top),
+            (cx + r * 0.10, top),
+            (cx, cy + int(r * 0.05)),
+        ]
+        pygame.draw.polygon(screen, with_alpha((200, 60, 60), alpha), ribbon)
+        pygame.draw.polygon(screen, with_alpha((60, 90, 200), alpha), ribbon2)
+
+    @staticmethod
+    def _draw_trophy(screen, cx, cy, r, fill, outline):
+        body_top = cy - r * 0.55
+        body_bot = cy + r * 0.35
+        top_w = r * 0.85
+        bot_w = r * 0.5
+        body_pts = [
+            (cx - top_w, body_top),
+            (cx + top_w, body_top),
+            (cx + bot_w, body_bot),
+            (cx - bot_w, body_bot),
+        ]
+        pygame.draw.polygon(screen, fill, body_pts)
+        pygame.draw.polygon(screen, outline, body_pts, 2)
+        try:
+            pygame.draw.arc(screen, outline,
+                            (cx - top_w - r * 0.4, body_top - r * 0.05,
+                             r * 0.55, r * 0.75),
+                            math.pi / 2, math.pi * 1.5, 2)
+            pygame.draw.arc(screen, outline,
+                            (cx + top_w - r * 0.15, body_top - r * 0.05,
+                             r * 0.55, r * 0.75),
+                            -math.pi / 2, math.pi / 2, 2)
+        except Exception:
+            pass
+        base_w = r * 0.75
+        base_h = max(2, int(r * 0.18))
+        pygame.draw.rect(screen, fill,
+                         (cx - base_w, body_bot, base_w * 2, base_h))
+        pygame.draw.rect(screen, outline,
+                         (cx - base_w, body_bot, base_w * 2, base_h), 2)
+        stem_w = max(2, int(r * 0.18))
+        stem_h = max(2, int(r * 0.12))
+        pygame.draw.rect(screen, fill,
+                         (cx - stem_w / 2, body_bot - stem_h,
+                          stem_w, stem_h))

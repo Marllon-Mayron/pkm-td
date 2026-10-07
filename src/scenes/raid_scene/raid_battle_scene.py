@@ -825,7 +825,7 @@ class RaidBattleScene(GameScene):
         self._applying_remote_weather = True
         try:
             if hasattr(self, 'battle_system') and self.battle_system:
-                self.battle_system.weather_manager.set_weather(
+                self.battle_system.weather_manager.set_weather_from_move(
                     weather_type, duration, source=None
                 )
                 print(f"[RAID] Weather remoto aplicado: {weather_value} ({duration}s)")

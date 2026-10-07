@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "name": "sunny",
+  "category": "weather",
+  "description": "Sol forte — raios girando + brilho quente",
+  "scale_mult": 1.0,
+  "anchor_mode": "center",
+  "world_scaled": false,
+  "fps": 60,
+  "duration_frames": 360,
+  "loop": true,
+  "loop_count": 0,
+  "anchor": "screen",
+  "space": "screen",
+  "world_offset": { "x": 0, "y": 0 },
+  "screen_offset": { "x": 0, "y": 0 },
+  "sound": null,
+  "layers": [
+    {
+      "id": "sun_tint", "type": "filter", "z": 0, "blend": "normal",
+      "color": "#FFC864", "alpha": 45,
+      "fade_in_frames": 40, "fade_out_frames": 0
+    },
+    {
+      "id": "sun_rays", "type": "sprite", "image": "_shared/sun_ray_64.png",
+      "z": 1, "blend": "add", "pivot": "center",
+      "offset": { "x": 460, "y": -240 },
+      "visible_frames": [0, 360],
+      "keyframes": [
+        { "f": 0,   "scale": 2.4, "alpha": 90,  "rot": 0   },
+        { "f": 120, "scale": 2.8, "alpha": 150, "rot": 120 },
+        { "f": 240, "scale": 2.4, "alpha": 90,  "rot": 240 },
+        { "f": 360, "scale": 2.8, "alpha": 150, "rot": 360 }
+      ],
+      "easing": "linear",
+      "frame_width": 0, "frame_height": 0, "frame_index": 0
+    },
+    {
+      "id": "sun_disc", "type": "sprite", "image": "_shared/sun_disc_64.png",
+      "z": 2, "blend": "add", "pivot": "center",
+      "offset": { "x": 460, "y": -240 },
+      "visible_frames": [0, 360],
+      "keyframes": [
+        { "f": 0,   "scale": 1.8, "alpha": 180 },
+        { "f": 90,  "scale": 2.1, "alpha": 240 },
+        { "f": 180, "scale": 1.8, "alpha": 180 },
+        { "f": 270, "scale": 2.1, "alpha": 240 },
+        { "f": 360, "scale": 1.8, "alpha": 180 }
+      ],
+      "easing": "linear",
+      "frame_width": 0, "frame_height": 0, "frame_index": 0
+    },
+    {
+      "id": "sparkles", "type": "emitter", "image": "_shared/sparkle_16.png",
+      "z": 3, "blend": "add", "pivot": "center", "offset": { "x": 0, "y": 0 },
+      "visible_frames": [0, 360],
+      "emitter": {
+        "spawn_area": { "x": -600, "y": -350, "w": 1200, "h": 700 },
+        "spawn_rate": 5.0, "max_particles": 15,
+        "lifetime": [1.5, 3.0],
+        "velocity": { "x": [-15, 15], "y": [-30, -10] },
+        "gravity": -5.0, "scale": [0.4, 0.9],
+        "alpha": [180, 255], "rotation_speed": [-30, 30],
+        "fade_out": true,
+        "tint_options": ["#FFF8C0", "#FFE080", "#FFFFFF"]
+      }
+    }
+  ],
+  "default_binding": { "trigger": "weather.sunny.enter" }
+}

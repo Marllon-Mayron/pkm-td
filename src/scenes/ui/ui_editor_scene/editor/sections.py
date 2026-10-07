@@ -18,6 +18,12 @@ BORDER_STYLE_OPTIONS = ["solid", "dashed", "dotted", "none"]
 DIVIDER_ORIENT_OPTIONS = ["horizontal", "vertical"]
 DROP_DIR_OPTIONS = ["down", "up"]
 
+SLOT_SHAPES = ["star", "circle", "square", "diamond", "triangle",
+               "pentagon", "hexagon", "heart", "shield", "trophy",
+               "medal", "none"]
+SLOT_ORIENT_OPTIONS = ["horizontal", "vertical"]
+
+TEXT_FIT_OPTIONS = ["none", "shrink", "wrap", "ellipsis", "shrink_wrap"]
 # =====================================================================
 # Tipos e rótulos de campo
 # =====================================================================
@@ -89,6 +95,14 @@ FIELD_TYPES = {
     "badge_border_color": "color",
     # world sprite
     "world_x": "float", "world_y": "float", "max_size": "int",
+    # slot row
+    "max_slots": "int", "slot_size": "int", "shape": "choice",
+    "outline_color": "color", "outline_width": "int",
+    "filled_alpha": "int", "empty_alpha": "int",
+    "icon_tint": "bool",
+
+    "text_fit": "choice",
+    "min_font_size": "int",
 }
 
 FIELD_LABELS = {
@@ -138,6 +152,16 @@ FIELD_LABELS = {
     "badge_text_color": "Texto badge", "bg_color": "Fundo badge",
     "badge_border_color": "Borda badge",
     "world_x": "World X", "world_y": "World Y", "max_size": "Tam. max",
+    "max_slots": "Total slots",
+    "slot_size": "Tam. slot (auto)",
+    "shape": "Forma",
+    "outline_color": "Contorno",
+    "outline_width": "Esp. contorno",
+    "filled_alpha": "Alpha aceso",
+    "empty_alpha": "Alpha apagado",
+    "icon_tint": "Tint no icone",
+    "text_fit": "Ajuste de texto",
+    "min_font_size": "Tam. minimo",
 }
 
 # =====================================================================
@@ -182,7 +206,7 @@ def sections_for_type(wtype):
 
     if wtype == "button":
         extra = [STYLE_FULL, COLORS_FULL, ALPHA_SECTION,
-                 ("content", "CONTEUDO", ["label"]),
+                 ("content", "CONTEUDO", ["label", "text_fit", "min_font_size"]),
                  ("action", "ACAO", ["on_click"]),
                  ICON_SECTION, IMAGE_SECTION, BORDER_SECTION,
                  SOUNDS_FULL]
@@ -192,7 +216,7 @@ def sections_for_type(wtype):
                  IMAGE_SECTION, BORDER_SECTION]
     elif wtype == "label":
         extra = [STYLE_TEXT, COLOR_TEXT, ALPHA_SECTION,
-                 ("content", "CONTEUDO", ["text"])]
+                 ("content", "CONTEUDO", ["text", "text_fit", "min_font_size"])]
     elif wtype == "list":
         extra = [STYLE_MIN, COLORS_FULL, ALPHA_SECTION,
                  ("content", "ITENS", ["items"]),
@@ -271,6 +295,18 @@ def sections_for_type(wtype):
                   ["text", "badge_text_color", "bg_color",
                    "badge_border_color"]),
                  STYLE_MIN]
+    elif wtype == "slot_row":
+        extra = [
+            ("content", "VALORES", ["value", "max_slots"]),
+            ("content", "APARENCIA",
+             ["shape", "orientation", "slot_size", "gap",
+              "outline_width"]),
+            ("colors", "CORES",
+             ["color_filled", "color_empty", "outline_color"]),
+            ("colors", "ALPHA",
+             ["filled_alpha", "empty_alpha"]),
+            ICON_SECTION,
+        ]
     else:
         extra = [STYLE_FULL, COLORS_FULL, ALPHA_SECTION,
                  ("content", "CONTEUDO", ["label", "title", "text"]),

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "bindings": {
+    "item.potion.use_on_ally":        { "animation": "items/potion_spray" },
+    "item.superpotion.use_on_ally":   { "animation": "items/superpotion_spray" },
+    "item.hyperpotion.use_on_ally":   { "animation": "items/hyperpotion_spray" },
+    "item.moomoo_milk.use_on_ally":   { "animation": "items/moomoo_milk_spray" },
+    "item.antidote.use_on_ally":      { "animation": "items/antidote_spray" },
+    "item.paralyze_heal.use_on_ally": { "animation": "items/paralyze_heal_spray" },
+    "item.awakening.use_on_ally":     { "animation": "items/awakening_spray" },
+    "item.burn_heal.use_on_ally":     { "animation": "items/burn_heal_spray" },
+    "item.ice_heal.use_on_ally":      { "animation": "items/ice_heal_spray" },
+    "item.full_heal.use_on_ally":     { "animation": "items/full_heal_spray" }
+  }
+}

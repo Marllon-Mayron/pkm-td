@@ -4084,8 +4084,7 @@ class MoveEffect:
                 return False
 
         # ===== APLICA O CLIMA TEMPORÁRIO COM SOURCE = ATTACKER =====
-        battle_system.weather_manager.set_weather(weather_type, duration, source=attacker)
-
+        battle_system.weather_manager.set_weather_from_move(weather_type, duration=duration, source=attacker )
         # ===== CONQUISTAS: Incrementa contador de mudanças de clima =====
         if hasattr(battle_system, 'game_scene') and battle_system.game_scene:
             game_scene = battle_system.game_scene

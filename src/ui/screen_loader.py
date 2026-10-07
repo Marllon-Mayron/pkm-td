@@ -10,13 +10,14 @@ import json
 import pygame
 from pathlib import Path
 
+from src.ui.layout import rel_rect, layout_text
 from src.config.paths import UI_LAYOUTS_PATH, RES_PATH
 from src.ui.layout import rel_rect
 from src.ui.theme import parse_color, with_alpha, color_alpha
 from src.ui.widgets import (
     Button, Panel, Label, ListView, GridSelect, ImageBox, Checkbox,
     Slider, Dropdown, TabPanel, ProgressBar, Badge, WorldSprite,
-    Divider, Table,
+    Divider, Table, SlotRow,
 )
 
 
@@ -432,6 +433,8 @@ class ScreenLoader:
                     icon_size=_get("icon_size"),
                     icon_position=_get("icon_position", "left"),
                     icon_gap=_int_or(_get("icon_gap"), 6),
+                    text_fit=str(_get("text_fit", "none")),
+                    min_font_size=_int_or(_get("min_font_size"), 8),
                     **bg_common, **common))
                 w = Button(wid, rect, **kw)
                 cls._bind_action(w, props.get("on_click"), actions, kind="click")
@@ -452,6 +455,8 @@ class ScreenLoader:
                     size=fsize or _get("size", 20),
                     bold=bold,
                     align=_get("align", "center"),
+                    text_fit=str(_get("text_fit", "none")),
+                    min_font_size=_int_or(_get("min_font_size"), 8),
                     **common))
                 w = Label(wid, rect, **kw)
 
@@ -611,7 +616,26 @@ class ScreenLoader:
                     font_name=fname, bold=bold, tab=tabname, z=z,
                 ))
                 w = Table(wid, rect, **kw)
-
+            elif wtype == "slot_row":
+                kw = _filter_kwargs(SlotRow, dict(
+                    value=_int_or(_get("value"), 0),
+                    max_slots=_int_or(_get("max_slots"), 3),
+                    shape=str(_get("shape", "star")),
+                    orientation=str(_get("orientation", "horizontal")),
+                    slot_size=_int_or(_get("slot_size"), None),
+                    gap=_int_or(_get("gap"), 8),
+                    color_filled=parse_color(_get("color_filled"), None),
+                    color_empty=parse_color(_get("color_empty"), None),
+                    outline_color=parse_color(_get("outline_color"), None),
+                    outline_width=_int_or(_get("outline_width"), 2),
+                    filled_alpha=_int_or(_get("filled_alpha"), 255),
+                    empty_alpha=_int_or(_get("empty_alpha"), 110),
+                    icon=icon_surf,
+                    icon_tint=_bool_or(_get("icon_tint"), True),
+                    pixel_art=pixel_art,
+                    z=z, tab=tabname,
+                ))
+                w = SlotRow(wid, rect, **kw)
             else:
                 print(f"[UI] tipo desconhecido: {wtype}")
                 return None

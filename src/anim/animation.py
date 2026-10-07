@@ -13,6 +13,7 @@ SCHEMA_VERSION = 1
 VALID_ANCHORS = ("target", "attacker", "projectile", "world", "screen", "mouse")
 VALID_SPACES = ("world", "screen")
 VALID_CATEGORIES = ("items", "effects", "moves", "weather", "ui", "cutscene")
+VALID_ANCHOR_MODES = ("center", "head", "feet")
 
 
 @dataclass
@@ -34,6 +35,27 @@ class AnimDefinition:
     camera: Optional[CameraDef] = None
     default_binding: Optional[dict] = None
     background: Optional[dict] = None
+
+    # ===== CAMPOS DE INTEGRAÇÃO =====
+    # scale_mult: multiplica uniformemente o tamanho do efeito INTEIRO.
+    #   Sprites, offsets, keyframes x/y e velocidades do emitter são todos
+    #   multiplicados por esse valor. Use pra encolher/esticar o efeito
+    #   sem editar layer por layer.
+    scale_mult: float = 1.0
+
+    # anchor_mode: onde a âncora "target" cai no sprite do alvo.
+    #   "center" → centro do sprite (topo da hitbox) — PADRÃO
+    #   "head"   → topo do sprite
+    #   "feet"   → base do sprite
+    anchor_mode: str = "center"
+
+    # world_scaled: quando True, o efeito é multiplicado pelo MESMO fator
+    #   que o jogo usa pra desenhar os pokémons:
+    #       camera.zoom * screen_manager.render_scale * (16/24)
+    #   Resultado: o efeito "acompanha" o zoom do jogador, exatamente como
+    #   os pokémons. Quando False, o efeito mantém tamanho fixo em pixels
+    #   de tela (não muda com zoom).
+    world_scaled: bool = True
 
     @property
     def duration_seconds(self) -> float:
@@ -67,6 +89,10 @@ class AnimDefinition:
         cam_raw = data.get("camera")
         camera = CameraDef.from_dict(cam_raw) if cam_raw else None
 
+        anchor_mode = str(data.get("anchor_mode", "center")).lower()
+        if anchor_mode not in VALID_ANCHOR_MODES:
+            anchor_mode = "center"
+
         return cls(
             name=str(data.get("name", "nova_animacao")),
             category=str(data.get("category", "effects")),
@@ -87,6 +113,9 @@ class AnimDefinition:
                              if data.get("default_binding") else None),
             background=(dict(data["background"])
                         if data.get("background") else None),
+            scale_mult=float(data.get("scale_mult", 1.0)),
+            anchor_mode=anchor_mode,
+            world_scaled=bool(data.get("world_scaled", True)),
         )
 
     def to_dict(self) -> dict:
@@ -95,6 +124,9 @@ class AnimDefinition:
             "name": self.name,
             "category": self.category,
             "description": self.description,
+            "scale_mult": self.scale_mult,
+            "anchor_mode": self.anchor_mode,
+            "world_scaled": self.world_scaled,
             "fps": self.fps,
             "duration_frames": self.duration_frames,
             "loop": self.loop,
