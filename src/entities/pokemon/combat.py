@@ -87,7 +87,8 @@ class PokemonCombat:
             delattr(self.pokemon, '_spider_web_locked_y')
 
     # ===== MÉTODOS DE BUSCA DE ALVO =====
-    def find_nearest_enemy(self, all_entities: List, attack_priority: Optional[AttackPriority] = None) -> Optional['Pokemon']:
+    def find_nearest_enemy(self, all_entities: List, attack_priority: Optional[AttackPriority] = None) -> Optional[
+        'Pokemon']:
         """Encontra o inimigo mais próximo, considerando prioridade de ataque"""
         if not all_entities:
             return None
@@ -102,6 +103,10 @@ class PokemonCombat:
                     continue
 
             if not entity.is_alive() or entity.is_defeated:
+                continue
+
+            # ===== NOVO: NUNCA escolhe como alvo quem está sendo capturado =====
+            if getattr(entity, '_capture_in_progress', False):
                 continue
 
             # Determina se é alvo válido
@@ -125,8 +130,8 @@ class PokemonCombat:
         # ===== FOLLOW ME: prioriza quem está com a flag ativa =====
         follow_target = self._get_follow_me_priority_target(valid_targets)
         if follow_target is not None:
-             print(f"[FOLLOW_ME] {self.pokemon.name} foi redirecionado para {follow_target.name}")
-             return follow_target
+            print(f"[FOLLOW_ME] {self.pokemon.name} foi redirecionado para {follow_target.name}")
+            return follow_target
 
         # ===== SE TEM ESTRATÉGIA DE PRIORIDADE, ORDENA =====
         if attack_priority and not self.pokemon.is_wild:  # Só para aliados
@@ -169,6 +174,10 @@ class PokemonCombat:
                 if not hasattr(entity, 'is_placed') or not entity.is_placed:
                     continue
             if not entity.is_alive() or entity.is_defeated:
+                continue
+
+            # ===== NOVO: NUNCA escolhe como alvo quem está sendo capturado =====
+            if getattr(entity, '_capture_in_progress', False):
                 continue
 
             is_valid_target = (not entity.is_wild) if self.pokemon.is_wild else entity.is_wild
@@ -227,6 +236,10 @@ class PokemonCombat:
             if not entity.is_alive() or entity.is_defeated:
                 continue
 
+            # ===== NOVO: NUNCA escolhe como alvo quem está sendo capturado =====
+            if getattr(entity, '_capture_in_progress', False):
+                continue
+
             # Verifica se é aliado (not wild)
             is_valid_target = not entity.is_wild
 
@@ -246,44 +259,49 @@ class PokemonCombat:
 
         return nearest
 
-    def is_target_in_range(self, target: 'Pokemon') -> bool:
+    def get_enemies_in_range(self, all_entities: List) -> List['Pokemon']:
         """
-        Verifica se o alvo está dentro do range de ataque.
-        Retorna False se o alvo estiver fora do range OU se não for mais válido.
+        Retorna lista de todos os inimigos dentro do range de ataque.
+        Útil para ataques em área futuramente.
         """
-        if not target or not target.is_alive() or target.is_defeated:
-            return False
+        enemies_in_range = []
 
-        # Calcula distância
-        dx = target.x - self.pokemon.x
-        dy = target.y - self.pokemon.y
-        distance = math.sqrt(dx * dx + dy * dy)
+        if not all_entities:
+            return enemies_in_range
 
-        # Obtém o move atual para saber o range necessário
-        current_move = self._get_current_move()
+        # ===== USA O RANGE PADRÃO DO POKÉMON (NÃO DEPENDE DO MOVE) =====
+        # Para ataques em área como Earthquake, sempre usa o attack_range padrão
+        required_range = self.pokemon.attack_range
 
-        if current_move:
-            if current_move.category == "physical":
-                required_range = 25  # Distância para ataque físico
-            elif current_move.category in ["special", "status"]:
-                required_range = self.pokemon.attack_range  # Range padrão para especiais
+        range_sq = required_range * required_range
+
+        print(f"[AREA_RANGE] {self.pokemon.name} verificando range {required_range} para {len(all_entities)} entidades")
+
+        for entity in all_entities:
+            # Pula entidades mortas
+            if not entity.is_alive() or entity.is_defeated:
+                continue
+
+            # ===== NOVO: NUNCA inclui quem está sendo capturado em ataques de área =====
+            if getattr(entity, '_capture_in_progress', False):
+                continue
+
+            # Verifica se é inimigo
+            is_valid_target = False
+            if self.pokemon.is_wild:
+                is_valid_target = not entity.is_wild
             else:
-                required_range = self.pokemon.attack_range
-        else:
-            required_range = self.pokemon.attack_range
+                is_valid_target = entity.is_wild
 
-        # Define uma margem de tolerância (30% a mais que o range)
-        # Isso evita que o Pokémon perca o target muito facilmente
-        tolerance = required_range * 1.3
+            if is_valid_target:
+                dx = self.pokemon.x - entity.x
+                dy = self.pokemon.y - entity.y
+                distance_sq = dx * dx + dy * dy
 
-        in_range = distance <= tolerance
+                if distance_sq <= range_sq:
+                    enemies_in_range.append(entity)
 
-        if not in_range:
-            print(f"[RANGE] {self.pokemon.name}: alvo {target.name} fora do range! "
-                  f"Distância: {distance:.0f} > {tolerance:.0f}")
-
-        return in_range
-
+        return enemies_in_range
     def lose_target(self, reason: str = "desconhecido"):
         """Faz o Pokémon perder o alvo atual e resetar estado de combate"""
         if self.pokemon.target:
@@ -434,6 +452,9 @@ class PokemonCombat:
         if getattr(self.pokemon, '_is_remote', False):
             return
 
+        if getattr(self.pokemon, '_capture_in_progress', False):
+            return
+
         # ===== PRIORIDADE 1: RETORNANDO PARA O SPOT =====
         if self.pokemon.combat_state == "returning":
             self._handle_returning_state(dt)
@@ -484,7 +505,11 @@ class PokemonCombat:
         # ===== VERIFICA SE O ALVO AINDA É VÁLIDO =====
         if self.pokemon.target:
             # Verifica se o alvo ainda está vivo
-            if not self.pokemon.target.is_alive() or self.pokemon.target.is_defeated:
+            if getattr(self.pokemon.target, '_capture_in_progress', False):
+                print(f"[COMBAT] {self.pokemon.name}: alvo {self.pokemon.target.name} "
+                      f"está sendo capturado — perdendo alvo")
+                self.pokemon.target = None
+            elif not self.pokemon.target.is_alive() or self.pokemon.target.is_defeated:
                 print(f"[COMBAT] {self.pokemon.name}: alvo {self.pokemon.target.name} foi derrotado!")
                 self.pokemon.target = None
 
@@ -1253,6 +1278,8 @@ class PokemonCombat:
     # ===== MÉTODOS DE DANO =====
     def take_damage(self, damage, attacker=None):
         """Recebe dano"""
+        if getattr(self.pokemon, '_capture_in_progress', False):
+            return False
         # ===== DECREMENTA SAFEGUARD AO RECEBER DANO =====
         if hasattr(self.pokemon, '_safeguard_active') and self.pokemon._safeguard_active:
             self.pokemon._safeguard_remaining -= 1

@@ -269,6 +269,71 @@ class PokemonStats:
             self.pokemon.evs[stat] = 0
         self.calculate_stats()
 
+    def add_evs_to_stat(self, stat: str, amount: int) -> dict:
+        """
+        Adiciona EVs a um stat específico, respeitando:
+          - MAX_EV_PER_STAT (por stat)
+          - MAX_TOTAL_EVS   (global)
+
+        Retorna dict:
+          {"success": bool, "stat": str, "amount": int (aplicado),
+           "current": int, "max": int, "message": str}
+        """
+        if stat not in self.pokemon.evs:
+            return {"success": False, "message": f"Stat inválido: {stat}",
+                    "stat": stat, "amount": 0, "current": 0, "max": 0}
+
+        if amount <= 0:
+            return {"success": False, "message": "Quantidade inválida",
+                    "stat": stat, "amount": 0,
+                    "current": self.pokemon.evs[stat],
+                    "max": self.MAX_EV_PER_STAT}
+
+        current = self.pokemon.evs.get(stat, 0)
+
+        # 1) Teto por stat
+        new_value = min(self.MAX_EV_PER_STAT, current + amount)
+        actual_gain = new_value - current
+
+        if actual_gain <= 0:
+            return {"success": False,
+                    "message": f"{stat.upper()} já está no máximo ({current}/{self.MAX_EV_PER_STAT})",
+                    "stat": stat, "amount": 0,
+                    "current": current, "max": self.MAX_EV_PER_STAT}
+
+        # 2) Teto global
+        total_before = self.get_ev_total()
+        room = self.MAX_TOTAL_EVS - total_before
+        if room <= 0:
+            return {"success": False,
+                    "message": f"Limite TOTAL de EVs já atingido ({total_before}/{self.MAX_TOTAL_EVS})",
+                    "stat": stat, "amount": 0,
+                    "current": current, "max": self.MAX_EV_PER_STAT}
+
+        if actual_gain > room:
+            actual_gain = room
+
+        # Aplica
+        self.pokemon.evs[stat] = current + actual_gain
+
+        # Recalcula stats e ajusta HP atual se o max_hp cresceu
+        old_max_hp = self.pokemon.max_hp
+        self.calculate_stats()
+
+        if self.pokemon.current_hp > 0:
+            hp_increase = self.pokemon.max_hp - old_max_hp
+            if hp_increase > 0:
+                self.pokemon.current_hp += hp_increase
+
+        return {
+            "success": True,
+            "stat": stat,
+            "amount": actual_gain,
+            "current": self.pokemon.evs[stat],
+            "max": self.MAX_EV_PER_STAT,
+            "message": f"+{actual_gain} EVs em {stat.upper()}",
+        }
+
     def can_gain_evs(self, ev_yield: dict) -> bool:
         total_after = self.get_ev_total() + sum(ev_yield.values())
         if total_after > self.MAX_TOTAL_EVS:

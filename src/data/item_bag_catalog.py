@@ -448,6 +448,52 @@ class ItemBagCatalog:
         }
 
         # ============================================================
+        # VITAMINAS (ITENS DE EV) + RESET DE EV
+        # ============================================================
+        # Cada vitamina dá +10 EVs no stat correspondente.
+        # Preços alinhados ao "Rare Candy" (4800) e pedras de evolução (5000).
+        # ============================================================
+        vitamins = [
+            ("hp_up", "HP UP", "HPUP.png", "HP", "hp"),
+            ("protein", "PROTEIN", "PROTEIN.png", "Ataque", "attack"),
+            ("iron", "IRON", "IRON.png", "Defesa", "defense"),
+            ("calcium", "CALCIUM", "CALCIUM.png", "Ataque Especial", "special_attack"),
+            ("zinc", "ZINC", "ZINC.png", "Defesa Especial", "special_defense"),
+            ("carbos", "CARBOS", "CARBOS.png", "Velocidade", "speed"),
+        ]
+
+        for item_id, name, filename, stat_display, stat_key in vitamins:
+            items[item_id] = {
+                "id": item_id,
+                "name": name,
+                "sprite_path": medicine_path / filename,
+                "description": f"Aumenta os EVs de {stat_display} em +10 pontos.",
+                "category": "medicine",
+                "usable_in_battle": False,
+                "usable_on_map": True,
+                "effect": "ev_boost",
+                "effect_value": {"stat": stat_key, "amount": 10},
+                "price": 3500,
+                "unlock_phase": "4-5",
+                "unlock_chapter": None,
+            }
+
+        # Zera TODOS os EVs do Pokémon (item consumível)
+        items["ev_reset"] = {
+            "id": "ev_reset",
+            "name": "EV RESET",
+            "sprite_path": medicine_path / "EVRESET.png",
+            "description": "Zera todos os EVs do Pokémon. Útil para treinar do zero.",
+            "category": "medicine",
+            "usable_in_battle": False,
+            "usable_on_map": True,
+            "effect": "ev_reset",
+            "effect_value": None,
+            "price": 5000,
+            "unlock_phase": "4-5",
+            "unlock_chapter": None,
+        }
+        # ============================================================
         # PEDRAS DE EVOLUÇÃO
         # ============================================================
         stones = [

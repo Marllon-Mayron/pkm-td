@@ -137,6 +137,19 @@ class LayerDef:
                 fade_in_frames=int(d.get("fade_in_frames", 0)),
                 fade_out_frames=int(d.get("fade_out_frames", 0)),
             )
+        if lt == "parallax":
+            return ParallaxLayerDef(
+                **base,
+                image_path=str(d.get("image", "")),
+                scroll_speed_x=float(d.get("scroll_speed_x", 20.0)),
+                scroll_speed_y=float(d.get("scroll_speed_y", 0.0)),
+                repeat_x=bool(d.get("repeat_x", True)),
+                repeat_y=bool(d.get("repeat_y", False)),
+                alpha=int(d.get("alpha", 255)),
+                tint=_parse_hex_color(d.get("tint", "#FFFFFF")),
+                stop_scroll_at_frame=int(d.get("stop_scroll_at_frame", -1)),
+            )
+
         return SpriteLayerDef(**base, image_path="", keyframes=[],
                               easing="linear")
 
@@ -314,5 +327,39 @@ class MessageLayerDef(LayerDef):
             "show_prompt": self.show_prompt,
             "prompt_char": self.prompt_char,
             "prompt_blink": self.prompt_blink,
+        })
+        return d
+
+# =====================================================================
+# LAYER: PARALLAX
+# =====================================================================
+@dataclass
+class ParallaxLayerDef(LayerDef):
+    """Fundo com scroll infinito (parallax).
+
+    A imagem e tiled horizontalmente (e/ou verticalmente) e desloca
+    continuamente em `scroll_speed_x` / `scroll_speed_y` pixels por
+    segundo. Perfeito para ceu, nuvens, montanhas e canos (Flappy).
+    """
+    image_path: str = ""
+    scroll_speed_x: float = 20.0
+    scroll_speed_y: float = 0.0
+    repeat_x: bool = True
+    repeat_y: bool = False
+    alpha: int = 255
+    tint: tuple = (255, 255, 255)
+    stop_scroll_at_frame: int = -1  # -1 = nunca para
+
+    def to_dict(self) -> dict:
+        d = self.base_dict()
+        d.update({
+            "image": self.image_path,
+            "scroll_speed_x": self.scroll_speed_x,
+            "scroll_speed_y": self.scroll_speed_y,
+            "repeat_x": self.repeat_x,
+            "repeat_y": self.repeat_y,
+            "alpha": self.alpha,
+            "tint": _to_hex_color(self.tint),
+            "stop_scroll_at_frame": self.stop_scroll_at_frame,
         })
         return d

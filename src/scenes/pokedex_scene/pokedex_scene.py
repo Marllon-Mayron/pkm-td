@@ -1,432 +1,454 @@
 # src/scenes/pokedex_scene/pokedex_scene.py
-
 """
-Tela da Pokédex
+Pokédex — Scene orquestradora.
+
+Todo o layout está em `res/ui_layouts/pokedex.json`.
+Toda a lógica de dados está em `PokedexLogic`.
+Aqui só: ligar widgets <-> dados e reagir a eventos.
 """
 import pygame
-from src.scenes.base_scene import BaseScene
-from src.data.pokedex import Pokedex
-from src.scenes.pokedex_scene.utils.constants import ( COLORS, FILTERS, SIZES, REGIONS)
-from src.scenes.pokedex_scene.components.search_bar import SearchBar
-from src.scenes.pokedex_scene.components.pokedex_list import PokedexList
-from src.scenes.pokedex_scene.components.pokemon_detail import PokemonDetail
-from src.scenes.pokedex_scene.components.dropdown import Dropdown
+
+from src.ui.screen_template import StandardScreen
+from src.ui.screen_loader import ScreenLoader
+from src.ui.theme import FontBook
+
+from src.scenes.pokedex_scene.pokedex_logic import PokedexLogic
+from src.ui.utils.type_bar_loader import type_bar_loader
+from src.ui.utils.type_icon_loader import type_icon_loader
+
+LAYOUT_PATH = "res/ui_layouts/pokedex.json"
 
 
-class PokedexScene(BaseScene):
+class PokedexScene(StandardScreen):
+    title = ""
+    show_back_button = False
+
     def __init__(self, game):
+        self.logic = PokedexLogic(game)
+        self.search_active = False
+        self.search_cursor_t = 0.0
         super().__init__(game)
 
-        self.pokedex = Pokedex()
-        self.player = game.player
-        self.filter_type = FILTERS['ALL']
-        self.region = REGIONS['ALL']
+    # =================================================================
+    def build(self):
+        ScreenLoader.load(self, LAYOUT_PATH)
+        self._populate_static()
 
-        self.search_bar = None
-        self.pokedex_list = None
-        self.pokemon_detail = None
-        self.filter_dropdown = None
-        self.region_dropdown = None
-
-        self.layout_initialized = False
-        self.last_window_size = (
-            self.screen_manager.window_width,
-            self.screen_manager.window_height,
-        )
-
-        self.fonts = self._create_fonts()
-
-        self.back_button = None
-        self.back_hover = False
-
-        self.total_seen = 0
-        self.total_caught = 0
-        self.total_pokemon = 0
-
-        self.current_selected_id = None
-
-        print("[POKEDEX_SCENE] Inicializada")
-
-    # ==========================================================
-    # FONTES E RESIZE
-    # ==========================================================
-    def _create_fonts(self):
-        base_size = max(14, self.screen_manager.window_height // 40)
+    def get_actions(self):
         return {
-            'title': pygame.font.Font(None, base_size * 2),
-            'large': pygame.font.Font(None, base_size + 4),
-            'medium': pygame.font.Font(None, base_size),
-            'small': pygame.font.Font(None, base_size - 2),
-            'tiny': pygame.font.Font(None, base_size - 4),
+            "back":             self._on_back,
+            "region_changed":   self._on_region_changed,
+            "status_changed":   self._on_status_changed,
+            "pokemon_selected": self._on_pokemon_selected,
+            "prev_pokemon":     self._on_prev,
+            "next_pokemon":     self._on_next,
+            "toggle_view":      self._on_toggle_view,
         }
 
-    def _check_resize(self):
-        current_size = (self.screen_manager.window_width,
-                        self.screen_manager.window_height)
-        if current_size != self.last_window_size:
-            self.last_window_size = current_size
-            self.layout_initialized = False
-            self.fonts = self._create_fonts()
+    # =================================================================
+    # População inicial
+    # =================================================================
+    def _populate_static(self):
+        dd = self.get("dd_region")
+        if dd is not None:
+            dd.options = self.logic.get_region_labels()
+            dd.value   = self.logic.get_region_label()
+
+        dd = self.get("dd_status")
+        if dd is not None:
+            dd.options = self.logic.get_status_labels()
+            dd.value   = self.logic.get_status_label()
+
+        grid = self.get("stats_grid")
+        if grid is not None:
+            grid.items = [0, 1, 2, 3, 4, 5]
+            grid.render_callback = self._render_stat_cell
+
+        self._refresh_search_label()
+        self._update_stats()
+        self._feed_grid()
+        self._update_detail()
+
+    # =================================================================
+    # Feed da grid de Pokémon
+    # =================================================================
+    def _feed_grid(self):
+        grid = self.get("pokemon_grid")
+        if grid is None:
+            return
+
+        items = []
+        for e in self.logic.filtered:
+            d = self.logic.item_dict(e)
+            # Tipo 1 (sempre existe — cai em undefined)
+            d["type_icon"] = type_icon_loader.get_original(d["type_key"])
+            # Tipo 2 (None para monotype)
+            tk2 = d.get("type_key_2")
+            d["type_icon_2"] = type_icon_loader.get_original(tk2) if tk2 else None
+            items.append(d)
+
+        grid.items = items
+
+    # =================================================================
+    # Stats gerais
+    # =================================================================
+    def _update_stats(self):
+        lbl = self.get("lbl_stat_total")
+        if lbl is not None:
+            lbl.text = f"Total: {self.logic.total_pokemon}"
+        lbl = self.get("lbl_stat_seen")
+        if lbl is not None:
+            lbl.text = f"Vistos: {self.logic.total_seen}"
+        lbl = self.get("lbl_stat_caught")
+        if lbl is not None:
+            lbl.text = f"Capturados: {self.logic.total_caught}"
+
+    # =================================================================
+    # Painel de detalhe
+    # =================================================================
+    def _update_detail(self):
+        state = self.logic.get_detail_state()
+
+        # sprite
+        img = self.get("detail_sprite")
+        if img is not None:
+            img.surface = state["sprite"]
+
+        # info do sprite (inmap)
+        lbl = self.get("lbl_sprite_info")
+        if lbl is not None:
+            lbl.text = state["sprite_info"]
+
+        # botão toggle
+        btn = self.get("btn_toggle")
+        if btn is not None:
+            btn.label = "SPRITE" if state["show_inmap"] else "INMAP"
+
+        # nome
+        lbl = self.get("detail_name")
+        if lbl is not None:
+            lbl.text = state["name"]
+
+        # status
+        badge = self.get("detail_status")
+        if badge is not None:
+            badge.text = state["status_text"]
+            badge.bg_color = state["status_color"]
+
+        # ===== TYPES — barras carregadas do type_bar_loader =====
+        b1 = self.get("detail_type_1")
+        b2 = self.get("detail_type_2")
+        types = state["types"]
+
+        show_1 = len(types) >= 1
+        show_2 = len(types) >= 2
+
+        if b1 is not None:
+            b1.visible = show_1
+            if show_1:
+                b1.surface = type_bar_loader.get_original(types[0]["key"])
+        if b2 is not None:
+            b2.visible = show_2
+            if show_2:
+                b2.surface = type_bar_loader.get_original(types[1]["key"])
+
+        self._center_type_bars(b1, b2, show_1, show_2)
+
+        # stats (só capturados)
+        lbl = self.get("lbl_stats_header")
+        if lbl is not None:
+            lbl.visible = state["caught"]
+
+        grid = self.get("stats_grid")
+        if grid is not None:
+            grid.visible = state["caught"]
+
+        # contador
+        lbl = self.get("lbl_nav_counter")
+        if lbl is not None:
+            lbl.text = state["counter"]
+
+        # widgets da animação InMap
+        self._update_inmap_widgets(state)
+
+    def _update_inmap_widgets(self, state):
+        show = state.get("show_inmap", False)
+
+        lbl = self.get("lbl_inmap_dir")
+        if lbl is not None:
+            lbl.visible = show
+            lbl.text = state.get("direction_label", "") if show else ""
+
+        lbl = self.get("lbl_inmap_frame")
+        if lbl is not None:
+            lbl.visible = show
+            lbl.text = state.get("frame_label", "") if show else ""
+
+        prog = self.get("inmap_progress")
+        if prog is not None:
+            prog.visible = show
+            if show:
+                prog.value = state.get("direction_progress", 0.0)
+
+    def _center_type_bars(self, b1, b2, show_1, show_2):
+        """
+        Reposiciona slots + imagens centralizados no detail_panel.
+
+        - 1 tipo:  [X]         (centralizado)
+        - 2 tipos: [X][Y]      (par colado, centralizado)
+        - 0 tipos: nada visível
+        """
+        parent = self.get("detail_panel")
+        s1 = self.get("type_slot_1")
+        s2 = self.get("type_slot_2")
+
+        if parent is None or b1 is None or b2 is None:
+            return
+
+        cx = parent.rect.centerx
+        w = b1.rect.width
+        gap = 6
+        y = b1.rect.y  # vem do JSON
+
+        if show_1 and show_2:
+            total = w + gap + w
+            x1 = cx - total // 2
+            x2 = x1 + w + gap
+
+            if s1 is not None:
+                s1.visible = True
+                s1.rect.x, s1.rect.y = x1, y
+            if s2 is not None:
+                s2.visible = True
+                s2.rect.x, s2.rect.y = x2, y
+
+            b1.rect.x, b1.rect.y = x1, y
+            b2.rect.x, b2.rect.y = x2, y
+
+        elif show_1:
+            x1 = cx - w // 2
+
+            if s1 is not None:
+                s1.visible = True
+                s1.rect.x, s1.rect.y = x1, y
+            if s2 is not None:
+                s2.visible = False
+
+            b1.rect.x, b1.rect.y = x1, y
+
+        else:
+            if s1 is not None:
+                s1.visible = False
+            if s2 is not None:
+                s2.visible = False
+
+    def _render_stat_cell(self, idx, item, screen, rect):
+        """Renderiza uma linha de stat (nome + barra + valor)."""
+        state = self.logic.get_detail_state()
+        stats = state.get("stats", [])
+        if idx >= len(stats):
             return True
-        return False
 
-    # ==========================================================
-    # LAYOUT
-    # ==========================================================
-    def _create_layout(self):
-        print("[POKEDEX_SCENE] Criando layout...")
-        vx = self.screen_manager.viewport_x
-        vy = self.screen_manager.viewport_y
-        vw = self.screen_manager.viewport_width
-        vh = self.screen_manager.viewport_height
+        stat = stats[idx]
+        label = stat["label"]
+        value = stat["value"]
+        vmax = max(1, stat["max"])
+        pct = max(0.0, min(1.0, value / vmax))
 
-        padding = SIZES['padding']
-        gap = SIZES['gap']
+        inner = rect.inflate(-2, -2)
 
-        # ===== HEADER =====
-        header_y = vy + padding
-        back_size = 40
-        self.back_button = pygame.Rect(vx + padding, header_y, back_size, back_size)
+        # nome
+        f_name = FontBook.get(11, bold=True,
+                              name="pokemon-firered-leafgreen-font-recreation")
+        n_surf = f_name.render(label, True, (160, 165, 180))
+        screen.blit(n_surf, (inner.x, inner.centery - n_surf.get_height() // 2))
 
-        # ===== SEARCH BAR =====
-        search_y = header_y + back_size + gap
-        search_width = min(350, vw * 0.35)
-        search_height = 34
-        search_x = vx + padding
-        self.search_bar = SearchBar(search_x, search_y, search_width, search_height)
+        # barra
+        bar_x = inner.x + 34
+        bar_w = inner.width - 34 - 34
+        bar_h = 10
+        bar_y = inner.centery - bar_h // 2
+        bar_rect = pygame.Rect(bar_x, bar_y, max(10, bar_w), bar_h)
+        pygame.draw.rect(screen, (26, 32, 48), bar_rect, border_radius=3)
 
-        # ===== DROPDOWNS (Região + Filtro) =====
-        dd_y = search_y + search_height + gap
-        dd_height = 32
+        if pct > 0:
+            if pct > 0.7:
+                col = (100, 200, 100)
+            elif pct > 0.4:
+                col = (248, 176, 48)
+            else:
+                col = (200, 80, 80)
+            fill_w = max(3, int(bar_rect.width * pct))
+            fill_rect = pygame.Rect(bar_rect.x, bar_rect.y, fill_w, bar_h)
+            pygame.draw.rect(screen, col, fill_rect, border_radius=3)
 
-        region_options = [
-            {'key': REGIONS['ALL'],   'label': "TODAS AS REGIÕES"},
-            {'key': REGIONS['KANTO'], 'label': "KANTO (GEN 1)"},
-            {'key': REGIONS['JOHTO'], 'label': "JOHTO (GEN 2)"},
-            {'key': REGIONS['HOENN'], 'label': "HOENN (GEN 3)"},
-        ]
-        filter_options = [
-            {'key': FILTERS['ALL'],        'label': "TODOS"},
-            {'key': FILTERS['CAUGHT'],     'label': "CAPTURADOS"},
-            {'key': FILTERS['SEEN'],       'label': "VISTOS"},
-            {'key': FILTERS['NOT_CAUGHT'], 'label': "NÃO CAPTURADOS"},
-            {'key': FILTERS['UNSEEN'],     'label': "NÃO VISTOS"},
-        ]
+        # valor
+        f_val = FontBook.get(11, bold=True,
+                             name="pokemon-firered-leafgreen-font-recreation")
+        v_surf = f_val.render(str(int(value)), True, (240, 242, 248))
+        screen.blit(v_surf, (inner.right - v_surf.get_width(),
+                             inner.centery - v_surf.get_height() // 2))
+        return True
 
-        region_w = 200
-        filter_w = 200
+    # =================================================================
+    # Callbacks
+    # =================================================================
+    def _on_back(self, *_):
+        from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
+        self.game.phase_select_scene = PhaseSelectScene(self.game)
+        self.game.current_scene = self.game.phase_select_scene
 
-        self.region_dropdown = Dropdown(
-            vx + padding, dd_y, region_w, dd_height,
-            region_options, default_key=self.region
-        )
-        self.region_dropdown.on_change = self._on_region_change
-
-        self.filter_dropdown = Dropdown(
-            vx + padding + region_w + gap, dd_y, filter_w, dd_height,
-            filter_options, default_key=self.filter_type
-        )
-        self.filter_dropdown.on_change = self._on_filter_change
-
-        # ===== LISTA E DETALHE =====
-        list_y = dd_y + dd_height + gap
-        bottom_margin = 50
-        list_height = vh - (list_y - vy) - bottom_margin - padding
-
-        list_width = int(vw * 0.32)
-        list_x = vx + padding
-
-        detail_width = vw - list_width - padding * 3
-        detail_x = list_x + list_width + padding
-
-        self.pokedex_list = PokedexList(list_x, list_y, list_width, list_height)
-        self.pokedex_list.on_item_click = self._on_list_item_click
-
-        self.pokemon_detail = PokemonDetail(detail_x, list_y, detail_width, list_height)
-
-        self._update_pokedex_list()
-        self._update_counts()
-
-        self.layout_initialized = True
-        print("[POKEDEX_SCENE] Layout criado!")
-
-    # ==========================================================
-    # CALLBACKS
-    # ==========================================================
-    def _on_list_item_click(self, pokemon_id):
-        self.current_selected_id = pokemon_id
-        self._update_detail(pokemon_id)
-
-    def _on_filter_change(self, new_filter):
-        print(f"[POKEDEX_SCENE] Filtro -> {new_filter}")
-        self.filter_type = new_filter
-        self._update_pokedex_list()
-
-    def _on_region_change(self, new_region):
-        print(f"[POKEDEX_SCENE] Região -> {new_region}")
-        self.region = new_region
-        self._update_pokedex_list()
-
-    # ==========================================================
-    # UPDATES
-    # ==========================================================
-    def _update_counts(self):
-        self.total_seen = len(self.player.seen_pokemon)
-        self.total_caught = len(self.player.caught_pokemon)
-        self.total_pokemon = len(self.pokedex.pokemon_data)
-
-    def _update_pokedex_list(self):
-        if not self.pokedex_list:
+    def _on_region_changed(self, *_):
+        dd = self.get("dd_region")
+        if dd is None:
             return
-        search_text = self.search_bar.get_search_text() if self.search_bar else ""
-        region = self.region_dropdown.get_selected_key() if self.region_dropdown else 'all'
+        self.logic.set_region_label(dd.value)
+        self._feed_grid()
+        self._update_stats()
+        self._update_detail()
 
-        self.pokedex_list.update_items(
-            self.pokedex.pokemon_data,
-            self.player,
-            search_text,
-            self.filter_type,
-            region,
-        )
-
-        selected_item = self.pokedex_list.get_selected_item()
-        if selected_item:
-            self.current_selected_id = selected_item.pokemon_id
-            self._update_detail(selected_item.pokemon_id)
-
-    def _update_detail(self, pokemon_id):
-        if not self.pokemon_detail:
+    def _on_status_changed(self, *_):
+        dd = self.get("dd_status")
+        if dd is None:
             return
-        is_caught = pokemon_id in self.player.caught_pokemon
-        is_seen = pokemon_id in self.player.seen_pokemon
-        pokemon_data = self.pokedex.get_pokemon(pokemon_id)
-        self.pokemon_detail.set_pokemon(pokemon_id, pokemon_data, is_caught, is_seen)
+        self.logic.set_status_label(dd.value)
+        self._feed_grid()
+        self._update_detail()
 
-        if self.pokedex_list:
-            self.pokedex_list.selected_id = pokemon_id
+    def _on_pokemon_selected(self, idx):
+        if 0 <= idx < len(self.logic.filtered):
+            self.logic.select(self.logic.filtered[idx]["id"])
+            self._feed_grid()
+            self._update_detail()
 
-    def _close_open_dropdown(self):
-        closed = False
-        if self.filter_dropdown and self.filter_dropdown.is_open:
-            self.filter_dropdown.close()
-            closed = True
-        if self.region_dropdown and self.region_dropdown.is_open:
-            self.region_dropdown.close()
-            closed = True
-        return closed
+    def _on_prev(self, *_):
+        self.logic.prev_pokemon()
+        self._feed_grid()
+        self._update_detail()
 
-    # ==========================================================
-    # EVENTOS
-    # ==========================================================
+    def _on_next(self, *_):
+        self.logic.next_pokemon()
+        self._feed_grid()
+        self._update_detail()
+
+    def _on_toggle_view(self, *_):
+        self.logic.toggle_view()
+        self._update_detail()
+
+    # =================================================================
+    # Busca
+    # =================================================================
+    def _refresh_search_label(self):
+        lbl = self.get("lbl_search_text")
+        if lbl is None:
+            return
+
+        txt = self.logic.search_text
+        if not txt and not self.search_active:
+            lbl.text = "Buscar..."
+            lbl.text_color = (90, 96, 112)
+            return
+
+        lbl.text_color = (240, 242, 248)
+
+        if self.search_active and int(self.search_cursor_t * 2) % 2 == 0:
+            lbl.text = (txt or "") + "|"
+        else:
+            lbl.text = txt or "|"
+
+    # =================================================================
+    # Eventos
+    # =================================================================
     def handle_event(self, event):
-        if self._check_resize():
-            self._create_layout()
+        # ===== INPUT DE BUSCA =====
+        if self.search_active and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.search_active = False
+                self.logic.set_search("")
+                self._refresh_search_label()
+                self._feed_grid()
+                self._update_detail()
+                return True
+            if event.key == pygame.K_RETURN:
+                self.search_active = False
+                self._refresh_search_label()
+                return True
+            if event.key == pygame.K_BACKSPACE:
+                self.logic.set_search(self.logic.search_text[:-1])
+                self._refresh_search_label()
+                self._feed_grid()
+                self._update_detail()
+                return True
+            if event.unicode and event.unicode.isprintable():
+                self.logic.set_search(self.logic.search_text + event.unicode)
+                self._refresh_search_label()
+                self._feed_grid()
+                self._update_detail()
+                return True
+            return True
 
+        # ===== CLIQUE FORA DA BUSCA =====
+        if (self.search_active
+                and event.type == pygame.MOUSEBUTTONDOWN
+                and event.button == 1):
+            sp = self.get("search_panel")
+            if sp is None or not sp.rect.collidepoint(event.pos):
+                self.search_active = False
+                self._refresh_search_label()
+
+        # ===== CLIQUE NA BUSCA =====
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            sp = self.get("search_panel")
+            if sp is not None and sp.rect.collidepoint(event.pos):
+                self.search_active = True
+                self._refresh_search_label()
+                return True
+
+        # ===== ATALHOS =====
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                # Se algum dropdown estiver aberto, só fecha
-                if self._close_open_dropdown():
-                    return
-                self._go_back()
+                self._on_back()
                 return
-            elif event.key == pygame.K_p:
+            if event.key == pygame.K_p:
                 self.toggle_pause()
-
-        if event.type == pygame.VIDEORESIZE:
-            self.layout_initialized = False
-            return
-
-        # ===== DROPDOWNS (prioridade) =====
-        dropdowns = [d for d in (self.filter_dropdown, self.region_dropdown) if d]
-        for dd in dropdowns:
-            if dd.handle_event(event):
-                # Se um abriu, fecha os outros
-                for other in dropdowns:
-                    if other is not dd and other.is_open:
-                        other.close()
                 return
+            if event.key == pygame.K_f:
+                self.search_active = True
+                self._refresh_search_label()
+                return True
 
-        # ===== BOTÃO VOLTAR =====
-        if event.type == pygame.MOUSEMOTION and self.back_button:
-            self.back_hover = self.back_button.collidepoint(event.pos)
+        super().handle_event(event)
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.back_button and self.back_button.collidepoint(event.pos):
-                self._go_back()
-                return
-
-        # ===== SEARCH BAR =====
-        if self.search_bar:
-            result = self.search_bar.handle_event(event)
-            if result is not None:
-                self._update_pokedex_list()
-
-        # ===== LISTA =====
-        if self.pokedex_list:
-            result = self.pokedex_list.handle_event(event)
-            if result and isinstance(result, int):
-                self.current_selected_id = result
-                self._update_detail(result)
-
-        # ===== DETALHE =====
-        if self.pokemon_detail:
-            result = self.pokemon_detail.handle_event(event, self.pokedex)
-            if result and result.get('action') == 'navigate':
-                new_id = result['pokemon_id']
-                self.current_selected_id = new_id
-                self._update_detail(new_id)
-                if self.pokedex_list:
-                    self.pokedex_list.update(self.screen_manager.get_delta_time())
-
+    # =================================================================
+    # Update
+    # =================================================================
     def fixed_update(self, dt):
-        if not self.layout_initialized:
-            self._create_layout()
-            return
-        if self.search_bar:
-            self.search_bar.update(dt)
-        if self.pokedex_list:
-            self.pokedex_list.update(dt)
-        if self.pokemon_detail:
-            self.pokemon_detail.update(dt)
+        self.search_cursor_t += dt
+        if self.search_active:
+            self._refresh_search_label()
 
-    # ==========================================================
-    # RENDER
-    # ==========================================================
-    def render(self, screen):
-        self._draw_gradient_background(screen)
+        self.logic.update_animation(dt)
 
-        if not self.layout_initialized:
-            self._create_layout()
+        if self.logic.show_inmap:
+            state = self.logic.get_detail_state()
 
-        vx = self.screen_manager.viewport_x
-        vy = self.screen_manager.viewport_y
-        vw = self.screen_manager.viewport_width
+            img = self.get("detail_sprite")
+            if img is not None:
+                img.surface = state["sprite"]
 
-        # ===== HEADER =====
-        self._render_back_button(screen)
+            lbl = self.get("lbl_inmap_dir")
+            if lbl is not None:
+                lbl.text = state.get("direction_label", "")
 
-        title = self.fonts['title'].render("POKEDEX", True, COLORS['text_accent'])
-        title_x = vx + (vw - title.get_width()) // 2
-        title_y = vy + SIZES['padding'] + 5
-        screen.blit(title, (title_x, title_y))
+            lbl = self.get("lbl_inmap_frame")
+            if lbl is not None:
+                lbl.text = state.get("frame_label", "")
 
-        line_y = title_y + title.get_height() + 6
-        line_width = 120
-        line_x = vx + (vw - line_width) // 2
-        pygame.draw.line(screen, COLORS['border_gold'],
-                         (line_x, line_y), (line_x + line_width, line_y), 2)
+            prog = self.get("inmap_progress")
+            if prog is not None:
+                prog.value = state.get("direction_progress", 0.0)
 
-        stats_text = (f"Total: {self.total_pokemon}  |  "
-                      f"Vistos: {self.total_seen}  |  "
-                      f"Capturados: {self.total_caught}")
-        stats_font = pygame.font.Font(None, 24)
-        stats_surf = stats_font.render(stats_text, True, COLORS['text_secondary'])
-        stats_x = vx + vw - SIZES['padding'] - stats_surf.get_width()
-        stats_y = vy + SIZES['padding'] + 8
-        screen.blit(stats_surf, (stats_x, stats_y))
+        super().fixed_update(dt)
 
-        # ===== SEARCH =====
-        if self.search_bar:
-            self.search_bar.render(screen, self.fonts['medium'])
-
-        # ===== DROPDOWN HEADERS =====
-        if self.region_dropdown:
-            self.region_dropdown.render_header(screen, self.fonts['medium'])
-        if self.filter_dropdown:
-            self.filter_dropdown.render_header(screen, self.fonts['medium'])
-
-        # ===== LISTA =====
-        if self.pokedex_list:
-            self.pokedex_list.render(
-                screen, self.pokedex,
-                self.fonts['medium'],
-                self.fonts['small'],
-            )
-
-        # ===== DETALHE =====
-        if self.pokemon_detail:
-            self.pokemon_detail.render(screen, self.pokedex, self.fonts)
-
-        # ===== CONTADOR =====
-        if self.pokedex_list:
-            count = self.pokedex_list.get_count()
-            count_text = f"Mostrando {count} de {self.total_pokemon} Pokemon"
-            count_surf = self.fonts['tiny'].render(
-                count_text, True, COLORS['text_secondary'])
-            count_x = vx + SIZES['padding']
-            count_y = self.pokedex_list.rect.bottom + 5
-            screen.blit(count_surf, (count_x, count_y))
-
-        # ===== INSTRUÇÕES =====
-        self._render_instructions(screen)
-
-        # ===== DROPDOWN OPTIONS (por último = acima de tudo) =====
-        if self.region_dropdown:
-            self.region_dropdown.render_options(screen, self.fonts['medium'])
-        if self.filter_dropdown:
-            self.filter_dropdown.render_options(screen, self.fonts['medium'])
-
-        if self.paused:
-            self._render_pause_overlay(screen)
-
-    # ==========================================================
-    # RENDER HELPERS
-    # ==========================================================
-    def _render_back_button(self, screen):
-        if not self.back_button:
-            return
-        bg_color = (50, 50, 55) if not self.back_hover else (70, 70, 80)
-        border_color = (90, 90, 100) if not self.back_hover else COLORS['text_accent']
-        pygame.draw.rect(screen, bg_color, self.back_button, border_radius=6)
-        pygame.draw.rect(screen, border_color, self.back_button, 2, border_radius=6)
-        back_text = pygame.font.Font(None, 32).render(
-            "<", True, COLORS['text_primary'])
-        screen.blit(back_text, back_text.get_rect(center=self.back_button.center))
-
-    def _render_instructions(self, screen):
-        inst_font = pygame.font.Font(None, 13)
-        inst_text = ("ESC voltar  |  P pausar  |  "
-                     "Use os dropdowns para filtrar por Região e Status")
-        inst_surf = inst_font.render(inst_text, True, COLORS['text_secondary'])
-
-        vx = self.screen_manager.viewport_x
-        vy = self.screen_manager.viewport_y
-        vw = self.screen_manager.viewport_width
-        vh = self.screen_manager.viewport_height
-
-        inst_x = vx + (vw - inst_surf.get_width()) // 2
-        inst_y = vy + vh - 20
-        screen.blit(inst_surf, (inst_x, inst_y))
-
-    def _draw_gradient_background(self, screen):
-        if (not hasattr(self, '_bg_cache')
-                or self._bg_cache.get_width() != self.screen_manager.window_width
-                or self._bg_cache.get_height() != self.screen_manager.window_height):
-            self._bg_cache = pygame.Surface(
-                (self.screen_manager.window_width,
-                 self.screen_manager.window_height)
-            )
-            for i in range(self.screen_manager.window_height):
-                t = i / self.screen_manager.window_height
-                r = int(10 + t * 15)
-                g = int(12 + t * 18)
-                b = int(20 + t * 25)
-                pygame.draw.line(self._bg_cache, (r, g, b), (0, i),
-                                 (self.screen_manager.window_width, i))
-        screen.blit(self._bg_cache, (0, 0))
-
-    def _render_pause_overlay(self, screen):
-        overlay = pygame.Surface(
-            (self.screen_manager.window_width, self.screen_manager.window_height))
-        overlay.set_alpha(180)
-        overlay.fill((10, 10, 10))
-        screen.blit(overlay, (0, 0))
-        pause_font = pygame.font.Font(None, 60)
-        pause_text = pause_font.render("PAUSADO", True, COLORS['text_primary'])
-        text_x = (self.screen_manager.window_width - pause_text.get_width()) // 2
-        text_y = (self.screen_manager.window_height - pause_text.get_height()) // 2
-        screen.blit(pause_text, (text_x, text_y))
-
-    def _go_back(self):
-        from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
-        self.game.current_scene = PhaseSelectScene(self.game)
+    def on_back(self):
+        self._on_back()

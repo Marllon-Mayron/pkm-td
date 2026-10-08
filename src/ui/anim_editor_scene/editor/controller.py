@@ -28,7 +28,7 @@ from src.anim.animation import AnimDefinition
 from src.anim.actor import ActorDef, ActorKeyframe, ActorRuntime
 from src.anim.layer import (
     Keyframe, LayerDef, SpriteLayerDef, EmitterLayerDef, FilterLayerDef,
-    MessageLayerDef,
+    MessageLayerDef, ParallaxLayerDef,
     _parse_hex_color, _to_hex_color,
 )
 from src.anim.camera import CameraDef, CameraKeyframe, CameraRuntime
@@ -42,7 +42,7 @@ from src.ui.anim_editor_scene.editor import sections as S
 from src.ui.anim_editor_scene.editor import scene_loader as SL
 from src.ui.anim_editor_scene.editor.logger import EditorLogger
 from src.ui.anim_editor_scene.editor.render_mixin import AnimEditorRenderMixin
-
+from src.ui.anim_editor_scene.editor.exporter import AnimationExporter
 
 # =====================================================================
 class InlineField:
@@ -170,7 +170,10 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         super().__init__(game)
 
         self.logger = EditorLogger()
-
+        self.timeline = TimelineWidget()
+        # exporter (MP4 via imageio-ffmpeg)
+        self.exporter = AnimationExporter(self)
+        self.preview_aspect = "youtube"  # youtube | tiktok | square | hd
         # retangulos
         self.top_rect = None
         self.left_rect = None
@@ -465,6 +468,7 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             ("add_emitter", "Emitter",        78),
             ("add_filter",  "Filter",         68),
             ("add_message", "Mensagem",       78),
+            ("add_parallax", "Parallax",      78),
         )
         for key, label, w in row1:
             if key.startswith("sep"):
@@ -496,6 +500,12 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             ("sep4",      "",         10),
             ("rescan",    "Re-Scan",  78),
             ("log",       "Log",      50),
+            ("sep5", "", 10),
+            ("exp_mp4", "Export MP4", 100),
+            ("sep5", "", 10),
+            ("exp_yt", "YT", 42),
+            ("exp_tt", "TikTok", 62),
+            ("exp_sq", "1:1", 44),
         )
         for key, label, w in row2:
             if key.startswith("sep"):
@@ -651,6 +661,9 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             return ("actor", "actor_kf")
         if self.selected_layer() is not None:
             return ("layer", "sheet", "layer_kf", "emitter", "message")
+        if self.selected_layer() is not None:
+            return ("layer", "sheet", "layer_kf", "emitter",
+                    "message", "parallax")
         return ("anim", "background", "camera", "sound")
 
     def _recalc_right_fields(self):
@@ -955,6 +968,15 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
                 if key in ("balloon_shadow", "show_prompt", "prompt_blink"):
                     return "true" if getattr(l, key) else "false"
                 return getattr(l, key, "")
+            if group == "parallax":
+                l = self.selected_layer()
+                if not isinstance(l, ParallaxLayerDef):
+                    return ""
+                if key == "tint":
+                    return _to_hex_color(l.tint)
+                if key in ("repeat_x", "repeat_y"):
+                    return "true" if getattr(l, key) else "false"
+                return getattr(l, key, "")
         return ""
 
     def _get_emitter_flat(self, layer, key):
@@ -1034,6 +1056,8 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
                     self._apply_emitter_field(key, field.buffer)
                 elif group == "message":
                     self._apply_message_field(key, field.buffer)
+                elif group == "parallax":
+                    self._apply_parallax_field(key, field.buffer)
                 self.logger.ok(f"{group}.{key} = {field.buffer!r}")
             except Exception as e:
                 self.logger.error(f"commit {group}.{key}: {e}")
@@ -1365,6 +1389,23 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         else:
             setattr(l, key, v)
 
+    def _apply_parallax_field(self, key, value):
+        l = self.selected_layer()
+        if not isinstance(l, ParallaxLayerDef):
+            return
+        v = str(value).strip()
+        _BOOL = ("1", "true", "yes", "on", "sim")
+
+        if key == "tint":
+            l.tint = _parse_hex_color(v)
+        elif key in ("repeat_x", "repeat_y"):
+            setattr(l, key, v.lower() in _BOOL)
+        elif key in ("scroll_speed_x", "scroll_speed_y"):
+            setattr(l, key, float(v))
+        elif key == "alpha":
+            l.alpha = max(0, min(255, int(float(v))))
+        else:
+            setattr(l, key, v)
     # =================================================================
     # PREVIEW ANIMATOR
     # =================================================================
@@ -1607,6 +1648,9 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         if ctrl and event.key == pygame.K_l:
             self.logger.visible = not self.logger.visible
             return True
+        if ctrl and event.key == pygame.K_e:
+            self._export_mp4(self.preview_aspect)
+            return True
 
         if event.key == pygame.K_g:
             self.show_grid = not self.show_grid; return True
@@ -1669,6 +1713,27 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         self._drag_kf = None
         self.logger.info("entrou em modo preview (P/ESC pra sair)")
 
+    def _preview_render_rect(self, screen_rect):
+        """Rect de render baseado no preview_aspect."""
+        if self.preview_aspect in ("youtube", "hd"):
+            return screen_rect
+        ratio = {"tiktok": 9/16, "square": 1.0}.get(self.preview_aspect, 16/9)
+        w = screen_rect.width
+        h = int(w / ratio)
+        if h > screen_rect.height:
+            h = screen_rect.height
+            w = int(h * ratio)
+        r = pygame.Rect(0, 0, w, h)
+        r.center = screen_rect.center
+        return r
+
+    def _cycle_preview_aspect(self):
+        order = ["youtube", "tiktok", "square"]
+        i = order.index(self.preview_aspect) if self.preview_aspect in order else 0
+        self.preview_aspect = order[(i + 1) % len(order)]
+        self.status_text = f"Aspect: {self.preview_aspect}"
+        self.logger.info(f"preview aspect = {self.preview_aspect}")
+
     def _exit_preview(self):
         self.preview_mode = False
         self.logger.info("saiu do modo preview")
@@ -1677,6 +1742,9 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_ESCAPE, pygame.K_p):
                 self._exit_preview()
+                return True
+            if event.key == pygame.K_a:
+                self._cycle_preview_aspect()
                 return True
             if event.key == pygame.K_SPACE:
                 self.preview_playing = not self.preview_playing
@@ -1752,6 +1820,8 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
                 self._reload_assets()
             elif name == "log":
                 self.logger.visible = not self.logger.visible
+            elif name == "exp_mp4":  # <-- NOVO
+                self._export_mp4()
             elif name == "add_actor":
                 self._add_actor()
             elif name == "add_sprite":
@@ -1762,6 +1832,16 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
                 self._add_layer_of_type("filter")
             elif name == "add_message":
                 self._add_layer_of_type("message")
+            elif name == "exp_mp4":
+                self._export_mp4("youtube")
+            elif name == "exp_yt":
+                self._export_mp4("youtube")
+            elif name == "exp_tt":
+                self._export_mp4("tiktok")
+            elif name == "exp_sq":
+                self._export_mp4("square")
+            elif name == "add_parallax":
+                self._add_layer_of_type("parallax")
             return True
         return False
 
@@ -1859,6 +1939,8 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             self._camera_kf_add()
         elif name == "cam_kf_del":
             self._camera_kf_del()
+        elif name == "add_parallax":
+            self._add_layer_of_type("parallax")
 
     # =================================================================
     # CANVAS
@@ -1997,6 +2079,20 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         self._bump_preview()
         self.status_text = "Nova animacao."
         self.logger.info("nova animacao")
+
+    def _export_mp4(self, aspect="youtube"):
+        if self.exporter.exporting:
+            return
+        if not self.exporter.is_available():
+            self.status_text = self.exporter.install_hint()
+            self.logger.warn(self.status_text)
+            return
+        ok = self.exporter.export_mp4(aspect=aspect, crf=18)
+        self.status_text = self.exporter.status
+        if ok:
+            self.logger.ok(self.exporter.status)
+        else:
+            self.logger.warn(self.exporter.status)
 
     def _save_current(self):
         try:
@@ -2229,6 +2325,17 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
                 show_prompt=True,
                 prompt_char="\u25BC",
                 prompt_blink=True,
+            )
+        elif ttype == "parallax":
+            new = ParallaxLayerDef(
+                **base,
+                image_path="_shared/flappy_clouds_480.png",
+                scroll_speed_x=30.0,
+                scroll_speed_y=0.0,
+                repeat_x=True,
+                repeat_y=False,
+                alpha=255,
+                tint=(255, 255, 255),
             )
         else:
             return

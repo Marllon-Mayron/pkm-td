@@ -36,6 +36,7 @@ from src.ui.toast_renderer import toast_info, toast_warning, toast_battle
 from src.scenes.game_scene.components.day_night_weather_system import DayNightWeatherSystem
 from src.scenes.game_scene.components.managers.in_game_debug_manager import InGameDebugManager
 from src.config.regions import make_phase_id, DEFAULT_REGION_ID
+from src.data.item_bag_catalog import item_bag_catalog
 
 GYM_PHASES = {
     (1, 5): 1,   # 1º Ginásio
@@ -1038,13 +1039,28 @@ class GameScene(BaseScene):
     # ===== MÉTODOS DE ITEM E CAPTURA =====
 
     def _on_item_use(self, target, item_data, target_type):
-        """Callback quando um item é usado em um alvo."""
+        """
+        Callback chamado quando um item é usado em um alvo.
+
+        ORDEM DOS BRANCHES IMPORTA:
+            Como `elif` avalia em ordem, qualquer item cuja `category` seja
+            "medicine" mas cujo efeito NÃO seja cura/revive precisa vir ANTES
+            do último `elif` (que faz o fallback para `use_medicine`).
+            Caso contrário, `use_medicine` recebe `effect_value` não-numérico
+            (dict/None) e quebra com TypeError.
+
+        Formato do retorno:
+            bool        → True consome / False não consome
+            dict        → {"consume_item": bool, "success": bool, ...}
+        """
         effect = item_data.get("effect", "")
         category = item_data.get("category", "")
 
         print(f"[ITEM USE] Categoria: {category}, Efeito: {effect}, Alvo: {target_type}")
 
-        # ===== CURAS DE STATUS =====
+        # ==================================================================
+        # 1. CURAS DE STATUS ESPECÍFICAS (antidote, paralyze_heal, etc.)
+        # ==================================================================
         if effect == "cure_status":
             if target_type == "ally":
                 from src.battle.effects.status_effect import StatusType
@@ -1064,8 +1080,10 @@ class GameScene(BaseScene):
                     if current_status and current_status.type == status_type:
                         self._play_item_spray_animation(item_data.get("id", ""), target)
                         self.battle_system.effect_manager.remove_status(target)
-                        toast_battle(f"{target.name} curou {status_to_cure}!", duration=4.0, pokemon=target,
-                                     portrait="happy")
+                        toast_battle(
+                            f"{target.name} curou {status_to_cure}!",
+                            duration=4.0, pokemon=target, portrait="happy"
+                        )
 
                         # ===== CONQUISTAS: CURA DE STATUS =====
                         if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
@@ -1089,13 +1107,13 @@ class GameScene(BaseScene):
                                 ach_mgr.check_and_unlock("first_paralyze_heal", self.phase_id)
                                 ach_mgr.check_and_unlock("paralyze_heal_100", self.phase_id)
 
-                            # Cura de Queimadura =====
+                            # Cura de Queimadura
                             elif status_to_cure == "burn" and item_data.get("id") == "burn_heal":
                                 ach_mgr.increment_counter("burn_heal_count")
                                 ach_mgr.check_and_unlock("first_burn_heal", self.phase_id)
                                 ach_mgr.check_and_unlock("burn_heal_10", self.phase_id)
 
-                            # Cura de Congelamento =====
+                            # Cura de Congelamento
                             elif status_to_cure == "freeze" and item_data.get("id") == "ice_heal":
                                 ach_mgr.increment_counter("freeze_heal_count")
                                 ach_mgr.check_and_unlock("first_freeze_heal", self.phase_id)
@@ -1104,7 +1122,9 @@ class GameScene(BaseScene):
                         return True
                 return False
 
-        # ===== CURA TODOS STATUS (full_heal) =====
+        # ==================================================================
+        # 2. CURA DE TODOS OS STATUS (full_heal)
+        # ==================================================================
         elif effect == "cure_all_status":
             if target_type == "ally":
                 current_status = self.battle_system.effect_manager.get_status(target)
@@ -1112,65 +1132,145 @@ class GameScene(BaseScene):
                     self._play_item_spray_animation(item_data.get("id", ""), target)
                     self.battle_system.effect_manager.remove_status(target)
                     self.battle_system.effect_manager.add_status_text(target, "todos os status curados!")
-                    toast_battle(f"{item_data['name']} usado em {target.name}!", duration=4.0, pokemon=target,
-                                 portrait="happy")
+                    toast_battle(
+                        f"{item_data['name']} usado em {target.name}!",
+                        duration=4.0, pokemon=target, portrait="happy"
+                    )
                     return True
                 return False
 
-        # ===== RESTAURA PP =====
+        # ==================================================================
+        # 3. RESTAURA PP (pp_up, pp_max)
+        # ==================================================================
         elif effect == "pp_restore":
             if target_type == "ally" and hasattr(target, 'restore_pp'):
                 percentage = item_data.get("effect_value", 1.0)
                 restored = target.restore_pp(percentage=percentage)
                 if restored > 0:
-                    toast_battle(f"{item_data['name']} usado em {target.name}! {restored} PP restaurados!!",
-                                 duration=4.0, pokemon=target, portrait="happy")
+                    toast_battle(
+                        f"{item_data['name']} usado em {target.name}! "
+                        f"{restored} PP restaurados!",
+                        duration=4.0, pokemon=target, portrait="happy"
+                    )
                     return True
                 return False
 
-        # ===== ITENS DE BATALHA =====
+        # ==================================================================
+        # 4. VITAMINAS (EV BOOST) — hp_up, protein, iron, calcium, zinc, carbos
+        #
+        # IMPORTANTE: este branch TEM QUE vir ANTES do fallback de "medicine",
+        # porque essas vitaminas usam category="medicine" mas seu
+        # effect_value é um DICT {"stat": ..., "amount": ...}, não um int.
+        # ==================================================================
+        elif effect == "ev_boost":
+            if target_type == "ally":
+                ev_data = item_data.get("effect_value", {}) or {}
+                stat_key = ev_data.get("stat")
+                amount = ev_data.get("amount", 10)
+
+                result = target.apply_ev_item(stat_key, amount)
+
+                if result.get("success"):
+                    toast_battle(
+                        f"{target.name}: +{result['amount']} EVs em {stat_key.upper()}! "
+                        f"({result['current']}/{result['max']})",
+                        duration=3.5, pokemon=target, portrait="happy"
+                    )
+                    return True
+
+                toast_warning(
+                    result.get("message", "Não foi possível aplicar."),
+                    duration=2.5
+                )
+                return False  # NÃO consome o item
+
+        # ==================================================================
+        # 5. RESET DE EV (ev_reset) — zera TODOS os EVs do Pokémon
+        #
+        # Também precisa vir ANTES do fallback de "medicine":
+        # seu effect_value é None.
+        # ==================================================================
+        elif effect == "ev_reset":
+            if target_type == "ally":
+                if target.reset_all_evs():
+                    toast_battle(
+                        f"{target.name} teve todos os EVs zerados!",
+                        duration=3.5, pokemon=target, portrait="happy"
+                    )
+                    return True
+
+                toast_warning(
+                    f"{target.name} já está com todos os EVs em 0.",
+                    duration=2.5
+                )
+                return False  # NÃO consome o item
+
+        # ==================================================================
+        # 6. ITENS DE BATALHA (X-Items) — buffs temporários
+        # ==================================================================
         elif effect == "battle_stat_boost":
             if target_type == "ally":
                 return self._apply_battle_item(target, item_data)
 
+        # ==================================================================
+        # 7. ESCAPEROPE — foge da fase sem penalidades
+        # ==================================================================
         elif effect == "escape_phase":
             if target_type == "ally":
                 # Verifica se o Pokémon está vivo
                 if not target.is_alive():
-                    toast_warning(f"{target.name} está derrotado! Não pode usar ESCAPEROPE.", duration=2.0)
+                    toast_warning(
+                        f"{target.name} está derrotado! Não pode usar ESCAPEROPE.",
+                        duration=2.0
+                    )
                     return {"consume_item": False, "success": False}
 
                 # Fuga sem penalidades
                 self.escape_phase()
                 return {"consume_item": True, "success": True}
 
-        # ===== PEDRA DE EVOLUÇÃO =====
+        # ==================================================================
+        # 8. PEDRA DE EVOLUÇÃO (evolution stones)
+        # ==================================================================
         elif effect == "evolution":
             if target_type == "ally":
                 success = self._use_evolution_stone(target, item_data)
                 return success
 
-        # ===== TM =====
+        # ==================================================================
+        # 9. TM — ensina um move ao Pokémon
+        # ==================================================================
         elif effect == "teach_move":
             if target_type == "ally":
                 move_to_teach = item_data.get("effect_value")
                 success = self._teach_move_to_pokemon(target, move_to_teach, item_data)
                 return success
 
-        # ===== POKÉBOLA =====
+        # ==================================================================
+        # 10. POKÉBOLA — captura inimigo selvagem
+        # ==================================================================
         elif target_type == "enemy" and category == "pokeball":
             if hasattr(target, 'is_boss') and target.is_boss:
-                toast_battle(f"Não é possível capturar {target.name}!", duration=2.0, pokemon=target, portrait="angry")
+                toast_battle(
+                    f"Não é possível capturar {target.name}!",
+                    duration=2.0, pokemon=target, portrait="angry"
+                )
                 return False  # BOSS: NÃO consome a pokébola
 
             self._attempt_capture(target, item_data)
             return True
 
+        # ==================================================================
+        # 11. RARE CANDY — level up
+        # ==================================================================
         elif effect == "level_up":
             if target_type == "ally":
                 pokemon = target
                 if pokemon.is_defeated:
-                    toast_warning(f"{pokemon.name} está derrotado! Não pode usar Rare Candy.", duration=2.0)
+                    toast_warning(
+                        f"{pokemon.name} está derrotado! Não pode usar Rare Candy.",
+                        duration=2.0
+                    )
                     return False
 
                 old_level = pokemon.level
@@ -1181,9 +1281,7 @@ class GameScene(BaseScene):
                 if new_level > old_level:
                     toast_battle(
                         f"{pokemon.name} subiu para o nível {new_level}!",
-                        duration=4.0,
-                        pokemon=pokemon,
-                        portrait="joyous"
+                        duration=4.0, pokemon=pokemon, portrait="joyous"
                     )
                     # ===== CONQUISTAS: RARE CANDY =====
                     if hasattr(self, 'player') and hasattr(self.player, 'achievement_manager'):
@@ -1194,8 +1292,17 @@ class GameScene(BaseScene):
                 else:
                     return False
 
-        # ===== MEDICAMENTOS (poções e revives) =====
+        # ==================================================================
+        # 12. FALLBACK: MEDICAMENTOS (poções e revives)
+        #
+        # ATENÇÃO: este é o ÚLTIMO branch porque é o mais genérico.
+        # Qualquer item com category="medicine" que NÃO tenha sido pego
+        # acima cai aqui — então, se você adicionar um novo item "medicine"
+        # com effect_value NÃO-numérico, precisa criar um branch para ele
+        # ANTES deste ponto.
+        # ==================================================================
         elif target_type == "ally" and category == "medicine":
+            # ===== VERIFICAÇÃO DE FLUXO DO EVENT PROCESSOR =====
             if hasattr(self, 'event_processor'):
                 expected = self.event_processor.get_next_custom_flag()
                 if expected is None:
@@ -1214,6 +1321,7 @@ class GameScene(BaseScene):
             medicine_success = self.use_medicine(target, item_data)
             return medicine_success
 
+        # Nenhum branch casou — item não faz nada com este tipo de alvo
         return False
 
     # ==================================================================
@@ -1527,6 +1635,7 @@ class GameScene(BaseScene):
               f"shakes={num_shakes} | success={is_success}")
 
         enemy._capture_hidden = True
+        enemy._capture_in_progress = True
 
         anim = CaptureShakeAnimation(
             self, enemy, ball_frames, pokemon_sprite,
@@ -1538,6 +1647,8 @@ class GameScene(BaseScene):
             print(f"[CAPTURE_ANIM] _on_complete | success={success}")
             if hasattr(enemy, '_capture_hidden'):
                 del enemy._capture_hidden
+            if hasattr(enemy, '_capture_in_progress'):
+                del enemy._capture_in_progress  # NOVO
             if success:
                 self._perform_capture(enemy)
             else:
@@ -1687,17 +1798,19 @@ class GameScene(BaseScene):
                 return False
 
             revive_percentage = item_data.get("effect_value", 0.5)
-            toast_battle(f"{pokemon.name} foi revivido!", duration=4.0, pokemon=pokemon, portrait="happy")
+            toast_battle(
+                f"{pokemon.name} foi revivido!",
+                duration=4.0, pokemon=pokemon, portrait="happy"
+            )
 
             pokemon.add_happiness(5, f"Usou {item_data.get('name', 'Revive')}")
-
             pokemon.revive(heal_percentage=revive_percentage)
 
             # ===== CONQUISTAS: Revive =====
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
                 player = game_scene.player
-                phase_id = phase_id = game_scene.phase_id
+                phase_id = game_scene.phase_id
                 if hasattr(player, 'achievement_manager'):
                     ach_mgr = player.achievement_manager
                     ach_mgr.increment_counter("revive_count")
@@ -1707,7 +1820,7 @@ class GameScene(BaseScene):
             # ===== CONQUISTAS: Cura (Revive também conta) =====
             if game_scene and hasattr(game_scene, 'player'):
                 player = game_scene.player
-                phase_id = phase_id = game_scene.phase_id
+                phase_id = game_scene.phase_id
                 if hasattr(player, 'achievement_manager'):
                     player.achievement_manager.increment_counter("heal_count")
                     player.achievement_manager.check_and_unlock("heal_5", phase_id)
@@ -1718,26 +1831,40 @@ class GameScene(BaseScene):
         # ===== POÇÕES E CURAS =====
         if not pokemon.is_alive():
             print(f"[MEDICINE] {pokemon.name} está derrotado! Use um Revive primeiro.")
-            toast_warning(f"{pokemon.name} está derrotado! Use um Revive primeiro.", duration=2.0)
+            toast_warning(
+                f"{pokemon.name} está derrotado! Use um Revive primeiro.",
+                duration=2.0
+            )
             return False
 
         heal_amount = item_data.get("effect_value", 0)
 
+        # ===== BLINDAGEM =====
+        # Alguns itens reutilizam category="medicine" mas guardam dict/None
+        # em effect_value (ex.: vitaminas, ev_reset). Se esse item chegou até
+        # aqui sem branch próprio, aborta limpo em vez de estourar TypeError.
+        if not isinstance(heal_amount, (int, float)):
+            print(f"[MEDICINE] {item_id}: effect_value não numérico "
+                  f"({heal_amount!r}) — não é cura, ignorando.")
+            return False
+
         # Cura completa (-1 = Full Heal)
         if heal_amount == -1:
             pokemon.heal()
-            toast_battle(f"{pokemon.name} foi completamente curado!", duration=4.0, pokemon=pokemon, portrait="happy")
+            toast_battle(
+                f"{pokemon.name} foi completamente curado!",
+                duration=4.0, pokemon=pokemon, portrait="happy"
+            )
             pokemon.add_happiness(3, f"Usou {item_data.get('name', 'medicina')}")
-            # ===== CONQUISTAS: Cura =====
+
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
                 player = game_scene.player
-                phase_id = phase_id = game_scene.phase_id
+                phase_id = game_scene.phase_id
                 if hasattr(player, 'achievement_manager'):
                     player.achievement_manager.increment_counter("heal_count")
                     player.achievement_manager.check_and_unlock("heal_5", phase_id)
                     player.achievement_manager.check_and_unlock("heal_100", phase_id)
-
             return True
 
         # Cura parcial
@@ -1745,19 +1872,21 @@ class GameScene(BaseScene):
             old_hp = pokemon.current_hp
             pokemon.current_hp = min(pokemon.max_hp, pokemon.current_hp + heal_amount)
             healed = pokemon.current_hp - old_hp
-            toast_battle(f"{pokemon.name} recuperou {healed} HP! ({pokemon.current_hp}/{pokemon.max_hp})",
-                         duration=4.0, pokemon=pokemon, portrait="happy")
+            toast_battle(
+                f"{pokemon.name} recuperou {healed} HP! "
+                f"({pokemon.current_hp}/{pokemon.max_hp})",
+                duration=4.0, pokemon=pokemon, portrait="happy"
+            )
             pokemon.add_happiness(3, f"Usou {item_data.get('name', 'medicina')}")
-            # ===== CONQUISTAS: Cura =====
+
             game_scene = pokemon.game_scene if hasattr(pokemon, 'game_scene') else None
             if game_scene and hasattr(game_scene, 'player'):
                 player = game_scene.player
-                phase_id = phase_id = game_scene.phase_id
+                phase_id = game_scene.phase_id
                 if hasattr(player, 'achievement_manager'):
                     player.achievement_manager.increment_counter("heal_count")
                     player.achievement_manager.check_and_unlock("heal_5", phase_id)
                     player.achievement_manager.check_and_unlock("heal_100", phase_id)
-
             return True
 
         return False
@@ -1823,6 +1952,53 @@ class GameScene(BaseScene):
 
         toast_info("Você fugiu da fase sem penalidades!", duration=3.0)
 
+    def use_ev_item_on_pokemon(self, pokemon, item_id: str) -> dict:
+        """
+        Aplica um item de EV (vitamina ou reset) DIRETAMENTE, sem drag.
+        Usado pelo overlay de EV Medicine no modal de detalhes.
+
+        Consome o item da mochila se a aplicação for bem-sucedida.
+        Retorna {"success": bool, "message": str}.
+        """
+        if not pokemon:
+            return {"success": False, "message": "Pokémon inválido"}
+
+        if not self.player.bag.has_item(item_id):
+            return {"success": False, "message": "Item não disponível na mochila"}
+
+        item_data = item_bag_catalog.get_item(item_id)
+        if not item_data:
+            return {"success": False, "message": "Item desconhecido"}
+
+        effect = item_data.get("effect")
+
+        # ----- Vitamina -----
+        if effect == "ev_boost":
+            ev_data = item_data.get("effect_value", {})
+            stat_key = ev_data.get("stat")
+            amount = ev_data.get("amount", 10)
+
+            result = pokemon.apply_ev_item(stat_key, amount)
+
+            if result.get("success"):
+                self.player.bag.remove_item(item_id, 1)
+                self.player.auto_save()
+                return {
+                    "success": True,
+                    "message": f"+{result['amount']} EVs em {stat_key.upper()} "
+                               f"({result['current']}/{result['max']})",
+                }
+            return {"success": False, "message": result.get("message", "Falhou")}
+
+        # ----- Reset -----
+        if effect == "ev_reset":
+            if pokemon.reset_all_evs():
+                self.player.bag.remove_item(item_id, 1)
+                self.player.auto_save()
+                return {"success": True, "message": "Todos os EVs foram zerados!"}
+            return {"success": False, "message": "Os EVs já estão em 0."}
+
+        return {"success": False, "message": "Efeito não suportado"}
     # ===== MÉTODOS DE POSICIONAMENTO =====
 
     @property

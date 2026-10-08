@@ -20,7 +20,7 @@ import pygame
 
 from src.anim.animation import AnimDefinition
 from src.anim.layer import (
-    SpriteLayerDef, FilterLayerDef, EmitterLayerDef, MessageLayerDef,
+    SpriteLayerDef, FilterLayerDef, EmitterLayerDef, MessageLayerDef,ParallaxLayerDef,
 )
 from src.anim.easing import apply_easing
 from src.anim.emitter import ParticleEmitter
@@ -381,30 +381,68 @@ class Animator:
         if self.finished:
             return
 
-        self._render_actors(screen, screen_manager,
-                            hidden_actors=hidden_actors)
+        # Garante runtimes de ator antes de qualquer render
+        for actor_def in (getattr(self.defn, "actors", None) or []):
+            self._ensure_actor_runtime(actor_def)
 
-        layers_sorted = sorted(enumerate(self.defn.layers),
-                               key=lambda t: (t[1].z, t[0]))
-        for _, layer in layers_sorted:
-            if not self._layer_visible_now(layer):
+        # Merge atores + layers numa lista unica ordenada por z
+        items = []
+        for i, a in enumerate(getattr(self.defn, "actors", None) or []):
+            items.append((getattr(a, "z", 10), 0, i, a))
+        for i, l in enumerate(self.defn.layers):
+            items.append((l.z, 1, i, l))
+        items.sort(key=lambda t: (t[0], t[1], t[2]))
+
+        for z, kind, idx, item in items:
+            if kind == 0:
+                self._render_one_actor(screen, screen_manager, item,
+                                       hidden_actors)
+                continue
+
+            if not self._layer_visible_now(item):
                 continue
             anchor_pos = self._resolve_anchor_screen_pos(
-                camera, screen_manager, screen=screen, layer=layer)
+                camera, screen_manager, screen=screen, layer=item)
             try:
-                if isinstance(layer, SpriteLayerDef):
-                    self._render_sprite_layer(screen, layer, anchor_pos,
+                if isinstance(item, SpriteLayerDef):
+                    self._render_sprite_layer(screen, item, anchor_pos,
                                               screen, screen_manager, camera)
-                elif isinstance(layer, FilterLayerDef):
-                    self._render_filter_layer(screen, layer, screen_manager)
-                elif isinstance(layer, EmitterLayerDef):
-                    self._render_emitter_layer(screen, layer, anchor_pos,
+                elif isinstance(item, FilterLayerDef):
+                    self._render_filter_layer(screen, item, screen_manager)
+                elif isinstance(item, EmitterLayerDef):
+                    self._render_emitter_layer(screen, item, anchor_pos,
                                                screen, screen_manager, camera)
-                elif isinstance(layer, MessageLayerDef):
-                    self._render_message_layer(screen, layer, anchor_pos,
+                elif isinstance(item, MessageLayerDef):
+                    self._render_message_layer(screen, item, anchor_pos,
                                                screen_manager)
+                elif isinstance(item, ParallaxLayerDef):
+                    self._render_parallax_layer(screen, item, anchor_pos,
+                                                screen_manager)
             except Exception as e:
-                print(f"[ANIM] erro layer '{layer.id}': {e}")
+                print(f"[ANIM] erro layer '{item.id}': {e}")
+
+    def _render_one_actor(self, screen, screen_manager, actor_def,
+                          hidden_actors):
+        if hidden_actors and actor_def.id in hidden_actors:
+            return
+        vf = getattr(actor_def, "visible_frames", None)
+        f = self.current_frame
+        if vf:
+            start = int(vf[0]) if len(vf) > 0 else 0
+            end = int(vf[1]) if len(vf) > 1 else -1
+            if f < start:
+                return
+            if end >= 0 and f > end:
+                return
+        rt = self._ensure_actor_runtime(actor_def)
+        ox, oy = self._actor_origin(screen, screen_manager)
+        _, _, cam_zoom = self._get_camera_state()
+        eff_zoom = self.zoom * cam_zoom
+        time_seconds = self.current_frame / max(1, self.defn.fps)
+        try:
+            rt.render(screen, ox, oy, f, time_seconds, eff_zoom)
+        except Exception as e:
+            print(f"[ANIM] erro ator '{actor_def.id}': {e}")
 
     def _layer_visible_now(self, layer):
         vf = layer.visible_frames
@@ -661,6 +699,92 @@ class Animator:
         surf.fill((*layer.color, alpha))
         screen.blit(surf, vp.topleft)
 
+    # -----------------------------------------------------------------
+    # PARALLAX
+    # -----------------------------------------------------------------
+    def _render_parallax_layer(self, screen, layer, anchor_pos,
+                               screen_manager=None):
+        img = self._get_sprite_image(layer.image_path)
+        if img is None:
+            return
+
+        if screen_manager is not None:
+            vp = pygame.Rect(
+                screen_manager.viewport_x, screen_manager.viewport_y,
+                screen_manager.viewport_width,
+                screen_manager.viewport_height)
+        else:
+            vp = screen.get_rect()
+
+        # ===== FREEZE: a partir de stop_scroll_at_frame, congela o scroll =====
+        fps = max(1, self.defn.fps)
+        t = self.current_frame / fps
+        if layer.stop_scroll_at_frame >= 0:
+            t_freeze = layer.stop_scroll_at_frame / fps
+            if t > t_freeze:
+                t = t_freeze
+
+        off_x = layer.offset_x - layer.scroll_speed_x * t
+        off_y = layer.offset_y - layer.scroll_speed_y * t
+
+        iw, ih = img.get_size()
+        if iw <= 0 or ih <= 0:
+            return
+
+        base = img
+        if layer.tint != (255, 255, 255):
+            base = _apply_tint(base, layer.tint)
+        if layer.alpha < 255:
+            base = base.copy()
+            base.set_alpha(int(layer.alpha))
+
+        # ===== PIVOT: posiciona o tile inicial =====
+        pivot = layer.pivot
+        if pivot == "top_left":
+            anchor_x, anchor_y = vp.x, vp.y
+        elif pivot == "top_center":
+            anchor_x, anchor_y = vp.centerx - iw // 2, vp.y
+        elif pivot == "top_right":
+            anchor_x, anchor_y = vp.right - iw, vp.y
+        elif pivot == "bottom_left":
+            anchor_x, anchor_y = vp.x, vp.bottom - ih
+        elif pivot == "bottom_center":
+            anchor_x, anchor_y = vp.centerx - iw // 2, vp.bottom - ih
+        elif pivot == "bottom_right":
+            anchor_x, anchor_y = vp.right - iw, vp.bottom - ih
+        else:  # center (default p/ parallax)
+            anchor_x, anchor_y = vp.centerx - iw // 2, vp.centery - ih // 2
+
+        # ---- posicoes X dos tiles ----
+        if layer.repeat_x:
+            start_x = anchor_x + int(off_x % iw) - iw
+            xs = []
+            x = start_x
+            while x < vp.right:
+                xs.append(x)
+                x += iw
+        else:
+            xs = [anchor_x + int(off_x)]
+
+        # ---- posicoes Y dos tiles ----
+        if layer.repeat_y:
+            start_y = anchor_y + int(off_y % ih) - ih
+            ys = []
+            y = start_y
+            while y < vp.bottom:
+                ys.append(y)
+                y += ih
+        else:
+            ys = [anchor_y + int(off_y)]
+
+        old_clip = screen.get_clip()
+        screen.set_clip(vp)
+        try:
+            for y in ys:
+                for x in xs:
+                    screen.blit(base, (x, y))
+        finally:
+            screen.set_clip(old_clip)
     # -----------------------------------------------------------------
     # MESSAGE (balao de dialogo com typewriter)
     # -----------------------------------------------------------------

@@ -110,7 +110,7 @@ class AnimEditorRenderMixin:
             "add_actor": "Adicionar Ator",
             "add_sprite": "Sprite", "add_emitter": "Emitter",
             "add_filter": "Filter",
-            "add_message": "Mensagem",   # ===== MESSAGE =====
+            "add_message": "Mensagem",
             "voltar": "Voltar",
             "play": "Pausar" if self.is_playing else "Play",
             "stop": "Stop",
@@ -124,6 +124,11 @@ class AnimEditorRenderMixin:
             "zoom_1_1": "1:1",
             "rescan": "Re-Scan",
             "log": "Log",
+            "add_parallax": "Parallax",
+            "exp_mp4": "Export MP4",
+            "exp_yt": "YT",
+            "exp_tt": "TikTok",
+            "exp_sq": "1:1",
         }
         for key, rect in self._top_btns.items():
             label = labels.get(key, key)
@@ -209,10 +214,13 @@ class AnimEditorRenderMixin:
             color = {"sprite": (120, 170, 240),
                      "emitter": (250, 180, 90),
                      "filter": (200, 130, 240),
-                     "message": (150, 230, 170)}.get(ltype, (150, 150, 150))
+                     "message": (150, 230, 170),
+                     "parallax": (130, 200, 250)}.get(ltype, (150, 150, 150))
             code = {"sprite": "SP", "emitter": "EM",
-                    "filter": "FI", "message": "MS"}.get(ltype, "?")
+                    "filter": "FI", "message": "MS",
+                    "parallax": "PX"}.get(ltype, "?")
             self._paint_chip(screen, chip, code, color)
+
 
         # Toggles (L e H) na direita da linha
         btn = 18
@@ -518,7 +526,8 @@ class AnimEditorRenderMixin:
             "sheet": "SPRITESHEET",
             "layer_kf": "KEYFRAME DO LAYER",
             "emitter": "EMITTER",
-            "message": "MENSAGEM",   # ===== MESSAGE =====
+            "message": "MENSAGEM",
+            "parallax": "PARALLAX",
         }
 
         for key, rect in self._right_field_rects:
@@ -680,17 +689,39 @@ class AnimEditorRenderMixin:
     # =================================================================
     def _render_preview_fullscreen(self, screen):
         rect = screen.get_rect()
-        screen.fill((0, 0, 0))
-        self._render_canvas_bg(screen, rect)
+        screen.fill((8, 8, 12))
+
+        render_rect = self._preview_render_rect(rect)
+
+        # background so dentro do rect de render
+        self._render_canvas_bg(screen, render_rect)
 
         try:
             preview = self._ensure_preview_animator()
             preview.current_frame = self.current_frame
-            preview.render(screen, camera=None,
-                           screen_manager=_FullscreenScreenManager(rect),
-                           hidden_actors=self._hidden_actor_ids())
+            preview.render(
+                screen, camera=None,
+                screen_manager=_FullscreenScreenManager(render_rect),
+                hidden_actors=self._hidden_actor_ids())
         except Exception as e:
             self.logger.error(f"preview: {e}")
+
+        # moldura de celular quando nao e 16:9
+        if render_rect != rect:
+            # escurece fora do frame
+            mask = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+            mask.fill((0, 0, 0, 180))
+            mask.fill((0, 0, 0, 0), render_rect)
+            screen.blit(mask, (0, 0))
+
+            # borda branca grossa
+            pygame.draw.rect(screen, (240, 240, 240), render_rect, 3)
+
+            # "notch" fake no topo (opcional, charme de celular)
+            notch_w, notch_h = 120, 16
+            notch = pygame.Rect(0, 0, notch_w, notch_h)
+            notch.center = (render_rect.centerx, render_rect.top + 8)
+            pygame.draw.rect(screen, (20, 20, 24), notch, border_radius=8)
 
         if not getattr(self, "preview_hud_hidden", False):
             self._render_preview_hud(screen, rect)
@@ -725,8 +756,9 @@ class AnimEditorRenderMixin:
                          nrect, 1, border_radius=4)
         screen.blit(nt, (nrect.x + 10, nrect.y + 5))
 
-        hints = ("P/ESC: sair   Space: play/pause   "
-                 "< >: frame   R: reiniciar   H: esconder HUD")
+        hints = (f"[{self.preview_aspect}]  A: aspect   "
+                 "P/ESC: sair   Space: play/pause   "
+                 "< >: frame   R: reiniciar   H: HUD")
         ht = font.render(hints, True, (200, 200, 200))
         hrect = pygame.Rect(rect.right - ht.get_width() - 32,
                             rect.bottom - 32,

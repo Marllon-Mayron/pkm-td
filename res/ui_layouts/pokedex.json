@@ -1,0 +1,596 @@
+{
+  "name": "pokedex",
+  "design_size": [1280, 720],
+  "widgets": [
+    {
+      "id": "bg",
+      "type": "panel",
+      "z": 0,
+      "x": 0.5, "y": 0.5, "w": 1.0, "h": 1.0, "anchor": "c",
+      "fill_color": "#0A0C14",
+      "draw_border": false,
+      "draw_shadow": false,
+      "border_radius": 0
+    },
+    {
+      "id": "main_panel",
+      "type": "panel",
+      "z": 1,
+      "x": 0.5, "y": 0.5, "w": 0.98, "h": 0.96, "anchor": "c",
+      "fill_color": "#141824",
+      "fill_alpha": 252,
+      "border_color": "#2A3050",
+      "border_width": 2,
+      "border_radius": 14,
+      "padding": 8,
+      "draw_shadow": true,
+      "props": { "title": "" }
+    },
+
+    {
+      "id": "sidebar",
+      "type": "panel",
+      "parent_id": "main_panel",
+      "z": 2,
+      "x": 0.0, "y": 0.0, "w": 0.25, "h": 1.0, "anchor": "tl",
+      "fill_color": "#1A2030",
+      "border_color": "#2E3650",
+      "border_width": 2,
+      "border_radius": 10,
+      "draw_shadow": false
+    },
+    {
+      "id": "btn_back",
+      "type": "button",
+      "parent_id": "sidebar",
+      "z": 4,
+      "x": 0.05, "y": 0.02, "w": 0.30, "h": 0.055, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 12,
+      "fill_color": "#2A3040",
+      "border_color": "#3A4560",
+      "text_color": "#E8E8F0",
+      "border_width": 2, "border_radius": 6,
+      "props": { "label": "< VOLTAR", "style": "ghost", "on_click": "back" }
+    },
+    {
+      "id": "lbl_pokedex_title",
+      "type": "label",
+      "parent_id": "sidebar",
+      "z": 4,
+      "x": 0.36, "y": 0.02, "w": 0.60, "h": 0.055, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 18, "bold": true,
+      "text_color": "#F8B030",
+      "props": { "text": "POKEDEX", "align": "right" }
+    },
+    {
+      "id": "side_div",
+      "type": "divider",
+      "parent_id": "sidebar",
+      "z": 3,
+      "x": 0.5, "y": 0.09, "w": 0.9, "h": 0.003, "anchor": "tc",
+      "color": "#F8B030", "thickness": 2
+    },
+
+    {
+      "id": "lbl_region_title",
+      "type": "label",
+      "parent_id": "sidebar",
+      "z": 4,
+      "x": 0.05, "y": 0.12, "w": 0.9, "h": 0.03, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 11, "bold": true,
+      "text_color": "#8A8F9A",
+      "props": { "text": "REGIAO", "align": "left" }
+    },
+    {
+      "id": "dd_region",
+      "type": "dropdown",
+      "parent_id": "sidebar",
+      "z": 100,
+      "x": 0.05, "y": 0.155, "w": 0.9, "h": 0.055, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 12,
+      "text_color": "#F0F2F8",
+      "fill_color": "#1E2436",
+      "border_color": "#3A4560",
+      "props": {
+        "options": ["Todas"],
+        "value": "Todas",
+        "drop_dir": "down",
+        "on_change": "region_changed"
+      }
+    },
+
+    {
+      "id": "lbl_status_title",
+      "type": "label",
+      "parent_id": "sidebar",
+      "z": 4,
+      "x": 0.05, "y": 0.23, "w": 0.9, "h": 0.03, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 11, "bold": true,
+      "text_color": "#8A8F9A",
+      "props": { "text": "STATUS", "align": "left" }
+    },
+    {
+      "id": "dd_status",
+      "type": "dropdown",
+      "parent_id": "sidebar",
+      "z": 100,
+      "x": 0.05, "y": 0.265, "w": 0.9, "h": 0.055, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 12,
+      "text_color": "#F0F2F8",
+      "fill_color": "#1E2436",
+      "border_color": "#3A4560",
+      "props": {
+        "options": ["Todos"],
+        "value": "Todos",
+        "drop_dir": "down",
+        "on_change": "status_changed"
+      }
+    },
+
+    {
+      "id": "lbl_search_title",
+      "type": "label",
+      "parent_id": "sidebar",
+      "z": 4,
+      "x": 0.05, "y": 0.34, "w": 0.9, "h": 0.03, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 11, "bold": true,
+      "text_color": "#8A8F9A",
+      "props": { "text": "BUSCAR", "align": "left" }
+    },
+    {
+      "id": "search_panel",
+      "type": "panel",
+      "parent_id": "sidebar",
+      "z": 4,
+      "x": 0.05, "y": 0.375, "w": 0.9, "h": 0.055, "anchor": "tl",
+      "fill_color": "#10141E",
+      "border_color": "#3A4560",
+      "border_width": 2,
+      "border_radius": 6,
+      "draw_shadow": false
+    },
+    {
+      "id": "lbl_search_text",
+      "type": "label",
+      "parent_id": "search_panel",
+      "z": 5,
+      "x": 0.03, "y": 0.5, "w": 0.94, "h": 0.8, "anchor": "cl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 12, "bold": true,
+      "text_color": "#5A6070",
+      "props": { "text": "Buscar...", "align": "left" }
+    },
+
+    {
+      "id": "stats_div",
+      "type": "divider",
+      "parent_id": "sidebar",
+      "z": 3,
+      "x": 0.5, "y": 0.46, "w": 0.9, "h": 0.003, "anchor": "tc",
+      "color": "#2E3650", "thickness": 1
+    },
+    {
+      "id": "lbl_stats_title",
+      "type": "label",
+      "parent_id": "sidebar",
+      "z": 4,
+      "x": 0.5, "y": 0.485, "w": 0.9, "h": 0.03, "anchor": "tc",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 11, "bold": true,
+      "text_color": "#F8B030",
+      "props": { "text": "ESTATISTICAS", "align": "center" }
+    },
+    {
+      "id": "stats_card",
+      "type": "panel",
+      "parent_id": "sidebar",
+      "z": 3,
+      "x": 0.5, "y": 0.525, "w": 0.9, "h": 0.28, "anchor": "tc",
+      "fill_color": "#10141E",
+      "border_color": "#2E3650",
+      "border_width": 2,
+      "border_radius": 8,
+      "draw_shadow": false
+    },
+    {
+      "id": "lbl_stat_total",
+      "type": "label",
+      "parent_id": "stats_card",
+      "z": 4,
+      "x": 0.06, "y": 0.08, "w": 0.88, "h": 0.22, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 12, "bold": true,
+      "text_color": "#A0A5B0",
+      "props": { "text": "Total: 0", "align": "left" }
+    },
+    {
+      "id": "lbl_stat_seen",
+      "type": "label",
+      "parent_id": "stats_card",
+      "z": 4,
+      "x": 0.06, "y": 0.40, "w": 0.88, "h": 0.22, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 12, "bold": true,
+      "text_color": "#A0A5B0",
+      "props": { "text": "Vistos: 0", "align": "left" }
+    },
+    {
+      "id": "lbl_stat_caught",
+      "type": "label",
+      "parent_id": "stats_card",
+      "z": 4,
+      "x": 0.06, "y": 0.72, "w": 0.88, "h": 0.22, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 12, "bold": true,
+      "text_color": "#64DC64",
+      "props": { "text": "Capturados: 0", "align": "left" }
+    },
+    {
+      "id": "lbl_hint",
+      "type": "label",
+      "parent_id": "sidebar",
+      "z": 4,
+      "x": 0.5, "y": 0.945, "w": 0.9, "h": 0.045, "anchor": "tc",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 9, "bold": true,
+      "text_color": "#5A6070",
+      "text_fit": "shrink_wrap", "min_font_size": 7,
+      "props": { "text": "ESC voltar  |  P pausar", "align": "center" }
+    },
+
+    {
+      "id": "content_panel",
+      "type": "panel",
+      "parent_id": "main_panel",
+      "z": 2,
+      "x": 0.255, "y": 0.0, "w": 0.745, "h": 1.0, "anchor": "tl",
+      "fill_color": "#10141E",
+      "border_color": "#2E3650",
+      "border_width": 2,
+      "border_radius": 10,
+      "draw_shadow": false
+    },
+
+    {
+      "id": "list_panel",
+      "type": "panel",
+      "parent_id": "content_panel",
+      "z": 3,
+      "x": 0.01, "y": 0.01, "w": 0.46, "h": 0.98, "anchor": "tl",
+      "fill_color": "#141824",
+      "border_color": "#2E3650",
+      "border_width": 2,
+      "border_radius": 8,
+      "padding": 6,
+      "draw_shadow": false
+    },
+    {
+      "id": "lbl_list_header",
+      "type": "label",
+      "parent_id": "list_panel",
+      "z": 4,
+      "x": 0.02, "y": 0.0, "w": 1.0, "h": 0.04, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 11, "bold": true,
+      "text_color": "#F8B030",
+      "props": { "text": "POKEMON", "align": "left" }
+    },
+    {
+      "id": "pokemon_grid",
+      "type": "card_grid",
+      "parent_id": "list_panel",
+      "z": 5,
+      "x": 0.0, "y": 0.05, "w": 0.94, "h": 0.95, "anchor": "tl",
+      "fill_color": "#141824", "fill_alpha": 0,
+      "border_width": 0,
+      "draw_shadow": false,
+      "cols": 1, "rows": 8,
+      "cell_gap": 2,
+      "padding": 0,
+      "show_scrollbar": true,
+      "scrollbar_width": 10,
+      "scrollbar_color": "#F8B030",
+      "scrollbar_bg": "#1A2030",
+      "scrollbar_radius": 5,
+      "props": {
+        "items": [],
+        "on_select": "pokemon_selected",
+        "card_layout": [
+          {
+            "id": "card_bg", "type": "panel", "z": 0,
+            "x": 0, "y": 0, "w": 0.94, "h": 1, "anchor": "tl",
+            "fill_color": "{item.bg_color}",
+            "border_color": "{item.border_color}",
+            "border_width": 1,
+            "border_radius": 4,
+            "draw_shadow": false
+          },
+          {
+            "id": "card_portrait", "type": "image", "z": 1,
+            "x": 0.005, "y": 0, "w": 0.24, "h": 1, "anchor": "tl",
+            "surface": "{item.portrait}",
+            "bg_image_mode": "contain",
+            "pixel_art": true
+          },
+          {
+            "id": "card_id", "type": "label", "z": 2,
+            "x": 0.27, "y": 0.06, "w": 0.36, "h": 0.22, "anchor": "tl",
+            "text": "{item.display_id}",
+            "font_name": "pokemon-firered-leafgreen-font-recreation",
+            "font_size": 9, "bold": true,
+            "text_color": "#8A8F9A",
+            "align": "left"
+          },
+          {
+            "id": "card_name", "type": "label", "z": 2,
+            "x": 0.27, "y": 0.28, "w": 0.36, "h": 0.42, "anchor": "tl",
+            "text": "{item.display_name}",
+            "font_name": "pokemon-firered-leafgreen-font-recreation",
+            "font_size": 12, "bold": true,
+            "text_color": "{item.name_color}",
+            "text_fit": "shrink", "min_font_size": 8,
+            "align": "left"
+          },
+          {
+            "id": "card_status", "type": "label", "z": 2,
+            "x": 0.27, "y": 0.72, "w": 0.36, "h": 0.22, "anchor": "tl",
+            "text": "{item.status_text}",
+            "font_name": "pokemon-firered-leafgreen-font-recreation",
+            "font_size": 8, "bold": true,
+            "text_color": "{item.status_color}",
+            "align": "left"
+          },
+          {
+            "id": "card_type_icon_1", "type": "image", "z": 2,
+            "x": 0.68, "y": 0.5, "w": 0.11, "h": 0.82, "anchor": "cl",
+            "surface": "{item.type_icon}",
+            "bg_image_mode": "contain",
+            "pixel_art": true
+          },
+          {
+            "id": "card_type_icon_2", "type": "image", "z": 2,
+            "x": 0.80, "y": 0.5, "w": 0.11, "h": 0.82, "anchor": "cl",
+            "surface": "{item.type_icon_2}",
+            "bg_image_mode": "contain",
+            "pixel_art": true
+          },
+          {
+            "id": "card_sel", "type": "panel", "z": 10,
+            "x": 0, "y": 0, "w": 0.94, "h": 1, "anchor": "tl",
+            "fill_alpha": 0,
+            "draw_border": true,
+            "border_color": "#F8B030",
+            "border_width": 2,
+            "border_radius": 4,
+            "draw_shadow": false,
+            "visible": "{item.is_selected}"
+          }
+        ]
+      }
+    },
+
+    {
+      "id": "detail_panel",
+      "type": "panel",
+      "parent_id": "content_panel",
+      "z": 3,
+      "x": 0.48, "y": 0.01, "w": 0.51, "h": 0.98, "anchor": "tl",
+      "fill_color": "#141824",
+      "border_color": "#2E3650",
+      "border_width": 2,
+      "border_radius": 8,
+      "draw_shadow": false
+    },
+
+    {
+      "id": "sprite_wrap",
+      "type": "panel",
+      "parent_id": "detail_panel",
+      "z": 4,
+      "x": 0.02, "y": 0.02, "w": 0.96, "h": 0.44, "anchor": "tl",
+      "fill_color": "#0A0C14",
+      "border_color": "#2E3650",
+      "border_width": 2,
+      "border_radius": 10,
+      "draw_shadow": false
+    },
+    {
+      "id": "detail_sprite",
+      "type": "image",
+      "parent_id": "sprite_wrap",
+      "z": 5,
+      "x": 0.5, "y": 0.45, "w": 0.85, "h": 0.76, "anchor": "c",
+      "bg_image_mode": "contain",
+      "pixel_art": true
+    },
+    {
+      "id": "lbl_sprite_info",
+      "type": "label",
+      "parent_id": "sprite_wrap",
+      "z": 6,
+      "x": 0.03, "y": 0.03, "w": 0.5, "h": 0.10, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 9, "bold": true,
+      "text_color": "#8A8F9A",
+      "props": { "text": "", "align": "left" }
+    },
+    {
+      "id": "btn_toggle",
+      "type": "button",
+      "parent_id": "sprite_wrap",
+      "z": 6,
+      "x": 0.98, "y": 0.06, "w": 0.24, "h": 0.13, "anchor": "tr",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 10,
+      "fill_color": "#2A3040",
+      "border_color": "#3A4560",
+      "text_color": "#F0F2F8",
+      "border_width": 2, "border_radius": 5,
+      "props": { "label": "INMAP", "style": "ghost", "on_click": "toggle_view" }
+    },
+    {
+      "id": "lbl_inmap_dir",
+      "type": "label",
+      "parent_id": "sprite_wrap",
+      "z": 7,
+      "x": 0.03, "y": 0.82, "w": 0.32, "h": 0.14, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 12, "bold": true,
+      "text_color": "#F8B030",
+      "props": { "text": "", "align": "left" }
+    },
+    {
+      "id": "lbl_inmap_frame",
+      "type": "label",
+      "parent_id": "sprite_wrap",
+      "z": 7,
+      "x": 0.97, "y": 0.82, "w": 0.32, "h": 0.14, "anchor": "tr",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 10, "bold": true,
+      "text_color": "#8A8F9A",
+      "props": { "text": "", "align": "right" }
+    },
+    {
+      "id": "inmap_progress",
+      "type": "progress",
+      "parent_id": "sprite_wrap",
+      "z": 7,
+      "x": 0.03, "y": 0.92, "w": 0.94, "h": 0.06, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "props": {
+        "value": 0,
+        "max_value": 1,
+        "min_value": 0,
+        "show_text": false,
+        "progress_bg": "#0A0C14",
+        "color_low": "#F8B030",
+        "color_mid": "#F8B030",
+        "color_high": "#F8B030",
+        "border_color": "#3A4560",
+        "border_width": 1,
+        "border_radius": 3,
+        "radius": 3
+      }
+    },
+
+    {
+      "id": "detail_name",
+      "type": "label",
+      "parent_id": "detail_panel",
+      "z": 4,
+      "x": 0.03, "y": 0.475, "w": 0.72, "h": 0.055, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 20, "bold": true,
+      "text_color": "#F0E6C8",
+      "text_fit": "shrink", "min_font_size": 12,
+      "props": { "text": "", "align": "left" }
+    },
+    {
+      "id": "detail_status",
+      "type": "badge",
+      "parent_id": "detail_panel",
+      "z": 4,
+      "x": 0.97, "y": 0.48, "w": 0.26, "h": 0.045, "anchor": "tr",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 10, "bold": true,
+      "props": {
+        "text": "VISTO",
+        "bg_color": "#4A80E8",
+        "badge_text_color": "#FFFFFF",
+        "badge_border_color": "#1A1E2E"
+      }
+    },
+
+    {
+      "id": "detail_type_1",
+      "type": "image",
+      "parent_id": "detail_panel",
+      "z": 4,
+      "x": 0.28, "y": 0.545, "w": 0.22, "h": 0.052, "anchor": "tl",
+      "bg_image_mode": "contain",
+      "pixel_art": true
+    },
+    {
+      "id": "detail_type_2",
+      "type": "image",
+      "parent_id": "detail_panel",
+      "z": 4,
+      "x": 0.51, "y": 0.545, "w": 0.22, "h": 0.052, "anchor": "tl",
+      "bg_image_mode": "contain",
+      "pixel_art": true
+    },
+
+    {
+      "id": "lbl_stats_header",
+      "type": "label",
+      "parent_id": "detail_panel",
+      "z": 4,
+      "x": 0.03, "y": 0.630, "w": 0.94, "h": 0.03, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 11, "bold": true,
+      "text_color": "#F8B030",
+      "props": { "text": "BASE STATS", "align": "left" }
+    },
+    {
+      "id": "stats_grid",
+      "type": "grid",
+      "parent_id": "detail_panel",
+      "z": 4,
+      "x": 0.03, "y": 0.665, "w": 0.94, "h": 0.245, "anchor": "tl",
+      "fill_color": "#141824", "fill_alpha": 0,
+      "border_width": 0,
+      "draw_shadow": false,
+      "props": {
+        "items": [0, 1, 2, 3, 4, 5],
+        "cols": 1, "rows": 6, "cell_gap": 3
+      }
+    },
+
+    {
+      "id": "btn_prev",
+      "type": "button",
+      "parent_id": "detail_panel",
+      "z": 4,
+      "x": 0.03, "y": 0.925, "w": 0.20, "h": 0.06, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 14,
+      "fill_color": "#2A3040",
+      "border_color": "#3A4560",
+      "text_color": "#F0F2F8",
+      "border_width": 2, "border_radius": 6,
+      "props": { "label": "<", "style": "ghost", "on_click": "prev_pokemon" }
+    },
+    {
+      "id": "btn_next",
+      "type": "button",
+      "parent_id": "detail_panel",
+      "z": 4,
+      "x": 0.97, "y": 0.925, "w": 0.20, "h": 0.06, "anchor": "tr",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 14,
+      "fill_color": "#2A3040",
+      "border_color": "#3A4560",
+      "text_color": "#F0F2F8",
+      "border_width": 2, "border_radius": 6,
+      "props": { "label": ">", "style": "ghost", "on_click": "next_pokemon" }
+    },
+    {
+      "id": "lbl_nav_counter",
+      "type": "label",
+      "parent_id": "detail_panel",
+      "z": 4,
+      "x": 0.5, "y": 0.94, "w": 0.30, "h": 0.04, "anchor": "tc",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 11, "bold": true,
+      "text_color": "#8A8F9A",
+      "props": { "text": "0 / 0", "align": "center" }
+    }
+  ]
+}

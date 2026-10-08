@@ -116,6 +116,9 @@ class PathTracker:
         if not state:
             return False, False
 
+        if getattr(enemy, '_capture_in_progress', False):
+            return False, False
+
         is_boss = getattr(enemy, 'is_boss', False)
 
         # ===== BOSS: PULA LÓGICA DE COMBATE =====

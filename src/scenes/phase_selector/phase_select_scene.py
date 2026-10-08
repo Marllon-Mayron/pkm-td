@@ -6,6 +6,7 @@ Tela de selecao de fases - Layout reformulado com REGIOES
 import pygame
 import math
 
+from scenes.pokedex_scene.pokedex_scene import PokedexScene
 from src.scenes.base_scene import BaseScene
 from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
 from src.config.progress import progress_manager
@@ -13,7 +14,6 @@ from src.config.phase_catalog import phase_catalog
 from src.config.global_settings import DEBUG_MODE
 from src.scenes.incubator_scene.incubator_scene import IncubatorScene
 from src.scenes.shop_scene.shop_scene import ShopScene
-from src.scenes.pokedex_scene import PokedexScene
 from src.scenes.achievement_scene.achievement_scene import AchievementScene
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 

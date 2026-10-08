@@ -21,6 +21,7 @@ from src.entities.pokemon.rendering import PokemonRendering
 from src.managers.notification_manager import notification_manager
 from src.ui.toast_renderer import toast_battle
 from src.ui.utils.icon_loader import get_held_icon
+from src.ui.utils.icon_loader import ingame_icon_loader
 
 # Cache global de sprites e fontes para reduzir recriação
 _SPRITE_CACHE = {}
@@ -127,16 +128,13 @@ class Pokemon(Entity):
 
         # ===== 8. BOSS: AUMENTA LEVEL E RECALCULA =====
         if is_boss:
-            self.level = self.base_level + 3
-            self.stats.calculate_stats()
-
             # ===== HP DO BOSS: multiplicador configurável =====
             BOSS_HP_MULTIPLIER = 4  # era 2
             self.max_hp = int(self.max_hp * BOSS_HP_MULTIPLIER)
 
             self.current_hp = self.max_hp
-            self.defense = int(self.defense * 4)
-            self.sp_defense = int(self.sp_defense * 4)
+            self.defense = int(self.defense * 2)
+            self.sp_defense = int(self.sp_defense * 2)
             self.defense_value = self._calculate_defense()
 
             toast_battle(
@@ -404,6 +402,9 @@ class Pokemon(Entity):
 
     def take_damage(self, damage, attacker=None):
         """Recebe dano e registra contribuição - delega para combat"""
+        # ===== CAPTURA EM ANDAMENTO: INVULNERÁVEL =====
+        if getattr(self, '_capture_in_progress', False):
+            return False
         # Registra a contribuição ANTES de delegar
         if attacker and self.is_wild:
             self.register_damage(attacker, min(damage, self.current_hp))
@@ -612,184 +613,246 @@ class Pokemon(Entity):
         return self.rendering.render_sprite(screen, sprite, screen_x, screen_y, zoom_scale)
 
     def _render_hp_bar(self, screen, sprite_rect, zoom_scale):
-        """Renderiza barra de HP - offset relativo ao tamanho do sprite"""
-        hp_percent = self.current_hp / self.max_hp
+        """
+        Renderiza a barra de HP com ícones.
 
-        # Tamanho da barra em pixels do mundo
-        bar_width = self.hp_bar_width
-        bar_height = self.hp_bar_height
+        Layout:
+            [captura]  [======== HP ========]  [held]
+        """
+        if sprite_rect is None:
+            return
+        if self.max_hp <= 0:
+            return
 
-        # ===== POSICIONAMENTO RELATIVO AO TAMANHO DO SPRITE =====
-        sprite_height = sprite_rect.height
-        relative_offset = -sprite_height * 0.35
+        hp_percent = max(0.0, min(1.0, self.current_hp / self.max_hp))
 
-        # Escala para a tela
-        if hasattr(self, 'screen_manager') and hasattr(self, 'camera'):
-            render_scale = self.screen_manager.render_scale
-            camera_zoom = self.camera.zoom if self.camera else 1.0
-            total_scale = render_scale * camera_zoom
+        # ===== ESCALA =====
+        try:
+            sm = getattr(self, 'screen_manager', None)
+            cam = getattr(self, 'camera', None)
+            if sm is not None and hasattr(sm, 'render_scale'):
+                render_scale = float(getattr(sm, 'render_scale', 1.0) or 1.0)
+                camera_zoom = float(getattr(cam, 'zoom', 1.0)) if cam else 1.0
+                total_scale = render_scale * camera_zoom
+            else:
+                total_scale = float(zoom_scale) if zoom_scale else 1.0
+        except Exception:
+            total_scale = float(zoom_scale) if zoom_scale else 1.0
 
-            screen_bar_width = int(bar_width * total_scale)
-            screen_bar_height = max(3, int(bar_height * total_scale))
+        if total_scale <= 0:
+            total_scale = 1.0
 
-            bar_x = sprite_rect.centerx - screen_bar_width // 2
-            bar_y = sprite_rect.top + relative_offset
+        # ===== DIMENSÕES DA BARRA =====
+        base_w = int(getattr(self, 'hp_bar_width', 48))
+        base_h = int(getattr(self, 'hp_bar_height', 5))
 
-            # ===== ÍCONE DE ITEM SEGURÁVEL (ao lado da HP) =====
-            if hasattr(self, 'held_item') and self.held_item:
-                icon = get_held_icon()
-                if icon:
-                    # Tamanho reduzido pela metade
-                    icon_size = max(6, int(8 * total_scale))
-                    icon_scaled = pygame.transform.scale(icon, (icon_size, icon_size))
+        bar_w = max(8, int(base_w * total_scale))
+        bar_h = max(3, int(base_h * total_scale))
 
-                    icon_x = bar_x + screen_bar_width + 3
-                    icon_y = bar_y - (icon_size - screen_bar_height) // 2
+        # ===== POSIÇÃO Y =====
+        gap_hp = max(4, int(5 * total_scale))
+        bar_x = sprite_rect.centerx - bar_w // 2
+        bar_y = sprite_rect.top - gap_hp - bar_h
 
-                    bg_rect = pygame.Rect(icon_x - 1, icon_y - 1, icon_size + 2, icon_size + 2)
-                    pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect, border_radius=2)
-                    pygame.draw.rect(screen, (255, 215, 0, 150), bg_rect, 1, border_radius=2)
+        # ===== ÍCONE DE CAPTURA (ESQUERDA — só selvagem) =====
+        try:
+            if getattr(self, 'is_wild', False):
+                icon_size = max(4, int(6 * total_scale))
+                gap_icon = max(2, int(3 * total_scale))
 
-                    screen.blit(icon_scaled, (icon_x, icon_y))
+                is_caught = self._is_player_caught()
+                icon_name = "capturado" if is_caught else "nao_capturado"
 
-        else:
-            screen_bar_width = int(bar_width * zoom_scale)
-            screen_bar_height = max(3, int(bar_height * zoom_scale))
-            bar_x = sprite_rect.centerx - screen_bar_width // 2
-            bar_y = sprite_rect.top + relative_offset
+                original = ingame_icon_loader.get(icon_name)
+                if original is not None:
+                    # pixel perfect
+                    icon_surf = pygame.transform.scale(
+                        original, (icon_size, icon_size)
+                    )
+                    icon_x = bar_x - icon_size - gap_icon
+                    icon_y = bar_y + (bar_h - icon_size) // 2
+                    screen.blit(icon_surf, (icon_x, icon_y))
+        except Exception as e:
+            print(f"[POKEMON] _render_hp_bar (capture icon) erro: {e}")
 
-            # ===== ÍCONE DE ITEM SEGURÁVEL (fallback sem camera) =====
-            if hasattr(self, 'held_item') and self.held_item:
-                icon = get_held_icon()
-                if icon:
-                    icon_size = max(12, int(16 * zoom_scale))
-                    icon_scaled = pygame.transform.scale(icon, (icon_size, icon_size))
-                    icon_x = bar_x + screen_bar_width + 4
-                    icon_y = bar_y - (icon_size - screen_bar_height) // 2
+        # ===== BARRA DE HP =====
+        pygame.draw.rect(screen, (60, 60, 60),
+                         (bar_x, bar_y, bar_w, bar_h))
 
-                    bg_rect = pygame.Rect(icon_x - 1, icon_y - 1, icon_size + 2, icon_size + 2)
-                    pygame.draw.rect(screen, (0, 0, 0, 180), bg_rect, border_radius=3)
-                    pygame.draw.rect(screen, (255, 215, 0, 150), bg_rect, 1, border_radius=3)
-
-                    screen.blit(icon_scaled, (icon_x, icon_y))
-
-        # Fundo da barra
-        pygame.draw.rect(screen, (60, 60, 60), (bar_x, bar_y, screen_bar_width, screen_bar_height))
-
-        # Cor da barra
-        if self.is_boss:
+        if getattr(self, 'is_boss', False):
             color = (0, 0, 255)
+        elif getattr(self, 'is_shiny', False):
+            color = (255, 0, 0)
         else:
-            if not self.is_shiny:
-                if hp_percent > 0.5:
-                    color = (0, 200, 0)
-                elif hp_percent > 0.25:
-                    color = (255, 255, 0)
-                else:
-                    color = (255, 0, 0)
+            if hp_percent > 0.5:
+                color = (0, 200, 0)
+            elif hp_percent > 0.25:
+                color = (255, 255, 0)
             else:
                 color = (255, 0, 0)
 
-        progress_width = int(screen_bar_width * hp_percent)
+        progress_width = int(bar_w * hp_percent)
         if progress_width > 0:
-            pygame.draw.rect(screen, color, (bar_x, bar_y, progress_width, screen_bar_height))
+            pygame.draw.rect(screen, color,
+                             (bar_x, bar_y, progress_width, bar_h))
 
-        # Borda da barra
-        pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y, screen_bar_width, screen_bar_height), 1)
+        pygame.draw.rect(screen, (100, 100, 100),
+                         (bar_x, bar_y, bar_w, bar_h), 1)
+
+        # ===== ÍCONE DE HELD (DIREITA) =====
+        try:
+            if getattr(self, 'held_item', None):
+                held_icon = get_held_icon()
+                if held_icon is not None:
+                    icon_size = max(4, int(6 * total_scale))
+                    gap_icon = max(2, int(3 * total_scale))
+
+                    scaled_icon = pygame.transform.scale(
+                        held_icon, (icon_size, icon_size)
+                    )
+                    icon_x = bar_x + bar_w + gap_icon
+                    icon_y = bar_y + (bar_h - icon_size) // 2
+                    screen.blit(scaled_icon, (icon_x, icon_y))
+        except Exception as e:
+            print(f"[POKEMON] _render_hp_bar (held icon) erro: {e}")
+
+    # ------------------------------------------------------------------
+    # Helper: player já capturou essa espécie?
+    # ------------------------------------------------------------------
+    def _is_player_caught(self) -> bool:
+        """
+        Verifica se o jogador já capturou essa espécie.
+
+        Tenta acessar o player por vários caminhos possíveis, porque
+        nem sempre `self.game_scene` está setado em selvagens.
+
+        Ordem:
+          1) self.game_scene.player.caught_pokemon
+          2) self.battle_system.game_scene.player.caught_pokemon
+          3) self.battle_system.player.caught_pokemon
+          4) self.battle_system.game_scene (sem .player mas com caught direto)
+        """
+        pid = getattr(self, 'id', None)
+        if pid is None:
+            return False
+
+        def _check(player):
+            if player is None:
+                return None
+            caught = getattr(player, 'caught_pokemon', None)
+            if caught is None:
+                return None
+            try:
+                return pid in caught
+            except Exception:
+                return None
+
+        # 1) game_scene direto
+        gs = getattr(self, 'game_scene', None)
+        r = _check(getattr(gs, 'player', None) if gs else None)
+        if r is not None:
+            return r
+
+        # 2) battle_system.game_scene
+        bs = getattr(self, 'battle_system', None)
+        if bs is not None:
+            gs2 = getattr(bs, 'game_scene', None)
+            r = _check(getattr(gs2, 'player', None) if gs2 else None)
+            if r is not None:
+                return r
+
+            # 3) battle_system.player
+            r = _check(getattr(bs, 'player', None))
+            if r is not None:
+                return r
+
+        # 4) Nada funcionou — assume não capturado
+        return False
 
     def _render_wild_text(self, screen, sprite_rect, zoom_scale):
         """
-        Renderiza nome e nível do Pokémon selvagem.
-        Offset relativo ao tamanho do sprite.
+        Renderiza nome + nível acima da HP bar.
+        Ancorado no topo do sprite com offsets absolutos para nunca
+        sobrepor a barra (mesmo com sprites pequenos).
         """
-        # ===== VERIFICAÇÃO DE SEGURANÇA =====
-        has_screen_manager = hasattr(self, 'screen_manager') and self.screen_manager is not None
-        has_camera = hasattr(self, 'camera') and self.camera is not None
+        if sprite_rect is None:
+            return
 
-        # ===== DADOS DO TEXTO =====
+        # ===== ESCALA =====
+        try:
+            sm = getattr(self, 'screen_manager', None)
+            cam = getattr(self, 'camera', None)
+            if sm is not None and hasattr(sm, 'render_scale'):
+                render_scale = float(getattr(sm, 'render_scale', 1.0) or 1.0)
+                camera_zoom = float(getattr(cam, 'zoom', 1.0)) if cam else 1.0
+                total_scale = render_scale * camera_zoom
+            else:
+                total_scale = float(zoom_scale) if zoom_scale else 1.0
+        except Exception:
+            total_scale = float(zoom_scale) if zoom_scale else 1.0
+
+        if total_scale <= 0:
+            total_scale = 1.0
+
+        # ===== DADOS =====
         name_text = f"{self.name} - "
         level_text = f"lv. {self.level:02d}"
 
-        # ===== CORES =====
         text_color = (255, 255, 255)
         outline_color = (0, 0, 0)
 
-        if self.is_shiny:
-            level_color = (255, 215, 0)  # Dourado para shiny
-        elif self.is_boss:
-            level_color = (255, 100, 100)  # Vermelho claro para boss
+        if getattr(self, 'is_shiny', False):
+            level_color = (255, 215, 0)
+        elif getattr(self, 'is_boss', False):
+            level_color = (255, 100, 100)
             text_color = (255, 100, 100)
         else:
             level_color = (255, 255, 255)
 
-        # ===== CALCULA ESCALA E TAMANHOS DE FONTE =====
-        if has_screen_manager and has_camera:
-            # Usa screen_manager e camera para escala precisa
-            render_scale = self.screen_manager.render_scale
-            camera_zoom = self.camera.zoom
-            total_scale = render_scale * camera_zoom
+        # ===== FONTES =====
+        name_font_size = max(9, int(11 * total_scale))
+        level_font_size = max(8, int(10 * total_scale))
 
-            base_name_font_size = 12
-            base_level_font_size = 11
-
-            name_font_size = max(10, int(base_name_font_size * total_scale))
-            level_font_size = max(9, int(base_level_font_size * total_scale))
-        else:
-            # Fallback: usa zoom_scale passado como parâmetro
-            total_scale = zoom_scale
-            name_font_size = max(10, int(12 * zoom_scale))
-            level_font_size = max(9, int(11 * zoom_scale))
-
-        # ===== CRIA FONTES =====
         name_font = self._get_font(name_font_size)
         level_font = self._get_font(level_font_size)
 
-        # ===== RENDERIZA TEXTOS COM CONTORNO =====
         name_surface = name_font.render(name_text, True, text_color)
         level_surface = level_font.render(level_text, True, level_color)
         name_outline = name_font.render(name_text, True, outline_color)
         level_outline = level_font.render(level_text, True, outline_color)
 
-        # ===== DIMENSÕES DOS TEXTOS =====
-        name_width = name_surface.get_width()
-        level_width = level_surface.get_width()
-        total_width = name_width + 2 + level_width
+        name_w = name_surface.get_width()
+        level_w = level_surface.get_width()
+        total_w = name_w + 2 + level_w
 
-        # ===== POSICIONAMENTO RELATIVO AO SPRITE =====
-        sprite_height = sprite_rect.height
+        # ===== POSIÇÃO Y — ACIMA DA HP BAR =====
+        # Replica o mesmo cálculo do _render_hp_bar
+        base_h = int(getattr(self, 'hp_bar_height', 5))
+        bar_h = max(3, int(base_h * total_scale))
+        gap_hp = max(4, int(5 * total_scale))
+        bar_y = sprite_rect.top - gap_hp - bar_h
 
-        # Offset relativo: 65% da altura do sprite acima do topo
-        # Ajustado para ficar acima da barra de HP (que está em -35%)
-        relative_offset = -sprite_height * 0.65
+        # Nome fica `gap_name` px ACIMA do topo da barra
+        gap_name = max(6, int(10 * total_scale))
+        text_bottom_y = bar_y - gap_name
+        text_y = text_bottom_y - name_surface.get_height()
 
-        # Posição na tela
-        screen_x = sprite_rect.centerx
-        screen_y = sprite_rect.top + relative_offset
+        # ===== POSIÇÃO X =====
+        start_x = sprite_rect.centerx - total_w // 2
+        name_x = start_x
+        level_x = start_x + name_w + 2
 
-        start_x = int(screen_x - total_width // 2)
-        text_y = int(screen_y)
-
-        name_x, name_y = start_x, text_y
-        level_x = start_x + name_width + 2
+        name_y = text_y
         level_y = text_y + (name_font_size - level_font_size)
 
-        # ===== DESENHA CONTORNO (4 direções) =====
-        for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+        # ===== CONTORNO (4 direções) =====
+        for dx, dy in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
             screen.blit(name_outline, (name_x + dx, name_y + dy))
             screen.blit(level_outline, (level_x + dx, level_y + dy))
 
-        # ===== DESENHA TEXTO PRINCIPAL =====
+        # ===== TEXTO PRINCIPAL =====
         screen.blit(name_surface, (name_x, name_y))
         screen.blit(level_surface, (level_x, level_y))
-
-        # ===== DEBUG: Mostra offset e escala se necessário =====
-        if hasattr(self, 'show_debug') and self.show_debug:
-            debug_font = self._get_font(10)
-            offset_info = debug_font.render(f"offset:{relative_offset:.0f}", True, (255, 255, 0))
-            screen.blit(offset_info, (screen_x - 40, sprite_rect.top - 50))
-
-            scale_info = debug_font.render(f"scale:{total_scale:.2f}", True, (255, 255, 0))
-            screen.blit(scale_info, (screen_x - 40, sprite_rect.top - 65))
 
     def _render_miss_text(self, screen, sprite_rect, zoom_scale):
         self.rendering.render_miss_text(screen, sprite_rect, zoom_scale)
@@ -1003,6 +1066,11 @@ class Pokemon(Entity):
             self.effect_manager = battle_system.effect_manager
             battle_system.effect_manager.register_pokemon(self)
 
+        if battle_system is not None:
+            gs = getattr(battle_system, 'game_scene', None)
+            if gs is not None:
+                self.game_scene = gs
+
     def heal(self, amount=None):
         if amount is None:
             self.current_hp = self.max_hp
@@ -1056,6 +1124,38 @@ class Pokemon(Entity):
     def reset_pp(self) -> int:
         """Reseta os PP de todos os moves para o máximo (100%)"""
         return self.restore_pp(percentage=1.0)
+
+    # ===== ITENS DE EV (Vitaminas / Reset) =====
+
+    def apply_ev_item(self, stat: str, amount: int) -> dict:
+        """
+        Aplica uma vitamina (EV Boost) ao Pokémon.
+        Retorna o dict do PokemonStats.add_evs_to_stat.
+        """
+        result = self.stats.add_evs_to_stat(stat, amount)
+        if result.get("success"):
+            self.add_happiness(2, f"Tomou vitamina ({stat})")
+        return result
+
+    def reset_all_evs(self) -> bool:
+        """
+        Zera TODOS os EVs do Pokémon (usado pelo item EV Reset ou pelo botão do modal).
+        Recalcula os stats e mantém o HP proporcional.
+        """
+        if self.stats.get_ev_total() == 0:
+            return False  # nada a fazer
+
+        # Guarda o % de HP para preservar a proporção após o recálculo
+        hp_ratio = self.current_hp / self.max_hp if self.max_hp > 0 else 1.0
+
+        self.stats.reset_evs()  # já recalcula internamente
+
+        # Ajusta o HP atual (não pode passar do novo max_hp)
+        if self.current_hp > 0:
+            new_hp = max(1, int(self.max_hp * hp_ratio))
+            self.current_hp = min(new_hp, self.max_hp)
+
+        return True
 
     def restore_moves(self, moves_data: list):
         """Restaura moves a partir de dados serializados"""
@@ -2002,6 +2102,7 @@ class Pokemon(Entity):
         self.spot_id = None
         self.is_moving = False
         self.is_placed = False
+        self.game_scene = game_scene
 
         # ===== LIMPA FLAG DE TELEPORT PENDENTE =====
         if hasattr(self, '_pending_teleport_to_spot'):
