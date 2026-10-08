@@ -12,16 +12,19 @@ Uso básico:
     )
 """
 from src.anim.animation import AnimDefinition
-from src.anim.layer import (
-    Keyframe, LayerDef, SpriteLayerDef, EmitterLayerDef, FilterLayerDef,
-)
 from src.anim.animator import Animator
 from src.anim.animation_manager import AnimationManager, animation_manager
 from src.anim.animation_registry import AnimationRegistry, animation_registry
 
+from src.anim.layer import (
+    Keyframe, LayerDef, SpriteLayerDef, EmitterLayerDef, FilterLayerDef,
+    MessageLayerDef,
+)
+
 __all__ = [
     "AnimDefinition",
-    "Keyframe", "LayerDef", "SpriteLayerDef", "EmitterLayerDef", "FilterLayerDef",
+    "Keyframe", "LayerDef", "SpriteLayerDef", "EmitterLayerDef",
+    "FilterLayerDef", "MessageLayerDef",
     "Animator",
     "AnimationManager", "animation_manager",
     "AnimationRegistry", "animation_registry",

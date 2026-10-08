@@ -28,6 +28,7 @@ from src.anim.animation import AnimDefinition
 from src.anim.actor import ActorDef, ActorKeyframe, ActorRuntime
 from src.anim.layer import (
     Keyframe, LayerDef, SpriteLayerDef, EmitterLayerDef, FilterLayerDef,
+    MessageLayerDef,
     _parse_hex_color, _to_hex_color,
 )
 from src.anim.camera import CameraDef, CameraKeyframe, CameraRuntime
@@ -138,6 +139,30 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         "kf_alpha": "Alpha",
         "kf_anim": "Anim", "kf_dir": "Dir",
         "size_px": "Tamanho (px)",
+
+        # ===== MESSAGE =====
+        "text": "Texto",
+        "text_speed": "Chars/s",
+        "start_delay": "Delay (f)",
+        "balloon_style": "Estilo",
+        "balloon_width": "Largura",
+        "balloon_height": "Altura",
+        "balloon_fill": "Cor fundo",
+        "balloon_border": "Cor borda",
+        "balloon_border_w": "Esp. borda",
+        "balloon_radius": "Raio",
+        "balloon_shadow": "Sombra",
+        "tail": "Seta",
+        "tail_x": "Pos seta",
+        "text_color": "Cor texto",
+        "font_path": "Fonte",
+        "font_size": "Tam. fonte",
+        "line_spacing": "Entre-linhas",
+        "padding": "Padding",
+        "text_align": "Alinhamento",
+        "show_prompt": "Mostrar seta",
+        "prompt_char": "Char seta",
+        "prompt_blink": "Piscar seta",
     }
 
     # =================================================================
@@ -213,7 +238,6 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         self.preview_hud_hidden = False
 
         # ==== estado do editor: travar / esconder ====
-        # Sets de (kind, obj_id): kind = "actor" | "layer"
         self._locked: set = set()
         self._hidden: set = set()
 
@@ -287,7 +311,6 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             snap = self.current_anim.to_dict()
         except Exception:
             return
-        # Evita duplicar o topo
         if self._undo_stack and self._undo_stack[-1] == snap:
             return
         self._undo_stack.append(snap)
@@ -327,7 +350,6 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         """Recria o current_anim a partir de um snapshot."""
         self.current_anim = AnimDefinition.from_dict(snap)
 
-        # corrige selecao se saiu de range
         if self.selection:
             kind, idx = self.selection
             if kind == "actor" and idx >= len(self.current_anim.actors):
@@ -335,11 +357,9 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             elif kind == "layer" and idx >= len(self.current_anim.layers):
                 self.selection = None
 
-        # limpa drags
         self._drag_actor = None
         self._drag_kf = None
 
-        # reseta o preview animator pra nao herdar cache de atores antigos
         if self._preview_animator is not None:
             self._preview_animator.stop()
         self._preview_animator = None
@@ -390,7 +410,6 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         self._layout_right_panel()
 
     def _hidden_actor_ids(self) -> set:
-        """Set de ids de atores escondidos (pro Animator filtrar)."""
         return {oid for (kind, oid) in self._hidden if kind == "actor"}
 
     def _is_hidden_layer(self, layer_id):
@@ -437,14 +456,15 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         x = r.x + 200
 
         row1 = (
-            ("novo",       "Novo",           60),
-            ("salvar",     "Salvar",         70),
-            ("abrir",      "Abrir",          60),
-            ("sep1",       "",               10),
-            ("add_actor",  "Adicionar Ator", 140),
-            ("add_sprite", "Sprite",         70),
-            ("add_emitter","Emitter",        78),
-            ("add_filter", "Filter",         68),
+            ("novo",        "Novo",           60),
+            ("salvar",      "Salvar",         70),
+            ("abrir",       "Abrir",          60),
+            ("sep1",        "",               10),
+            ("add_actor",   "Adicionar Ator", 140),
+            ("add_sprite",  "Sprite",         70),
+            ("add_emitter", "Emitter",        78),
+            ("add_filter",  "Filter",         68),
+            ("add_message", "Mensagem",       78),
         )
         for key, label, w in row1:
             if key.startswith("sep"):
@@ -461,21 +481,21 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         x = r.x + 200
 
         row2 = (
-            ("play",     "Play",     66),
-            ("stop",     "Stop",     60),
-            ("loop",     "Loop",     70),
-            ("sep2",     "",         10),
-            ("autokey",  "Auto-Key", 92),
-            ("onion",    "Onion",    76),
-            ("sep3",     "",         10),
-            ("zoom_out", "-",        30),
-            ("zoom_reset","100%",    58),
-            ("zoom_in",  "+",        30),
-            ("zoom_fit", "Fit",      44),
-            ("zoom_1_1", "1:1",      42),
-            ("sep4",     "",         10),
-            ("rescan",   "Re-Scan",  78),
-            ("log",      "Log",      50),
+            ("play",      "Play",     66),
+            ("stop",      "Stop",     60),
+            ("loop",      "Loop",     70),
+            ("sep2",      "",         10),
+            ("autokey",   "Auto-Key", 92),
+            ("onion",     "Onion",    76),
+            ("sep3",      "",         10),
+            ("zoom_out",  "-",        30),
+            ("zoom_reset","100%",     58),
+            ("zoom_in",   "+",        30),
+            ("zoom_fit",  "Fit",      44),
+            ("zoom_1_1",  "1:1",      42),
+            ("sep4",      "",         10),
+            ("rescan",    "Re-Scan",  78),
+            ("log",       "Log",      50),
         )
         for key, label, w in row2:
             if key.startswith("sep"):
@@ -608,6 +628,7 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             ("add_sprite",  "+ Sprite"),
             ("add_emitter", "+ Emitter"),
             ("add_filter",  "+ Filter"),
+            ("add_message", "+ Mensagem"),
             ("cam_kf_add",  "+ Keyframe da Camera"),
             ("cam_kf_del",  "- Keyframe da Camera"),
         ]
@@ -629,7 +650,7 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         if self.selected_actor() is not None:
             return ("actor", "actor_kf")
         if self.selected_layer() is not None:
-            return ("layer", "sheet", "layer_kf", "emitter")
+            return ("layer", "sheet", "layer_kf", "emitter", "message")
         return ("anim", "background", "camera", "sound")
 
     def _recalc_right_fields(self):
@@ -667,7 +688,7 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         actor = self.selected_actor()
         layer = self.selected_layer()
 
-        # ==== ANIMACAO / BACKGROUND / CAMERA / SOM (nada selecionado) ====
+        # ==== ANIMACAO / BACKGROUND / CAMERA / SOM ====
         if actor is None and layer is None:
             for key, kind in (
                     ("name", "text"), ("category", "choice"),
@@ -774,6 +795,33 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
                         ("fade_out", "bool"), ("tints", "text"),
                 ):
                     self.fields[("emitter", key)] = InlineField(key, kind)
+
+            elif isinstance(layer, MessageLayerDef):
+                for key, kind in (
+                        ("text", "text"),
+                        ("text_speed", "float"),
+                        ("start_delay", "int"),
+                        ("balloon_style", "choice"),
+                        ("balloon_width", "int"),
+                        ("balloon_height", "int"),
+                        ("balloon_fill", "text"),
+                        ("balloon_border", "text"),
+                        ("balloon_border_w", "int"),
+                        ("balloon_radius", "int"),
+                        ("balloon_shadow", "bool"),
+                        ("tail", "choice"),
+                        ("tail_x", "float"),
+                        ("text_color", "text"),
+                        ("font_path", "text"),
+                        ("font_size", "int"),
+                        ("line_spacing", "int"),
+                        ("padding", "int"),
+                        ("text_align", "choice"),
+                        ("show_prompt", "bool"),
+                        ("prompt_char", "text"),
+                        ("prompt_blink", "bool"),
+                ):
+                    self.fields[("message", key)] = InlineField(key, kind)
 
     def _selected_layer_keyframe(self):
         layer = self.selected_layer()
@@ -895,6 +943,18 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
                 if not isinstance(l, EmitterLayerDef):
                     return ""
                 return self._get_emitter_flat(l, key)
+
+            if group == "message":
+                l = self.selected_layer()
+                if not isinstance(l, MessageLayerDef):
+                    return ""
+                if key == "text":
+                    return (l.text or "").replace("\n", "|")
+                if key in ("balloon_fill", "balloon_border", "text_color"):
+                    return _to_hex_color(getattr(l, key))
+                if key in ("balloon_shadow", "show_prompt", "prompt_blink"):
+                    return "true" if getattr(l, key) else "false"
+                return getattr(l, key, "")
         return ""
 
     def _get_emitter_flat(self, layer, key):
@@ -934,7 +994,6 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         if bbox is None or bbox[2] <= 0 or bbox[3] <= 0:
             self.status_text = "Nao foi possivel medir o sprite."
             return
-        # Tamanho atual do bbox em pixels na tela
         current_scale = (rt.TARGET_BASE * a.display_scale
                         / max(bbox[2], bbox[3]))
         target_px = int(round(max(bbox[2], bbox[3]) * current_scale))
@@ -951,7 +1010,6 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         for (group, key), f in self.fields.items():
             if f is not field:
                 continue
-            # Snapshot ANTES da mutacao
             self._push_undo()
             try:
                 if group == "anim":
@@ -974,6 +1032,8 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
                     self._apply_layer_kf_field(key, field.buffer)
                 elif group == "emitter":
                     self._apply_emitter_field(key, field.buffer)
+                elif group == "message":
+                    self._apply_message_field(key, field.buffer)
                 self.logger.ok(f"{group}.{key} = {field.buffer!r}")
             except Exception as e:
                 self.logger.error(f"commit {group}.{key}: {e}")
@@ -1262,6 +1322,50 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             self._preview_animator._emitter_runners.clear()
 
     # =================================================================
+    # MESSAGE
+    # =================================================================
+    def _apply_message_field(self, key, value):
+        l = self.selected_layer()
+        if not isinstance(l, MessageLayerDef):
+            return
+
+        v = str(value)
+        _BOOL = ("1", "true", "yes", "on", "sim")
+
+        # ---------- Texto ----------
+        if key == "text":
+            # Aceita 3 formas de quebra no editor:
+            #   "|"    -> quebra (atalho visual rapido)
+            #   "\n"   -> quebra (2 chars literais)
+            #   "\\n"  -> quebra (JSON editado a mao)
+            s = (v.replace("\\\\n", "\n")
+                   .replace("\\n", "\n")
+                   .replace("|", "\n"))
+            l.text = s
+
+        # ---------- Cores (hex) ----------
+        elif key in ("balloon_fill", "balloon_border", "text_color"):
+            setattr(l, key, _parse_hex_color(v))
+
+        # ---------- Booleanos ----------
+        elif key in ("balloon_shadow", "show_prompt", "prompt_blink"):
+            setattr(l, key, v.strip().lower() in _BOOL)
+
+        # ---------- Floats ----------
+        elif key in ("text_speed", "tail_x"):
+            setattr(l, key, float(v))
+
+        # ---------- Ints ----------
+        elif key in ("start_delay", "balloon_width", "balloon_height",
+                     "balloon_border_w", "balloon_radius", "font_size",
+                     "line_spacing", "padding"):
+            setattr(l, key, int(float(v)))
+
+        # ---------- Strings (estilo, tail, alinhamento, fonte...) ----------
+        else:
+            setattr(l, key, v)
+
+    # =================================================================
     # PREVIEW ANIMATOR
     # =================================================================
     def _ensure_preview_animator(self):
@@ -1486,7 +1590,6 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             self._on_frame_changed()
             return True
 
-        # UNDO / REDO
         if ctrl and event.key == pygame.K_z:
             if shift:
                 self._redo()
@@ -1657,6 +1760,8 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
                 self._add_layer_of_type("emitter")
             elif name == "add_filter":
                 self._add_layer_of_type("filter")
+            elif name == "add_message":
+                self._add_layer_of_type("message")
             return True
         return False
 
@@ -1667,7 +1772,6 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
         if not self.left_rect.collidepoint(pos):
             return False
 
-        # Toggle lock/hide primeiro
         for kind, obj_id, flag, rect in self._left_toggle_rects:
             if rect.collidepoint(pos):
                 if flag == "lock":
@@ -1727,6 +1831,8 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             self._add_layer_of_type("emitter")
         elif name == "add_filter":
             self._add_layer_of_type("filter")
+        elif name == "add_message":
+            self._add_layer_of_type("message")
         elif name == "actor_kf_add":
             self._actor_kf_add()
         elif name == "actor_kf_del":
@@ -1785,7 +1891,6 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             actor = self.current_anim.actors[hit]
             rt = self._actor_runtime(actor)
             props = rt.eval_at(self.current_frame)
-            # Snapshot ANTES do drag (o drag vai mutar keyframes)
             self._push_undo()
             self._drag_actor = {
                 "idx": hit,
@@ -1839,7 +1944,6 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             enumerate(self.current_anim.actors),
             key=lambda t: -getattr(t[1], "z", 0))
         for idx, actor in actors:
-            # Pula travados e escondidos
             if self.is_locked("actor", actor.id):
                 continue
             if self.is_hidden("actor", actor.id):
@@ -1941,7 +2045,6 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             self._undo_stack.clear()
             self._redo_stack.clear()
 
-            # Reseta preview animator
             if self._preview_animator is not None:
                 self._preview_animator.stop()
             self._preview_animator = None
@@ -2101,6 +2204,32 @@ class AnimEditorController(AnimEditorRenderMixin, BaseScene):
             new = FilterLayerDef(
                 **base, color=(0, 0, 0), alpha=140,
                 fade_in_frames=10, fade_out_frames=20)
+        elif ttype == "message":
+            new = MessageLayerDef(
+                **base,
+                text="Ola!\\nEscreva o dialogo aqui.",
+                text_speed=25.0,
+                start_delay=10,
+                balloon_style="firered",
+                balloon_width=320,
+                balloon_height=100,
+                balloon_fill=(248, 248, 248),
+                balloon_border=(48, 48, 96),
+                balloon_border_w=3,
+                balloon_radius=8,
+                balloon_shadow=True,
+                tail="down",
+                tail_x=0.5,
+                text_color=(40, 40, 40),
+                font_path="pokemon-firered-leafgreen-font-recreation.ttf",
+                font_size=22,
+                line_spacing=4,
+                padding=12,
+                text_align="left",
+                show_prompt=True,
+                prompt_char="\u25BC",
+                prompt_blink=True,
+            )
         else:
             return
 

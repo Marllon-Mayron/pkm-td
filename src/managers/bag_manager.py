@@ -89,6 +89,26 @@ class BagManager:
             return self.catalog.get_item(item_id)
         return None
 
+    def get_all_items_for_render(self):
+        """
+        Retorna TODOS os itens do inventário, IGNORANDO o filtro de categoria
+        da mochila. Deve ser usado por telas que NÃO são a mochila da fase
+        (ex: Loja), para não herdar o filtro que o jogador deixou ativo.
+        """
+        items_for_render = []
+        for i, (item_id, quantity) in enumerate(self.items.items()):
+            item_data = self.catalog.get_item(item_id)
+            if not item_data:
+                continue
+            items_for_render.append({
+                "id": item_id,
+                "data": item_data,
+                "quantity": quantity,
+                "selected": False,
+                "index": i,
+            })
+        return items_for_render
+
     def _update_filtered_items(self):
         """Atualiza a lista de itens filtrada por categoria"""
         all_items = list(self.items.keys())

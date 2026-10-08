@@ -79,6 +79,37 @@ class LayerDef:
             aim_at=str(d.get("aim_at", "")),
         )
 
+        if lt == "message":
+            return MessageLayerDef(
+                **base,
+                text=str(d.get("text", "")),
+                text_speed=float(d.get("text_speed", 28.0)),
+                start_delay=int(d.get("start_delay", 0)),
+                balloon_style=str(d.get("balloon_style", "firered")),
+                balloon_width=int(d.get("balloon_width", 340)),
+                balloon_height=int(d.get("balloon_height", 100)),
+                balloon_fill=_parse_hex_color(
+                    d.get("balloon_fill", "#F8F8F8")),
+                balloon_border=_parse_hex_color(
+                    d.get("balloon_border", "#303060")),
+                balloon_border_w=int(d.get("balloon_border_w", 3)),
+                balloon_radius=int(d.get("balloon_radius", 8)),
+                balloon_shadow=bool(d.get("balloon_shadow", True)),
+                tail=str(d.get("tail", "down")),
+                tail_x=float(d.get("tail_x", 0.5)),
+                text_color=_parse_hex_color(
+                    d.get("text_color", "#282828")),
+                font_path=str(d.get("font_path",
+                    "pokemon-firered-leafgreen-font-recreation.ttf")),
+                font_size=int(d.get("font_size", 22)),
+                line_spacing=int(d.get("line_spacing", 4)),
+                padding=int(d.get("padding", 12)),
+                text_align=str(d.get("text_align", "left")),
+                show_prompt=bool(d.get("show_prompt", False)),
+                prompt_char=str(d.get("prompt_char", "▼")),
+                prompt_blink=bool(d.get("prompt_blink", True)),
+            )
+
         if lt == "sprite":
             return SpriteLayerDef(
                 **base,
@@ -213,3 +244,75 @@ def _parse_hex_color(s) -> tuple:
 def _to_hex_color(rgb) -> str:
     r, g, b = int(rgb[0]) & 0xFF, int(rgb[1]) & 0xFF, int(rgb[2]) & 0xFF
     return f"#{r:02X}{g:02X}{b:02X}"
+
+# =====================================================================
+# LAYER: MESSAGE (balão de diálogo estilo Pokémon)
+# =====================================================================
+@dataclass
+class MessageLayerDef(LayerDef):
+    # ----- Texto -----
+    text: str = ""
+    text_speed: float = 28.0          # chars por segundo
+    start_delay: int = 0              # frames antes de começar a digitar
+
+    # ----- Balão -----
+    balloon_style: str = "firered"    # firered | ruby | plain | none
+    balloon_width: int = 340
+    balloon_height: int = 100
+    balloon_fill: tuple = (248, 248, 248)
+    balloon_border: tuple = (48, 48, 96)
+    balloon_border_w: int = 3
+    balloon_radius: int = 8
+    balloon_shadow: bool = True
+
+    # ----- Seta (tail) -----
+    tail: str = "down"                # none | down | up | left | right
+    tail_x: float = 0.5               # 0..1 ao longo da borda
+
+    # ----- Texto -----
+    text_color: tuple = (40, 40, 40)
+    font_path: str = "pokemon-firered-leafgreen-font-recreation.ttf"
+    font_size: int = 22
+    line_spacing: int = 4
+    padding: int = 12
+    text_align: str = "left"          # left | center | right
+
+    # ----- Prompt (▼ piscante) -----
+    show_prompt: bool = False
+    prompt_char: str = "▼"
+    prompt_blink: bool = True
+
+    def __post_init__(self):
+        # Normaliza: qualquer "\n" literal vira newline real.
+        if self.text:
+            self.text = (self.text
+                         .replace("\\\\n", "\n")
+                         .replace("\\n", "\n"))
+
+    def to_dict(self) -> dict:
+        d = self.base_dict()
+        d.update({
+            "text": self.text,
+            "text_speed": self.text_speed,
+            "start_delay": self.start_delay,
+            "balloon_style": self.balloon_style,
+            "balloon_width": self.balloon_width,
+            "balloon_height": self.balloon_height,
+            "balloon_fill": _to_hex_color(self.balloon_fill),
+            "balloon_border": _to_hex_color(self.balloon_border),
+            "balloon_border_w": self.balloon_border_w,
+            "balloon_radius": self.balloon_radius,
+            "balloon_shadow": self.balloon_shadow,
+            "tail": self.tail,
+            "tail_x": self.tail_x,
+            "text_color": _to_hex_color(self.text_color),
+            "font_path": self.font_path,
+            "font_size": self.font_size,
+            "line_spacing": self.line_spacing,
+            "padding": self.padding,
+            "text_align": self.text_align,
+            "show_prompt": self.show_prompt,
+            "prompt_char": self.prompt_char,
+            "prompt_blink": self.prompt_blink,
+        })
+        return d

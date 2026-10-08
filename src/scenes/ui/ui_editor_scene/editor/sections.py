@@ -24,6 +24,12 @@ SLOT_SHAPES = ["star", "circle", "square", "diamond", "triangle",
 SLOT_ORIENT_OPTIONS = ["horizontal", "vertical"]
 
 TEXT_FIT_OPTIONS = ["none", "shrink", "wrap", "ellipsis", "shrink_wrap"]
+
+LAYER_TYPES = ["sprite", "emitter", "filter", "message"]
+
+MESSAGE_STYLES = ["firered", "ruby", "plain", "none"]
+MESSAGE_TAILS = ["none", "down", "up", "left", "right"]
+TEXT_ALIGNS = ["left", "center", "right"]
 # =====================================================================
 # Tipos e rótulos de campo
 # =====================================================================
@@ -103,6 +109,32 @@ FIELD_TYPES = {
 
     "text_fit": "choice",
     "min_font_size": "int",
+
+    "card_layout": "json_text",
+
+    # ----- MESSAGE -----
+    "text": "Texto",
+    "text_speed": "Chars/s",
+    "start_delay": "Delay (f)",
+    "balloon_style": "Estilo",
+    "balloon_width": "Largura",
+    "balloon_height": "Altura",
+    "balloon_fill": "Cor fundo",
+    "balloon_border": "Cor borda",
+    "balloon_border_w": "Esp. borda",
+    "balloon_radius": "Raio",
+    "balloon_shadow": "Sombra",
+    "tail": "Seta",
+    "tail_x": "Pos seta",
+    "text_color": "Cor texto",
+    "font_path": "Fonte",
+    "font_size": "Tam. fonte",
+    "line_spacing": "Entre-linhas",
+    "padding": "Padding",
+    "text_align": "Alinhamento",
+    "show_prompt": "Mostrar ▼",
+    "prompt_char": "Char ▼",
+    "prompt_blink": "Piscar ▼",
 }
 
 FIELD_LABELS = {
@@ -162,6 +194,7 @@ FIELD_LABELS = {
     "icon_tint": "Tint no icone",
     "text_fit": "Ajuste de texto",
     "min_font_size": "Tam. minimo",
+    "card_layout": "Layout do card (JSON)",
 }
 
 # =====================================================================
@@ -203,6 +236,18 @@ ICON_SECTION   = ("icon", "ICONE",
 
 def sections_for_type(wtype):
     base = [IDENTITY, POSITION]
+
+    if wtype == "card_grid":
+        return base + [
+            ("content", "GRID", ["cols", "rows", "cell_gap", "padding"]),
+            ("content", "SCROLL", ["show_scrollbar", "scrollbar_width",
+                                   "scrollbar_color", "scrollbar_bg",
+                                   "scrollbar_radius"]),
+            ("content", "CARD LAYOUT (JSON)", ["card_layout"]),
+            ("action", "ACAO", ["on_select"]),
+            ("colors", "CORES", ["fill_color", "border_color"]),
+            ALPHA_SECTION,
+        ]
 
     if wtype == "button":
         extra = [STYLE_FULL, COLORS_FULL, ALPHA_SECTION,
@@ -307,6 +352,7 @@ def sections_for_type(wtype):
              ["filled_alpha", "empty_alpha"]),
             ICON_SECTION,
         ]
+
     else:
         extra = [STYLE_FULL, COLORS_FULL, ALPHA_SECTION,
                  ("content", "CONTEUDO", ["label", "title", "text"]),

@@ -21,7 +21,14 @@ from src.scenes.ui.ui_editor_scene.editor.modals import LoadPicker, ImagePicker
 from src.scenes.ui.ui_editor_scene.editor.guides import compute_guides_and_snap
 from src.scenes.ui.ui_editor_scene.editor import sections as S
 from src.scenes.ui.ui_editor_scene.editor.render_mixin import EditorRenderMixin
-
+from src.scenes.ui.ui_editor_scene.editor.card_editor import (
+    CardLayoutEditor, CardLayoutField,
+)
+from src.anim.layer import (
+    Keyframe, LayerDef, SpriteLayerDef, EmitterLayerDef, FilterLayerDef,
+    MessageLayerDef,
+    _parse_hex_color, _to_hex_color,
+)
 
 DESIGN_W, DESIGN_H = 1280, 720
 LAYOUTS_DIR = UI_LAYOUTS_PATH
@@ -55,6 +62,7 @@ class EditorController(EditorRenderMixin, BaseScene):
         ("badge", "Badge", "gold"),
         ("world_sprite", "Sprite3D", "primary"),
         ("slot_row", "Slots", "gold"),
+        ("card_grid", "CardGrid", "success"),
     ]
 
     # =================================================================
@@ -71,6 +79,8 @@ class EditorController(EditorRenderMixin, BaseScene):
         self.drag_offset = (0, 0)
         self.drag_start_rect = None
         self._drag_rects = {}
+
+        self.card_editor = CardLayoutEditor()
 
         self._active_guides_v = []
         self._active_guides_h = []
@@ -98,7 +108,7 @@ class EditorController(EditorRenderMixin, BaseScene):
         self.right_scroll = 0
         self.right_max_scroll = 0
 
-        # ---- NOVO: scroll da árvore de prioridade (left) ----
+        # ----  scroll da árvore de prioridade (left) ----
         self.left_tree_scroll = 0
         self.left_tree_max_scroll = 0
         self._left_tree_clip = pygame.Rect(0, 0, 0, 0)
@@ -607,7 +617,22 @@ class EditorController(EditorRenderMixin, BaseScene):
                     ftype = S.FIELD_TYPES.get(k, "text")
                     rect = pygame.Rect(x0, y, w_, 24)
 
-                    if ftype in ("choice", "sound"):
+                    # =================================================
+                    # CARD LAYOUT — abre o modal do sub-editor
+                    # =================================================
+                    if k == "card_layout":
+                        layout = props.get("card_layout", []) or []
+                        if not isinstance(layout, list):
+                            layout = []
+
+                        def _mk_open():
+                            return lambda: self._open_card_editor()
+
+                        f = CardLayoutField(rect, on_open=_mk_open())
+                        f.set_count(len(layout))
+                        self.fields[k] = f
+
+                    elif ftype in ("choice", "sound"):
                         opt_list = options.get(k, ["-"])
                         if k in ("click_sound", "hover_sound"):
                             cur = self._pick(w, props, k, None)
@@ -632,7 +657,6 @@ class EditorController(EditorRenderMixin, BaseScene):
                         elif k == "border_sides":
                             cur_s = str(self._pick(w, props,
                                                    "border_sides", "all"))
-                        # NOVO:
                         elif k == "border_style":
                             cur_s = str(self._pick(w, props,
                                                    "border_style", "solid"))
@@ -672,8 +696,10 @@ class EditorController(EditorRenderMixin, BaseScene):
 
                     elif ftype == "image":
                         cur = self._pick(w, props, k, "")
+
                         def _mk_open(key=k):
                             return lambda: self._open_image_picker(key)
+
                         f = ImageField(rect, str(cur) if cur else "",
                                        on_open=_mk_open())
                         self.fields[k] = f
@@ -700,6 +726,7 @@ class EditorController(EditorRenderMixin, BaseScene):
                             cur = ""
                         else:
                             cur = str(cur)
+
                         f = TextField(rect, cur,
                                       placeholder=placeholders.get(k, ""))
                         f.focused = old_focus.get(k, False)
@@ -1320,10 +1347,7 @@ class EditorController(EditorRenderMixin, BaseScene):
             items = ScreenLoader.list_layouts()
         except Exception:
             items = []
-        self.load_picker.open_with(
-            items,
-            on_select=self._on_load_selected,
-            center=(self.top_rect.centerx, self.top_rect.centery))
+        self.load_picker.open_with(items, on_select=self._on_load_selected)
 
     def _on_load_selected(self, name):
         path = LAYOUTS_DIR / f"{name}.json"
@@ -1366,8 +1390,114 @@ class EditorController(EditorRenderMixin, BaseScene):
             items = []
         self.image_picker.open_with(
             items,
-            on_select=lambda name: self._on_image_selected(field_key, name),
-            center=(self.top_rect.centerx, self.top_rect.centery))
+            on_select=lambda name: self._on_image_selected(field_key, name))
+
+    def _card_sample(self):
+        """
+        Retorna 1 conquista REAL como dict de bindings, ciclando a cada
+        chamada. Cai num fallback estático se não houver nada.
+        """
+        fallback = {
+            "id":                 "sample",
+            "title":              "Conquista Exemplo",
+            "description":        "Complete a primeira fase sem perder HP.",
+            "rarity_name":        "RARO",
+            "rarity_color":       "#6496FF",
+            "rarity_color_dark":  "#142033",
+            "card_surface":       None,
+            "unlocked":           True,
+            "locked":             False,
+            "is_selected":        False,
+            "progress":           3,
+            "progress_max":       10,
+        }
+        try:
+            player = getattr(self.game, "player", None)
+            if player is None:
+                return fallback
+            mgr = getattr(player, "achievement_manager", None)
+            if mgr is None:
+                return fallback
+
+            rid = mgr.get_current_region()
+            achs = list(mgr.get_all_achievements(region_id=rid) or [])
+            if not achs:
+                return fallback
+
+            idx = getattr(self, "_card_sample_idx", 0) % len(achs)
+            self._card_sample_idx = idx + 1
+            ach = achs[idx]
+
+            try:
+                rarity = ach.rarity
+                rcolors = {}
+                # fallback: puxa do próprio AchievementLogic, se existir
+                from src.scenes.achievement_scene.achievement_logic import (
+                    AchievementLogic as AL)
+                rcolors = AL.RARITY_COLORS
+                rnames  = AL.RARITY_NAMES
+            except Exception:
+                rcolors = {}
+                rnames  = {}
+
+            col = rcolors.get(rarity, (150, 150, 150))
+            nm  = rnames.get(rarity, "")
+
+            def _hex(c):
+                return f"#{c[0]:02X}{c[1]:02X}{c[2]:02X}"
+
+            dark = tuple(max(15, c // 5) for c in col)
+
+            # Surface do card (se existir)
+            surf = None
+            try:
+                from src.scenes.achievement_scene.achievement_logic import (
+                    AchievementLogic as AL)
+                logic = AL(self.game)
+                surf = logic.get_card_surface(ach)
+            except Exception:
+                pass
+
+            prog = (0, 0)
+            if not ach.unlocked:
+                try:
+                    prog = mgr.get_progress(ach.id)
+                except Exception:
+                    prog = (0, 0)
+
+            return {
+                "id":                 ach.id,
+                "title":              ach.title,
+                "description":        ach.description,
+                "rarity_name":        nm,
+                "rarity_color":       _hex(col),
+                "rarity_color_dark":  _hex(dark),
+                "card_surface":       surf,
+                "unlocked":           bool(ach.unlocked),
+                "locked":             not bool(ach.unlocked),
+                "is_selected":        False,
+                "progress":           prog[0],
+                "progress_max":       prog[1],
+            }
+        except Exception as e:
+            print(f"[CardEditor] _card_sample falhou: {e}")
+            return fallback
+
+    def _open_card_editor(self):
+        if not (0 <= self.selected_idx < len(self.widgets_data)):
+            return
+        w = self.widgets_data[self.selected_idx]
+        props = w.setdefault("props", {})
+        layout = props.get("card_layout", []) or []
+
+        def _on_save(new_layout):
+            props["card_layout"] = new_layout
+            self._mark_dirty()
+            self._rebuild_fields()
+            self.status_text = f"card_layout atualizado ({len(new_layout)} widgets)"
+
+        # Passa o CALLABLE — o modal vai invocar e permitir re-ciclar
+        self.card_editor.open_with(layout, self._card_sample, _on_save)
 
     def _on_image_selected(self, field_key, name):
         if name == "(nenhuma)":
@@ -1581,6 +1711,11 @@ class {cls}(StandardScreen):
     # EVENTOS
     # =================================================================
     def handle_event(self, event):
+
+        if self.card_editor.open:
+            if self.card_editor.handle_event(event):
+                return
+
         if self._tab_dd is not None and self._tab_dd.open:
             if self._tab_dd.handle_event(event):
                 return
@@ -2041,6 +2176,11 @@ class {cls}(StandardScreen):
             f.update(dt)
         if self.name_field:
             self.name_field.update(dt)
+
+        self.card_editor.fixed_update(dt)
+        self.load_picker.fixed_update(dt)
+        self.image_picker.fixed_update(dt)
+
         cur = (self.screen_manager.window_width,
                self.screen_manager.window_height)
         if cur != self._last_size:
@@ -2063,6 +2203,7 @@ class {cls}(StandardScreen):
             self.color_picker.render(screen)
             self.load_picker.render(screen)
             self.image_picker.render(screen)
+            self.card_editor.render(screen)
             return
 
         self._render_top(screen)
@@ -2082,3 +2223,4 @@ class {cls}(StandardScreen):
         self.color_picker.render(screen)
         self.load_picker.render(screen)
         self.image_picker.render(screen)
+        self.card_editor.render(screen)

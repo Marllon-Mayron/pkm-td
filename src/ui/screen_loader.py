@@ -17,7 +17,7 @@ from src.ui.theme import parse_color, with_alpha, color_alpha
 from src.ui.widgets import (
     Button, Panel, Label, ListView, GridSelect, ImageBox, Checkbox,
     Slider, Dropdown, TabPanel, ProgressBar, Badge, WorldSprite,
-    Divider, Table, SlotRow,
+    Divider, Table, SlotRow, CardGrid,
 )
 
 
@@ -394,11 +394,16 @@ class ScreenLoader:
         click_vol = _get("click_volume")
         hover_vol = _get("hover_volume")
 
+        def _is_binding(v):
+            return isinstance(v, str) and "{item." in v
+
         bg_image_name = _get("bg_image")
-        bg_image_surf = _load_ui_image(bg_image_name, create_if_missing=True)
+        bg_image_surf = (None if _is_binding(bg_image_name)
+                         else _load_ui_image(bg_image_name, create_if_missing=True))
 
         icon_name = _get("icon") or _get("icon_surface")
-        icon_surf = _load_ui_image(icon_name, create_if_missing=True)
+        icon_surf = (None if _is_binding(icon_name)
+                     else _load_ui_image(icon_name, create_if_missing=True))
 
         bg_tint = parse_color(_get("bg_tint"), None)
 
@@ -636,6 +641,36 @@ class ScreenLoader:
                     z=z, tab=tabname,
                 ))
                 w = SlotRow(wid, rect, **kw)
+
+            elif wtype == "card_grid":
+                layout = _get("card_layout") or props.get("card_layout") or []
+                # garante que é lista de dicts
+                if isinstance(layout, dict):
+                    layout = list(layout.values())
+                kw = _filter_kwargs(CardGrid, dict(
+                    items=_get("items", []) or [],
+                    cols=_int_or(_get("cols"), 4),
+                    rows=_int_or(_get("rows"), 3),
+                    cell_gap=_int_or(_get("cell_gap"), 8),
+                    padding=_int_or(_get("padding"), 0),
+                    card_layout=layout,
+                    on_select=None,
+                    show_scrollbar=_bool_or(_get("show_scrollbar"), True),
+                    scrollbar_width=_int_or(_get("scrollbar_width"), 12),
+                    scrollbar_color=parse_color(_get("scrollbar_color"), None),
+                    scrollbar_bg=parse_color(_get("scrollbar_bg"), None),
+                    scrollbar_radius=_int_or(_get("scrollbar_radius"), 6),
+                    click_sound=click_snd,
+                    hover_sound=hover_snd,
+                    click_volume=click_vol,
+                    hover_volume=hover_vol,
+                    screen_loader=cls,
+                    z=z, tab=tabname,
+                ))
+                w = CardGrid(wid, rect, **kw)
+                cls._bind_action(w, props.get("on_select"), actions,
+                                 kind="select")
+
             else:
                 print(f"[UI] tipo desconhecido: {wtype}")
                 return None

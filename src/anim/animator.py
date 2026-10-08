@@ -11,13 +11,17 @@ Regras:
     o tamanho real do sprite do alvo.
   - `world_scaled` faz a animacao escalar junto com o zoom da camera de jogo,
     IGUAL aos pokemons (camera.zoom * render_scale * TILE_SCALE).
+  - Layers do tipo `message` renderizam bales de dialogo estilo Pokemon
+    com efeito typewriter (letra por letra).
 """
 import math
 from pathlib import Path
 import pygame
 
 from src.anim.animation import AnimDefinition
-from src.anim.layer import SpriteLayerDef, FilterLayerDef, EmitterLayerDef
+from src.anim.layer import (
+    SpriteLayerDef, FilterLayerDef, EmitterLayerDef, MessageLayerDef,
+)
 from src.anim.easing import apply_easing
 from src.anim.emitter import ParticleEmitter
 from src.anim.actor import ActorRuntime
@@ -311,9 +315,9 @@ class Animator:
             sx, sy = render_context.world_to_screen(wx, wy, camera,
                                                     screen_manager)
 
-            # ===== ÂNCORA DINÂMICA (head/feet) =====
+            # ===== ANCORA DINAMICA (head/feet) =====
             # Desloca o anchor em pixels de TELA conforme o tamanho real
-            # do sprite do alvo. Usa a MESMA fórmula do Pokemon.render.
+            # do sprite do alvo. Usa a MESMA formula do Pokemon.render.
             if anchor_obj is not None and self.defn.anchor_mode != "center":
                 sprite = getattr(anchor_obj, 'sprite', None)
                 if sprite is not None and camera is not None and screen_manager is not None:
@@ -396,6 +400,9 @@ class Animator:
                 elif isinstance(layer, EmitterLayerDef):
                     self._render_emitter_layer(screen, layer, anchor_pos,
                                                screen, screen_manager, camera)
+                elif isinstance(layer, MessageLayerDef):
+                    self._render_message_layer(screen, layer, anchor_pos,
+                                               screen_manager)
             except Exception as e:
                 print(f"[ANIM] erro layer '{layer.id}': {e}")
 
@@ -440,7 +447,7 @@ class Animator:
                 span = max(1, b.f - a.f)
                 t = apply_easing(layer.easing, (f - a.f) / span)
 
-                # frame_index: interpolação LINEAR (frames discretos)
+                # frame_index: interpolacao LINEAR (frames discretos)
                 raw = (f - a.f) / span
                 a_fi = getattr(a, "frame_index", -1)
                 b_fi = getattr(b, "frame_index", -1)
@@ -529,7 +536,7 @@ class Animator:
             base = base.copy()
             base.set_alpha(int(props["alpha"]))
 
-        # ===== POSIÇÃO =====
+        # ===== POSICAO =====
         # Offsets e keyframes x/y escalam com scale_mult e ws (uniforme)
         offset_scale = eff_zoom * scale_mult * ws
         px = anchor_pos[0] + (layer.offset_x + props["x"]) * offset_scale
@@ -655,6 +662,111 @@ class Animator:
         screen.blit(surf, vp.topleft)
 
     # -----------------------------------------------------------------
+    # MESSAGE (balao de dialogo com typewriter)
+    # -----------------------------------------------------------------
+    def _render_message_layer(self, screen, layer, anchor_pos,
+                              screen_manager=None):
+        if layer.balloon_style == "none" and not layer.text:
+            return
+
+        # ---- frame local (a partir de visible_frames[0]) ----
+        vf = layer.visible_frames
+        start_f = int(vf[0]) if vf and len(vf) > 0 else 0
+        local_f = max(0, self.current_frame - start_f)
+
+        # ---- quantos caracteres mostrar ----
+        if local_f < layer.start_delay:
+            visible_chars = 0
+        else:
+            fps = max(1, self.defn.fps)
+            elapsed = (local_f - layer.start_delay) / fps
+            visible_chars = int(elapsed * layer.text_speed)
+
+        full_text = layer.text or ""
+
+        # ---- fonte + layout estavel do texto ----
+        font = _get_dialogue_font(layer.font_path, layer.font_size)
+        pad = layer.padding
+        bw_border = layer.balloon_border_w
+        max_text_w = max(20, layer.balloon_width
+                         - pad * 2 - bw_border * 2)
+        wrapped = _layout_wrapped_text(font, full_text, max_text_w)
+        total_wrapped = sum(len(l) for l in wrapped)
+        if total_wrapped <= 0:
+            visible_chars = 0
+        else:
+            visible_chars = min(visible_chars, total_wrapped)
+        is_fully_typed = (visible_chars >= total_wrapped)
+
+        # ---- posicao do balao (usa pivot + anchor_pos) ----
+        _, _, cam_zoom = self._get_camera_state()
+        eff_zoom = self.zoom * cam_zoom
+        base_x = anchor_pos[0] + layer.offset_x * eff_zoom
+        base_y = anchor_pos[1] + layer.offset_y * eff_zoom
+
+        bw = layer.balloon_width
+        bh = layer.balloon_height
+        pivot = layer.pivot
+        if pivot == "top_left":
+            bx, by = base_x, base_y
+        elif pivot == "top_center":
+            bx, by = base_x - bw / 2, base_y
+        elif pivot == "top_right":
+            bx, by = base_x - bw, base_y
+        elif pivot == "bottom_left":
+            bx, by = base_x, base_y - bh
+        elif pivot == "bottom_center":
+            bx, by = base_x - bw / 2, base_y - bh
+        elif pivot == "bottom_right":
+            bx, by = base_x - bw, base_y - bh
+        else:  # center
+            bx, by = base_x - bw / 2, base_y - bh / 2
+
+        rect = pygame.Rect(int(bx), int(by), bw, bh)
+
+        # ---- desenha balao ----
+        _draw_balloon(screen, rect, layer)
+
+        # ---- desenha texto (typewriter) ----
+        inner = rect.inflate(-pad * 2 - bw_border * 2,
+                             -pad * 2 - bw_border * 2)
+        line_h = font.get_height() + layer.line_spacing
+
+        remaining = visible_chars
+        ty = inner.y
+        for line in wrapped:
+            if remaining <= 0:
+                break
+            if remaining >= len(line):
+                shown = line
+                remaining -= len(line)
+            else:
+                shown = line[:remaining]
+                remaining = 0
+
+            if shown:
+                surf = font.render(shown, True, layer.text_color)
+                if layer.text_align == "center":
+                    tx = inner.x + (inner.width - surf.get_width()) // 2
+                elif layer.text_align == "right":
+                    tx = inner.x + inner.width - surf.get_width()
+                else:
+                    tx = inner.x
+                screen.blit(surf, (tx, ty))
+            ty += line_h
+
+        # ---- prompt piscante ----
+        if layer.show_prompt and is_fully_typed and wrapped:
+            show = True
+            if layer.prompt_blink:
+                show = (pygame.time.get_ticks() // 400) % 2 == 0
+            if show:
+                pf = _get_dialogue_font(layer.font_path, layer.font_size)
+                pt = pf.render(layer.prompt_char, True, layer.text_color)
+                screen.blit(pt, (rect.right - pad - pt.get_width() - 4,
+                                 rect.bottom - pad - pt.get_height() - 2))
+
+    # -----------------------------------------------------------------
     # IMAGEM
     # -----------------------------------------------------------------
     def _get_sprite_image(self, image_path):
@@ -719,3 +831,158 @@ def _lerp_color(a, b, t):
     return (int(a[0] + (b[0] - a[0]) * t),
             int(a[1] + (b[1] - a[1]) * t),
             int(a[2] + (b[2] - a[2]) * t))
+
+
+# =====================================================================
+# MENSAGENS — cache de fontes, wrap, balao
+# =====================================================================
+_FONT_CACHE: dict = {}
+
+
+def _get_dialogue_font(font_path: str, size: int):
+    """Carrega (e cacheia) fonte de res/fontes/<font_path>."""
+    key = (str(font_path), int(size))
+    if key in _FONT_CACHE:
+        return _FONT_CACHE[key]
+    font = None
+    try:
+        from src.config.paths import RES_PATH
+        p = RES_PATH / "fontes" / font_path
+        if p.exists():
+            font = pygame.font.Font(str(p), int(size))
+        else:
+            print(f"[ANIM] fonte nao encontrada: {p}")
+    except Exception as e:
+        print(f"[ANIM] erro fonte '{font_path}': {e}")
+    if font is None:
+        try:
+            font = pygame.font.Font(None, int(size))
+        except Exception:
+            font = pygame.font.SysFont("arial", int(size))
+    _FONT_CACHE[key] = font
+    return font
+
+
+def _layout_wrapped_text(font, text: str, max_width: int) -> list:
+    """Quebra texto em linhas para caber em `max_width` pixels.
+
+    Regras:
+      - `\n` real (newline) sempre quebra.
+      - `\\n` (barra + n, 2 chars) tambem quebra (fallback p/ textos
+        que vieram do JSON sem normalizacao).
+      - `|` (pipe) tambem quebra (atalho rapido do editor).
+      - Word-wrap automatico por espaco.
+      - Se uma palavra sozinha for maior que `max_width`, ela e
+        cortada por caractere (nunca trava / estoura a caixa).
+    """
+    if not text:
+        return []
+
+    # ---- Normaliza quebras ----
+    if "\\n" in text:
+        text = text.replace("\\\\n", "\n").replace("\\n", "\n")
+    if "|" in text:
+        text = text.replace("|", "\n")
+
+    lines = []
+    for para in text.split("\n"):
+        if para == "":
+            lines.append("")
+            continue
+
+        words = para.split(" ")
+        current = ""
+        for word in words:
+            candidate = (current + " " + word) if current else word
+
+            if font.size(candidate)[0] <= max_width:
+                current = candidate
+                continue
+
+            # Nao coube: fecha a linha atual (se houver)
+            if current:
+                lines.append(current)
+                current = ""
+
+            # Palavra sozinha pode ainda ser maior que a caixa:
+            # corta por caractere.
+            if font.size(word)[0] > max_width:
+                while word and font.size(word)[0] > max_width:
+                    cut = len(word)
+                    while cut > 1 and font.size(word[:cut])[0] > max_width:
+                        cut -= 1
+                    lines.append(word[:cut])
+                    word = word[cut:]
+                current = word
+            else:
+                current = word
+
+        if current:
+            lines.append(current)
+
+    return lines
+
+
+def _draw_balloon(screen, rect, layer):
+    """Desenha o balao conforme o estilo."""
+    style = layer.balloon_style
+    if style == "none":
+        return
+    fill = layer.balloon_fill
+    border = layer.balloon_border
+    bw = layer.balloon_border_w
+    radius = layer.balloon_radius
+
+    # Sombra
+    if layer.balloon_shadow:
+        sh = rect.move(3, 3)
+        sh_surf = pygame.Surface(sh.size, pygame.SRCALPHA)
+        pygame.draw.rect(sh_surf, (0, 0, 0, 80), sh_surf.get_rect(),
+                         border_radius=radius)
+        screen.blit(sh_surf, sh.topleft)
+
+    # Preenchimento + borda
+    if style == "firered":
+        pygame.draw.rect(screen, fill, rect, border_radius=radius)
+        pygame.draw.rect(screen, border, rect, bw,
+                         border_radius=radius)
+    elif style == "ruby":
+        pygame.draw.rect(screen, fill, rect, border_radius=4)
+        pygame.draw.rect(screen, border, rect, 2, border_radius=4)
+    else:  # plain
+        pygame.draw.rect(screen, fill, rect)
+        pygame.draw.rect(screen, border, rect, bw)
+
+    # Tail (seta apontando)
+    tail = layer.tail
+    if tail and tail != "none":
+        _draw_tail(screen, rect, tail, layer.tail_x, fill, border, bw)
+
+
+def _draw_tail(screen, rect, direction, pos, fill, border, bw):
+    size = 14
+    if direction == "down":
+        cx = rect.x + int(rect.width * pos)
+        left = (cx - size, rect.bottom - 2)
+        right = (cx + size, rect.bottom - 2)
+        tip = (cx, rect.bottom + size)
+    elif direction == "up":
+        cx = rect.x + int(rect.width * pos)
+        left = (cx - size, rect.top + 2)
+        right = (cx + size, rect.top + 2)
+        tip = (cx, rect.top - size)
+    elif direction == "left":
+        cy = rect.y + int(rect.height * pos)
+        left = (rect.left + 2, cy - size)
+        right = (rect.left + 2, cy + size)
+        tip = (rect.left - size, cy)
+    elif direction == "right":
+        cy = rect.y + int(rect.height * pos)
+        left = (rect.right - 2, cy - size)
+        right = (rect.right - 2, cy + size)
+        tip = (rect.right + size, cy)
+    else:
+        return
+    pygame.draw.polygon(screen, fill, [left, right, tip])
+    pygame.draw.line(screen, border, left, tip, bw)
+    pygame.draw.line(screen, border, right, tip, bw)

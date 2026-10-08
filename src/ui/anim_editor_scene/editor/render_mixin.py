@@ -110,6 +110,7 @@ class AnimEditorRenderMixin:
             "add_actor": "Adicionar Ator",
             "add_sprite": "Sprite", "add_emitter": "Emitter",
             "add_filter": "Filter",
+            "add_message": "Mensagem",   # ===== MESSAGE =====
             "voltar": "Voltar",
             "play": "Pausar" if self.is_playing else "Play",
             "stop": "Stop",
@@ -204,11 +205,13 @@ class AnimEditorRenderMixin:
             self._paint_chip(screen, chip, "AT", (120, 200, 160))
         else:
             ltype = getattr(obj, "type", "?")
+            # ===== MESSAGE ===== (adicionado "message")
             color = {"sprite": (120, 170, 240),
                      "emitter": (250, 180, 90),
-                     "filter": (200, 130, 240)}.get(ltype, (150, 150, 150))
+                     "filter": (200, 130, 240),
+                     "message": (150, 230, 170)}.get(ltype, (150, 150, 150))
             code = {"sprite": "SP", "emitter": "EM",
-                    "filter": "FI"}.get(ltype, "?")
+                    "filter": "FI", "message": "MS"}.get(ltype, "?")
             self._paint_chip(screen, chip, code, color)
 
         # Toggles (L e H) na direita da linha
@@ -235,7 +238,6 @@ class AnimEditorRenderMixin:
 
         t = self._font(self.FONT_BASE).render(name, True, col)
         max_w = name_right - (chip.right + 8)
-        # Trunca se necessario
         if t.get_width() > max_w:
             while name and self._font(self.FONT_BASE).size(name)[0] > max_w:
                 name = name[:-1]
@@ -344,7 +346,6 @@ class AnimEditorRenderMixin:
             alpha_mult = 0.32 if i == 0 else 0.15
             for actor_def in sorted(self.current_anim.actors,
                                     key=lambda a: getattr(a, "z", 0)):
-                # Pula escondidos
                 if self.is_hidden("actor", actor_def.id):
                     continue
                 vf = getattr(actor_def, "visible_frames", None)
@@ -364,7 +365,6 @@ class AnimEditorRenderMixin:
         a = self.selected_actor()
         if not a:
             return
-        # Nao desenha a caixa se o ator esta escondido
         if self.is_hidden("actor", a.id):
             return
 
@@ -387,7 +387,6 @@ class AnimEditorRenderMixin:
         pygame.draw.circle(screen, box_color, (int(ax), int(ay)), 3)
 
         if is_locked:
-            # Desenha um pequeno "L" no canto
             t = self._font(12, bold=True).render("L", True, box_color)
             screen.blit(t, (rect.x + 4, rect.y + 2))
 
@@ -519,6 +518,7 @@ class AnimEditorRenderMixin:
             "sheet": "SPRITESHEET",
             "layer_kf": "KEYFRAME DO LAYER",
             "emitter": "EMITTER",
+            "message": "MENSAGEM",   # ===== MESSAGE =====
         }
 
         for key, rect in self._right_field_rects:
@@ -560,8 +560,19 @@ class AnimEditorRenderMixin:
             pygame.draw.rect(screen, bg, rect, border_radius=4)
             pygame.draw.rect(screen, border, rect, bw, border_radius=4)
 
+            # Trunca valores longos (ex: texto de mensagem) pra nao estourar
             vt = self._font(self.FONT_VALUE).render(
                 value, True, (220, 230, 250))
+            if vt.get_width() > rect.width - 12:
+                # Corte por caractere respeitando a largura
+                shown = value
+                while shown and self._font(self.FONT_VALUE).size(shown)[0] \
+                        > rect.width - 16:
+                    shown = shown[:-1]
+                if shown != value:
+                    shown = shown[:-1] + "…"
+                vt = self._font(self.FONT_VALUE).render(
+                    shown, True, (220, 230, 250))
             screen.blit(vt, (rect.x + 8,
                              rect.centery - vt.get_height() // 2))
 
@@ -588,6 +599,7 @@ class AnimEditorRenderMixin:
             "add_sprite": "+ Sprite",
             "add_emitter": "+ Emitter",
             "add_filter": "+ Filter",
+            "add_message": "+ Mensagem",   # ===== MESSAGE =====
             "cam_kf_add": "+ Keyframe da Camera",
             "cam_kf_del": "- Keyframe da Camera",
         }
@@ -674,7 +686,6 @@ class AnimEditorRenderMixin:
         try:
             preview = self._ensure_preview_animator()
             preview.current_frame = self.current_frame
-            # No preview, atores escondidos continuam escondidos
             preview.render(screen, camera=None,
                            screen_manager=_FullscreenScreenManager(rect),
                            hidden_actors=self._hidden_actor_ids())

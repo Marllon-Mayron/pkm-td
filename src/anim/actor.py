@@ -419,6 +419,32 @@ class ActorRuntime:
 
         return None
 
+    def _get_reference_bbox(self):
+        """Bbox de REFERENCIA — nunca muda depois de calculado.
+
+        Usa a anim/dir DEFAULT do ator (a que estava selecionada quando
+        ele foi configurado no editor). Resultado: o sprite SEMPRE
+        renderiza no mesmo tamanho, independente da animacao em
+        execucao (idle, walk, attack, eat...). Isso evita o famoso
+        'Totodile ficou pequeno quando jogou a berry'."""
+        key = ("__ref__",)
+        if key in self._bbox_cache:
+            return self._bbox_cache[key]
+
+        anim = self.defn.default_anim or "idle"
+        d = self.defn.default_dir or "down"
+
+        ref = self._get_union_bbox(anim, d)
+        if ref is None:
+            ref = self._get_union_bbox("idle", "down")
+        if ref is None:
+            ref = self._get_union_bbox("idle", "left")
+        if ref is None:
+            ref = self._get_union_bbox("idle", "right")
+
+        self._bbox_cache[key] = ref
+        return ref
+
     # =================================================================
     # RENDER
     # =================================================================
@@ -458,21 +484,24 @@ class ActorRuntime:
                                   # do frame (em coords do frame original)
 
         if size_px > 0:
-            bbox = self._get_union_bbox(props["anim"], props["dir"])
-            if bbox is not None and bbox[2] > 0 and bbox[3] > 0:
-                bx, by, bw, bh = bbox
-                base_scale = size_px / max(bw, bh)
+            # SCALE: usa o bbox de REFERENCIA (estavel entre anims)
+            ref_bbox = self._get_reference_bbox()
+            if ref_bbox is not None and ref_bbox[2] > 0 and ref_bbox[3] > 0:
+                base_scale = size_px / max(ref_bbox[2], ref_bbox[3])
+            else:
+                base_scale = (self.TARGET_BASE * self.defn.display_scale
+                              / max(w, h))
 
-                # Centro do bbox em coords do frame
+            # OFFSET: usa o bbox ATUAL (so pra centralizar o que esta
+            # visivel agora — nao afeta tamanho)
+            cur_bbox = self._get_union_bbox(props["anim"], props["dir"])
+            if cur_bbox is not None and cur_bbox[2] > 0 and cur_bbox[3] > 0:
+                bx, by, bw, bh = cur_bbox
                 bbox_cx = bx + bw / 2.0
                 bbox_cy = by + bh / 2.0
                 frame_cx = w / 2.0
                 frame_cy = h / 2.0
                 offset_px = (bbox_cx - frame_cx, bbox_cy - frame_cy)
-            else:
-                # fallback: frame-based
-                base_scale = (self.TARGET_BASE * self.defn.display_scale
-                              / max(w, h))
         else:
             base_scale = (self.TARGET_BASE * self.defn.display_scale
                           / max(w, h))

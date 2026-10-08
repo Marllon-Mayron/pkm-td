@@ -1002,7 +1002,8 @@ class PokemonModal:
         vy = my - cr.y + int(self.scroll_y)
         return rect.collidepoint(vx, vy)
 
-    def _draw_panel(self, surf, x, y, w, h, title, accent=None, help_key=None):
+    def _draw_panel(self, surf, x, y, w, h, title, accent=None, help_key=None,
+                    title_right=None, title_right_color=None):
         r = pygame.Rect(x, y, w, h)
         accent = accent or self.C['gold']
 
@@ -1020,6 +1021,14 @@ class PokemonModal:
         font = self.fonts['section']
         txt = font.render(_sanitize(title).upper(), True, accent)
         surf.blit(txt, (tb.x + 14, tb.centery - txt.get_height() // 2))
+
+        # Texto extra à direita do título (ex: total de IVs)
+        if title_right:
+            tr_color = title_right_color or self.C['text']
+            tr_s = self.fonts['section'].render(
+                _sanitize(title_right), True, tr_color)
+            surf.blit(tr_s, (tb.right - tr_s.get_width() - 12,
+                             tb.centery - tr_s.get_height() // 2))
 
         if help_key:
             self._register_help(tb, help_key)
@@ -2033,14 +2042,38 @@ class PokemonModal:
 
     def _draw_ivs_panel(self, surf, col, y):
         h = 60 + 6 * 36
+
+        # ===== Total de IVs: soma de todos os IVs / (32 * 6) =====
+        total_iv = sum(self.pokemon.ivs.get(k, 0) for k in
+                       ('hp', 'attack', 'defense',
+                        'special_attack', 'special_defense', 'speed'))
+        iv_max = 31 * 6  # 186
+        pct_iv = total_iv / iv_max if iv_max > 0 else 0
+
+        # Cor dinâmica conforme o aproveitamento
+        if pct_iv >= 0.85:
+            iv_total_color = self.C['iv_perfect']  # dourado
+        elif pct_iv >= 0.65:
+            iv_total_color = self.C['iv_great']  # verde
+        elif pct_iv >= 0.45:
+            iv_total_color = self.C['iv_good']  # azul
+        elif pct_iv >= 0.25:
+            iv_total_color = self.C['iv_bad']  # vermelho
+        else:
+            iv_total_color = self.C['iv_horrible']  # roxo
+
+        iv_total_text = f"TOTAL {total_iv} / {iv_max}"
+
         inner = self._draw_panel(surf, col.x, y, col.width, h,
                                  "Valores Individuais",
-                                 accent=self.C['blue'], help_key='ivs')
+                                 accent=self.C['blue'], help_key='ivs',
+                                 title_right=iv_total_text,
+                                 title_right_color=iv_total_color)
 
         ivs = [
-            ("HP",         self.pokemon.ivs.get('hp', 0)),
-            ("ATAQUE",     self.pokemon.ivs.get('attack', 0)),
-            ("DEFESA",     self.pokemon.ivs.get('defense', 0)),
+            ("HP", self.pokemon.ivs.get('hp', 0)),
+            ("ATAQUE", self.pokemon.ivs.get('attack', 0)),
+            ("DEFESA", self.pokemon.ivs.get('defense', 0)),
             ("SP. ATAQUE", self.pokemon.ivs.get('special_attack', 0)),
             ("SP. DEFESA", self.pokemon.ivs.get('special_defense', 0)),
             ("VELOCIDADE", self.pokemon.ivs.get('speed', 0)),

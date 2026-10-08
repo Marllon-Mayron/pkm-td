@@ -2082,3 +2082,334 @@ class SlotRow(Widget):
         pygame.draw.rect(screen, fill,
                          (cx - stem_w / 2, body_bot - stem_h,
                           stem_w, stem_h))
+
+# =====================================================================
+# CARD GRID — replica um template (card_layout) em N células
+# =====================================================================
+from src.ui.bindings import resolve_wdata
+
+
+class CardGrid(Widget):
+    """
+    Grid de cards cujo visual vem 100% do JSON (`card_layout`).
+
+    Cada widget do `card_layout` é posicionado em coordenadas RELATIVAS
+    à célula (0..1), não ao pai. O widget replica pra cada item da lista.
+
+    Suporta:
+      - scroll vertical (roda do mouse)
+      - hover/click por célula (on_select(idx))
+      - bindings {item.xxx} resolvidos em runtime
+      - cache dos sub-widgets por slot (não recria a cada frame)
+    """
+    def __init__(self, wid, rect,
+                 items=None,
+                 cols=4,
+                 rows=3,
+                 cell_gap=8,
+                 padding=0,
+                 card_layout=None,
+                 on_select=None,
+                 show_scrollbar=True,
+                 scrollbar_width=12,
+                 scrollbar_color=(212, 168, 80),
+                 scrollbar_bg=(26, 26, 46),
+                 scrollbar_radius=6,
+                 z=0, tab=None,
+                 click_sound="CLICK", hover_sound=None,
+                 click_volume=None, hover_volume=None,
+                 screen_loader=None):
+        super().__init__(wid, rect, z=z)
+        self.items = items or []
+        self.cols = max(1, int(cols))
+        self.rows = max(1, int(rows))
+        self.cell_gap = int(cell_gap)
+        self.padding = int(padding)
+        self.card_layout = list(card_layout or [])
+        self.on_select = on_select
+        self.tab = tab
+        self.click_sound = click_sound
+        self.hover_sound = hover_sound
+        self.click_volume = click_volume
+        self.hover_volume = hover_volume
+        self._loader = screen_loader
+
+        # Scrollbar
+        self.show_scrollbar = bool(show_scrollbar)
+        self.scrollbar_width = int(scrollbar_width)
+        self.scrollbar_color = scrollbar_color
+        self.scrollbar_bg = scrollbar_bg
+        self.scrollbar_radius = int(scrollbar_radius)
+
+        # Estado
+        self.scroll = 0
+        self._hover_idx = -1
+        self._dragging_scroll = False
+        self._scroll_drag_offset = 0
+
+        # Cache dos sub-widgets por slot (0..cols*rows-1)
+        self._slot_widgets = {}
+
+    # -----------------------------------------------------------------
+    # Cálculos
+    # -----------------------------------------------------------------
+    def _inner_rect(self):
+        r = self.rect.inflate(-self.padding * 2, -self.padding * 2)
+        return r
+
+    def _cell_rect(self, col, row):
+        inner = self._inner_rect()
+        gap = self.cell_gap
+        cw = (inner.width - gap * (self.cols - 1)) // self.cols
+        ch = (inner.height - gap * (self.rows - 1)) // self.rows
+        x = inner.x + col * (cw + gap)
+        y = inner.y + row * (ch + gap)
+        return pygame.Rect(x, y, cw, ch)
+
+    def _total_rows(self):
+        if not self.items:
+            return 0
+        return (len(self.items) + self.cols - 1) // self.cols
+
+    def _max_scroll(self):
+        return max(0, self._total_rows() - self.rows)
+
+    # -----------------------------------------------------------------
+    # Construção (lazy) dos sub-widgets por slot
+    # -----------------------------------------------------------------
+    def _ensure_loader(self):
+        if self._loader is None:
+            from src.ui.screen_loader import ScreenLoader
+            self._loader = ScreenLoader
+
+    def _build_slot(self, slot_idx):
+        self._ensure_loader()
+        col = slot_idx % self.cols
+        row = slot_idx // self.cols
+        cell = self._cell_rect(col, row)
+
+        widgets = []
+        for wdata in self.card_layout:
+            # Cria com valores crus; serão re-resolvidos a cada render
+            w = self._loader._build_widget(wdata, cell, {}, None)
+            if w is not None:
+                w.z = int(wdata.get("z", 0))
+                widgets.append((wdata, w))
+        widgets.sort(key=lambda t: t[1].z)
+        return widgets
+
+    def _get_slot(self, slot_idx):
+        if slot_idx not in self._slot_widgets:
+            self._slot_widgets[slot_idx] = self._build_slot(slot_idx)
+        return self._slot_widgets[slot_idx]
+
+    # -----------------------------------------------------------------
+    # Aplicar bindings em runtime
+    # -----------------------------------------------------------------
+    _FIELD_MAP = {
+        "text": "text",
+        "label": "label",
+        "fill_color": "fill_color",
+        "border_color": "border_color",
+        "text_color": "text_color",
+        "bg_color": "bg_color",
+        "badge_text_color": "text_color",       # badge usa text_color
+        "icon": "surface",                       # ImageBox / Button
+        "surface": "surface",
+        "value": "value",
+        "max_value": "max_value",
+        "visible": "visible",
+    }
+
+    def _apply_bindings(self, widget, wdata, item):
+        from src.ui.theme import parse_color
+        resolved = resolve_wdata(wdata, item)
+
+        # Mescla top-level + props (props não sobrescreve top-level)
+        merged = dict(resolved)
+        for k, v in (resolved.get("props", {}) or {}).items():
+            if k not in merged:
+                merged[k] = v
+
+        for key, attr in self._FIELD_MAP.items():
+            if key not in merged:
+                continue
+            val = merged[key]
+            if key.endswith("color") or key.endswith("_color"):
+                if isinstance(val, str) and val.startswith("#"):
+                    c = parse_color(val, None)
+                    if c:
+                        val = c
+            try:
+                setattr(widget, attr, val)
+            except Exception:
+                pass
+
+        # Surface / icon resolvidos como objeto direto
+        if "surface" in merged and hasattr(widget, "surface"):
+            try: widget.surface = merged["surface"]
+            except Exception: pass
+        if "icon" in merged and hasattr(widget, "icon"):
+            try: widget.icon = merged["icon"]
+            except Exception: pass
+
+    # -----------------------------------------------------------------
+    # Eventos
+    # -----------------------------------------------------------------
+    def _hit_index(self, pos):
+        inner = self._inner_rect()
+        if not inner.collidepoint(pos):
+            return -1
+        gap = self.cell_gap
+        cw = (inner.width - gap * (self.cols - 1)) // self.cols
+        ch = (inner.height - gap * (self.rows - 1)) // self.rows
+        rel_x = pos[0] - inner.x
+        rel_y = pos[1] - inner.y
+        col = rel_x // (cw + gap)
+        row = rel_y // (ch + gap)
+        if col >= self.cols or row >= self.rows:
+            return -1
+        idx = (self.scroll + row) * self.cols + int(col)
+        return int(idx) if 0 <= idx < len(self.items) else -1
+
+    def _scrollbar_rects(self):
+        if not self.show_scrollbar or self._max_scroll() <= 0:
+            return None, None
+        w = self.scrollbar_width
+        pad = 4
+        track = pygame.Rect(
+            self.rect.right - w - pad, self.rect.y + pad,
+            w, self.rect.height - pad * 2,
+        )
+        total = self._total_rows()
+        visible = self.rows
+        ratio = visible / total if total else 1
+        thumb_h = max(24, int(track.height * ratio))
+        max_s = self._max_scroll()
+        thumb_y = (track.y + int((track.height - thumb_h) *
+                                 (self.scroll / max_s))
+                   if max_s > 0 else track.y)
+        return track, pygame.Rect(track.x, thumb_y, w, thumb_h)
+
+    def handle_event(self, event):
+        if not self.visible or not self.enabled:
+            return False
+
+        # Scrollbar drag
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            track, thumb = self._scrollbar_rects()
+            if track and thumb and track.collidepoint(event.pos):
+                if thumb.collidepoint(event.pos):
+                    self._scroll_drag_offset = event.pos[1] - thumb.y
+                else:
+                    self._scroll_drag_offset = thumb.height // 2
+                self._dragging_scroll = True
+                return True
+
+        if event.type == pygame.MOUSEMOTION and self._dragging_scroll:
+            track, thumb = self._scrollbar_rects()
+            if track and thumb and self._max_scroll() > 0:
+                range_ = track.height - thumb.height
+                rel = event.pos[1] - self._scroll_drag_offset - track.y
+                rel = max(0, min(range_, rel))
+                if range_ > 0:
+                    self.scroll = int(self._max_scroll() * rel / range_)
+            return True
+
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self._dragging_scroll:
+                self._dragging_scroll = False
+                return True
+
+        # Wheel
+        if event.type == pygame.MOUSEWHEEL:
+            mx, my = pygame.mouse.get_pos()
+            if self.rect.collidepoint(mx, my):
+                self.scroll -= event.y
+                self.scroll = max(0, min(self._max_scroll(), self.scroll))
+                return True
+
+        # Hover / click
+        if event.type == pygame.MOUSEMOTION:
+            old = self._hover_idx
+            self._hover_idx = self._hit_index(event.pos)
+            if self._hover_idx >= 0 and self._hover_idx != old:
+                self._play_hover()
+
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            idx = self._hit_index(event.pos)
+            if idx >= 0 and self.on_select:
+                self._play_click()
+                self.on_select(idx)
+                return True
+        return False
+
+    # -----------------------------------------------------------------
+    # Render
+    # -----------------------------------------------------------------
+    def render(self, screen):
+        if not self.visible:
+            return
+
+        # Fundo
+        if self.fill_alpha < 255 and self.fill_color:
+            surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
+            pygame.draw.rect(surf,
+                             with_alpha(self.fill_color, self.fill_alpha),
+                             surf.get_rect(), border_radius=8)
+            screen.blit(surf, self.rect.topleft)
+        elif self.fill_color:
+            pygame.draw.rect(screen, self.fill_color, self.rect,
+                             border_radius=8)
+
+        if self.border_color and self.border_width > 0:
+            pygame.draw.rect(screen, self.border_color, self.rect,
+                             self.border_width, border_radius=8)
+
+        # Clip
+        old = screen.get_clip()
+        clip = self._inner_rect()
+        if self.show_scrollbar and self._max_scroll() > 0:
+            clip.width -= self.scrollbar_width + 6
+        screen.set_clip(clip)
+
+        # Células
+        for slot_idx in range(self.cols * self.rows):
+            col = slot_idx % self.cols
+            row = slot_idx // self.cols
+            item_idx = (self.scroll + row) * self.cols + col
+            if item_idx < 0 or item_idx >= len(self.items):
+                continue
+            item = self.items[item_idx]
+
+            # Garante que a célula está dentro do clip
+            cell = self._cell_rect(col, row)
+            if not cell.colliderect(clip):
+                continue
+
+            # Injetar flag de seleção (se a scene setar selected_id)
+            for wdata, widget in self._get_slot(slot_idx):
+                self._apply_bindings(widget, wdata, item)
+                try:
+                    widget.render(screen)
+                except Exception as e:
+                    print(f"[CardGrid] erro render slot={slot_idx} "
+                          f"item={item_idx}: {e}")
+
+        screen.set_clip(old)
+
+        # Scrollbar
+        track, thumb = self._scrollbar_rects()
+        if track and thumb:
+            pygame.draw.rect(screen, self.scrollbar_bg, track,
+                             border_radius=self.scrollbar_radius)
+            col = self.scrollbar_color
+            if self._dragging_scroll:
+                col = lighten(col, 0.25)
+            pygame.draw.rect(screen, col, thumb,
+                             border_radius=self.scrollbar_radius)
+
+    def update(self, dt):
+        for slot in self._slot_widgets.values():
+            for _, w in slot:
+                w.update(dt)

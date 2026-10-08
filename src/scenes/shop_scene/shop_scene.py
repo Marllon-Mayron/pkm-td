@@ -1014,7 +1014,7 @@ class ShopScene(BaseScene):
     def _refresh_inventory_cards(self):
         """Recria os cards do inventário com os dados atuais da bag"""
         self.inventory_cards = []
-        items = self.player.bag.get_items_for_render()
+        items = self.player.bag.get_all_items_for_render()
 
         print(f"[SHOP] Criando {len(items)} cards de inventário...")
 
