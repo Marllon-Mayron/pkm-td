@@ -3,7 +3,9 @@
 Widgets reutilizáveis.
 
 Novidades desta versão:
-  - border_style: "solid" | "dashed" | "dotted" | "none" (em Panel e Button)
+  - Cache de gradiente em Panel/Button (evita alocação por frame)
+  - CardGrid com cache de bindings (só re-resolve quando o item muda)
+  - border_style: "solid" | "dashed" | "dotted" | "none"
   - ListView com scrollbar visual + drag + mouse wheel
   - Dropdown com drop_dir: "down" | "up"
   - Divider: linha horizontal/vertical com espessura, cor e estilo
@@ -114,6 +116,25 @@ def _draw_border_box(screen, rect, color, thickness, radius, style="solid",
                           thickness, col, style)
 
 
+def _grad_cache_key(rect, fill_color, fill_alpha, radius, extra=()):
+    return (rect.width, rect.height, fill_color, fill_alpha, radius) + tuple(extra)
+
+
+def _make_gradient(rect, fill, fill_dark, radius, fill_alpha=255, amount=0.30):
+    grad = pygame.Surface(rect.size, pygame.SRCALPHA)
+    for y in range(rect.height):
+        t = y / max(1, rect.height - 1)
+        c = lerp_color(fill, fill_dark, t * amount)
+        pygame.draw.line(grad, c, (0, y), (rect.width, y))
+    mask = pygame.Surface(rect.size, pygame.SRCALPHA)
+    pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(),
+                     border_radius=radius)
+    grad.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    if fill_alpha < 255:
+        grad.set_alpha(fill_alpha)
+    return grad
+
+
 # =====================================================================
 # BASE
 # =====================================================================
@@ -216,6 +237,15 @@ class Button(Widget):
         self.text_fit = text_fit
         self.min_font_size = int(min_font_size)
 
+        # Cache
+        self._grad_cache = None
+        self._grad_cache_key_saved = None
+        self._shadow_cache = None
+        self._shadow_cache_key_saved = None
+
+    def _invalidate_cache(self):
+        self._grad_cache_key_saved = None
+        self._shadow_cache_key_saved = None
 
     def handle_event(self, event):
         if not self.visible or not self.enabled:
@@ -228,21 +258,27 @@ class Button(Widget):
                 self._play_hover()
             elif not self._hover and was:
                 self._target_scale = 1.0
+            if self._hover != was:
+                self._invalidate_cache()
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._hover:
                 self._pressed = True
                 self._target_scale = 0.96
+                self._invalidate_cache()
                 return True
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
             if self._pressed and self._hover:
                 self._pressed = False
                 self._target_scale = 1.04
+                self._invalidate_cache()
                 self._play_click()
                 if self.on_click:
                     self.on_click(self)
                 return True
-            self._pressed = False
-            self._target_scale = 1.0
+            if self._pressed:
+                self._pressed = False
+                self._target_scale = 1.0
+                self._invalidate_cache()
         return False
 
     def update(self, dt):
@@ -251,6 +287,23 @@ class Button(Widget):
             self._glow = min(1.0, self._glow + dt * 4)
         else:
             self._glow = max(0.0, self._glow - dt * 4)
+
+    def _get_grad(self, style, fill):
+        key = _grad_cache_key(self.rect, fill, self.fill_alpha,
+                              self.border_radius,
+                              (self.style_name, self._hover,
+                               self._pressed, self.enabled))
+        if self._grad_cache_key_saved == key and self._grad_cache is not None:
+            return self._grad_cache
+        top = lighten(fill, 0.18)
+        bot = darken(fill, 0.12)
+        grad = _make_gradient(self.rect, top, bot, self.border_radius,
+                              self.fill_alpha, amount=1.0)
+        # _make_gradient interpola top→bot linearmente; passar fill_dark=bot
+        # e amount=1.0 dá o mesmo resultado do código original
+        self._grad_cache = grad
+        self._grad_cache_key_saved = key
+        return grad
 
     def render(self, screen):
         if not self.visible:
@@ -268,10 +321,14 @@ class Button(Widget):
 
         if self.draw_shadow:
             sh = rect.move(3, 4)
-            sh_s = pygame.Surface(sh.size, pygame.SRCALPHA)
-            pygame.draw.rect(sh_s, (0, 0, 0, 120), sh_s.get_rect(),
-                             border_radius=self.border_radius)
-            screen.blit(sh_s, sh.topleft)
+            sh_key = (sh.width, sh.height, self.border_radius)
+            if self._shadow_cache_key_saved != sh_key or self._shadow_cache is None:
+                sh_s = pygame.Surface(sh.size, pygame.SRCALPHA)
+                pygame.draw.rect(sh_s, (0, 0, 0, 120), sh_s.get_rect(),
+                                 border_radius=self.border_radius)
+                self._shadow_cache = sh_s
+                self._shadow_cache_key_saved = sh_key
+            screen.blit(self._shadow_cache, sh.topleft)
 
         if self.bg_image is not None:
             draw_image_in_rect(screen, self.bg_image, rect,
@@ -287,26 +344,15 @@ class Button(Widget):
             else:
                 base = style["fill"]
             fill = self.fill_color if self.fill_color else base
-
-            grad = pygame.Surface(rect.size, pygame.SRCALPHA)
-            top = lighten(fill, 0.18)
-            bot = darken(fill, 0.12)
-            for y in range(rect.height):
-                t = y / max(1, rect.height - 1)
-                c = lerp_color(top, bot, t)
-                pygame.draw.line(grad, c, (0, y), (rect.width, y))
-            mask = pygame.Surface(rect.size, pygame.SRCALPHA)
-            pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(),
-                             border_radius=self.border_radius)
-            grad.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-            if self.fill_alpha < 255:
-                grad.set_alpha(self.fill_alpha)
+            grad = self._get_grad(style, fill)
+            if grad.get_size() != rect.size:
+                grad = pygame.transform.scale(grad, rect.size)
             screen.blit(grad, rect.topleft)
 
         if self.draw_border and self.border_width > 0:
             border = self.border_color if self.border_color else \
-                     (style["border_hover"] if (self._hover and self.enabled)
-                      else style["border"])
+                (style["border_hover"] if (self._hover and self.enabled)
+                 else style["border"])
             _draw_border_box(screen, rect, border, self.border_width,
                              self.border_radius, self.border_style,
                              sides=None, alpha=self.border_alpha)
@@ -317,10 +363,27 @@ class Button(Widget):
             hi_s.fill((255, 255, 255, 60))
             screen.blit(hi_s, hi.topleft)
 
+        # ===== TEXTO / ÍCONE (só se houver conteúdo) =====
+        has_label = bool(self.label and str(self.label).strip())
+        has_icon = self.icon is not None
+
+        if not has_label and not has_icon:
+            # Botão "mudo": só o glow se estiver hovered
+            if self._hover and self.enabled and self._glow > 0:
+                a = int(60 * self._glow)
+                glow = pygame.Surface(rect.size, pygame.SRCALPHA)
+                pygame.draw.rect(glow, (Palette.GOLD[0], Palette.GOLD[1],
+                                        Palette.GOLD[2], a),
+                                 glow.get_rect(),
+                                 border_radius=self.border_radius)
+                screen.blit(glow, rect.topleft,
+                            special_flags=pygame.BLEND_RGBA_ADD)
+            return
+
         font = FontBook.get(self.font_size, bold=self.bold, name=self.font_name)
         tcol = self.text_color if self.text_color else style["text"]
 
-        if self.icon is not None:
+        if has_icon:
             self._render_with_icon(screen, rect, font, tcol)
         else:
             draw_text_centered(
@@ -347,7 +410,6 @@ class Button(Widget):
         isize = int(self.icon_size)
         icon = _scale_sprite(self.icon, (isize, isize), self.pixel_art)
 
-        # Helper pra reusar o mesmo "ajuste de texto" em qualquer posição
         def _draw_label(target_rect):
             draw_text_centered(
                 screen, self.label, font, tcol, target_rect,
@@ -363,14 +425,12 @@ class Button(Widget):
         pos = self.icon_position
         pad = 8
 
-        # ---------- Ícone centralizado (sem texto) ----------
         if pos == "center":
             ix = rect.centerx - isize // 2
             iy = rect.centery - isize // 2
             screen.blit(icon, (ix, iy))
             return
 
-        # ---------- Ícone em cima, texto embaixo ----------
         if pos == "top":
             total_h = isize + self.icon_gap + font.get_height()
             iy = rect.centery - total_h // 2
@@ -381,12 +441,10 @@ class Button(Widget):
             _draw_label(text_rect)
             return
 
-        # ---------- Ícone à direita, texto à esquerda ----------
         if pos == "right":
             ix = rect.right - pad - isize
             tx = rect.x + pad
             tw = rect.width - isize - self.icon_gap - pad * 2
-        # ---------- Ícone à esquerda, texto à direita ----------
         else:
             ix = rect.x + pad
             tx = ix + isize + self.icon_gap
@@ -441,6 +499,25 @@ class Panel(Widget):
         self.pixel_art = bool(pixel_art)
         self.tab = tab
 
+        # Cache
+        self._grad_cache = None
+        self._grad_cache_key_saved = None
+        self._shadow_cache = None
+        self._shadow_cache_key_saved = None
+
+    def _get_grad(self):
+        fill = self.fill_color if self.fill_color else self.skin.fill
+        key = _grad_cache_key(self.rect, fill, self.fill_alpha,
+                              self.border_radius,
+                              (self.skin.fill_dark,))
+        if self._grad_cache_key_saved == key and self._grad_cache is not None:
+            return self._grad_cache
+        grad = _make_gradient(self.rect, fill, self.skin.fill_dark,
+                              self.border_radius, self.fill_alpha, 0.30)
+        self._grad_cache = grad
+        self._grad_cache_key_saved = key
+        return grad
+
     def render(self, screen):
         if not self.visible:
             return
@@ -448,10 +525,14 @@ class Panel(Widget):
 
         if self.draw_shadow:
             sh = rect.move(4, 4)
-            sh_s = pygame.Surface(sh.size, pygame.SRCALPHA)
-            pygame.draw.rect(sh_s, (0, 0, 0, 130), sh_s.get_rect(),
-                             border_radius=self.border_radius)
-            screen.blit(sh_s, sh.topleft)
+            sh_key = (sh.width, sh.height, self.border_radius)
+            if self._shadow_cache_key_saved != sh_key or self._shadow_cache is None:
+                sh_s = pygame.Surface(sh.size, pygame.SRCALPHA)
+                pygame.draw.rect(sh_s, (0, 0, 0, 130), sh_s.get_rect(),
+                                 border_radius=self.border_radius)
+                self._shadow_cache = sh_s
+                self._shadow_cache_key_saved = sh_key
+            screen.blit(self._shadow_cache, sh.topleft)
 
         if self.bg_image is not None:
             layer = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
@@ -467,19 +548,7 @@ class Panel(Widget):
             layer.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
             screen.blit(layer, rect.topleft)
         else:
-            fill = self.fill_color if self.fill_color else self.skin.fill
-            grad = pygame.Surface(rect.size, pygame.SRCALPHA)
-            for y in range(rect.height):
-                t = y / max(1, rect.height - 1)
-                c = lerp_color(fill, self.skin.fill_dark, t * 0.30)
-                pygame.draw.line(grad, c, (0, y), (rect.width, y))
-            mask = pygame.Surface(rect.size, pygame.SRCALPHA)
-            pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(),
-                             border_radius=self.border_radius)
-            grad.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-            if self.fill_alpha < 255:
-                grad.set_alpha(self.fill_alpha)
-            screen.blit(grad, rect.topleft)
+            screen.blit(self._get_grad(), rect.topleft)
 
         if self.draw_border and self.border_width > 0 \
                 and self.border_style != "none":
@@ -626,7 +695,6 @@ class ListView(Widget):
         self.click_volume = click_volume
         self.hover_volume = hover_volume
 
-        # ---- Scrollbar ----
         self.show_scrollbar = bool(show_scrollbar)
         self.scrollbar_width = int(scrollbar_width)
         self.scrollbar_color = scrollbar_color or (150, 170, 210)
@@ -635,7 +703,6 @@ class ListView(Widget):
         self._dragging_scroll = False
         self._scroll_drag_offset = 0
 
-    # -----------------------------------------------------------------
     def _visible_rows(self):
         return max(1, (self.rect.height - 16) // self.ROW_H)
 
@@ -643,7 +710,6 @@ class ListView(Widget):
         return max(0, len(self.items) - self._visible_rows())
 
     def _scrollbar_rects(self):
-        """Retorna (track, thumb) ou (None, None)."""
         if not self.show_scrollbar:
             return None, None
         if self._max_scroll() <= 0:
@@ -667,19 +733,16 @@ class ListView(Widget):
         thumb = pygame.Rect(track.x, thumb_y, w, thumb_h)
         return track, thumb
 
-    # -----------------------------------------------------------------
     def handle_event(self, event):
         if not self.visible or not self.enabled:
             return False
 
-        # ---- Scrollbar drag ----
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             track, thumb = self._scrollbar_rects()
             if track and thumb and track.collidepoint(event.pos):
                 if thumb.collidepoint(event.pos):
                     self._scroll_drag_offset = event.pos[1] - thumb.y
                 else:
-                    # Clicou no track → salta e começa a arrastar
                     self._scroll_drag_offset = thumb.height // 2
                     self._update_scroll_from_mouse(event.pos[1])
                 self._dragging_scroll = True
@@ -694,7 +757,6 @@ class ListView(Widget):
                 self._dragging_scroll = False
                 return True
 
-        # ---- Mouse wheel ----
         if event.type == pygame.MOUSEWHEEL:
             mx, my = pygame.mouse.get_pos()
             if self.rect.collidepoint(mx, my):
@@ -702,7 +764,6 @@ class ListView(Widget):
                 self.scroll = max(0, min(self._max_scroll(), self.scroll))
                 return True
 
-        # ---- Hover ----
         if event.type == pygame.MOUSEMOTION:
             old = self._hover_index
             self._hover_index = -1
@@ -714,7 +775,6 @@ class ListView(Widget):
             if self._hover_index != old and self._hover_index >= 0:
                 self._play_hover()
 
-        # ---- Click ----
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             track, _ = self._scrollbar_rects()
             if track and track.collidepoint(event.pos):
@@ -737,7 +797,6 @@ class ListView(Widget):
         rel_y = max(0, min(thumb_range, rel_y))
         self.scroll = int(max_s * (rel_y / thumb_range))
 
-    # -----------------------------------------------------------------
     def render(self, screen):
         if not self.visible:
             return
@@ -753,14 +812,12 @@ class ListView(Widget):
                               border_color=self.border_color,
                               fill_override=self.fill_color)
 
-        # Borda com estilo
         if self.border_style != "solid":
             _draw_border_box(screen, self.rect,
                              self.border_color or Palette.BORDER_DARK,
                              1, 8, self.border_style)
 
         clip = self.rect.inflate(-12, -12)
-        # Se scrollbar visível, ajusta clip à esquerda
         if self.show_scrollbar and self._max_scroll() > 0:
             clip.width -= self.scrollbar_width + 6
 
@@ -796,7 +853,6 @@ class ListView(Widget):
             y += self.ROW_H
         screen.set_clip(old)
 
-        # ---- Scrollbar ----
         track, thumb = self._scrollbar_rects()
         if track and thumb:
             pygame.draw.rect(screen, self.scrollbar_bg, track,
@@ -1121,10 +1177,12 @@ class Slider(Widget):
                 return True
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
             if self.dragging:
-                self.dragging = False; return True
+                self.dragging = False
+                return True
         elif event.type == pygame.MOUSEMOTION:
             if self.dragging:
-                self._set_from_x(event.pos[0]); return True
+                self._set_from_x(event.pos[0])
+                return True
             was = self._hover
             self._hover = self.rect.collidepoint(event.pos)
             if self._hover and not was:
@@ -1218,10 +1276,14 @@ class Dropdown(Widget):
         self.hover_volume = hover_volume
 
     def _open(self):
-        self._saved_z = self.z; self.z = 99999; self.open = True
+        self._saved_z = self.z
+        self.z = 99999
+        self.open = True
 
     def _close(self):
-        self.z = self._saved_z; self.open = False; self._list_rect = None
+        self.z = self._saved_z
+        self.open = False
+        self._list_rect = None
 
     def handle_event(self, event):
         if not self.visible or not self.enabled:
@@ -1237,9 +1299,11 @@ class Dropdown(Widget):
                         self.on_change(self.value)
                 return True
             if self.rect.collidepoint(event.pos):
-                if self.open: self._close()
+                if self.open:
+                    self._close()
                 else:
-                    self._open(); self._play_click()
+                    self._open()
+                    self._play_click()
                 return True
             if self.open:
                 self._close()
@@ -1260,7 +1324,7 @@ class Dropdown(Widget):
         if self.drop_dir == "up":
             y = self.rect.y - h - 2
             if y < 4:
-                y = self.rect.bottom + 2  # fallback pra baixo se não caber
+                y = self.rect.bottom + 2
         else:
             y = self.rect.bottom + 2
             sfc = pygame.display.get_surface()
@@ -1276,7 +1340,6 @@ class Dropdown(Widget):
         border = self.border_color or (Palette.GOLD if self.open
                                        else Palette.BORDER_DARK)
 
-        # Fundo
         if self.fill_alpha < 255:
             surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
             pygame.draw.rect(surf, with_alpha(bg, self.fill_alpha),
@@ -1285,7 +1348,6 @@ class Dropdown(Widget):
         else:
             pygame.draw.rect(screen, bg, self.rect, border_radius=6)
 
-        # Borda
         _draw_border_box(screen, self.rect, border, 2, 6,
                          self.border_style)
 
@@ -1296,7 +1358,6 @@ class Dropdown(Widget):
         screen.blit(s, (self.rect.x + 8,
                         self.rect.centery - s.get_height() // 2))
 
-        # Seta (muda conforme drop_dir)
         arrow_char = "^" if self.drop_dir == "up" else "v"
         arrow = font.render(arrow_char, True, (180, 190, 210))
         screen.blit(arrow, (self.rect.right - 16,
@@ -1457,13 +1518,9 @@ class Badge(Widget):
 
 
 # =====================================================================
-# DIVIDER — linha divisória horizontal/vertical com estilo
+# DIVIDER
 # =====================================================================
 class Divider(Widget):
-    """
-    Linha reta horizontal ou vertical.
-    Pode ser solid, dashed, dotted ou none.
-    """
     def __init__(self, wid, rect, orientation="horizontal",
                  color=None, thickness=2, style="solid",
                  padding=0, radius=0,
@@ -1510,12 +1567,6 @@ class Divider(Widget):
 # TABLE
 # =====================================================================
 class Table(Widget):
-    """
-    Tabela com headers + rows.
-    - headers: list[str]
-    - rows: list[list[str]]
-    - col_widths: list[float] (relativo) ou None (igual)
-    """
     def __init__(self, wid, rect,
                  headers=None, rows=None, col_widths=None,
                  row_height=30, header_height=34,
@@ -1582,7 +1633,6 @@ class Table(Widget):
 
         xs = self._col_xs()
 
-        # ----- Cabeçalho -----
         head_rect = pygame.Rect(self.rect.x, self.rect.y,
                                 self.rect.width, self.header_height)
         pygame.draw.rect(screen, self.header_bg, head_rect)
@@ -1602,7 +1652,6 @@ class Table(Widget):
                               cell.centery - txt.get_height() // 2))
             screen.set_clip(old)
 
-        # ----- Linhas -----
         y = self.rect.y + self.header_height
         rf = FontBook.get(self.font_size, bold=self.bold,
                           name=self.font_name)
@@ -1628,16 +1677,13 @@ class Table(Widget):
                 screen.set_clip(old)
             y += self.row_height
 
-        # ----- Grid (linhas verticais + horizontais + borda) -----
         if self.grid_width > 0:
-            # Verticais
             for i in range(1, n):
                 if i < len(xs):
                     pygame.draw.line(screen, self.grid_color,
                                      (xs[i], self.rect.y),
                                      (xs[i], min(y, self.rect.bottom)),
                                      self.grid_width)
-            # Horizontais
             hy = self.rect.y + self.header_height
             pygame.draw.line(screen, self.grid_color,
                              (self.rect.x, hy), (self.rect.right, hy),
@@ -1649,8 +1695,6 @@ class Table(Widget):
                                      (self.rect.x, ly),
                                      (self.rect.right, ly),
                                      self.grid_width)
-
-            # Borda externa
             _draw_border_box(screen, self.rect, self.grid_color,
                              self.grid_width, 6, "solid")
 
@@ -1661,9 +1705,9 @@ class Table(Widget):
 class TabPanel(Widget):
     def __init__(self, wid, rect, tabs=None, current_tab=None,
                  on_change=None, z=0, font_name="default", bold=True,
-                 font_size=None,                      # ← NOVO
-                 tab_font_size=None,                  # ← alias
-                 tab_height=None,                     # ← NOVO
+                 font_size=None,
+                 tab_font_size=None,
+                 tab_height=None,
                  text_color=None, fill_color=None, border_color=None,
                  fill_alpha=255, border_alpha=255, tab=None,
                  click_sound="CLICK", hover_sound=None,
@@ -1770,7 +1814,6 @@ class TabPanel(Widget):
         if not self.tabs:
             return
 
-        # ← usa font_size explícito se setado
         font = FontBook.get(self._effective_font_size(),
                             bold=self.bold, name=self.font_name)
 
@@ -1801,6 +1844,7 @@ class TabPanel(Widget):
                 pygame.draw.line(screen, Palette.GOLD,
                                  (r.x + 8, r.bottom - 2),
                                  (r.right - 8, r.bottom - 2), 2)
+
 
 # =====================================================================
 # HELPERS DE FORMA — usados por SlotRow
@@ -1854,23 +1898,9 @@ def _tint_surface(surf, color):
 
 
 # =====================================================================
-# SLOT ROW — fileira de N slots iguais (aceso/apagado)
+# SLOT ROW
 # =====================================================================
 class SlotRow(Widget):
-    """
-    Fileira (ou coluna) de N slots iguais. Cada slot é "aceso" ou "apagado".
-
-    Ideal para: estrelas de fase, medalhas, insígnias de ginásio,
-    vidas, slots de inventário, checks de progresso, etc.
-
-    shape: desenha a forma proceduralmente
-      ("star" | "circle" | "square" | "diamond" | "triangle" |
-       "pentagon" | "hexagon" | "heart" | "shield" | "trophy" |
-       "medal" | "none")
-
-    icon: se fornecido, desenha a imagem no lugar do shape
-          (com tint opcional via `icon_tint`)
-    """
     SHAPES = (
         "star", "circle", "square", "diamond", "triangle",
         "pentagon", "hexagon", "heart", "shield", "trophy",
@@ -1920,7 +1950,6 @@ class SlotRow(Widget):
         self.pixel_art = bool(pixel_art)
         self.tab = tab
 
-    # -----------------------------------------------------------------
     def set_value(self, v):
         self.value = max(0, min(self.max_slots, int(v)))
 
@@ -1928,7 +1957,6 @@ class SlotRow(Widget):
         self.max_slots = max(1, int(n))
         self.value = max(0, min(self.max_slots, self.value))
 
-    # -----------------------------------------------------------------
     def _compute_slot_size(self):
         if self.slot_size:
             return max(6, int(self.slot_size))
@@ -1952,7 +1980,6 @@ class SlotRow(Widget):
         x0 = self.rect.centerx - total // 2 + s // 2
         return [(x0 + i * (s + self.gap), y, s) for i in range(n)]
 
-    # -----------------------------------------------------------------
     def render(self, screen):
         if not self.visible:
             return
@@ -1963,7 +1990,6 @@ class SlotRow(Widget):
         color = self.color_filled if filled else self.color_empty
         alpha = self.filled_alpha if filled else self.empty_alpha
 
-        # ---- Ícone custom (imagem) ----
         if self.icon is not None:
             iw, ih = self.icon.get_size()
             if iw > 0 and ih > 0:
@@ -2083,8 +2109,9 @@ class SlotRow(Widget):
                          (cx - stem_w / 2, body_bot - stem_h,
                           stem_w, stem_h))
 
+
 # =====================================================================
-# CARD GRID — replica um template (card_layout) em N células
+# CARD GRID
 # =====================================================================
 from src.ui.bindings import resolve_wdata
 
@@ -2093,14 +2120,10 @@ class CardGrid(Widget):
     """
     Grid de cards cujo visual vem 100% do JSON (`card_layout`).
 
-    Cada widget do `card_layout` é posicionado em coordenadas RELATIVAS
-    à célula (0..1), não ao pai. O widget replica pra cada item da lista.
-
-    Suporta:
-      - scroll vertical (roda do mouse)
-      - hover/click por célula (on_select(idx))
-      - bindings {item.xxx} resolvidos em runtime
-      - cache dos sub-widgets por slot (não recria a cada frame)
+    Performance:
+      - sub-widgets são criados uma vez por slot e cacheados
+      - bindings `{item.xxx}` só são recalculados quando o item muda
+        (comparação por identidade `is`) — antes era a cada frame.
     """
     def __init__(self, wid, rect,
                  items=None,
@@ -2134,14 +2157,12 @@ class CardGrid(Widget):
         self.hover_volume = hover_volume
         self._loader = screen_loader
 
-        # Scrollbar
         self.show_scrollbar = bool(show_scrollbar)
         self.scrollbar_width = int(scrollbar_width)
         self.scrollbar_color = scrollbar_color
         self.scrollbar_bg = scrollbar_bg
         self.scrollbar_radius = int(scrollbar_radius)
 
-        # Estado
         self.scroll = 0
         self._hover_idx = -1
         self._dragging_scroll = False
@@ -2149,13 +2170,12 @@ class CardGrid(Widget):
 
         # Cache dos sub-widgets por slot (0..cols*rows-1)
         self._slot_widgets = {}
+        # Cache de qual item foi aplicado por slot (para pular re-binding)
+        self._applied_items = {}
 
     # -----------------------------------------------------------------
-    # Cálculos
-    # -----------------------------------------------------------------
     def _inner_rect(self):
-        r = self.rect.inflate(-self.padding * 2, -self.padding * 2)
-        return r
+        return self.rect.inflate(-self.padding * 2, -self.padding * 2)
 
     def _cell_rect(self, col, row):
         inner = self._inner_rect()
@@ -2175,8 +2195,6 @@ class CardGrid(Widget):
         return max(0, self._total_rows() - self.rows)
 
     # -----------------------------------------------------------------
-    # Construção (lazy) dos sub-widgets por slot
-    # -----------------------------------------------------------------
     def _ensure_loader(self):
         if self._loader is None:
             from src.ui.screen_loader import ScreenLoader
@@ -2190,7 +2208,6 @@ class CardGrid(Widget):
 
         widgets = []
         for wdata in self.card_layout:
-            # Cria com valores crus; serão re-resolvidos a cada render
             w = self._loader._build_widget(wdata, cell, {}, None)
             if w is not None:
                 w.z = int(wdata.get("z", 0))
@@ -2204,8 +2221,6 @@ class CardGrid(Widget):
         return self._slot_widgets[slot_idx]
 
     # -----------------------------------------------------------------
-    # Aplicar bindings em runtime
-    # -----------------------------------------------------------------
     _FIELD_MAP = {
         "text": "text",
         "label": "label",
@@ -2213,8 +2228,8 @@ class CardGrid(Widget):
         "border_color": "border_color",
         "text_color": "text_color",
         "bg_color": "bg_color",
-        "badge_text_color": "text_color",       # badge usa text_color
-        "icon": "surface",                       # ImageBox / Button
+        "badge_text_color": "text_color",
+        "icon": "surface",
         "surface": "surface",
         "value": "value",
         "max_value": "max_value",
@@ -2225,7 +2240,6 @@ class CardGrid(Widget):
         from src.ui.theme import parse_color
         resolved = resolve_wdata(wdata, item)
 
-        # Mescla top-level + props (props não sobrescreve top-level)
         merged = dict(resolved)
         for k, v in (resolved.get("props", {}) or {}).items():
             if k not in merged:
@@ -2245,7 +2259,6 @@ class CardGrid(Widget):
             except Exception:
                 pass
 
-        # Surface / icon resolvidos como objeto direto
         if "surface" in merged and hasattr(widget, "surface"):
             try: widget.surface = merged["surface"]
             except Exception: pass
@@ -2253,8 +2266,6 @@ class CardGrid(Widget):
             try: widget.icon = merged["icon"]
             except Exception: pass
 
-    # -----------------------------------------------------------------
-    # Eventos
     # -----------------------------------------------------------------
     def _hit_index(self, pos):
         inner = self._inner_rect()
@@ -2295,7 +2306,6 @@ class CardGrid(Widget):
         if not self.visible or not self.enabled:
             return False
 
-        # Scrollbar drag
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             track, thumb = self._scrollbar_rects()
             if track and thumb and track.collidepoint(event.pos):
@@ -2321,7 +2331,6 @@ class CardGrid(Widget):
                 self._dragging_scroll = False
                 return True
 
-        # Wheel
         if event.type == pygame.MOUSEWHEEL:
             mx, my = pygame.mouse.get_pos()
             if self.rect.collidepoint(mx, my):
@@ -2329,7 +2338,6 @@ class CardGrid(Widget):
                 self.scroll = max(0, min(self._max_scroll(), self.scroll))
                 return True
 
-        # Hover / click
         if event.type == pygame.MOUSEMOTION:
             old = self._hover_idx
             self._hover_idx = self._hit_index(event.pos)
@@ -2344,14 +2352,10 @@ class CardGrid(Widget):
                 return True
         return False
 
-    # -----------------------------------------------------------------
-    # Render
-    # -----------------------------------------------------------------
     def render(self, screen):
         if not self.visible:
             return
 
-        # Fundo
         if self.fill_alpha < 255 and self.fill_color:
             surf = pygame.Surface(self.rect.size, pygame.SRCALPHA)
             pygame.draw.rect(surf,
@@ -2366,14 +2370,12 @@ class CardGrid(Widget):
             pygame.draw.rect(screen, self.border_color, self.rect,
                              self.border_width, border_radius=8)
 
-        # Clip
         old = screen.get_clip()
         clip = self._inner_rect()
         if self.show_scrollbar and self._max_scroll() > 0:
             clip.width -= self.scrollbar_width + 6
         screen.set_clip(clip)
 
-        # Células
         for slot_idx in range(self.cols * self.rows):
             col = slot_idx % self.cols
             row = slot_idx // self.cols
@@ -2382,14 +2384,19 @@ class CardGrid(Widget):
                 continue
             item = self.items[item_idx]
 
-            # Garante que a célula está dentro do clip
             cell = self._cell_rect(col, row)
             if not cell.colliderect(clip):
                 continue
 
-            # Injetar flag de seleção (se a scene setar selected_id)
-            for wdata, widget in self._get_slot(slot_idx):
-                self._apply_bindings(widget, wdata, item)
+            slot_widgets = self._get_slot(slot_idx)
+
+            # Re-resolve bindings só se o item mudou
+            if self._applied_items.get(slot_idx) is not item:
+                for wdata, widget in slot_widgets:
+                    self._apply_bindings(widget, wdata, item)
+                self._applied_items[slot_idx] = item
+
+            for wdata, widget in slot_widgets:
                 try:
                     widget.render(screen)
                 except Exception as e:
@@ -2398,7 +2405,6 @@ class CardGrid(Widget):
 
         screen.set_clip(old)
 
-        # Scrollbar
         track, thumb = self._scrollbar_rects()
         if track and thumb:
             pygame.draw.rect(screen, self.scrollbar_bg, track,

@@ -11,6 +11,7 @@ from src.config.regions import (
     RegionCatalog, DEFAULT_REGION_ID, parse_phase_id,
 )
 from src.config.paths import RES_PATH
+from src.ui.utils.type_bar_loader import rarity_bar_loader
 
 
 class AchievementLogic:
@@ -40,6 +41,14 @@ class AchievementLogic:
         AchievementRarity.RARE:      (100, 150, 255),
         AchievementRarity.EPIC:      (200, 100, 255),
         AchievementRarity.LEGENDARY: (255, 215, 0),
+    }
+    # ===== Chave usada pelo rarity_bar_loader =====
+    RARITY_KEY = {
+        AchievementRarity.COMMON:    "common",
+        AchievementRarity.UNCOMMON:  "uncommon",
+        AchievementRarity.RARE:      "rare",
+        AchievementRarity.EPIC:      "epic",
+        AchievementRarity.LEGENDARY: "legendary",
     }
 
     # =================================================================
@@ -216,6 +225,18 @@ class AchievementLogic:
 
         self._card_cache[aid] = surf
         return surf
+
+    # -----------------------------------------------------------------
+    # Rarity bar (mesmo padrão do profile)
+    # -----------------------------------------------------------------
+    def get_rarity_surface(self, ach: Achievement) -> Optional[pygame.Surface]:
+        """Retorna a barra 70×16 da raridade do achievement, ou None."""
+        if ach is None:
+            return None
+        key = self.RARITY_KEY.get(ach.rarity)
+        if not key:
+            return None
+        return rarity_bar_loader.get_original(key)
 
     # -----------------------------------------------------------------
     # Helpers

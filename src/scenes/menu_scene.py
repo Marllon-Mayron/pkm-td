@@ -20,7 +20,7 @@ from src.ui.toast_renderer import toast_warning
 
 
 # =========================================================================
-# SLIDESHOW GENÉRICO (agora guarda o nome de cada imagem)
+# SLIDESHOW GENÉRICO
 # =========================================================================
 class ImageSlideshow:
     """Gerenciador de slideshow de imagens (preview ou news)."""
@@ -35,9 +35,7 @@ class ImageSlideshow:
         self._loaded = False
         self.folder_path = None
 
-    # ------------------------------------------------------------------
     def load_from_folder(self, folder_path):
-        """Carrega TODAS as imagens de uma pasta (ordenação natural)."""
         self.image_surfaces = []
         self.image_names = []
         self.current_index = 0
@@ -54,7 +52,6 @@ class ImageSlideshow:
                     "*.PNG", "*.JPG", "*.JPEG", "*.BMP"):
             image_files.extend(folder_path.glob(ext))
 
-        # Remove duplicatas
         seen = set()
         unique = []
         for f in image_files:
@@ -62,7 +59,6 @@ class ImageSlideshow:
                 seen.add(f)
                 unique.append(f)
 
-        # Ordenação NATURAL: news_2 antes de news_10
         image_files = sorted(unique, key=natural_sort_key)
 
         if not image_files:
@@ -104,7 +100,6 @@ class ImageSlideshow:
             self.image_names.append(f"fallback_{i + 1}.png")
         self._loaded = True
 
-    # ------------------------------------------------------------------
     def update(self, dt):
         if not self._loaded or len(self.image_surfaces) <= 1:
             return
@@ -119,7 +114,6 @@ class ImageSlideshow:
         return self.image_surfaces[self.current_index]
 
     def get_current_name(self):
-        """Retorna o nome do arquivo da imagem atual (ou None)."""
         if not self._loaded or not self.image_names:
             return None
         if 0 <= self.current_index < len(self.image_names):
@@ -143,7 +137,7 @@ class ImageSlideshow:
 
 
 # =========================================================================
-# BUTTON (inalterado)
+# BUTTON
 # =========================================================================
 class Button:
     """Botão estilizado com responsividade e efeitos visuais"""
@@ -351,8 +345,7 @@ class MenuScene(BaseScene):
     def __init__(self, game):
         super().__init__(game)
 
-        has_starter = getattr(self.game.player, 'has_chosen_starter', False)
-        self.start_text = "Continuar Jogo" if has_starter else "Iniciar Jogo"
+        self.start_text = "Jogar"
 
         # Estado
         self.reset_confirmation_active = False
@@ -403,7 +396,6 @@ class MenuScene(BaseScene):
     # ======================================================================
 
     def _load_slideshows(self):
-        # PREVIEW
         preview_path = SPRITES_PATH / "screenshots" / "game_preview"
         ok = self.preview_slideshow.load_from_folder(preview_path)
         if not ok:
@@ -412,7 +404,6 @@ class MenuScene(BaseScene):
         if not ok:
             self.preview_slideshow._create_fallback_images()
 
-        # NEWS (versões em subpastas)
         news_base = SPRITES_PATH / "screenshots" / "news"
         if news_base.exists() and news_base.is_dir():
             self.news_versions = sorted(
@@ -566,10 +557,8 @@ class MenuScene(BaseScene):
                    (40, 40, 60), (80, 80, 120), self.open_settings, None,
                    volume=BTN_VOLUME),
             editor_btn,
-            Button(left_margin, main_btn_y + 0.37, 0.17, 0.06, "Mystery Gift",
-                   (40, 20, 40), (80, 40, 80), self.open_mystery_gift, None,
-                   volume=BTN_VOLUME),
-            Button(left_margin + 0.18, main_btn_y + 0.37, 0.17, 0.06, "RESETAR",
+            # ===== RESETAR (agora linha inteira, sem Mystery Gift do lado) =====
+            Button(left_margin, main_btn_y + 0.37, button_width, 0.06, "RESETAR",
                    (60, 15, 15), (120, 25, 25), self.show_reset_confirmation, None,
                    volume=BTN_VOLUME),
             Button(left_margin, main_btn_y + 0.46, button_width, 0.07, "Sair",
@@ -577,7 +566,6 @@ class MenuScene(BaseScene):
                    volume=BTN_VOLUME),
         ]
 
-        # ===== BOTÃO DEBUG (apenas se DEBUG_MODE) =====
         if DEBUG_MODE:
             debug_btn = Button(
                 left_margin, main_btn_y + 0.55, button_width, 0.055, "DEBUG",
@@ -646,26 +634,16 @@ class MenuScene(BaseScene):
         from src.scenes.debug_scene.debug_scene import DebugScene
         self.game.current_scene = DebugScene(self.game)
 
-    def open_mystery_gift(self):
-        from src.scenes.mystery_gift_scene.mystery_gift_scene import MysteryGiftScene
-        self.game.current_scene = MysteryGiftScene(self.game)
+    # ===== open_mystery_gift removido (agora fica na PhaseSelectScene) =====
 
     def quit_game(self):
         sound_manager.stop_music(fade_ms=300)
         self.game.running = False
 
     def start_game(self):
-        sound_manager.stop_music(fade_ms=300)
-        has_chosen_starter = getattr(self.game.player, 'has_chosen_starter', False)
-        if has_chosen_starter:
-            from src.config.progress import progress_manager
-            # Pega qualquer fase nova que tenha sido adicionada ao catálogo enquanto o jogo estava aberto e sincroniza com o save.
-            progress_manager.reload_progress()
-            self.game.current_scene = PhaseSelectScene(self.game)
-        else:
-            from src.scenes.starter_select_scene.starter_select_scene import StarterSelectScene
-            self.game.starter_select_scene = StarterSelectScene(self.game)
-            self.game.current_scene = self.game.starter_select_scene
+        """Abre a tela de seleção de save."""
+        from src.scenes.save_slot_scene.save_slot_scene import SaveSlotScene
+        self.game.current_scene = SaveSlotScene(self.game)
 
     # ======================================================================
     # RESET
@@ -717,10 +695,11 @@ class MenuScene(BaseScene):
 
             from src.config.progress import progress_manager
             game_state = {
+                "current_region": 1,
                 "current_chapter": 1,
                 "current_phase": 1,
                 "unlocked_chapters": [1],
-                "unlocked_phases": ["1-1"],
+                "unlocked_phases": ["1:1:1"],
                 "completed_phases": [],
                 "stars": {}
             }
@@ -740,10 +719,8 @@ class MenuScene(BaseScene):
             self.reset_confirmation_active = False
 
     def _refresh_buttons(self):
-        has_starter = getattr(self.game.player, 'has_chosen_starter', False)
-        self.start_text = "Continuar Jogo" if has_starter else "Iniciar Jogo"
         if self.buttons:
-            self.buttons[0].text = self.start_text
+            self.buttons[0].text = "Jogar"
             self.buttons[0].text_surface = None
 
     # ======================================================================
@@ -948,7 +925,6 @@ class MenuScene(BaseScene):
 
         mouse_pos = pygame.mouse.get_pos()
 
-        # ===================== TABS =====================
         pad = 10
         tab_h = max(30, int(panel_height * 0.06))
         tab_w = int(panel_width * 0.30)
@@ -965,7 +941,6 @@ class MenuScene(BaseScene):
 
         content_y = tab_y + tab_h + 10
 
-        # ===================== VERSION SELECTOR =====================
         self.version_left_rect = None
         self.version_right_rect = None
 
@@ -995,34 +970,28 @@ class MenuScene(BaseScene):
 
             content_y = ver_y + ver_h + 10
 
-        # ===================== CÁLCULO DE ESPAÇO (de baixo pra cima) =====================
         bottom_pad = 12
         bottom_y = panel_y + panel_height - bottom_pad
 
-        # LINK (só news)
         link_h = max(34, int(panel_height * 0.065)) if self.view_mode == "news" else 0
         link_y = None
         if self.view_mode == "news":
             link_y = bottom_y - link_h
             bottom_y = link_y - 10
 
-        # DOTS
         dots_h = 10
         dots_y = bottom_y - dots_h
         bottom_y = dots_y - 6
 
-        # INDICADOR "3 / 8"
         ind_font = pygame.font.Font(None, max(14, int(panel_height * 0.028)))
         ind_h = ind_font.get_height()
         ind_y = bottom_y - ind_h
         bottom_y = ind_y - 6
 
-        # NAV (< >)
         nav_h = max(30, int(panel_height * 0.06))
         nav_y = bottom_y - nav_h
         bottom_y = nav_y - 8
 
-        # TÍTULO DA IMAGEM (só news)
         title_font = pygame.font.Font(None, max(16, int(panel_height * 0.032)))
         title_lines = []
         title_h = 0
@@ -1037,7 +1006,6 @@ class MenuScene(BaseScene):
                 title_h = len(title_lines) * line_h
                 bottom_y -= title_h + 8
 
-        # ÁREA DA IMAGEM
         img_margin = 12
         img_x = panel_x + img_margin
         img_y = content_y
@@ -1046,12 +1014,10 @@ class MenuScene(BaseScene):
         if img_h < 50:
             img_h = 50
 
-        # ===================== IMAGEM =====================
         active = self._get_active_slideshow()
         current_img = active.get_current_image() if active else None
         self._render_slideshow_image(screen, current_img, img_x, img_y, img_w, img_h, vh)
 
-        # ===================== TÍTULO (renderiza abaixo da imagem) =====================
         if self.view_mode == "news" and title_lines:
             line_h = title_font.get_height() + 2
             ty = bottom_y + 8 - title_h + (title_h - len(title_lines) * line_h) // 2
@@ -1061,7 +1027,6 @@ class MenuScene(BaseScene):
                 screen.blit(surf, (tx, ty))
                 ty += line_h
 
-        # ===================== NAV =====================
         nav_size = nav_h
         nav_gap = 20
         left_x = panel_x + (panel_width - nav_size * 2 - nav_gap) // 2
@@ -1085,7 +1050,6 @@ class MenuScene(BaseScene):
             t = f.render(sym, True, (220, 210, 240))
             screen.blit(t, t.get_rect(center=rect.center))
 
-        # Indicador
         count = active.get_image_count() if active else 0
         if count > 1:
             idx = active.current_index + 1
@@ -1106,7 +1070,6 @@ class MenuScene(BaseScene):
                 if is_active:
                     pygame.draw.circle(screen, (255, 215, 0), (x, cy), dot_size // 2 + 2, 1)
 
-        # ===================== LINK =====================
         self.link_button_rect = None
         self._link_hover = False
         if self.view_mode == "news":
@@ -1136,11 +1099,7 @@ class MenuScene(BaseScene):
                 t = f.render("Sem changelog cadastrado", True, (140, 140, 150))
                 screen.blit(t, t.get_rect(center=btn_rect.center))
 
-    # ------------------------------------------------------------------
-    # WRAP DE TEXTO
-    # ------------------------------------------------------------------
     def _wrap_text(self, text, font, max_width):
-        """Quebra texto em múltiplas linhas para caber em max_width."""
         words = str(text).split(' ')
         lines = []
         cur = ""
@@ -1151,13 +1110,11 @@ class MenuScene(BaseScene):
             else:
                 if cur:
                     lines.append(cur)
-                # Se uma única palavra é maior que max_width, ela fica sozinha
                 cur = w
         if cur:
             lines.append(cur)
         return lines
 
-    # ------------------------------------------------------------------
     def _render_tab(self, screen, rect, label, is_active, mouse_pos):
         hover = rect.collidepoint(mouse_pos)
 
@@ -1231,7 +1188,6 @@ class MenuScene(BaseScene):
         screen.blit(surf, (x + (w - surf.get_width()) // 2,
                            y + (h - surf.get_height()) // 2))
 
-    # ------------------------------------------------------------------
     def _draw_gradient_background(self, screen):
         width = self.screen_manager.window_width
         height = self.screen_manager.window_height
@@ -1267,7 +1223,6 @@ class MenuScene(BaseScene):
 
             pygame.draw.circle(screen, color, (x, y), size)
 
-    # ------------------------------------------------------------------
     def _render_reset_confirmation(self, screen):
         vx = self.screen_manager.viewport_x
         vy = self.screen_manager.viewport_y
@@ -1375,7 +1330,6 @@ class MenuScene(BaseScene):
         self._confirm_yes_rect = yes_rect
         self._confirm_no_rect = no_rect
 
-    # ------------------------------------------------------------------
     def _render_pause_overlay(self, screen):
         overlay = pygame.Surface((self.screen_manager.window_width, self.screen_manager.window_height))
         overlay.set_alpha(128)

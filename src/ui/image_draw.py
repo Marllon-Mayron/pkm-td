@@ -3,15 +3,16 @@
 Utilitário central de desenho de imagens.
 
 Modos:
-  "stretch"   estica pra preencher (ignora aspect)
-  "tile"      repete em 2D no tamanho original
-  "tile_h"    repete na horizontal, altura esticada
-  "tile_v"    repete na vertical, largura esticada
-  "center"    tamanho original, centralizado
-  "contain"   mantém aspect, cabe dentro
-  "cover"     mantém aspect, cobre tudo (corta sobras)
-  "fit_w"     largura total, altura proporcional
-  "fit_h"     altura total, largura proporcional
+  "stretch"        estica pra preencher (ignora aspect)
+  "tile"           repete em 2D no tamanho original
+  "tile_h"         repete na horizontal, altura esticada
+  "tile_v"         repete na vertical, largura esticada
+  "center"         tamanho original, centralizado
+  "contain"        mantém aspect, cabe dentro
+  "cover"          mantém aspect, cobre tudo (corta sobras)
+  "fit_w"          largura total, altura proporcional
+  "fit_h"          altura total, largura proporcional
+  "pixel_perfect"  escala por fator INTEIRO (nearest), centraliza no rect
 
 Escala:
   smooth=False (padrão) → pygame.transform.scale (nearest, pixel perfect)
@@ -20,7 +21,7 @@ Escala:
 import pygame
 
 MODES = ("stretch", "tile", "tile_h", "tile_v", "center",
-         "contain", "cover", "fit_w", "fit_h")
+         "contain", "cover", "fit_w", "fit_h", "pixel_perfect")
 
 
 def _apply_tint(img, tint):
@@ -47,6 +48,7 @@ def _scaled_size(img, rect, mode):
     if iw <= 0 or ih <= 0:
         return (1, 1)
     rw, rh = max(1, rect.width), max(1, rect.height)
+
     if mode == "stretch":
         return (rw, rh)
     if mode == "center":
@@ -55,6 +57,10 @@ def _scaled_size(img, rect, mode):
         return (rw, max(1, int(ih * rw / iw)))
     if mode == "fit_h":
         return (max(1, int(iw * rh / ih)), rh)
+    if mode == "pixel_perfect":
+        n = max(1, min(rw // iw, rh // ih))
+        return (iw * n, ih * n)
+
     ratio_img = iw / ih
     ratio_rect = rw / rh
     if mode == "contain":
@@ -99,10 +105,37 @@ def draw_image_in_rect(target, image, rect, mode="stretch",
         img = _apply_alpha(img, alpha)
 
     rw, rh = max(1, rect.width), max(1, rect.height)
+    iw, ih = img.get_size()
+    if iw <= 0 or ih <= 0:
+        return rect
 
-    # Modos de repetição
+    # ===== PIXEL PERFECT =====
+    # Escala por fator INTEIRO (nearest), centraliza no rect.
+    # Garante que cada pixel do PNG ocupe N x N pixels na tela, sem
+    # borrão nem pixel cortado no meio.
+    if mode == "pixel_perfect":
+        n = max(1, min(rw // iw, rh // ih))
+        fits_int = (iw * n <= rw and ih * n <= rh)
+
+        if fits_int:
+            nw, nh = iw * n, ih * n
+        else:
+            # fractional fallback
+            s = min(rw / iw, rh / ih)
+            nw = max(1, int(iw * s))
+            nh = max(1, int(ih * s))
+
+        surf = _scale(img, (nw, nh), smooth=False)
+        x = rect.x + (rw - nw) // 2
+        y = rect.y + (rh - nh) // 2
+        old = target.get_clip()
+        target.set_clip(rect.clip(old))
+        target.blit(surf, (x, y))
+        target.set_clip(old)
+        return pygame.Rect(x, y, nw, nh)
+
+    # ===== Modos de repetição =====
     if mode in ("tile", "tile_h", "tile_v"):
-        iw, ih = img.get_size()
         if mode == "tile_h":
             tile = _scale(img, (iw, rh), smooth)
             tile_w, tile_h = iw, rh
@@ -126,7 +159,7 @@ def draw_image_in_rect(target, image, rect, mode="stretch",
         target.set_clip(old)
         return rect
 
-    # Modos de escala única
+    # ===== Modos de escala única =====
     nw, nh = _scaled_size(img, rect, mode)
     if (nw, nh) != img.get_size():
         surf = _scale(img, (nw, nh), smooth)

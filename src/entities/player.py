@@ -10,6 +10,7 @@ from src.managers.bag_manager import BagManager
 from src.managers.ui_config_manager import ui_config_manager
 from src.managers.save_manager import SaveManager
 from src.managers.achievement_manager import AchievementManager
+from src.utils.player_sprite import clear_cache
 
 
 class Player(Entity):
@@ -86,12 +87,71 @@ class Player(Entity):
 
         # ===== CUSTOMIZACAO DO PERFIL =====
         self.profile_customization = {
-            "featured_achievements": [],  # keys de ACHIEVEMENTS (máx 3)
-            "background_color": "default",  # key de BACKGROUND_OPTIONS
-            "favorite_pokemon_id": None,  # unique_id do pokemon favorito (do TIME)
+            "featured_achievements": [],
+            "background_color": "default",
+            "favorite_pokemon_id": None,
+            "appearance": {
+                "skin": "skin_1",
+                "eyes": "eyes_1",
+                "hair": None,
+                "torso": None,
+                "pants": None,
+                "hat": None,
+            },
         }
 
+        # Dá todas as roupas ao jogador novo (pra ele testar o armário)
+        _all_clothes = (
+            "skin_1", "skin_2",
+            "eyes_1", "eyes_2", "eyes_3", "eyes_4", "eyes_5", "eyes_6",
+            "hair_1", "hair_2", "hair_3",
+            "torso_1", "torso_2",
+            "pants_1", "pants_2",
+            "hat_1", "hat_2",
+        )
+        for _item in _all_clothes:
+            self.bag.items.setdefault(_item, 1)
+
         self.save_manager = SaveManager()
+
+    def get_appearance(self) -> dict:
+        pc = self.profile_customization
+        app = pc.setdefault("appearance", {})
+        defaults = {
+            "skin": "skin_1",
+            "eyes": "eyes_1",
+            "hair": None,
+            "torso": None,
+            "pants": None,
+            "hat": None,
+        }
+        for k, v in defaults.items():
+            app.setdefault(k, v)
+        return app
+
+    def owns_clothing(self, item_id: str) -> bool:
+        """True se o jogador tem a peça na mochila (qtd > 0)."""
+        try:
+            return self.bag.items.get(item_id, 0) > 0
+        except Exception:
+            return False
+
+    def get_owned_clothing_by_slot(self) -> dict:
+        from src.data.item_bag_catalog import item_bag_catalog
+        result = {s: [] for s in ("skin", "eyes", "hair", "torso", "pants", "hat")}
+        for item_id, qty in self.bag.items.items():
+            if qty <= 0: continue
+            data = item_bag_catalog.items.get(item_id)
+            if not data or data.get("category") != "clothing": continue
+            slot = data.get("slot")
+            if slot in result:
+                result[slot].append(item_id)
+        return result
+
+    def set_appearance(self, **kwargs):
+        app = self.get_appearance()
+        app.update(kwargs)          # aceita None para "remover"
+        clear_cache()
 
     def get_pokemon_instance(self, unique_id: str) -> Optional['Pokemon']:
         """
@@ -379,57 +439,133 @@ class Player(Entity):
             if uid and uid in self._pokemon_cache:
                 self._pokemon_cache[uid].capture_method = new_method
 
-    def _get_current_save_name(self, slot=1):
+    def _get_current_save_name(self, slot=None):
         """
-        Obtém o nome atual do save (do save_manager em memória ou do arquivo).
-        Usado para que auto_saves NÃO sobrescrevam um nome customizado.
+        Lê o nome do save DIRETO DO ARQUIVO do slot (não da memória!).
+        Isso evita que o nome de um slot vaze para outro.
         """
+        import os, json
         from src.managers.save_manager import save_manager
 
-        # 1. Tenta pegar do save_manager em memória
-        try:
-            if getattr(save_manager, 'save_data', None):
-                name = save_manager.save_data.get("meta", {}).get("save_name")
-                if name:
-                    return name
-        except Exception:
-            pass
+        if slot is None:
+            slot = save_manager.current_save_file or 1
 
-        # 2. Fallback: lê direto do arquivo do slot
-        try:
-            import os, json
-            filepath = os.path.join(save_manager.save_dir, f"save_{slot}.json")
-            if os.path.exists(filepath):
+        filepath = os.path.join(save_manager.save_dir, f"save_{slot}.json")
+        if os.path.exists(filepath):
+            try:
                 with open(filepath, 'r', encoding='utf-8') as f:
-                    file_data = json.load(f)
-                name = file_data.get("meta", {}).get("save_name")
+                    data = json.load(f)
+                name = data.get("meta", {}).get("save_name")
                 if name:
                     return name
-        except Exception as e:
-            print(f"[PLAYER] Erro ao ler nome do save: {e}")
+            except Exception as e:
+                print(f"[PLAYER] Erro ao ler nome do save {slot}: {e}")
 
-        # 3. Fallback final
         return f"Save {slot}"
 
-    def save_game(self, slot=1):
-        """Salva o jogo atual preservando o nome customizado do save."""
+    def save_game(self, slot=None):
+        """
+        Salva o jogo atual.
+        - Se slot=None, usa o slot atualmente carregado (save_manager.current_save_file).
+        - O nome é preservado lendo DIRETO do arquivo daquele slot.
+        """
         from src.managers.save_manager import save_manager
+        from src.config.progress import progress_manager
 
-        # Preserva o nome atual (não força "Save N")
+        if slot is None:
+            slot = save_manager.current_save_file or 1
+
         save_name = self._get_current_save_name(slot)
 
+        # Pega o chapter/phase do progress_manager (que é a fonte da verdade)
         game_state = {
-            "current_chapter": getattr(self, 'current_chapter', 1),
-            "current_phase": getattr(self, 'current_phase', 1)
+            "current_region": progress_manager.progress.get("current_region", 1),
+            "current_chapter": progress_manager.progress.get("current_chapter", 1),
+            "current_phase": progress_manager.progress.get("current_phase", 1),
         }
 
         return save_manager.save_game(self, game_state, save_name=save_name, slot=slot)
 
-    def load_game(self, slot=1):
-        """Carrega um jogo"""
+    def load_game(self, slot=None):
+        """Carrega um jogo. Se slot=None, usa o slot atual do save_manager."""
         from src.managers.save_manager import save_manager
+
+        if slot is None:
+            slot = save_manager.current_save_file or 1
+
         return save_manager.load_game(self, slot)
 
+    def reset_all_data(self):
+        """
+        Reseta TODOS os dados do jogador in-place (para um novo jogo).
+        Não apaga arquivos — só o estado em memória. Quem chama deve salvar depois.
+        """
+        import uuid
+
+        self.team.clear()
+        self.pc_box.clear()
+        if hasattr(self, '_pokemon_cache'):
+            self._pokemon_cache.clear()
+
+        self.money = 100
+        self.score = 0
+        self.seen_pokemon.clear()
+        self.caught_pokemon.clear()
+
+        self.achievements = {"unlocked": [], "counters": {}, "unlocked_data": {}}
+        if hasattr(self, 'achievement_manager'):
+            try:
+                self.achievement_manager.load_from_player()
+            except Exception as e:
+                print(f"[PLAYER] Aviso ao recarregar achievements: {e}")
+
+        self.desfossilizadores.clear()
+        if hasattr(self, '_add_initial_desfossilizador'):
+            self._add_initial_desfossilizador()
+
+        self.has_chosen_starter = False
+        self.total_playtime = 0.0
+        self._playtime_accumulator = 0.0
+
+        self.redeemed_codes = {}
+        self.mystery_gift_history = []
+
+        self.x = 100
+        self.y = 100
+        self.selected_slot = 0
+        self.chapter_page_num = 1
+        self.current_region = 1
+
+        self.pending_mythical_id = None
+        self.pending_mythical_phase_id = None
+
+        # Bag: roupas básicas + nada mais
+        self.bag.items = {}
+        _all_clothes = (
+            "skin_1", "skin_2",
+            "eyes_1", "eyes_2", "eyes_3", "eyes_4", "eyes_5", "eyes_6",
+            "hair_1", "hair_2", "hair_3",
+            "torso_1", "torso_2",
+            "pants_1", "pants_2",
+            "hat_1", "hat_2",
+        )
+        for _item in _all_clothes:
+            self.bag.items.setdefault(_item, 1)
+        if hasattr(self.bag, '_update_filtered_items'):
+            self.bag._update_filtered_items()
+
+        self.profile_customization = {
+            "featured_achievements": [],
+            "background_color": "default",
+            "favorite_pokemon_id": None,
+            "appearance": {
+                "skin": "skin_1", "eyes": "eyes_1", "hair": None,
+                "torso": None, "pants": None, "hat": None,
+            },
+        }
+
+        self.uuid = str(uuid.uuid4())
+        print("[PLAYER] reset_all_data() executado")
     # metodo para salvar automaticamente em momentos chave
     def auto_save(self):
         """Salvamento automático após ações importantes"""

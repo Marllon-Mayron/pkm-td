@@ -284,12 +284,21 @@ class StarterSelectScene(BaseScene):
                 pokemon.nickname = nickname
                 pokemon.name = nickname
 
-            # ===== GANHA 6 POKEBOLAS AO ESCOLHER O INICIAL =====
             self._give_starting_items()
 
-            # Marca que escolheu o inicial e salva
             self.game.player.has_chosen_starter = True
-            self.game.player.save_game(1)
+
+            # ===== FIX: usa o slot ativo em vez de "1" hardcoded =====
+            from src.managers.save_manager import save_manager
+            slot = save_manager.current_save_file
+            if not slot:
+                print("[STARTER_SELECT] ERRO: nenhum slot ativo, abortando save")
+                self.confirmed = False
+                self.show_nickname_dialog = False
+                return
+
+            self.game.player.save_game(slot)
+            print(f"[STARTER_SELECT] Starter salvo no slot {slot}")
 
             from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
             self.game.current_scene = PhaseSelectScene(self.game)

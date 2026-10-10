@@ -138,7 +138,8 @@ class StandardScreen(BaseScene):
     # =================================================================
     def handle_event(self, event):
         if event.type == pygame.VIDEORESIZE:
-            self.on_resize(); return
+            self.on_resize()
+            return
         if self._back_btn and self._back_btn.handle_event(event):
             return
         ordered = sorted(self.widgets, key=lambda x: getattr(x, "z", 0),
@@ -146,10 +147,35 @@ class StandardScreen(BaseScene):
         for w in ordered:
             if w is self._back_btn:
                 continue
+            if not getattr(w, "visible", True):
+                continue  # ← pula invisíveis
             if not self._is_visible_by_tab(w):
                 continue
             if w.handle_event(event):
                 return
+
+    def fixed_update(self, dt):
+        self._check_resize()
+        for w in self.widgets:
+            if not getattr(w, "visible", True):
+                continue  # ← pula invisíveis
+            if not self._is_visible_by_tab(w):
+                continue
+            w.update(dt)
+        self.update(dt)
+
+    def render(self, screen):
+        self._draw_background(screen)
+        self._draw_title(screen)
+        for w in sorted(self.widgets, key=lambda x: getattr(x, "z", 0)):
+            if not getattr(w, "visible", True):
+                continue  # ← pula invisíveis
+            if not self._is_visible_by_tab(w):
+                continue
+            w.render(screen)
+        self.draw_content(screen)
+        if self.paused:
+            self._render_pause_overlay(screen)
 
     def fixed_update(self, dt):
         self._check_resize()

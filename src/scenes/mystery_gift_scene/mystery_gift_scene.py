@@ -94,20 +94,21 @@ class MysteryGiftScene(BaseScene):
 
     # VERIFICAÇÃO DE SAVE
     def _check_save_loaded(self):
-        """Verifica se o jogador tem um save carregado"""
-        # Verifica se existe um arquivo de save
-        save_file = os.path.join("saves", "save_1.json")
-        has_save_file = os.path.exists(save_file)
-
-        # Verifica se o save_manager tem um save carregado
+        """Verifica se o jogador tem um save carregado (no slot atual)."""
         from src.managers.save_manager import save_manager
+
+        slot = save_manager.current_save_file
+        if slot is None:
+            print("[MYSTERY_GIFT] Nenhum slot ativo no save_manager")
+            return False
+
+        save_file = os.path.join("saves", f"save_{slot}.json")
+        has_save_file = os.path.exists(save_file)
         has_save_manager = save_manager.current_save_file is not None
 
-        print(f"[MYSTERY_GIFT] Verificação de save:")
-        print(f"  - Arquivo de save existe: {has_save_file}")
+        print(f"[MYSTERY_GIFT] Verificação de save (slot {slot}):")
+        print(f"  - Arquivo existe: {has_save_file}")
         print(f"  - SaveManager tem save: {has_save_manager}")
-
-        # Retorna True se tiver arquivo de save
         return has_save_file and has_save_manager
 
     # UI

@@ -13,8 +13,8 @@ from src.ui.screen_loader import ScreenLoader
 from src.ui.theme import FontBook
 
 from src.scenes.pokedex_scene.pokedex_logic import PokedexLogic
-from src.ui.utils.type_bar_loader import type_bar_loader
 from src.ui.utils.type_icon_loader import type_icon_loader
+from src.ui.utils import type_bar_loader
 
 LAYOUT_PATH = "res/ui_layouts/pokedex.json"
 
@@ -63,6 +63,10 @@ class PokedexScene(StandardScreen):
         if grid is not None:
             grid.items = [0, 1, 2, 3, 4, 5]
             grid.render_callback = self._render_stat_cell
+
+        grid = self.get("detail_types")
+        if grid is not None:
+            grid.render_callback = self._render_type_cell
 
         self._refresh_search_label()
         self._update_stats()
@@ -135,24 +139,14 @@ class PokedexScene(StandardScreen):
             badge.text = state["status_text"]
             badge.bg_color = state["status_color"]
 
-        # ===== TYPES — barras carregadas do type_bar_loader =====
-        b1 = self.get("detail_type_1")
-        b2 = self.get("detail_type_2")
-        types = state["types"]
-
-        show_1 = len(types) >= 1
-        show_2 = len(types) >= 2
-
-        if b1 is not None:
-            b1.visible = show_1
-            if show_1:
-                b1.surface = type_bar_loader.get_original(types[0]["key"])
-        if b2 is not None:
-            b2.visible = show_2
-            if show_2:
-                b2.surface = type_bar_loader.get_original(types[1]["key"])
-
-        self._center_type_bars(b1, b2, show_1, show_2)
+        # ===== TYPES — grid dinâmico com type_bar_loader =====
+        grid = self.get("detail_types")
+        if grid is not None:
+            keys = [t["key"] for t in state.get("types", [])][:2]
+            grid.items = keys
+            grid.cols  = max(1, len(keys))
+            grid.rows  = 1
+            grid.visible = bool(keys)
 
         # stats (só capturados)
         lbl = self.get("lbl_stats_header")
@@ -190,57 +184,21 @@ class PokedexScene(StandardScreen):
             if show:
                 prog.value = state.get("direction_progress", 0.0)
 
-    def _center_type_bars(self, b1, b2, show_1, show_2):
+    # =================================================================
+    # Callbacks de célula (grid)
+    # =================================================================
+    def _render_type_cell(self, idx, item, screen, rect):
         """
-        Reposiciona slots + imagens centralizados no detail_panel.
-
-        - 1 tipo:  [X]         (centralizado)
-        - 2 tipos: [X][Y]      (par colado, centralizado)
-        - 0 tipos: nada visível
+        `item` é a chave do tipo (string, ex: "fire").
+        Desenha a barra 48x16 do `type_bar_loader` centralizada na célula.
         """
-        parent = self.get("detail_panel")
-        s1 = self.get("type_slot_1")
-        s2 = self.get("type_slot_2")
-
-        if parent is None or b1 is None or b2 is None:
-            return
-
-        cx = parent.rect.centerx
-        w = b1.rect.width
-        gap = 6
-        y = b1.rect.y  # vem do JSON
-
-        if show_1 and show_2:
-            total = w + gap + w
-            x1 = cx - total // 2
-            x2 = x1 + w + gap
-
-            if s1 is not None:
-                s1.visible = True
-                s1.rect.x, s1.rect.y = x1, y
-            if s2 is not None:
-                s2.visible = True
-                s2.rect.x, s2.rect.y = x2, y
-
-            b1.rect.x, b1.rect.y = x1, y
-            b2.rect.x, b2.rect.y = x2, y
-
-        elif show_1:
-            x1 = cx - w // 2
-
-            if s1 is not None:
-                s1.visible = True
-                s1.rect.x, s1.rect.y = x1, y
-            if s2 is not None:
-                s2.visible = False
-
-            b1.rect.x, b1.rect.y = x1, y
-
-        else:
-            if s1 is not None:
-                s1.visible = False
-            if s2 is not None:
-                s2.visible = False
+        if not item:
+            return True
+        surf = type_bar_loader.get_original(item)
+        if surf is None:
+            return True
+        screen.blit(surf, surf.get_rect(center=rect.center))
+        return True
 
     def _render_stat_cell(self, idx, item, screen, rect):
         """Renderiza uma linha de stat (nome + barra + valor)."""

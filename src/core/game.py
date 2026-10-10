@@ -53,71 +53,124 @@ class Game:
 
     def _initialize_save(self):
         """
-        Inicializa o save automaticamente.
-        - Se existir save, carrega
-        - Se não existir, cria um save inicial vazio
+        Carrega o ÚLTIMO slot usado (persistido em saves/last_slot.txt).
+        Se não houver nada, cai no slot 1 (comportamento antigo).
         """
         from src.managers.save_manager import save_manager
         from src.config.progress import progress_manager
 
-        # Verifica se existe save_1.json
-        save_file = os.path.join("saves", "save_1.json")
-        save_exists = os.path.exists(save_file)
+        slot = self._read_last_slot()  # <-- NOVO
+        save_file = os.path.join("saves", f"save_{slot}.json")
 
-        if save_exists:
-            print("[GAME] Save existente encontrado - carregando...")
-            success = self.player.load_game(1)
+        if os.path.exists(save_file):
+            print(f"[GAME] Save existente encontrado (slot {slot}) - carregando...")
+            success = save_manager.load_game(self.player, slot)
             if success:
-                print("[GAME] Save carregado com sucesso!")
-                # ===== RECARREGA PROGRESSO + SETTINGS DO SAVE =====
-                # load_game() já rodou _sync_unlocked_phases_with_catalog()
-                # dentro do SaveManager. reload_progress() lê esse estado atualizado.
+                print(f"[GAME] Save slot {slot} carregado com sucesso!")
                 progress_manager.reload_progress()
                 return
-            else:
-                print("[GAME] Erro ao carregar save - criando novo...")
+            print(f"[GAME] Erro ao carregar slot {slot} - criando novo...")
         else:
-            print("[GAME] Nenhum save encontrado - criando novo...")
+            print(f"[GAME] Nenhum save no slot {slot} - criando novo...")
 
-        # Cria um save inicial vazio
-        self._create_initial_save()
+        self._create_initial_save(slot=slot)
 
-    def _create_initial_save(self):
-        """
-        Cria um save inicial vazio.
-        Isso permite que o jogador acesse configurações, mystery gift, etc.
-        """
+    # ---------- helpers ----------
+    def _last_slot_path(self):
+        return os.path.join("saves", "last_slot.txt")
+
+    def _read_last_slot(self) -> int:
+        path = self._last_slot_path()
+        try:
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    n = int(f.read().strip())
+                if 1 <= n <= 3:
+                    return n
+        except Exception as e:
+            print(f"[GAME] last_slot inválido, usando 1: {e}")
+        return 1
+
+    def write_last_slot(self, slot: int):
+        """Persiste o slot atual para o próximo boot."""
+        try:
+            os.makedirs("saves", exist_ok=True)
+            with open(self._last_slot_path(), "w", encoding="utf-8") as f:
+                f.write(str(int(slot)))
+            print(f"[GAME] last_slot = {slot}")
+        except Exception as e:
+            print(f"[GAME] Erro ao gravar last_slot: {e}")
+
+    def _create_initial_save(self, slot: int = 1):
         from src.managers.save_manager import save_manager
         from src.config.progress import progress_manager
 
-        print("[GAME] Criando save inicial vazio...")
+        print(f"[GAME] Criando save inicial vazio (slot {slot})...")
 
-        # Garante que o jogador tem um desfossilizador
         if not hasattr(self.player, 'desfossilizadores') or not self.player.desfossilizadores:
             if hasattr(self.player, '_add_initial_desfossilizador'):
                 self.player._add_initial_desfossilizador()
 
-        # ===== GARANTE QUE HAS_CHOSEN_STARTER É FALSE =====
         self.player.has_chosen_starter = False
 
-        # Salva o jogo com estado inicial
         game_state = {
+            "current_region": 1,
             "current_chapter": 1,
             "current_phase": 1,
             "unlocked_chapters": [1],
-            "unlocked_phases": ["1-1"],
+            "unlocked_phases": ["1:1:1"],
             "completed_phases": [],
-            "stars": {}
+            "stars": {},
         }
 
-        success = save_manager.save_game(self.player, game_state, save_name="Save 1", slot=1)
+        success = save_manager.save_game(
+            self.player, game_state,
+            save_name=f"Save {slot}", slot=slot,
+        )
 
         if success:
-            print("[GAME] Save inicial criado com sucesso!")
-            # ===== RECARREGA PROGRESSO + SETTINGS =====
+            print(f"[GAME] Save inicial criado com sucesso no slot {slot}!")
+            self.write_last_slot(slot)  # <-- NOVO
             progress_manager.reload_progress()
         else:
             print("[GAME] ERRO: Não foi possível criar o save inicial!")
+
+    def load_save_slot(self, slot=1) -> bool:
+        from src.managers.save_manager import save_manager
+        from src.config.progress import progress_manager
+
+        success = save_manager.load_game(self.player, slot)
+        if success:
+            self.write_last_slot(slot)  # <-- NOVO
+            progress_manager.reload_progress()
+            print(f"[GAME] Slot {slot} carregado com sucesso")
+            return True
+        print(f"[GAME] Falha ao carregar o slot {slot}")
+        return False
+
+    def start_new_game_in_slot(self, slot=1):
+        from src.managers.save_manager import save_manager
+        from src.config.progress import progress_manager
+
+        self.player.reset_all_data()
+
+        game_state = {
+            "current_region": 1,
+            "current_chapter": 1,
+            "current_phase": 1,
+            "unlocked_chapters": [1],
+            "unlocked_phases": ["1:1:1"],
+            "completed_phases": [],
+            "stars": {},
+        }
+        save_manager.save_game(
+            self.player, game_state,
+            save_name=f"Save {slot}", slot=slot,
+        )
+        save_manager.current_save_file = slot  # ← ESSENCIAL
+        self.write_last_slot(slot)
+        progress_manager.reload_progress()
+        print(f"[GAME] Novo jogo iniciado no slot {slot}")
 
     def initialize_camera(self, world_width, world_height):
         """Inicializa a câmera com o tamanho do mundo"""

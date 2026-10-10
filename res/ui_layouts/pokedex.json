@@ -509,22 +509,20 @@
     },
 
     {
-      "id": "detail_type_1",
-      "type": "image",
+      "id": "detail_types",
+      "type": "grid",
       "parent_id": "detail_panel",
       "z": 4,
-      "x": 0.28, "y": 0.545, "w": 0.22, "h": 0.052, "anchor": "tl",
-      "bg_image_mode": "contain",
-      "pixel_art": true
-    },
-    {
-      "id": "detail_type_2",
-      "type": "image",
-      "parent_id": "detail_panel",
-      "z": 4,
-      "x": 0.51, "y": 0.545, "w": 0.22, "h": 0.052, "anchor": "tl",
-      "bg_image_mode": "contain",
-      "pixel_art": true
+      "x": 0.5, "y": 0.545, "w": 0.94, "h": 0.052, "anchor": "tc",
+      "fill_color": "#141824", "fill_alpha": 0,
+      "border_width": 0,
+      "draw_shadow": false,
+      "props": {
+        "items": [],
+        "cols": 2, "rows": 1,
+        "cell_gap": 6,
+        "on_select": null
+      }
     },
 
     {

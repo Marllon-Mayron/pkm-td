@@ -431,7 +431,7 @@ class ScreenLoader:
         try:
             if wtype == "button":
                 kw = _filter_kwargs(Button, dict(
-                    label=_get("label", "Botão"),
+                    label=_get("label", ""),
                     style=_get("style", "primary"),
                     font_size=fsize, bold=bold,
                     icon_surface=icon_surf,

@@ -102,6 +102,7 @@ class AchievementScene(StandardScreen):
             "rarity_name":        self.logic.RARITY_NAMES.get(ach.rarity, ""),
             "rarity_color":       _hex(rarity),
             "rarity_color_dark":  _hex(dark),
+            "rarity_surface":     self.logic.get_rarity_surface(ach),  # ← NOVO
             "card_surface":       self.logic.get_card_surface(ach),
             "unlocked":           bool(ach.unlocked),
             "locked":             not bool(ach.unlocked),
@@ -111,9 +112,6 @@ class AchievementScene(StandardScreen):
         }
 
     def _feed_grid(self):
-        # CORRIGIDO: o ID real no JSON é "cards_list" (o antigo "cards_grid"
-        # nunca existiu no layout, então o get() sempre retornava None e a
-        # lista nunca populava).
         grid = self.get("cards_list")
         if grid is None:
             return
@@ -147,15 +145,16 @@ class AchievementScene(StandardScreen):
         if t is not None:
             t.text = ach.title if ach else "Selecione uma conquista"
 
-        b = self.get("lbl_detail_rarity")
-        if b is not None:
+        # ===== RARITY BAR (substituiu o badge) =====
+        bar = self.get("detail_rarity_bar")
+        if bar is not None:
             if ach is not None:
-                b.visible  = True
-                b.text     = self.logic.RARITY_NAMES.get(ach.rarity, "")
-                b.bg_color = self.logic.RARITY_COLORS.get(
-                    ach.rarity, (150, 150, 150))
+                surf = self.logic.get_rarity_surface(ach)
+                bar.visible = surf is not None
+                bar.surface = surf
             else:
-                b.visible = False
+                bar.visible = False
+                bar.surface = None
 
         d = self.get("lbl_detail_desc")
         if d is not None:
@@ -201,7 +200,7 @@ class AchievementScene(StandardScreen):
             meta.text = self.logic.build_meta_text(ach) if ach else ""
 
     # =================================================================
-    # Recompensas (ainda é callback — ver observação no fim)
+    # Recompensas
     # =================================================================
     def _render_reward_cell(self, idx, item, screen, rect):
         ach = self.logic.selected
@@ -213,8 +212,6 @@ class AchievementScene(StandardScreen):
         kind, value = rewards[idx]
         inner = rect.inflate(-4, -4)
 
-        # CORRIGIDO: cores alinhadas com a paleta nova
-        # (verde-claro de fundo + borda dourada fina sobre painel bege).
         pygame.draw.rect(screen, (221, 232, 192), inner, border_radius=6)   # #DDE8C0
         pygame.draw.rect(screen, (138, 106, 42), inner, 1, border_radius=6)  # #8A6A2A
 
@@ -277,7 +274,6 @@ class AchievementScene(StandardScreen):
         self._refresh_list()
 
     def _refresh_list(self):
-        # CORRIGIDO: mesmo ID do _feed_grid
         grid = self.get("cards_list")
         if grid is not None:
             grid.scroll = 0
@@ -290,7 +286,6 @@ class AchievementScene(StandardScreen):
         if lbl is None: return
         txt = self.logic.search_text
 
-        # CORRIGIDO: cores alinhadas com o JSON (texto #3A2210 sobre #FBF6E0)
         if not txt and not self.search_active:
             lbl.text = "Buscar..."
             lbl.text_color = (90, 58, 16)      # #5A3A10 (placeholder)

@@ -137,15 +137,12 @@ class PhaseCard:
                              glow.get_rect(), border_radius=12)
             screen.blit(glow, scaled_rect)
 
-        # Número
         num = font_small.render(f"{self.phase_id}", True, self.text_color)
         screen.blit(num, (scaled_rect.x + 10, scaled_rect.y + 10))
 
-        # Nome
         self._render_wrapped_text(screen, self.phase_name, font_name, name_color,
                                   scaled_rect.centerx, scaled_rect.centery - 12)
 
-        # Status
         status = font_small.render(self.status_text, True, self.status_color)
         sr = status.get_rect(center=(scaled_rect.centerx, scaled_rect.centery + 28))
         screen.blit(status, sr)
@@ -376,6 +373,7 @@ class PhaseSelectScene(BaseScene):
         self.incubator_button_rect = None
         self.profile_button_rect = None
         self.npc_hall_button_rect = None
+        self.mystery_gift_button_rect = None      # <-- NOVO
 
         # Hover states
         self.back_button_hovered = False
@@ -386,6 +384,7 @@ class PhaseSelectScene(BaseScene):
         self.incubator_button_hovered = False
         self.profile_button_hovered = False
         self.npc_hall_button_hovered = False
+        self.mystery_gift_button_hovered = False  # <-- NOVO
 
         # Scroll
         self.scroll_y = 0
@@ -422,13 +421,11 @@ class PhaseSelectScene(BaseScene):
     # ======================================================================
     def _discover_regions(self):
         regions = []
-        # Tenta via catálogo
         try:
             regions = self.catalog.get_all_regions()
         except (AttributeError, TypeError):
             regions = []
         if not regions:
-            # Fallback via exporter
             try:
                 from src.editor.phase_exporter import phase_exporter
                 regions = phase_exporter.list_regions_with_phases()
@@ -449,7 +446,6 @@ class PhaseSelectScene(BaseScene):
         if not chapters:
             try:
                 from src.editor.phase_exporter import phase_exporter
-                # list_phases(region=X) retorna [(chapter, phase), ...]
                 phases = phase_exporter.list_phases(region=region_id)
                 chapters = sorted({int(c) for (c, p) in phases})
             except Exception:
@@ -459,23 +455,18 @@ class PhaseSelectScene(BaseScene):
         return chapters
 
     def _get_chapter_phases(self, region_id, chapter_id):
-        """Retorna [(chapter, phase_num), ...] e nomes via cache."""
-        # Tenta catálogo novo
         try:
             phases = self.catalog.get_chapter_phases(region_id, chapter_id)
             if phases:
-                # espera lista de dicts com 'number' e 'name'
                 if isinstance(phases[0], dict):
                     return phases
         except (TypeError, AttributeError):
             pass
 
-        # Fallback: tenta catálogo antigo
         try:
             phases = self.catalog.get_chapter_phases(chapter_id)
             if phases:
                 if isinstance(phases[0], dict):
-                    # se for lista de dicts, retorna como está (assume formato consistente)
                     result = []
                     for p in phases:
                         result.append({
@@ -487,7 +478,6 @@ class PhaseSelectScene(BaseScene):
         except (TypeError, AttributeError):
             pass
 
-        # Fallback final: exporter
         try:
             from src.editor.phase_exporter import phase_exporter
             phase_nums = phase_exporter.list_phases(region=region_id, chapter=chapter_id)
@@ -521,7 +511,6 @@ class PhaseSelectScene(BaseScene):
         return name
 
     def _get_chapter_progress(self, region_id, chapter_id, phase_ids):
-        """Retorna {'completed': n, 'total': n}."""
         completed = 0
         for pid in phase_ids:
             try:
@@ -544,10 +533,8 @@ class PhaseSelectScene(BaseScene):
         except Exception:
             pass
 
-        # Regiões
         self.available_regions = self._discover_regions()
 
-        # Região inicial
         if hasattr(self.game, 'player') and self.game.player:
             saved = getattr(self.game.player, 'current_region', DEFAULT_REGION_ID)
             if saved in self.available_regions:
@@ -557,10 +544,8 @@ class PhaseSelectScene(BaseScene):
         else:
             self.current_region_id = self.available_regions[0]
 
-        # Capítulos da região atual
         self.available_chapters = self._discover_chapters(self.current_region_id)
 
-        # Capítulo inicial
         if self.available_chapters:
             self.current_chapter_id = self.available_chapters[0]
         else:
@@ -589,21 +574,31 @@ class PhaseSelectScene(BaseScene):
         bs = int(min(vw * 0.045, vh * 0.065, 40))
         self.back_button_rect = pygame.Rect(vx + 20, vy + 20, bs, bs)
 
-        # Botões inferiores
+        # ===== BOTÕES INFERIORES — 2 LINHAS DE 4 =====
         bw = int(vw * 0.09)
         bh = int(vh * 0.055)
         bsp = int(vw * 0.010)
-        total = bw * 7 + bsp * 6
-        sx = vx + (vw - total) // 2
-        by = vy + vh - bh - int(vh * 0.06)
+        row_gap = int(vh * 0.010)
+        buttons_per_row = 4
 
-        self.shop_button_rect = pygame.Rect(sx, by, bw, bh)
-        self.npc_hall_button_rect = pygame.Rect(sx + (bw + bsp), by, bw, bh)
-        self.minigame_button_rect = pygame.Rect(sx + (bw + bsp) * 2, by, bw, bh)
-        self.pokedex_button_rect = pygame.Rect(sx + (bw + bsp) * 3, by, bw, bh)
-        self.achievement_button_rect = pygame.Rect(sx + (bw + bsp) * 4, by, bw, bh)
-        self.incubator_button_rect = pygame.Rect(sx + (bw + bsp) * 5, by, bw, bh)
-        self.profile_button_rect = pygame.Rect(sx + (bw + bsp) * 6, by, bw, bh)
+        total_row_w = bw * buttons_per_row + bsp * (buttons_per_row - 1)
+        sx = vx + (vw - total_row_w) // 2
+
+        # Linha 2 fica na parte de baixo, linha 1 acima dela
+        row2_y = vy + vh - bh - int(vh * 0.06)
+        row1_y = row2_y - bh - row_gap
+
+        # Linha 1
+        self.shop_button_rect        = pygame.Rect(sx + (bw + bsp) * 0, row1_y, bw, bh)
+        self.npc_hall_button_rect    = pygame.Rect(sx + (bw + bsp) * 1, row1_y, bw, bh)
+        self.minigame_button_rect    = pygame.Rect(sx + (bw + bsp) * 2, row1_y, bw, bh)
+        self.pokedex_button_rect     = pygame.Rect(sx + (bw + bsp) * 3, row1_y, bw, bh)
+
+        # Linha 2
+        self.achievement_button_rect = pygame.Rect(sx + (bw + bsp) * 0, row2_y, bw, bh)
+        self.incubator_button_rect   = pygame.Rect(sx + (bw + bsp) * 1, row2_y, bw, bh)
+        self.profile_button_rect     = pygame.Rect(sx + (bw + bsp) * 2, row2_y, bw, bh)
+        self.mystery_gift_button_rect = pygame.Rect(sx + (bw + bsp) * 3, row2_y, bw, bh)   # <-- NOVO
 
         # ===== ABAS DE REGIÃO =====
         region_tab_w = int(vw * 0.11)
@@ -675,6 +670,7 @@ class PhaseSelectScene(BaseScene):
 
         region_tab_h = int(vh * 0.055) if self.region_tabs else 0
         tab_h = int(vh * 0.075) if self.chapter_tabs else 0
+        # Como agora temos 2 linhas de botões, o espaço útil reduziu um pouco
         grid_start_y = vy + int(vh * 0.20) + region_tab_h + tab_h
 
         grid_w = cols * card_w + (cols - 1) * card_margin
@@ -682,10 +678,9 @@ class PhaseSelectScene(BaseScene):
 
         rows = math.ceil(len(phases) / cols)
         grid_h = rows * (card_h + card_margin)
-        visible_h = vh - (grid_start_y - vy) - int(vh * 0.15)
+        visible_h = vh - (grid_start_y - vy) - int(vh * 0.20)
         self.max_scroll = max(0, grid_h - visible_h)
 
-        # Mítico
         from src.data.mythical_catalog import MythicalCatalog
         pending_mythical_entry = None
         if hasattr(self.game, 'player') and self.game.player:
@@ -711,7 +706,6 @@ class PhaseSelectScene(BaseScene):
 
             mythical_id_for_card = None
             if pending_mythical_entry:
-                # Simplificação: mostra em todas as fases da região do mítico
                 if phase_id in pending_mythical_entry.phases:
                     mythical_id_for_card = pending_mythical_entry.pokemon_id
 
@@ -812,6 +806,7 @@ class PhaseSelectScene(BaseScene):
         self.incubator_button_hovered = chk(self.incubator_button_rect)
         self.profile_button_hovered = chk(self.profile_button_rect)
         self.npc_hall_button_hovered = chk(self.npc_hall_button_rect)
+        self.mystery_gift_button_hovered = chk(self.mystery_gift_button_rect)   # <-- NOVO
 
     def _handle_click(self, pos):
         if self.back_button_rect and self.back_button_rect.collidepoint(pos):
@@ -836,15 +831,15 @@ class PhaseSelectScene(BaseScene):
             self._open_profile(); return
         if self.npc_hall_button_rect and self.npc_hall_button_rect.collidepoint(pos):
             self._open_npc_hall(); return
+        if self.mystery_gift_button_rect and self.mystery_gift_button_rect.collidepoint(pos):
+            self._open_mystery_gift(); return      # <-- NOVO
 
-        # Regiões
         for rt in self.region_tabs:
             res = rt.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
             if res:
                 self._change_region(res)
                 return
 
-        # Capítulos
         for tab in self.chapter_tabs:
             res = tab.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
             if res:
@@ -856,7 +851,6 @@ class PhaseSelectScene(BaseScene):
                     t.active = (t.chapter_id == self.current_chapter_id)
                 return
 
-        # Scroll bar
         if self.phase_cards and self.max_scroll > 0:
             sb = self._get_scroll_bar_rect()
             if sb and sb.collidepoint(pos):
@@ -864,7 +858,6 @@ class PhaseSelectScene(BaseScene):
                 self.last_mouse_y = pos[1]
                 return
 
-        # Cards
         for card in self.phase_cards:
             res = card.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
             if res:
@@ -884,7 +877,6 @@ class PhaseSelectScene(BaseScene):
         self.available_chapters = self._discover_chapters(region_id)
         self.current_chapter_id = self.available_chapters[0] if self.available_chapters else 1
 
-        # Recria abas de capítulo + cards
         self._create_layout()
 
     def _prev_region(self):
@@ -954,6 +946,12 @@ class PhaseSelectScene(BaseScene):
         sound_manager.stop_music(fade_ms=300)
         self.game.current_scene = ProfileScene(self.game, return_scene="phase_select")
 
+    def _open_mystery_gift(self):                                # <-- NOVO
+        sound_manager.play_effect(SoundEffect.CLICK)
+        sound_manager.stop_music(fade_ms=300)
+        from src.scenes.mystery_gift_scene.mystery_gift_scene import MysteryGiftScene
+        self.game.current_scene = MysteryGiftScene(self.game)
+
     def _on_shop_closed(self):
         self.layout_initialized = False
 
@@ -967,7 +965,6 @@ class PhaseSelectScene(BaseScene):
                 region_id=self.current_region_id,
             )
         except TypeError:
-            # Fallback para assinatura antiga
             ts = TeamSelectScene(self.game, self.current_chapter_id, phase_number)
 
         self.game.team_select_scene = ts
@@ -1068,7 +1065,6 @@ class PhaseSelectScene(BaseScene):
         vw = self.screen_manager.viewport_width
         vh = self.screen_manager.viewport_height
 
-        # Título
         title = self.title_font.render("SELECIONAR FASE", True, (255, 255, 255))
         tsh = self.title_font.render("SELECIONAR FASE", True, (30, 30, 45))
         tx = vx + (vw - title.get_width()) // 2
@@ -1076,33 +1072,31 @@ class PhaseSelectScene(BaseScene):
         screen.blit(tsh, (tx + 2, ty + 2))
         screen.blit(title, (tx, ty))
 
-        # Linha
         bw = int(vw * 0.15)
         bx = vx + (vw - bw) // 2
         by = ty + title.get_height() + 6
         pygame.draw.rect(screen, (100, 85, 55), (bx, by, bw, 3), border_radius=2)
 
-        # Botão voltar
         self._render_button(screen, self.back_button_rect, "<", self.back_button_hovered)
 
-        # Botões inferiores
+        # ===== LINHA 1 =====
         self._render_bottom_button(screen, self.shop_button_rect, "LOJA", self.shop_button_hovered)
+        self._render_bottom_button(screen, self.npc_hall_button_rect, "NPC HALL", self.npc_hall_button_hovered)
         self._render_bottom_button(screen, self.minigame_button_rect, "MINIGAMES", self.minigame_button_hovered)
         self._render_bottom_button(screen, self.pokedex_button_rect, "POKEDEX", self.pokedex_button_hovered)
+
+        # ===== LINHA 2 =====
         self._render_bottom_button(screen, self.achievement_button_rect, "CONQUISTAS", self.achievement_button_hovered)
         self._render_bottom_button(screen, self.incubator_button_rect, "INCUBADORA", self.incubator_button_hovered, not self._is_incubator_unlocked())
         self._render_bottom_button(screen, self.profile_button_rect, "PERFIL", self.profile_button_hovered)
-        self._render_bottom_button(screen, self.npc_hall_button_rect, "NPC HALL", self.npc_hall_button_hovered)
+        self._render_bottom_button(screen, self.mystery_gift_button_rect, "MYSTERY GIFT", self.mystery_gift_button_hovered)   # <-- NOVO
 
-        # Abas de região
         for rt in self.region_tabs:
             rt.render(screen, self.tab_font)
 
-        # Abas de capítulo
         for tab in self.chapter_tabs:
             tab.render(screen, self.tab_font)
 
-        # Linha divisória
         if self.chapter_tabs:
             line_y = self.chapter_tabs[0].rect.bottom + 12
             line_w = int(vw * 0.3)
@@ -1123,14 +1117,13 @@ class PhaseSelectScene(BaseScene):
                 pygame.draw.line(screen, (70, 70, 80),
                                  (line_x, l2_y), (line_x + line_w, l2_y), 1)
 
-        # Cards (clipping)
         region_tab_h = int(vh * 0.055) if self.region_tabs else 0
         tab_h = int(vh * 0.075) if self.chapter_tabs else 0
         clip_rect = pygame.Rect(
             vx,
             vy + int(vh * 0.20) + region_tab_h + tab_h,
             vw,
-            vh - int(vh * 0.20) - region_tab_h - tab_h - int(vh * 0.12)
+            vh - int(vh * 0.20) - region_tab_h - tab_h - int(vh * 0.20)
         )
 
         old_clip = screen.get_clip()
@@ -1140,11 +1133,9 @@ class PhaseSelectScene(BaseScene):
                 card.render(screen, self.phase_font_large, self.phase_font_small, self.phase_font_name)
         screen.set_clip(old_clip)
 
-        # Scrollbar
         if self.max_scroll > 0:
             self._render_scroll_bar(screen)
 
-        # Instruções
         font_small = pygame.font.Font(None, 16)
         inst_text = "SETAS TROCAM REGIAO | CLIQUE NA FASE | ESC VOLTAR"
         if DEBUG_MODE:
@@ -1217,7 +1208,7 @@ class PhaseSelectScene(BaseScene):
         region_tab_h = int(vh * 0.055) if self.region_tabs else 0
         tab_h = int(vh * 0.075) if self.chapter_tabs else 0
         return (vx + vw - 14, vy + int(vh * 0.20) + region_tab_h + tab_h,
-                8, vh - int(vh * 0.20) - region_tab_h - tab_h - int(vh * 0.15))
+                8, vh - int(vh * 0.20) - region_tab_h - tab_h - int(vh * 0.20))
 
     def _get_scroll_bar_rect(self):
         if self.max_scroll <= 0:

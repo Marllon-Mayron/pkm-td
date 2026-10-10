@@ -6,7 +6,7 @@ import pygame
 from pathlib import Path
 
 # Importa os paths centralizados
-from src.config.paths import PROJECT_ROOT, ITEMS_PATH
+from src.config.paths import PROJECT_ROOT, ITEMS_PATH, SPRITES_PATH
 
 # Importa o EffectFactory para pegar descrições dos moves
 from src.battle.effects.effect_factory import EffectFactory
@@ -112,7 +112,76 @@ class ItemBagCatalog:
         battle_items_path = self.base_path / "battle-item"
         held_items_path = self.base_path / "held-itens"
         fossils_path = self.base_path / "Fosseis"
+        # ============================================================
+        # ROUPAS (categoria "clothing")
+        # Sprites em: res/PokemonSprites/player/<pasta>/<arquivo>.png
+        # ============================================================
+        clothing_path = SPRITES_PATH / "player"
 
+        CLOTHING_RARITIES = {
+            "common": {"name": "COMUM", "hex": "#C8C8C8"},
+            "uncommon": {"name": "INCOMUM", "hex": "#64DC78"},
+            "rare": {"name": "RARO", "hex": "#5096FF"},
+            "epic": {"name": "EPICO", "hex": "#C864F0"},
+            "legendary": {"name": "LENDARIO", "hex": "#FFC83C"},
+        }
+
+        clothing_defs = [
+            # ---- SKIN ----
+            ("skin_1", "PELE 1", "skin", "skin/skin_1.png", 0, "common"),
+            ("skin_2", "PELE 2", "skin", "skin/skin_2.png", 0, "rare"),
+
+            # ---- EYES ----
+            ("eyes_1", "OLHOS 1", "eyes", "head/Eyes/eye_shape_1.png", 0, "common"),
+            ("eyes_2", "OLHOS 2", "eyes", "head/Eyes/eye_shape_2.png", 0, "common"),
+            ("eyes_3", "OLHOS 3", "eyes", "head/Eyes/eye_shape_3.png", 0, "uncommon"),
+            ("eyes_4", "OLHOS 4", "eyes", "head/Eyes/eye_shape_4.png", 0, "rare"),
+            ("eyes_5", "OLHOS 5", "eyes", "head/Eyes/eye_shape_5.png", 0, "epic"),
+            ("eyes_6", "OLHOS 6", "eyes", "head/Eyes/eye_shape_6.png", 0, "legendary"),
+
+            # ---- HAIR ----
+            ("hair_1", "CABELO 1", "hair", "hair/hair_1.png", 0, "common"),
+            ("hair_2", "CABELO 2", "hair", "hair/hair_2.png", 0, "uncommon"),
+            ("hair_3", "CABELO 3", "hair", "hair/hair_3.png", 0, "rare"),
+
+            # ---- TORSO ----
+            ("torso_1", "TOPO 1", "torso", "torso/torso_1.png", 0, "common"),
+            ("torso_2", "TOPO 2", "torso", "torso/torso_2.png", 0, "uncommon"),
+
+            # ---- PANTS ----
+            ("pants_1", "CALCA 1", "pants", "pants/pants_1.png", 0, "common"),
+            ("pants_2", "CALCA 2", "pants", "pants/pants_2.png", 0, "uncommon"),
+
+            # ---- HAT (substitui shoes) ----
+            ("hat_1", "CHAPEU 1", "hat", "hat/hat_1.png", 0, "common"),
+            ("hat_2", "CHAPEU 2", "hat", "hat/hat_2.png", 0, "uncommon"),
+            ("hat_3", "CHAPEU 3", "hat", "hat/hat_3.png", 0, "rare"),
+            ("hat_4", "CHAPEU 4", "hat", "hat/hat_4.png", 0, "epic"),
+            ("hat_5", "CHAPEU 5", "hat", "hat/hat_5.png", 0, "legendary"),
+        ]
+
+        for item_id, name, slot, rel_path, price, rarity in clothing_defs:
+            rinfo = CLOTHING_RARITIES.get(rarity, CLOTHING_RARITIES["common"])
+            items[item_id] = {
+                "id": item_id,
+                "name": name,
+                "sprite_path": clothing_path / rel_path,
+                "description": f"Roupa: {name}",
+                "category": "clothing",
+                "slot": slot,
+                "rarity": rarity,
+                "rarity_name": rinfo["name"],
+                "rarity_color": rinfo["hex"],
+                "usable_in_battle": False,
+                "usable_on_map": False,
+                "effect": None,
+                "effect_value": None,
+                "price": price,
+                "not_for_sale": True,
+                "unlock_phase": None,
+                "unlock_chapter": None,
+            }
+            
         # ============================================================
         # POKÉBOLAS
         # ============================================================
