@@ -14,6 +14,7 @@ from src.battle.effects.effect_factory import EffectFactory
 # Importa o MoveData para pegar descrições originais como fallback
 from src.data.move_data import MoveData
 
+HIDDEN_CATEGORIES = {"fossil", "held_item", "clothing"}
 
 class ItemBagCatalog:
     """Catálogo de itens da mochila - similar ao Pokedex"""

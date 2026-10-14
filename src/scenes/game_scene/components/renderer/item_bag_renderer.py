@@ -2,7 +2,7 @@
 
 import pygame
 import math
-from src.data.item_bag_catalog import item_bag_catalog
+from src.data.item_bag_catalog import item_bag_catalog, HIDDEN_CATEGORIES
 
 # Cache global para fontes
 _FONT_CACHE = {}
@@ -111,6 +111,20 @@ class ItemBagRenderer:
             else:
                 _SPRITE_CACHE[cache_key] = None
         return _SPRITE_CACHE[cache_key]
+
+    def _get_visible_items(self):
+        """
+        Retorna [(real_idx, item), ...] apenas com itens VISÍVEIS.
+
+        `real_idx` é o índice em `self.bag.get_items_for_render()`.
+        Usamos esse índice original para casar com `bag.selected_item_index`
+        e com `hovered_index` (ambos guardam o índice "real").
+        """
+        all_items = self.bag.get_items_for_render()
+        return [
+            (i, it) for i, it in enumerate(all_items)
+            if (it.get("data") or {}).get("category") not in HIDDEN_CATEGORIES
+        ]
 
     # ---------- SINCRONIZAÇÃO DE CATEGORIA ----------
     def _sync_page_with_category(self):
@@ -364,9 +378,9 @@ class ItemBagRenderer:
         return max(0, available_height // 60)
 
     def _get_max_scroll(self):
-        items = self.bag.get_items_for_render()
+        visible = self._get_visible_items()
         max_visible = self._get_max_visible_items()
-        return max(0, len(items) - max_visible)
+        return max(0, len(visible) - max_visible)
 
     def _scroll_items(self, direction):
         max_scroll = self._get_max_scroll()
@@ -377,9 +391,9 @@ class ItemBagRenderer:
         """Rect visual da track da scrollbar (fina, 6px)."""
         if self.minimized:
             return None
-        items = self.bag.get_items_for_render()
+        visible = self._get_visible_items()
         max_visible = self._get_max_visible_items()
-        if max_visible <= 0 or len(items) <= max_visible:
+        if max_visible <= 0 or len(visible) <= max_visible:
             return None
         bar_x = self.x + self.width - 10
         bar_y = self.y + 80
@@ -405,12 +419,12 @@ class ItemBagRenderer:
         track = self._get_scroll_bar_track_rect()
         if track is None:
             return None
-        items = self.bag.get_items_for_render()
+        visible = self._get_visible_items()
         max_visible = self._get_max_visible_items()
         max_scroll = self._get_max_scroll()
-        if max_scroll == 0 or not items:
+        if max_scroll == 0 or not visible:
             return None
-        thumb_height = max(20, track.height * max_visible / len(items))
+        thumb_height = max(20, track.height * max_visible / len(visible))
         scroll_ratio = self.scroll_offset / max_scroll
         thumb_y = track.y + scroll_ratio * (track.height - thumb_height)
         return pygame.Rect(track.x, thumb_y, track.width, thumb_height)
@@ -424,16 +438,16 @@ class ItemBagRenderer:
             self._scrollbar_jump_to(mouse_y)
 
     def _scrollbar_jump_to(self, mouse_y):
-        """Converte a posição Y do mouse em scroll_offset (centraliza o thumb na posição)."""
+        """Converte a posição Y do mouse em scroll_offset."""
         track = self._get_scroll_bar_track_rect()
         if track is None:
             return
-        items = self.bag.get_items_for_render()
+        visible = self._get_visible_items()
         max_visible = self._get_max_visible_items()
         max_scroll = self._get_max_scroll()
-        if max_scroll == 0 or not items:
+        if max_scroll == 0 or not visible:
             return
-        thumb_height = max(20, track.height * max_visible / len(items))
+        thumb_height = max(20, track.height * max_visible / len(visible))
         track_range = track.height - thumb_height
         if track_range <= 0:
             self.scroll_offset = 0
@@ -588,10 +602,10 @@ class ItemBagRenderer:
         max_visible = self._get_max_visible_items()
         if visual_index >= max_visible:
             return -1
-        real_index = self.scroll_offset + visual_index
-        items = self.bag.get_items_for_render()
-        if 0 <= real_index < len(items):
-            return real_index
+        visible = self._get_visible_items()
+        real_scroll_idx = self.scroll_offset + visual_index
+        if 0 <= real_scroll_idx < len(visible):
+            return visible[real_scroll_idx][0]  # índice REAL na lista cheia
         return -1
 
     # ---------- RENDER ----------
@@ -776,8 +790,8 @@ class ItemBagRenderer:
     def _draw_items(self, screen):
         if self.minimized:
             return
-        items = self.bag.get_items_for_render()
-        if not items:
+        visible = self._get_visible_items()
+        if not visible:
             item_font = self._get_font(20)
             empty_text = item_font.render("Nenhum item", True, (150, 150, 150))
             text_x = self.x + (self.width - empty_text.get_width()) // 2
@@ -789,18 +803,15 @@ class ItemBagRenderer:
             return
 
         start_idx = self.scroll_offset
-        end_idx = min(start_idx + max_visible, len(items))
+        end_idx = min(start_idx + max_visible, len(visible))
         start_y = self.y + 80
         item_height = 60
 
-        # Calcula espaço disponível para a descrição (largura)
-        # Margem esquerda: 70 (nome) + 10, margem direita: área da quantidade (~50) + 15
         desc_x = self.x + 70
-        desc_max_width = self.x + self.width - 15 - (self.x + 70) - 50  # 50 para quantidade e margem
+        desc_max_width = self.x + self.width - 15 - (self.x + 70) - 50
         desc_max_width = max(20, desc_max_width)
 
-        for visual_idx, real_idx in enumerate(range(start_idx, end_idx)):
-            item = items[real_idx]
+        for visual_idx, (real_idx, item) in enumerate(visible[start_idx:end_idx]):
             item_y = start_y + visual_idx * item_height
 
             if real_idx == self.bag.selected_item_index:
@@ -836,22 +847,16 @@ class ItemBagRenderer:
             screen.blit(qty_bg, (self.x + self.width - qty_bg_width - 15, item_y + 8))
             screen.blit(qty_text, (self.x + self.width - qty_bg_width - 8, item_y + 12))
 
-            # Descrição: truncar dinamicamente
+            # Descrição (truncada)
             desc = item["data"]["description"]
-            # Calcula quantos caracteres cabem no espaço disponível
-            # Usa a fonte qty_font (18) para medir
             if desc_max_width > 0:
-                # Vai truncando até caber
                 full_desc = desc
                 while full_desc:
                     if qty_font.size(full_desc)[0] <= desc_max_width:
                         break
-                    # Remove caracteres do final
                     full_desc = full_desc[:-1]
-                # Se ainda assim não couber, coloca "..."
                 if qty_font.size(full_desc)[0] > desc_max_width:
-                    full_desc = full_desc[:max(1, len(full_desc)-3)] + "..."
-                # Garante que não fique vazio
+                    full_desc = full_desc[:max(1, len(full_desc) - 3)] + "..."
                 if not full_desc:
                     full_desc = "..."
                 desc = full_desc

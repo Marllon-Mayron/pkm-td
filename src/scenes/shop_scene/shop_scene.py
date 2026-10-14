@@ -1,1728 +1,468 @@
 # src/scenes/shop_scene/shop_scene.py
-
 """
-Tela da loja - UI profissional com responsividade
+Loja — StandardScreen + JSON + Logic.
+Busca com foco: clique no input, digite, ESC/click fora blur.
 """
 import pygame
-from src.scenes.base_scene import BaseScene
-from src.data.item_bag_catalog import item_bag_catalog
-from src.config.progress import progress_manager
 
+from src.ui.screen_template import StandardScreen
+from src.ui.screen_loader import ScreenLoader
+from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 
-class ShopItemCard:
-    """Card de item na loja com design clean"""
+from .shop_logic import ShopLogic
 
-    def __init__(self, item_data, index):
-        self.item_data = item_data
-        self.item_id = item_data["id"]
-        self.name = item_data["name"]
-        self.category = item_data["category"]
-        self.description = item_data["description"]
-        self.price = item_data.get("price", 100)
-        self.index = index
-        self.is_locked = False
-        self.unlock_phase = item_data.get("unlock_phase") or item_data.get("unlock_chapter")  # Fase necessária
 
-        self.rect = pygame.Rect(0, 0, 0, 0)
-        self.is_hovered = False
-        self.owned_quantity = 0
+LAYOUT_PATH = "res/ui_layouts/shop.json"
 
-        # Efeitos visuais
-        self.hover_alpha = 0
-        self.pulse_time = 0
 
-    def update_position(self, x, y, width, height):
-        self.rect = pygame.Rect(x, y, width, height)
+class ShopScene(StandardScreen):
+    title = ""
+    show_back_button = False
 
-    def update_owned(self, bag_items):
-        self.owned_quantity = bag_items.get(self.item_id, 0)
+    # =================================================================
+    def __init__(self, game, return_scene=None):
+        self.return_scene = return_scene or "phase_select"
+        self.logic = ShopLogic(game)
 
-    def update_animation(self, dt):
-        """Atualiza animações do card"""
-        self.pulse_time += dt
+        self._search_focused = False
+        self._cursor_t = 0.0
 
-        if self.is_hovered and self.hover_alpha < 20:
-            self.hover_alpha = min(20, self.hover_alpha + dt * 100)
-        elif not self.is_hovered and self.hover_alpha > 0:
-            self.hover_alpha = max(0, self.hover_alpha - dt * 100)
-
-    def handle_event(self, event):
-        # Se o item está bloqueado, não interage
-        if self.is_locked:
-            return None
-
-        if event.type == pygame.MOUSEMOTION:
-            was_hovered = self.is_hovered
-            self.is_hovered = self.rect.collidepoint(event.pos)
-            return was_hovered != self.is_hovered
-
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.is_hovered:
-                return self
-
-        return None
-
-    def _wrap_text(self, text, font, max_width):
-        """Divide o texto em múltiplas linhas baseado na largura máxima"""
-        words = text.split(' ')
-        lines = []
-        current_line = []
-
-        for word in words:
-            # Testa se adicionar a palavra atual ultrapassa a largura
-            test_line = ' '.join(current_line + [word])
-            if font.render(test_line, True, (255, 255, 255)).get_width() <= max_width:
-                current_line.append(word)
-            else:
-                if current_line:  # Salva a linha atual
-                    lines.append(' '.join(current_line))
-                    current_line = [word]
-                else:
-                    # Se a palavra sozinha já ultrapassa, força a quebra
-                    lines.append(word)
-                    current_line = []
-
-        if current_line:
-            lines.append(' '.join(current_line))
-
-        return lines
-
-    def render(self, screen, fonts, selected=False):
-        # Cores do tema clean
-        colors = {
-            'bg': (30, 30, 35, 240),
-            'bg_hover': (40, 45, 55, 250),
-            'bg_locked': (25, 25, 30, 200),  # Fundo mais escuro para itens bloqueados
-            'border': (60, 65, 75, 255),
-            'border_selected': (80, 160, 255, 255),
-            'border_hover': (100, 140, 200, 255),
-            'border_locked': (50, 45, 40, 255),  # Borda escura para bloqueados
-            'text': (255, 255, 255, 255),
-            'text_dim': (180, 190, 210, 255),
-            'text_locked': (100, 100, 110, 255),  # Texto escurecido
-            'price': (120, 255, 120, 255),
-            'price_locked': (80, 100, 80, 255),  # Preço escurecido
-            'description': (150, 160, 180, 255),
-            'description_locked': (90, 95, 105, 255),  # Descrição escurecida
-            'owned_bg': (45, 45, 55, 230),
-            'lock_overlay': (0, 0, 0, 180)  # Overlay de bloqueio
-        }
-
-        # Determina cores baseadas no estado
-        if self.is_locked:
-            border_color = colors['border_locked']
-            bg_color = colors['bg_locked']
-            text_color = colors['text_locked']
-            price_color = colors['price_locked']
-            desc_color = colors['description_locked']
-        elif selected:
-            border_color = colors['border_selected']
-            bg_color = (45, 55, 75, 250)
-            text_color = colors['text'][:3]
-            price_color = colors['price'][:3]
-            desc_color = colors['description'][:3]
-        elif self.is_hovered:
-            border_color = colors['border_hover']
-            bg_color = colors['bg_hover']
-            text_color = colors['text'][:3]
-            price_color = colors['price'][:3]
-            desc_color = colors['description'][:3]
-        else:
-            border_color = colors['border']
-            bg_color = colors['bg']
-            text_color = colors['text'][:3]
-            price_color = colors['price'][:3]
-            desc_color = colors['description'][:3]
-
-        # Sombra suave
-        shadow_rect = self.rect.copy()
-        shadow_rect.x += 2
-        shadow_rect.y += 2
-        pygame.draw.rect(screen, (0, 0, 0, 40), shadow_rect, border_radius=6)
-
-        # Fundo principal
-        pygame.draw.rect(screen, bg_color, self.rect, border_radius=6)
-
-        # Borda
-        pygame.draw.rect(screen, border_color, self.rect, 1, border_radius=6)
-
-        # Sprite do item (com opacidade reduzida se bloqueado)
-        sprite = item_bag_catalog.get_sprite(self.item_id, scaled=True)
-        if sprite:
-            if self.is_locked:
-                # Cria uma versão escurecida do sprite
-                locked_sprite = sprite.copy()
-                locked_sprite.fill((50, 50, 60, 180), special_flags=pygame.BLEND_RGBA_MULT)
-                screen.blit(locked_sprite, (self.rect.x + 6, self.rect.y + 16))
-                # Desenha um cadeado sobre o sprite
-                lock_font = pygame.font.Font(None, 24)
-                lock_text = lock_font.render("🔒", True, (200, 180, 100))
-                screen.blit(lock_text, (self.rect.x + 6, self.rect.y + 16))
-            else:
-                screen.blit(sprite, (self.rect.x + 6, self.rect.y + 16))
-
-        # Nome do item
-        name_text = fonts['medium'].render(self.name, True, text_color)
-        screen.blit(name_text, (self.rect.x + 60, self.rect.y + 10))
-
-        # Se está bloqueado, mostra a fase necessária
-        if self.is_locked and self.unlock_phase:
-            lock_text = fonts['small'].render(f"Desbloqueia na fase {self.unlock_phase}", True, (200, 180, 100))
-            screen.blit(lock_text, (self.rect.x + 60, self.rect.y + 52))
-
-        # DESCRIÇÃO
-        max_desc_width = self.rect.width - 70
-        desc_font = fonts['medium']
-
-        # Quebra o texto em múltiplas linhas
-        desc_lines = self._wrap_text(self.description, desc_font, max_desc_width)
-
-        # Renderiza cada linha da descrição
-        current_y = self.rect.y + 32
-        line_height = desc_font.get_height() + 2
-
-        # Limita a 3 linhas para não ocupar muito espaço
-        max_lines = 3
-        for i, line in enumerate(desc_lines[:max_lines]):
-            desc_text = desc_font.render(line, True, desc_color)
-            screen.blit(desc_text, (self.rect.x + 60, current_y))
-            current_y += line_height
-
-        # Se houver mais linhas, indica com um pequeno ícone
-        if len(desc_lines) > max_lines:
-            more_text = desc_font.render("...", True, desc_color)
-            screen.blit(more_text, (self.rect.x + 60, current_y))
-
-        # PREÇO (apenas se não estiver bloqueado, ou mostra "???")
-        if not self.is_locked:
-            price_text = fonts['large'].render(f"${self.price}", True, price_color)
-            screen.blit(price_text, (self.rect.x + 60, self.rect.y + 52))
-
-        # Quantidade possuída
-        if self.owned_quantity > 0 and not self.is_locked:
-            qty_text = fonts['medium'].render(f"possui: x{self.owned_quantity}", True, (180, 180, 200))
-            screen.blit(qty_text, (self.rect.right - 80, self.rect.y + 10))
-
-    def render_small(self, screen, fonts, x, y, width, height):
-        """Renderiza card em tamanho pequeno (para visualização compacta)"""
-        self.rect = pygame.Rect(x, y, width, height)
-        self.render(screen, fonts, False)
-
-
-class InventoryItemCard:
-    """Card do inventário com design clean"""
-
-    def __init__(self, item_id, item_data, quantity, index):
-        self.item_id = item_id
-        self.item_data = item_data
-        self.name = item_data["name"]
-        self.category = item_data["category"]
-        self.description = item_data["description"]
-        self.quantity = quantity
-        self.index = index
-        self.sell_price = int(item_data.get("price", 100) * 0.5)
-
-        self.rect = pygame.Rect(0, 0, 0, 0)
-        self.is_hovered = False
-
-        # Efeitos visuais
-        self.hover_alpha = 0
-
-    def update_position(self, x, y, width, height):
-        self.rect = pygame.Rect(x, y, width, height)
-
-    def update_animation(self, dt):
-        """Atualiza animações do card"""
-        if self.is_hovered and self.hover_alpha < 20:
-            self.hover_alpha = min(20, self.hover_alpha + dt * 100)
-        elif not self.is_hovered and self.hover_alpha > 0:
-            self.hover_alpha = max(0, self.hover_alpha - dt * 100)
-
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEMOTION:
-            was_hovered = self.is_hovered
-            self.is_hovered = self.rect.collidepoint(event.pos)
-            return was_hovered != self.is_hovered
-
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.is_hovered:
-                return self
-
-        return None
-
-    def render(self, screen, fonts, selected=False):
-        # Cores do tema clean para inventário
-        colors = {
-            'bg': (35, 30, 35, 240),
-            'bg_hover': (50, 40, 50, 250),
-            'border': (75, 65, 75, 255),
-            'border_selected': (255, 180, 120, 255),
-            'border_hover': (180, 130, 100, 255),
-            'text': (255, 240, 230, 255),
-            'text_dim': (200, 180, 170, 255),
-            'sell_price': (255, 160, 160, 255),
-            'description': (200, 180, 170, 255)
-        }
-
-        # Determina cores baseadas no estado
-        if selected:
-            border_color = colors['border_selected']
-            bg_color = (70, 50, 60, 250)
-        elif self.is_hovered:
-            border_color = colors['border_hover']
-            bg_color = colors['bg_hover']
-        else:
-            border_color = colors['border']
-            bg_color = colors['bg']
-
-        # Sombra suave
-        shadow_rect = self.rect.copy()
-        shadow_rect.x += 2
-        shadow_rect.y += 2
-        pygame.draw.rect(screen, (0, 0, 0, 40), shadow_rect, border_radius=6)
-
-        # Fundo principal
-        pygame.draw.rect(screen, bg_color, self.rect, border_radius=6)
-
-        # Borda
-        pygame.draw.rect(screen, border_color, self.rect, 1, border_radius=6)
-
-        # Sprite do item
-        sprite = item_bag_catalog.get_sprite(self.item_id, scaled=True)
-        if sprite:
-            screen.blit(sprite, (self.rect.x + 6, self.rect.y + 16))
-
-        # Nome do item
-        name_text = fonts['medium'].render(self.name, True, colors['text'][:3])
-        screen.blit(name_text, (self.rect.x + 60, self.rect.y + 10))
-
-        # DESCRIÇÃO
-        max_desc_width = self.rect.width - 70
-        description = self.description
-        if len(description) > 35:
-            description = description[:32] + "..."
-
-        desc_text = fonts['small'].render(description, True, colors['description'][:3])
-        if desc_text.get_width() > max_desc_width:
-            while len(description) > 3 and desc_text.get_width() > max_desc_width:
-                description = description[:-1]
-                desc_text = fonts['small'].render(description + "...", True, colors['description'][:3])
-
-        screen.blit(desc_text, (self.rect.x + 60, self.rect.y + 32))
-
-        # PREÇO DE VENDA
-        sell_text = fonts['medium'].render(f"${self.sell_price}", True, colors['sell_price'][:3])
-        screen.blit(sell_text, (self.rect.x + 60, self.rect.y + 52))
-
-        # Quantidade
-        qty_text = fonts['small'].render(f"x{self.quantity}", True, (255, 220, 100))
-        screen.blit(qty_text, (self.rect.right - 40, self.rect.y + 15))
-
-
-class CategorySelector:
-    """Seletor de categorias com paginação (setas < >)"""
-
-    def __init__(self, x, y, width):
-        self.rect = pygame.Rect(x, y, width, 35)
-        self.categories = [
-            ("all", "Todos"),
-            ("pokeball", "Pokébolas"),
-            ("medicine", "Medicina"),
-            ("battle_item", "Batalha"),
-            ("tm", "TMs/HMs"),
-            ("items", "Itens"),
-            ("fossil", "Fósseis"),
-            ("held_item", "Seguráveis"),
-        ]
-        self.categories_per_page = 3
-        self.current_page = 0
-        self.total_pages = (len(self.categories) + self.categories_per_page - 1) // self.categories_per_page
-
-        self.selected = "all"
-        self.hovered_button = None
-
-        # Atributo para compatibilidade com o código existente
-        self.buttons = []  # será preenchido em _update_buttons
-
-        # Botões de navegação
-        self.left_arrow_rect = None
-        self.right_arrow_rect = None
-        self.page_label_rect = None
-
-        self._update_buttons()
-
-    def _update_buttons(self):
-        """Atualiza a lista de botões com base na página atual"""
-        self.buttons = []  # limpa
-
-        start_idx = self.current_page * self.categories_per_page
-        end_idx = min(start_idx + self.categories_per_page, len(self.categories))
-        page_categories = self.categories[start_idx:end_idx]
-
-        # Largura disponível para as categorias (descontando margens e espaço para setas)
-        margin = 10
-        arrows_space = 60
-        available_width = self.rect.width - margin * 2 - arrows_space
-        btn_width = (available_width - (len(page_categories) - 1) * 5) // len(page_categories) if page_categories else 0
-        btn_width = max(60, btn_width)
-
-        x = self.rect.x + margin
-        y = self.rect.y + 5
-        height = self.rect.height - 10
-
-        for cat_id, cat_name in page_categories:
-            btn_rect = pygame.Rect(x, y, btn_width, height)
-            self.buttons.append({
-                "id": cat_id,
-                "name": cat_name,
-                "rect": btn_rect
-            })
-            x += btn_width + 5
-
-        # Setas e indicador de página
-        arrows_x = self.rect.x + self.rect.width - arrows_space - 5
-        self.left_arrow_rect = pygame.Rect(arrows_x, y, 20, height)
-        self.page_label_rect = pygame.Rect(arrows_x + 22, y, 20, height)
-        self.right_arrow_rect = pygame.Rect(arrows_x + 44, y, 20, height)
-
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEMOTION:
-            self.hovered_button = None
-            for btn in self.buttons:
-                if btn["rect"].collidepoint(event.pos):
-                    self.hovered_button = btn["id"]
-                    break
-            return None
-
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # Clique em categorias
-            for btn in self.buttons:
-                if btn["rect"].collidepoint(event.pos):
-                    if self.selected != btn["id"]:
-                        self.selected = btn["id"]
-                        return self.selected
-
-            # Clique nas setas
-            if self.left_arrow_rect and self.left_arrow_rect.collidepoint(event.pos):
-                if self.current_page > 0:
-                    self.current_page -= 1
-                    self._update_buttons()
-                    return "page_changed"
-
-            if self.right_arrow_rect and self.right_arrow_rect.collidepoint(event.pos):
-                if self.current_page < self.total_pages - 1:
-                    self.current_page += 1
-                    self._update_buttons()
-                    return "page_changed"
-
-        return None
-
-    def render(self, screen, fonts):
-        # Desenha os botões de categoria
-        for btn in self.buttons:
-            selected = (btn["id"] == self.selected)
-            hovered = (btn["id"] == self.hovered_button)
-
-            if selected:
-                bg_color = (60, 100, 140, 200)
-                text_color = (255, 255, 255)
-            elif hovered:
-                bg_color = (50, 60, 80, 180)
-                text_color = (220, 220, 240)
-            else:
-                bg_color = (30, 35, 45, 150)
-                text_color = (180, 190, 210)
-
-            pygame.draw.rect(screen, bg_color, btn["rect"], border_radius=4)
-            pygame.draw.rect(screen, (80, 90, 110), btn["rect"], 1, border_radius=4)
-
-            text = fonts['small'].render(btn["name"], True, text_color)
-            text_x = btn["rect"].x + (btn["rect"].width - text.get_width()) // 2
-            text_y = btn["rect"].y + (btn["rect"].height - text.get_height()) // 2
-            screen.blit(text, (text_x, text_y))
-
-        # Desenha setas e página (se houver mais de uma página)
-        if self.total_pages > 1:
-            # Seta esquerda
-            left_color = (150, 150, 150) if self.current_page > 0 else (80, 80, 80)
-            left_points = [
-                (self.left_arrow_rect.x + 5, self.left_arrow_rect.centery),
-                (self.left_arrow_rect.x + 12, self.left_arrow_rect.y + 5),
-                (self.left_arrow_rect.x + 12, self.left_arrow_rect.y + self.left_arrow_rect.height - 5)
-            ]
-            pygame.draw.polygon(screen, left_color, left_points)
-
-            # Seta direita
-            right_color = (150, 150, 150) if self.current_page < self.total_pages - 1 else (80, 80, 80)
-            right_points = [
-                (self.right_arrow_rect.x + self.right_arrow_rect.width - 5, self.right_arrow_rect.centery),
-                (self.right_arrow_rect.x + self.right_arrow_rect.width - 12, self.right_arrow_rect.y + 5),
-                (self.right_arrow_rect.x + self.right_arrow_rect.width - 12,
-                 self.right_arrow_rect.y + self.right_arrow_rect.height - 5)
-            ]
-            pygame.draw.polygon(screen, right_color, right_points)
-
-            # Número da página
-            page_text = fonts['small'].render(f"{self.current_page + 1}/{self.total_pages}", True, (180, 180, 200))
-            page_rect = page_text.get_rect(center=self.page_label_rect.center)
-            screen.blit(page_text, page_rect)
-
-
-class QuantitySelector:
-    """Seletor de quantidade — layout sequencial (nada se sobrepõe)."""
-
-    def __init__(self, x, y, width, height):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.quantity = 1
-        self.max_quantity = 99
-        self.min_quantity = 1
-        self.visible = False
-        self.mode = "buy"
-        self.item = None
-        self.total_price = 0
-        self.unit_price = 0
-        self.hovered_btn = None
-
-        # Rects dos botões (definidos em _layout)
-        self.btn_decrease    = pygame.Rect(0, 0, 0, 0)
-        self.btn_increase    = pygame.Rect(0, 0, 0, 0)
-        self.btn_decrease_10 = pygame.Rect(0, 0, 0, 0)
-        self.btn_increase_10 = pygame.Rect(0, 0, 0, 0)
-        self.btn_max         = pygame.Rect(0, 0, 0, 0)
-        self.btn_confirm     = pygame.Rect(0, 0, 0, 0)
-        self.btn_cancel      = pygame.Rect(0, 0, 0, 0)
-
-        # Posições auxiliares
-        self.pad = 0
-        self.header_rect = pygame.Rect(0, 0, 0, 0)
-        self.header_sprite_size = 0
-        self.sep_y = 0
-        self.qty_label_y = 0
-        self.qty_box_rect = pygame.Rect(0, 0, 0, 0)
-        self.total_rect = pygame.Rect(0, 0, 0, 0)
-
-        self._layout()
-
-    # ------------------------------------------------------------------
-    # LAYOUT — cursor sequencial do topo pra baixo
-    # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
-    # LAYOUT — cursor sequencial do topo pra baixo
-    # ------------------------------------------------------------------
-    def _layout(self):
-        x, y = self.rect.x, self.rect.y
-        W, H = self.rect.width, self.rect.height
-
-        # ---- Padding externo ----
-        pad = max(14, min(int(H * 0.045), 30))
-        self.pad = pad
-
-        # ---- Alturas base de cada bloco ----
-        header_h = max(54, int(H * 0.13))
-        label_h = 20
-        box_h = max(70, int(H * 0.16))
-        quick_h = max(44, int(H * 0.10))
-        total_h = max(44, int(H * 0.09))
-        footer_h = max(50, int(H * 0.11))
-
-        # ---- Margem entre blocos (aumentada) ----
-        gap = max(18, int(H * 0.042))
-        label_gap = max(10, gap // 2)
-
-        def needed(g, hd, lb, bx, qk, tt, ft, lg):
-            # pad*2 + 5 gaps (header/sep/caixa/rápida/total) + 1px do separador + label_gap
-            return (pad * 2 + hd + lb + bx + qk + tt + ft
-                    + g * 5 + 1 + lg)
-
-        # ---- Comprime o gap se não couber ----
-        while (gap > 8 and
-               needed(gap, header_h, label_h, box_h, quick_h, total_h,
-                      footer_h, label_gap) > H):
-            gap -= 1
-            label_gap = max(6, gap // 2)
-
-        # ---- Ainda não coube: escala os blocos ----
-        if (needed(gap, header_h, label_h, box_h, quick_h, total_h,
-                   footer_h, label_gap) > H):
-            fixed = pad * 2 + gap * 5 + 1 + label_gap
-            avail = max(1, H - fixed)
-            base = header_h + label_h + box_h + quick_h + total_h + footer_h
-            s = avail / base
-            header_h = int(header_h * s)
-            label_h = int(label_h * s)
-            box_h = int(box_h * s)
-            quick_h = int(quick_h * s)
-            total_h = int(total_h * s)
-            footer_h = int(footer_h * s)
-
-        # ---- Cursor sequencial ----
-        cursor = y + pad
-
-        # ========== HEADER ==========
-        self.header_rect = pygame.Rect(x + pad, cursor, W - pad * 2, header_h)
-        self.header_sprite_size = min(header_h, int(W * 0.20))
-        cursor += header_h + gap
-
-        # ========== SEPARADOR ==========
-        self.sep_y = cursor
-        cursor += 1 + gap
-
-        # ========== LABEL "QUANTIDADE" ==========
-        self.qty_label_y = cursor
-        cursor += label_h + label_gap
-
-        # ========== CAIXA DA QUANTIDADE ==========
-        box_x = x + pad
-        box_w = W - pad * 2
-        self.qty_box_rect = pygame.Rect(box_x, cursor, box_w, box_h)
-
-        inner_pad = 8
-        btn_size = max(1, box_h - inner_pad * 2)
-        btn_y = cursor + inner_pad
-        self.btn_decrease = pygame.Rect(box_x + inner_pad, btn_y,
-                                        btn_size, btn_size)
-        self.btn_increase = pygame.Rect(box_x + box_w - btn_size - inner_pad,
-                                        btn_y, btn_size, btn_size)
-        cursor += box_h + gap
-
-        # ========== LINHA RÁPIDA (-10 MAX +10) ==========
-        quick_gap = max(10, int(W * 0.025))
-        quick_w = (box_w - quick_gap * 2) // 3
-        self.btn_decrease_10 = pygame.Rect(box_x, cursor, quick_w, quick_h)
-        self.btn_max = pygame.Rect(box_x + quick_w + quick_gap,
-                                   cursor, quick_w, quick_h)
-        self.btn_increase_10 = pygame.Rect(box_x + (quick_w + quick_gap) * 2,
-                                           cursor, quick_w, quick_h)
-        cursor += quick_h + gap
-
-        # ========== FAIXA DE TOTAL ==========
-        self.total_rect = pygame.Rect(box_x, cursor, box_w, total_h)
-        cursor += total_h + gap
-
-        # ========== FOOTER (Cancelar | Confirmar) ==========
-        btn_gap = max(10, int(W * 0.025))
-        cancel_w = int((box_w - btn_gap) * 0.42)
-        confirm_w = box_w - btn_gap - cancel_w
-        self.btn_cancel = pygame.Rect(box_x, cursor, cancel_w, footer_h)
-        self.btn_confirm = pygame.Rect(box_x + cancel_w + btn_gap,
-                                       cursor, confirm_w, footer_h)
-
-        # ---- Rede de segurança: rodapé nunca sai do painel ----
-        overflow = self.btn_confirm.bottom - (self.rect.bottom - pad)
-        if overflow > 0:
-            self.btn_cancel.y -= overflow
-            self.btn_confirm.y -= overflow
-
-    # ------------------------------------------------------------------
-    # ESTADO
-    # ------------------------------------------------------------------
-    def show(self, mode, item, player_money, max_from_inventory=None):
-        self.mode = mode
-        self.item = item
-        self.visible = True
-        self.quantity = 1
-        self.hovered_btn = None
-        self._layout()
-
-        if mode == "buy":
-            price = item.get("price", 100)
-            self.unit_price = price
-            self.max_quantity = (
-                min(99, player_money // price)
-                if player_money >= price else 0
-            )
-        else:
-            self.unit_price = item.sell_price
-            self.max_quantity = item.quantity
-            self.quantity = min(1, self.max_quantity)
-
-        self.update_total()
-
-    def hide(self):
-        self.visible = False
-        self.item = None
-        self.hovered_btn = None
-
-    def update_total(self):
-        if not self.item:
-            return
-        self.total_price = self.quantity * self.unit_price
-
-    def _is_enabled(self, name):
-        if name == "decrease":
-            return self.quantity > self.min_quantity
-        if name == "increase":
-            return self.quantity < self.max_quantity
-        if name == "decrease_10":
-            return self.quantity > self.min_quantity
-        if name == "increase_10":
-            return self.quantity < self.max_quantity
-        if name == "max":
-            return self.max_quantity > 0 and self.quantity < self.max_quantity
-        return True
-
-    # ------------------------------------------------------------------
-    # EVENTOS
-    # ------------------------------------------------------------------
-    def handle_event(self, event):
-        if not self.visible:
-            return None
-
-        if event.type == pygame.MOUSEMOTION:
-            self.hovered_btn = None
-            for key, rect in (
-                ("decrease",    self.btn_decrease),
-                ("increase",    self.btn_increase),
-                ("decrease_10", self.btn_decrease_10),
-                ("increase_10", self.btn_increase_10),
-                ("max",         self.btn_max),
-                ("confirm",     self.btn_confirm),
-                ("cancel",      self.btn_cancel),
-            ):
-                if rect.collidepoint(event.pos):
-                    self.hovered_btn = key
-                    break
-            return None
-
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.btn_decrease.collidepoint(event.pos):
-                self.quantity = max(self.min_quantity, self.quantity - 1)
-                self.update_total(); return "update"
-            if self.btn_increase.collidepoint(event.pos):
-                self.quantity = min(self.max_quantity, self.quantity + 1)
-                self.update_total(); return "update"
-            if self.btn_decrease_10.collidepoint(event.pos):
-                self.quantity = max(self.min_quantity, self.quantity - 10)
-                self.update_total(); return "update"
-            if self.btn_increase_10.collidepoint(event.pos):
-                self.quantity = min(self.max_quantity, self.quantity + 10)
-                self.update_total(); return "update"
-            if self.btn_max.collidepoint(event.pos):
-                if self.max_quantity > 0:
-                    self.quantity = max(self.min_quantity, self.max_quantity)
-                    self.update_total(); return "update"
-            if self.btn_confirm.collidepoint(event.pos):
-                return "confirm"
-            if self.btn_cancel.collidepoint(event.pos):
-                self.hide(); return "cancel"
-
-        return None
-
-    # ------------------------------------------------------------------
-    # RENDER
-    # ------------------------------------------------------------------
-    def render(self, screen, fonts):
-        if not self.visible:
-            return
-
-        # Overlay
-        ov = pygame.Surface((screen.get_width(), screen.get_height()))
-        ov.set_alpha(210); ov.fill((0, 0, 0))
-        screen.blit(ov, (0, 0))
-
-        # ---- Painel ----
-        pygame.draw.rect(screen, (32, 36, 48), self.rect, border_radius=16)
-        pygame.draw.rect(screen, (75, 95, 135), self.rect, 2, border_radius=16)
-        pygame.draw.rect(screen, (48, 55, 72),
-                         self.rect.inflate(-10, -10), 1, border_radius=14)
-
-        # ========== HEADER ==========
-        hr = self.header_rect
-        sp_size = self.header_sprite_size
-        sp_rect = pygame.Rect(hr.x, hr.y + (hr.height - sp_size) // 2,
-                              sp_size, sp_size)
-
-        pygame.draw.rect(screen, (22, 26, 34), sp_rect, border_radius=10)
-        pygame.draw.rect(screen, (60, 72, 95), sp_rect, 2, border_radius=10)
-
-        item_name = (self.item['name']
-                     if isinstance(self.item, dict) else self.item.name)
-        item_id   = (self.item['id']
-                     if isinstance(self.item, dict) else self.item.item_id)
-
-        sprite = item_bag_catalog.get_sprite(item_id, scaled=True)
-        if sprite:
-            ss = sp_size - 12
-            sprite = pygame.transform.smoothscale(sprite, (ss, ss))
-            screen.blit(sprite, (sp_rect.x + 6, sp_rect.y + 6))
-
-        # Texto: ação + nome, ancorado à direita do sprite
-        tx = sp_rect.right + 16
-        action_txt = "COMPRAR" if self.mode == "buy" else "VENDER"
-        action_col = (100, 200, 255) if self.mode == "buy" else (255, 180, 90)
-        at = fonts['small'].render(action_txt, True, action_col)
-        nt = fonts['title'].render(item_name, True, (240, 245, 255))
-
-        # Empilha verticalmente os dois textos, centralizados no header
-        total_h_txt = at.get_height() + 4 + nt.get_height()
-        ty = hr.y + (hr.height - total_h_txt) // 2
-        screen.blit(at, (tx, ty))
-        screen.blit(nt, (tx, ty + at.get_height() + 4))
-
-        # ========== SEPARADOR ==========
-        pygame.draw.line(screen, (55, 65, 88),
-                         (hr.x, self.sep_y),
-                         (hr.right, self.sep_y), 1)
-
-        # ========== LABEL "QUANTIDADE" ==========
-        ql = fonts['small'].render("QUANTIDADE", True, (140, 152, 180))
-        screen.blit(ql, (self.rect.centerx - ql.get_width() // 2,
-                         self.qty_label_y))
-
-        # ========== CAIXA DA QUANTIDADE ==========
-        box = self.qty_box_rect
-        pygame.draw.rect(screen, (20, 24, 32), box, border_radius=12)
-        pygame.draw.rect(screen, (60, 75, 100), box, 2, border_radius=12)
-
-        # Número grande central
-        qtxt = fonts['title'].render(str(self.quantity), True, (255, 255, 255))
-        screen.blit(qtxt, qtxt.get_rect(center=box.center))
-
-        # Botões − / + (dentro da caixa)
-        self._render_round_button(
-            screen, fonts, self.btn_decrease, "−",
-            self.hovered_btn == "decrease",
-            self._is_enabled("decrease"))
-        self._render_round_button(
-            screen, fonts, self.btn_increase, "+",
-            self.hovered_btn == "increase",
-            self._is_enabled("increase"))
-
-        # ========== LINHA RÁPIDA ==========
-        self._render_quick_button(
-            screen, fonts, self.btn_decrease_10, "−10",
-            self.hovered_btn == "decrease_10",
-            self._is_enabled("decrease_10"))
-        self._render_quick_button(
-            screen, fonts, self.btn_max, "MAX",
-            self.hovered_btn == "max",
-            self._is_enabled("max"))
-        self._render_quick_button(
-            screen, fonts, self.btn_increase_10, "+10",
-            self.hovered_btn == "increase_10",
-            self._is_enabled("increase_10"))
-
-        # ========== FAIXA DE TOTAL ==========
-        tb = self.total_rect
-        pygame.draw.rect(screen, (24, 34, 28), tb, border_radius=10)
-        pygame.draw.rect(screen, (55, 100, 65), tb, 2, border_radius=10)
-
-        left_txt = fonts['small'].render(
-            f"{self.quantity}  ×  ${self.unit_price}",
-            True, (170, 195, 175))
-        screen.blit(left_txt,
-                    (tb.x + 16, tb.centery - left_txt.get_height() // 2))
-
-        right_txt = fonts['medium'].render(
-            f"${self.total_price}", True, (135, 255, 150))
-        screen.blit(right_txt,
-                    (tb.right - right_txt.get_width() - 16,
-                     tb.centery - right_txt.get_height() // 2))
-
-        # ========== FOOTER ==========
-        self._render_footer_button(
-            screen, fonts, self.btn_cancel, "CANCELAR", "danger",
-            self.hovered_btn == "cancel")
-        self._render_footer_button(
-            screen, fonts, self.btn_confirm, "CONFIRMAR", "success",
-            self.hovered_btn == "confirm")
-
-    # ------------------------------------------------------------------
-    # HELPERS DE RENDER
-    # ------------------------------------------------------------------
-    def _render_round_button(self, screen, fonts, btn, symbol,
-                             hovered, enabled):
-        if hovered and enabled:
-            bg, bd = (90, 130, 180), (150, 200, 255)
-        elif enabled:
-            bg, bd = (58, 84, 125), (95, 135, 185)
-        else:
-            bg, bd = (40, 45, 58), (65, 72, 88)
-
-        radius = btn.width // 2
-        pygame.draw.rect(screen, bg, btn, border_radius=radius)
-        pygame.draw.rect(screen, bd, btn, 2, border_radius=radius)
-
-        color = (255, 255, 255) if enabled else (130, 135, 150)
-        t = fonts['title'].render(symbol, True, color)
-        screen.blit(t, t.get_rect(center=btn.center))
-
-    def _render_quick_button(self, screen, fonts, btn, label,
-                             hovered, enabled):
-        if hovered and enabled:
-            bg, bd = (65, 92, 140), (150, 195, 245)
-        elif enabled:
-            bg, bd = (42, 55, 80), (90, 115, 160)
-        else:
-            bg, bd = (34, 38, 50), (62, 68, 85)
-
-        pygame.draw.rect(screen, bg, btn, border_radius=10)
-        pygame.draw.rect(screen, bd, btn, 2, border_radius=10)
-
-        color = (240, 245, 255) if enabled else (120, 125, 140)
-        t = fonts['medium'].render(label, True, color)
-        screen.blit(t, t.get_rect(center=btn.center))
-
-    def _render_footer_button(self, screen, fonts, btn, label, kind, hovered):
-        if kind == "success":
-            bg = (55, 140, 70) if hovered else (42, 105, 55)
-            bd = (140, 235, 155) if hovered else (100, 175, 115)
-        else:
-            bg = (150, 65, 65) if hovered else (110, 55, 55)
-            bd = (230, 140, 140) if hovered else (170, 100, 100)
-
-        pygame.draw.rect(screen, bg, btn, border_radius=10)
-        pygame.draw.rect(screen, bd, btn, 2, border_radius=10)
-
-        t = fonts['medium'].render(label, True, (255, 255, 255))
-        screen.blit(t, t.get_rect(center=btn.center))
-
-class ShopScene(BaseScene):
-    # Largura visual da scrollbar (mobile-friendly)
-    _SCROLLBAR_WIDTH = 14
-    _SCROLLBAR_HIT_PAD = 8   # padding extra pra clicar com o dedo
-
-    def __init__(self, game):
         super().__init__(game)
 
-        self.player = game.player
-        self.catalog = item_bag_catalog
-        self.progress = progress_manager  # Referência ao progresso
-        self.on_close_callback = None
-        # Dados da loja
-        self.shop_items = []
-        self._load_shop_items()
+    # =================================================================
+    # CICLO DE VIDA
+    # =================================================================
+    def build(self):
+        ScreenLoader.load(self, LAYOUT_PATH)
+        self._refresh_all()
 
-        # Estado
-        self.selected_shop_index = 0
-        self.selected_inventory_index = 0
-        self.sell_multiplier = 0.5
+    def enter(self):
+        self._search_focused = False
+        self._refresh_all()
 
-        # Categorias
-        self.shop_category = "all"
-        self.inventory_category = "all"
-        self.filtered_shop_items = []
-        self.filtered_inventory_items = []
-
-        # Scroll
-        self.shop_scroll_y = 0
-        self.shop_scroll_target = 0
-        self.inventory_scroll_y = 0
-        self.inventory_scroll_target = 0
-        self.max_shop_scroll = 0
-        self.max_inventory_scroll = 0
-
-        # ===== DRAG DA SCROLLBAR =====
-        self._dragging_scroll = None          # None | "shop" | "inventory"
-        self._scroll_thumb_offset = 0         # offset do clique dentro do thumb
-        self._scroll_hover = None             # None | "shop" | "inventory"
-
-        # Rects de hit-testing (recalculados a cada frame em _render_scroll_bar)
-        self._shop_scrollbar_rect = None
-        self._shop_scrollbar_track_rect = None
-        self._shop_scrollbar_thumb_rect = None
-
-        self._inventory_scrollbar_rect = None
-        self._inventory_scrollbar_track_rect = None
-        self._inventory_scrollbar_thumb_rect = None
-
-        # Elementos UI
-        self.shop_cards = []
-        self.inventory_cards = []
-        self.shop_category_selector = None
-        self.inventory_category_selector = None
-        self.quantity_selector = None
-
-        # Layout
-        self.layout_initialized = False
-        self.shop_panel_rect = None
-        self.inventory_panel_rect = None
-
-        # Fontes
-        self.fonts = self._create_responsive_fonts()
-
-        # Feedback
-        self.feedback_message = ""
-        self.feedback_timer = 0
-        self.feedback_alpha = 0
-
-        # Botões
-        self.back_button = None
-        self.money_rect = None
-
-        # Offset para descer tudo abaixo do título
-        self.category_offset = 30  # Ajuste este valor (20-40 pixels)
-
-        # Já carrega os itens no início
-        self._refresh_all_data()
-
-    def _create_responsive_fonts(self):
-        """Cria fontes com tamanhos baseados na resolução"""
-        base_size = max(16, self.screen_manager.window_height // 45)
-
+    # =================================================================
+    # ACTIONS
+    # =================================================================
+    def get_actions(self):
         return {
-            'title': pygame.font.Font(None, base_size * 2),
-            'large': pygame.font.Font(None, base_size),
-            'medium': pygame.font.Font(None, base_size - 2),
-            'small': pygame.font.Font(None, base_size - 4)
+            "back":                  lambda *_: self._on_back(),
+            "tab_buy":               lambda *_: self._switch_tab("buy"),
+            "tab_sell":              lambda *_: self._switch_tab("sell"),
+            "buy_category_changed":  lambda *_: self._on_category_changed("buy"),
+            "sell_category_changed": lambda *_: self._on_category_changed("sell"),
+            "buy_click":             lambda idx: self._on_card_click(idx, "buy"),
+            "sell_click":            lambda idx: self._on_card_click(idx, "sell"),
+            "search_clear":          lambda *_: self._on_search_clear(),
+            "qty_minus":             lambda *_: self._qty_step("dec", 1),
+            "qty_plus":              lambda *_: self._qty_step("inc", 1),
+            "qty_minus_10":          lambda *_: self._qty_step("dec", 10),
+            "qty_plus_10":           lambda *_: self._qty_step("inc", 10),
+            "qty_max":               lambda *_: self._qty_step("max", 0),
+            "qty_cancel":            lambda *_: self._close_qty(),
+            "qty_confirm":           lambda *_: self._confirm_qty(),
         }
 
-    def _load_shop_items(self):
-        """Carrega todos os itens do catálogo (exceto os marcados como not_for_sale)"""
-        all_items = self.catalog.get_all_items()
-        self.shop_items = [
-            item for item in all_items
-            if "price" in item and not item.get("not_for_sale", False)
-        ]
-        self.shop_items.sort(key=lambda x: (x["category"], x["price"]))
+    # =================================================================
+    # REFRESH
+    # =================================================================
+    def _refresh_all(self):
+        self.logic.refresh()
+        self._apply_tab()
+        self._update_money()
+        self._feed_grids()
+        self._update_counts()
+        self._update_empty_labels()
+        self._update_search_display()
+        self._update_modal_visibility()
 
-    def _is_item_available(self, item_data):
-        """Verifica se um item está disponível para compra baseado no progresso"""
-        # Itens com not_for_sale nunca aparecem na loja (mas podem ser vendidos pelo jogador)
-        if item_data.get("not_for_sale", False):
-            return False
+    def _feed_grids(self):
+        buy = self.get("buy_grid")
+        if buy is not None:
+            buy.items = list(self.logic.buy_items)
+            buy.scroll = 0
+        sell = self.get("sell_grid")
+        if sell is not None:
+            sell.items = list(self.logic.sell_items)
+            sell.scroll = 0
 
-        unlock_phase = item_data.get("unlock_phase") or item_data.get("unlock_chapter")
-        if unlock_phase is None:
-            return True
+    def _refresh_list_only(self):
+        """Só re-alimenta grids/counts — usado durante digitação."""
+        self._feed_grids()
+        self._update_counts()
+        self._update_empty_labels()
 
-        return self.progress.is_phase_completed(unlock_phase)
+    def _update_money(self):
+        lbl = self.get("lbl_money")
+        if lbl is not None:
+            lbl.text = f"{int(self.game.player.money):,}".replace(",", ".")
 
-    def _refresh_all_data(self):
-        """ATUALIZA TODOS OS DADOS DA LOJA - Chamado sempre que houver mudança"""
-        print("[SHOP] Atualizando todos os dados da loja...")
+    def _update_counts(self):
+        bc = self.get("buy_count")
+        if bc is not None:
+            bc.text = f"{len(self.logic.buy_items)} itens"
+        sc = self.get("sell_count")
+        if sc is not None:
+            sc.text = f"{len(self.logic.sell_items)} itens"
 
-        # 1. Recarrega os itens da loja do catálogo
-        self._load_shop_items()
+    def _update_empty_labels(self):
+        be = self.get("buy_empty")
+        if be is not None:
+            be.visible = (self.logic.current_tab == "buy"
+                          and not self.logic.buy_items)
+        se = self.get("sell_empty")
+        if se is not None:
+            se.visible = (self.logic.current_tab == "sell"
+                          and not self.logic.sell_items)
 
-        # 2. Atualiza os cards do inventário com os dados mais recentes da bag
-        self._refresh_inventory_cards()
+    # =================================================================
+    # SEARCH
+    # =================================================================
+    def _update_search_display(self):
+        lbl = self.get("search_lbl")
+        inp = self.get("search_input")
+        clr = self.get("search_clear")
 
-        # 3. Atualiza os cards da loja
-        self._refresh_shop_cards()
-
-        # 4. Aplica os filtros
-        self.filter_shop()
-        self.filter_inventory()
-
-        # 5. Recalcula os scrolls
-        self._recalculate_scrolls()
-
-        print(
-            f"[SHOP] Dados atualizados: {len(self.shop_cards)} itens na loja, {len(self.inventory_cards)} itens no inventário")
-
-    def _refresh_inventory_cards(self):
-        """Recria os cards do inventário com os dados atuais da bag"""
-        self.inventory_cards = []
-        items = self.player.bag.get_all_items_for_render()
-
-        print(f"[SHOP] Criando {len(items)} cards de inventário...")
-
-        for i, item in enumerate(items):
-            card = InventoryItemCard(
-                item["id"],
-                item["data"],
-                item["quantity"],
-                i
-            )
-            self.inventory_cards.append(card)
-
-        # Atualiza a quantidade nos cards da loja
-        for card in self.shop_cards:
-            card.update_owned(self.player.bag.items)
-
-    def _refresh_shop_cards(self):
-        """Recria os cards da loja"""
-        self.shop_cards = []
-
-        print(f"[SHOP] Criando {len(self.filtered_shop_items)} cards de loja...")
-
-        for i, item_data in enumerate(self.filtered_shop_items):
-            card = ShopItemCard(item_data, i)
-            card.is_locked = not self._is_item_available(item_data)
-            card.update_owned(self.player.bag.items)
-            self.shop_cards.append(card)
-
-    # ==================================================================
-    # DRAG DA SCROLLBAR
-    # ==================================================================
-    def _begin_scroll_drag(self, which, mouse_pos):
-        """Inicia o drag de uma scrollbar. `which` é 'shop' ou 'inventory'."""
-        if which == "shop":
-            thumb = self._shop_scrollbar_thumb_rect
-            track = self._shop_scrollbar_track_rect
-        else:
-            thumb = self._inventory_scrollbar_thumb_rect
-            track = self._inventory_scrollbar_track_rect
-
-        if not track:
+        if lbl is None:
             return
 
-        # Clique no thumb → guarda offset. Clique na track → pula e começa a arrastar.
-        if thumb and thumb.collidepoint(mouse_pos):
-            self._scroll_thumb_offset = mouse_pos[1] - thumb.y
+        txt = self.logic.search_text
+        focused = self._search_focused
+
+        if not txt and not focused:
+            lbl.text = "Buscar..."
+            lbl.text_color = (110, 125, 150)
         else:
-            thumb_h = thumb.height if thumb else 20
-            self._scroll_thumb_offset = thumb_h // 2
-            self._update_scroll_from_mouse(mouse_pos[1])
+            if focused and int(self._cursor_t * 2) % 2 == 0:
+                lbl.text = (txt or "") + "|"
+            else:
+                lbl.text = txt or "|"
+            lbl.text_color = (232, 232, 240)
 
-        self._dragging_scroll = which
+        # Botão X só aparece se há texto
+        if clr is not None:
+            clr.visible = bool(txt)
 
-    def _update_scroll_from_mouse(self, mouse_y):
-        """Converte a posição Y do mouse em scroll (durante o drag)."""
-        which = self._dragging_scroll
-        if not which:
+        # Borda de foco
+        if inp is not None:
+            inp.border_color = (255, 210, 74) if focused else (58, 72, 112)
+            inp.border_width = 2
+
+    def _on_search_clear(self):
+        self.logic.clear_search()
+        self._play_click(0.25)
+        self.logic.refresh()
+        self._refresh_list_only()
+        self._update_search_display()
+
+    def _on_search_focus(self):
+        if not self._search_focused:
+            self._search_focused = True
+            self._update_search_display()
+
+    def _on_search_blur(self):
+        if self._search_focused:
+            self._search_focused = False
+            self._update_search_display()
+
+    def _is_click_in_search(self, pos) -> bool:
+        for wid in ("search_input", "search_lbl", "search_icon"):
+            w = self.get(wid)
+            if w is not None and getattr(w, "rect", None) is not None:
+                if w.rect.collidepoint(pos):
+                    return True
+        return False
+
+    # =================================================================
+    # ABAS
+    # =================================================================
+    def _switch_tab(self, tab: str):
+        if self.logic.current_tab == tab:
+            return
+        self.logic.current_tab = tab
+        self._search_focused = False
+        self._play_click(0.3)
+        self._apply_tab()
+        self._update_empty_labels()
+        self._update_search_display()
+        self._update_modal_visibility()
+
+    def _apply_tab(self):
+        is_buy = self.logic.current_tab == "buy"
+
+        for wid in ("buy_filter_lbl", "buy_dd_category",
+                    "buy_count", "buy_grid"):
+            self._set_visible(wid, is_buy)
+        for wid in ("sell_filter_lbl", "sell_dd_category",
+                    "sell_count", "sell_grid"):
+            self._set_visible(wid, not is_buy)
+
+        tab_buy = self.get("tab_buy")
+        if tab_buy is not None:
+            tab_buy.fill_color = (42, 110, 62) if is_buy else (58, 58, 80)
+            tab_buy.border_color = (90, 216, 112) if is_buy else (122, 122, 144)
+        tab_sell = self.get("tab_sell")
+        if tab_sell is not None:
+            tab_sell.fill_color = (110, 62, 42) if not is_buy else (58, 58, 80)
+            tab_sell.border_color = (216, 140, 90) if not is_buy else (122, 122, 144)
+
+    def _set_visible(self, wid: str, v: bool):
+        w = self.get(wid)
+        if w is not None:
+            w.visible = v
+
+    # =================================================================
+    # CATEGORIA
+    # =================================================================
+    def _on_category_changed(self, mode: str):
+        if mode == "buy":
+            dd = self.get("buy_dd_category")
+            if dd is None:
+                return
+            cat_id = self._label_to_category(dd.value, self.logic.BUY_CATEGORIES)
+            if cat_id is None:
+                return
+            self.logic.buy_category = cat_id
+            self.logic.refresh_buy()
+        else:
+            dd = self.get("sell_dd_category")
+            if dd is None:
+                return
+            cat_id = self._label_to_category(dd.value, self.logic.SELL_CATEGORIES)
+            if cat_id is None:
+                return
+            self.logic.sell_category = cat_id
+            self.logic.refresh_sell()
+
+        self._feed_grids()
+        self._update_counts()
+        self._update_empty_labels()
+
+    @staticmethod
+    def _label_to_category(label: str, table):
+        for cid, lbl in table:
+            if lbl == label:
+                return cid
+        return None
+
+    # =================================================================
+    # CLIQUE EM CARD
+    # =================================================================
+    def _on_card_click(self, idx: int, mode: str):
+        if idx < 0:
+            return
+        items = self.logic.buy_items if mode == "buy" else self.logic.sell_items
+        if idx >= len(items):
+            return
+        card = items[idx]
+
+        if not self.logic.open_qty(card):
+            self._update_feedback()
             return
 
-        if which == "shop":
-            track = self._shop_scrollbar_track_rect
-            thumb = self._shop_scrollbar_thumb_rect
-            max_scroll = self.max_shop_scroll
-        else:
-            track = self._inventory_scrollbar_track_rect
-            thumb = self._inventory_scrollbar_thumb_rect
-            max_scroll = self.max_inventory_scroll
+        self._play_click(0.3)
+        self._refresh_qty_modal()
+        self._update_modal_visibility()
 
-        if not track or not thumb or max_scroll <= 0:
+    # =================================================================
+    # QUANTITY MODAL
+    # =================================================================
+    def _refresh_qty_modal(self):
+        item = self.logic.qty_item
+        if item is None:
             return
 
-        thumb_h = thumb.height
-        track_y = track.y
-        track_h = track.height
-        track_range = max(1, track_h - thumb_h)
+        is_buy = self.logic.qty_mode == "buy"
+        self._set_text("qty_title", "COMPRAR" if is_buy else "VENDER")
+        self._set_text("qty_name", item["name"])
+        self._set_text(
+            "qty_unit",
+            f"Preco unitario: $ {self.logic.qty_unit_price:,}".replace(",", "."))
 
-        desired_y = mouse_y - self._scroll_thumb_offset
-        desired_y = max(track_y, min(track_y + track_range, desired_y))
+        spr_w = self.get("qty_sprite")
+        if spr_w is not None:
+            spr_w.surface = item.get("sprite_surface")
 
-        ratio = (desired_y - track_y) / track_range
-        new_scroll = ratio * max_scroll
+        self._refresh_qty_value()
 
-        # Aplica imediatamente (sem lerp) para dar resposta tátil durante o drag
-        if which == "shop":
-            self.shop_scroll_target = new_scroll
-            self.shop_scroll_y = new_scroll
-        else:
-            self.inventory_scroll_target = new_scroll
-            self.inventory_scroll_y = new_scroll
+    def _refresh_qty_value(self):
+        self._set_text("qty_value", str(self.logic.qty_value))
+        total = self.logic.qty_total()
+        self._set_text("qty_total_value", f"$ {total:,}".replace(",", "."))
 
-    def _recalculate_scrolls(self):
-        """Recalcula os valores máximos de scroll"""
-        card_height = 80
-        card_margin = 8
+        tv = self.get("qty_total_value")
+        if tv is not None:
+            if (self.logic.qty_mode == "buy"
+                    and total > self.game.player.money):
+                tv.text_color = (255, 130, 130)
+            else:
+                tv.text_color = (138, 240, 128)
 
-        # Shop scroll
-        visible_height = self.shop_panel_rect.height - 60 - self.category_offset if self.shop_panel_rect else 0
-        self.max_shop_scroll = max(0, len(self.shop_cards) * (card_height + card_margin) - visible_height)
-        self.shop_scroll_target = min(self.shop_scroll_target, self.max_shop_scroll)
-
-        # Inventory scroll
-        visible_height = self.inventory_panel_rect.height - 60 - self.category_offset if self.inventory_panel_rect else 0
-        self.max_inventory_scroll = max(0, len(self.filtered_inventory_items) * (
-                    card_height + card_margin) - visible_height)
-        self.inventory_scroll_target = min(self.inventory_scroll_target, self.max_inventory_scroll)
-
-    def refresh_inventory(self):
-        """Método público para forçar atualização do inventário"""
-        self._refresh_inventory_cards()
-        self.filter_inventory()
-        self._recalculate_scrolls()
-
-    def filter_shop(self):
-        """Filtra itens da loja por categoria e disponibilidade"""
-        print(f"[SHOP] Filtrando loja - Categoria: {self.shop_category}")
-
-        # Primeiro filtra por categoria
-        if self.shop_category == "all":
-            category_filtered = self.shop_items
-        else:
-            category_filtered = [
-                item for item in self.shop_items
-                if item["category"] == self.shop_category
-            ]
-
-        # Depois filtra por disponibilidade (baseado no progresso)
-        self.filtered_shop_items = [
-            item for item in category_filtered
-            if self._is_item_available(item)
-        ]
-
-        print(f"[SHOP] Itens filtrados: {len(self.filtered_shop_items)}")
-
-        # Atualiza o flag de bloqueio nos cards e recria
-        self._refresh_shop_cards()
-
-    def filter_inventory(self):
-        """Filtra itens do inventário por categoria"""
-        print(f"[SHOP] Filtrando inventário - Categoria: {self.inventory_category}")
-
-        if self.inventory_category == "all":
-            self.filtered_inventory_items = self.inventory_cards.copy()
-        else:
-            self.filtered_inventory_items = [
-                card for card in self.inventory_cards
-                if card.category == self.inventory_category
-            ]
-
-        print(f"[SHOP] Itens no inventário: {len(self.filtered_inventory_items)}")
-
-    def _create_layout(self):
-        """Cria layout responsivo"""
-        vp_x = self.screen_manager.viewport_x
-        vp_y = self.screen_manager.viewport_y
-        vp_w = self.screen_manager.viewport_width
-        vp_h = self.screen_manager.viewport_height
-
-        # Margens
-        margin = max(20, vp_w // 40)
-
-        # Botão voltar
-        btn_size = max(46, vp_h // 20)
-        self.back_button = pygame.Rect(vp_x + margin, vp_y + margin, btn_size, btn_size)
-
-        # Área de dinheiro
-        money_width = max(150, vp_w // 8)
-        money_height = max(36, vp_h // 20)
-        self.money_rect = pygame.Rect(
-            vp_x + vp_w - money_width - margin,
-            vp_y + margin,
-            money_width,
-            money_height
-        )
-
-        # Painéis lado a lado
-        panel_width = (vp_w - margin * 3) // 2
-        panel_height = vp_h - margin * 3 - 40
-        panel_y = vp_y + margin + 50
-
-        # Painel esquerdo (loja)
-        self.shop_panel_rect = pygame.Rect(vp_x + margin, panel_y, panel_width, panel_height)
-
-        # Painel direito (inventário)
-        self.inventory_panel_rect = pygame.Rect(
-            vp_x + vp_w - panel_width - margin,
-            panel_y,
-            panel_width,
-            panel_height
-        )
-
-        # Seletores de categoria
-        self.shop_category_selector = CategorySelector(
-            self.shop_panel_rect.x + 10,
-            self.shop_panel_rect.y + 5,
-            self.shop_panel_rect.width - 20
-        )
-
-        self.inventory_category_selector = CategorySelector(
-            self.inventory_panel_rect.x + 10,
-            self.inventory_panel_rect.y + 5,
-            self.inventory_panel_rect.width - 20
-        )
-
-        # Seletor de quantidade
-        selector_width = min(320, vp_w // 3)
-        selector_height = min(260, vp_h // 3)
-        self.quantity_selector = QuantitySelector(
-            vp_x + (vp_w - selector_width) // 2,
-            vp_y + (vp_h - selector_height) // 2,
-            selector_width,
-            selector_height
-        )
-
-        # Atualiza fontes
-        self.fonts = self._create_responsive_fonts()
-
-        # Cria os cards
-        self._refresh_all_data()
-
-        self.layout_initialized = True
-
-    def _create_shop_cards_visual(self):
-        """Cria a posição visual dos cards da loja"""
-        if not self.shop_panel_rect:
+    def _qty_step(self, action: str, amount: int):
+        if not self.logic.qty_open:
             return
+        if action == "inc":
+            self.logic.qty_inc(amount)
+        elif action == "dec":
+            self.logic.qty_dec(amount)
+        elif action == "max":
+            self.logic.qty_max_out()
+        self._play_click(0.2)
+        self._refresh_qty_value()
 
-        card_height = 80
-        card_margin = 8
-        start_y = self.shop_panel_rect.y + 50 + self.category_offset
-
-        # Recalcula scroll máximo
-        visible_height = self.shop_panel_rect.height - 60 - self.category_offset
-        self.max_shop_scroll = max(0, len(self.shop_cards) * (card_height + card_margin) - visible_height)
-        self.shop_scroll_target = min(self.shop_scroll_target, self.max_shop_scroll)
-
-        for i, card in enumerate(self.shop_cards):
-            card_y = start_y + i * (card_height + card_margin) - self.shop_scroll_y
-            card.update_position(
-                self.shop_panel_rect.x + 10,
-                card_y,
-                self.shop_panel_rect.width - 25,
-                card_height
-            )
-
-    def _create_inventory_cards_visual(self):
-        """Cria a posição visual dos cards do inventário"""
-        if not self.inventory_panel_rect:
+    def _confirm_qty(self):
+        if not self.logic.qty_open:
             return
+        ok = self.logic.confirm_transaction()
+        if ok:
+            self._play_click(0.4)
+            self._close_qty()
+            self._refresh_all()
+            try:
+                self.game.player.auto_save()
+            except Exception:
+                pass
+        else:
+            self._update_feedback()
+            self._refresh_qty_modal()
 
-        card_height = 80
-        card_margin = 8
-        start_y = self.inventory_panel_rect.y + 50 + self.category_offset
+    def _close_qty(self):
+        self.logic.close_qty()
+        self._update_modal_visibility()
 
-        # Recalcula scroll máximo
-        visible_height = self.inventory_panel_rect.height - 60 - self.category_offset
-        self.max_inventory_scroll = max(0, len(self.filtered_inventory_items) * (
-                    card_height + card_margin) - visible_height)
-        self.inventory_scroll_target = min(self.inventory_scroll_target, self.max_inventory_scroll)
+    def _update_modal_visibility(self):
+        v = self.logic.qty_open
+        for wid in (
+            "qty_backdrop", "qty_panel",
+            "qty_title", "qty_sprite_wrap", "qty_sprite",
+            "qty_name", "qty_unit",
+            "qty_value_box", "qty_minus", "qty_value", "qty_plus",
+            "qty_minus_10", "qty_max", "qty_plus_10",
+            "qty_total_panel", "qty_total_label", "qty_total_value",
+            "qty_cancel", "qty_confirm",
+        ):
+            self._set_visible(wid, v)
 
-        for i, card in enumerate(self.filtered_inventory_items):
-            card_y = start_y + i * (card_height + card_margin) - self.inventory_scroll_y
-            card.update_position(
-                self.inventory_panel_rect.x + 10,
-                card_y,
-                self.inventory_panel_rect.width - 25,
-                card_height
-            )
+    # =================================================================
+    # HELPERS
+    # =================================================================
+    def _set_text(self, wid: str, text: str):
+        w = self.get(wid)
+        if w is not None and hasattr(w, "text"):
+            w.text = text
 
+    def _play_click(self, v=0.3):
+        try:
+            sound_manager.play_effect(SoundEffect.CLICK, volume=v)
+        except Exception:
+            pass
+
+    # =================================================================
+    # FEEDBACK
+    # =================================================================
+    def _update_feedback(self):
+        lbl = self.get("feedback_lbl")
+        if lbl is None:
+            return
+        if self.logic.has_feedback():
+            lbl.visible = True
+            lbl.text = self.logic.feedback_text
+            kind = self.logic.feedback_kind
+            if kind == "error":
+                lbl.text_color = (255, 130, 130)
+            elif kind == "success":
+                lbl.text_color = (138, 240, 128)
+            else:
+                lbl.text_color = (200, 210, 240)
+        else:
+            lbl.visible = False
+
+    # =================================================================
+    # NAV
+    # =================================================================
+    def _on_back(self):
+        self._play_click()
+        if self.return_scene == "menu":
+            from src.scenes.menu_scene import MenuScene
+            self.game.current_scene = MenuScene(self.game)
+        else:
+            from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
+            self.game.current_scene = PhaseSelectScene(self.game)
+
+    # =================================================================
+    # EVENTOS
+    # =================================================================
     def handle_event(self, event):
-        # ===== Seletor de quantidade (prioridade máxima) =====
-        if self.quantity_selector and self.quantity_selector.visible:
-            result = self.quantity_selector.handle_event(event)
-            if result == "confirm":
-                self._execute_transaction()
+        # ===== MODAL DE QUANTIDADE =====
+        if self.logic.qty_open:
+            super().handle_event(event)
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self._close_qty()
+                elif event.key == pygame.K_RETURN:
+                    self._confirm_qty()
             return
 
-        # ===== DRAG DA SCROLLBAR (prioridade sobre cards/categorias) =====
+        # ===== BUSCA ATIVA =====
+        if self._search_focused and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self._on_search_blur()
+                return
+            if event.key == pygame.K_RETURN:
+                self._on_search_blur()
+                return
+            if event.key == pygame.K_BACKSPACE:
+                self.logic.set_search(self.logic.search_text[:-1])
+                self.logic.refresh()
+                self._refresh_list_only()
+                self._update_search_display()
+                return
+            if event.key == pygame.K_DELETE:
+                self.logic.clear_search()
+                self.logic.refresh()
+                self._refresh_list_only()
+                self._update_search_display()
+                return
+            if event.unicode and event.unicode.isprintable():
+                if len(self.logic.search_text) < 32:
+                    self.logic.set_search(self.logic.search_text + event.unicode)
+                    self.logic.refresh()
+                    self._refresh_list_only()
+                    self._update_search_display()
+                return
+            # Bloqueia teclas de navegação durante foco
+            return
+
+        # ===== CLICK: foco da busca =====
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            # Checa shop primeiro, depois inventory
-            if self._shop_scrollbar_rect and self._shop_scrollbar_rect.collidepoint(event.pos):
-                self._begin_scroll_drag("shop", event.pos)
+            if self._is_click_in_search(event.pos):
+                self._on_search_focus()
                 return
-            if self._inventory_scrollbar_rect and self._inventory_scrollbar_rect.collidepoint(event.pos):
-                self._begin_scroll_drag("inventory", event.pos)
-                return
+            else:
+                self._on_search_blur()
+                # continua processando normalmente para os outros widgets
 
-        if event.type == pygame.MOUSEMOTION and self._dragging_scroll:
-            self._update_scroll_from_mouse(event.pos[1])
+        # ===== ATALHO: "/" foca a busca =====
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_SLASH:
+            self._on_search_focus()
             return
 
-        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            if self._dragging_scroll:
-                self._dragging_scroll = None
-                return
-
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_p:
-                self.toggle_pause()
-            elif event.key == pygame.K_ESCAPE:
-                # Chama callback se existir
-                if self.on_close_callback:
-                    self.on_close_callback()
-
-                from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
-                self.game.current_scene = PhaseSelectScene(self.game)
-
-        elif event.type == pygame.VIDEORESIZE:
-            self.layout_initialized = False
-
-        elif event.type == pygame.MOUSEWHEEL:
-            mouse_pos = pygame.mouse.get_pos()
-
-            if self.shop_panel_rect and self.shop_panel_rect.collidepoint(mouse_pos):
-                self.shop_scroll_target += event.y * -20
-                self.shop_scroll_target = max(0, min(self.max_shop_scroll, self.shop_scroll_target))
-
-            elif self.inventory_panel_rect and self.inventory_panel_rect.collidepoint(mouse_pos):
-                self.inventory_scroll_target += event.y * -20
-                self.inventory_scroll_target = max(0, min(self.max_inventory_scroll, self.inventory_scroll_target))
-
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.back_button and self.back_button.collidepoint(event.pos):
-                if self.on_close_callback:
-                    self.on_close_callback()
-                from src.scenes.phase_selector.phase_select_scene import PhaseSelectScene
-                self.game.current_scene = PhaseSelectScene(self.game)
-                return
-
-            if self.shop_category_selector:
-                new_category = self.shop_category_selector.handle_event(event)
-                if new_category:
-                    self.shop_category = new_category
-                    self.filter_shop()
-                    self._create_shop_cards_visual()
-                    self.shop_scroll_target = 0
-                    self.selected_shop_index = 0
-                    return
-
-            if self.inventory_category_selector:
-                new_category = self.inventory_category_selector.handle_event(event)
-                if new_category:
-                    self.inventory_category = new_category
-                    self.filter_inventory()
-                    self._create_inventory_cards_visual()
-                    self.inventory_scroll_target = 0
-                    self.selected_inventory_index = 0
-                    return
-
-            if self.shop_panel_rect and self.shop_panel_rect.collidepoint(event.pos):
-                for card in self.shop_cards:
-                    # Só permite interagir se não estiver bloqueado
-                    if not card.is_locked:
-                        result = card.handle_event(event)
-                        if result:
-                            self.selected_shop_index = card.index
-                            self._open_quantity_selector_for_card(card)
-                            return
-
-            if self.inventory_panel_rect and self.inventory_panel_rect.collidepoint(event.pos):
-                for card in self.filtered_inventory_items:
-                    result = card.handle_event(event)
-                    if result:
-                        self.selected_inventory_index = card.index
-                        self._open_quantity_selector_for_inventory(card)
-                        return
-
-        # Passa eventos para os cards para hover
-        for card in self.shop_cards:
-            card.handle_event(event)
-        for card in self.inventory_cards:
-            card.handle_event(event)
-
-    def _open_quantity_selector_for_card(self, card):
-        # Verifica novamente se o item está disponível antes de abrir o seletor
-        if self._is_item_available(card.item_data):
-            self.quantity_selector.show("buy", card.item_data, self.player.money)
-        else:
-            self.feedback_message = f"Item bloqueado! Complete a fase {card.unlock_phase} primeiro."
-            self.feedback_timer = 2.0
-
-    def _open_quantity_selector_for_inventory(self, card):
-        self.quantity_selector.show("sell", card, self.player.money)
-
-    def _execute_transaction(self):
-        selector = self.quantity_selector
-        if not selector or not selector.item:
+        # ===== ESC global =====
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self._on_back()
             return
 
-        quantity = selector.quantity
-        total = selector.total_price
+        super().handle_event(event)
 
-        if selector.mode == "buy":
-            item_data = selector.item
-            item_id = item_data["id"]
-            item_name = item_data["name"]
-
-            # Verifica novamente se o item está disponível antes de comprar
-            if not self._is_item_available(item_data):
-                self.feedback_message = f"Item bloqueado! Complete a fase necessária primeiro."
-                self.feedback_timer = 2.0
-                selector.hide()
-                return
-
-            if self.player.money >= total:
-                self.player.money -= total
-                self.player.bag.add_item(item_id, quantity)
-                self.feedback_message = f"Comprou {quantity}x {item_name}"
-                self.feedback_timer = 2.0
-            else:
-                self.feedback_message = "Dinheiro insuficiente!"
-                self.feedback_timer = 1.5
-                selector.hide()
-                return
-
-        else:  # modo "sell"
-            item_card = selector.item
-            item_id = item_card.item_id
-            item_name = item_card.name
-
-            # Verifica se tem quantidade suficiente
-            current_qty = self.player.bag.get_quantity(item_id)
-            if current_qty >= quantity:
-                self.player.money += total
-                self.player.bag.remove_item(item_id, quantity)
-                self.feedback_message = f"Vendeu {quantity}x {item_name}"
-                self.feedback_timer = 2.0
-            else:
-                self.feedback_message = f"Você só tem {current_qty}x {item_name}!"
-                self.feedback_timer = 1.5
-                selector.hide()
-                return
-
-        # ========== FORÇA ATUALIZAÇÃO COMPLETA DA UI ==========
-        self._refresh_all_data()
-        # =====================================================
-
-        self.game.player.auto_save()
-        selector.hide()
-
+    # =================================================================
+    # UPDATE
+    # =================================================================
     def fixed_update(self, dt):
-        if not self.layout_initialized:
-            self._create_layout()
-            return
+        self.logic.update(dt)
+        self._update_feedback()
 
-        # Atualiza animações
-        for card in self.shop_cards + self.inventory_cards:
-            if hasattr(card, 'update_animation'):
-                card.update_animation(dt)
+        # Cursor piscante
+        if self._search_focused:
+            self._cursor_t += dt
+            self._update_search_display()
 
-        # Scroll suave (apenas quando NÃO está arrastando — drag aplica direto)
-        if self._dragging_scroll != "shop":
-            if abs(self.shop_scroll_y - self.shop_scroll_target) > 0.1:
-                self.shop_scroll_y += (self.shop_scroll_target - self.shop_scroll_y) * min(1, dt * 10)
-                self._create_shop_cards_visual()
-
-        if self._dragging_scroll != "inventory":
-            if abs(self.inventory_scroll_y - self.inventory_scroll_target) > 0.1:
-                self.inventory_scroll_y += (self.inventory_scroll_target - self.inventory_scroll_y) * min(1, dt * 10)
-                self._create_inventory_cards_visual()
-
-        # Feedback
-        if self.feedback_timer > 0:
-            self.feedback_timer -= dt
-            self.feedback_alpha = min(255, int(255 * self.feedback_timer))
-        else:
-            self.feedback_alpha = 0
-
-    def render(self, screen):
-        # ===== Reset dos rects de hit-testing (recalculados neste frame) =====
-        self._shop_scrollbar_rect = None
-        self._shop_scrollbar_track_rect = None
-        self._shop_scrollbar_thumb_rect = None
-        self._inventory_scrollbar_rect = None
-        self._inventory_scrollbar_track_rect = None
-        self._inventory_scrollbar_thumb_rect = None
-
-        self._draw_gradient_background(screen)
-
-        if not self.layout_initialized:
-            self._create_layout()
-            return
-
-        # Título
-        title = self.fonts['title'].render("LOJA", True, (255, 215, 0))
-        title_x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - title.get_width()) // 2
-        screen.blit(title, (title_x, self.screen_manager.viewport_y + 25))
-
-        # Botão voltar
-        if self.back_button:
-            pygame.draw.rect(screen, (40, 40, 45), self.back_button, border_radius=6)
-            pygame.draw.rect(screen, (80, 80, 90), self.back_button, 1, border_radius=6)
-            back_text = self.fonts['large'].render("Voltar", True, (200, 200, 210))
-            back_rect = back_text.get_rect(center=self.back_button.center)
-            screen.blit(back_text, back_rect)
-
-        # Dinheiro
-        self._render_money(screen)
-
-        # Painéis
-        self._render_panels(screen)
-
-        # Seletor de quantidade (renderiza por cima de tudo)
-        if self.quantity_selector and self.quantity_selector.visible:
-            self.quantity_selector.render(screen, self.fonts)
-
-        # Feedback
-        if self.feedback_alpha > 0:
-            self._render_feedback(screen)
-
-        if self.paused:
-            self._render_pause_overlay(screen)
-
-    def _render_money(self, screen):
-        if not self.money_rect:
-            return
-
-        pygame.draw.rect(screen, (30, 35, 45), self.money_rect, border_radius=6)
-        pygame.draw.rect(screen, (80, 120, 180), self.money_rect, 1, border_radius=6)
-
-        coin = self.fonts['title'].render("$", True, (255, 215, 0))
-        screen.blit(coin, (self.money_rect.x + 10, self.money_rect.y + 10))
-
-        money_text = self.fonts['title'].render(str(self.player.money), True, (150, 255, 150))
-        screen.blit(money_text, (self.money_rect.x + 30, self.money_rect.y + 10))
-
-    def _render_panels(self, screen):
-        # Painel da loja
-        self._render_panel(
-            screen,
-            self.shop_panel_rect,
-            "COMPRAR",
-            self.shop_category_selector,
-            self.shop_cards,
-            (80, 140, 220)
-        )
-
-        # Painel do inventário
-        self._render_panel(
-            screen,
-            self.inventory_panel_rect,
-            "VENDER",
-            self.inventory_category_selector,
-            self.filtered_inventory_items,
-            (220, 140, 80)
-        )
-
-    def _render_panel(self, screen, rect, title, category_selector, cards, color):
-        if not rect:
-            return
-
-        # Fundo
-        pygame.draw.rect(screen, (25, 28, 32, 240), rect, border_radius=8)
-        pygame.draw.rect(screen, color, rect, 1, border_radius=8)
-
-        # Título do painel
-        title_text = self.fonts['large'].render(title, True, color)
-        screen.blit(title_text, (category_selector.rect.x + (category_selector.rect.width / 2 - 16), rect.y + 12))
-
-        # Categorias
-        if category_selector:
-            # Move o seletor inteiro para baixo
-            category_selector.rect.y = rect.y + 8 + self.category_offset
-
-            # Atualiza a posição de cada botão dentro do seletor
-            for btn in category_selector.buttons:
-                btn["rect"].y = category_selector.rect.y + 5
-
-            category_selector.render(screen, self.fonts)
-
-        # Área de clipping (cards começam depois das categorias)
-        old_clip = screen.get_clip()
-        clip_rect = pygame.Rect(
-            rect.x,
-            rect.y + 40 + self.category_offset,
-            rect.width,
-            rect.height - 50 - self.category_offset
-        )
-        screen.set_clip(clip_rect)
-
-        # Atualiza posição dos cards antes de renderizar
-        if title == "COMPRAR":
-            self._create_shop_cards_visual()
-        else:
-            self._create_inventory_cards_visual()
-
-        # Cards
-        for i, card in enumerate(cards):
-            if hasattr(card, 'rect') and card.rect.bottom > clip_rect.top and card.rect.top < clip_rect.bottom:
-                selected = False
-                if isinstance(card, ShopItemCard):
-                    selected = (i == self.selected_shop_index and card in self.shop_cards)
-                else:
-                    selected = (i == self.selected_inventory_index and card in self.filtered_inventory_items)
-
-                card.render(screen, self.fonts, selected)
-
-        screen.set_clip(old_clip)
-
-        # Barra de scroll
-        max_scroll = self.max_shop_scroll if title == "COMPRAR" else self.max_inventory_scroll
-        scroll_y = self.shop_scroll_y if title == "COMPRAR" else self.inventory_scroll_y
-
-        self._render_scroll_bar(
-            screen, rect, scroll_y, max_scroll, color,
-            "shop" if title == "COMPRAR" else "inventory",
-        )
-
-    def _render_scroll_bar(self, screen, panel_rect, scroll_y, max_scroll,
-                           color, which):
-        """
-        Renderiza a scrollbar e armazena seus rects para hit-testing.
-        which: 'shop' ou 'inventory'
-        """
-        if not panel_rect:
-            return
-
-        bar_w = self._SCROLLBAR_WIDTH
-        bar_x = panel_rect.right - bar_w - 4
-        bar_y = panel_rect.y + 45 + self.category_offset
-        bar_height = panel_rect.height - 50 - self.category_offset
-
-        if bar_height <= 20:
-            return
-
-        track_rect = pygame.Rect(bar_x, bar_y, bar_w, bar_height)
-
-        # Track (fundo)
-        pygame.draw.rect(screen, (38, 38, 48), track_rect, border_radius=7)
-        pygame.draw.rect(screen, (55, 55, 70), track_rect, 1, border_radius=7)
-
-        if max_scroll <= 0:
-            # Sem necessidade de scroll: registra apenas a track
-            if which == "shop":
-                self._shop_scrollbar_track_rect = track_rect
-            else:
-                self._inventory_scrollbar_track_rect = track_rect
-            return
-
-        # Calcula geometria do thumb
-        thumb_ratio = bar_height / (bar_height + max_scroll)
-        thumb_h = max(48, int(bar_height * thumb_ratio))   # mínimo 48px: fácil de agarrar
-        max_s = max(1, max_scroll)
-        thumb_y = bar_y + int((scroll_y / max_s) * (bar_height - thumb_h))
-
-        thumb_rect = pygame.Rect(bar_x, thumb_y, bar_w, thumb_h)
-
-        # Cor da thumb conforme estado
-        mouse_pos = pygame.mouse.get_pos()
-        if self._dragging_scroll == which:
-            thumb_color = (220, 220, 250)
-            thumb_border = (255, 255, 255)
-        elif thumb_rect.collidepoint(mouse_pos):
-            thumb_color = (200, 200, 235)
-            thumb_border = (230, 230, 250)
-        else:
-            thumb_color = color
-            thumb_border = (230, 230, 245)
-
-        pygame.draw.rect(screen, thumb_color, thumb_rect, border_radius=7)
-        pygame.draw.rect(screen, thumb_border, thumb_rect, 1, border_radius=7)
-
-        # Registra os rects para hit-testing
-        # Área clicável mais larga que a visual (padding à esquerda e direita)
-        pad = self._SCROLLBAR_HIT_PAD
-        hit_rect = pygame.Rect(
-            bar_x - pad, bar_y,
-            bar_w + pad * 2, bar_height
-        )
-
-        if which == "shop":
-            self._shop_scrollbar_rect = hit_rect
-            self._shop_scrollbar_track_rect = track_rect
-            self._shop_scrollbar_thumb_rect = thumb_rect
-        else:
-            self._inventory_scrollbar_rect = hit_rect
-            self._inventory_scrollbar_track_rect = track_rect
-            self._inventory_scrollbar_thumb_rect = thumb_rect
-
-    def _render_feedback(self, screen):
-        if self.feedback_alpha <= 0:
-            return
-
-        text = self.fonts['small'].render(self.feedback_message, True, (255, 255, 255))
-        text.set_alpha(self.feedback_alpha)
-
-        bg = pygame.Surface((text.get_width() + 30, text.get_height() + 12))
-        bg.set_alpha(min(180, self.feedback_alpha))
-        bg.fill((30, 30, 35))
-
-        x = self.screen_manager.viewport_x + (self.screen_manager.viewport_width - bg.get_width()) // 2
-        y = self.screen_manager.viewport_y + self.screen_manager.viewport_height - 60
-
-        screen.blit(bg, (x, y))
-        screen.blit(text, (x + 15, y + 6))
-
-    def _draw_gradient_background(self, screen):
-        for i in range(self.screen_manager.window_height):
-            value = int(15 + (i / self.screen_manager.window_height) * 20)
-            color = (value, value, value + 5)
-            pygame.draw.line(screen, color, (0, i), (self.screen_manager.window_width, i))
-
-    def _render_pause_overlay(self, screen):
-        overlay = pygame.Surface((self.screen_manager.window_width, self.screen_manager.window_height))
-        overlay.set_alpha(180)
-        overlay.fill((10, 10, 10))
-        screen.blit(overlay, (0, 0))
-
-        pause_text = self.fonts['title'].render("PAUSADO", True, (200, 200, 200))
-        text_x = (self.screen_manager.window_width - pause_text.get_width()) // 2
-        text_y = (self.screen_manager.window_height - pause_text.get_height()) // 2
-        screen.blit(pause_text, (text_x, text_y))
+        super().fixed_update(dt)
