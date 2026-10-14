@@ -24,14 +24,31 @@ from src.ui.widgets import (
 LAYOUTS_DIR = UI_LAYOUTS_PATH
 _MISSING_WARNED = set()
 
+
 # =====================================================================
 # IMAGENS
 # =====================================================================
+# Ordem importa: o PRIMEIRO match vence.
+#
+#   RES_PATH:
+#       "Maps/bedroom.png"          → res/Maps/bedroom.png
+#       "PokemonSprites/pikachu.png" → res/PokemonSprites/pikachu.png
+#
+#   RES_PATH/PokemonSprites/UI:
+#       "Maps/bedroom.png"           → res/PokemonSprites/UI/Maps/bedroom.png
+#       "achievementCard/x.png"      → res/PokemonSprites/UI/achievementCard/x.png
+#
+#   RES_PATH/ui:
+#       "menu_bg.png"                → res/ui/menu_bg.png
 _UI_IMAGE_DIRS = [
+    RES_PATH,
     RES_PATH / "PokemonSprites" / "UI",
     RES_PATH / "ui",
 ]
+
+# Onde placeholders são salvos (editor visual)
 _UI_CREATE_DIR = RES_PATH / "PokemonSprites" / "UI"
+
 _IMAGE_CACHE = {}
 _MISSING_IMAGES_LOGGED = set()
 
@@ -40,33 +57,84 @@ def _image_extensions():
     return (".png", ".jpg", ".jpeg", ".bmp", ".gif")
 
 
+def _case_insensitive_find(base: Path, target_name: str) -> Path | None:
+    """
+    Fallback final: procura `target_name` ignorando case em `base`.
+
+    Cobre o caso mais comum em times multi-OS:
+    arquivo commitado como `Bedroom.png`, código procura `bedroom.png`.
+    No Windows funciona (FS é case-insensitive). No Linux/Mac quebra.
+    """
+    if not base.exists() or not target_name:
+        return None
+    lowered = target_name.lower()
+    try:
+        for entry in base.rglob("*"):
+            if entry.is_file() and entry.name.lower() == lowered:
+                return entry
+    except Exception:
+        pass
+    return None
+
+
 def _find_image_file(name):
+    """
+    Procura `name` em todos os `_UI_IMAGE_DIRS`.
+
+    Estratégia em ordem:
+      1. Caminho direto: `base / name` (com extensão).
+      2. Sem extensão: tenta cada extensão em `base/name.ext`.
+      3. Fallback recursivo DENTRO do diretório de UI (não em RES_PATH inteiro,
+         senão varre Maps/, items/, fontes/...).
+      4. Fallback case-insensitive no diretório de UI.
+
+    Retorna `Path` absoluto ou `None`.
+    """
     name = str(name).strip().replace("\\", "/")
     if not name:
         return None
+
     p = Path(name)
     has_ext = p.suffix.lower() in _image_extensions()
+
     for base in _UI_IMAGE_DIRS:
         if not base.exists():
             continue
+
+        # 1) Tentativa direta
         candidate = base / name
         if candidate.is_file():
             return candidate
+
+        # 2) Sem extensão → tenta cada extensão
         if not has_ext:
             for ext in _image_extensions():
-                candidate = base / f"{name}{ext}"
-                if candidate.is_file():
-                    return candidate
-        target = p.name if has_ext else None
-        if target:
-            for found in base.rglob(target):
-                if found.is_file():
-                    return found
-        else:
-            for ext in _image_extensions():
-                for found in base.rglob(f"{p.name}{ext}"):
+                c = base / f"{name}{ext}"
+                if c.is_file():
+                    return c
+
+        # 3) Fallback recursivo SÓ nos diretórios de UI
+        #    (nunca varre RES_PATH inteiro, que tem Maps/, items/, fontes/...)
+        if base != RES_PATH:
+            if has_ext:
+                for found in base.rglob(p.name):
                     if found.is_file():
                         return found
+            else:
+                for ext in _image_extensions():
+                    for found in base.rglob(f"{p.name}{ext}"):
+                        if found.is_file():
+                            return found
+
+    # 4) Fallback case-insensitive — só nos diretórios de UI
+    for base in _UI_IMAGE_DIRS:
+        if base == RES_PATH:
+            continue
+        hit = _case_insensitive_find(base, p.name)
+        if hit is not None:
+            print(f"[UI] match case-insensitive: {hit}")
+            return hit
+
     return None
 
 
@@ -102,11 +170,20 @@ def _create_placeholder_image(name):
 
 
 def _load_ui_image(name, create_if_missing=False):
+    """
+    Carrega imagem por nome. Cacheado por chave.
+
+    `create_if_missing=True` é usado apenas pelo EDITOR visual (que precisa
+    de placeholder para poder ver o widget). Em cenas finais, mantenha `False`
+    para que assets faltando apareçam no log em vez de virarem PNG rosa.
+    """
     if not name:
         return None
+
     key = str(name).strip()
     if key in _IMAGE_CACHE:
         return _IMAGE_CACHE[key]
+
     found = _find_image_file(key)
     if found is not None:
         try:
@@ -115,13 +192,16 @@ def _load_ui_image(name, create_if_missing=False):
             return surf
         except Exception as e:
             print(f"[UI] erro ao carregar {found}: {e}")
+
     if create_if_missing:
         surf = _create_placeholder_image(key)
         _IMAGE_CACHE[key] = surf
         return surf
+
     if key not in _MISSING_IMAGES_LOGGED:
         _MISSING_IMAGES_LOGGED.add(key)
         print(f"[UI] imagem não encontrada: {key!r}")
+
     _IMAGE_CACHE[key] = None
     return None
 
@@ -397,13 +477,24 @@ class ScreenLoader:
         def _is_binding(v):
             return isinstance(v, str) and "{item." in v
 
+        # ============================================================
+        # bg_image / icon
+        # ============================================================
+        # IMPORTANTE: `create_if_missing=False` aqui.
+        # Se o arquivo não existir, o console loga `[UI] imagem não
+        # encontrada: '...'`. Placeholder rosa só é criado pelo editor
+        # visual (que chama _load_ui_image(create_if_missing=True)).
+        # Assim, um asset faltando em outra máquina fica visível no log
+        # em vez de virar PNG silencioso.
+        # ============================================================
         bg_image_name = _get("bg_image")
         bg_image_surf = (None if _is_binding(bg_image_name)
-                         else _load_ui_image(bg_image_name, create_if_missing=True))
+                         else _load_ui_image(bg_image_name,
+                                             create_if_missing=False))
 
         icon_name = _get("icon") or _get("icon_surface")
         icon_surf = (None if _is_binding(icon_name)
-                     else _load_ui_image(icon_name, create_if_missing=True))
+                     else _load_ui_image(icon_name, create_if_missing=False))
 
         bg_tint = parse_color(_get("bg_tint"), None)
 
@@ -621,6 +712,7 @@ class ScreenLoader:
                     font_name=fname, bold=bold, tab=tabname, z=z,
                 ))
                 w = Table(wid, rect, **kw)
+
             elif wtype == "slot_row":
                 kw = _filter_kwargs(SlotRow, dict(
                     value=_int_or(_get("value"), 0),
@@ -644,7 +736,6 @@ class ScreenLoader:
 
             elif wtype == "card_grid":
                 layout = _get("card_layout") or props.get("card_layout") or []
-                # garante que é lista de dicts
                 if isinstance(layout, dict):
                     layout = list(layout.values())
                 kw = _filter_kwargs(CardGrid, dict(

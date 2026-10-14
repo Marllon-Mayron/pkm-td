@@ -27,13 +27,20 @@ class SaveSlotLogic:
     def __init__(self, game):
         self.game = game
         self.player = game.player
-        self._avatar_cache: Dict[int, pygame.Surface] = {}
+        self._avatar_cache: Dict[tuple, pygame.Surface] = {}
 
     # ================================================================
     # LISTAGEM
     # ================================================================
     def list_slots(self) -> List[dict]:
-        """Retorna a lista dos 3 slots com dados prontos pra UI."""
+        """
+        Retorna a lista dos 3 slots com dados prontos pra UI.
+
+        Fonte da verdade dos dados de cada slot: o PRÓPRIO ARQUIVO do save,
+        lido em `_read_slot_header()` — assim não dependemos do que o
+        `save_manager.list_saves()` expõe (que historicamente omitia
+        `play_time`, `team_size`, etc).
+        """
         raw = save_manager.list_saves()
         out = []
         for entry in raw:
@@ -42,62 +49,115 @@ class SaveSlotLogic:
             is_error = entry.get("error", False)
             is_current = (slot_num == save_manager.current_save_file)
 
+            # Lê o cabeçalho direto do arquivo
+            header = {}
+            if not is_empty and not is_error:
+                header = self._read_slot_header(slot_num)
+
             info = {
                 "slot": slot_num,
                 "is_empty": is_empty,
                 "is_error": is_error,
                 "is_current": is_current,
-                "name": entry.get("name", f"Save {slot_num}"),
-                "chapter": entry.get("chapter", 1),
-                "phase": entry.get("phase", 1),
-                "pokemon_count": entry.get("pokemon_count", 0),
-                "team_size": entry.get("team_size", 0),
-                "play_time": entry.get("play_time", 0),
-                "last_save": entry.get("last_save"),
-                "avatar": self._build_avatar(slot_num, is_empty, is_error),
+                "name": header.get("save_name") or entry.get("name") or f"Save {slot_num}",
+                "chapter": int(header.get("chapter", entry.get("chapter", 1)) or 1),
+                "phase":   int(header.get("phase", entry.get("phase", 1)) or 1),
+                "pokemon_count": int(header.get("pokemon_count",
+                                                entry.get("pokemon_count", 0)) or 0),
+                "team_size":     int(header.get("team_size",
+                                                entry.get("team_size", 0)) or 0),
+                "play_time":     float(header.get("play_time",
+                                                  entry.get("play_time", 0)) or 0.0),
+                "last_save":     header.get("last_save") or entry.get("last_save"),
+                "avatar": self._avatar_for(
+                    slot_num, header.get("appearance"), is_empty, is_error),
                 "ghost": is_empty or is_error,
             }
             out.append(info)
         return out
 
     # ================================================================
-    # AVATAR
+    # LEITURA LEVE DO ARQUIVO
     # ================================================================
-    def _read_appearance(self, slot_num: int) -> Optional[dict]:
-        """Lê SÓ o campo appearance do arquivo do slot (sem carregar o save)."""
+    def _read_slot_header(self, slot_num: int) -> dict:
+        """
+        Abre o arquivo do save e extrai SOMENTE campos leves:
+          - player.total_playtime
+          - player.profile_customization.appearance
+          - player.caught_pokemon (contagem)
+          - player.team (contagem)
+          - meta.save_name
+          - meta.last_save
+          - game_state.current_chapter / current_phase
+        Não carrega o save inteiro. Não usa o save_manager.
+        """
         filepath = os.path.join(save_manager.save_dir, f"save_{slot_num}.json")
         if not os.path.exists(filepath):
-            return None
+            return {}
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            app = (data.get("player", {})
-                       .get("profile_customization", {})
-                       .get("appearance"))
-            if isinstance(app, dict):
-                merged = dict(DEFAULT_APPEARANCE)
-                merged.update(app)
-                return merged
-            return None
         except Exception as e:
-            print(f"[SLOT] Erro lendo aparência do slot {slot_num}: {e}")
-            return None
+            print(f"[SLOT] Erro lendo header do slot {slot_num}: {e}")
+            return {}
 
-    def _build_avatar(self, slot_num: int, is_empty: bool, is_error: bool) -> Optional[pygame.Surface]:
-        """Retorna a surface do avatar (real ou fantasma). Cacheado por slot."""
-        key = (slot_num, is_empty, is_error)
+        player = data.get("player", {}) or {}
+        meta   = data.get("meta", {}) or {}
+        state  = data.get("game_state", {}) or {}
+        pc     = player.get("profile_customization", {}) or {}
+        app    = pc.get("appearance")
+
+        # `caught_pokemon` pode ser set serializado como lista
+        caught = player.get("caught_pokemon", []) or []
+        try:
+            pokemon_count = len(caught)
+        except TypeError:
+            pokemon_count = 0
+
+        team = player.get("team", []) or []
+        try:
+            team_size = len(team)
+        except TypeError:
+            team_size = 0
+
+        return {
+            "appearance": app if isinstance(app, dict) else None,
+            "play_time": float(player.get("total_playtime", 0) or 0.0),
+            "save_name": meta.get("save_name"),
+            "last_save": meta.get("last_save"),
+            "chapter": int(state.get("current_chapter", 1) or 1),
+            "phase":   int(state.get("current_phase", 1) or 1),
+            "pokemon_count": pokemon_count,
+            "team_size": team_size,
+        }
+
+    # ================================================================
+    # AVATAR
+    # ================================================================
+    def _avatar_for(self, slot_num: int, appearance: Optional[dict],
+                    is_empty: bool, is_error: bool) -> Optional[pygame.Surface]:
+        """
+        Devolve a surface do avatar para o slot.
+
+        Cache inclui a ASSINATURA da aparência, então trocar de roupa e
+        voltar pra tela de slots já pega o sprite novo automaticamente.
+        """
+        # Assinatura da aparência (evita cache "grudento")
+        sig = None
+        if appearance:
+            try:
+                sig = tuple(sorted((k, str(v)) for k, v in appearance.items()))
+            except Exception:
+                sig = None
+
+        key = (slot_num, is_empty, is_error, sig)
         if key in self._avatar_cache:
             return self._avatar_cache[key]
 
-        appearance = None
-        if not is_empty and not is_error:
-            appearance = self._read_appearance(slot_num)
-
         is_ghost = appearance is None
-        if is_ghost:
-            appearance = DEFAULT_APPEARANCE
+        use_appearance = appearance if appearance else DEFAULT_APPEARANCE
 
-        surf = self._render_avatar(appearance, AVATAR_TARGET)
+        surf = self._render_avatar(use_appearance, AVATAR_TARGET)
 
         # Slot vazio → aplica overlay escuro (fantasma)
         if is_ghost and surf is not None:
@@ -139,11 +199,15 @@ class SaveSlotLogic:
     # ================================================================
     @staticmethod
     def format_play_time(seconds) -> str:
+        """
+        Mesma formatação usada no ProfileLogic.playtime_text():
+            "04h 12m"
+        """
         try:
             t = int(seconds or 0)
         except Exception:
             t = 0
-        return f"{t // 3600}h {(t % 3600) // 60:02d}m"
+        return f"{t // 3600:02d}h {(t % 3600) // 60:02d}m"
 
     @staticmethod
     def format_last_save(iso_str) -> str:

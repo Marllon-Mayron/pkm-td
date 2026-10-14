@@ -1066,15 +1066,161 @@
     "paths": {
         "paths": [
             {
-                "nodes": [],
+                "nodes": [
+                    [
+                        120,
+                        216
+                    ],
+                    [
+                        120,
+                        40
+                    ],
+                    [
+                        120,
+                        216
+                    ]
+                ],
                 "closed": false
             }
         ],
         "current_path_index": 0
     },
     "waves": {
-        "waves": [],
-        "selected_wave": 0,
+        "waves": [
+            {
+                "wave_index": 0,
+                "path_index": 0,
+                "name": "Wave 1",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 3,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 63,
+                "max_level": 63,
+                "wave_size": 1,
+                "spawn_interval": 3.0,
+                "initial_delay": 10.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
+            },
+            {
+                "wave_index": 1,
+                "path_index": 0,
+                "name": "Wave 2",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 6,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 63,
+                "max_level": 63,
+                "wave_size": 1,
+                "spawn_interval": 3.0,
+                "initial_delay": 1.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
+            },
+            {
+                "wave_index": 2,
+                "path_index": 0,
+                "name": "Wave 3",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 9,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 63,
+                "max_level": 63,
+                "wave_size": 1,
+                "spawn_interval": 3.0,
+                "initial_delay": 1.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
+            },
+            {
+                "wave_index": 3,
+                "path_index": 0,
+                "name": "Wave 4",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 25,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 65,
+                "max_level": 65,
+                "wave_size": 1,
+                "spawn_interval": 3.0,
+                "initial_delay": 5.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
+            },
+            {
+                "wave_index": 4,
+                "path_index": 0,
+                "name": "Wave 5",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 143,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 59,
+                "max_level": 59,
+                "wave_size": 1,
+                "spawn_interval": 3.0,
+                "initial_delay": 1.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
+            },
+            {
+                "wave_index": 5,
+                "path_index": 0,
+                "name": "Wave 6",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 18,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 59,
+                "max_level": 59,
+                "wave_size": 1,
+                "spawn_interval": 3.0,
+                "initial_delay": 1.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
+            }
+        ],
+        "selected_wave": 4,
         "templates": {
             "templates": []
         }
@@ -1083,12 +1229,80 @@
         "spot_size": 16,
         "grid_size": 16,
         "snap_to_grid": true,
-        "spots": []
+        "spots": [
+            {
+                "x": 144,
+                "y": 80,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 80,
+                "y": 80,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 144,
+                "y": 112,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 80,
+                "y": 112,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 80,
+                "y": 144,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 144,
+                "y": 144,
+                "size": 16,
+                "allowed_types": []
+            }
+        ]
     },
     "target_items": {
         "grid_size": 16,
         "snap_to_grid": true,
-        "items": []
+        "items": [
+            {
+                "x": 112,
+                "y": 32,
+                "item_id": 1
+            },
+            {
+                "x": 112,
+                "y": 32,
+                "item_id": 1
+            },
+            {
+                "x": 112,
+                "y": 32,
+                "item_id": 1
+            },
+            {
+                "x": 112,
+                "y": 32,
+                "item_id": 1
+            },
+            {
+                "x": 112,
+                "y": 32,
+                "item_id": 1
+            },
+            {
+                "x": 112,
+                "y": 32,
+                "item_id": 1
+            }
+        ]
     },
     "events": {
         "triggers": [],
@@ -1104,6 +1318,6 @@
     },
     "localization_type": "default",
     "custom_folder": "",
-    "day_night_mode": "random",
-    "base_weather": "random"
+    "day_night_mode": "day",
+    "base_weather": "none"
 }

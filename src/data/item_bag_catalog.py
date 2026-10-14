@@ -113,6 +113,7 @@ class ItemBagCatalog:
         battle_items_path = self.base_path / "battle-item"
         held_items_path = self.base_path / "held-itens"
         fossils_path = self.base_path / "Fosseis"
+
         # ============================================================
         # ROUPAS (categoria "clothing")
         # Sprites em: res/PokemonSprites/player/<pasta>/<arquivo>.png
@@ -195,9 +196,11 @@ class ItemBagCatalog:
                 "unlock_phase": None,
                 "unlock_chapter": None,
             }
-            
+
         # ============================================================
         # POKÉBOLAS
+        # FireRed: Poké Ball desde o início | Great Ball em Cerulean (Cap 2)
+        # | Ultra Ball na Celadon Dept Store (Cap 4) | Master Ball no final (Cap 8)
         # ============================================================
         items["pokeball"] = {
             "id": "pokeball",
@@ -210,7 +213,7 @@ class ItemBagCatalog:
             "effect": "capture",
             "effect_value": 1.0,
             "price": 200,
-            "unlock_phase": None,
+            "unlock_phase": None,  # disponível desde o começo
             "unlock_chapter": None,
         }
 
@@ -225,7 +228,7 @@ class ItemBagCatalog:
             "effect": "capture",
             "effect_value": 1.5,
             "price": 600,
-            "unlock_phase": "1-6",
+            "unlock_phase": "2-1",  # Cerulean City Mart
             "unlock_chapter": None,
         }
 
@@ -240,7 +243,7 @@ class ItemBagCatalog:
             "effect": "capture",
             "effect_value": 2,
             "price": 1200,
-            "unlock_phase": "3-4",
+            "unlock_phase": "4-1",  # Celadon Dept Store
             "unlock_chapter": None,
         }
 
@@ -255,8 +258,8 @@ class ItemBagCatalog:
             "effect": "capture",
             "effect_value": 3,
             "price": 20000,
-            "not_for_sale": True,  # Não aparece na loja, mas pode ser vendido
-            "unlock_phase": None,
+            "not_for_sale": True,
+            "unlock_phase": "8-5",  # Após vencer o Champion
             "unlock_chapter": None,
         }
 
@@ -272,7 +275,7 @@ class ItemBagCatalog:
             "effect_value": 1,
             "price": 999999,
             "not_for_sale": True,
-            "unlock_phase": None,
+            "unlock_phase": "5-1",  # Safari Zone (Fuchsia)
             "unlock_chapter": None,
         }
 
@@ -288,12 +291,14 @@ class ItemBagCatalog:
             "effect_value": 1.0,
             "happiness_bonus": 60,
             "price": 400,
-            "unlock_phase": "1-6",
+            "unlock_phase": "2-4",  # Rota 4 (após Mt. Moon)
             "unlock_chapter": None,
         }
 
         # ============================================================
         # POÇÕES
+        # Potion desde o início | Super Potion em Cerulean (Cap 2)
+        # | Hyper Potion na Celadon Dept Store (Cap 4)
         # ============================================================
         items["potion"] = {
             "id": "potion",
@@ -306,7 +311,7 @@ class ItemBagCatalog:
             "effect": "heal",
             "effect_value": 20,
             "price": 200,
-            "unlock_phase": None,
+            "unlock_phase": None,  # desde o início
             "unlock_chapter": None,
         }
 
@@ -321,7 +326,7 @@ class ItemBagCatalog:
             "effect": "heal",
             "effect_value": 50,
             "price": 450,
-            "unlock_phase": "1-6",
+            "unlock_phase": "2-1",  # Cerulean City Mart
             "unlock_chapter": None,
         }
 
@@ -336,7 +341,7 @@ class ItemBagCatalog:
             "effect": "heal",
             "effect_value": 200,
             "price": 1200,
-            "unlock_phase": "3-4",
+            "unlock_phase": "4-1",  # Celadon Dept Store
             "unlock_chapter": None,
         }
 
@@ -352,9 +357,10 @@ class ItemBagCatalog:
             "effect_value": 100,
             "price": 500,
             "not_for_sale": True,
-            "unlock_phase": None,
+            "unlock_phase": "5-1",  # Rota 12 (Fazenda Moomoo)
             "unlock_chapter": None,
         }
+
         # ============================================================
         # ITENS DE CURA DE STATUS
         # ============================================================
@@ -369,7 +375,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "poison",
             "price": 100,
-            "unlock_phase": None,
+            "unlock_phase": "1-2",  # Rota 1 (primeiro mart)
             "unlock_chapter": None,
         }
 
@@ -384,7 +390,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "paralysis",
             "price": 200,
-            "unlock_phase": "1-6",
+            "unlock_phase": "1-3",  # Rota 22 / Pewter Mart
             "unlock_chapter": None,
         }
 
@@ -399,7 +405,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "sleep",
             "price": 250,
-            "unlock_phase": "1-6",
+            "unlock_phase": "1-4",  # Pewter Mart
             "unlock_chapter": None,
         }
 
@@ -414,7 +420,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "burn",
             "price": 250,
-            "unlock_phase": "4-5",
+            "unlock_phase": "1-6",  # Viridian Forest / Pewter Mart
             "unlock_chapter": None,
         }
 
@@ -429,7 +435,7 @@ class ItemBagCatalog:
             "effect": "cure_status",
             "effect_value": "freeze",
             "price": 250,
-            "unlock_phase": "4-5",
+            "unlock_phase": "2-1",  # Cerulean City Mart
             "unlock_chapter": None,
         }
 
@@ -444,7 +450,7 @@ class ItemBagCatalog:
             "effect": "cure_all_status",
             "effect_value": None,
             "price": 600,
-            "unlock_phase": "1-6",
+            "unlock_phase": "4-1",  # Celadon Dept Store
             "unlock_chapter": None,
         }
 
@@ -460,12 +466,13 @@ class ItemBagCatalog:
             "effect_value": 1,
             "price": 4800,
             "not_for_sale": True,
-            "unlock_phase": None,
+            "unlock_phase": "4-1",  # Celadon (encontrado pela cidade)
             "unlock_chapter": None,
         }
 
         # ============================================================
         # REVIVES
+        # Revive na Celadon Dept Store (Cap 4) | Max Revive em Cinnabar (Cap 7)
         # ============================================================
         items["revive"] = {
             "id": "revive",
@@ -476,9 +483,9 @@ class ItemBagCatalog:
             "usable_in_battle": True,
             "usable_on_map": True,
             "effect": "revive",
-            "effect_value": 0.5,  # 50% do HP máximo
+            "effect_value": 0.5,
             "price": 1000,
-            "unlock_phase": "1-6",
+            "unlock_phase": "4-1",  # Celadon Dept Store
             "unlock_chapter": None,
         }
 
@@ -491,9 +498,9 @@ class ItemBagCatalog:
             "usable_in_battle": True,
             "usable_on_map": True,
             "effect": "revive",
-            "effect_value": 1.0,  # 100% do HP máximo
+            "effect_value": 1.0,
             "price": 1900,
-            "unlock_phase": "2-8",
+            "unlock_phase": "7-1",  # Rota 19/20 / Cinnabar Mart
             "unlock_chapter": None,
         }
 
@@ -511,7 +518,7 @@ class ItemBagCatalog:
             "effect": "pp_restore",
             "effect_value": 0.2,
             "price": 100,
-            "unlock_phase": "1-4",
+            "unlock_phase": "5-1",  # Rota 12
             "unlock_chapter": None,
         }
 
@@ -526,15 +533,13 @@ class ItemBagCatalog:
             "effect": "pp_restore",
             "effect_value": 1.0,
             "price": 450,
-            "unlock_phase": "2-8",
+            "unlock_phase": "7-4",  # Mansão Pokémon (Cinnabar)
             "unlock_chapter": None,
         }
 
         # ============================================================
         # VITAMINAS (ITENS DE EV) + RESET DE EV
-        # ============================================================
-        # Cada vitamina dá +10 EVs no stat correspondente.
-        # Preços alinhados ao "Rare Candy" (4800) e pedras de evolução (5000).
+        # Todas disponíveis na Celadon Dept Store (Cap 4)
         # ============================================================
         vitamins = [
             ("hp_up", "HP UP", "HPUP.png", "HP", "hp"),
@@ -557,7 +562,7 @@ class ItemBagCatalog:
                 "effect": "ev_boost",
                 "effect_value": {"stat": stat_key, "amount": 10},
                 "price": 3500,
-                "unlock_phase": "4-5",
+                "unlock_phase": "4-1",  # Celadon Dept Store
                 "unlock_chapter": None,
             }
 
@@ -573,21 +578,24 @@ class ItemBagCatalog:
             "effect": "ev_reset",
             "effect_value": None,
             "price": 5000,
-            "unlock_phase": "4-5",
+            "unlock_phase": "6-4",  # Saffron (item especial pós-Silph)
             "unlock_chapter": None,
         }
+
         # ============================================================
         # PEDRAS DE EVOLUÇÃO
+        # FireRed: na Celadon Dept Store (2F) — Cap 4
+        # Sun/Shiny/Dawn (itens de Gen posterior) em Cinnabar — Cap 7
         # ============================================================
         stones = [
-            ("firestone", "FIRESTONE", "2-8"),
-            ("thunderstone", "THUNDERSTONE", "2-8"),
-            ("waterstone", "WATERSTONE", "2-8"),
-            ("leafstone", "LEAFSTONE", "3-4"),
-            ("moonstone", "MOONSTONE", "3-4"),
-            ("sunstone", "SUNSTONE", "4-5"),
-            ("shinystone", "SHINYSTONE", "4-5"),
-            ("dawnstone", "DAWNSTONE", "4-5"),
+            ("firestone", "FIRESTONE", "4-1"),
+            ("thunderstone", "THUNDERSTONE", "4-1"),
+            ("waterstone", "WATERSTONE", "4-1"),
+            ("leafstone", "LEAFSTONE", "4-1"),
+            ("moonstone", "MOONSTONE", "4-1"),
+            ("sunstone", "SUNSTONE", "7-1"),
+            ("shinystone", "SHINYSTONE", "7-1"),
+            ("dawnstone", "DAWNSTONE", "7-1"),
         ]
         for stone_id, stone_name, unlock_phase in stones:
             items[stone_id] = {
@@ -607,6 +615,7 @@ class ItemBagCatalog:
 
         # ============================================================
         # ITENS DE BATALHA (X-ITEMS)
+        # FireRed: primeiros X-Items em Vermilion (Cap 3)
         # ============================================================
         battle_items = [
             ("x_accuracy", "X ACCURACY", "XACCURACY.png", "Precisão", "accuracy"),
@@ -632,7 +641,7 @@ class ItemBagCatalog:
                     "duration": 20.0,
                 },
                 "price": 500,
-                "unlock_phase": "1-6",
+                "unlock_phase": "3-1",  # Vermilion Mart
                 "unlock_chapter": None,
             }
 
@@ -647,12 +656,13 @@ class ItemBagCatalog:
             "effect": "escape_phase",
             "effect_value": None,
             "price": 400,
-            "unlock_phase": "1-3",
+            "unlock_phase": "1-6",  # Pewter Mart
             "unlock_chapter": None,
         }
 
         # ============================================================
         # FÓSSEIS (não vendidos na loja)
+        # FireRed: escolhidos no Mt. Moon (Cap 2)
         # ============================================================
         fossils = [
             ("helix_fossil", "HELIX FOSSIL", "HELIXFOSSIL.png", "Omanyte/Omastar"),
@@ -672,14 +682,14 @@ class ItemBagCatalog:
                 "effect_value": pokemon_name,
                 "price": 1500,
                 "not_for_sale": True,
-                "unlock_phase": None,
+                "unlock_phase": "2-2",  # Mt. Moon
                 "unlock_chapter": None,
             }
 
         # ============================================================
         # HELD ITEMS (ITENS SEGURÁVEIS)
+        # Type boosters aparecem naturalmente a partir do Cap 4 (Celadon/Silph)
         # ============================================================
-
         held_items = [
             # Inseto
             ("silverpowder", "SILVERPOWDER", "Aumenta o poder de golpes do tipo Inseto em 10%.", "held_item", 8000),
@@ -717,31 +727,30 @@ class ItemBagCatalog:
             ("spelltag", "SPELLTAG", "Aumenta o poder de golpes do tipo Fantasma em 10%.", "held_item", 8000),
             # Demais itens seguráveis (venda na loja)
             ("kings_rock", "KINGSROCK", "Dá 10% de chance de fazer o oponente hesitar ao usar um ataque que causa dano.", "held_item", 9000),
-            ("dragon_scale", "DRAGONSCALE", "Escama especial que faz o Seadra evoluir para Kingdra.", "held_item",9000),
+            ("dragon_scale", "DRAGONSCALE", "Escama especial que faz o Seadra evoluir para Kingdra.", "held_item", 9000),
             ("upgrade", "UPGRADE", "Dispositivo avançado que faz o Porygon evoluir para Porygon2.", "held_item", 9000),
         ]
 
-        # Itens seguráveis que NÃO são vendidos na loja (mas podem ser revendidos)
+        # Itens seguráveis que NÃO são vendidos na loja
         held_items_not_for_sale = [
             ("amulet_coin", "AMULETCOIN",
              "Dobra o dinheiro recebido ao vencer batalhas contra treinadores. O Pokémon precisa participar da batalha.",
              "held_item", 10000),
             ("big_pearl", "BIGPEARL", "Uma pérola grande e bonita. Pode ser vendida por um preço bem alto.",
              "held_item", 10000),
-            ("stick", "STICK", "Alho-poró. Aumenta a taxa de acerto crítico do Farfetch'd em 2 níveis.", "held_item",
-             1000),
+            ("stick", "STICK", "Alho-poró. Aumenta a taxa de acerto crítico do Farfetch'd em 2 níveis.", "held_item", 1000),
             ("thick_club", "THICKCLUB", "Osso grosso. Dobra o Ataque do Cubone e Maroak.", "held_item", 1000),
-            ("light_ball", "LIGHTBALL", "Bola elétrica. Dobra o Ataque e Ataque Especial do Pikachu.", "held_item",
-             1000),
+            ("light_ball", "LIGHTBALL", "Bola elétrica. Dobra o Ataque e Ataque Especial do Pikachu.", "held_item", 1000),
             ("lucky_punch", "LUCKYPUNCH", "Luva da sorte. Aumenta muito a taxa de acerto crítico da Chansey.",
              "held_item", 1000),
-            ("big_mushroom", "BIGMUSHROOM", "Cogumelo grande e raro. Pode ser vendido por um preço alto.", "held_item",
-             2400),
+            ("big_mushroom", "BIGMUSHROOM", "Cogumelo grande e raro. Pode ser vendido por um preço alto.", "held_item", 2400),
             ("tiny_mushroom", "TINYMUSHROOM", "Cogumelo pequeno e comum. Pode ser vendido por um preço razoável.",
              "held_item", 600),
-            ("exp_share", "EXPSHARE", "O Pokémon que segurar este item recebe metade do XP ganho pelos outros membros do time em batalha.","held_item", 5000,),
-            ("everstone", "EVERSTONE", "Uma pedra misteriosa que impede a evolução do Pokémon que a segura.", "held_item", 3000,
-            ),
+            ("exp_share", "EXPSHARE",
+             "O Pokémon que segurar este item recebe metade do XP ganho pelos outros membros do time em batalha.",
+             "held_item", 5000),
+            ("everstone", "EVERSTONE", "Uma pedra misteriosa que impede a evolução do Pokémon que a segura.",
+             "held_item", 3000),
         ]
 
         for item_id, name, description, category, price in held_items:
@@ -754,11 +763,9 @@ class ItemBagCatalog:
                 "usable_in_battle": False,
                 "usable_on_map": False,
                 "effect": "held_item_boost",
-                "effect_value": {
-                    "type_boost": 1.1,
-                },
+                "effect_value": {"type_boost": 1.1},
                 "price": price,
-                "unlock_phase": "4-5",
+                "unlock_phase": "4-1",  # Celadon Dept Store / Silph Co
                 "unlock_chapter": None,
             }
 
@@ -772,17 +779,16 @@ class ItemBagCatalog:
                 "usable_in_battle": False,
                 "usable_on_map": False,
                 "effect": "held_item_boost",
-                "effect_value": {
-                    "type_boost": 1.1,
-                },
+                "effect_value": {"type_boost": 1.1},
                 "price": price,
-                "not_for_sale": True,  # ← não aparece na loja, mas pode ser vendido
-                "unlock_phase": "4-5",
+                "not_for_sale": True,
+                "unlock_phase": "4-1",  # Celadon / rotas do Cap 4
                 "unlock_chapter": None,
             }
 
         # ============================================================
         # ITENS ESPECIAIS DE MINIGAME
+        # Poké Flute: Pokémon Tower (Cap 4)
         # ============================================================
         items["pokeflute"] = {
             "id": "pokeflute",
@@ -796,36 +802,26 @@ class ItemBagCatalog:
             "effect_value": None,
             "price": 500,
             "not_for_sale": True,
-            "unlock_phase": None,
+            "unlock_phase": "4-4",  # Pokémon Tower (Lavender)
             "unlock_chapter": None,
         }
 
         # ============================================================
-        # ITENS ESPECIAIS (não vendidos na loja, mas revendíveis pelo jogador)
+        # ITENS ESPECIAIS (não vendidos na loja, mas revendíveis)
         # ============================================================
-        # A flag "not_for_sale": True remove o item da vitrine da loja,
-        # mas o jogador ainda pode vendê-lo pelo preço de venda (price * 0.5).
         special_items = [
-            (
-                "nugget", "NUGGET",
-                "Um pedaço de ouro puro. Pode ser vendido por um preço alto.",
-                "held_item", 5000,
-            ),
-            (
-                "pearl", "PEARL",
-                "Uma pérola bonita. Pode ser vendida por um preço alto.",
-                "held_item", 2000,
-            ),
-            (
-                "oranberry", "ORANBERRY",
-                "Um Pokémon segurando esta baga recupera 10 HP quando estiver com pouco HP.",
-                "held_item", 200,
-            ),
-            (
-                "leppaberry", "LEPPABERRY",
-                "Um Pokémon segurando esta baga recupera 10 PP de um movimento quando estiver com pouco PP.",
-                "held_item", 400,
-            ),
+            ("nugget", "NUGGET",
+             "Um pedaço de ouro puro. Pode ser vendido por um preço alto.",
+             "held_item", 5000),
+            ("pearl", "PEARL",
+             "Uma pérola bonita. Pode ser vendida por um preço alto.",
+             "held_item", 2000),
+            ("oranberry", "ORANBERRY",
+             "Um Pokémon segurando esta baga recupera 10 HP quando estiver com pouco HP.",
+             "held_item", 200),
+            ("leppaberry", "LEPPABERRY",
+             "Um Pokémon segurando esta baga recupera 10 PP de um movimento quando estiver com pouco PP.",
+             "held_item", 400),
         ]
 
         for item_id, name, description, category, price in special_items:
@@ -834,77 +830,94 @@ class ItemBagCatalog:
                 "name": name,
                 "sprite_path": held_items_path / f"{name}.png",
                 "description": description,
-                "category": category,  # "held_item"
+                "category": category,
                 "usable_in_battle": False,
                 "usable_on_map": False,
                 "effect": None,
                 "effect_value": None,
                 "price": price,
                 "not_for_sale": True,
-                "unlock_phase": None,
+                "unlock_phase": "4-1",  # Celadon / rotas iniciais
                 "unlock_chapter": None,
             }
 
         # ============================================================
         # TMs / HMs
+        # Mapeados pela localização REAL no Pokémon FireRed
         # ============================================================
         # (id, nome, sprite_file, move_name, unlock_phase, price)
         tms = [
-            ("tm_bide", "TM34 - Bide", "machine_NORMAL.png", "bide", "1-6", 2000),
-            ("tm_dream_eater", "TM42 - Dream Eater", "machine_PSYCHIC.png", "dream-eater", "2-1", 1000),
-            ("tm_thunder_wave", "TM45 - Thunder Wave", "machine_ELECTRIC.png", "thunder-wave", "2-2", 1600),
-            ("tm_whirlwind", "TM04 - Whirlwind", "machine_NORMAL.png", "whirlwind", "2-3", 2500),
-            ("tm_water_gun", "TM12 - Water Gun", "machine_WATER.png", "water-gun", "2-4", 2000),
-            ("tm_mega_punch", "TM01 - Mega Punch", "machine_NORMAL.png", "mega-punch", "2-5", 3000),
-            ("tm_seismic_toss", "TM19 - Seismic Toss", "machine_FIGHTING.png", "seismic-toss", "2-6", 2000),
-            ("tm_self_destruct", "TM36 - Self Destruct", "machine_NORMAL.png", "self-destruct", "2-6", 1000),
-            ("tm_dig", "TM28 - Dig", "machine_WATER.png", "dig", "2-7", 2000),
-            ("tm_bubble_beam", "TM11 - Bubble Beam", "machine_WATER.png", "bubble-beam", "2-8", 2500),
-            ("tm_body_slam", "TM08 - Body Slam", "machine_NORMAL.png", "body-slam", "3-1", 2000),
-            ("tm_rest", "TM44 - Rest", "machine_NORMAL.png", "rest", "3-3", 2000),
-            ("tm_rage", "TM20 - Rage", "machine_NORMAL.png", "rage", "3-3", 2000),
-            ("tm_swift", "TM39 - Swift", "machine_NORMAL.png", "swift", "3-3", 2000),
-            ("tm_tri_attack", "TM49 - Tri Attack", "machine_NORMAL.png", "tri-attack", "3-3", 3333),
-            ("tm_thunderbolt", "TM24 - Thunderbolt", "machine_ELECTRIC.png", "thunderbolt", "3-4", 3000),
-            ("tm_pay_day", "TM16 - Pay Day", "machine_NORMAL.png", "pay-day", "3-5", 5000),
-            ("tm_double_edge", "TM10 - Double Edge", "machine_NORMAL.png", "double-edge", "4-1", 3000),
-            ("tm_razor_wind", "TM02 - Razor Wind", "machine_NORMAL.png", "razor-wind", "4-1", 2000),
-            ("tm_horn_drill", "TM07 - Horn Drill", "machine_NORMAL.png", "horn-drill", "4-1", 2500),
-            ("tm_hyper_beam", "TM15 - Hyper Beam", "machine_NORMAL.png", "hyper-beam", "4-2", 5500),
-            ("tm_dragon_rage", "TM23 - Dragon Rage", "machine_NORMAL.png", "dragon-rage", "4-2", 3300),
-            ("tm_soft_boiled", "TM41 - Soft Boiled", "machine_NORMAL.png", "soft-boiled", "4-3", 2200),
-            ("tm_mega_drain", "TM21 - Mega Drain", "machine_GRASS.png", "mega-drain", "4-5", 3500),
-            ("tm_ice_beam", "TM13 - Ice Beam", "machine_ICE.png", "ice-beam", "4-5", 3000),
-            ("tm_rock_slide", "TM48 - Rock Slide", "machine_ROCK.png", "rock-slide", "4-5", 4000),
-            ("hm_surf", "HM03 - Surf", "machine_WATER.png", "surf", "4-5", 4500),
-            ("tm_swords_dance", "TM03 - Swords Dance", "machine_NORMAL.png", "swords-dance", "4-5", 1500),
-            ("tm_mega_kick", "TM05 - Mega Kick", "machine_NORMAL.png", "mega-kick", "4-5", 3000),
-            ("tm_earthquake", "TM26 - Earthquake", "machine_GROUND.png", "earthquake", "4-5", 4000),
-            ("tm_submission", "TM17 - Submission", "machine_FIGHTING.png", "submission", "4-5", 3000),
-            ("tm_counter", "TM18 - Counter", "machine_FIGHTING.png", "counter", "4-5", 3000),
-            ("tm_double_team", "TM32 - Double Team", "machine_NORMAL.png", "double-team", "4-5", 1500),
-            ("tm_reflect", "TM33 - Reflect", "machine_PSYCHIC.png", "reflect", "4-5", 1500),
-            ("tm_egg_bomb", "TM37 - Egg Bomb", "machine_NORMAL.png", "egg-bomb", "4-5", 2000),
-            ("tm_skull_bash", "TM40 - Skull Bash", "machine_NORMAL.png", "skull-bash", "4-5", 2500),
-            ("tm_toxic", "TM06 - Toxic", "machine_POISON.png", "toxic", "5-5", 3000),
-            ("tm_blizzard", "TM14 - Blizzard", "machine_ICE.png", "blizzard", "6-2", 3000),
-            ("tm_take_down", "TM09 - Take Down", "machine_NORMAL.png", "take-down", "6-4", 3000),
-            ("tm_psychic", "TM29 - psychic", "machine_PSYCHIC.png", "psychic", "6-4", 3000),
-            ("tm_teleport", "TM30 - Teleport", "machine_PSYCHIC.png", "teleport", "6-4", 750),
-            ("tm_psywave", "TM46 - Psywave", "machine_PSYCHIC.png", "psywave", "6-5", 3300),
-            ("tm_thunder", "TM25 - Thunder", "machine_ELECTRIC.png", "thunder", "6-8", 3500),
-            ("tm_fire_blast", "TM38 - Fire Blast", "machine_FIRE.png", "fire-blast", "6-10", 5200),
-            ("tm_solar_beam", "TM22 - Solar Beam", "machine_FIGHTING.png", "solar-beam", "7-2", 5500),
-            ("tm_double_edge", "TM10 - Double EDGE", "machine_NORMAL.png", "double-edge", "7-3", 5000),
-            ("tm_fissure", "TM27 - Fissure", "machine_GROUND.png", "fissure", "7-4", 5000),
-            ("tm_sky_attack", "TM43 - Sky Attack", "machine_FLYING.png", "sky-attack", "7-5", 4500),
-            ("tm_explosion", "TM47 - Explosion", "machine_NORMAL.png", "explosion", "7-5", 1800),
+            # -------- Cap 1: Pewter / Viridian --------
+            ("tm_bide", "TM34 - Bide", "machine_NORMAL.png", "bide", "1-8", 2000),  # Gym reward Pewter
 
-            ("hm_cut", "HM01 - CUT", "machine_NORMAL.png", "cut", "2-8", 2000),
-            ("hm_flash", "HM05 - FLASH", "machine_NORMAL.png", "flash", "2-3", 1000),
-            ("hm_fly", "HM02 - FLY", "machine_FLYING.png", "fly", "3-4", 3000),
-            ("hm_surf", "HM03 - SURF", "machine_WATER.png", "surf", "5-1", 5000),
-            ("hm_strength", "HM04 - STRENGTH", "machine_NORMAL.png", "strength", "4-5", 3000),
+            # -------- Cap 2: Cerulean / Mt. Moon / Rota 24-25 --------
+            ("tm_water_gun", "TM12 - Water Gun", "machine_WATER.png", "water-gun", "2-2", 2000),  # Mt. Moon
+            ("tm_thunder_wave", "TM45 - Thunder Wave", "machine_ELECTRIC.png", "thunder-wave", "2-5", 1600),  # Rota 24
+            ("tm_seismic_toss", "TM19 - Seismic Toss", "machine_FIGHTING.png", "seismic-toss", "2-6", 2000),  # Rota 25
+            ("hm_flash", "HM05 - FLASH", "machine_NORMAL.png", "flash", "2-8", 1000),  # Rota 2 (pós-Cut)
+
+            # -------- Cap 3: Vermilion / S.S. Anne --------
+            ("tm_dig", "TM28 - Dig", "machine_WATER.png", "dig", "3-3", 2000),  # Cerulean Rocket
+            ("hm_cut", "HM01 - CUT", "machine_NORMAL.png", "cut", "3-4", 2000),  # S.S. Anne
+            ("tm_rest", "TM44 - Rest", "machine_NORMAL.png", "rest", "3-4", 2000),  # S.S. Anne
+            ("tm_thunderbolt", "TM24 - Thunderbolt", "machine_ELECTRIC.png", "thunderbolt", "3-5", 3000),  # Gym Vermilion
+
+            # -------- Cap 4: Celadon / Lavender / Rock Tunnel / Rota 11 --------
+            # Rocket Hideout (Celadon)
+            ("tm_razor_wind", "TM02 - Razor Wind", "machine_NORMAL.png", "razor-wind", "4-2", 2000),
+            ("tm_horn_drill", "TM07 - Horn Drill", "machine_NORMAL.png", "horn-drill", "4-2", 2500),
+            ("tm_body_slam", "TM08 - Body Slam", "machine_NORMAL.png", "body-slam", "4-2", 2000),
+            ("tm_double_edge", "TM10 - Double Edge", "machine_NORMAL.png", "double-edge", "4-2", 3000),
+            # Game Corner (Celadon)
+            ("tm_ice_beam", "TM13 - Ice Beam", "machine_ICE.png", "ice-beam", "4-3", 3000),
+            ("tm_hyper_beam", "TM15 - Hyper Beam", "machine_NORMAL.png", "hyper-beam", "4-3", 5500),
+            ("tm_submission", "TM17 - Submission", "machine_FIGHTING.png", "submission", "4-3", 3000),
+            ("tm_counter", "TM18 - Counter", "machine_FIGHTING.png", "counter", "4-3", 3000),
+            ("tm_dragon_rage", "TM23 - Dragon Rage", "machine_NORMAL.png", "dragon-rage", "4-3", 3300),
+            # Celadon (gifts / Dept Store)
+            ("tm_mega_drain", "TM21 - Mega Drain", "machine_GRASS.png", "mega-drain", "4-1", 3500),
+            ("tm_soft_boiled", "TM41 - Soft Boiled", "machine_NORMAL.png", "soft-boiled", "4-1", 2200),
+            ("tm_tri_attack", "TM49 - Tri Attack", "machine_NORMAL.png", "tri-attack", "4-1", 3333),
+            ("tm_swords_dance", "TM03 - Swords Dance", "machine_NORMAL.png", "swords-dance", "4-1", 1500),
+            ("tm_mega_kick", "TM05 - Mega Kick", "machine_NORMAL.png", "mega-kick", "4-1", 3000),
+            ("tm_earthquake", "TM26 - Earthquake", "machine_GROUND.png", "earthquake", "4-1", 4000),
+            ("tm_double_team", "TM32 - Double Team", "machine_NORMAL.png", "double-team", "4-1", 1500),
+            ("tm_reflect", "TM33 - Reflect", "machine_PSYCHIC.png", "reflect", "4-1", 1500),
+            ("tm_egg_bomb", "TM37 - Egg Bomb", "machine_NORMAL.png", "egg-bomb", "4-1", 2000),
+            ("tm_skull_bash", "TM40 - Skull Bash", "machine_NORMAL.png", "skull-bash", "4-1", 2500),
+            # Rock Tunnel (Rota 9/10)
+            ("tm_rock_slide", "TM48 - Rock Slide", "machine_ROCK.png", "rock-slide", "4-3", 4000),
+            # Rota 12 / 15 / 16
+            ("tm_pay_day", "TM16 - Pay Day", "machine_NORMAL.png", "pay-day", "4-5", 5000),
+            ("tm_rage", "TM20 - Rage", "machine_NORMAL.png", "rage", "4-5", 2000),
+            ("tm_swift", "TM39 - Swift", "machine_NORMAL.png", "swift", "4-5", 2000),
+            # HMs
+            ("hm_fly", "HM02 - FLY", "machine_FLYING.png", "fly", "4-5", 3000),  # Rota 16
+            ("hm_surf", "HM03 - SURF", "machine_WATER.png", "surf", "4-6", 4500),  # Safari (Fuchsia)
+            ("hm_strength", "HM04 - STRENGTH", "machine_NORMAL.png", "strength", "4-6", 3000),  # Fuchsia
+
+            # -------- Cap 5: Fuchsia / Rota 12-15 --------
+            ("tm_toxic", "TM06 - Toxic", "machine_POISON.png", "toxic", "5-1", 3000),  # Rota 27 / Game Corner
+            ("tm_take_down", "TM09 - Take Down", "machine_NORMAL.png", "take-down", "5-1", 3000),
+            ("tm_teleport", "TM30 - Teleport", "machine_PSYCHIC.png", "teleport", "5-2", 750),
+            ("tm_psywave", "TM46 - Psywave", "machine_PSYCHIC.png", "psywave", "5-3", 3300),
+
+            # -------- Cap 6: Saffron / Silph Co / Power Plant --------
+            ("tm_psychic", "TM29 - psychic", "machine_PSYCHIC.png", "psychic", "6-2", 3000),  # Mr. Psychic
+            ("tm_self_destruct", "TM36 - Self Destruct", "machine_NORMAL.png", "self-destruct", "6-1", 1000),  # Silph
+            ("tm_thunder", "TM25 - Thunder", "machine_ELECTRIC.png", "thunder", "6-5", 3500),  # Power Plant
+            # Power Plant fica entre Rota 9/10, mas só acessível com Surf (após Cap 4)
+            # Colocamos em 6-5 por progressão de Saffron
+
+            # -------- Cap 7: Cinnabar / Seafoam / Mansão --------
+            ("tm_blizzard", "TM14 - Blizzard", "machine_ICE.png", "blizzard", "7-4", 3000),  # Mansão Pokémon
+            ("tm_solar_beam", "TM22 - Solar Beam", "machine_FIGHTING.png", "solar-beam", "7-4", 5500),  # Mansão
+            ("tm_fire_blast", "TM38 - Fire Blast", "machine_FIRE.png", "fire-blast", "7-5", 5200),  # Gym Cinnabar
+            ("tm_explosion", "TM47 - Explosion", "machine_NORMAL.png", "explosion", "7-5", 1800),  # Cerulean Cave
+
+            # -------- Cap 8: Viridian / Victory Road --------
+            ("tm_fissure", "TM27 - Fissure", "machine_GROUND.png", "fissure", "8-2", 5000),  # Gym Viridian
+            ("tm_sky_attack", "TM43 - Sky Attack", "machine_FLYING.png", "sky-attack", "8-3", 4500),  # Victory Road
         ]
 
         for tm_id, tm_name, sprite_file, move_name, unlock_phase, price in tms:

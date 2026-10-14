@@ -1950,6 +1950,6 @@
     },
     "localization_type": "default",
     "custom_folder": "",
-    "day_night_mode": "day",
+    "day_night_mode": "night",
     "base_weather": "none"
 }

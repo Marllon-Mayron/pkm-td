@@ -827,7 +827,7 @@
                         4360,
                         4360,
                         4360,
-                        4385
+                        4383
                     ],
                     [
                         0,
@@ -849,7 +849,7 @@
                         4360,
                         4360,
                         4360,
-                        4360
+                        4383
                     ],
                     [
                         0,
@@ -871,7 +871,7 @@
                         4360,
                         4360,
                         4360,
-                        4360
+                        4383
                     ],
                     [
                         0,
@@ -893,7 +893,7 @@
                         4386,
                         4384,
                         4384,
-                        4384
+                        4368
                     ],
                     [
                         0,
@@ -1003,7 +1003,7 @@
                         4385,
                         4382,
                         4382,
-                        4382
+                        4366
                     ],
                     [
                         0,
@@ -1025,7 +1025,7 @@
                         4360,
                         4360,
                         4360,
-                        4360
+                        4383
                     ],
                     [
                         0,
@@ -1047,7 +1047,7 @@
                         4360,
                         4360,
                         4360,
-                        4360
+                        4383
                     ],
                     [
                         0,
@@ -1069,7 +1069,7 @@
                         4360,
                         4360,
                         4360,
-                        4360
+                        4383
                     ],
                     [
                         0,
@@ -1091,7 +1091,7 @@
                         4360,
                         4360,
                         4360,
-                        4360
+                        4383
                     ],
                     [
                         0,
@@ -1113,7 +1113,7 @@
                         4360,
                         4360,
                         4360,
-                        4360
+                        4383
                     ],
                     [
                         0,
@@ -1135,7 +1135,7 @@
                         4360,
                         4360,
                         4360,
-                        4360
+                        4383
                     ],
                     [
                         0,
@@ -1157,7 +1157,7 @@
                         4360,
                         4360,
                         4360,
-                        4360
+                        4383
                     ],
                     [
                         0,
@@ -1179,7 +1179,7 @@
                         4384,
                         4384,
                         4384,
-                        4384
+                        4368
                     ],
                     [
                         0,
@@ -3385,22 +3385,85 @@
                 "path_index": 0,
                 "name": "Wave 1",
                 "enabled": true,
-                "enemies": [],
-                "min_level": 1,
-                "max_level": 5,
+                "enemies": [
+                    {
+                        "pokemon_id": 111,
+                        "percentage": 24.0
+                    },
+                    {
+                        "pokemon_id": 75,
+                        "percentage": 25.0
+                    },
+                    {
+                        "pokemon_id": 67,
+                        "percentage": 24.0
+                    },
+                    {
+                        "pokemon_id": 95,
+                        "percentage": 24.0
+                    },
+                    {
+                        "pokemon_id": 147,
+                        "percentage": 1.0
+                    },
+                    {
+                        "pokemon_id": 231,
+                        "percentage": 2.0
+                    }
+                ],
+                "min_level": 28,
+                "max_level": 30,
                 "wave_size": 10,
-                "spawn_interval": 3.0,
-                "initial_delay": 2.0,
-                "repeat_wave": false,
-                "repeat_count": 1,
-                "template_id": null,
+                "spawn_interval": 1.0,
+                "initial_delay": 10.0,
+                "repeat_wave": true,
+                "repeat_count": 5,
+                "template_id": "template_5250",
                 "use_variants": false,
                 "variants": []
             }
         ],
         "selected_wave": 0,
         "templates": {
-            "templates": []
+            "templates": [
+                {
+                    "template_id": "template_5250",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 111,
+                            "percentage": 24.0
+                        },
+                        {
+                            "pokemon_id": 75,
+                            "percentage": 25.0
+                        },
+                        {
+                            "pokemon_id": 67,
+                            "percentage": 24.0
+                        },
+                        {
+                            "pokemon_id": 95,
+                            "percentage": 24.0
+                        },
+                        {
+                            "pokemon_id": 147,
+                            "percentage": 1.0
+                        },
+                        {
+                            "pokemon_id": 231,
+                            "percentage": 2.0
+                        }
+                    ],
+                    "min_level": 28,
+                    "max_level": 30,
+                    "wave_size": 10,
+                    "spawn_interval": 1.0,
+                    "initial_delay": 10.0,
+                    "repeat_wave": true,
+                    "repeat_count": 5
+                }
+            ]
         }
     },
     "tower_spots": {

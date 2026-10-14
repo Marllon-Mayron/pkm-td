@@ -119,9 +119,19 @@ class ShopLogic:
         self.buy_items = out
 
     def refresh_sell(self):
+        """
+        FIX: a quantidade vive no ENTRY (não no `data`). Por isso passamos
+        `quantity` separadamente para `_make_sell_card` — antes ele recebia
+        só o `data` e sempre lia `_quantity = 0`, o que fazia `open_qty`
+        rejeitar todo clique e o modal nunca abrir.
+        """
         out = []
         for entry in self.player.bag.get_all_items_for_render():
             data = entry.get("data") or {}
+            quantity = int(entry.get("quantity", 0))
+
+            if quantity <= 0:
+                continue
             if data.get("category") in self.HIDDEN_CATEGORIES:
                 continue
             if (self.sell_category != "all"
@@ -130,13 +140,13 @@ class ShopLogic:
             if not self._matches_search(
                     data.get("name", ""), data.get("description", "")):
                 continue
-            out.append(self._make_sell_card(data))
+            out.append(self._make_sell_card(data, quantity))
 
         out.sort(key=lambda d: (d["category"], d["name"]))
         self.sell_items = out
 
     # ================================================================
-    # CARD DICTS — apenas sprite, título, descrição e preço.
+    # CARD DICTS — sprite, título, descrição e preço.
     # ================================================================
     def _make_buy_card(self, item_data: dict) -> dict:
         item_id = item_data["id"]
@@ -166,7 +176,7 @@ class ShopLogic:
             "_mode": "buy",
         }
 
-    def _make_sell_card(self, item_data: dict) -> dict:
+    def _make_sell_card(self, item_data: dict, quantity: int = 0) -> dict:
         item_id = item_data["id"]
         category = item_data.get("category", "")
         cat_rgb = self.CATEGORY_COLORS.get(category, (140, 160, 200))
@@ -186,7 +196,7 @@ class ShopLogic:
             "price_bg": "#2A1828",
             "price_fg": "#FFC8A0",
             "_sell_price": sell_price,
-            "_quantity": int(item_data.get("quantity", 0)),
+            "_quantity": max(0, int(quantity)),
             "_mode": "sell",
         }
 
@@ -206,9 +216,11 @@ class ShopLogic:
     # ================================================================
     def open_qty(self, card: dict) -> bool:
         mode = card.get("_mode")
+
         if mode == "buy":
             price = card["_price"]
             if price <= 0:
+                self.set_feedback("Item sem preco definido.", "error")
                 return False
             max_affordable = self.player.money // price
             if max_affordable < 1:
@@ -216,12 +228,17 @@ class ShopLogic:
                 return False
             self.qty_max = min(99, max_affordable)
             self.qty_unit_price = price
-        else:
-            have = card.get("_quantity", 0)
+
+        elif mode == "sell":
+            have = int(card.get("_quantity", 0))
             if have < 1:
+                self.set_feedback("Sem itens para vender!", "error")
                 return False
             self.qty_max = have
             self.qty_unit_price = card["_sell_price"]
+
+        else:
+            return False
 
         self.qty_open = True
         self.qty_mode = mode

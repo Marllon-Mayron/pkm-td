@@ -1969,6 +1969,6 @@
     },
     "localization_type": "default",
     "custom_folder": "",
-    "day_night_mode": "dawn",
+    "day_night_mode": "day",
     "base_weather": "sunny"
 }
