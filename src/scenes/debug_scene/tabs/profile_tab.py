@@ -231,7 +231,14 @@ class ProfileTab:
         return ordered
 
     def _get_chapters_and_phases(self):
-        """Retorna [(chapter, [(phase_id, phase_name, number), ...]), ...] ordenado."""
+        """Retorna [(chapter, [(phase_id, phase_name, number), ...]), ...] ordenado.
+
+        Suporta:
+          - Formato novo: {region: {chapter: [phases]}}
+          - Formato antigo: {chapter: [phases]}
+        """
+        from src.config.regions import make_phase_id, DEFAULT_REGION_ID
+
         try:
             from src.config.phase_catalog import phase_catalog
             phase_catalog.refresh()
@@ -240,16 +247,58 @@ class ProfileTab:
             print(f"[PROFILE] Erro ao ler catálogo: {e}")
             return []
 
+        if not all_phases:
+            return []
+
+        # Detecta se é formato novo (region: {chapter: [...]}) ou antigo
+        try:
+            sample_key = next(iter(all_phases.keys()))
+            sample_val = all_phases[sample_key]
+        except (StopIteration, KeyError, TypeError):
+            return []
+
+        if isinstance(sample_val, dict):
+            # Pode ser:
+            #   novo -> {chapter_int: [phases]}
+            #   antigo -> {chapter_int: [phases]} também é dict...
+            # Diferencia pelo conteúdo: se o valor do chapter for list → formato novo.
+            inner_key = next(iter(sample_val.keys())) if sample_val else None
+            inner_val = sample_val.get(inner_key) if inner_key is not None else None
+            if isinstance(inner_val, list):
+                regions_dict = all_phases  # formato novo
+            else:
+                regions_dict = {DEFAULT_REGION_ID: all_phases}  # antigo
+        else:
+            return []
+
         result = []
-        for chapter in sorted(all_phases.keys()):
-            phases_sorted = sorted(all_phases[chapter], key=lambda ph: ph["number"])
-            chapter_phases = []
-            for ph in phases_sorted:
-                num = ph["number"]
-                pid = f"{chapter}-{num}"
-                name = ph.get("name", f"Fase {num}")
-                chapter_phases.append((pid, name, num))
-            result.append((chapter, chapter_phases))
+        for region_id, chapters_dict in regions_dict.items():
+            if not isinstance(chapters_dict, dict):
+                continue
+            for chapter in sorted(chapters_dict.keys()):
+                phases_list = chapters_dict[chapter]
+                if not phases_list:
+                    continue
+
+                if isinstance(phases_list[0], dict):
+                    phases_sorted = sorted(phases_list, key=lambda ph: ph["number"])
+                    norm = [{"number": ph["number"],
+                             "name": ph.get("name", f"Fase {ph['number']}")}
+                            for ph in phases_sorted]
+                else:
+                    norm = [{"number": int(n), "name": f"Fase {n}"}
+                            for n in sorted(int(n) for n in phases_list)]
+
+                chapter_phases = []
+                for ph in norm:
+                    num = ph["number"]
+                    pid = make_phase_id(region_id, chapter, num)
+                    chapter_phases.append((pid, ph["name"], num))
+
+                # Rótulo do capítulo com prefixo da região (se houver >1 região)
+                label_ch = chapter
+                result.append((label_ch, chapter_phases))
+
         return result
 
     def _get_progress_state(self):
@@ -262,6 +311,18 @@ class ProfileTab:
         gs.setdefault("current_phase", 1)
         return gs
 
+    def refresh(self):
+        """Recarrega buffers e reseta scroll (chamado ao trocar slot)."""
+        self._refresh_buffers()
+        self.scroll = 0
+        self._max_scroll = 0
+        self._last_content_height = 0
+        self.focused_input = None
+        self._phase_cache = None
+        self._desfo_selected = 0
+        self._ach_selected = 0
+        # Se a seção atual depende de dados do catálogo, força refresh
+        # (o catálogo em si é cacheado fora; nada a fazer aqui)
     def _persist_progress(self, gs):
         """Aplica mudanças no save_data, recarrega o progress_manager e grava JSON."""
         save_manager.save_data["game_state"] = gs

@@ -2,7 +2,20 @@
 
 """
 Gerenciador de camadas para o jogo.
-Suporta offsets por tile (pintura livre do editor).
+
+IMPORTANTE — arquitetura de renderização:
+  Cada camada é uma superfície TRANSPARENTE (SRCALPHA), exatamente como no
+  editor. Os tiles são blitados nessa superfície e o blend natural do alpha
+  faz o resultado aparecer igual ao editor, sem criar "caixas pretas" em
+  cima das camadas de baixo.
+
+  Isso significa que:
+    - Um tile de chão (pixels com alpha=255) naturalmente cobre o fundo.
+    - Um tile de decoração com regiões vazias deixa o chão aparecer.
+    - Não importa se a camada está marcada como "ground", "decoration" ou
+      "ceiling" — o resultado visual é o mesmo.
+  O `layer_type` fica apenas como metadado (usado para ordenação em 3 passes
+  pelo GameLayerManager: ground → decoration → ceiling).
 """
 import pygame
 import os
@@ -23,6 +36,10 @@ class GameLayer:
         self.tileset = []
         self.tilesets = []
         self.tileset_paths = []
+
+        # ===== AUTOTILE METADATA =====
+        self.autotile_tilesets = []
+
         self._cached_tiles = {}
 
         self._cached_surface = None
@@ -90,9 +107,20 @@ class GameLayer:
             traceback.print_exc()
             return None, 0, 0
 
+    def _empty_tile(self):
+        size = self.tile_size
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        surf.fill((0, 0, 0, 0))
+        return surf
+
     def load_tileset_from_image(self, image_path, tile_width, tile_height, spacing=0):
         tiles, cols, rows = self._extract_tiles(image_path, tile_width, tile_height, spacing)
-        if tiles is None: return False
+        if tiles is None:
+            return False
+
+        # Reconstrói do zero: zera metadata de autotile antigo
+        self.autotile_tilesets = []
+
         self.tileset = tiles
         self.tilesets = [{
             'path': image_path, 'tiles': tiles, 'start_id': 1, 'count': len(tiles),
@@ -105,7 +133,12 @@ class GameLayer:
 
     def add_tileset_from_image(self, image_path, tile_width, tile_height, spacing=0):
         tiles, cols, rows = self._extract_tiles(image_path, tile_width, tile_height, spacing)
-        if tiles is None: return False
+        if tiles is None:
+            return False
+
+        # Adicionar tileset normal invalida o metadata de autotile
+        self.autotile_tilesets = []
+
         next_start = len(self.tileset) + 1
         self.tilesets.append({
             'path': image_path, 'tiles': tiles, 'start_id': next_start, 'count': len(tiles),
@@ -118,8 +151,117 @@ class GameLayer:
         self._invalidate_surface_cache()
         return True
 
-    def load_tileset(self, p, w, h): return self.load_tileset_from_image(p, w, h)
-    def add_tileset(self, p, w, h): return self.add_tileset_from_image(p, w, h)
+    # ==================================================================
+    # AUTOTILE — respeita start_id e count salvos no JSON
+    # ==================================================================
+    def add_autotile_tileset(self, local_id, sheet_path, tiles,
+                             cell_size, cols=8, rows=6,
+                             start_id=None, count=None):
+        """
+        Anexa tiles de um autotile ao tileset da layer.
+        Se start_id for fornecido, ALINHA o tileset para que o primeiro
+        tile do autotile fique exatamente nesse ID.
+        """
+        # Normaliza a lista de tiles para o 'count' salvo
+        if count is not None:
+            count = int(count)
+            if len(tiles) > count:
+                tiles = list(tiles[:count])
+            elif len(tiles) < count:
+                pad = [self._empty_tile() for _ in range(count - len(tiles))]
+                tiles = list(tiles) + pad
+
+        # Alinha o tileset ao start_id salvo
+        if start_id is not None:
+            start_id = int(start_id)
+            needed_len = start_id - 1
+            current_len = len(self.tileset)
+
+            if current_len < needed_len:
+                pad_count = needed_len - current_len
+                print(f"[GameLayer] autotile #{local_id}: "
+                      f"padding {pad_count} tiles vazios para alinhar "
+                      f"start_id={start_id}")
+                self.tileset.extend(
+                    self._empty_tile() for _ in range(pad_count)
+                )
+            elif current_len > needed_len:
+                print(f"[GameLayer] AVISO: autotile #{local_id} start_id="
+                      f"{start_id} mas tileset já tem {current_len} tiles. "
+                      f"Truncando {current_len - needed_len} tiles.")
+                del self.tileset[needed_len:]
+
+            self.tileset.extend(tiles)
+            info = {
+                'local_id': int(local_id),
+                'start_id': start_id,
+                'count': len(tiles),
+                'sheet_path': sheet_path,
+                'cell_size': int(cell_size),
+                'cols': int(cols),
+                'rows': int(rows),
+            }
+
+            for i, existing in enumerate(self.autotile_tilesets):
+                if existing.get('local_id') == local_id:
+                    self.autotile_tilesets[i] = info
+                    break
+            else:
+                self.autotile_tilesets.append(info)
+
+            self._invalidate_surface_cache()
+            return info
+
+        # Fallback: sem start_id
+        existing = None
+        for info in self.autotile_tilesets:
+            if info.get('local_id') == local_id:
+                existing = info
+                break
+
+        if existing is not None:
+            expected_end = existing['start_id'] + existing['count'] - 1
+            if len(self.tileset) >= expected_end:
+                return existing
+
+            current_len = len(self.tileset)
+            if current_len + 1 != existing['start_id']:
+                print(f"[GameLayer] Aviso: start_id do autotile #{local_id} "
+                      f"não bate (salvo={existing['start_id']}, "
+                      f"atual={current_len + 1}). Reajustando.")
+                existing['start_id'] = current_len + 1
+
+            self.tileset.extend(tiles)
+            existing['count'] = len(tiles)
+            self._invalidate_surface_cache()
+            return existing
+
+        start_id = len(self.tileset) + 1
+        self.tileset.extend(tiles)
+        info = {
+            'local_id': local_id,
+            'start_id': start_id,
+            'count': len(tiles),
+            'sheet_path': sheet_path,
+            'cell_size': cell_size,
+            'cols': cols,
+            'rows': rows,
+        }
+        self.autotile_tilesets.append(info)
+        self._invalidate_surface_cache()
+        return info
+
+    def find_autotile_tileset(self, local_id):
+        for info in self.autotile_tilesets:
+            if info.get('local_id') == local_id:
+                return info
+        return None
+
+    def load_tileset(self, p, w, h):
+        return self.load_tileset_from_image(p, w, h)
+
+    def add_tileset(self, p, w, h):
+        return self.add_tileset_from_image(p, w, h)
 
     def get_tile_image(self, tile_id):
         try:
@@ -151,10 +293,7 @@ class GameLayer:
         if total_w <= 0 or total_h <= 0:
             return None
 
-        if self.layer_type in ("decoration", "ceiling"):
-            surface = pygame.Surface((total_w, total_h), pygame.SRCALPHA)
-        else:
-            surface = pygame.Surface((total_w, total_h))
+        surface = pygame.Surface((total_w, total_h), pygame.SRCALPHA)
 
         if not self.tileset:
             return surface
@@ -311,7 +450,7 @@ class GameLayerManager:
                         continue
                 print(f"    Offsets: {len(layer.tile_offsets)} tiles deslocados")
 
-            # Tileset(s)
+            # ===== TILESETS NORMAIS =====
             tileset_paths = []
             if layer_data.get("tileset_paths"):
                 tileset_paths = layer_data["tileset_paths"]
@@ -320,7 +459,8 @@ class GameLayerManager:
 
             slice_size = self.tile_size
             for ts_idx, ts_path in enumerate(tileset_paths):
-                if not ts_path: continue
+                if not ts_path:
+                    continue
                 found = self._find_tileset_path(ts_path, base_path)
                 if not found:
                     print(f"    ✗ Tileset não encontrado: {ts_path}")
@@ -330,14 +470,66 @@ class GameLayerManager:
                 else:
                     layer.add_tileset_from_image(found, slice_size, slice_size)
 
+            # ===== AUTOTILES =====
+            autotile_data = layer_data.get("autotile_tilesets", []) or []
+            if autotile_data:
+                loaded_at = 0
+                for at in autotile_data:
+                    sheet_path = at.get("sheet_path")
+                    if not sheet_path:
+                        continue
+
+                    found = self._find_tileset_path(sheet_path, base_path, is_autotile=True)
+                    if not found:
+                        print(f"    ✗ Autotile sheet não encontrado: {sheet_path}")
+                        continue
+
+                    cell_size = int(at.get("cell_size", layer_tile_size))
+                    cols = int(at.get("cols", 8))
+                    rows = int(at.get("rows", 6))
+                    local_id = int(at.get("local_id", 0))
+                    saved_start = at.get("start_id")
+                    saved_count = at.get("count")
+
+                    tiles, _c, _r = layer._extract_tiles(found, cell_size, cell_size, 0)
+                    if tiles is None:
+                        print(f"    ✗ Falha ao extrair autotile: {found}")
+                        continue
+
+                    if saved_start is not None and saved_count is not None \
+                            and len(tiles) != int(saved_count):
+                        print(f"    ! autotile #{local_id}: sheet tem {len(tiles)} "
+                              f"tiles, JSON esperava {saved_count}. Normalizando.")
+
+                    layer.add_autotile_tileset(
+                        local_id=local_id,
+                        sheet_path=found,
+                        tiles=tiles,
+                        cell_size=cell_size,
+                        cols=cols,
+                        rows=rows,
+                        start_id=saved_start,
+                        count=saved_count,
+                    )
+                    loaded_at += 1
+
+                print(f"    Autotiles: {loaded_at}/{len(autotile_data)} sheet(s) "
+                      f"carregado(s) (total tileset: {len(layer.tileset)})")
+
             self.layers.append(layer)
 
         print(f"\n=== GameLayerManager: {len(self.layers)} camadas ===\n")
         return self
 
-    def _find_tileset_path(self, tileset_path, base_path):
+    def _find_tileset_path(self, tileset_path, base_path, is_autotile=False):
+        if not tileset_path:
+            return None
+        if os.path.isabs(tileset_path) and os.path.exists(tileset_path):
+            return tileset_path
+
         basename = os.path.basename(tileset_path)
         possible = []
+
         if base_path:
             clean = tileset_path
             if clean.startswith('pkm-td/'):
@@ -345,16 +537,26 @@ class GameLayerManager:
             if clean.startswith('pkm-td\\'):
                 clean = clean[len('pkm-td\\'):]
             possible.append(os.path.join(base_path, clean))
+
+        if is_autotile:
+            possible.append(os.path.join("res", "AllTiles", "Autotile", basename))
+            if base_path:
+                possible.append(os.path.join(base_path, "res", "AllTiles", "Autotile", basename))
+
         possible.append(os.path.join("res", "AllTiles", basename))
         if base_path:
             possible.append(os.path.join(base_path, "res", "AllTiles", basename))
         possible.append(basename)
+
         for p in possible:
             n = os.path.normpath(p)
             if os.path.exists(n):
                 return n
         return None
 
+    # ==================================================================
+    # RENDER — 3 passes por tipo (igual ao editor)
+    # ==================================================================
     def render_ground_layers(self, screen, camera, screen_manager):
         for layer in self.layers:
             if layer.layer_type == "ground":

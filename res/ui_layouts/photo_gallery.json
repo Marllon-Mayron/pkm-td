@@ -1,0 +1,246 @@
+{
+  "name": "photo_gallery",
+  "design_size": [1280, 720],
+  "widgets": [
+    {
+      "id": "bg",
+      "type": "panel",
+      "z": 0,
+      "x": 0.5, "y": 0.5, "w": 1.0, "h": 1.0, "anchor": "c",
+      "fill_color": "#060810",
+      "draw_border": false, "draw_shadow": false, "border_radius": 0
+    },
+    {
+      "id": "main_panel",
+      "type": "panel",
+      "z": 1,
+      "x": 0.5, "y": 0.5, "w": 0.98, "h": 0.96, "anchor": "c",
+      "fill_color": "#0E1424", "fill_alpha": 252,
+      "border_color": "#2E3856", "border_width": 3,
+      "border_radius": 14, "padding": 12, "draw_shadow": true
+    },
+
+    {
+      "id": "hd",
+      "type": "panel",
+      "parent_id": "main_panel",
+      "z": 3,
+      "x": 0.5, "y": 0.0, "w": 1.0, "h": 0.10, "anchor": "tc",
+      "fill_color": "#141C32", "fill_alpha": 252,
+      "border_color": "#FFD24A", "border_width": 3,
+      "border_radius": 10, "draw_shadow": true
+    },
+    {
+      "id": "lbl_title",
+      "type": "label",
+      "parent_id": "hd",
+      "z": 4,
+      "x": 0.02, "y": 0.08, "w": 0.55, "h": 0.50, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 22, "bold": true,
+      "text_color": "#FFD24A",
+      "text_fit": "shrink", "min_font_size": 14,
+      "props": { "text": "GALERIA DE FOTOS", "align": "left" }
+    },
+    {
+      "id": "lbl_count",
+      "type": "label",
+      "parent_id": "hd",
+      "z": 4,
+      "x": 0.02, "y": 0.60, "w": 0.55, "h": 0.34, "anchor": "tl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 12, "bold": true,
+      "text_color": "#8A98C0",
+      "props": { "text": "0 fotos", "align": "left" }
+    },
+    {
+      "id": "lbl_page",
+      "type": "label",
+      "parent_id": "hd",
+      "z": 4,
+      "x": 0.99, "y": 0.30, "w": 0.30, "h": 0.40, "anchor": "tr",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 14, "bold": true,
+      "text_color": "#B8CCE8",
+      "text_fit": "shrink", "min_font_size": 10,
+      "props": { "text": "Pagina 1 / 1", "align": "right" }
+    },
+
+    {
+      "id": "gallery_frame",
+      "type": "panel",
+      "parent_id": "main_panel",
+      "z": 3,
+      "x": 0.0, "y": 0.11, "w": 1.0, "h": 0.78, "anchor": "tl",
+      "fill_color": "#080C16", "fill_alpha": 252,
+      "border_color": "#3A4870", "border_width": 2,
+      "border_radius": 12, "draw_shadow": true
+    },
+    {
+      "id": "photos_grid",
+      "type": "grid",
+      "parent_id": "gallery_frame",
+      "z": 5,
+      "x": 0.5, "y": 0.5, "w": 0.96, "h": 0.96, "anchor": "c",
+      "fill_color": "#080C16", "fill_alpha": 0,
+      "border_width": 0, "draw_shadow": false,
+      "props": {
+        "items": [],
+        "cols": 4, "rows": 2,
+        "cell_gap": 8
+      }
+    },
+
+    {
+      "id": "nav_frame",
+      "type": "panel",
+      "parent_id": "main_panel",
+      "z": 4,
+      "x": 0.5, "y": 1.0, "w": 1.0, "h": 0.085, "anchor": "bc",
+      "fill_color": "#0A1020", "fill_alpha": 250,
+      "border_color": "#2E3856", "border_width": 2,
+      "border_radius": 10, "draw_shadow": false
+    },
+    {
+      "id": "btn_back",
+      "type": "button",
+      "parent_id": "nav_frame",
+      "z": 5,
+      "x": 0.03, "y": 0.5, "w": 0.13, "h": 0.72, "anchor": "cl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 12,
+      "fill_color": "#2A3358", "border_color": "#3A4870",
+      "text_color": "#E8E8F0", "border_width": 2, "border_radius": 6,
+      "text_fit": "shrink", "min_font_size": 9,
+      "click_sound": "CLICK", "click_volume": 0.3,
+      "props": { "label": "< VOLTAR", "style": "ghost", "on_click": "back" }
+    },
+    {
+      "id": "btn_prev",
+      "type": "button",
+      "parent_id": "nav_frame",
+      "z": 5,
+      "x": 0.20, "y": 0.5, "w": 0.11, "h": 0.72, "anchor": "cl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 12,
+      "fill_color": "#2A3358", "border_color": "#3A4870",
+      "text_color": "#E8E8F0", "border_width": 2, "border_radius": 6,
+      "text_fit": "shrink", "min_font_size": 9,
+      "click_sound": "CLICK", "click_volume": 0.3,
+      "props": { "label": "< ANTERIOR", "style": "ghost", "on_click": "prev_page" }
+    },
+    {
+      "id": "btn_next",
+      "type": "button",
+      "parent_id": "nav_frame",
+      "z": 5,
+      "x": 0.69, "y": 0.5, "w": 0.11, "h": 0.72, "anchor": "cl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 12,
+      "fill_color": "#2A3358", "border_color": "#3A4870",
+      "text_color": "#E8E8F0", "border_width": 2, "border_radius": 6,
+      "text_fit": "shrink", "min_font_size": 9,
+      "click_sound": "CLICK", "click_volume": 0.3,
+      "props": { "label": "PROXIMA >", "style": "ghost", "on_click": "next_page" }
+    },
+    {
+      "id": "btn_delete",
+      "type": "button",
+      "parent_id": "nav_frame",
+      "z": 5,
+      "x": 0.84, "y": 0.5, "w": 0.13, "h": 0.72, "anchor": "cl",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 12,
+      "fill_color": "#5A2828", "border_color": "#C85555",
+      "text_color": "#F0D8D8", "border_width": 2, "border_radius": 6,
+      "text_fit": "shrink", "min_font_size": 9,
+      "click_sound": "CLICK", "click_volume": 0.3,
+      "visible": false,
+      "props": { "label": "EXCLUIR", "style": "ghost", "on_click": "delete" }
+    },
+
+    {
+      "id": "m_confirm_backdrop",
+      "type": "panel",
+      "z": 1000,
+      "x": 0.5, "y": 0.5, "w": 1.0, "h": 1.0, "anchor": "c",
+      "fill_color": "#000000", "fill_alpha": 200,
+      "draw_border": false, "draw_shadow": false,
+      "visible": false
+    },
+    {
+      "id": "m_confirm_panel",
+      "type": "panel",
+      "z": 1001,
+      "x": 0.5, "y": 0.5, "w": 0.45, "h": 0.32, "anchor": "c",
+      "fill_color": "#1E1418", "fill_alpha": 252,
+      "border_color": "#C85555", "border_width": 3,
+      "border_radius": 14, "draw_shadow": true,
+      "visible": false
+    },
+    {
+      "id": "m_confirm_title",
+      "type": "label",
+      "parent_id": "m_confirm_panel",
+      "z": 1002,
+      "x": 0.5, "y": 0.10, "w": 0.9, "h": 0.15, "anchor": "tc",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 20, "bold": true,
+      "text_color": "#FF8080",
+      "props": { "text": "EXCLUIR FOTO", "align": "center" },
+      "visible": false
+    },
+    {
+      "id": "m_confirm_msg1",
+      "type": "label",
+      "parent_id": "m_confirm_panel",
+      "z": 1002,
+      "x": 0.5, "y": 0.38, "w": 0.9, "h": 0.10, "anchor": "tc",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 14, "bold": true,
+      "text_color": "#D8D8E8",
+      "props": { "text": "Tem certeza que deseja excluir esta foto?", "align": "center" },
+      "visible": false
+    },
+    {
+      "id": "m_confirm_msg2",
+      "type": "label",
+      "parent_id": "m_confirm_panel",
+      "z": 1002,
+      "x": 0.5, "y": 0.50, "w": 0.9, "h": 0.10, "anchor": "tc",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "font_size": 12, "bold": true,
+      "text_color": "#FFA0A0",
+      "props": { "text": "Esta acao nao pode ser desfeita!", "align": "center" },
+      "visible": false
+    },
+    {
+      "id": "m_confirm_yes",
+      "type": "button",
+      "parent_id": "m_confirm_panel",
+      "z": 1003,
+      "x": 0.30, "y": 0.80, "w": 0.25, "h": 0.16, "anchor": "bc",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 14,
+      "fill_color": "#8A2020", "border_color": "#FF5050",
+      "text_color": "#FFFFFF", "border_width": 2, "border_radius": 8,
+      "click_sound": "CLICK", "click_volume": 0.3,
+      "props": { "label": "SIM", "style": "danger", "on_click": "confirm_yes" },
+      "visible": false
+    },
+    {
+      "id": "m_confirm_no",
+      "type": "button",
+      "parent_id": "m_confirm_panel",
+      "z": 1003,
+      "x": 0.70, "y": 0.80, "w": 0.25, "h": 0.16, "anchor": "bc",
+      "font_name": "pokemon-firered-leafgreen-font-recreation",
+      "bold": true, "font_size": 14,
+      "fill_color": "#3A3A50", "border_color": "#7A7A90",
+      "text_color": "#E0E0F0", "border_width": 2, "border_radius": 8,
+      "click_sound": "CLICK", "click_volume": 0.3,
+      "props": { "label": "NAO", "style": "ghost", "on_click": "confirm_no" },
+      "visible": false
+    }
+  ]
+}

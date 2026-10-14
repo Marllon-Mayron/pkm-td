@@ -3,6 +3,7 @@ from typing import Optional
 
 import pygame, uuid, math
 
+from src.data.item_bag_catalog import item_bag_catalog
 from src.entities.pokemon import Pokemon
 from src.entities.base import Entity
 from src.data.pokedex import Pokedex
@@ -100,17 +101,8 @@ class Player(Entity):
             },
         }
 
-        # Dá todas as roupas ao jogador novo (pra ele testar o armário)
-        _all_clothes = (
-            "skin_1", "skin_2",
-            "eyes_1", "eyes_2", "eyes_3", "eyes_4", "eyes_5", "eyes_6",
-            "hair_1", "hair_2", "hair_3",
-            "torso_1", "torso_2",
-            "pants_1", "pants_2",
-            "hat_1", "hat_2",
-        )
-        for _item in _all_clothes:
-            self.bag.items.setdefault(_item, 1)
+        for _item in item_bag_catalog.get_items_by_category("clothing"):
+            self.bag.items.setdefault(_item["id"], 1)
 
         self.save_manager = SaveManager()
 
@@ -541,16 +533,9 @@ class Player(Entity):
 
         # Bag: roupas básicas + nada mais
         self.bag.items = {}
-        _all_clothes = (
-            "skin_1", "skin_2",
-            "eyes_1", "eyes_2", "eyes_3", "eyes_4", "eyes_5", "eyes_6",
-            "hair_1", "hair_2", "hair_3",
-            "torso_1", "torso_2",
-            "pants_1", "pants_2",
-            "hat_1", "hat_2",
-        )
-        for _item in _all_clothes:
-            self.bag.items.setdefault(_item, 1)
+        for _item in item_bag_catalog.get_items_by_category("clothing"):
+            self.bag.items.setdefault(_item["id"], 1)
+
         if hasattr(self.bag, '_update_filtered_items'):
             self.bag._update_filtered_items()
 

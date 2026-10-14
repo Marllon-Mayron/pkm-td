@@ -5014,22 +5014,153 @@
                 "path_index": 0,
                 "name": "Wave 1",
                 "enabled": true,
-                "enemies": [],
-                "min_level": 1,
-                "max_level": 5,
-                "wave_size": 10,
-                "spawn_interval": 3.0,
-                "initial_delay": 2.0,
-                "repeat_wave": false,
-                "repeat_count": 1,
-                "template_id": null,
+                "enemies": [
+                    {
+                        "pokemon_id": 187,
+                        "percentage": 15.0
+                    },
+                    {
+                        "pokemon_id": 96,
+                        "percentage": 30.0
+                    },
+                    {
+                        "pokemon_id": 23,
+                        "percentage": 25.0
+                    },
+                    {
+                        "pokemon_id": 27,
+                        "percentage": 25.0
+                    },
+                    {
+                        "pokemon_id": 50,
+                        "percentage": 5.0
+                    }
+                ],
+                "min_level": 15,
+                "max_level": 18,
+                "wave_size": 6,
+                "spawn_interval": 1.5,
+                "initial_delay": 10.0,
+                "repeat_wave": true,
+                "repeat_count": 2,
+                "template_id": "template_8491",
+                "use_variants": false,
+                "variants": []
+            },
+            {
+                "wave_index": 1,
+                "path_index": 1,
+                "name": "Wave 2",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 187,
+                        "percentage": 15.0
+                    },
+                    {
+                        "pokemon_id": 96,
+                        "percentage": 30.0
+                    },
+                    {
+                        "pokemon_id": 23,
+                        "percentage": 25.0
+                    },
+                    {
+                        "pokemon_id": 27,
+                        "percentage": 25.0
+                    },
+                    {
+                        "pokemon_id": 50,
+                        "percentage": 5.0
+                    }
+                ],
+                "min_level": 15,
+                "max_level": 18,
+                "wave_size": 6,
+                "spawn_interval": 1.5,
+                "initial_delay": 10.0,
+                "repeat_wave": true,
+                "repeat_count": 2,
+                "template_id": "template_8491",
+                "use_variants": false,
+                "variants": []
+            },
+            {
+                "wave_index": 2,
+                "path_index": 2,
+                "name": "Wave 3",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 187,
+                        "percentage": 15.0
+                    },
+                    {
+                        "pokemon_id": 96,
+                        "percentage": 30.0
+                    },
+                    {
+                        "pokemon_id": 23,
+                        "percentage": 25.0
+                    },
+                    {
+                        "pokemon_id": 27,
+                        "percentage": 25.0
+                    },
+                    {
+                        "pokemon_id": 50,
+                        "percentage": 5.0
+                    }
+                ],
+                "min_level": 15,
+                "max_level": 18,
+                "wave_size": 6,
+                "spawn_interval": 1.5,
+                "initial_delay": 10.0,
+                "repeat_wave": true,
+                "repeat_count": 2,
+                "template_id": "template_8491",
                 "use_variants": false,
                 "variants": []
             }
         ],
         "selected_wave": 0,
         "templates": {
-            "templates": []
+            "templates": [
+                {
+                    "template_id": "template_8491",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 187,
+                            "percentage": 15.0
+                        },
+                        {
+                            "pokemon_id": 96,
+                            "percentage": 30.0
+                        },
+                        {
+                            "pokemon_id": 23,
+                            "percentage": 25.0
+                        },
+                        {
+                            "pokemon_id": 27,
+                            "percentage": 25.0
+                        },
+                        {
+                            "pokemon_id": 50,
+                            "percentage": 5.0
+                        }
+                    ],
+                    "min_level": 15,
+                    "max_level": 18,
+                    "wave_size": 6,
+                    "spawn_interval": 1.5,
+                    "initial_delay": 10.0,
+                    "repeat_wave": true,
+                    "repeat_count": 2
+                }
+            ]
         }
     },
     "tower_spots": {

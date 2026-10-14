@@ -1,16 +1,19 @@
 # src/scenes/debug_scene/debug_scene.py
 """
-Cena de Debug — container com abas.
+Cena de Debug — container com abas + seletor de slot.
 
-- Responsável pelo header, abas principais, layout geral e UI primitives
-  (botões, sliders, painéis, etc) reutilizadas pelas abas filhas.
+- Header: título, seletor de slot (1/2/3) + botão Reload, botão X.
 - Cada aba concreta vive em `tabs/` e expõe a interface:
     handle_event(event)
     on_click(name)
     render(screen, left_rect, right_rect)
     render_footer(screen, footer_rect)
     fixed_update(dt)
-    has_focus() / clear_focus()
+    has_focus() / clear_focus() / refresh()
+
+Ao trocar de slot (slot_1/slot_2/slot_3), a cena recarrega o player
+do arquivo correspondente e pede para cada aba re-sincronizar seus
+buffers internos via `refresh()`.
 
 Somente acessível com DEBUG_MODE = True.
 """
@@ -25,7 +28,12 @@ class DebugScene(BaseScene):
     TAB_POKEMON = "pokemon"
     TAB_ITEMS = "items"
     TAB_PROFILE = "profile"
-    _PARENT_CLICKS = ("close", "tab_pokemon", "tab_items", "tab_profile")
+
+    _PARENT_CLICKS = (
+        "close",
+        "tab_pokemon", "tab_items", "tab_profile",
+        "slot_1", "slot_2", "slot_3", "slot_reload",
+    )
 
     # ------------------------------------------------------------------
     def __init__(self, game):
@@ -36,6 +44,10 @@ class DebugScene(BaseScene):
             return
 
         self.tab = self.TAB_POKEMON
+
+        # ===== Slot ativo no debug =====
+        from src.managers.save_manager import save_manager
+        self.debug_slot = save_manager.current_save_file or 1
 
         # Estado global (immediate-mode UI)
         self._clicks = []
@@ -70,6 +82,64 @@ class DebugScene(BaseScene):
         return self._tabs[self.tab]
 
     # ==================================================================
+    # TROCA DE SLOT
+    # ==================================================================
+    def _switch_slot(self, slot: int):
+        """Carrega um slot para edição, aplicando no player em memória."""
+        if slot == self.debug_slot:
+            return
+
+        from src.managers.save_manager import save_manager
+
+        ok = False
+        try:
+            ok = self.game.player.load_game(slot)
+        except Exception as e:
+            print(f"[DEBUG] load_game({slot}) falhou: {e}")
+            ok = False
+
+        if not ok:
+            self.show_message(f"Slot {slot} não encontrado ou corrompido.")
+            return
+
+        self.debug_slot = slot
+        save_manager.current_save_file = slot
+        self._refresh_all_tabs()
+        self.show_message(f"Editando Slot {slot}")
+
+    def _reload_current_slot(self):
+        """Recarrega o slot atual (útil se algo foi editado por fora)."""
+        from src.managers.save_manager import save_manager
+        try:
+            ok = self.game.player.load_game(self.debug_slot)
+        except Exception as e:
+            print(f"[DEBUG] reload falhou: {e}")
+            ok = False
+
+        if ok:
+            save_manager.current_save_file = self.debug_slot
+            self._refresh_all_tabs()
+            self.show_message(f"Slot {self.debug_slot} recarregado")
+        else:
+            self.show_message(f"Erro ao recarregar Slot {self.debug_slot}")
+
+    def _refresh_all_tabs(self):
+        """Pede para cada aba re-sincronizar seus buffers internos."""
+        for tab in self._tabs.values():
+            try:
+                if hasattr(tab, "refresh"):
+                    tab.refresh()
+            except Exception as e:
+                print(f"[DEBUG] refresh de {type(tab).__name__} falhou: {e}")
+
+    def save_game(self):
+        """Salva o player no SLOT SELECIONADO no debug."""
+        try:
+            self.game.player.save_game(slot=self.debug_slot)
+        except Exception as e:
+            print(f"[DEBUG] save_game falhou: {e}")
+
+    # ==================================================================
     # UI PRIMITIVES  (usadas pelas abas)
     # ==================================================================
     def get_font(self, size):
@@ -98,14 +168,6 @@ class DebugScene(BaseScene):
     def show_message(self, text, duration=2.5):
         self.message = text
         self.message_timer = duration
-
-    def save_game(self):
-        try:
-            from src.managers.save_manager import save_manager
-            slot = save_manager.current_save_file or 1
-            self.game.player.save_game(slot=slot)
-        except Exception as e:
-            print(f"[DEBUG] Save falhou: {e}")
 
     def wrap_text(self, text, font, max_width):
         words = str(text).split(" ")
@@ -356,6 +418,14 @@ class DebugScene(BaseScene):
                 if clicked == "close":
                     self._close()
                     return
+                if clicked == "slot_1":
+                    self._switch_slot(1); return
+                if clicked == "slot_2":
+                    self._switch_slot(2); return
+                if clicked == "slot_3":
+                    self._switch_slot(3); return
+                if clicked == "slot_reload":
+                    self._reload_current_slot(); return
                 if clicked == "tab_pokemon" and self.tab != self.TAB_POKEMON:
                     self.tab = self.TAB_POKEMON
                     self.active_tab.clear_focus()
@@ -368,7 +438,6 @@ class DebugScene(BaseScene):
                     self.tab = self.TAB_PROFILE
                     self.active_tab.clear_focus()
                     return
-                # se já estava na aba, apenas ignora
                 if clicked in ("tab_pokemon", "tab_items", "tab_profile"):
                     return
 
@@ -420,7 +489,7 @@ class DebugScene(BaseScene):
         for j in range(0, vh, 40):
             pygame.draw.line(screen, (18, 20, 32), (vx, vy + j), (vx + vw, vy + j), 1)
 
-        # Header
+        # ===== HEADER =====
         header_h = int(vh * 0.075)
         pygame.draw.rect(screen, (20, 22, 34), (vx, vy, vw, header_h))
         pygame.draw.line(screen, (100, 80, 130),
@@ -430,11 +499,54 @@ class DebugScene(BaseScene):
         title = title_font.render("DEBUG MODE", True, (255, 220, 120))
         screen.blit(title, (vx + 20, vy + (header_h - title.get_height()) // 2))
 
-        sub_font = self.get_font(max(14, vh * 0.020))
-        sub = sub_font.render("· Painel de Desenvolvimento", True, (180, 180, 200))
-        screen.blit(sub, (vx + 20 + title.get_width() + 12,
-                          vy + (header_h - sub.get_height()) // 2 + 4))
+        # ===== SELETOR DE SLOT =====
+        # Botões compactos no centro do header
+        slot_btn_w = int(vw * 0.055)
+        slot_btn_h = int(header_h * 0.62)
+        slot_gap = 6
+        total_w = slot_btn_w * 3 + slot_gap * 2
+        slot_x = vx + vw // 2 - total_w // 2
+        slot_y = vy + (header_h - slot_btn_h) // 2
 
+        for i, slot_num in enumerate((1, 2, 3)):
+            btn_rect = pygame.Rect(slot_x + i * (slot_btn_w + slot_gap),
+                                   slot_y, slot_btn_w, slot_btn_h)
+            self.register_click(f"slot_{slot_num}", btn_rect)
+
+            active = (self.debug_slot == slot_num)
+            hovered = btn_rect.collidepoint(pygame.mouse.get_pos())
+
+            if active:
+                bg = (90, 70, 40)
+                border = (255, 210, 90)
+                tc = (255, 240, 180)
+            elif hovered:
+                bg = (55, 50, 75)
+                border = (140, 120, 180)
+                tc = (230, 225, 240)
+            else:
+                bg = (32, 32, 50)
+                border = (70, 65, 95)
+                tc = (190, 190, 210)
+
+            pygame.draw.rect(screen, bg, btn_rect, border_radius=6)
+            pygame.draw.rect(screen, border, btn_rect,
+                             2 if active else 1, border_radius=6)
+            bf = self.get_font(max(12, int(slot_btn_h * 0.5)))
+            bt = bf.render(f"SLOT {slot_num}", True, tc)
+            screen.blit(bt, bt.get_rect(center=btn_rect.center))
+
+        # Botão RELOAD
+        reload_w = int(vw * 0.075)
+        reload_h = slot_btn_h
+        reload_rect = pygame.Rect(slot_x + total_w + 12, slot_y,
+                                  reload_w, reload_h)
+        self.register_click("slot_reload", reload_rect)
+        self.draw_button(screen, reload_rect, "↻ RELOAD",
+                         primary=True,
+                         font_size=max(11, int(reload_h * 0.45)))
+
+        # Botão de fechar
         close_size = int(header_h * 0.6)
         close_rect = pygame.Rect(
             vx + vw - close_size - 15,
@@ -445,7 +557,7 @@ class DebugScene(BaseScene):
         self.draw_button(screen, close_rect, "X", danger=True,
                          font_size=max(14, close_size * 0.55))
 
-        # Abas principais
+        # ===== ABAS PRINCIPAIS =====
         tab_y = vy + header_h + 8
         tab_h = int(vh * 0.05)
         tab_w = int(vw * 0.16)
@@ -462,7 +574,7 @@ class DebugScene(BaseScene):
         self.draw_tab(screen, item_tab, "ITENS", self.tab == self.TAB_ITEMS)
         self.draw_tab(screen, prof_tab, "PERFIL", self.tab == self.TAB_PROFILE)
 
-        # Área de conteúdo
+        # ===== ÁREA DE CONTEÚDO =====
         content_top = tab_y + tab_h + 10
         footer_h = int(vh * 0.11)
         content_bottom = vy + vh - footer_h - 8

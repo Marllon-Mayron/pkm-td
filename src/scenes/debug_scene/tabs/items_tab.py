@@ -91,6 +91,14 @@ class ItemsTab:
     def clear_focus(self):
         self.focused_input = None
 
+    def refresh(self):
+        """Recarrega a lista de itens possuídos (chamado ao trocar slot)."""
+        self.refresh_owned()
+        self._apply_search()
+        self.scroll = 0
+        self.selected = 0
+        self.focused_input = None
+
     # ==================================================================
     # EVENTOS
     # ==================================================================

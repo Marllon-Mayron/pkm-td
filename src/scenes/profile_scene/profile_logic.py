@@ -10,12 +10,30 @@ from src.config.paths import SPRITES_PATH, ITEMS_PATH
 from src.managers.save_manager import save_manager
 from src.ui.utils.type_bar_loader import rarity_bar_loader
 
-GYM_PHASES = {"1-5":1,"2-8":2,"3-4":3,"4-5":4,"5-5":5,"6-5":6,"6-10":7,"7-4":8}
-BADGE_SPRITES = ["rock-badge.png","water-badge.png","thunder-badge.png",
-                 "rainbow-badge.png","poison-badge.png","marsh-badge.png",
-                 "volcano-badge.png","earth-badge.png"]
-BADGE_COLORS = {1:(180,140,80),2:(80,140,220),3:(240,200,60),4:(220,120,200),
-                5:(160,80,200),6:(140,100,60),7:(220,80,40),8:(140,100,60)}
+# =====================================================================
+# GINÁSIOS
+# =====================================================================
+# Chave = (chapter, phase) → número da badge.
+# O phase_id COMPLETO é montado como f"{region}:{chapter}:{phase}",
+# igual ao game_scene.py (make_phase_id). NUNCA compare com "5-4".
+GYM_PHASES = {
+    (1, 5): 1,   # 1º Ginásio — Rock
+    (2, 6): 2,   # 2º Ginásio — Water
+    (3, 4): 3,   # 3º Ginásio — Thunder
+    (4, 6): 4,   # 4º Ginásio — Rainbow
+    (5, 4): 5,   # 5º Ginásio — Poison
+    (6, 4): 6,   # 6º Ginásio — Marsh
+    (7, 4): 7,   # 7º Ginásio — Volcano
+    (8, 2): 8,   # 8º Ginásio — Earth
+}
+
+BADGE_SPRITES = ["rock-badge.png", "water-badge.png", "thunder-badge.png",
+                 "rainbow-badge.png", "poison-badge.png", "marsh-badge.png",
+                 "volcano-badge.png", "earth-badge.png"]
+
+BADGE_COLORS = {1: (180, 140, 80), 2: (80, 140, 220), 3: (240, 200, 60),
+                4: (220, 120, 200), 5: (160, 80, 200), 6: (140, 100, 60),
+                7: (220, 80, 40), 8: (140, 100, 60)}
 
 MAX_FEATURED = 3
 
@@ -45,6 +63,15 @@ RARITY_COLORS = {
     "epic": "#C864F0", "legendary": "#FFC83C",
 }
 
+# ====== ORDEM DE RARIDADE DE ACHIEVEMENTS (menor = mais raro) ======
+_ACH_RARITY_ORDER = {
+    AchievementRarity.LEGENDARY: 0,
+    AchievementRarity.EPIC:      1,
+    AchievementRarity.RARE:      2,
+    AchievementRarity.UNCOMMON:  3,
+    AchievementRarity.COMMON:    4,
+}
+
 
 # =====================================================================
 # HELPERS DE BOUNDING BOX
@@ -72,21 +99,7 @@ class ProfileLogic:
     # ================================================================
     # CONSTANTES DO PET — mesmas do game scene
     # ================================================================
-    # TILE_SCALE usado em Pokemon.render():
-    #     zoom_scale = camera.zoom * render_scale * TILE_SCALE
-    # Aqui não há câmera nem render_scale, então só replicamos esse fator.
     PET_TILE_SCALE = 16 / 24  # ≈ 0.6667
-
-    # "Zoom virtual" do pet. Simula o `camera.zoom` do game scene.
-    #     tamanho_no_canvas = frame_size × PET_CAMERA_ZOOM × PET_TILE_SCALE
-    #
-    # Referência:
-    #   3.0 → Pikachu 64px, Groudon 192px (canvas 192 — Groudon preenche)
-    #
-    # O tamanho final na TELA é:
-    #     tamanho_no_canvas × (widget_px / canvas_px)
-    # Ou seja, para aumentar o pet sem mexer na proporção, aumente
-    # o widget no JSON — não o zoom.
     PET_CAMERA_ZOOM = 3.0
 
     def __init__(self, game):
@@ -115,7 +128,7 @@ class ProfileLogic:
         d = ITEMS_PATH / "badge"
         for i, fname in enumerate(BADGE_SPRITES):
             num = i + 1
-            for path in (d/fname, d/fname.lower(), d/fname.upper()):
+            for path in (d / fname, d / fname.lower(), d / fname.upper()):
                 if path.exists():
                     try:
                         self.badge_sprites[num] = pygame.image.load(
@@ -130,11 +143,12 @@ class ProfileLogic:
         size = 64
         s = pygame.Surface((size, size), pygame.SRCALPHA)
         color = BADGE_COLORS.get(num, (200, 200, 200))
-        pygame.draw.circle(s, color, (size//2, size//2), size//2 - 2)
-        pygame.draw.circle(s, (255,255,255), (size//2, size//2), size//2 - 2, 2)
+        pygame.draw.circle(s, color, (size // 2, size // 2), size // 2 - 2)
+        pygame.draw.circle(s, (255, 255, 255), (size // 2, size // 2),
+                           size // 2 - 2, 2)
         f = pygame.font.Font(None, 32)
-        t = f.render(str(num), True, (255,255,255))
-        s.blit(t, t.get_rect(center=(size//2, size//2)))
+        t = f.render(str(num), True, (255, 255, 255))
+        s.blit(t, t.get_rect(center=(size // 2, size // 2)))
         return s
 
     # ================================================================
@@ -142,27 +156,29 @@ class ProfileLogic:
     # ================================================================
     def save_name(self) -> str:
         try:
-            return save_manager.save_data.get("meta",{}).get("save_name","Novo Jogo")
+            return save_manager.save_data.get("meta", {}).get("save_name", "Novo Jogo")
         except Exception:
             return "Novo Jogo"
 
     def uuid_short(self) -> str:
-        return f"ID: {getattr(self.player,'uuid','N/A')[:12]}"
+        return f"ID: {getattr(self.player, 'uuid', 'N/A')[:12]}"
 
     def playtime_text(self) -> str:
         t = getattr(self.player, "total_playtime", 0.0)
-        return f"{int(t//3600):02d}h {int((t%3600)//60):02d}m"
+        return f"{int(t // 3600):02d}h {int((t % 3600) // 60):02d}m"
 
     def money_text(self) -> str:
-        return f"$ {int(getattr(self.player,'money',0)):,}".replace(",",".")
+        return f"$ {int(getattr(self.player, 'money', 0)):,}".replace(",", ".")
 
     def team_box_text(self) -> str:
-        return (f"Time {len(getattr(self.player,'team',[]))}/6  "
-                f"Box {len(getattr(self.player,'pc_box',[]))}")
+        return (f"Time {len(getattr(self.player, 'team', []))}/6  "
+                f"Box {len(getattr(self.player, 'pc_box', []))}")
 
     def level_info(self):
-        try: return self.player.get_level_progress()
-        except Exception: return (1, 0, 100, 0.0)
+        try:
+            return self.player.get_level_progress()
+        except Exception:
+            return (1, 0, 100, 0.0)
 
     def level_text(self) -> str:
         return f"Nivel {self.level_info()[0]}"
@@ -177,34 +193,79 @@ class ProfileLogic:
     def stat_items(self) -> List[dict]:
         p = self.player
         total_p = (len(self.pokedex.pokemon_data)
-                   if hasattr(self.pokedex,"pokemon_data") else 151)
-        seen = len(getattr(p,"seen_pokemon",set()))
-        caught = len(getattr(p,"caught_pokemon",set()))
+                   if hasattr(self.pokedex, "pokemon_data") else 151)
+        seen = len(getattr(p, "seen_pokemon", set()))
+        caught = len(getattr(p, "caught_pokemon", set()))
         badges = self.badges_earned()
-        am = getattr(p,"achievement_manager",None)
+        am = getattr(p, "achievement_manager", None)
         ach_u = am.get_unlocked_count() if am else 0
         ach_t = am.get_total_count() if am else 100
         photos = self._count_photos()
 
         return [
-            {"title":"VISTOS",    "value_str":f"{seen}/{total_p}",
-             "color":"#7A90C8","bg_color":"#121A30"},
-            {"title":"CAPTURADOS","value_str":f"{caught}/{total_p}",
-             "color":"#90D090","bg_color":"#101A24"},
-            {"title":"INSIGNIAS", "value_str":f"{badges}/8",
-             "color":"#FFD24A","bg_color":"#1A1710"},
-            {"title":"CONQUISTAS","value_str":f"{ach_u}/{ach_t}",
-             "color":"#FFB060","bg_color":"#1A1410"},
-            {"title":"FOTOS",     "value_str":str(photos),
-             "color":"#E8C8FF","bg_color":"#181025"},
+            {"title": "VISTOS",     "value_str": f"{seen}/{total_p}",
+             "color": "#7A90C8", "bg_color": "#121A30"},
+            {"title": "CAPTURADOS", "value_str": f"{caught}/{total_p}",
+             "color": "#90D090", "bg_color": "#101A24"},
+            {"title": "INSIGNIAS",  "value_str": f"{badges}/8",
+             "color": "#FFD24A", "bg_color": "#1A1710"},
+            {"title": "CONQUISTAS", "value_str": f"{ach_u}/{ach_t}",
+             "color": "#FFB060", "bg_color": "#1A1410"},
+            {"title": "FOTOS",      "value_str": str(photos),
+             "color": "#E8C8FF", "bg_color": "#181025"},
         ]
 
-    def badges_earned(self) -> int:
-        n = 0
-        for pid in GYM_PHASES:
+    # ----------------------------------------------------------------
+    # GINÁSIOS — CADA UM VERIFICADO INDIVIDUALMENTE
+    # ----------------------------------------------------------------
+    def _current_region(self) -> int:
+        """Região atual do jogador (fallback 1)."""
+        r = getattr(self.player, "current_region", None)
+        if r is None:
             try:
-                if progress_manager.is_phase_completed(pid): n += 1
-            except Exception: pass
+                r = save_manager.save_data.get("game_state", {}).get("current_region", 1)
+            except Exception:
+                r = 1
+        try:
+            return int(r) if r is not None else 1
+        except Exception:
+            return 1
+
+    def _gym_completed(self, chapter: int, phase: int,
+                       region: Optional[int] = None) -> bool:
+        """
+        Verifica se o ginásio (chapter, phase) foi concluído.
+
+        O phase_id real é f"{region}:{chapter}:{phase}" (ex: "1:5:4"),
+        igual ao game_scene.make_phase_id().
+        """
+        if region is None:
+            region = self._current_region()
+        pid = f"{region}:{chapter}:{phase}"
+        try:
+            return bool(progress_manager.is_phase_completed(pid))
+        except Exception as e:
+            print(f"[PROFILE] _gym_completed({pid}) erro: {e}")
+            return False
+
+    def _gym_completed_in_any_region(self, chapter: int, phase: int) -> bool:
+        """
+        Fallback: procura o ginásio em QUALQUER região (1..8).
+        Cobre saves antigos/migrados cujo current_region não bate.
+        """
+        if self._gym_completed(chapter, phase):
+            return True
+        for region in range(1, 9):
+            if self._gym_completed(chapter, phase, region=region):
+                return True
+        return False
+
+    def badges_earned(self) -> int:
+        """Conta quantas badges o jogador JÁ POSSUI (não é sequencial)."""
+        n = 0
+        for (chapter, phase) in GYM_PHASES:
+            if self._gym_completed_in_any_region(chapter, phase):
+                n += 1
         return n
 
     def _count_photos(self) -> int:
@@ -212,17 +273,44 @@ class ProfileLogic:
         return len(list(d.glob("photo_*.png"))) if d.exists() else 0
 
     def badge_items(self) -> List[dict]:
-        earned = self.badges_earned()
+        """
+        Retorna os 8 slots de badge, marcando CADA UM individualmente
+        como obtido/não obtido — sem lógica sequencial.
+        """
         out = []
-        for num in range(1, 9):
-            has = num <= earned
+        for (chapter, phase), num in GYM_PHASES.items():
+            has = self._gym_completed_in_any_region(chapter, phase)
             out.append({
                 "badge_surface": self.badge_sprites.get(num) if has else None,
-                "has_badge": has,
-                "number": str(num),
-                "bg_color": "#1A2340" if has else "#0E1424",
-                "border_color": "#FFD24A" if has else "#2E3856",
+                "has_badge":     has,
+                "number":        str(num),
+                "bg_color":      "#1A2340" if has else "#0E1424",
+                "border_color":  "#FFD24A" if has else "#2E3856",
             })
+        out.sort(key=lambda d: int(d["number"]))
+        return out
+
+    # ================================================================
+    # HELPERS DE ACHIEVEMENTS DESBLOQUEADAS
+    # ================================================================
+    def _unlocked_ids(self) -> List[str]:
+        """
+        Retorna IDs de conquistas desbloqueadas SEM o prefixo de região.
+
+        O save guarda no formato "region:id" (ex: "1:first_capture"),
+        mas ACHIEVEMENTS é indexado só pelo id ("first_capture").
+        Sem esse parse, `k in ACHIEVEMENTS` sempre retorna False.
+        """
+        raw = self.player.achievements.get("unlocked", []) or []
+        out: List[str] = []
+        for k in raw:
+            s = str(k)
+            if ":" in s:
+                # "1:first_capture" → "first_capture"
+                _, _, aid = s.partition(":")
+                out.append(aid)
+            else:
+                out.append(s)
         return out
 
     # ================================================================
@@ -230,54 +318,63 @@ class ProfileLogic:
     # ================================================================
     def _featured_keys(self) -> List[str]:
         cur = self.player.profile_customization.get("featured_achievements", [])
-        if cur: return list(cur)[:MAX_FEATURED]
-        unlocked = self.player.achievements.get("unlocked", [])
-        if not unlocked: return []
-        order = {AchievementRarity.LEGENDARY:0, AchievementRarity.EPIC:1,
-                 AchievementRarity.RARE:2, AchievementRarity.UNCOMMON:3,
-                 AchievementRarity.COMMON:4}
-        ids = sorted([k for k in unlocked if k in ACHIEVEMENTS],
-                     key=lambda k: order.get(ACHIEVEMENTS[k].rarity, 5))
-        return ids[:MAX_FEATURED]
+        if cur:
+            # também normaliza as chaves salvas (defensivo)
+            return [str(k).partition(":")[2] if ":" in str(k) else str(k)
+                    for k in list(cur)[:MAX_FEATURED]]
+
+        unlocked_ids = [k for k in self._unlocked_ids() if k in ACHIEVEMENTS]
+        if not unlocked_ids:
+            return []
+
+        unlocked_ids.sort(
+            key=lambda k: _ACH_RARITY_ORDER.get(ACHIEVEMENTS[k].rarity, 5)
+        )
+        return unlocked_ids[:MAX_FEATURED]
 
     def featured_items(self) -> List[dict]:
         keys = self._featured_keys()
         items = []
         for k in keys:
             a = ACHIEVEMENTS.get(k)
-            if a is None: continue
-            col = getattr(a.rarity, "color", (150,150,150))
-            dark = tuple(max(15, c//6) for c in col)
+            if a is None:
+                continue
+            col = getattr(a.rarity, "color", (150, 150, 150))
+            dark = tuple(max(15, c // 6) for c in col)
             items.append({
                 "title": a.title,
                 "description": a.description or "",
-                "rarity_name": getattr(a.rarity,"display_name","").upper(),
+                "rarity_name": getattr(a.rarity, "display_name", "").upper(),
                 "rarity_color": self._hex(col),
                 "bg_color": self._hex(dark),
             })
         while len(items) < MAX_FEATURED:
-            items.append({"title":"—","description":"Nenhuma conquista em destaque",
-                          "rarity_name":"—","rarity_color":"#3A4870",
-                          "bg_color":"#101828"})
+            items.append({"title": "—",
+                          "description": "Nenhuma conquista em destaque",
+                          "rarity_name": "—", "rarity_color": "#3A4870",
+                          "bg_color": "#101828"})
         return items
 
     def achievement_items(self, selected_keys) -> List[dict]:
-        unlocked = self.player.achievements.get("unlocked", [])
-        order = {AchievementRarity.LEGENDARY:0, AchievementRarity.EPIC:1,
-                 AchievementRarity.RARE:2, AchievementRarity.UNCOMMON:3,
-                 AchievementRarity.COMMON:4}
-        keys = sorted([k for k in unlocked if k in ACHIEVEMENTS],
-                      key=lambda k: order.get(ACHIEVEMENTS[k].rarity, 5))
-        sel = set(selected_keys or [])
+        unlocked_ids = [k for k in self._unlocked_ids() if k in ACHIEVEMENTS]
+        keys = sorted(
+            unlocked_ids,
+            key=lambda k: _ACH_RARITY_ORDER.get(ACHIEVEMENTS[k].rarity, 5)
+        )
+        # normaliza as chaves selecionadas (defensivo)
+        sel = {
+            str(k).partition(":")[2] if ":" in str(k) else str(k)
+            for k in (selected_keys or [])
+        }
         out = []
         for k in keys:
             a = ACHIEVEMENTS[k]
-            col = getattr(a.rarity, "color", (150,150,150))
+            col = getattr(a.rarity, "color", (150, 150, 150))
             out.append({
                 "key": k,
                 "title": a.title,
                 "description": a.description or "",
-                "rarity_name": getattr(a.rarity,"display_name","").upper(),
+                "rarity_name": getattr(a.rarity, "display_name", "").upper(),
                 "rarity_color": self._hex(col),
                 "bg_color": "#4A6E90" if k in sel else "#1E2438",
                 "border_color": "#FFD24A" if k in sel else "#3A4870",
@@ -290,36 +387,43 @@ class ProfileLogic:
     # ================================================================
     def favorite_pokemon(self):
         fid = self.player.profile_customization.get("favorite_pokemon_id")
-        if not fid: return None
-        for pk in getattr(self.player,"team",[]):
-            if getattr(pk,"unique_id",None) == fid: return pk
+        if not fid:
+            return None
+        for pk in getattr(self.player, "team", []):
+            if getattr(pk, "unique_id", None) == fid:
+                return pk
         return None
 
     def favorite_surface(self, target=160):
         fav = self.favorite_pokemon()
-        if fav is None: return None
-        shiny = getattr(fav,"is_shiny",False)
+        if fav is None:
+            return None
+        shiny = getattr(fav, "is_shiny", False)
         key = (fav.id, shiny, target)
-        if key in self._fav_cache: return self._fav_cache[key]
+        if key in self._fav_cache:
+            return self._fav_cache[key]
         surf = None
         try:
-            surf = self.pokedex.get_sprite(fav.id,"front",shiny)
+            surf = self.pokedex.get_sprite(fav.id, "front", shiny)
             if surf is None:
-                surf = self.pokedex.get_portrait(fav.id,"normal",shiny)
+                surf = self.pokedex.get_portrait(fav.id, "normal", shiny)
             if surf:
-                w,h = surf.get_size()
-                sc = min(target/max(1,w), target/max(1,h))
+                w, h = surf.get_size()
+                sc = min(target / max(1, w), target / max(1, h))
                 surf = pygame.transform.smoothscale(
-                    surf, (max(1,int(w*sc)), max(1,int(h*sc))))
-        except Exception: surf = None
+                    surf, (max(1, int(w * sc)), max(1, int(h * sc))))
+        except Exception:
+            surf = None
         self._fav_cache[key] = surf
         return surf
 
     def favorite_name(self) -> str:
         fav = self.favorite_pokemon()
-        if fav is None: return "—"
-        nm = getattr(fav,"custom_name",None) or fav.name
-        if getattr(fav,"is_shiny",False): nm += " *"
+        if fav is None:
+            return "—"
+        nm = getattr(fav, "custom_name", None) or fav.name
+        if getattr(fav, "is_shiny", False):
+            nm += " *"
         return nm
 
     def favorite_level(self) -> str:
@@ -328,20 +432,23 @@ class ProfileLogic:
 
     def favorite_hp(self):
         fav = self.favorite_pokemon()
-        if fav is None: return (0,1)
-        return (getattr(fav,"current_hp",0), max(1,getattr(fav,"max_hp",1)))
+        if fav is None:
+            return (0, 1)
+        return (getattr(fav, "current_hp", 0), max(1, getattr(fav, "max_hp", 1)))
 
     def team_items(self, current_id) -> List[dict]:
         out = []
-        for pk in getattr(self.player,"team",[]):
-            uid = getattr(pk,"unique_id",None)
-            nm = getattr(pk,"custom_name",None) or pk.name
-            if getattr(pk,"is_shiny",False): nm += " *"
+        for pk in getattr(self.player, "team", []):
+            uid = getattr(pk, "unique_id", None)
+            nm = getattr(pk, "custom_name", None) or pk.name
+            if getattr(pk, "is_shiny", False):
+                nm += " *"
             surf = None
             try:
-                surf = self.pokedex.get_sprite(pk.id,"front",
-                                               getattr(pk,"is_shiny",False))
-            except Exception: pass
+                surf = self.pokedex.get_sprite(pk.id, "front",
+                                               getattr(pk, "is_shiny", False))
+            except Exception:
+                pass
             out.append({
                 "uid": uid,
                 "portrait": surf,
@@ -362,11 +469,14 @@ class ProfileLogic:
             from src.data.item_bag_catalog import item_bag_catalog
             bag = getattr(self.player.bag, "items", {})
             for iid, qty in bag.items():
-                if qty <= 0: continue
+                if qty <= 0:
+                    continue
                 data = item_bag_catalog.items.get(iid)
-                if not data or data.get("category") != "clothing": continue
+                if not data or data.get("category") != "clothing":
+                    continue
                 slot = data.get("slot")
-                if slot in result: result[slot].append(iid)
+                if slot in result:
+                    result[slot].append(iid)
         except Exception as e:
             print(f"[PROFILE] owned_clothing erro: {e}")
         for s in result:
@@ -374,7 +484,8 @@ class ProfileLogic:
         return result
 
     def get_clothing_name(self, item_id) -> str:
-        if item_id is None: return "NENHUM"
+        if item_id is None:
+            return "NENHUM"
         try:
             from src.data.item_bag_catalog import item_bag_catalog
             return item_bag_catalog.items.get(item_id, {}).get("name", item_id)
@@ -465,7 +576,8 @@ class ProfileLogic:
         result = {}
         for slot in WARDROBE_SLOTS:
             items = owned.get(slot, [])
-            if not items: continue
+            if not items:
+                continue
             if slot in WARDROBE_OPTIONAL:
                 if _random.random() < 0.7:
                     result[slot] = _random.choice(items)
@@ -489,7 +601,8 @@ class ProfileLogic:
         try:
             from src.utils.player_sprite import clear_cache
             clear_cache()
-        except Exception: pass
+        except Exception:
+            pass
 
     # ================================================================
     # SPRITE DO JOGADOR
@@ -502,9 +615,6 @@ class ProfileLogic:
         real (16×16) centralizado. Escalamos o canvas INTEIRO por fator
         inteiro (mesmo critério do código antigo), então o conteúdo
         aparece em (target / 2) px — ex: target=96 → conteúdo 48×48.
-
-        Isso mantém o tamanho visual correto e casa com a escala do pet
-        (frame 32 → 3× → 96), evitando que o player fique gigante.
         """
         if target in self._avatar_cache:
             return self._avatar_cache[target]
@@ -538,20 +648,7 @@ class ProfileLogic:
         Retorna (frames_by_anim, pid, shiny).
 
         Reproduz EXATAMENTE a fórmula do game scene:
-
             tamanho_no_canvas = frame_size × zoom × TILE_SCALE
-
-        Onde:
-          - frame_size_nativo  vem do AnimData.xml do pokémon
-          - zoom               = PET_CAMERA_ZOOM
-          - TILE_SCALE         = 16/24
-
-        O tamanho final na TELA depende do widget no JSON:
-            tamanho_na_tela = tamanho_no_canvas × (widget_px / target_size)
-
-        Para aumentar o pet mantendo a proporção, aumente o WIDGET —
-        não o zoom. Assim todos os pokémons (pequenos e grandes)
-        crescem juntos.
         """
         fav = self.favorite_pokemon()
         if fav is None:
@@ -563,10 +660,8 @@ class ProfileLogic:
         if key in self._pet_frames_cache:
             return self._pet_frames_cache[key], pid, shiny
 
-        # -------------------------------------------------------------
         # 1. frame_size real do pokémon (AnimData.xml)
-        # -------------------------------------------------------------
-        frame_size = 32  # fallback
+        frame_size = 32
         try:
             raw_data = self.pokedex.get_raw_inmap_data(pid, shiny)
             anim_data = raw_data.get("anim_data", {}) or {}
@@ -578,9 +673,7 @@ class ProfileLogic:
         except Exception as e:
             print(f"[PROFILE] pet_frames frame_size erro: {e}")
 
-        # -------------------------------------------------------------
         # 2. Coleta frames disponíveis
-        # -------------------------------------------------------------
         raw: dict = {}
         for anim_name in ("sleep", "idle", "walk", "hop", "dance"):
             frames = self._try_pet_anim(pid, shiny, anim_name)
@@ -600,14 +693,10 @@ class ProfileLogic:
         if not raw:
             return {}, None, False
 
-        # -------------------------------------------------------------
-        # 3. Escala — MESMA FÓRMULA DO GAME SCENE
-        # -------------------------------------------------------------
+        # 3. Escala
         scale = self.PET_CAMERA_ZOOM * self.PET_TILE_SCALE
 
-        # -------------------------------------------------------------
-        # 4. Normaliza — sprite no tamanho certo, centralizado no canvas
-        # -------------------------------------------------------------
+        # 4. Normaliza
         def _normalize(surf: pygame.Surface) -> pygame.Surface:
             fw, fh = surf.get_size()
 
@@ -675,5 +764,6 @@ class ProfileLogic:
 
     @staticmethod
     def _hex(c) -> str:
-        if not c: return "#000000"
+        if not c:
+            return "#000000"
         return f"#{c[0]:02X}{c[1]:02X}{c[2]:02X}"

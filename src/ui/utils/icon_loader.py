@@ -168,3 +168,44 @@ def get_held_icon() -> Optional[pygame.Surface]:
     if _HELD_FALLBACK is None:
         _HELD_FALLBACK = _build_held_fallback()
     return _HELD_FALLBACK
+
+phase_star_loader = UIImageLoader(SPRITES_PATH / "UI" / "Icons")
+
+_STAR_FILLED_NAME = "star"
+_STAR_EMPTY_NAME  = "withoutStar"
+
+
+def _build_star_fallback(filled: bool, size: int = 28) -> pygame.Surface:
+    """Fallback procedural caso os PNGs não existam."""
+    import math
+    surf = pygame.Surface((size, size), pygame.SRCALPHA)
+    cx = cy = size / 2.0
+    R = size * 0.46
+    r = R * 0.45
+    pts = []
+    for i in range(10):
+        ang = -math.pi / 2 + i * math.pi / 5
+        rad = R if i % 2 == 0 else r
+        pts.append((cx + math.cos(ang) * rad, cy + math.sin(ang) * rad))
+    if filled:
+        pygame.draw.polygon(surf, (255, 210, 74), pts)
+        pygame.draw.polygon(surf, (140, 100, 20), pts, 2)
+    else:
+        pygame.draw.polygon(surf, (60, 65, 80), pts)
+        pygame.draw.polygon(surf, (90, 98, 120), pts, 2)
+    return surf
+
+
+def get_phase_star_surfaces(size: int = 28):
+    """
+    Retorna (filled, empty) — duas Surfaces escaladas para `size`.
+    Faz fallback procedural se os PNGs faltarem.
+    """
+    size_t = (int(size), int(size))
+    filled = phase_star_loader.get_scaled(_STAR_FILLED_NAME, size_t)
+    empty  = phase_star_loader.get_scaled(_STAR_EMPTY_NAME,  size_t)
+    if filled is None:
+        filled = _build_star_fallback(filled=True,  size=size)
+    if empty is None:
+        empty = _build_star_fallback(filled=False, size=size)
+    return filled, empty

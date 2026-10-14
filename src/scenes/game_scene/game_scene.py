@@ -40,13 +40,13 @@ from src.data.item_bag_catalog import item_bag_catalog
 
 GYM_PHASES = {
     (1, 5): 1,   # 1º Ginásio
-    (2, 8): 2,   # 2º Ginásio
+    (2, 6): 2,   # 2º Ginásio
     (3, 4): 3,   # 3º Ginásio
-    (4, 5): 4,   # 4º Ginásio
-    (5, 5): 5,   # 5º Ginásio
-    (6, 5): 6,   # 6º Ginásio
-    (6, 10): 7,  # 7º Ginásio
-    (7, 4): 8,   # 8º Ginásio
+    (4, 6): 4,   # 4º Ginásio
+    (5, 4): 5,   # 5º Ginásio
+    (6, 4): 6,   # 6º Ginásio
+    (7, 4): 7,  # 7º Ginásio
+    (8, 2): 8,   # 8º Ginásio
 }
 
 MYTHICAL_SPAWN_CHANCE = 0.05
@@ -309,63 +309,59 @@ class GameScene(BaseScene):
             region_id=self.region_id,
         )
 
-        # ==================================================================
-        # AVANÇO DE FASE / CAPÍTULO
-        # ==================================================================
-        def _phase_exists(self, chapter_id, phase_number):
-            """Verifica se (chapter, phase) existe no catálogo pra região atual."""
-            try:
-                from src.config.phase_catalog import phase_catalog
-                info = phase_catalog.get_phase_info(
-                    self.region_id, chapter_id, phase_number,
-                )
-                return bool(info)
-            except Exception:
-                return False
-
-        def _next_chapter_phase1(self, chapter_id):
-            """
-            Acha o próximo capítulo (>= chapter_id + 1) que tenha pelo menos
-            a fase 1. Retorna (chapter, 1) ou (None, None).
-            """
-            # Limite superior generoso — cobre qualquer jogo.
-            MAX_CHAPTERS = 32
-            for c in range(chapter_id + 1, MAX_CHAPTERS + 1):
-                if self._phase_exists(c, 1):
-                    return c, 1
-            return None, None
-
-        def advance_level(self):
-            """
-            Avança pra próxima fase da MESMA região:
-              1) tenta (chapter, phase + 1)
-              2) se não existir, tenta (chapter + 1, phase 1) — próximo capítulo
-              3) se não existir nada, retorna False (cena cai no menu)
-            """
-            # -------- 1) Próxima fase do capítulo atual --------
-            if self._phase_exists(self.chapter_id, self.phase_number + 1):
-                next_chapter = self.chapter_id
-                next_phase = self.phase_number + 1
-                print(f"[ADVANCE] {self.chapter_id}-{self.phase_number} "
-                      f"→ {next_chapter}-{next_phase} (mesma capitulo)")
-            else:
-                # -------- 2) Próximo capítulo, fase 1 --------
-                next_chapter, next_phase = self._next_chapter_phase1(self.chapter_id)
-                if next_chapter is None:
-                    print(f"[ADVANCE] Não há próxima fase nem próximo capítulo. "
-                          f"Fim do conteúdo da região {self.region_id}.")
-                    return False
-                print(f"[ADVANCE] Fim do capítulo {self.chapter_id} "
-                      f"→ capitulo {next_chapter}, fase 1")
-
-            # -------- 3) Troca de cena --------
-            self.game.current_scene = GameScene(
-                self.game,
-                chapter_id=next_chapter,
-                phase_number=next_phase,
-                region_id=self.region_id,
+    def _phase_exists(self, chapter_id, phase_number):
+        """Verifica se (chapter, phase) existe no catálogo pra região atual."""
+        try:
+            from src.config.phase_catalog import phase_catalog
+            info = phase_catalog.get_phase_info(
+                self.region_id, chapter_id, phase_number,
             )
-            return True
+            return bool(info)
+        except Exception:
+            return False
+
+    def _next_chapter_phase1(self, chapter_id):
+        """
+        Acha o próximo capítulo (>= chapter_id + 1) que tenha pelo menos
+        a fase 1. Retorna (chapter, 1) ou (None, None).
+        """
+        MAX_CHAPTERS = 32
+        for c in range(chapter_id + 1, MAX_CHAPTERS + 1):
+            if self._phase_exists(c, 1):
+                return c, 1
+        return None, None
+
+    def advance_level(self):
+        """
+        Avança pra próxima fase da MESMA região:
+          1) tenta (chapter, phase + 1)
+          2) se não existir, tenta (chapter + 1, phase 1) — próximo capítulo
+          3) se não existir nada, retorna False
+        """
+        # -------- 1) Próxima fase do capítulo atual --------
+        if self._phase_exists(self.chapter_id, self.phase_number + 1):
+            next_chapter = self.chapter_id
+            next_phase = self.phase_number + 1
+            print(f"[ADVANCE] {self.chapter_id}-{self.phase_number} "
+                  f"→ {next_chapter}-{next_phase} (mesmo capítulo)")
+        else:
+            # -------- 2) Próximo capítulo, fase 1 --------
+            next_chapter, next_phase = self._next_chapter_phase1(self.chapter_id)
+            if next_chapter is None:
+                print(f"[ADVANCE] Não há próxima fase nem próximo capítulo. "
+                      f"Fim do conteúdo da região {self.region_id}.")
+                return False
+            print(f"[ADVANCE] Fim do capítulo {self.chapter_id} "
+                  f"→ capítulo {next_chapter}, fase 1")
+
+        # -------- 3) Troca de cena --------
+        self.game.current_scene = GameScene(
+            self.game,
+            chapter_id=next_chapter,
+            phase_number=next_phase,
+            region_id=self.region_id,
+        )
+        return True
 
     def _apply_tutorial_setup(self):
         """
@@ -3262,11 +3258,22 @@ class GameScene(BaseScene):
         # =========================================================
         # RENDER ORDEM
         #   chão → decoração → entidades → teto → efeitos
+        #
+        # O teto é renderizado DEPOIS das entidades (pokémons, inimigos,
+        # projéteis) para cobrir pontes, casas, torres, copas de árvore.
+        # O GameLayerManager detecta "teto" por tipo OU por nome.
         # =========================================================
 
-        # 1. CHÃO
+        # 1. CHÃO  (camadas tipadas "ground", exceto as de teto)
         perf_monitor.start_section("RENDER_MAP_GROUND")
         map_renderer.render_ground(screen, camera, screen_mgr)
+        perf_monitor.end_section()
+
+
+
+        # 3. DECORAÇÃO  (camadas tipadas "decoration", exceto as de teto)
+        perf_monitor.start_section("RENDER_MAP_DECORATION")
+        map_renderer.render_decoration(screen, camera, screen_mgr)
         perf_monitor.end_section()
 
         # 2. Spots de torre (nível do chão)
@@ -3277,11 +3284,6 @@ class GameScene(BaseScene):
                 show_editing=False,
                 highlight_spot=self.hovered_spot if hasattr(self, 'hovered_spot') else None
             )
-        perf_monitor.end_section()
-
-        # 3. DECORAÇÃO (agora ABAIXO das entidades)
-        perf_monitor.start_section("RENDER_MAP_DECORATION")
-        map_renderer.render_decoration(screen, camera, screen_mgr)
         perf_monitor.end_section()
 
         # 4. Paths (apenas debug)
@@ -3308,13 +3310,14 @@ class GameScene(BaseScene):
                 self.capture_shake_animation.render(screen, camera, screen_mgr)
         perf_monitor.end_section()
 
-        # 7. POKÉMON COLOCADOS (acima da decoração)
+        # 7. POKÉMON COLOCADOS
         perf_monitor.start_section("RENDER_PLACED_POKEMON")
         if placement_mgr:
             placement_mgr.render(screen, camera, screen_mgr)
         perf_monitor.end_section()
 
-        # 8. TETO (por cima de tudo — arcos, copas grandes, cavernas)
+        # 8. TETO (por cima de tudo — pontes, casas, torres, copas)
+        # Detectado por tipo "ceiling" OU por nome contendo "teto"/"ceiling".
         perf_monitor.start_section("RENDER_MAP_CEILING")
         map_renderer.render_ceiling(screen, camera, screen_mgr)
         perf_monitor.end_section()
@@ -3383,6 +3386,7 @@ class GameScene(BaseScene):
         else:
             # UI oculta: ainda renderiza as animações de clima (screen)
             animation_manager.render(screen, camera, self.screen_manager, space="screen")
+
         # ===== QUICK SWITCH =====
         perf_monitor.start_section("RENDER_QUICK_SWITCH")
         if hasattr(self, 'move_quick_switch_manager'):

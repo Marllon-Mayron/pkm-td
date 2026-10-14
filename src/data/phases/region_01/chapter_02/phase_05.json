@@ -692,6 +692,107 @@
                 "width": 24,
                 "height": 26,
                 "tile_size": 16,
+                "autotile_tilesets": [
+                    {
+                        "local_id": 1,
+                        "start_id": 4017,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bike_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 2,
+                        "start_id": 4065,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_brick_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 3,
+                        "start_id": 4113,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 4,
+                        "start_id": 4161,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 5,
+                        "start_id": 4209,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_cave_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 6,
+                        "start_id": 4257,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_dirt_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 7,
+                        "start_id": 4305,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_gravel_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 8,
+                        "start_id": 4353,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 9,
+                        "start_id": 4401,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 10,
+                        "start_id": 4449,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_water_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 11,
+                        "start_id": 4497,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_white_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    }
+                ],
                 "tileset_paths": [
                     "res/AllTiles/Tilesets/OutsideFireRed.png"
                 ]
@@ -1380,6 +1481,107 @@
                 "width": 24,
                 "height": 26,
                 "tile_size": 16,
+                "autotile_tilesets": [
+                    {
+                        "local_id": 1,
+                        "start_id": 4017,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bike_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 2,
+                        "start_id": 4065,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_brick_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 3,
+                        "start_id": 4113,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 4,
+                        "start_id": 4161,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 5,
+                        "start_id": 4209,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_cave_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 6,
+                        "start_id": 4257,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_dirt_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 7,
+                        "start_id": 4305,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_gravel_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 8,
+                        "start_id": 4353,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 9,
+                        "start_id": 4401,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 10,
+                        "start_id": 4449,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_water_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 11,
+                        "start_id": 4497,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_white_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    }
+                ],
                 "tileset_paths": [
                     "res/AllTiles/Tilesets/OutsideFireRed.png"
                 ]
@@ -2068,6 +2270,107 @@
                 "width": 24,
                 "height": 26,
                 "tile_size": 16,
+                "autotile_tilesets": [
+                    {
+                        "local_id": 1,
+                        "start_id": 4017,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bike_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 2,
+                        "start_id": 4065,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_brick_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 3,
+                        "start_id": 4113,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 4,
+                        "start_id": 4161,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 5,
+                        "start_id": 4209,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_cave_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 6,
+                        "start_id": 4257,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_dirt_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 7,
+                        "start_id": 4305,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_gravel_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 8,
+                        "start_id": 4353,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 9,
+                        "start_id": 4401,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 10,
+                        "start_id": 4449,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_water_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 11,
+                        "start_id": 4497,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_white_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    }
+                ],
                 "tileset_paths": [
                     "res/AllTiles/Tilesets/OutsideFireRed.png"
                 ]
@@ -2128,22 +2431,115 @@
                 "path_index": 0,
                 "name": "Wave 1",
                 "enabled": true,
-                "enemies": [],
-                "min_level": 1,
-                "max_level": 5,
-                "wave_size": 10,
-                "spawn_interval": 3.0,
-                "initial_delay": 2.0,
-                "repeat_wave": false,
-                "repeat_count": 1,
-                "template_id": null,
+                "enemies": [
+                    {
+                        "pokemon_id": 12,
+                        "percentage": 30.0
+                    },
+                    {
+                        "pokemon_id": 15,
+                        "percentage": 30.0
+                    },
+                    {
+                        "pokemon_id": 43,
+                        "percentage": 17.5
+                    },
+                    {
+                        "pokemon_id": 69,
+                        "percentage": 17.5
+                    },
+                    {
+                        "pokemon_id": 63,
+                        "percentage": 5.0
+                    }
+                ],
+                "min_level": 11,
+                "max_level": 14,
+                "wave_size": 8,
+                "spawn_interval": 2.0,
+                "initial_delay": 6.0,
+                "repeat_wave": true,
+                "repeat_count": 3,
+                "template_id": "template_4527",
+                "use_variants": false,
+                "variants": []
+            },
+            {
+                "wave_index": 1,
+                "path_index": 1,
+                "name": "Wave 2",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 12,
+                        "percentage": 30.0
+                    },
+                    {
+                        "pokemon_id": 15,
+                        "percentage": 30.0
+                    },
+                    {
+                        "pokemon_id": 43,
+                        "percentage": 17.5
+                    },
+                    {
+                        "pokemon_id": 69,
+                        "percentage": 17.5
+                    },
+                    {
+                        "pokemon_id": 63,
+                        "percentage": 5.0
+                    }
+                ],
+                "min_level": 11,
+                "max_level": 14,
+                "wave_size": 8,
+                "spawn_interval": 2.0,
+                "initial_delay": 6.0,
+                "repeat_wave": true,
+                "repeat_count": 3,
+                "template_id": "template_4527",
                 "use_variants": false,
                 "variants": []
             }
         ],
-        "selected_wave": 0,
+        "selected_wave": 1,
         "templates": {
-            "templates": []
+            "templates": [
+                {
+                    "template_id": "template_4527",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 12,
+                            "percentage": 30.0
+                        },
+                        {
+                            "pokemon_id": 15,
+                            "percentage": 30.0
+                        },
+                        {
+                            "pokemon_id": 43,
+                            "percentage": 17.5
+                        },
+                        {
+                            "pokemon_id": 69,
+                            "percentage": 17.5
+                        },
+                        {
+                            "pokemon_id": 63,
+                            "percentage": 5.0
+                        }
+                    ],
+                    "min_level": 11,
+                    "max_level": 14,
+                    "wave_size": 8,
+                    "spawn_interval": 2.0,
+                    "initial_delay": 6.0,
+                    "repeat_wave": true,
+                    "repeat_count": 3
+                }
+            ]
         }
     },
     "tower_spots": {
@@ -2198,19 +2594,61 @@
     "target_items": {
         "grid_size": 16,
         "snap_to_grid": true,
-        "items": []
+        "items": [
+            {
+                "x": 144,
+                "y": 192,
+                "item_id": 1
+            },
+            {
+                "x": 144,
+                "y": 192,
+                "item_id": 1
+            },
+            {
+                "x": 144,
+                "y": 192,
+                "item_id": 1
+            },
+            {
+                "x": 144,
+                "y": 192,
+                "item_id": 1
+            },
+            {
+                "x": 144,
+                "y": 192,
+                "item_id": 1
+            },
+            {
+                "x": 144,
+                "y": 192,
+                "item_id": 1
+            },
+            {
+                "x": 144,
+                "y": 192,
+                "item_id": 1
+            },
+            {
+                "x": 144,
+                "y": 192,
+                "item_id": 1
+            },
+            {
+                "x": 144,
+                "y": 192,
+                "item_id": 1
+            },
+            {
+                "x": 144,
+                "y": 192,
+                "item_id": 1
+            }
+        ]
     },
     "events": {
-        "triggers": [
-            {
-                "trigger_type": "time",
-                "time_value": 0.0,
-                "wave_index": 0,
-                "wave_state": "wave_start",
-                "custom_condition": "",
-                "events": []
-            }
-        ],
+        "triggers": [],
         "selected_trigger": 0
     },
     "rewards": {

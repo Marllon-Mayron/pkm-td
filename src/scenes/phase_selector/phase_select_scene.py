@@ -1,1278 +1,389 @@
 # src/scenes/phase_selector/phase_select_scene.py
-
 """
-Tela de selecao de fases - Layout reformulado com REGIOES
+Tela de Seleção de Fase — padrão Editor.
+
+- Layout 100% em `res/ui_layouts/phase_select.json`
+- Lógica 100% em `PhaseSelectLogic`
+- Aqui só liga widgets <-> dados e reage a eventos.
 """
 import pygame
-import math
 
-from scenes.pokedex_scene.pokedex_scene import PokedexScene
-from src.scenes.base_scene import BaseScene
-from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
-from src.config.progress import progress_manager
-from src.config.phase_catalog import phase_catalog
+from src.ui.screen_template import StandardScreen
+from src.ui.screen_loader import ScreenLoader
+
+from src.scenes.phase_selector.phase_select_logic import PhaseSelectLogic
+from src.config.regions import RegionCatalog
 from src.config.global_settings import DEBUG_MODE
-from src.scenes.incubator_scene.incubator_scene import IncubatorScene
-from src.scenes.shop_scene.shop_scene import ShopScene
-from src.scenes.achievement_scene.achievement_scene import AchievementScene
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 
-from src.config.regions import (
-    RegionCatalog, DEFAULT_REGION_ID, make_phase_id, parse_phase_id
-)
+LAYOUT_PATH = "res/ui_layouts/phase_select.json"
 
 
-# ======================================================================
-# FASE CARD
-# ======================================================================
-class PhaseCard:
-    def __init__(self, phase_data, unlocked=False, completed=False, mythical_id=None,
-                 region_id=DEFAULT_REGION_ID):
-        self.phase_data = phase_data
-        self.phase_number = phase_data["number"]
-        self.phase_name = phase_data.get("name", f"Fase {phase_data['number']}")
-        self.chapter_id = phase_data["chapter"]
-        self.region_id = region_id
-        self.phase_id = make_phase_id(region_id, self.chapter_id, self.phase_number)
-
-        self.unlocked = unlocked
-        self.completed = completed
-        self.mythical_id = mythical_id
-
-        self.rect = pygame.Rect(0, 0, 0, 0)
-        self.is_hovered = False
-        self.scale = 1.0
-        self.target_scale = 1.0
-        self.glow_alpha = 0
-        self.glow_direction = 1
-
-        self._update_colors()
-
-    def _update_colors(self):
-        if not self.unlocked:
-            self.bg_color = (30, 30, 35)
-            self.border_color = (50, 50, 55)
-            self.text_color = (80, 80, 85)
-            self.name_color = (100, 100, 105)
-            self.status_color = (80, 80, 85)
-            self.status_text = "BLOQUEADA"
-        elif self.completed:
-            self.bg_color = (35, 50, 35)
-            self.border_color = (70, 120, 70)
-            self.text_color = (180, 220, 180)
-            self.name_color = (200, 240, 200)
-            self.status_color = (140, 200, 140)
-            self.status_text = "CONCLUIDA"
-        else:
-            self.bg_color = (40, 45, 55)
-            self.border_color = (80, 100, 140)
-            self.text_color = (220, 220, 240)
-            self.name_color = (200, 200, 220)
-            self.status_color = (140, 140, 200)
-            self.status_text = "DISPONIVEL"
-
-    def update(self, dt):
-        self.scale += (self.target_scale - self.scale) * 0.1
-        if self.is_hovered and self.unlocked:
-            self.glow_alpha += self.glow_direction * 3
-            if self.glow_alpha >= 120:
-                self.glow_alpha = 120
-                self.glow_direction = -1
-            elif self.glow_alpha <= 0:
-                self.glow_alpha = 0
-                self.glow_direction = 1
-        else:
-            self.glow_alpha = max(0, self.glow_alpha - 5)
-
-    def update_position(self, x, y, width, height):
-        self.rect = pygame.Rect(x, y, width, height)
-
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEMOTION:
-            was = self.is_hovered
-            self.is_hovered = self.rect.collidepoint(event.pos)
-            if self.is_hovered and not was and self.unlocked:
-                self.target_scale = 1.05
-                sound_manager.play_effect(SoundEffect.CLICK)
-            elif not self.is_hovered and was:
-                self.target_scale = 1.0
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.is_hovered and self.unlocked:
-                sound_manager.play_effect(SoundEffect.CLICK)
-                self.target_scale = 0.95
-                return self.phase_number
-        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            if self.is_hovered:
-                self.target_scale = 1.05
-        return None
-
-    def render(self, screen, font_large, font_small, font_name):
-        scaled_rect = self.rect.copy()
-        if self.scale != 1.0:
-            wo = (self.rect.width * (self.scale - 1)) // 2
-            ho = (self.rect.height * (self.scale - 1)) // 2
-            scaled_rect = self.rect.inflate(wo * 2, ho * 2)
-            scaled_rect.center = self.rect.center
-
-        shadow = scaled_rect.copy()
-        shadow.x += 4
-        shadow.y += 4
-        pygame.draw.rect(screen, (10, 10, 15), shadow, border_radius=12)
-
-        if self.is_hovered and self.unlocked:
-            color = tuple(min(255, c + 20) for c in self.bg_color)
-            border = tuple(min(255, c + 30) for c in self.border_color)
-            name_color = tuple(min(255, c + 40) for c in self.name_color)
-        else:
-            color = self.bg_color
-            border = self.border_color
-            name_color = self.name_color
-
-        pygame.draw.rect(screen, color, scaled_rect, border_radius=12)
-        pygame.draw.rect(screen, border, scaled_rect, 2, border_radius=12)
-
-        if self.is_hovered and self.unlocked and self.glow_alpha > 0:
-            glow = pygame.Surface((scaled_rect.width, scaled_rect.height), pygame.SRCALPHA)
-            pygame.draw.rect(glow, (*border[:3], self.glow_alpha),
-                             glow.get_rect(), border_radius=12)
-            screen.blit(glow, scaled_rect)
-
-        num = font_small.render(f"{self.phase_id}", True, self.text_color)
-        screen.blit(num, (scaled_rect.x + 10, scaled_rect.y + 10))
-
-        self._render_wrapped_text(screen, self.phase_name, font_name, name_color,
-                                  scaled_rect.centerx, scaled_rect.centery - 12)
-
-        status = font_small.render(self.status_text, True, self.status_color)
-        sr = status.get_rect(center=(scaled_rect.centerx, scaled_rect.centery + 28))
-        screen.blit(status, sr)
-
-        if self.mythical_id is not None and self.unlocked:
-            self._render_mythical_icon(screen, scaled_rect)
-
-        if not self.unlocked:
-            ov = pygame.Surface((scaled_rect.width, scaled_rect.height), pygame.SRCALPHA)
-            ov.fill((0, 0, 0, 160))
-            screen.blit(ov, scaled_rect)
-
-    def _render_mythical_icon(self, screen, scaled_rect):
-        try:
-            from src.data.pokedex import Pokedex
-            portrait = Pokedex().get_portrait(self.mythical_id, "happy", False)
-            if portrait is None:
-                return
-            size = 34
-            portrait_scaled = pygame.transform.scale(portrait, (size, size))
-            icon_x = scaled_rect.centerx - size // 2
-            icon_y = scaled_rect.top + 6
-
-            pulse = int(80 + 40 * (0.5 + 0.5 * math.sin(pygame.time.get_ticks() * 0.005)))
-            bg_rect = pygame.Rect(icon_x - 4, icon_y - 4, size + 8, size + 8)
-            bg = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
-            bg.fill((255, 215, 0, pulse))
-            screen.blit(bg, bg_rect)
-            pygame.draw.rect(screen, (255, 215, 0), bg_rect, 2, border_radius=6)
-            screen.blit(portrait_scaled, (icon_x, icon_y))
-        except Exception as e:
-            print(f"[MYTHICAL] {e}")
-
-    def _render_wrapped_text(self, screen, text, font, color, cx, cy):
-        words = text.split()
-        if not words:
-            return
-        single = font.render(text, True, color)
-        if single.get_width() <= self.rect.width - 30:
-            screen.blit(single, single.get_rect(center=(cx, cy)))
-            return
-        if len(words) == 1:
-            while words[0] and font.size(words[0] + "...")[0] > self.rect.width - 30:
-                words[0] = words[0][:-1]
-            t = font.render(words[0] + "...", True, color)
-            screen.blit(t, t.get_rect(center=(cx, cy)))
-            return
-        mid = len(words) // 2
-        l1 = " ".join(words[:mid])
-        l2 = " ".join(words[mid:])
-        while l1 and font.size(l1)[0] > self.rect.width - 30:
-            l1 = l1[:-1]
-        while l2 and font.size(l2)[0] > self.rect.width - 30:
-            l2 = l2[:-1]
-        if l1:
-            s1 = font.render(l1, True, color)
-            screen.blit(s1, s1.get_rect(center=(cx, cy - 10)))
-        if l2:
-            s2 = font.render(l2, True, color)
-            screen.blit(s2, s2.get_rect(center=(cx, cy + 10)))
-
-
-# ======================================================================
-# CHAPTER TAB
-# ======================================================================
-class ChapterTab:
-    def __init__(self, chapter_id, name, progress):
-        self.chapter_id = chapter_id
-        self.name = name
-        self.progress = progress
-        self.rect = pygame.Rect(0, 0, 0, 0)
-        self.is_hovered = False
-        self.active = False
-        self.scale = 1.0
-        self.target_scale = 1.0
-
-    def update(self, dt):
-        self.scale += (self.target_scale - self.scale) * 0.1
-
-    def update_position(self, x, y, w, h):
-        self.rect = pygame.Rect(x, y, w, h)
-
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEMOTION:
-            was = self.is_hovered
-            self.is_hovered = self.rect.collidepoint(event.pos)
-            if self.is_hovered and not was:
-                self.target_scale = 1.05
-                sound_manager.play_effect(SoundEffect.CLICK)
-            elif not self.is_hovered and was:
-                self.target_scale = 1.0
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.is_hovered:
-                sound_manager.play_effect(SoundEffect.CLICK)
-                self.target_scale = 0.95
-                return self.chapter_id
-        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            if self.is_hovered:
-                self.target_scale = 1.05
-        return None
-
-    def render(self, screen, font):
-        scaled = self.rect.copy()
-        if self.scale != 1.0:
-            wo = (self.rect.width * (self.scale - 1)) // 2
-            ho = (self.rect.height * (self.scale - 1)) // 2
-            scaled = self.rect.inflate(wo * 2, ho * 2)
-            scaled.center = self.rect.center
-
-        if self.active:
-            color, border, text_color = (55, 55, 70), (140, 140, 170), (255, 255, 255)
-        elif self.is_hovered:
-            color, border, text_color = (50, 50, 60), (110, 110, 140), (230, 230, 240)
-        else:
-            color, border, text_color = (35, 35, 42), (60, 60, 75), (160, 160, 180)
-
-        sh = scaled.copy(); sh.y += 3
-        pygame.draw.rect(screen, (10, 10, 15), sh, border_radius=8)
-        pygame.draw.rect(screen, color, scaled, border_radius=8)
-        pygame.draw.rect(screen, border, scaled, 2, border_radius=8)
-
-        text = font.render(self.name, True, text_color)
-        screen.blit(text, text.get_rect(center=(scaled.centerx, scaled.centery - 8)))
-        pt = font.render(f"{self.progress['completed']}/{self.progress['total']}",
-                         True, text_color)
-        screen.blit(pt, pt.get_rect(center=(scaled.centerx, scaled.centery + 14)))
-
-        if self.active and self.progress['total'] > 0:
-            bw = scaled.width - 20
-            bh = 3
-            bx = scaled.x + 10
-            by = scaled.bottom - 8
-            pygame.draw.rect(screen, (30, 30, 40), (bx, by, bw, bh), border_radius=2)
-            ratio = self.progress['completed'] / self.progress['total']
-            if ratio > 0:
-                c = (100, 180, 100) if ratio >= 1 else (80, 120, 200)
-                pygame.draw.rect(screen, c, (bx, by, int(bw * ratio), bh), border_radius=2)
-
-
-# ======================================================================
-# REGION TAB
-# ======================================================================
-class RegionTab:
-    def __init__(self, region_id, name):
-        self.region_id = region_id
-        self.name = name
-        self.rect = pygame.Rect(0, 0, 0, 0)
-        self.is_hovered = False
-        self.active = False
-        self.scale = 1.0
-        self.target_scale = 1.0
-
-    def update(self, dt):
-        self.scale += (self.target_scale - self.scale) * 0.1
-
-    def update_position(self, x, y, w, h):
-        self.rect = pygame.Rect(x, y, w, h)
-
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEMOTION:
-            was = self.is_hovered
-            self.is_hovered = self.rect.collidepoint(event.pos)
-            if self.is_hovered and not was:
-                self.target_scale = 1.05
-            elif not self.is_hovered and was:
-                self.target_scale = 1.0
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.is_hovered:
-                return self.region_id
-        return None
-
-    def render(self, screen, font):
-        scaled = self.rect.copy()
-        if self.scale != 1.0:
-            wo = (self.rect.width * (self.scale - 1)) // 2
-            ho = (self.rect.height * (self.scale - 1)) // 2
-            scaled = self.rect.inflate(wo * 2, ho * 2)
-            scaled.center = self.rect.center
-
-        if self.active:
-            color, border, text_color = (70, 90, 140), (140, 180, 240), (255, 255, 255)
-        elif self.is_hovered:
-            color, border, text_color = (55, 60, 80), (110, 130, 170), (230, 230, 240)
-        else:
-            color, border, text_color = (40, 42, 58), (70, 75, 100), (180, 185, 210)
-
-        sh = scaled.copy(); sh.y += 2
-        pygame.draw.rect(screen, (10, 10, 15), sh, border_radius=8)
-        pygame.draw.rect(screen, color, scaled, border_radius=8)
-        pygame.draw.rect(screen, border, scaled, 2, border_radius=8)
-
-        text = font.render(self.name.upper(), True, text_color)
-        screen.blit(text, text.get_rect(center=scaled.center))
-
-
-# ======================================================================
-# SCENE
-# ======================================================================
-class PhaseSelectScene(BaseScene):
+class PhaseSelectScene(StandardScreen):
+    title = ""
+    show_back_button = False
 
     def __init__(self, game):
+        self.logic = PhaseSelectLogic(game)
+        self._music_started = False
         super().__init__(game)
 
-        self.progress = progress_manager
-        self.catalog = phase_catalog
-        self._phase_name_cache = {}
+    # =================================================================
+    # BUILD
+    # =================================================================
+    def build(self):
+        ScreenLoader.load(self, LAYOUT_PATH)
+        self._populate_static()
 
-        # ===== REGIÕES =====
-        self.available_regions = []
-        self.current_region_id = DEFAULT_REGION_ID
-        self.region_tabs = []
+    def get_actions(self):
+        return {
+            "back":               self._on_back,
+            "region_changed":     self._on_region_changed,
+            "chapter_changed":    self._on_chapter_changed,
+            "phase_selected":     self._on_phase_selected,
+            "play":               self._on_play,
 
-        # Estado do player
-        if hasattr(game, 'player') and game.player:
-            saved_region = getattr(game.player, 'current_region', DEFAULT_REGION_ID)
-            self.current_region_id = saved_region
+            "open_shop":          self._open_shop,
+            "open_npc_hall":      self._open_npc_hall,
+            "open_minigame":      self._open_minigame,
+            "open_pokedex":       self._open_pokedex,
+            "open_achievements":  self._open_achievements,
+            "open_incubator":     self._open_incubator,
+            "open_profile":       self._open_profile,
+            "open_mystery_gift":  self._open_mystery_gift,
+        }
 
-        # Elementos UI
-        self.chapter_tabs = []
-        self.phase_cards = []
+    # =================================================================
+    # População inicial
+    # =================================================================
+    def _populate_static(self):
+        rt = self.get("region_tabs")
+        if rt is not None:
+            rt.tabs = self.logic.region_tab_labels()
+            rt.current_tab = self.logic.current_region_label()
 
-        # Botões
-        self.back_button_rect = None
-        self.shop_button_rect = None
-        self.minigame_button_rect = None
-        self.pokedex_button_rect = None
-        self.achievement_button_rect = None
-        self.incubator_button_rect = None
-        self.profile_button_rect = None
-        self.npc_hall_button_rect = None
-        self.mystery_gift_button_rect = None      # <-- NOVO
+        ct = self.get("chapter_tabs")
+        if ct is not None:
+            ct.tabs = self.logic.chapter_tab_labels()
+            ct.current_tab = self.logic.current_chapter_label()
 
-        # Hover states
-        self.back_button_hovered = False
-        self.shop_button_hovered = False
-        self.minigame_button_hovered = False
-        self.pokedex_button_hovered = False
-        self.achievement_button_hovered = False
-        self.incubator_button_hovered = False
-        self.profile_button_hovered = False
-        self.npc_hall_button_hovered = False
-        self.mystery_gift_button_hovered = False  # <-- NOVO
+        self._update_region_badge()
+        self._update_incubator_button()
+        self._feed_grid()
+        self._update_detail()
 
-        # Scroll
-        self.scroll_y = 0
-        self.scroll_target = 0
-        self.max_scroll = 0
-        self.dragging_scroll = False
-        self.last_mouse_y = 0
+    def _update_region_badge(self):
+        badge = self.get("lbl_region_badge")
+        if badge is None:
+            return
+        name = RegionCatalog.get_name(self.logic.current_region_id)
+        badge.text = f"REGIAO {self.logic.current_region_id}: {name.upper()}"
 
-        # Estado
-        self.layout_initialized = False
-        self.last_window_size = (self.screen_manager.window_width,
-                                 self.screen_manager.window_height)
-        self.dev_mode = DEBUG_MODE
-        self._animation_timer = 0
-        self._music_started = False
-
-        # Fontes
-        self.title_font = pygame.font.Font(None, 52)
-        self.tab_font = pygame.font.Font(None, 20)
-        self.phase_font_large = pygame.font.Font(None, 34)
-        self.phase_font_small = pygame.font.Font(None, 15)
-        self.phase_font_name = pygame.font.Font(None, 17)
-        self.button_font = pygame.font.Font(None, 22)
-
-        # Capítulo atual
-        self.current_chapter_id = 1
-        self.available_chapters = [1]
-
-        self.refresh_data()
-        self._start_phase_select_music()
-
-    # ======================================================================
-    # DESCOBERTA DE DADOS
-    # ======================================================================
-    def _discover_regions(self):
-        regions = []
-        try:
-            regions = self.catalog.get_all_regions()
-        except (AttributeError, TypeError):
-            regions = []
-        if not regions:
-            try:
-                from src.editor.phase_exporter import phase_exporter
-                regions = phase_exporter.list_regions_with_phases()
-            except Exception:
-                regions = []
-        if not regions:
-            regions = [DEFAULT_REGION_ID]
-        return sorted(set(int(r) for r in regions))
-
-    def _discover_chapters(self, region_id):
-        chapters = []
-        try:
-            all_phases = self.catalog.get_all_phases(region_id)
-            if all_phases:
-                chapters = sorted(int(c) for c in all_phases.keys())
-        except (TypeError, AttributeError):
-            chapters = []
-        if not chapters:
-            try:
-                from src.editor.phase_exporter import phase_exporter
-                phases = phase_exporter.list_phases(region=region_id)
-                chapters = sorted({int(c) for (c, p) in phases})
-            except Exception:
-                chapters = []
-        if not chapters:
-            chapters = [1]
-        return chapters
-
-    def _get_chapter_phases(self, region_id, chapter_id):
-        try:
-            phases = self.catalog.get_chapter_phases(region_id, chapter_id)
-            if phases:
-                if isinstance(phases[0], dict):
-                    return phases
-        except (TypeError, AttributeError):
-            pass
-
-        try:
-            phases = self.catalog.get_chapter_phases(chapter_id)
-            if phases:
-                if isinstance(phases[0], dict):
-                    result = []
-                    for p in phases:
-                        result.append({
-                            "number": p.get("number", 1),
-                            "name": p.get("name", f"Fase {p.get('number', 1)}"),
-                            "chapter": chapter_id,
-                        })
-                    return result
-        except (TypeError, AttributeError):
-            pass
-
-        try:
-            from src.editor.phase_exporter import phase_exporter
-            phase_nums = phase_exporter.list_phases(region=region_id, chapter=chapter_id)
-            result = []
-            for p_num in phase_nums:
-                name = self._get_phase_name_from_disk(region_id, chapter_id, p_num)
-                result.append({
-                    "number": p_num,
-                    "name": name,
-                    "chapter": chapter_id,
-                })
-            return result
-        except Exception:
-            return []
-
-    def _get_phase_name_from_disk(self, region_id, chapter_id, phase_num):
-        key = (region_id, chapter_id, phase_num)
-        if key in self._phase_name_cache:
-            return self._phase_name_cache[key]
-
-        name = f"Fase {chapter_id}-{phase_num}"
-        try:
-            from src.editor.phase_exporter import phase_exporter
-            data = phase_exporter.load_phase(chapter_id, phase_num, region=region_id)
-            if data and data.get("name"):
-                name = data["name"]
-        except Exception:
-            pass
-
-        self._phase_name_cache[key] = name
-        return name
-
-    def _get_chapter_progress(self, region_id, chapter_id, phase_ids):
-        completed = 0
-        for pid in phase_ids:
-            try:
-                if self.progress.is_phase_completed(pid):
-                    completed += 1
-            except Exception:
-                pass
-        return {"completed": completed, "total": len(phase_ids)}
-
-    # ======================================================================
-    # REFRESH
-    # ======================================================================
-    def refresh_data(self):
-        try:
-            self.progress.reload_progress()
-        except Exception:
-            pass
-        try:
-            self.catalog.refresh()
-        except Exception:
-            pass
-
-        self.available_regions = self._discover_regions()
-
-        if hasattr(self.game, 'player') and self.game.player:
-            saved = getattr(self.game.player, 'current_region', DEFAULT_REGION_ID)
-            if saved in self.available_regions:
-                self.current_region_id = saved
-            else:
-                self.current_region_id = self.available_regions[0]
+    def _update_incubator_button(self):
+        btn = self.get("btn_incubator")
+        if btn is None:
+            return
+        unlocked = self.logic.is_incubator_unlocked()
+        btn.enabled = unlocked
+        btn.label = "INCUBADORA" if unlocked else "INCUBADORA (BLOQ)"
+        if unlocked:
+            btn.fill_color = (42, 51, 88)
+            btn.border_color = (74, 90, 138)
+            btn.text_color = (232, 232, 240)
         else:
-            self.current_region_id = self.available_regions[0]
+            btn.fill_color = (40, 40, 45)
+            btn.border_color = (60, 60, 65)
+            btn.text_color = (110, 110, 120)
 
-        self.available_chapters = self._discover_chapters(self.current_region_id)
+    # =================================================================
+    # Feed do CardGrid
+    # =================================================================
+    def _feed_grid(self):
+        grid = self.get("phases_grid")
+        if grid is None:
+            return
+        grid.items = [
+            self.logic.item_dict(i) for i in range(len(self.logic.phases))
+        ]
 
-        if self.available_chapters:
-            self.current_chapter_id = self.available_chapters[0]
-        else:
-            self.current_chapter_id = 1
+    # =================================================================
+    # Detail Panel
+    # =================================================================
+    def _update_detail(self):
+        state = self.logic.get_detail_state()
 
-        self.layout_initialized = False
+        img = self.get("detail_image")
+        if img is not None:
+            img.surface = state["image"]
 
-    def _check_resize(self):
-        cur = (self.screen_manager.window_width, self.screen_manager.window_height)
-        if cur != self.last_window_size:
-            self.last_window_size = cur
-            self.layout_initialized = False
-            return True
-        return False
+        lbl = self.get("detail_number")
+        if lbl is not None:
+            lbl.text = state.get("number", "")
 
-    # ======================================================================
-    # LAYOUT
-    # ======================================================================
-    def _create_layout(self):
-        vx = self.screen_manager.viewport_x
-        vy = self.screen_manager.viewport_y
-        vw = self.screen_manager.viewport_width
-        vh = self.screen_manager.viewport_height
+        lbl = self.get("detail_name")
+        if lbl is not None:
+            lbl.text = state["name"]
 
-        # Voltar
-        bs = int(min(vw * 0.045, vh * 0.065, 40))
-        self.back_button_rect = pygame.Rect(vx + 20, vy + 20, bs, bs)
+        badge = self.get("detail_status")
+        if badge is not None:
+            badge.text = state["status_text"]
+            badge.bg_color = (26, 35, 64)
+            badge.text_color = state["status_color"]
+            badge.border_color = state["status_color"]
 
-        # ===== BOTÕES INFERIORES — 2 LINHAS DE 4 =====
-        bw = int(vw * 0.09)
-        bh = int(vh * 0.055)
-        bsp = int(vw * 0.010)
-        row_gap = int(vh * 0.010)
-        buttons_per_row = 4
+        # Estrelas do detalhe (3 imagens: filled/empty)
+        for i in range(1, 4):
+            star_img = self.get(f"detail_star_{i}")
+            if star_img is not None:
+                star_img.surface = state.get(f"star_{i}")
 
-        total_row_w = bw * buttons_per_row + bsp * (buttons_per_row - 1)
-        sx = vx + (vw - total_row_w) // 2
+        lbl = self.get("detail_desc")
+        if lbl is not None:
+            lbl.text = state["description"]
 
-        # Linha 2 fica na parte de baixo, linha 1 acima dela
-        row2_y = vy + vh - bh - int(vh * 0.06)
-        row1_y = row2_y - bh - row_gap
+        btn = self.get("btn_play")
+        if btn is not None:
+            btn.enabled = state["can_play"]
+            btn.label = "JOGAR" if state["can_play"] else "BLOQUEADA"
 
-        # Linha 1
-        self.shop_button_rect        = pygame.Rect(sx + (bw + bsp) * 0, row1_y, bw, bh)
-        self.npc_hall_button_rect    = pygame.Rect(sx + (bw + bsp) * 1, row1_y, bw, bh)
-        self.minigame_button_rect    = pygame.Rect(sx + (bw + bsp) * 2, row1_y, bw, bh)
-        self.pokedex_button_rect     = pygame.Rect(sx + (bw + bsp) * 3, row1_y, bw, bh)
-
-        # Linha 2
-        self.achievement_button_rect = pygame.Rect(sx + (bw + bsp) * 0, row2_y, bw, bh)
-        self.incubator_button_rect   = pygame.Rect(sx + (bw + bsp) * 1, row2_y, bw, bh)
-        self.profile_button_rect     = pygame.Rect(sx + (bw + bsp) * 2, row2_y, bw, bh)
-        self.mystery_gift_button_rect = pygame.Rect(sx + (bw + bsp) * 3, row2_y, bw, bh)   # <-- NOVO
-
-        # ===== ABAS DE REGIÃO =====
-        region_tab_w = int(vw * 0.11)
-        region_tab_h = int(vh * 0.055)
-        region_tab_sp = int(vw * 0.010)
-        total_rw = len(self.available_regions) * (region_tab_w + region_tab_sp) - region_tab_sp
-        region_start_x = vx + (vw - total_rw) // 2
-        region_y = vy + int(vh * 0.045)
-
-        self.region_tabs = []
-        for i, rid in enumerate(self.available_regions):
-            rx = region_start_x + i * (region_tab_w + region_tab_sp)
-            tab = RegionTab(rid, RegionCatalog.get_name(rid))
-            tab.update_position(rx, region_y, region_tab_w, region_tab_h)
-            tab.active = (rid == self.current_region_id)
-            self.region_tabs.append(tab)
-
-        # ===== ABAS DE CAPÍTULO =====
-        if self.available_chapters:
-            tab_w = int(vw * 0.10)
-            tab_h = int(vh * 0.075)
-            tab_sp = int(vw * 0.012)
-            total_tw = len(self.available_chapters) * (tab_w + tab_sp) - tab_sp
-            tab_start_x = vx + (vw - total_tw) // 2
-            tab_y = vy + int(vh * 0.045) + region_tab_h + int(vh * 0.015)
-
-            self.chapter_tabs = []
-            for i, ch_id in enumerate(self.available_chapters):
-                tx = tab_start_x + i * (tab_w + tab_sp)
-                phases_data = self._get_chapter_phases(self.current_region_id, ch_id)
-                phase_ids = [make_phase_id(self.current_region_id, ch_id, p["number"])
-                             for p in phases_data]
-                prog = self._get_chapter_progress(self.current_region_id, ch_id, phase_ids)
-
-                tab = ChapterTab(ch_id, f"CAP {ch_id}", prog)
-                tab.update_position(tx, tab_y, tab_w, tab_h)
-                tab.active = (ch_id == self.current_chapter_id)
-                self.chapter_tabs.append(tab)
-
-        self._create_phase_cards()
-
-        if hasattr(self.game, 'player') and self.game.player:
-            self.game.player.chapter_page_num = self.current_chapter_id
-            self.game.player.current_region = self.current_region_id
-
-        self.layout_initialized = True
-        self.scroll_y = 0
-        self.scroll_target = 0
-
-    def _create_phase_cards(self):
-        vx = self.screen_manager.viewport_x
-        vy = self.screen_manager.viewport_y
-        vw = self.screen_manager.viewport_width
-        vh = self.screen_manager.viewport_height
-
-        phases = self._get_chapter_phases(self.current_region_id, self.current_chapter_id)
-        if not phases:
-            self.phase_cards = []
-            self.max_scroll = 0
+    # =================================================================
+    # Callbacks — Tabs
+    # =================================================================
+    def _on_region_changed(self, label):
+        rid = self.logic.region_id_from_label(label)
+        if rid is None or rid == self.logic.current_region_id:
             return
 
-        card_base_w = int(vw * 0.10)
-        card_margin = int(vw * 0.015)
-        avail_w = vw - int(vw * 0.08)
-        cols = max(2, min(5, avail_w // (card_base_w + card_margin)))
-        card_w = (avail_w - (cols - 1) * card_margin) // cols
-        card_w = max(int(vw * 0.07), min(int(vw * 0.12), card_w))
-        card_h = int(card_w * 1.25)
+        self.logic.set_region(rid)
 
-        region_tab_h = int(vh * 0.055) if self.region_tabs else 0
-        tab_h = int(vh * 0.075) if self.chapter_tabs else 0
-        # Como agora temos 2 linhas de botões, o espaço útil reduziu um pouco
-        grid_start_y = vy + int(vh * 0.20) + region_tab_h + tab_h
+        ct = self.get("chapter_tabs")
+        if ct is not None:
+            ct.tabs = self.logic.chapter_tab_labels()
+            ct.current_tab = self.logic.current_chapter_label()
 
-        grid_w = cols * card_w + (cols - 1) * card_margin
-        grid_start_x = vx + (vw - grid_w) // 2
+        self._update_region_badge()
+        self._feed_grid()
+        self._update_detail()
 
-        rows = math.ceil(len(phases) / cols)
-        grid_h = rows * (card_h + card_margin)
-        visible_h = vh - (grid_start_y - vy) - int(vh * 0.20)
-        self.max_scroll = max(0, grid_h - visible_h)
-
-        from src.data.mythical_catalog import MythicalCatalog
-        pending_mythical_entry = None
-        if hasattr(self.game, 'player') and self.game.player:
-            pending_id = getattr(self.game.player, 'pending_mythical_id', None)
-            if pending_id is not None:
-                pending_mythical_entry = MythicalCatalog.get_mythical(pending_id)
-
-        self.phase_cards = []
-        for i, phase_data in enumerate(phases):
-            row = i // cols
-            col = i % cols
-            card_x = grid_start_x + col * (card_w + card_margin)
-            card_y = grid_start_y + row * (card_h + card_margin) - self.scroll_y
-
-            phase_id = make_phase_id(self.current_region_id, self.current_chapter_id,
-                                     phase_data["number"])
-            try:
-                unlocked = self.progress.is_phase_unlocked(phase_id)
-                completed = self.progress.is_phase_completed(phase_id)
-            except Exception:
-                unlocked = False
-                completed = False
-
-            mythical_id_for_card = None
-            if pending_mythical_entry:
-                if phase_id in pending_mythical_entry.phases:
-                    mythical_id_for_card = pending_mythical_entry.pokemon_id
-
-            card = PhaseCard(
-                phase_data, unlocked, completed,
-                mythical_id=mythical_id_for_card,
-                region_id=self.current_region_id,
-            )
-            card.update_position(card_x, card_y, card_w, card_h)
-            self.phase_cards.append(card)
-
-    def _is_incubator_unlocked(self):
-        try:
-            return self.progress.is_phase_completed(make_phase_id(DEFAULT_REGION_ID, 1, 5))
-        except Exception:
-            try:
-                return self.progress.is_phase_completed("1-5")
-            except Exception:
-                return False
-
-    # ======================================================================
-    # EVENTOS
-    # ======================================================================
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEMOTION:
-            self._update_hover_states(event.pos)
-
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_p:
-                self.toggle_pause()
-            elif event.key == pygame.K_ESCAPE:
-                sound_manager.play_effect(SoundEffect.CLICK)
-                sound_manager.stop_music(fade_ms=300)
-                self.game.current_scene = self.game.menu_scene
-            elif event.key == pygame.K_LEFT:
-                self._prev_region()
-            elif event.key == pygame.K_RIGHT:
-                self._next_region()
-            elif event.key == pygame.K_r and pygame.key.get_mods() & pygame.KMOD_CTRL:
-                if DEBUG_MODE:
-                    self._reset_progress()
-            elif event.key == pygame.K_u:
-                if DEBUG_MODE:
-                    self._debug_unlock_next()
-            elif event.key == pygame.K_a:
-                if DEBUG_MODE:
-                    self._debug_unlock_all()
-            elif event.key == pygame.K_s:
-                self._open_shop()
-            elif event.key == pygame.K_m:
-                self._open_minigames()
-            elif event.key == pygame.K_x:
-                self._open_pokedex()
-            elif event.key == pygame.K_c:
-                self._open_achievements()
-            elif event.key == pygame.K_i:
-                self._open_incubator()
-            elif event.key == pygame.K_v:
-                self._open_profile()
-
-        elif event.type == pygame.VIDEORESIZE:
-            self.layout_initialized = False
-
-        elif event.type == pygame.MOUSEWHEEL:
-            if self.phase_cards and self.max_scroll > 0:
-                self.scroll_target += event.y * -30
-                self.scroll_target = max(0, min(self.max_scroll, self.scroll_target))
-
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            self._handle_click(event.pos)
-
-        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-            self.dragging_scroll = False
-
-        if event.type == pygame.MOUSEMOTION:
-            for card in self.phase_cards:
-                card.handle_event(event)
-            for tab in self.chapter_tabs:
-                tab.handle_event(event)
-            for rt in self.region_tabs:
-                rt.handle_event(event)
-
-            if self.dragging_scroll:
-                dy = event.pos[1] - self.last_mouse_y
-                speed = self.max_scroll / max(1, (self.screen_manager.viewport_height - 200))
-                self.scroll_target += dy * speed * 1.5
-                self.scroll_target = max(0, min(self.max_scroll, self.scroll_target))
-                self.last_mouse_y = event.pos[1]
-
-    def _update_hover_states(self, pos):
-        def chk(r):
-            return r.collidepoint(pos) if r else False
-        self.back_button_hovered = chk(self.back_button_rect)
-        self.shop_button_hovered = chk(self.shop_button_rect)
-        self.minigame_button_hovered = chk(self.minigame_button_rect)
-        self.pokedex_button_hovered = chk(self.pokedex_button_rect)
-        self.achievement_button_hovered = chk(self.achievement_button_rect)
-        self.incubator_button_hovered = chk(self.incubator_button_rect)
-        self.profile_button_hovered = chk(self.profile_button_rect)
-        self.npc_hall_button_hovered = chk(self.npc_hall_button_rect)
-        self.mystery_gift_button_hovered = chk(self.mystery_gift_button_rect)   # <-- NOVO
-
-    def _handle_click(self, pos):
-        if self.back_button_rect and self.back_button_rect.collidepoint(pos):
-            sound_manager.play_effect(SoundEffect.CLICK)
-            sound_manager.stop_music(fade_ms=300)
-            self.game.current_scene = self.game.menu_scene
+    def _on_chapter_changed(self, label):
+        ch = self.logic.chapter_id_from_label(label)
+        if ch is None or ch == self.logic.current_chapter_id:
             return
 
-        if self.shop_button_rect and self.shop_button_rect.collidepoint(pos):
-            self._open_shop(); return
-        if self.minigame_button_rect and self.minigame_button_rect.collidepoint(pos):
-            self._open_minigames(); return
-        if self.pokedex_button_rect and self.pokedex_button_rect.collidepoint(pos):
-            self._open_pokedex(); return
-        if self.achievement_button_rect and self.achievement_button_rect.collidepoint(pos):
-            self._open_achievements(); return
-        if self.incubator_button_rect and self.incubator_button_rect.collidepoint(pos):
-            if self._is_incubator_unlocked():
-                self._open_incubator()
+        self.logic.set_chapter(ch)
+        self._feed_grid()
+        self._update_detail()
+
+    # =================================================================
+    # Callbacks — Cards / Play
+    # =================================================================
+    def _on_phase_selected(self, idx):
+        if 0 <= idx < len(self.logic.phases):
+            self.logic.select_phase(self.logic.phases[idx]["number"])
+            self._feed_grid()
+            self._update_detail()
+
+    def _on_play(self, *_):
+        state = self.logic.get_detail_state()
+        if not state["valid"] or not state["can_play"]:
+            sound_manager.play_effect(SoundEffect.ERROR)
             return
-        if self.profile_button_rect and self.profile_button_rect.collidepoint(pos):
-            self._open_profile(); return
-        if self.npc_hall_button_rect and self.npc_hall_button_rect.collidepoint(pos):
-            self._open_npc_hall(); return
-        if self.mystery_gift_button_rect and self.mystery_gift_button_rect.collidepoint(pos):
-            self._open_mystery_gift(); return      # <-- NOVO
 
-        for rt in self.region_tabs:
-            res = rt.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
-            if res:
-                self._change_region(res)
-                return
+        self.start_phase(self.logic.selected_phase_number)
 
-        for tab in self.chapter_tabs:
-            res = tab.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
-            if res:
-                self.current_chapter_id = res
-                if hasattr(self.game, 'player') and self.game.player:
-                    self.game.player.chapter_page_num = self.current_chapter_id
-                self._create_phase_cards()
-                for t in self.chapter_tabs:
-                    t.active = (t.chapter_id == self.current_chapter_id)
-                return
-
-        if self.phase_cards and self.max_scroll > 0:
-            sb = self._get_scroll_bar_rect()
-            if sb and sb.collidepoint(pos):
-                self.dragging_scroll = True
-                self.last_mouse_y = pos[1]
-                return
-
-        for card in self.phase_cards:
-            res = card.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN, button=1, pos=pos))
-            if res:
-                self.start_phase(res)
-                return
-
-    # ======================================================================
-    # NAVEGAÇÃO
-    # ======================================================================
-    def _change_region(self, region_id):
-        if region_id == self.current_region_id:
-            return
-        self.current_region_id = region_id
-        if hasattr(self.game, 'player') and self.game.player:
-            self.game.player.current_region = region_id
-
-        self.available_chapters = self._discover_chapters(region_id)
-        self.current_chapter_id = self.available_chapters[0] if self.available_chapters else 1
-
-        self._create_layout()
-
-    def _prev_region(self):
-        if not self.available_regions:
-            return
-        try:
-            idx = self.available_regions.index(self.current_region_id)
-            if idx > 0:
-                self._change_region(self.available_regions[idx - 1])
-        except ValueError:
-            pass
-
-    def _next_region(self):
-        if not self.available_regions:
-            return
-        try:
-            idx = self.available_regions.index(self.current_region_id)
-            if idx < len(self.available_regions) - 1:
-                self._change_region(self.available_regions[idx + 1])
-        except ValueError:
-            pass
-
-    def _reset_progress(self):
-        if not DEBUG_MODE:
-            return
-        try:
-            self.progress.reset_progress()
-            self.catalog.refresh()
-        except Exception:
-            pass
-        self.refresh_data()
-
-    def _open_shop(self):
+    # =================================================================
+    # Navegação / Ações
+    # =================================================================
+    def _on_back(self, *_):
         sound_manager.play_effect(SoundEffect.CLICK)
+        sound_manager.stop_music(fade_ms=300)
+        self._music_started = False
+        self.game.current_scene = self.game.menu_scene
+
+    def _open_shop(self, *_):
+        sound_manager.play_effect(SoundEffect.CLICK)
+        from src.scenes.shop_scene.shop_scene import ShopScene
         self.game.shop_scene = ShopScene(self.game)
-        self.game.shop_scene.on_close_callback = self._on_shop_closed
         self.game.current_scene = self.game.shop_scene
 
-    def _open_npc_hall(self):
+    def _open_npc_hall(self, *_):
         sound_manager.play_effect(SoundEffect.CLICK)
         from src.scenes.npc_hall_scene.npc_hall_scene import NpcHallScene
         self.game.current_scene = NpcHallScene(self.game)
 
-    def _open_minigames(self):
+    def _open_minigame(self, *_):
         sound_manager.play_effect(SoundEffect.CLICK)
         from src.scenes.minigame_select_scene.minigame_select_scene import MinigameSelectScene
         self.game.current_scene = MinigameSelectScene(self.game)
 
-    def _open_pokedex(self):
+    def _open_pokedex(self, *_):
         sound_manager.play_effect(SoundEffect.CLICK)
+        from src.scenes.pokedex_scene.pokedex_scene import PokedexScene
         self.game.pokedex_scene = PokedexScene(self.game)
         self.game.current_scene = self.game.pokedex_scene
 
-    def _open_achievements(self):
+    def _open_achievements(self, *_):
         sound_manager.play_effect(SoundEffect.CLICK)
+        from src.scenes.achievement_scene.achievement_scene import AchievementScene
         self.game.achievement_scene = AchievementScene(self.game)
         self.game.current_scene = self.game.achievement_scene
 
-    def _open_incubator(self):
+    def _open_incubator(self, *_):
+        if not self.logic.is_incubator_unlocked():
+            sound_manager.play_effect(SoundEffect.ERROR)
+            return
         sound_manager.play_effect(SoundEffect.CLICK)
+        from src.scenes.incubator_scene.incubator_scene import IncubatorScene
         self.game.incubator_scene = IncubatorScene(self.game)
         self.game.current_scene = self.game.incubator_scene
 
-    def _open_profile(self):
+    def _open_profile(self, *_):
         sound_manager.play_effect(SoundEffect.CLICK)
         from src.scenes.profile_scene.profile_scene import ProfileScene
         sound_manager.stop_music(fade_ms=300)
+        self._music_started = False
         self.game.current_scene = ProfileScene(self.game, return_scene="phase_select")
 
-    def _open_mystery_gift(self):                                # <-- NOVO
+    def _open_mystery_gift(self, *_):
         sound_manager.play_effect(SoundEffect.CLICK)
         sound_manager.stop_music(fade_ms=300)
+        self._music_started = False
         from src.scenes.mystery_gift_scene.mystery_gift_scene import MysteryGiftScene
         self.game.current_scene = MysteryGiftScene(self.game)
 
-    def _on_shop_closed(self):
-        self.layout_initialized = False
-
+    # =================================================================
+    # Iniciar fase
+    # =================================================================
     def start_phase(self, phase_number):
         sound_manager.play_effect(SoundEffect.CLICK)
         sound_manager.stop_music(fade_ms=300)
+        self._music_started = False
+
+        from src.scenes.team_select_scene.team_select_scene import TeamSelectScene
 
         try:
             ts = TeamSelectScene(
-                self.game, self.current_chapter_id, phase_number,
-                region_id=self.current_region_id,
+                self.game,
+                self.logic.current_chapter_id,
+                phase_number,
+                region_id=self.logic.current_region_id,
             )
         except TypeError:
-            ts = TeamSelectScene(self.game, self.current_chapter_id, phase_number)
+            ts = TeamSelectScene(
+                self.game, self.logic.current_chapter_id, phase_number
+            )
 
         self.game.team_select_scene = ts
         self.game.current_scene = ts
 
-    # ======================================================================
-    # DEBUG
-    # ======================================================================
-    def _debug_unlock_next(self):
-        if not DEBUG_MODE or not self.phase_cards:
+    # =================================================================
+    # Eventos / Atalhos
+    # =================================================================
+    def handle_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self._on_back()
+                return True
+            if event.key == pygame.K_p:
+                self.toggle_pause()
+                return True
+            if event.key == pygame.K_LEFT:
+                self._cycle_region(-1)
+                return True
+            if event.key == pygame.K_RIGHT:
+                self._cycle_region(+1)
+                return True
+            if event.key == pygame.K_RETURN:
+                self._on_play()
+                return True
+
+            if DEBUG_MODE:
+                if event.key == pygame.K_r and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    self.logic.reset_progress()
+                    self._populate_static()
+                    return True
+                if event.key == pygame.K_u:
+                    self.logic.debug_unlock_next()
+                    self._feed_grid()
+                    self._update_detail()
+                    return True
+                if event.key == pygame.K_a:
+                    self.logic.debug_unlock_all()
+                    self._feed_grid()
+                    self._update_detail()
+                    return True
+
+            if event.key == pygame.K_s:
+                self._open_shop(); return True
+            if event.key == pygame.K_m:
+                self._open_minigame(); return True
+            if event.key == pygame.K_x:
+                self._open_pokedex(); return True
+            if event.key == pygame.K_c:
+                self._open_achievements(); return True
+            if event.key == pygame.K_i:
+                self._open_incubator(); return True
+            if event.key == pygame.K_v:
+                self._open_profile(); return True
+
+        super().handle_event(event)
+
+    def _cycle_region(self, delta: int):
+        ids = self.logic.available_regions
+        if not ids:
             return
-        for card in self.phase_cards:
-            if not card.unlocked:
-                try:
-                    self.progress.unlock_specific_phase(card.phase_id)
-                except Exception:
-                    pass
-                self._create_phase_cards()
-                return
-
-    def _debug_unlock_all(self):
-        if not DEBUG_MODE:
+        try:
+            i = ids.index(self.logic.current_region_id)
+        except ValueError:
             return
-        for rt in self.region_tabs:
-            chapters = self._discover_chapters(rt.region_id)
-            for ch in chapters:
-                phases = self._get_chapter_phases(rt.region_id, ch)
-                for p in phases:
-                    pid = make_phase_id(rt.region_id, ch, p["number"])
-                    try:
-                        self.progress.unlock_specific_phase(pid)
-                    except Exception:
-                        pass
-        self._create_phase_cards()
-
-    # ======================================================================
-    # UPDATE
-    # ======================================================================
-    def fixed_update(self, dt):
-        if self.paused:
-            return
-        self._animation_timer += dt
-
-        if abs(self.scroll_y - self.scroll_target) > 0.1:
-            self.scroll_y += (self.scroll_target - self.scroll_y) * min(1, dt * 10)
-            if self.phase_cards:
-                self._update_cards_position()
-
-        for card in self.phase_cards:
-            card.update(dt)
-        for tab in self.chapter_tabs:
-            tab.update(dt)
-        for rt in self.region_tabs:
-            rt.update(dt)
-
-    def _update_cards_position(self):
-        vx = self.screen_manager.viewport_x
-        vy = self.screen_manager.viewport_y
-        vw = self.screen_manager.viewport_width
-        vh = self.screen_manager.viewport_height
-
-        phases = self._get_chapter_phases(self.current_region_id, self.current_chapter_id)
-        if not phases or not self.phase_cards:
+        ni = max(0, min(len(ids) - 1, i + delta))
+        if ni == i:
             return
 
-        card_base_w = int(vw * 0.10)
-        card_margin = int(vw * 0.015)
-        avail_w = vw - int(vw * 0.08)
-        cols = max(2, min(5, avail_w // (card_base_w + card_margin)))
-        card_w = (avail_w - (cols - 1) * card_margin) // cols
-        card_w = max(int(vw * 0.07), min(int(vw * 0.12), card_w))
-        card_h = int(card_w * 1.25)
+        self.logic.set_region(ids[ni])
 
-        region_tab_h = int(vh * 0.055) if self.region_tabs else 0
-        tab_h = int(vh * 0.075) if self.chapter_tabs else 0
-        grid_start_y = vy + int(vh * 0.20) + region_tab_h + tab_h
-        grid_w = cols * card_w + (cols - 1) * card_margin
-        grid_start_x = vx + (vw - grid_w) // 2
+        rt = self.get("region_tabs")
+        if rt is not None:
+            rt.current_tab = self.logic.current_region_label()
 
-        for i, card in enumerate(self.phase_cards):
-            row = i // cols
-            col = i % cols
-            card.rect.x = grid_start_x + col * (card_w + card_margin)
-            card.rect.y = grid_start_y + row * (card_h + card_margin) - self.scroll_y
+        ct = self.get("chapter_tabs")
+        if ct is not None:
+            ct.tabs = self.logic.chapter_tab_labels()
+            ct.current_tab = self.logic.current_chapter_label()
 
-    # ======================================================================
-    # RENDER
-    # ======================================================================
-    def render(self, screen):
-        self._check_resize()
-        self._draw_gradient_background(screen)
+        self._update_region_badge()
+        self._feed_grid()
+        self._update_detail()
 
-        if not self.layout_initialized:
-            self._create_layout()
+    def on_back(self):
+        self._on_back()
 
-        vx = self.screen_manager.viewport_x
-        vy = self.screen_manager.viewport_y
-        vw = self.screen_manager.viewport_width
-        vh = self.screen_manager.viewport_height
-
-        title = self.title_font.render("SELECIONAR FASE", True, (255, 255, 255))
-        tsh = self.title_font.render("SELECIONAR FASE", True, (30, 30, 45))
-        tx = vx + (vw - title.get_width()) // 2
-        ty = vy + 15
-        screen.blit(tsh, (tx + 2, ty + 2))
-        screen.blit(title, (tx, ty))
-
-        bw = int(vw * 0.15)
-        bx = vx + (vw - bw) // 2
-        by = ty + title.get_height() + 6
-        pygame.draw.rect(screen, (100, 85, 55), (bx, by, bw, 3), border_radius=2)
-
-        self._render_button(screen, self.back_button_rect, "<", self.back_button_hovered)
-
-        # ===== LINHA 1 =====
-        self._render_bottom_button(screen, self.shop_button_rect, "LOJA", self.shop_button_hovered)
-        self._render_bottom_button(screen, self.npc_hall_button_rect, "NPC HALL", self.npc_hall_button_hovered)
-        self._render_bottom_button(screen, self.minigame_button_rect, "MINIGAMES", self.minigame_button_hovered)
-        self._render_bottom_button(screen, self.pokedex_button_rect, "POKEDEX", self.pokedex_button_hovered)
-
-        # ===== LINHA 2 =====
-        self._render_bottom_button(screen, self.achievement_button_rect, "CONQUISTAS", self.achievement_button_hovered)
-        self._render_bottom_button(screen, self.incubator_button_rect, "INCUBADORA", self.incubator_button_hovered, not self._is_incubator_unlocked())
-        self._render_bottom_button(screen, self.profile_button_rect, "PERFIL", self.profile_button_hovered)
-        self._render_bottom_button(screen, self.mystery_gift_button_rect, "MYSTERY GIFT", self.mystery_gift_button_hovered)   # <-- NOVO
-
-        for rt in self.region_tabs:
-            rt.render(screen, self.tab_font)
-
-        for tab in self.chapter_tabs:
-            tab.render(screen, self.tab_font)
-
-        if self.chapter_tabs:
-            line_y = self.chapter_tabs[0].rect.bottom + 12
-            line_w = int(vw * 0.3)
-            line_x = vx + (vw - line_w) // 2
-            pygame.draw.line(screen, (70, 70, 80),
-                             (line_x, line_y), (line_x + line_w, line_y), 1)
-
-            phases = self._get_chapter_phases(self.current_region_id, self.current_chapter_id)
-            if phases:
-                rname = RegionCatalog.get_name(self.current_region_id)
-                total_text = f"{rname} - {len(phases)} fases disponiveis"
-                total_s = self.tab_font.render(total_text, True, (180, 180, 190))
-                total_x = vx + (vw - total_s.get_width()) // 2
-                total_y = line_y + 8
-                screen.blit(total_s, (total_x, total_y))
-
-                l2_y = total_y + 20
-                pygame.draw.line(screen, (70, 70, 80),
-                                 (line_x, l2_y), (line_x + line_w, l2_y), 1)
-
-        region_tab_h = int(vh * 0.055) if self.region_tabs else 0
-        tab_h = int(vh * 0.075) if self.chapter_tabs else 0
-        clip_rect = pygame.Rect(
-            vx,
-            vy + int(vh * 0.20) + region_tab_h + tab_h,
-            vw,
-            vh - int(vh * 0.20) - region_tab_h - tab_h - int(vh * 0.20)
-        )
-
-        old_clip = screen.get_clip()
-        screen.set_clip(clip_rect)
-        for card in self.phase_cards:
-            if card.rect.bottom > clip_rect.top and card.rect.top < clip_rect.bottom:
-                card.render(screen, self.phase_font_large, self.phase_font_small, self.phase_font_name)
-        screen.set_clip(old_clip)
-
-        if self.max_scroll > 0:
-            self._render_scroll_bar(screen)
-
-        font_small = pygame.font.Font(None, 16)
-        inst_text = "SETAS TROCAM REGIAO | CLIQUE NA FASE | ESC VOLTAR"
-        if DEBUG_MODE:
-            inst_text += " | [U] proxima | [A] todas"
-        inst = font_small.render(inst_text, True, (100, 100, 120))
-        ix = vx + (vw - inst.get_width()) // 2
-        iy = vy + vh - 18
-        screen.blit(inst, (ix, iy))
-
-        if DEBUG_MODE:
-            dbg = font_small.render("CTRL+R resetar progresso", True, (60, 60, 70))
-            screen.blit(dbg, (vx + 15, vy + vh - 40))
-
-        if self.paused:
-            self._render_pause_overlay(screen)
-
-    def _render_button(self, screen, rect, text, hovered):
-        if not rect:
-            return
-        sh = rect.copy(); sh.y += 3
-        pygame.draw.rect(screen, (10, 10, 15), sh, border_radius=8)
-        if hovered:
-            bg, bc, tc = (70, 70, 80), (160, 160, 180), (255, 255, 255)
-        else:
-            bg, bc, tc = (45, 45, 55), (90, 90, 105), (200, 200, 210)
-        pygame.draw.rect(screen, bg, rect, border_radius=8)
-        pygame.draw.rect(screen, bc, rect, 2, border_radius=8)
-        f = pygame.font.Font(None, int(rect.height * 0.6))
-        t = f.render(text, True, tc)
-        screen.blit(t, t.get_rect(center=rect.center))
-
-    def _render_bottom_button(self, screen, rect, text, hovered, locked=False):
-        if not rect:
-            return
-        sh = rect.copy(); sh.y += 3
-        pygame.draw.rect(screen, (10, 10, 15), sh, border_radius=8)
-        if locked:
-            bg, bc, tc = (35, 35, 40), (60, 60, 65), (80, 80, 85)
-        elif hovered:
-            bg, bc, tc = (70, 70, 85), (160, 160, 190), (255, 255, 255)
-        else:
-            bg, bc, tc = (50, 50, 60), (100, 100, 120), (220, 220, 230)
-        pygame.draw.rect(screen, bg, rect, border_radius=8)
-        pygame.draw.rect(screen, bc, rect, 2, border_radius=8)
-        f = pygame.font.Font(None, int(rect.height * 0.4))
-        t = f.render(text, True, tc)
-        screen.blit(t, t.get_rect(center=rect.center))
-        if locked:
-            lf = pygame.font.Font(None, int(rect.height * 0.3))
-            lt = lf.render("Complete 1-5", True, (70, 70, 75))
-            screen.blit(lt, lt.get_rect(center=(rect.centerx, rect.bottom + 14)))
-
-    def _render_scroll_bar(self, screen):
-        if self.max_scroll <= 0:
-            return
-        x, y, width, height = self._get_scroll_bar_area()
-        sh = max(30, height * (height / (height + self.max_scroll)))
-        sp = y + (self.scroll_y / self.max_scroll) * (height - sh)
-        pygame.draw.rect(screen, (30, 30, 38), (x, y, width, height), border_radius=4)
-        sr = pygame.Rect(x, sp, width, sh)
-        c = (120, 120, 140) if self.dragging_scroll else (80, 80, 95)
-        pygame.draw.rect(screen, c, sr, border_radius=4)
-        pygame.draw.rect(screen, (150, 150, 170), sr, 1, border_radius=4)
-
-    def _get_scroll_bar_area(self):
-        vx = self.screen_manager.viewport_x
-        vy = self.screen_manager.viewport_y
-        vw = self.screen_manager.viewport_width
-        vh = self.screen_manager.viewport_height
-        region_tab_h = int(vh * 0.055) if self.region_tabs else 0
-        tab_h = int(vh * 0.075) if self.chapter_tabs else 0
-        return (vx + vw - 14, vy + int(vh * 0.20) + region_tab_h + tab_h,
-                8, vh - int(vh * 0.20) - region_tab_h - tab_h - int(vh * 0.20))
-
-    def _get_scroll_bar_rect(self):
-        if self.max_scroll <= 0:
-            return None
-        x, y, w, h = self._get_scroll_bar_area()
-        sh = max(30, h * (h / (h + self.max_scroll)))
-        sp = y + (self.scroll_y / self.max_scroll) * (h - sh)
-        return pygame.Rect(x, sp, w, sh)
-
-    def _draw_gradient_background(self, screen):
-        width = self.screen_manager.window_width
-        height = self.screen_manager.window_height
-        for i in range(height):
-            t = i / height
-            r = int(10 + t * 20)
-            g = int(12 + t * 25)
-            b = int(25 + t * 35)
-            pygame.draw.line(screen, (r, g, b), (0, i), (width, i))
-
-        vx = self.screen_manager.viewport_x
-        vy = self.screen_manager.viewport_y
-        vw = self.screen_manager.viewport_width
-        vh = self.screen_manager.viewport_height
-
-        star_positions = [
-            (0.03, 0.03), (0.08, 0.08), (0.15, 0.05), (0.22, 0.10),
-            (0.30, 0.04), (0.38, 0.12), (0.45, 0.06), (0.52, 0.09),
-            (0.60, 0.04), (0.68, 0.11), (0.75, 0.05), (0.82, 0.08),
-            (0.90, 0.07), (0.95, 0.10), (0.05, 0.15), (0.12, 0.18),
-            (0.88, 0.17), (0.93, 0.22), (0.02, 0.25), (0.98, 0.28),
-        ]
-        for i, (rx, ry) in enumerate(star_positions):
-            x = vx + int(rx * vw)
-            y = vy + int(ry * vh)
-            size = 1 + int(((i * 5) % 2))
-            color = (200 + int(55 * (self._animation_timer * 0.3 + i) % 1),
-                     200 + int(55 * (self._animation_timer * 0.4 + i + 1) % 1),
-                     255)
-            pygame.draw.circle(screen, color, (x, y), size)
-
-    def _render_pause_overlay(self, screen):
-        ov = pygame.Surface((self.screen_manager.window_width,
-                             self.screen_manager.window_height))
-        ov.set_alpha(180)
-        ov.fill((10, 10, 10))
-        screen.blit(ov, (0, 0))
-        f = pygame.font.Font(None, 74)
-        t = f.render("PAUSADO", True, (200, 200, 200))
-        screen.blit(t, t.get_rect(center=(self.screen_manager.window_width // 2,
-                                          self.screen_manager.window_height // 2)))
-
-    def _start_phase_select_music(self):
-        if not self._music_started:
-            if sound_manager.play_team_select_music(loop=True):
-                self._music_started = True
-            else:
-                if sound_manager.play_menu_music("Title_Theme", loop=True):
-                    self._music_started = True
-
+    # =================================================================
+    # Ciclo de vida
+    # =================================================================
     def on_enter(self):
+        # Recarrega progresso (pode ter mudado após voltar de uma fase)
+        self.logic.refresh_all()
+        self._populate_static()
+
         if not self._music_started or not pygame.mixer.music.get_busy():
             self._start_phase_select_music()
-        self.layout_initialized = False
 
     def on_exit(self):
         sound_manager.stop_music(fade_ms=300)
         self._music_started = False
+
+    def _start_phase_select_music(self):
+        if self._music_started:
+            return
+        if sound_manager.play_team_select_music(loop=True):
+            self._music_started = True
+        elif sound_manager.play_menu_music("Title_Theme", loop=True):
+            self._music_started = True
+
+    # =================================================================
+    # Resize — repopula bindings após rebuild dos widgets
+    # =================================================================
+    def on_resize(self):
+        super().on_resize()
+        self._populate_static()

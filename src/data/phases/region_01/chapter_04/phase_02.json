@@ -1070,9 +1070,9 @@
                         2,
                         2,
                         4266,
-                        4291,
-                        4264,
-                        4290,
+                        4288,
+                        4288,
+                        4288,
                         4288,
                         4272,
                         2,
@@ -3328,25 +3328,25 @@
                         0
                     ],
                     [
-                        4381,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4360,
-                        4383,
+                        4362,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4384,
+                        4368,
                         0,
                         524,
                         0,
@@ -6892,22 +6892,69 @@
                 "path_index": 0,
                 "name": "Wave 1",
                 "enabled": true,
-                "enemies": [],
-                "min_level": 1,
-                "max_level": 5,
+                "enemies": [
+                    {
+                        "pokemon_id": 79,
+                        "percentage": 25.0
+                    },
+                    {
+                        "pokemon_id": 23,
+                        "percentage": 25.0
+                    },
+                    {
+                        "pokemon_id": 27,
+                        "percentage": 25.0
+                    },
+                    {
+                        "pokemon_id": 213,
+                        "percentage": 25.0
+                    }
+                ],
+                "min_level": 16,
+                "max_level": 20,
                 "wave_size": 10,
-                "spawn_interval": 3.0,
-                "initial_delay": 2.0,
-                "repeat_wave": false,
-                "repeat_count": 1,
-                "template_id": null,
+                "spawn_interval": 2.0,
+                "initial_delay": 10.0,
+                "repeat_wave": true,
+                "repeat_count": 3,
+                "template_id": "template_2091",
                 "use_variants": false,
                 "variants": []
             }
         ],
         "selected_wave": 0,
         "templates": {
-            "templates": []
+            "templates": [
+                {
+                    "template_id": "template_2091",
+                    "name": "Template 1",
+                    "enemies": [
+                        {
+                            "pokemon_id": 79,
+                            "percentage": 25.0
+                        },
+                        {
+                            "pokemon_id": 23,
+                            "percentage": 25.0
+                        },
+                        {
+                            "pokemon_id": 27,
+                            "percentage": 25.0
+                        },
+                        {
+                            "pokemon_id": 213,
+                            "percentage": 25.0
+                        }
+                    ],
+                    "min_level": 16,
+                    "max_level": 20,
+                    "wave_size": 10,
+                    "spawn_interval": 2.0,
+                    "initial_delay": 10.0,
+                    "repeat_wave": true,
+                    "repeat_count": 3
+                }
+            ]
         }
     },
     "tower_spots": {

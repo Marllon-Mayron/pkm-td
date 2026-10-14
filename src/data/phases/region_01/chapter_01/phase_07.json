@@ -356,6 +356,107 @@
                 "width": 15,
                 "height": 20,
                 "tile_size": 16,
+                "autotile_tilesets": [
+                    {
+                        "local_id": 1,
+                        "start_id": 1153,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bike_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 2,
+                        "start_id": 1201,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_brick_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 3,
+                        "start_id": 1249,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 4,
+                        "start_id": 1297,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 5,
+                        "start_id": 1345,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_cave_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 6,
+                        "start_id": 1393,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_dirt_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 7,
+                        "start_id": 1441,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_gravel_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 8,
+                        "start_id": 1489,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 9,
+                        "start_id": 1537,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 10,
+                        "start_id": 1585,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_water_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 11,
+                        "start_id": 1633,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_white_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    }
+                ],
                 "tileset_paths": [
                     "res/AllTiles/Tilesets/GymInsideFireRed.png"
                 ]
@@ -708,6 +809,107 @@
                 "width": 15,
                 "height": 20,
                 "tile_size": 16,
+                "autotile_tilesets": [
+                    {
+                        "local_id": 1,
+                        "start_id": 1153,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bike_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 2,
+                        "start_id": 1201,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_brick_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 3,
+                        "start_id": 1249,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 4,
+                        "start_id": 1297,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 5,
+                        "start_id": 1345,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_cave_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 6,
+                        "start_id": 1393,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_dirt_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 7,
+                        "start_id": 1441,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_gravel_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 8,
+                        "start_id": 1489,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 9,
+                        "start_id": 1537,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 10,
+                        "start_id": 1585,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_water_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 11,
+                        "start_id": 1633,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_white_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    }
+                ],
                 "tileset_paths": [
                     "res/AllTiles/Tilesets/GymInsideFireRed.png"
                 ]
@@ -1060,6 +1262,107 @@
                 "width": 15,
                 "height": 20,
                 "tile_size": 16,
+                "autotile_tilesets": [
+                    {
+                        "local_id": 1,
+                        "start_id": 1153,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bike_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 2,
+                        "start_id": 1201,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_brick_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 3,
+                        "start_id": 1249,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 4,
+                        "start_id": 1297,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 5,
+                        "start_id": 1345,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_cave_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 6,
+                        "start_id": 1393,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_dirt_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 7,
+                        "start_id": 1441,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_gravel_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 8,
+                        "start_id": 1489,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 9,
+                        "start_id": 1537,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 10,
+                        "start_id": 1585,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_water_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 11,
+                        "start_id": 1633,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_white_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    }
+                ],
                 "tileset_paths": [
                     "res/AllTiles/Tilesets/GymInsideFireRed.png"
                 ]
@@ -1076,7 +1379,7 @@
                     ],
                     [
                         120,
-                        104
+                        72
                     ],
                     [
                         120,
@@ -1093,7 +1396,7 @@
                     ],
                     [
                         120,
-                        104
+                        72
                     ],
                     [
                         120,
@@ -1118,8 +1421,8 @@
                         "percentage": 100.0
                     }
                 ],
-                "min_level": 11,
-                "max_level": 11,
+                "min_level": 10,
+                "max_level": 10,
                 "wave_size": 1,
                 "spawn_interval": 3.0,
                 "initial_delay": 6.0,
@@ -1137,14 +1440,14 @@
                 "enemies": [
                     {
                         "pokemon_id": 95,
-                        "percentage": 0.0
+                        "percentage": 100.0
                     }
                 ],
-                "min_level": 13,
-                "max_level": 13,
+                "min_level": 12,
+                "max_level": 12,
                 "wave_size": 1,
                 "spawn_interval": 3.0,
-                "initial_delay": 10.0,
+                "initial_delay": 15.0,
                 "repeat_wave": false,
                 "repeat_count": 1,
                 "template_id": null,

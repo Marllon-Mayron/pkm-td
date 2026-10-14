@@ -48,8 +48,11 @@ class LevelCompleteLogic:
             self.xp_in_level = 0
             self.xp_span = 100
 
-        # --- Próxima fase ---
-        self.next_phase = progress_manager.get_next_phase(self.phase_id)
+        # ===== Próxima fase =====
+        # Usamos SEMPRE (region, chapter, phase) como tupla canônica,
+        # descoberta via phase_catalog — não dependemos do formato do
+        # progress_manager (que devolve strings como "01-02-03").
+        self.next_phase = self._compute_next_phase()   # (region, ch, ph) ou None
         self.has_next_phase = self.next_phase is not None
 
         # --- Pokémon da fase ---
@@ -63,6 +66,41 @@ class LevelCompleteLogic:
 
         # --- Snapshot para retry ---
         self.placement_snapshot = self._capture_placement_snapshot()
+
+    # =================================================================
+    # DESCOBERTA DA PRÓXIMA FASE
+    # =================================================================
+    def _compute_next_phase(self):
+        """
+        Descobre a próxima fase a partir da fase atual.
+        Retorna (region, chapter, phase) ou None.
+
+        Lógica:
+          1) tenta (chapter, phase + 1) na mesma região
+          2) se não existir, tenta o próximo capítulo (phase 1)
+          3) se nada existir, retorna None
+        """
+        gs = self.game_scene
+        region = getattr(gs, "region_id", 1)
+        chapter = getattr(gs, "chapter_id", 1)
+        phase = getattr(gs, "phase_number", 1)
+
+        # 1) Próxima fase do mesmo capítulo
+        try:
+            if phase_catalog.get_phase_info(region, chapter, phase + 1):
+                return (region, chapter, phase + 1)
+        except Exception:
+            pass
+
+        # 2) Próximo capítulo, fase 1 (limite generoso)
+        for c in range(chapter + 1, chapter + 32):
+            try:
+                if phase_catalog.get_phase_info(region, c, 1):
+                    return (region, c, 1)
+            except Exception:
+                continue
+
+        return None
 
     # =================================================================
     def _capture_placement_snapshot(self):
@@ -117,16 +155,16 @@ class LevelCompleteLogic:
         return self.stars, 3
 
     def get_next_phase_text(self):
-        if not self.next_phase:
-            return "Última fase do capítulo!"
+        if self.next_phase is None:
+            return "Última fase!"
+        region, chapter, phase = self.next_phase
         try:
-            chapter, phase = map(int, self.next_phase.split("-"))
-            info = phase_catalog.get_phase_info(chapter, phase)
+            info = phase_catalog.get_phase_info(region, chapter, phase)
             if info:
                 return f"Próxima fase: {info['name']}"
         except Exception:
             pass
-        return f"Próxima fase: {self.next_phase}"
+        return f"Próxima fase: {chapter}-{phase}"
 
     def get_pokemon_ids(self):
         return list(self.pokemon_ids)
@@ -157,29 +195,36 @@ class LevelCompleteLogic:
             self.game.current_scene = new_scene
             return "retry"
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"[LEVEL_COMPLETE] retry falhou: {e}")
             return "menu"
 
     def advance(self):
         """Avança para a próxima fase/capítulo."""
-        if not self.next_phase:
-            return "menu"
-        print(f"[LEVEL_COMPLETE] Avançando para {self.next_phase}")
+        if self.next_phase is None:
+            print("[LEVEL_COMPLETE] Sem próxima fase — indo para o menu")
+            return self.quit_to_menu()
+
+        region, chapter, phase = self.next_phase
+        print(f"[LEVEL_COMPLETE] Avançando para {region}:{chapter}-{phase}")
+
         try:
-            chapter, phase = map(int, self.next_phase.split("-"))
             from src.scenes.game_scene.game_scene import GameScene
             self.game_scene.cleanup()
             new_scene = GameScene(
                 self.game,
                 chapter,
                 phase,
-                region_id=self.game_scene.region_id,
+                region_id=region,
             )
             self.game.current_scene = new_scene
             return "advanced"
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"[LEVEL_COMPLETE] advance falhou: {e}")
-            return "menu"
+            return self.quit_to_menu()
 
     def quit_to_menu(self):
         print("[LEVEL_COMPLETE] Voltando para phase select")
@@ -191,5 +236,7 @@ class LevelCompleteLogic:
             self.game.current_scene = ps
             return "menu"
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"[LEVEL_COMPLETE] menu falhou: {e}")
             return "menu"

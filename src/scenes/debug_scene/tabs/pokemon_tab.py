@@ -214,6 +214,26 @@ class PokemonTab:
         for i, _ in enumerate(player.pc_box):
             self.edit_targets.append({"source": "box", "index": i})
 
+    def refresh(self):
+        """Recria alvos de edição e limpa caches (chamado ao trocar slot)."""
+        self._refresh_edit_targets()
+        self.list_scroll = 0
+        self.edit_scroll = 0
+        self.list_selected = 0
+        self.edit_selected = 0
+        self.search_text = ""
+        self._apply_search()
+        self.focused_input = None
+        self._close_move_picker()
+        # Se estava em modo EDIT e não há mais alvos, volta pra CREATE
+        if self.mode == self.MODE_EDIT and not self.edit_targets:
+            self.mode = self.MODE_CREATE
+            self.edit_form = None
+        elif self.mode == self.MODE_EDIT:
+            self.edit_selected = min(self.edit_selected,
+                                     len(self.edit_targets) - 1)
+            self._load_edit_form()
+
     def _apply_search(self):
         q = self.search_text.strip().lower()
         if not q:

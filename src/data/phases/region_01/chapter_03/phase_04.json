@@ -98,7 +98,7 @@
                         302,
                         302,
                         303,
-                        304,
+                        302,
                         302,
                         302,
                         302,
@@ -117,7 +117,7 @@
                         302,
                         302,
                         303,
-                        304,
+                        302,
                         302,
                         302,
                         302,
@@ -136,7 +136,7 @@
                         302,
                         302,
                         303,
-                        304,
+                        302,
                         302,
                         302,
                         302,
@@ -155,7 +155,7 @@
                         302,
                         302,
                         303,
-                        304,
+                        302,
                         302,
                         302,
                         302,
@@ -174,7 +174,7 @@
                         302,
                         302,
                         303,
-                        304,
+                        302,
                         302,
                         302,
                         302,
@@ -193,7 +193,7 @@
                         302,
                         302,
                         303,
-                        304,
+                        302,
                         302,
                         302,
                         302,
@@ -212,7 +212,7 @@
                         302,
                         302,
                         303,
-                        304,
+                        302,
                         302,
                         302,
                         302,
@@ -231,7 +231,7 @@
                         302,
                         302,
                         303,
-                        304,
+                        302,
                         302,
                         302,
                         302,
@@ -250,26 +250,7 @@
                         302,
                         302,
                         303,
-                        304,
                         302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        238
-                    ],
-                    [
-                        233,
-                        304,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        303,
-                        304,
                         302,
                         302,
                         302,
@@ -288,26 +269,7 @@
                         302,
                         302,
                         303,
-                        304,
                         302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        238
-                    ],
-                    [
-                        233,
-                        304,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        303,
-                        304,
                         302,
                         302,
                         302,
@@ -326,26 +288,7 @@
                         302,
                         302,
                         303,
-                        304,
                         302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        238
-                    ],
-                    [
-                        233,
-                        304,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        303,
-                        304,
                         302,
                         302,
                         302,
@@ -364,26 +307,7 @@
                         302,
                         302,
                         303,
-                        304,
                         302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        238
-                    ],
-                    [
-                        233,
-                        304,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        302,
-                        303,
-                        304,
                         302,
                         302,
                         302,
@@ -402,7 +326,7 @@
                         302,
                         302,
                         303,
-                        304,
+                        302,
                         302,
                         302,
                         302,
@@ -421,7 +345,83 @@
                         302,
                         302,
                         303,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        238
+                    ],
+                    [
+                        233,
                         304,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        303,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        238
+                    ],
+                    [
+                        233,
+                        304,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        303,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        238
+                    ],
+                    [
+                        233,
+                        304,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        303,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        238
+                    ],
+                    [
+                        233,
+                        304,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        302,
+                        303,
+                        302,
                         302,
                         302,
                         302,
@@ -440,7 +440,7 @@
                         242,
                         302,
                         303,
-                        304,
+                        302,
                         244,
                         245,
                         245,
@@ -453,6 +453,107 @@
                 "width": 17,
                 "height": 23,
                 "tile_size": 16,
+                "autotile_tilesets": [
+                    {
+                        "local_id": 1,
+                        "start_id": 1153,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bike_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 2,
+                        "start_id": 1201,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_brick_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 3,
+                        "start_id": 1249,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 4,
+                        "start_id": 1297,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 5,
+                        "start_id": 1345,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_cave_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 6,
+                        "start_id": 1393,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_dirt_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 7,
+                        "start_id": 1441,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_gravel_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 8,
+                        "start_id": 1489,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 9,
+                        "start_id": 1537,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 10,
+                        "start_id": 1585,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_water_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 11,
+                        "start_id": 1633,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_white_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    }
+                ],
                 "tileset_paths": [
                     "res/AllTiles/Tilesets/GymInsideFireRed.png"
                 ]
@@ -773,9 +874,9 @@
                         247,
                         0,
                         247,
+                        278,
                         0,
-                        0,
-                        0,
+                        278,
                         247,
                         0,
                         247,
@@ -792,9 +893,9 @@
                         0,
                         0,
                         0,
+                        286,
                         0,
-                        0,
-                        0,
+                        286,
                         0,
                         0,
                         0,
@@ -811,9 +912,9 @@
                         0,
                         0,
                         0,
+                        294,
                         0,
-                        0,
-                        0,
+                        294,
                         0,
                         0,
                         0,
@@ -902,13 +1003,114 @@
                 "width": 17,
                 "height": 23,
                 "tile_size": 16,
+                "autotile_tilesets": [
+                    {
+                        "local_id": 1,
+                        "start_id": 1153,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bike_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 2,
+                        "start_id": 1201,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_brick_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 3,
+                        "start_id": 1249,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 4,
+                        "start_id": 1297,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 5,
+                        "start_id": 1345,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_cave_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 6,
+                        "start_id": 1393,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_dirt_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 7,
+                        "start_id": 1441,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_gravel_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 8,
+                        "start_id": 1489,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 9,
+                        "start_id": 1537,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 10,
+                        "start_id": 1585,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_water_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 11,
+                        "start_id": 1633,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_white_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    }
+                ],
                 "tileset_paths": [
                     "res/AllTiles/Tilesets/GymInsideFireRed.png"
                 ]
             },
             {
                 "name": "Teto",
-                "type": "ceiling",
+                "type": "decoration",
                 "tiles": [
                     [
                         0,
@@ -1241,9 +1443,9 @@
                         0,
                         0,
                         0,
+                        232,
                         0,
-                        0,
-                        0,
+                        232,
                         0,
                         0,
                         0,
@@ -1260,9 +1462,9 @@
                         0,
                         0,
                         2,
+                        240,
                         0,
-                        0,
-                        0,
+                        240,
                         2,
                         0,
                         0,
@@ -1279,9 +1481,9 @@
                         0,
                         0,
                         0,
+                        248,
                         0,
-                        0,
-                        0,
+                        248,
                         0,
                         0,
                         0,
@@ -1351,6 +1553,107 @@
                 "width": 17,
                 "height": 23,
                 "tile_size": 16,
+                "autotile_tilesets": [
+                    {
+                        "local_id": 1,
+                        "start_id": 1153,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bike_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 2,
+                        "start_id": 1201,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_brick_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 3,
+                        "start_id": 1249,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 4,
+                        "start_id": 1297,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_bronw_cave_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 5,
+                        "start_id": 1345,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_cave_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 6,
+                        "start_id": 1393,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_dirt_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 7,
+                        "start_id": 1441,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_gravel_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 8,
+                        "start_id": 1489,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_mountain_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 9,
+                        "start_id": 1537,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_sand_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 10,
+                        "start_id": 1585,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_water_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    },
+                    {
+                        "local_id": 11,
+                        "start_id": 1633,
+                        "count": 48,
+                        "sheet_path": "C:\\Users\\Marllon\\PycharmProjects\\pkm-td\\res\\AllTiles\\Autotile\\autotile_white_path_16.png",
+                        "cell_size": 16,
+                        "cols": 8,
+                        "rows": 6
+                    }
+                ],
                 "tileset_paths": [
                     "res/AllTiles/Tilesets/GymInsideFireRed.png"
                 ]
@@ -1360,7 +1663,20 @@
     "paths": {
         "paths": [
             {
-                "nodes": [],
+                "nodes": [
+                    [
+                        136,
+                        360
+                    ],
+                    [
+                        136,
+                        40
+                    ],
+                    [
+                        136,
+                        360
+                    ]
+                ],
                 "closed": false
             }
         ],
@@ -1373,12 +1689,61 @@
                 "path_index": 0,
                 "name": "Wave 1",
                 "enabled": true,
-                "enemies": [],
-                "min_level": 1,
-                "max_level": 5,
-                "wave_size": 10,
+                "enemies": [
+                    {
+                        "pokemon_id": 25,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 18,
+                "max_level": 18,
+                "wave_size": 1,
                 "spawn_interval": 3.0,
-                "initial_delay": 2.0,
+                "initial_delay": 10.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
+            },
+            {
+                "wave_index": 1,
+                "path_index": 0,
+                "name": "Wave 2",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 100,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 21,
+                "max_level": 21,
+                "wave_size": 1,
+                "spawn_interval": 3.0,
+                "initial_delay": 10.0,
+                "repeat_wave": false,
+                "repeat_count": 1,
+                "template_id": null,
+                "use_variants": false,
+                "variants": []
+            },
+            {
+                "wave_index": 2,
+                "path_index": 0,
+                "name": "Wave 3",
+                "enabled": true,
+                "enemies": [
+                    {
+                        "pokemon_id": 26,
+                        "percentage": 100.0
+                    }
+                ],
+                "min_level": 24,
+                "max_level": 24,
+                "wave_size": 1,
+                "spawn_interval": 3.0,
+                "initial_delay": 15.0,
                 "repeat_wave": false,
                 "repeat_count": 1,
                 "template_id": null,
@@ -1386,7 +1751,7 @@
                 "variants": []
             }
         ],
-        "selected_wave": 0,
+        "selected_wave": 2,
         "templates": {
             "templates": []
         }
@@ -1397,36 +1762,6 @@
         "snap_to_grid": true,
         "spots": [
             {
-                "x": 80,
-                "y": 240,
-                "size": 16,
-                "allowed_types": []
-            },
-            {
-                "x": 80,
-                "y": 208,
-                "size": 16,
-                "allowed_types": []
-            },
-            {
-                "x": 176,
-                "y": 208,
-                "size": 16,
-                "allowed_types": []
-            },
-            {
-                "x": 176,
-                "y": 240,
-                "size": 16,
-                "allowed_types": []
-            },
-            {
-                "x": 80,
-                "y": 128,
-                "size": 16,
-                "allowed_types": []
-            },
-            {
                 "x": 160,
                 "y": 128,
                 "size": 16,
@@ -1439,8 +1774,54 @@
                 "allowed_types": []
             },
             {
-                "x": 80,
+                "x": 160,
+                "y": 208,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 96,
+                "y": 208,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 96,
+                "y": 128,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 96,
                 "y": 96,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 112,
+                "y": 272,
+                "size": 16,
+                "allowed_types": [
+                    "electric"
+                ]
+            },
+            {
+                "x": 144,
+                "y": 272,
+                "size": 16,
+                "allowed_types": [
+                    "electric"
+                ]
+            },
+            {
+                "x": 96,
+                "y": 176,
+                "size": 16,
+                "allowed_types": []
+            },
+            {
+                "x": 160,
+                "y": 176,
                 "size": 16,
                 "allowed_types": []
             }
