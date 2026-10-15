@@ -18911,12 +18911,25 @@
         "selected_trigger": 0
     },
     "rewards": {
-        "money": 100,
-        "experience": 50,
-        "item_rewards": [],
-        "drop_chance": 0.0,
+        "money": 150,
+        "experience": 100,
+        "item_rewards": [
+            {
+                "item_id": "helix_fossil",
+                "weight": 33
+            },
+            {
+                "item_id": "dome_fossil",
+                "weight": 33
+            },
+            {
+                "item_id": "old_amber",
+                "weight": 34
+            }
+        ],
+        "drop_chance": 0.01,
         "max_items": 3,
-        "template_name": null
+        "template_name": "Fosseis"
     },
     "localization_type": "default",
     "custom_folder": "",

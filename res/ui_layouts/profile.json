@@ -209,7 +209,7 @@
       "x": 0.30, "y": 0.11, "w": 0.40, "h": 0.657, "anchor": "tl",
       "fill_color": "#0B1020",
       "fill_alpha": 255,
-      "bg_image": "Maps/bedroom.png",
+      "bg_image": "PokemonSprites/UI/Maps/bedroom.png",
       "bg_image_mode": "cover",
       "bg_image_alpha": 255,
       "pixel_art": true,

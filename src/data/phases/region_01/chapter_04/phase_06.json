@@ -1917,11 +1917,20 @@
         "selected_trigger": 0
     },
     "rewards": {
-        "money": 100,
-        "experience": 50,
-        "item_rewards": [],
-        "drop_chance": 0.0,
-        "max_items": 3,
+        "money": 300,
+        "experience": 300,
+        "item_rewards": [
+            {
+                "item_id": "leafstone",
+                "weight": 50
+            },
+            {
+                "item_id": "sunstone",
+                "weight": 50
+            }
+        ],
+        "drop_chance": 0.01,
+        "max_items": 1,
         "template_name": null
     },
     "localization_type": "default",

@@ -2035,12 +2035,21 @@
         "selected_trigger": 0
     },
     "rewards": {
-        "money": 100,
-        "experience": 50,
-        "item_rewards": [],
-        "drop_chance": 0.0,
+        "money": 200,
+        "experience": 200,
+        "item_rewards": [
+            {
+                "item_id": "potion",
+                "weight": 60
+            },
+            {
+                "item_id": "pokeball",
+                "weight": 40
+            }
+        ],
+        "drop_chance": 0.01,
         "max_items": 3,
-        "template_name": null
+        "template_name": "Basico"
     },
     "localization_type": "default",
     "custom_folder": "",

@@ -2129,8 +2129,8 @@
         "selected_trigger": 0
     },
     "rewards": {
-        "money": 100,
-        "experience": 50,
+        "money": 250,
+        "experience": 250,
         "item_rewards": [],
         "drop_chance": 0.0,
         "max_items": 3,

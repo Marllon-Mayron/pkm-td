@@ -2643,8 +2643,8 @@
         "selected_trigger": 0
     },
     "rewards": {
-        "money": 100,
-        "experience": 50,
+        "money": 250,
+        "experience": 300,
         "item_rewards": [
             {
                 "item_id": "pokeflute",

@@ -3057,11 +3057,16 @@
         "selected_trigger": 0
     },
     "rewards": {
-        "money": 100,
-        "experience": 50,
-        "item_rewards": [],
-        "drop_chance": 0.0,
-        "max_items": 3,
+        "money": 250,
+        "experience": 250,
+        "item_rewards": [
+            {
+                "item_id": "waterstone",
+                "weight": 100
+            }
+        ],
+        "drop_chance": 0.01,
+        "max_items": 1,
         "template_name": null
     },
     "localization_type": "default",

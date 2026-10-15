@@ -3223,7 +3223,7 @@ class GameScene(BaseScene):
         self.player.auto_save()
 
         # ===== MOSTRA A CENA DE FASE COMPLETA =====
-        if self.chapter_id == 8 and self.phase_number == 1:
+        if self.chapter_id == 8 and self.phase_number == 5:
             # Fase final → agenda o Hall of Fame em 3.5s (não abre a cena)
             self._pending_final_victory_delay = 3.5
             print("[FINAL_VICTORY] Fase final detectada! Hall of Fame em 3.5s.")
