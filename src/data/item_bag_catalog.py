@@ -131,48 +131,48 @@ class ItemBagCatalog:
         clothing_defs = [
             # ---- SKIN ----
             ("skin_1", "PELE 1", "skin", "skin/skin_1.png", 0, "common"),
-            ("skin_2", "PELE 2", "skin", "skin/skin_2.png", 0, "rare"),
+            ("skin_2", "PELE 2", "skin", "skin/skin_2.png", 0, "common"),
 
             # ---- EYES ----
             ("eyes_1", "OLHOS 1", "eyes", "head/Eyes/eye_shape_1.png", 0, "common"),
             ("eyes_2", "OLHOS 2", "eyes", "head/Eyes/eye_shape_2.png", 0, "common"),
-            ("eyes_3", "OLHOS 3", "eyes", "head/Eyes/eye_shape_3.png", 0, "uncommon"),
-            ("eyes_4", "OLHOS 4", "eyes", "head/Eyes/eye_shape_4.png", 0, "rare"),
+            ("eyes_3", "OLHOS 3", "eyes", "head/Eyes/eye_shape_3.png", 0, "common"),
+            ("eyes_4", "OLHOS 4", "eyes", "head/Eyes/eye_shape_4.png", 0, "common"),
             ("eyes_5", "OLHOS 5", "eyes", "head/Eyes/eye_shape_5.png", 0, "epic"),
-            ("eyes_6", "OLHOS 6", "eyes", "head/Eyes/eye_shape_6.png", 0, "legendary"),
-            ("eyes_7", "OLHOS 7", "eyes", "head/Eyes/eye_shape_7.png", 0, "legendary"),
+            ("eyes_6", "OLHOS 6", "eyes", "head/Eyes/eye_shape_6.png", 0, "common"),
+            ("eyes_7", "OLHOS 7", "eyes", "head/Eyes/eye_shape_7.png", 0, "uncommon"),
             ("eyes_8", "OLHOS 8", "eyes", "head/Eyes/eye_shape_8.png", 0, "legendary"),
 
             # ---- HAIR ----
             ("hair_1", "CABELO 1", "hair", "hair/hair_1.png", 0, "common"),
-            ("hair_2", "CABELO 2", "hair", "hair/hair_2.png", 0, "uncommon"),
-            ("hair_3", "CABELO 3", "hair", "hair/hair_3.png", 0, "rare"),
+            ("hair_2", "CABELO 2", "hair", "hair/hair_2.png", 0, "common"),
+            ("hair_3", "CABELO 3", "hair", "hair/hair_3.png", 0, "common"),
             ("hair_4", "CABELO 4", "hair", "hair/hair_4.png", 0, "rare"),
-            ("hair_5", "CABELO 5", "hair", "hair/hair_5.png", 0, "rare"),
-            ("hair_6", "CABELO 6", "hair", "hair/hair_6.png", 0, "rare"),
-            ("hair_7", "CABELO 7", "hair", "hair/hair_7.png", 0, "rare"),
-            ("hair_8", "CABELO 8", "hair", "hair/hair_8.png", 0, "rare"),
+            ("hair_5", "CABELO 5", "hair", "hair/hair_5.png", 0, "common"),
+            ("hair_6", "CABELO 6", "hair", "hair/hair_6.png", 0, "uncommon"),
+            ("hair_7", "CABELO 7", "hair", "hair/hair_7.png", 0, "uncommon"),
+            ("hair_8", "CABELO 8", "hair", "hair/hair_8.png", 0, "uncommon"),
 
             # ---- TORSO ----
-            ("torso_1", "TOPO 1", "torso", "torso/torso_1.png", 0, "common"),
-            ("torso_2", "TOPO 2", "torso", "torso/torso_2.png", 0, "uncommon"),
-            ("torso_3", "TOPO 3", "torso", "torso/torso_3.png", 0, "uncommon"),
-            ("torso_4", "TOPO 4", "torso", "torso/torso_4.png", 0, "uncommon"),
-            ("torso_5", "TOPO 5", "torso", "torso/torso_5.png", 0, "uncommon"),
+            ("torso_1", "Camisa Aberta", "torso", "torso/torso_1.png", 0, "uncommon"),
+            ("torso_2", "Regata Azul", "torso", "torso/torso_2.png", 0, "common"),
+            ("torso_3", "Jardineira", "torso", "torso/torso_3.png", 0, "rare"),
+            ("torso_4", "Camisa Estampada", "torso", "torso/torso_4.png", 0, "uncommon"),
+            ("torso_5", "Camisa Gentleman", "torso", "torso/torso_5.png", 0, "rare"),
 
             # ---- PANTS ----
-            ("pants_1", "CALCA 1", "pants", "pants/pants_1.png", 0, "common"),
-            ("pants_2", "CALCA 2", "pants", "pants/pants_2.png", 0, "uncommon"),
-            ("pants_3", "CALCA 3", "pants", "pants/pants_3.png", 0, "uncommon"),
-            ("pants_4", "CALCA 4", "pants", "pants/pants_4.png", 0, "uncommon"),
-            ("pants_5", "CALCA 5", "pants", "pants/pants_5.png", 0, "uncommon"),
+            ("pants_1", "Calça com cinto", "pants", "pants/pants_1.png", 0, "common"),
+            ("pants_2", "Short Marrom", "pants", "pants/pants_2.png", 0, "uncommon"),
+            ("pants_3", "Calça Preta", "pants", "pants/pants_3.png", 0, "uncommon"),
+            ("pants_4", "Cueca", "pants", "pants/pants_4.png", 0, "common"),
+            ("pants_5", "Calça Gentleman", "pants", "pants/pants_5.png", 0, "rare"),
 
             # ---- HAT  ----
-            ("hat_1", "CHAPEU 1", "hat", "hat/hat_1.png", 0, "common"),
-            ("hat_2", "CHAPEU 2", "hat", "hat/hat_2.png", 0, "uncommon"),
-            ("hat_3", "CHAPEU 3", "hat", "hat/hat_3.png", 0, "rare"),
-            ("hat_4", "CHAPEU 4", "hat", "hat/hat_4.png", 0, "rare"),
-            ("hat_5", "CHAPEU 5", "hat", "hat/hat_5.png", 0, "rare"),
+            ("hat_1", "Chapéu Verde", "hat", "hat/hat_1.png", 0, "uncommon"),
+            ("hat_2", "Boné Azul", "hat", "hat/hat_2.png", 0, "common"),
+            ("hat_3", "Lacinho Verde", "hat", "hat/hat_3.png", 0, "common"),
+            ("hat_4", "Boné Cyberpunk", "hat", "hat/hat_4.png", 0, "uncommon"),
+            ("hat_5", "Chapéu Gentleman", "hat", "hat/hat_5.png", 0, "rare"),
         ]
 
         for item_id, name, slot, rel_path, price, rarity in clothing_defs:

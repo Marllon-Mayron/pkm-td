@@ -51,6 +51,7 @@ class PhaseSelectScene(StandardScreen):
             "open_incubator":     self._open_incubator,
             "open_profile":       self._open_profile,
             "open_mystery_gift":  self._open_mystery_gift,
+            "open_chests": self._on_open_chests,
         }
 
     # =================================================================
@@ -221,6 +222,16 @@ class PhaseSelectScene(StandardScreen):
         from src.scenes.pokedex_scene.pokedex_scene import PokedexScene
         self.game.pokedex_scene = PokedexScene(self.game)
         self.game.current_scene = self.game.pokedex_scene
+
+    def _on_open_chests(self, *_):
+        try:
+            sound_manager.play_effect(SoundEffect.CLICK, volume=0.5)
+        except Exception:
+            pass
+        from src.scenes.chest_scene.chest_scene import ChestScene
+        self.game.current_scene = ChestScene(
+            self.game, return_scene="phase_select"
+        )
 
     def _open_achievements(self, *_):
         sound_manager.play_effect(SoundEffect.CLICK)

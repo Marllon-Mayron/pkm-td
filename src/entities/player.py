@@ -79,6 +79,7 @@ class Player(Entity):
 
         self.desfossilizadores = []
         self._add_initial_desfossilizador()
+        self._init_chests()
         self.total_playtime = 0.0  # segundos totais de jogo
         self._playtime_accumulator = 0.0  # para acumular dt
 
@@ -100,9 +101,6 @@ class Player(Entity):
                 "hat": None,
             },
         }
-
-        for _item in item_bag_catalog.get_items_by_category("clothing"):
-            self.bag.items.setdefault(_item["id"], 1)
 
         self.save_manager = SaveManager()
 
@@ -515,6 +513,8 @@ class Player(Entity):
         if hasattr(self, '_add_initial_desfossilizador'):
             self._add_initial_desfossilizador()
 
+        self._init_chests()
+
         self.has_chosen_starter = False
         self.total_playtime = 0.0
         self._playtime_accumulator = 0.0
@@ -533,8 +533,6 @@ class Player(Entity):
 
         # Bag: roupas básicas + nada mais
         self.bag.items = {}
-        for _item in item_bag_catalog.get_items_by_category("clothing"):
-            self.bag.items.setdefault(_item["id"], 1)
 
         if hasattr(self.bag, '_update_filtered_items'):
             self.bag._update_filtered_items()
@@ -677,3 +675,74 @@ class Player(Entity):
         self.achievement_manager.increment_counter("incubator_upgrade_count")
         self.achievement_manager.check_and_unlock("first_incubator_upgrade")
         return True
+
+    # ============================================================
+    # BAÚS (3 slots fixos: simple / rare / epic)
+    # ============================================================
+    def _init_chests(self):
+        """Inicializa os 3 baús. Cada um começa PRONTO pra abrir."""
+        from src.data.chest_data import make_chest_slot
+        self.chests = [make_chest_slot(i) for i in range(3)]
+
+    def check_chest_status(self):
+        """Atualiza status de cooldown baseado em tempo real. Chamado no load/enter."""
+        from src.data.chest_data import refresh_slot_status
+        for c in self.chests:
+            refresh_slot_status(c)
+
+    def open_chest(self, slot_idx: int):
+        """
+        Rola as recompensas e marca o baú como 'opened'.
+        Retorna a lista de recompensas (ou [] se inválido).
+        """
+        from src.data.chest_data import roll_chest_rewards, CHEST_ORDER
+        if slot_idx < 0 or slot_idx >= len(self.chests):
+            return []
+
+        c = self.chests[slot_idx]
+        self.check_chest_status()
+        if c["status"] != "ready":
+            return []
+
+        chest_type = CHEST_ORDER[slot_idx]
+        rewards = roll_chest_rewards(chest_type, player=self)  # ← player=self!
+
+        c["status"] = "opened"
+        c["rewards"] = rewards
+        return rewards
+
+    def collect_chest(self, slot_idx: int):
+        """
+        Aplica as recompensas no bag, zera o slot e inicia o cooldown.
+        Salva o jogo automaticamente no final.
+        Retorna a lista de recompensas aplicadas.
+        """
+        import time
+        if slot_idx < 0 or slot_idx >= len(self.chests):
+            return []
+
+        c = self.chests[slot_idx]
+        if c["status"] != "opened":
+            return []
+
+        rewards = list(c.get("rewards", []))
+        for r in rewards:
+            iid = r["item_id"]
+            qty = int(r.get("qty", 1))
+            self.bag.items[iid] = self.bag.items.get(iid, 0) + qty
+
+        if hasattr(self.bag, "_update_filtered_items"):
+            self.bag._update_filtered_items()
+
+        c["status"] = "cooldown"
+        c["start_time"] = time.time()
+        c["rewards"] = []
+
+        # ===== AUTO-SAVE =====
+        try:
+            self.save_game()
+            print(f"[CHEST] Auto-save após coletar baú {slot_idx}")
+        except Exception as e:
+            print(f"[CHEST] Aviso: auto-save falhou: {e}")
+
+        return rewards

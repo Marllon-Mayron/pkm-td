@@ -22,7 +22,6 @@ from src.scenes.base_scene import BaseScene
 from src.config.paths import SPRITES_PATH
 from src.managers.sounds.sound_manager import sound_manager, SoundEffect
 from .rename_dialog import RenameDialog
-from .relearn_dialog import RelearnDialog
 
 
 # =========================================================================
@@ -497,10 +496,18 @@ class NpcHallScene(BaseScene):
 
     def _open_dialog(self, action):
         sound_manager.play_effect(SoundEffect.CLICK, volume=0.3)
+
         if action == "rename":
             self.active_dialog = RenameDialog(self.game, RENAME_COST)
+
         elif action == "relearn":
-            self.active_dialog = RelearnDialog(self.game, RELEARN_COST)
+            from src.scenes.npc_hall_scene.relearn_scene import RelearnScene
+            self.game.current_scene = RelearnScene(
+                self.game,
+                RELEARN_COST,
+                return_scene=self,
+            )
+
         elif action == "trainer_battle":
             from src.scenes.arena_scene.trainer_select_scene import TrainerSelectScene
             self.game.current_scene = TrainerSelectScene(self.game)

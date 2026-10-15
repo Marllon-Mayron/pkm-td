@@ -4,6 +4,7 @@ import json
 import uuid
 import os
 import pickle
+import time
 from datetime import datetime
 from typing import Dict
 
@@ -76,6 +77,7 @@ class SaveManager:
                     "unlocked_data": {}
                 },
                 "desfossilizadores": [],
+                "chests": [],
                 "total_playtime": 0,
                 "has_chosen_starter": False,
                 "profile_customization": {
@@ -469,6 +471,25 @@ class SaveManager:
                 "favorite_pokemon_id": None,
             }
         ))
+
+        # ===== CHESTS =====
+        player_data["chests"] = [
+            {
+                "id": int(c.get("id", i)),
+                "status": str(c.get("status", "ready")),
+                "start_time": float(c.get("start_time", time.time())),
+                "duration": float(c.get("duration", 0.0)),
+                "rewards": [
+                    {
+                        "item_id": str(r.get("item_id", "")),
+                        "qty": int(r.get("qty", 1)),
+                        "is_clothing": bool(r.get("is_clothing", False)),
+                    }
+                    for r in c.get("rewards", [])
+                ],
+            }
+            for i, c in enumerate(getattr(player, "chests", []))
+        ]
 
         # ===== PC BOX - normaliza dicionarios (idempotente) =====
         from datetime import datetime
@@ -864,6 +885,22 @@ class SaveManager:
                     "favorite_pokemon_id": None,
                 }
             ))
+
+            # ===== CHESTS =====
+            chests_data = player_data.get("chests", [])
+            if chests_data:
+                player.chests = chests_data
+                # Garante que tem 3 slots
+                while len(player.chests) < 3:
+                    from src.data.chest_data import make_chest_slot
+                    player.chests.append(make_chest_slot(len(player.chests)))
+            else:
+                if hasattr(player, "_init_chests"):
+                    player._init_chests()
+
+            # Atualiza status (cooldowns que já passaram viram "ready")
+            if hasattr(player, "check_chest_status"):
+                player.check_chest_status()
 
             print(f"[SAVE] Jogo carregado de {filepath}")
             print(f"[SAVE] Box: {len(player.pc_box)} Pokemon | Time: {len(player.team)} Pokemon")
@@ -1440,9 +1477,14 @@ class SaveManager:
             # --- 3) Player: current_region ---
             migrated.setdefault("player", {}).setdefault("current_region", DEFAULT_REGION_ID)
 
+            # ===== MIGRAÇÃO: CHESTS =====
+            if "chests" not in migrated.get("player", {}):
+                migrated["player"]["chests"] = []
+
             migrated["meta"]["version"] = "0.2.0"
             version = "0.2.0"
             print("[MIGRATE] Migração 0.2.0 concluída")
+
 
         print(f"[MIGRATE] Migracao concluida! Versao final: {migrated['meta']['version']}")
         return migrated
