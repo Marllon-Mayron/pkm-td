@@ -65,3 +65,64 @@ SCENES_EDITOR_PATH_STR  = str(SCENES_EDITOR_PATH)
 def ensure_path(path):
     """Converte string para Path se necessário"""
     return Path(path) if isinstance(path, str) else path
+
+
+def resolve_asset_path(raw_path):
+    """
+    Resolve caminhos de assets de forma compatível com Windows, Linux e Android.
+
+    Aceita:
+      - Caminhos absolutos antigos do Windows;
+      - Caminhos relativos como res/AllTiles/Autotile/arquivo.png;
+      - Caminhos relativos como AllTiles/Autotile/arquivo.png.
+    """
+    if not raw_path:
+        return None
+
+    raw = str(raw_path).strip().replace("\\", "/")
+    lower = raw.lower()
+    candidates = []
+
+    # Mantém o caminho absoluto original quando ele existe.
+    original = Path(raw)
+    if original.is_absolute():
+        candidates.append(original)
+
+    # Recupera a parte relativa a partir da pasta "res".
+    # Ex.: C:/Users/.../pkm-td/res/AllTiles/Autotile/x.png
+    # vira: res/AllTiles/Autotile/x.png
+    marker = "/res/"
+    index = lower.rfind(marker)
+
+    if index >= 0:
+        relative = raw[index + 1:]
+        candidates.append(PROJECT_ROOT / relative)
+
+    elif lower.startswith("res/"):
+        candidates.append(PROJECT_ROOT / raw)
+
+    elif lower.startswith("alltiles/"):
+        candidates.append(RES_PATH / raw)
+
+    else:
+        candidates.append(PROJECT_ROOT / raw)
+
+    # Remove candidatos duplicados e prioriza arquivos existentes.
+    unique_candidates = []
+    seen = set()
+
+    for candidate in candidates:
+        key = str(candidate)
+        if key not in seen:
+            seen.add(key)
+            unique_candidates.append(candidate)
+
+    for candidate in unique_candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+
+    # Retorna um caminho útil para o diagnóstico, mesmo se não existir.
+    if unique_candidates:
+        return unique_candidates[0]
+
+    return None

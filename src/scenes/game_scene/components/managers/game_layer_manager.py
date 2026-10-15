@@ -20,7 +20,7 @@ IMPORTANTE — arquitetura de renderização:
 import pygame
 import os
 from src.core.render_context import render_context
-
+from src.config.paths import resolve_asset_path
 
 class GameLayer:
     def __init__(self, name, layer_type, width, height, tile_size=16):
@@ -524,34 +524,62 @@ class GameLayerManager:
     def _find_tileset_path(self, tileset_path, base_path, is_autotile=False):
         if not tileset_path:
             return None
-        if os.path.isabs(tileset_path) and os.path.exists(tileset_path):
-            return tileset_path
 
-        basename = os.path.basename(tileset_path)
+        # Normaliza caminhos Windows para funcionar também no Android/Linux.
+        normalized_path = str(tileset_path).replace("\\", "/")
+
+        # Primeiro tenta resolver o caminho com o helper do paths.py.
+        try:
+            resolved = resolve_asset_path(normalized_path)
+
+            if resolved and os.path.isfile(str(resolved)):
+                return str(resolved)
+        except (OSError, TypeError, ValueError):
+            pass
+
+        # O os.path.basename no Linux não reconhece barras invertidas.
+        basename = os.path.basename(normalized_path)
+
         possible = []
 
+        # Caminho relativo à pasta-base do mapa.
         if base_path:
-            clean = tileset_path
-            if clean.startswith('pkm-td/'):
-                clean = clean[len('pkm-td/'):]
-            if clean.startswith('pkm-td\\'):
-                clean = clean[len('pkm-td\\'):]
+            clean = normalized_path
+
+            if clean.startswith("pkm-td/"):
+                clean = clean[len("pkm-td/"):]
+
             possible.append(os.path.join(base_path, clean))
 
+        # Locais específicos dos autotiles.
         if is_autotile:
-            possible.append(os.path.join("res", "AllTiles", "Autotile", basename))
-            if base_path:
-                possible.append(os.path.join(base_path, "res", "AllTiles", "Autotile", basename))
+            possible.append(
+                os.path.join("res", "AllTiles", "Autotile", basename)
+            )
 
+            if base_path:
+                possible.append(
+                    os.path.join(
+                        base_path, "res", "AllTiles", "Autotile", basename
+                    )
+                )
+
+        # Locais alternativos para tilesets convencionais.
         possible.append(os.path.join("res", "AllTiles", basename))
+
         if base_path:
-            possible.append(os.path.join(base_path, "res", "AllTiles", basename))
+            possible.append(
+                os.path.join(base_path, "res", "AllTiles", basename)
+            )
+
         possible.append(basename)
 
-        for p in possible:
-            n = os.path.normpath(p)
-            if os.path.exists(n):
-                return n
+        for path in possible:
+            normalized = os.path.normpath(path)
+
+            if os.path.isfile(normalized):
+                return normalized
+
         return None
 
     # ==================================================================
