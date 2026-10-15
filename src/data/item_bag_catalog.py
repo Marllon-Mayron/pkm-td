@@ -205,7 +205,7 @@ class ItemBagCatalog:
         items["pokeball"] = {
             "id": "pokeball",
             "name": "POKEBALL",
-            "sprite_path": pokeballs_path / "POKEBALL.png",
+            "sprite_path": pokeballs_path / "pokeball.png",
             "description": "Uma bola para capturar Pokémon selvagens",
             "category": "pokeball",
             "usable_in_battle": True,
